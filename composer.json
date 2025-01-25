@@ -46,6 +46,12 @@
         "mockery/mockery": "^1.6"
         
     },
+    "scripts": {
+        "version:major": "./scripts/version.sh major",
+        "version:minor": "./scripts/version.sh minor",
+        "version:patch": "./scripts/version.sh patch",
+        "setup:hooks": "./scripts/setup-hooks.sh"
+    },
     "extra": {
         "laravel": {
             "providers": [],
