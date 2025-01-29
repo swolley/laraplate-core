@@ -8,7 +8,7 @@ return [
             /*
              * The path where the swagger file is served.
              */
-            'path' => 'docs',
+            'path' => 'swagger',
 
             'title' => env('APP_NAME', 'Laraplate') . ' - Swagger',
 

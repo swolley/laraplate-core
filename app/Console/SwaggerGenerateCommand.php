@@ -80,6 +80,10 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         $doc = (new ModuleDocGenerator($config, $moduleName !== 'App' ? config('modules.namespace') . '\\' . $moduleName : $moduleName, $filter))->generate();
         $doc['tags'] = [$moduleName];
+        // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
+        if (!empty(array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY))) {
+            $doc['tags'][] = 'Api';
+        }
 
         $formattedDoc = (new FormatterManager($doc))
             ->setFormat($this->option('format'))

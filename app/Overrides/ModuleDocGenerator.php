@@ -66,7 +66,7 @@ class ModuleDocGenerator extends Generator
                 
                 foreach ($combination as $param => $value) {
                     $new_uri = str_replace('{' . $param . '}', $value, $new_uri);
-                    unset($new_route->wheres['pippo']);
+                    unset($new_route->wheres[$param]);
                 }
                 
                 $new_route->uri = $new_uri;
@@ -144,7 +144,7 @@ class ModuleDocGenerator extends Generator
         $group = Str::contains($uri, '/app/') ? 'App' : (Str::contains($uri, '/api/') ? 'Api' : 'Others');
         $path_method = &$this->docs['paths'][$this->route->uri()][$this->method];
         $path_method['operationId'] = $operationId;
-        $path_method['tags'] = [$group];
+        $path_method['tags'] = array_unique([$group, Str::replace('Modules\\', '', $this->module)]);
 
         if ($this->route->uri() === '/up') {
             $path_method['responses']['200']['content'] = [
