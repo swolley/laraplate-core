@@ -121,7 +121,7 @@ class CrudController extends Controller
         $filters = $this->isParsableRequest($request) ? $request->parsed() : $request->validated();
 
         try {
-            return $operation($response_builder, $filters);
+            return $operation($response_builder, $filters)->getResponse();
         } catch (QueryException $ex) {
             return $response_builder
                 ->setData($ex)
@@ -130,27 +130,33 @@ class CrudController extends Controller
         } catch (LockedModelException $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_LOCKED)->getResponse();
+                ->setStatus(Response::HTTP_LOCKED)
+                ->getResponse();
         } catch (UnexpectedValueException | BadMethodCallException $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_BAD_REQUEST)->getResponse();
+                ->setStatus(Response::HTTP_BAD_REQUEST)
+                ->getResponse();
         } catch (\LogicException | AlreadyLockedException | CannotUnlockException $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_NOT_MODIFIED)->getResponse();
+                ->setStatus(Response::HTTP_NOT_MODIFIED)
+                ->getResponse();
         } catch (ModelNotFoundException $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_NO_CONTENT)->getResponse();
+                ->setStatus(Response::HTTP_NO_CONTENT)
+                ->getResponse();
         } catch (UnauthorizedException $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_UNAUTHORIZED)->getResponse();
+                ->setStatus(Response::HTTP_UNAUTHORIZED)
+                ->getResponse();
         } catch (Throwable $ex) {
             return $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR)->getResponse();
+                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR)
+                ->getResponse();
         }
     }
 

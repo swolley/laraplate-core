@@ -59,6 +59,7 @@ class CreateUserCommand extends Command
 
                     foreach ($fillables as $attribute) {
                         if ($attribute !== 'password') {
+                            $suggestion = $attribute === 'email' ? "@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com' : '';
                             $options = null;
                             if (isset($validations[$attribute])) {
                                 if (is_string($validations[$attribute]) && preg_match('/in:([^|]*)/', $validations[$attribute], $matches)) {
@@ -74,7 +75,7 @@ class CreateUserCommand extends Command
                             if ($options !== null) {
                                 $answer = search(ucfirst($attribute), fn($value) => array_filter($options, fn($o) => str_starts_with($o, $value)));
                             } else {
-                                $answer = text(ucfirst($attribute), required: true, validate: fn(string $value) => $this->validationCallback($attribute, $value, $validations));
+                                $answer = text(ucfirst($attribute), $suggestion, required: true, validate: fn(string $value) => $this->validationCallback($attribute, $value, $validations));
                             }
                         } else {
                             $answer = password(ucfirst($attribute), 'Type a password or let blank to randomly generate it', false, fn(string $value) => $value === '' ? null : $this->validationCallback($attribute, $value, $validations));

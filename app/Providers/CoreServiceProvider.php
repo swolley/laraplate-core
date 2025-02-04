@@ -54,7 +54,6 @@ class CoreServiceProvider extends ServiceProvider
         $this->registerCommands();
         $this->registerCommandSchedules();
         $this->registerTranslations();
-        $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
         $this->registerAuths();
@@ -63,7 +62,7 @@ class CoreServiceProvider extends ServiceProvider
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
         $is_production = $app->isProduction();
-
+        
         if ($is_production && config('core.force_https')) {
             URL::forceScheme('https');
         }
@@ -77,14 +76,16 @@ class CoreServiceProvider extends ServiceProvider
                 ->numbers()
                 ->symbols()
                 ->uncompromised();
-        });
-    }
-
-    /**
+            });
+        }
+        
+        /**
      * Register the service provider.
      */
     public function register(): void
     {
+        $this->registerConfig();
+        
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
 
