@@ -13,6 +13,7 @@ use PHPUnit\Framework\Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +26,7 @@ use Modules\Core\Grids\Casts\GridAction;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Grids\Definitions\Entity;
 use Modules\Core\Grids\Hooks\HasReadHooks;
+use Illuminate\Support\Facades\Concurrency;
 use Modules\Core\Grids\Hooks\HasWriteHooks;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Grids\Requests\GridRequest;
@@ -549,24 +551,24 @@ class Grid extends Entity
             return $this->processLayouts($responseBuilder);
         }
 
-        // $promises = [];
+        $processes = [];
 
         // data
         if (in_array($action, [GridAction::SELECT, GridAction::DATA])) {
-            $this->processData($responseBuilder);
+            $processes[] = fn () => $this->processData($responseBuilder);
         }
 
         // options
         if ($action === GridAction::SELECT || $action === GridAction::OPTIONS) {
-            $this->processOptions($responseBuilder);
+            $processes[] = fn () => $this->processOptions($responseBuilder);
         }
 
         // funnels
         if ($action === GridAction::SELECT || $action === GridAction::FUNNELS) {
-            $this->processFunnels($responseBuilder);
+            $processes[] = fn () => $this->processFunnels($responseBuilder);
         }
 
-        // $promises->await();
+        Concurrency::driver(App::runningInConsole() ? 'fork' : 'process')->run($processes);
 
         return $responseBuilder;
     }
