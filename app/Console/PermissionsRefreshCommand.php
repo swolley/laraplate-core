@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
 use Approval\Traits\RequiresApproval;
@@ -30,7 +30,7 @@ class PermissionsRefreshCommand extends Command
     /**
      * @var string[]
      */
-    private array $models_blacklist = [
+    private const MODELS_BLACKLIST = [
         'App\\Models\\Version',
         'App\\Models\\Modification',
         'Modules\\Core\\Models\\DynamicEntity',
@@ -203,7 +203,7 @@ class PermissionsRefreshCommand extends Command
 
     private function checkIfBlacklisted(string $model): bool
     {
-        foreach ($this->models_blacklist as $blacklisted) {
+        foreach (self::MODELS_BLACKLIST as $blacklisted) {
             if ($model === $blacklisted || is_subclass_of($model, $blacklisted)) {
                 return true;
             }

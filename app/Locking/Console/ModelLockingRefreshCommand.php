@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Console;
 
-use Illuminate\Console\Command;
-
+use Modules\Core\Overrides\Command;
 use function Laravel\Prompts\confirm;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;

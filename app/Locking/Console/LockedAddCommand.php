@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Locking\Console;
 
 use Illuminate\Support\Str;
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\App;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;

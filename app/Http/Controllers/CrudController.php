@@ -17,11 +17,9 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Cache\Searchable;
 use Modules\Core\Casts\WhereClause;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Auth;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\FiltersGroup;
 use Approval\Traits\RequiresApproval;
-use Illuminate\Support\Facades\Cache;
 use Modules\Core\Models\Modification;
 use Modules\Core\Casts\FilterOperator;
 use Illuminate\Database\Eloquent\Model;
@@ -281,7 +279,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($data)
                     ->setCachedAt(Carbon::now());
-            });
+            }, cache: $this->cache);
         });
     }
 
@@ -307,7 +305,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            });
+            }, cache: $this->cache);
         });
     }
 
@@ -550,7 +548,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            });
+            }, cache: $this->cache);
         });
     }
 
@@ -588,7 +586,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            });
+            }, cache: $this->cache);
         });
     }
 
@@ -792,7 +790,7 @@ class CrudController extends Controller
             $key_value = is_string($key) ? $filters->$key : array_map(fn($k) => $filters->$k, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
             /** @var User $user */
-            $user = Auth::user();
+            $user = $this->auth->user();
             if ($filters['modification']) {
                 $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $filters->primaryKey])->findOrFail($filters['modification']);
                 if ($operation === 'approve') {
@@ -941,7 +939,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, CrudRequestData $filters): Response {
             $model = $filters->model;
             $table = $model->getTable();
-            Cache::tags([config('app.name'), $table])->flush();
+            CacheManager::clearByEntity($model, $this->cache);
 
             return $responseBuilder
                 ->setData("$table cached cleared")

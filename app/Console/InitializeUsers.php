@@ -6,7 +6,7 @@ namespace Modules\Core\Console;
 
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use function Laravel\Prompts\text;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;

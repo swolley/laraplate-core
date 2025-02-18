@@ -6,18 +6,23 @@ namespace Modules\Core\Http\Controllers;
 
 use ArrayAccess;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 use UnexpectedValueException;
 use Illuminate\Contracts\View\View;
 use Nwidart\Modules\Facades\Module;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Request as RequestFacade;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 class DocsController extends OpenApiJsonController
 {
-    public function mergeDocs(string $version = 'v1')
+    public function __construct(
+        protected \Illuminate\Cache\Repository $cache,
+    ) {}
+
+    public function mergeDocs(Request $request, string $version = 'v1')
     {
-        return response()->json($this->getJson($version));
+        return $this->cache->tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), function () use ($version) {
+            return response()->json($this->getJson($version));
+        });
     }
 
     public function welcome(): View
@@ -88,37 +93,32 @@ class DocsController extends OpenApiJsonController
      */
     protected function getJson(string $version): array
     {
-        /** @var array $main_json */
-        $main_json = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName() . $version, config('cache.duration'), function () use ($version) {
-            $assets = resource_path('swagger') . DIRECTORY_SEPARATOR;
-            $files = glob($assets . '*-swagger.json');
-            $modules = modules(true, false, true);
+        $assets = resource_path('swagger') . DIRECTORY_SEPARATOR;
+        $files = glob($assets . '*-swagger.json');
+        $modules = modules(true, false, true);
 
-            $additionalPaths = [];
-            $main_json = [];
+        $additionalPaths = [];
+        $main_json = [];
 
-            foreach ($files as $file) {
-                $short_name = str_replace($assets, '', $file);
+        foreach ($files as $file) {
+            $short_name = str_replace($assets, '', $file);
 
-                /** @var array{paths: mixed,...} $json */
-                $json = json_decode(file_get_contents($file), true);
-                $json['paths'] = array_filter($json['paths'], function ($k) use ($version) {
-                    return Str::contains($k, $version) || !Str::contains($k, '/api/');
-                }, ARRAY_FILTER_USE_KEY);
+            /** @var array{paths: mixed,...} $json */
+            $json = json_decode(file_get_contents($file), true);
+            $json['paths'] = array_filter($json['paths'], function ($k) use ($version) {
+                return Str::contains($k, $version) || !Str::contains($k, '/api/');
+            }, ARRAY_FILTER_USE_KEY);
 
-                if (Str::startsWith($short_name, 'App')) {
-                    $main_json = $json;
-                } elseif (in_array(str_replace([$assets, '-swagger.json'], '', $file), $modules, true)) {
-                    $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn(string $k) => Str::contains($k, $version) || !Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
-                }
+            if (Str::startsWith($short_name, 'App')) {
+                $main_json = $json;
+            } elseif (in_array(str_replace([$assets, '-swagger.json'], '', $file), $modules, true)) {
+                $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn(string $k) => Str::contains($k, $version) || !Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
             }
+        }
 
-            if (!empty($additionalPaths)) {
-                $main_json['paths'] = array_merge($main_json['paths'], $additionalPaths);
-            }
-
-            return $main_json;
-        });
+        if (!empty($additionalPaths)) {
+            $main_json['paths'] = array_merge($main_json['paths'], $additionalPaths);
+        }
 
         return $main_json;
     }

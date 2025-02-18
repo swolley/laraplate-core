@@ -21,9 +21,11 @@ trait HasCache
     protected static function bootHasCache(): void
     {
         static::saved(function (Model $model): void {
-            if (Cache::supportsTags()) {
-                Cache::tags([$model->getTable])->flush();
-            }
+            $model->invalidateCache();
+        });
+
+        static::deleted(function (Model $model): void {
+            $model->invalidateCache();
         });
     }
 
@@ -35,5 +37,14 @@ trait HasCache
     public function usesCache(): bool
     {
         return true;
+    }
+
+    public function invalidateCache(): void
+    {
+        if (Cache::supportsTags()) {
+            Cache::tags([$this->getTable()])->flush();
+        } else {
+            Cache::forget($this->getCacheKey());
+        }
     }
 }

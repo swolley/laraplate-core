@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Carbon\Carbon;
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use function Laravel\Prompts\text;
@@ -25,83 +25,81 @@ class HandleLicensesCommand extends Command
     public function handle()
     {
         try {
-            $number = 0;
-            $valid_to = null;
+            return DB::transaction(function () {
+                $number = 0;
+                $valid_to = null;
 
-            $licenses_groups = License::query()->groupBy('valid_to')
-                ->select(DB::raw("valid_to"), DB::raw('count(*) as count'))
-                ->get();
-            $licenses_count = (int) $licenses_groups->reduce(fn(int $total, object $current) => $total + $current->count, 0);
+                $licenses_groups = License::query()->groupBy('valid_to')
+                    ->select(DB::raw("valid_to"), DB::raw('count(*) as count'))
+                    ->get();
+                $licenses_count = (int) $licenses_groups->reduce(fn(int $total, object $current) => $total + $current->count, 0);
 
-            if ($licenses_groups->isEmpty()) {
-                $this->output->info('No licenses found');
-            } else {
-                $this->output->info('Current licenses status');
-                table(
-                    ['Status', 'Expiration', 'Licenses Qt.'],
-                    $licenses_groups->map(fn($data) => [
-                        $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : (!$data->valid_to ? 'perpetual' : 'expired'),
-                        $data->valid_to,
-                        $data->count,
-                    ]),
-                );
-            }
+                if ($licenses_groups->isEmpty()) {
+                    $this->output->info('No licenses found');
+                } else {
+                    $this->output->info('Current licenses status');
+                    table(
+                        ['Status', 'Expiration', 'Licenses Qt.'],
+                        $licenses_groups->map(fn($data) => [
+                            $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : (!$data->valid_to ? 'perpetual' : 'expired'),
+                            $data->valid_to,
+                            $data->count,
+                        ]),
+                    );
+                }
 
-            $choices = ['list', 'add', 'close'];
-            if ($licenses_groups->isNotEmpty()) {
-                $choices[] = 'renew';
-            }
-            $action = select('Choose an action', $choices);
+                $choices = ['list', 'add', 'close'];
+                if ($licenses_groups->isNotEmpty()) {
+                    $choices[] = 'renew';
+                }
+                $action = select('Choose an action', $choices);
 
-            if ($action !== 'list') {
-                $number = (int) text(
-                    "Number of licenses to $action",
-                    validate: fn($value) => $this->validationCallback('number', $value, ['number' => 'numeric|min:0'])
-                );
+                if ($action !== 'list') {
+                    $number = (int) text(
+                        "Number of licenses to $action",
+                        validate: fn($value) => $this->validationCallback('number', $value, ['number' => 'numeric|min:0'])
+                    );
 
-                if ($number === 0) return static::SUCCESS;
+                    if ($number === 0) return static::SUCCESS;
 
-                $validations = (new License)->getOperationRules('create');
+                    $validations = (new License)->getOperationRules('create');
 
-                $valid_to = text(
-                    "Specify an expiring date, otherwise it'll be " . ($action === 'close' ? 'today' : 'perpetual'),
-                    'yyyy-mm-dd',
-                    validate: fn($value) => $this->validationCallback('valid_to', $value, $validations)
-                );
-                $valid_to = $valid_to ? new Carbon($valid_to) : null;
-            }
+                    $valid_to = text(
+                        "Specify an expiring date, otherwise it'll be " . ($action === 'close' ? 'today' : 'perpetual'),
+                        'yyyy-mm-dd',
+                        validate: fn($value) => $this->validationCallback('valid_to', $value, $validations)
+                    );
+                    $valid_to = $valid_to ? new Carbon($valid_to) : null;
+                }
 
 
-            DB::beginTransaction();
+                switch ($action) {
+                    case 'renew':
+                        $this->renewLicenses($number, $licenses_count, $valid_to);
+                        break;
+                    case 'add':
+                        $this->addLicenses($number, $valid_to);
+                        break;
+                    case 'close':
+                        $this->closeLicenses($number, $valid_to);
+                        break;
+                    case 'list':
+                        $this->listLicenses();
+                        break;
+                }
 
-            switch ($action) {
-                case 'renew':
-                    $this->renewLicenses($number, $licenses_count, $valid_to);
-                    break;
-                case 'add':
-                    $this->addLicenses($number, $valid_to);
-                    break;
-                case 'close':
-                    $this->closeLicenses($number, $valid_to);
-                    break;
-                case 'list':
-                    $this->listLicenses();
-                    break;
-            }
+                $user_class = user_class();
+                if (!$user_class instanceof \Modules\Core\Models\User) {
+                    $this->output->info('User class is not Modules\Core\Models\User');
+                    DB::commit();
+                    return static::SUCCESS;
+                }
+                $user_class::query()->whereNotNull('license_id')->update([
+                    'license_id' => null
+                ]);
 
-            $user_class = user_class();
-            if (!$user_class instanceof \Modules\Core\Models\User) {
-                $this->output->info('User class is not Modules\Core\Models\User');
-                DB::commit();
                 return static::SUCCESS;
-            }
-            $user_class::query()->whereNotNull('license_id')->update([
-                'license_id' => null
-            ]);
-
-            DB::commit();
-
-            return static::SUCCESS;
+            });
         } catch (\Throwable $ex) {
             $this->output->error($ex->getMessage());
             return static::FAILURE;

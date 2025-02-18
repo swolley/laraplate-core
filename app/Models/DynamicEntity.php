@@ -57,15 +57,12 @@ final class DynamicEntity extends Model
 
         if (config('crud.dynamic_entities', false)) {
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
-            if (Cache::has($cache_key)) {
-                /** @var string $cached */
-                $cached = Cache::get($cache_key);
-                return unserialize($cached);
-            }
-            $model = new static($attributes);
-            $model->inspect($tableName, $connection, $request);
-            Cache::set($cache_key, serialize($model), config('cache.duration'));
-            return $model;
+            
+            return Cache::remember($cache_key, config('cache.duration'), function() use ($tableName, $connection, $attributes, $request) {
+                $model = new static($attributes);
+                $model->inspect($tableName, $connection, $request);
+                return $model;
+            });
         }
 
         throw new UnexpectedValueException('Dynamic tables mapping is not enabled');

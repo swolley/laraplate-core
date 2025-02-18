@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\ResponseBuilder;
+use Illuminate\Cache\Repository;
 
 class CacheManager
 {
@@ -31,7 +32,7 @@ class CacheManager
     /**
      * Try to extract from cache or by specified callback using request info
      */
-    public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, int $duration = null): mixed
+    public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, int $duration = null, ?Repository $cache = null): mixed
     {
         $tags = [config('APP_NAME')];
         if ($entity) {
@@ -53,7 +54,7 @@ class CacheManager
             array_push($tags, ...$user);
         }
         $key = static::getKeyFromRequest($request);
-        $cache = Cache::tags($tags);
+        $cache = $cache ? $cache->tags($tags) : Cache::tags($tags);
         $duration = $duration !== null ? $duration : config('cache.duration');
 
         if ($cache->has($key)) {
@@ -73,7 +74,7 @@ class CacheManager
     /**
      * clear cache by specified entity
      */
-    public static function clearByEntity(Model|string|array $entity): void
+    public static function clearByEntity(Model|string|array $entity, ?Repository $cache = null): void
     {
         $models = Arr::wrap($entity);
 
@@ -83,7 +84,9 @@ class CacheManager
             }
 
             if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                Cache::tags([config('APP_NAME'), self::getTableName($model)])->flush();
+                ($cache
+                    ? $cache->tags([config('APP_NAME'), self::getTableName($model)])
+                    : Cache::tags([config('APP_NAME'), self::getTableName($model)]))->flush();
             }
         }
     }
@@ -91,7 +94,7 @@ class CacheManager
     /**
      * clear cache by request extracted info
      */
-    public static function clearByRequest(Request $request, Model|string|array|null $entity = null): void
+    public static function clearByRequest(Request $request, Model|string|array|null $entity = null, ?Repository $cache = null): void
     {
         $key = static::getKeyFromRequest($request);
         if ($entity) {
@@ -103,18 +106,22 @@ class CacheManager
                 }
 
                 if (!method_exists($model, 'usesCache') || $model->usesCache()) {
-                    Cache::tags([config('APP_NAME'), self::getTableName($model)])->forget($key);
+                    ($cache
+                        ? $cache->tags([config('APP_NAME'), self::getTableName($model)])
+                        : Cache::tags([config('APP_NAME'), self::getTableName($model)]))->forget($key);
                 }
             }
         } else {
-            Cache::tags([config('APP_NAME')])->forget($key);
+            ($cache
+                ? $cache->tags([config('APP_NAME')])
+                : Cache::tags([config('APP_NAME')]))->forget($key);
         }
     }
 
     /**
      * clear cache elements by user and only by entity if specified
      */
-    public static function clearByUser(User $user, Model|string|array|null $entity = null): void
+    public static function clearByUser(User $user, Model|string|array|null $entity = null, ?Repository $cache = null): void
     {
         $user_key = 'U' . $user->id;
         if ($entity) {
@@ -126,18 +133,22 @@ class CacheManager
                 }
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                    Cache::tags([config('APP_NAME'), self::getTableName($model), $user_key])->flush();
+                    ($cache
+                        ? $cache->tags([config('APP_NAME'), self::getTableName($model), $user_key])
+                        : Cache::tags([config('APP_NAME'), self::getTableName($model), $user_key]))->flush();
                 }
             }
         } else {
-            Cache::tags([config('APP_NAME'), $user_key])->flush();
+            ($cache
+                ? $cache->tags([config('APP_NAME'), $user_key])
+                : Cache::tags([config('APP_NAME'), $user_key]))->flush();
         }
     }
 
     /**
      * clear cache elements by user group and only by entity if specified
      */
-    public static function clearByGroup(Role $role, Model|string|array|null $entity = null): void
+    public static function clearByGroup(Role $role, Model|string|array|null $entity = null, ?Repository $cache = null): void
     {
         $role_key = 'R' . $role->id;
         if ($entity) {
@@ -149,11 +160,15 @@ class CacheManager
                 }
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                    Cache::tags([config('APP_NAME'), self::getTableName($model), $role_key])->flush();
+                    ($cache
+                        ? $cache->tags([config('APP_NAME'), self::getTableName($model), $role_key])
+                        : Cache::tags([config('APP_NAME'), self::getTableName($model), $role_key]))->flush();
                 }
             }
         } else {
-            Cache::tags([config('APP_NAME'), $role_key])->flush();
+            ($cache
+                ? $cache->tags([config('APP_NAME'), $role_key])
+                : Cache::tags([config('APP_NAME'), $role_key]))->flush();
         }
     }
 

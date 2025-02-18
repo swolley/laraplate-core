@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Illuminate\Support\Str;
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'lang:check-translations')]
