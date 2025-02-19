@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Cache\CacheManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Events\MigrationsEnded;
@@ -36,7 +36,7 @@ class CommandListenerProvider extends ServiceProvider
     {
         Event::listen(MigrationsEnded::class, function (MigrationsEnded $event) {
             info("Cleaning Inspected entities");
-            Cache::tags(['inspector'])->flush();
+            $this->app->make(CacheManager::class)->tags(['inspector'])->flush();
         });
     }
 }

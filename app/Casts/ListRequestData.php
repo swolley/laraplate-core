@@ -130,6 +130,7 @@ class ListRequestData extends SelectRequestData
             foreach ($filters as &$filter) {
                 $this->conformFiltersToQueryBuilderFormat($filter, $level + 1);
             }
+            unset($filter);
         } elseif (Arr::has($filters, 'filters')) {
             $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower($filters['operator'])) : WhereClause::AND;
             $this->conformFiltersToQueryBuilderFormat($filters['filters'], $level + 1);
@@ -158,7 +159,7 @@ class ListRequestData extends SelectRequestData
                 $value = new Sort($value['property'], $value['direction'] ?? SortDirection::ASC);
             }
         }
-
+        unset($value);
         return $sorts;
     }
 

@@ -5,23 +5,19 @@ declare(strict_types=1);
 namespace Modules\Core\Database\Seeders;
 
 use Illuminate\Support\Str;
-use Illuminate\Database\Seeder;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Overrides\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Modules\Core\Casts\SettingTypeEnum;
-use Modules\Core\Helpers\HasSeedersUtils;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Database\Eloquent\Collection;
 
 class CoreDatabaseSeeder extends Seeder
 {
-    use HasSeedersUtils;
-
     /**
      * @var Collection<string, Role>
      */
@@ -40,7 +36,6 @@ class CoreDatabaseSeeder extends Seeder
             $this->defaultUsers();
             $this->defaultCrons();
         });
-        $this->command->newLine();
     }
 
     private function defaultPermissions(): void
@@ -64,7 +59,7 @@ class CoreDatabaseSeeder extends Seeder
 
         $this->groups = $role_class::withoutGlobalScopes()->get()->keyBy('name');
 
-        DB::transaction(function () use ($role_class, $permission_class, $role_table, $user_table) {
+        $this->db->transaction(function () use ($role_class, $permission_class, $role_table, $user_table) {
 
             $name = 'superadmin';
             if (!$this->groups->has($name)) {
@@ -146,50 +141,39 @@ class CoreDatabaseSeeder extends Seeder
     {
         $this->logOperation(Setting::class);
 
-        DB::transaction(function () {
-            $name = 'defaultLanguage';
-            if (!Setting::query()->withoutGlobalScopes()->where('name', $name)->exists()) {
-                $this->create(Setting::class, [
-                    'name' => $name,
-                    'value' => config('app.locale'),
-                    'type' => SettingTypeEnum::STRING,
-                    'group_name' => 'base',
-                    'description' => 'Lingua default',
-                ]);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
-            }
+        $default_settings = [
+            [
+                'name' => 'defaultLanguage',
+                'value' => config('app.locale'),
+                'type' => SettingTypeEnum::STRING,
+                'group_name' => 'base',
+                'description' => 'Lingua default',
+            ],
+            [
+                'name' => 'pagination',
+                'value' => 20,
+                'type' => SettingTypeEnum::INTEGER,
+                'group_name' => 'base',
+                'description' => 'Paginazione default chiamate',
+            ],
+            [
+                'name' => 'maxConcurrentSessions',
+                'value' => PHP_INT_MAX,
+                'type' => SettingTypeEnum::INTEGER,
+                'group_name' => 'base',
+                'description' => 'Numero massimo sessioni simultanee',
+            ],
+        ];
 
-            $name = 'pagination';
-            if (!Setting::query()->withoutGlobalScopes()->where('name', $name)->exists()) {
-                $this->create(Setting::class, [
-                    'name' => $name,
-                    'value' => 20,
-                    'type' => SettingTypeEnum::INTEGER,
-                    'group_name' => 'base',
-                    'description' => 'Paginazione default chiamate',
-                ]);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
+        $this->db->transaction(function () use ($default_settings) {
+            foreach ($default_settings as $setting) {
+                if (!Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
+                    $this->create(Setting::class, $setting);
+                    $this->command->line("    - {$setting['name']} <fg=green>created</>");
+                } else {
+                    $this->command->line("    - {$setting['name']} already exists");
+                }
             }
-
-            $name = 'maxConcurrentSessions';
-            if (!Setting::query()->withoutGlobalScopes()->where('name', $name)->exists()) {
-                $this->create(Setting::class, [
-                    'name' => $name,
-                    'value' => PHP_INT_MAX,
-                    'type' => SettingTypeEnum::INTEGER,
-                    'group_name' => 'base',
-                    'description' => 'Numero massimo sessioni simultanee',
-                ]);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
-            }
-
-            // ModuleDatabaseActivator::seedBackendModules();
         });
     }
 
@@ -197,35 +181,33 @@ class CoreDatabaseSeeder extends Seeder
     {
         $this->logOperation(CronJob::class);
 
-        DB::transaction(function () {
-            $name = 'clearUserAssignedLicenses';
-            if (!CronJob::query()->withoutGlobalScopes()->where('name', $name)->exists()) {
-                $this->create(CronJob::class, [
-                    'name' => $name,
-                    'command' => 'auth:clear-licenses',
-                    'parameters' => [],
-                    'schedule' => '@midnight',
-                    'description' => 'Resetta assegnazione licenze login a utenti',
-                    'is_active' => config('core.enable_user_licenses'),
-                ]);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
-            }
+        $default_crons = [
+            [
+                'name' => 'clearUserAssignedLicenses',
+                'command' => 'auth:clear-licenses',
+                'parameters' => [],
+                'schedule' => '@midnight',
+                'description' => 'Resetta assegnazione licenze login a utenti',
+                'is_active' => config('core.enable_user_licenses'),
+            ],
+            [
+                'name' => 'clearResetTokens',
+                'command' => 'auth:clear-resets',
+                'parameters' => [],
+                'schedule' => '*/4 * * * *',
+                'description' => 'Rimuove reset password tokens scaduti',
+                'is_active' => true,
+            ],
+        ];
 
-            $name = 'clearResetTokens';
-            if (!CronJob::query()->withoutGlobalScopes()->where('name', $name)->exists()) {
-                $this->create(CronJob::class, [
-                    'name' => $name,
-                    'command' => 'auth:clear-resets',
-                    'parameters' => [],
-                    'schedule' => '*/4 * * * *',
-                    'description' => 'Rimuove reset password tokens scaduti',
-                    'is_active' => true,
-                ]);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
+        $this->db->transaction(function () use ($default_crons) {
+            foreach ($default_crons as $cron) {
+                if (!CronJob::query()->withoutGlobalScopes()->where('name', $cron['name'])->exists()) {
+                    $this->create(CronJob::class, $cron);
+                    $this->command->line("    - {$cron['name']} <fg=green>created</>");
+                } else {
+                    $this->command->line("    - {$cron['name']} already exists");
+                }
             }
         });
     }

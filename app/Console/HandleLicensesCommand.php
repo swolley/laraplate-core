@@ -9,12 +9,12 @@ use Modules\Core\Overrides\Command;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use function Laravel\Prompts\text;
-use Illuminate\Support\Facades\DB;
 use function Laravel\Prompts\table;
 use Illuminate\Support\Facades\Log;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\confirm;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Database\DatabaseManager;
 
 class HandleLicensesCommand extends Command
 {
@@ -22,15 +22,20 @@ class HandleLicensesCommand extends Command
 
     protected $description = 'Renew, add or delete user licenses. <comment>(⛭ Modules\Core)</comment>';
 
+    public function __construct(DatabaseManager $db)
+    {
+        parent::__construct($db);
+    }
+
     public function handle()
     {
         try {
-            return DB::transaction(function () {
+            return $this->db->transaction(function () {
                 $number = 0;
                 $valid_to = null;
 
                 $licenses_groups = License::query()->groupBy('valid_to')
-                    ->select(DB::raw("valid_to"), DB::raw('count(*) as count'))
+                    ->select($this->db->raw("valid_to"), $this->db->raw('count(*) as count'))
                     ->get();
                 $licenses_count = (int) $licenses_groups->reduce(fn(int $total, object $current) => $total + $current->count, 0);
 
@@ -91,7 +96,7 @@ class HandleLicensesCommand extends Command
                 $user_class = user_class();
                 if (!$user_class instanceof \Modules\Core\Models\User) {
                     $this->output->info('User class is not Modules\Core\Models\User');
-                    DB::commit();
+                    $this->db->commit();
                     return static::SUCCESS;
                 }
                 $user_class::query()->whereNotNull('license_id')->update([

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
 use Approval\Traits\RequiresApproval;
 use Modules\Core\Helpers\HasValidity;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\DatabaseManager;
 
 class PermissionsRefreshCommand extends Command
 {
@@ -38,6 +38,11 @@ class PermissionsRefreshCommand extends Command
         'Modules\\Core\\Models\\ModelEmbedding',
         'Illuminate\\Database\\Eloquent\\Relations\\Pivot',
     ];
+
+    public function __construct(DatabaseManager $db)
+    {
+        parent::__construct($db);
+    }
 
     /**
      * Execute the console command.
@@ -69,7 +74,7 @@ class PermissionsRefreshCommand extends Command
         $permission_class = config('permission.models.permission');
         $parental_class = "Parental\\HasChildren";
 
-        DB::beginTransaction();
+        $this->db->beginTransaction();
 
         foreach ($all_models as $model) {
             $need_bypass = $this->checkIfBlacklisted($model);
@@ -198,7 +203,7 @@ class PermissionsRefreshCommand extends Command
             $this->info('No changes needed');
         }
 
-        DB::commit();
+        $this->db->commit();
     }
 
     private function checkIfBlacklisted(string $model): bool

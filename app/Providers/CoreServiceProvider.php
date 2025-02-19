@@ -27,6 +27,7 @@ use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Cache\CacheManager;
 
 class CoreServiceProvider extends ServiceProvider
 {
@@ -62,7 +63,7 @@ class CoreServiceProvider extends ServiceProvider
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
         $is_production = $app->isProduction();
-        
+
         if ($is_production && config('core.force_https')) {
             URL::forceScheme('https');
         }
@@ -76,16 +77,16 @@ class CoreServiceProvider extends ServiceProvider
                 ->numbers()
                 ->symbols()
                 ->uncompromised();
-            });
-        }
-        
-        /**
+        });
+    }
+
+    /**
      * Register the service provider.
      */
     public function register(): void
     {
         $this->registerConfig();
-        
+
         /** @var \Illuminate\Foundation\Application $app */
         $app = $this->app;
 
@@ -137,11 +138,18 @@ class CoreServiceProvider extends ServiceProvider
             $schedule = $this->app->make(Schedule::class);
             $crons = [];
             $cache_key = (new CronJob())->getTable();
-            if (Cache::has($cache_key)) {
-                $crons = Cache::get($cache_key);
-            } else if (Schema::hasTable($cache_key)) {
-                $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
-                Cache::put($cache_key, $crons);
+            $cache = $this->app->make(CacheManager::class);
+            if ($cache->has($cache_key)) {
+                $crons = $cache->get($cache_key);
+            } else {
+                try {
+                    if (Schema::hasTable($cache_key)) {
+                        $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
+                        $cache->put($cache_key, $crons);
+                    }
+                } catch (\Exception $e) {
+                    report($e);
+                }
             }
 
             foreach ($crons as $cron) {

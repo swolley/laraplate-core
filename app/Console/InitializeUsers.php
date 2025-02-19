@@ -8,15 +8,20 @@ use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
 use function Laravel\Prompts\text;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use function Laravel\Prompts\password;
+use Illuminate\Database\DatabaseManager;
 
 class InitializeUsers extends Command
 {
 	protected $signature = 'auth:initialize-users';
 
 	protected $description = 'Initialize users. <comment>(⛭ Modules\Core)</comment>';
+
+	public function __construct(DatabaseManager $db)
+	{
+		parent::__construct($db);
+	}
 
 	public function handle(): void
 	{
@@ -28,7 +33,7 @@ class InitializeUsers extends Command
 
 		$groups = Role::all()->keyBy('name');
 
-		DB::transaction(function () use ($admin, $root, $anonymous, $user_class, $groups) {
+		$this->db->transaction(function () use ($admin, $root, $anonymous, $user_class, $groups) {
 			if (!$user_class::whereName($root)->exists()) {
 				$email = text("Please specify a $root user email", required: true, validate: fn(string $value) => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
 				$password = password("Please specify a $root user password", required: true);

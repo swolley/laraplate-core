@@ -13,7 +13,6 @@ use UnexpectedValueException;
 use Illuminate\Support\Carbon;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Crud\CrudHelper;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Cache\Searchable;
 use Modules\Core\Casts\WhereClause;
 use Illuminate\Foundation\Auth\User;
@@ -28,6 +27,7 @@ use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Elastic\Elasticsearch\ClientBuilder;
+use Illuminate\Database\DatabaseManager;
 use Modules\Core\Casts\IParsableRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Casts\DetailRequestData;
@@ -58,6 +58,14 @@ use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
 
 class CrudController extends Controller
 {
+    protected DatabaseManager $db;
+
+    public function __construct(DatabaseManager $db)
+    {
+        parent::__construct();
+        $this->db = $db;
+    }
+
     /**
      * checks if model uses recursive relationships trait
      */
@@ -668,7 +676,7 @@ class CrudController extends Controller
                 throw new ModelNotFoundException('No model Found');
             }
             $updated_records = new Collection();
-            DB::transaction(function () use ($found_records, $updated_records, $values) {
+            $this->db->transaction(function () use ($found_records, $updated_records, $values) {
                 foreach ($found_records as $found_record) {
                     /** @psalm-suppress InvalidArgument */
                     if ($found_record->update($values->changes)) {
@@ -707,7 +715,7 @@ class CrudController extends Controller
                 throw new ModelNotFoundException('No model Found');
             }
             $deleted_records = new Collection();
-            DB::transaction(function () use ($found_records, $deleted_records) {
+            $this->db->transaction(function () use ($found_records, $deleted_records) {
                 foreach ($found_records as $found_record) {
                     if ($found_record->forceDelete()) {
                         $deleted_records->add($found_record);
@@ -872,7 +880,7 @@ class CrudController extends Controller
                 throw new AlreadyLockedException($operation === 'lock' ? 'Record already locked' : 'Record isn\'t locked');
             }
             $locked_records = new Collection();
-            DB::transaction(function () use ($found_records, $locked_records) {
+            $this->db->transaction(function () use ($found_records, $locked_records) {
                 foreach ($found_records as $found_record) {
                     /** @psalm-suppress InvalidArgument */
                     if (!$found_record->isLocked() && $found_record->lock()) {

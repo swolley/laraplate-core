@@ -8,7 +8,6 @@ use Throwable;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use function Laravel\Prompts\text;
-use Illuminate\Support\Facades\DB;
 use function Laravel\Prompts\table;
 use Modules\Core\Models\Permission;
 use Modules\Core\Overrides\Command;
@@ -17,6 +16,7 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Hash;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\password;
+use Illuminate\Database\DatabaseManager;
 use function Laravel\Prompts\multiselect;
 use Modules\Core\Helpers\HasCommandUtils;
 
@@ -33,6 +33,11 @@ class CreateUserCommand extends Command
      * The console command description.
      */
     protected $description = 'Create new user <comment>(⛭ Modules\Core)</comment>';
+
+    public function __construct(DatabaseManager $db)
+    {
+        parent::__construct($db);
+    }
 
     /**
      * Execute the console command.
@@ -52,7 +57,7 @@ class CreateUserCommand extends Command
             $created_users = [];
 
             do {
-                DB::transaction(function () use ($user, $fillables, $validations, $all_roles, $all_permissions, &$created_users, &$total_users_created) {
+                $this->db->transaction(function () use ($user, $fillables, $validations, $all_roles, $all_permissions, &$created_users, &$total_users_created) {
                     /** @var User $user */
                     $user = new (user_class());
                     $password = '';
@@ -120,7 +125,7 @@ class CreateUserCommand extends Command
 
             return static::SUCCESS;
         } catch (Throwable $ex) {
-            $this->error($ex->getMEssage());
+            $this->error($ex->getMessage());
 
             return static::FAILURE;
         }

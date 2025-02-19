@@ -445,6 +445,7 @@ class Grid extends Entity
         foreach ($necessary_fields as $name => &$config) {
             $config = Field::create($name, readable: $config['readable'], writable: $config['writable']);
         }
+        unset($config);
         $fields = array_map(fn($generator) => $generator($this->getModel()), array_values($necessary_fields));
         $this->setFields($fields);
     }
@@ -555,17 +556,17 @@ class Grid extends Entity
 
         // data
         if (in_array($action, [GridAction::SELECT, GridAction::DATA])) {
-            $processes[] = fn () => $this->processData($responseBuilder);
+            $processes[] = fn() => $this->processData($responseBuilder);
         }
 
         // options
         if ($action === GridAction::SELECT || $action === GridAction::OPTIONS) {
-            $processes[] = fn () => $this->processOptions($responseBuilder);
+            $processes[] = fn() => $this->processOptions($responseBuilder);
         }
 
         // funnels
         if ($action === GridAction::SELECT || $action === GridAction::FUNNELS) {
-            $processes[] = fn () => $this->processFunnels($responseBuilder);
+            $processes[] = fn() => $this->processFunnels($responseBuilder);
         }
 
         Concurrency::driver(App::runningInConsole() ? 'fork' : 'process')->run($processes);
