@@ -31,16 +31,16 @@ return new class() extends Migration
             $table->unique(['user_id', 'grid_name', 'layout_name']);
         });
 
-        $connection = DB::connection();
-        if ($connection->getDriverName() === 'pgsql') {
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
             $true = 'TRUE';
-        } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb', 'sqlite'])) {
+        } elseif (in_array($driver, ['mysql', 'mariadb', 'sqlite'])) {
             $true = 1;
         } else {
             throw new \Exception('Unsupported database driver');
         }
 
-        if ($connection->getDriverName() !== 'sqlite') {
+        if ($driver !== 'sqlite') {
             DB::statement(
                 "ALTER TABLE {$this->table_name}
                 ADD CONSTRAINT {$this->table_name}_public_CHECK 

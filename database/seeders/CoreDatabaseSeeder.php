@@ -54,52 +54,43 @@ class CoreDatabaseSeeder extends Seeder
         $permission_class = config('permission.models.permission');
         $role_table = (new $role_class)->getTable();
         $user_table = (new $user_class)->getTable();
+
         $this->logOperation($role_class);
 
-
-        $this->groups = $role_class::withoutGlobalScopes()->get()->keyBy('name');
-
-        $this->db->transaction(function () use ($role_class, $permission_class, $role_table, $user_table) {
-
-            $name = 'superadmin';
-            if (!$this->groups->has($name)) {
-                $this->groups->put($name, $this->create($role_class, ['name' => $name, 'locked_at' => now()]));
-            }
-
-            $name = 'admin';
-            if (!$this->groups->has($name)) {
-                $permission = $this->create($role_class, ['name' => $name, 'locked_at' => now()]);
-                $this->groups->put($name, $permission);
-                $authorized_permissions = $permission_class::where(function ($query) use ($user_table, $role_table) {
+        $roles_Data = [
+            [
+                'name' => 'superadmin',
+                'locked_at' => now(),
+            ],
+            [
+                'name' => 'admin',
+                'locked_at' => now(),
+                'permissions' => fn() => $permission_class::where(function ($query) use ($user_table, $role_table) {
                     $query->whereIn('table_name', [$user_table, $role_table])
                         ->orWhere('name', 'like', '%.' . ActionEnum::SELECT->value);
-                })
-                    ->orWhereNot('name', 'like', '%.' . ActionEnum::LOCK->value)
-                    ->get();
-                // @phpstan-ignore-next-line
-                $permission->givePermissionTo($authorized_permissions);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
-            }
+                })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get()
+            ],
+            [
+                'name' => 'guest',
+                'locked_at' => now(),
+                'permissions' => fn() => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
+                    ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
+                    ->get()
+            ],
+        ];
 
-            $name = 'guest';
-            if (!$this->groups->has($name)) {
-                $permission = $this->create($role_class, ['name' => $name, 'locked_at' => now()]);
-                $this->groups->put($name, $permission);
-                $authorized_permissions = $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
-                    ->whereNotIn('table_name', [
-                        'versions',
-                        'user_grid_configs',
-                        'modifications',
-                        'cron_jobs',
-                    ])
-                    ->get();
-                // @phpstan-ignore-next-line
-                $permission->givePermissionTo($authorized_permissions);
-                $this->command->line("    - $name <fg=green>created</>");
-            } else {
-                $this->command->line("    - $name already exists");
+        $this->groups = $role_class::withoutGlobalScopes()->get()->keyBy('name');
+        $existing_roles = $this->groups->keys()->all();
+        $new_roles = array_filter($roles_Data, fn($role) => !in_array($role['name'], $existing_roles));
+
+        $this->db->transaction(function () use ($role_class, $permission_class, $role_table, $user_table, $new_roles) {
+            foreach ($new_roles as $role) {
+                if (!Setting::query()->withoutGlobalScopes()->where('name', $role['name'])->exists()) {
+                    $this->create($role_class, $role);
+                    $this->command->line("    - {$role['name']} <fg=green>created</>");
+                } else {
+                    $this->command->line("    - {$role['name']} already exists");
+                }
             }
         });
     }
@@ -165,8 +156,19 @@ class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $this->db->transaction(function () use ($default_settings) {
-            foreach ($default_settings as $setting) {
+        $existing_settings = Setting::withoutGlobalScopes()
+            ->pluck('name')
+            ->flip()
+            ->all();
+
+        $new_settings = array_filter(
+            $default_settings,
+            fn($setting) =>
+            !isset($existing_settings[$setting['name']])
+        );
+
+        $this->db->transaction(function () use ($new_settings) {
+            foreach ($new_settings as $setting) {
                 if (!Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
                     $this->create(Setting::class, $setting);
                     $this->command->line("    - {$setting['name']} <fg=green>created</>");
@@ -200,8 +202,19 @@ class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $this->db->transaction(function () use ($default_crons) {
-            foreach ($default_crons as $cron) {
+        $existing_crons = CronJob::withoutGlobalScopes()
+            ->pluck('name')
+            ->flip()
+            ->all();
+
+        $new_crons = array_filter(
+            $default_crons,
+            fn($cron) =>
+            !isset($existing_crons[$cron['name']])
+        );
+
+        $this->db->transaction(function () use ($new_crons) {
+            foreach ($new_crons as $cron) {
                 if (!CronJob::query()->withoutGlobalScopes()->where('name', $cron['name'])->exists()) {
                     $this->create(CronJob::class, $cron);
                     $this->command->line("    - {$cron['name']} <fg=green>created</>");

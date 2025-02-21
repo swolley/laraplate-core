@@ -55,9 +55,13 @@ use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
+use Modules\Core\Helpers\HasCrudOperations;
+use Illuminate\Support\Facades\Cache;
 
 class CrudController extends Controller
 {
+    use HasCrudOperations;
+
     protected DatabaseManager $db;
 
     public function __construct(DatabaseManager $db)
@@ -166,91 +170,7 @@ class CrudController extends Controller
         }
     }
 
-    //region DA RENDERE COMUNE
-    /**
-     * removes non fillable request values from model
-     *
-     *
-     * @return string[]
-     *
-     * @psalm-return list<non-empty-string>
-     */
-    private function removeNonFillableProperties(Model $model, array &$values): array
-    {
-        $fillables = $model->getFillable();
-        $discarder_values = [];
-        if (!empty($fillables)) {
-            foreach (array_keys($values) as $property) {
-                if (in_array($property, $fillables)) {
-                    continue;
-                }
-                $discarder_values[] = "Discarder '$property', because is not a fillable property";
-                unset($values[$property]);
-            }
-        }
-
-        return $discarder_values;
-    }
-
-    /**
-     * @param  string[]  $groupBy
-     * @return Collection
-     */
-    private function applyGroupBy(Collection &$data, array $groupBy)
-    {
-        if (empty($groupBy)) {
-            return $data;
-        }
-
-        /** @psalm-suppress InvalidTemplateParam */
-        return $data->groupBy($groupBy);
-    }
-    //endregion
-
     //region READ OPERATIONS
-
-    private function listByPagination(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
-    {
-        $query->take($filters->pagination)->skip($filters->skip);
-        $data = $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords($data->count())
-            ->setPagination($filters->pagination)
-            ->setCurrentPage($filters->page)
-            ->setTotalPages($filters->calculateTotalPages($totalRecords));
-
-        return $data;
-    }
-
-    private function listByFromTo(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
-    {
-        $query->skip($filters->skip);
-        if (isset($filters->to)) {
-            $query->take($filters->take);
-        }
-        $data = $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords($data->count())
-            ->setFrom($filters->from)
-            ->setTo($filters->to);
-
-        return $data;
-    }
-
-    private function listByOthers(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
-    {
-        if (isset($filters->limit)) {
-            $query->take($filters->take);
-        }
-        $data = $filters->count ? $totalRecords : $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords(is_numeric($data) ? $data : $data->count());
-
-        return $data;
-    }
 
     /**
      * List the specified resource
@@ -271,13 +191,12 @@ class CrudController extends Controller
                 $crud_helper->prepareQuery($query, $filters);
 
                 $total_records = $query->count();
-                if (isset($filters->page)) {
-                    $data = $this->listByPagination($query, $filters, $responseBuilder, $total_records);
-                } elseif (isset($filters->from)) {
-                    $data = $this->listByFromTo($query, $filters, $responseBuilder, $total_records);
-                } else {
-                    $data = $this->listByOthers($query, $filters, $responseBuilder, $total_records);
-                }
+
+                $data = match (true) {
+                    isset($filters->page) => $this->listByPagination($query, $filters, $responseBuilder, $total_records),
+                    isset($filters->from) => $this->listByFromTo($query, $filters, $responseBuilder, $total_records),
+                    default => $this->listByOthers($query, $filters, $responseBuilder, $total_records)
+                };
 
                 if (isset($filters->group_by)) {
                     $data = $this->applyGroupBy($data, $filters->group_by);
@@ -317,48 +236,46 @@ class CrudController extends Controller
         });
     }
 
-    private function getElasticSearchQuery(SearchRequestData $filters, array $embeddings = null)
+    private function getElasticSearchQuery(SearchRequestData $filters, array $embeddings = null): array
     {
+        $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
+
+        $cache = Cache::store('redis'); // o altro store configurato per Octane
+        if ($cachedTemplate = $cache->get($templateKey)) {
+            return $cachedTemplate;
+        }
+
         $params = [
             'body' => [
                 'query' => [
-                    'bool' => [],
-                ],
-            ],
+                    'bool' => [
+                        'must' => [],
+                        'should' => [],
+                        'minimum_should_match' => 1
+                    ]
+                ]
+            ]
         ];
 
-        // Initialize must and should arrays
-        $must = [];
-        $should = [];
-
         if ($embeddings) {
-            $should[] = [
+            $params['body']['query']['bool']['should'][] = [
                 'script_score' => [
-                    'query' => [
-                        'match_all' => (object) []
-                    ],
+                    'query' => ['match_all' => new \stdClass()],
                     'script' => [
                         'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                        'params' => [
-                            'query_vector' => $embeddings,
-                        ],
-                    ],
-                ],
+                        'params' => ['query_vector' => $embeddings]
+                    ]
+                ]
             ];
         }
 
         if ($filters->filters instanceof FiltersGroup) {
-            $must = $this->translateFiltersToElasticsearch($filters->filters);
+            $params['body']['query']['bool']['must'] = $this->translateFiltersToElasticsearch($filters->filters);
         }
 
-        // Combine must and should conditions
-        if (!empty($must)) {
-            $params['body']['query']['bool']['must'] = $must;
-        }
-
-        if (!empty($should)) {
-            $params['body']['query']['bool']['should'] = $should;
-        }
+        // Aggiungiamo ottimizzazioni per la query
+        $params['body']['_source'] = ['includes' => $filters->fields ?? ['*']];
+        $params['body']['sort'] = ['_score' => ['order' => 'desc']];
 
         if ($filters->mainEntity) {
             $params['index'] = $filters->mainEntity;
@@ -368,9 +285,7 @@ class CrudController extends Controller
             $params['size'] = $filters->take;
         }
 
-        if ($filters->from) {
-            $params['from'] = $filters->from;
-        }
+        $cache->put($templateKey, $params, 3600); // cache per 1 ora
 
         return $params;
     }
@@ -920,19 +835,6 @@ class CrudController extends Controller
     {
         return $this->doLockOperation($request, 'unlock');
     }
-
-    // TODO: non ho creato la rotta perché se creo file di modelli e poi rifaccio un deploy li perderei
-    // public function mapModel(Request $request, string $entity
-    // {
-    //     return $this->executeOperation($request, $entity, function (ResponseBuilder $response_builder, Model $model, array $filters) use ($entity) {
-    //         if ($model instanceof DynamicEntity) throw new \LogicException("A model for '$entity' entity already exists");
-    //         $table = $model->getTable();
-    //         Artisan::call("make:model {$table}");
-
-    //         $model_class = $model::class;
-    //         return (new ResponseBuilder())->setData("Model $model_class persisted to filesystem")->setStatus(Response::HTTP_CREATED);
-    //     });
-    // }
 
     /**
      * Clear model cache
