@@ -24,6 +24,9 @@ use Modules\Core\Actions\Fortify\CreateNewUser;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
+use Modules\Core\Auth\Services\AuthenticationService;
+use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
+use Modules\Core\Auth\Providers\SocialiteProvider;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -61,6 +64,13 @@ class FortifyServiceProvider extends ServiceProvider
                     : redirect()->intended(Fortify::redirects('register'));
             }
         });
+
+        $this->app->singleton(AuthenticationService::class, function ($app) {
+            return new AuthenticationService([
+                $app->make(FortifyCredentialsProvider::class),
+                $app->make(SocialiteProvider::class),
+            ]);
+        });
     }
 
     /**
@@ -87,45 +97,18 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($request->session()->get('login.id'));
         });
 
-        Fortify::authenticateUsing(function (LoginRequest $request) {
-            $username = $request->request->get('username');
-            $email = $request->request->get('email');
-            $password = $request->request->get('password');
+        Fortify::authenticateUsing(function ($request) {
+            $service = $this->app->make(AuthenticationService::class);
+            $result = $service->authenticate($request);
 
-            /** @phpstan-ignore larastan.relationExistence */
-            $query = User::query()->has('roles');
-            if ($username) {
-                $query->where('username', $username);
-            } else {
-                $query->where('email', $email);
-            }
-            /** @var User|null $user */
-            $user = $query->first();
-
-            if (!$user || !Hash::check($password, $user->password)) return null;
-
-            // verify registration confirmation
-            if (class_uses_trait($user, MustVerifyEmail::class) && !$user->hasVerifiedEmail()) {
-                Log::warning("Cannot login user {$user->name} because registration was not confirmed");
-                return null;
-            }
-
-            // verify user license
-            if (config('core.enable_user_licenses')) {
-                /** @phpstan-ignore larastan.relationExistence */
-                $available_license = License::query()->doesntHave('user')->first();
-                if (!$user->license_id && !$available_license && $user->roles->filter(fn($role) => $role->name === 'superadmin')->isEmpty()) {
-                    Log::warning("No free licenses available for user login");
-                    return null;
+            if ($result['success']) {
+                if (config('core.enable_user_licenses') && $result['license']) {
+                    session()->put('license_id', $result['license']->id);
                 }
-                if (!$user->license_id) {
-                    $user->license()->associate(License::query()->free()->first());
-                    Session::put('license_id', $user->license_id);
-                }
+                return $result['user'];
             }
 
-            $request->setUserResolver(fn() => $user);
-            return $user;
+            return null;
         });
     }
 }

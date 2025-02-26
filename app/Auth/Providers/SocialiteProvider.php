@@ -1,0 +1,94 @@
+<?php
+
+namespace Modules\Core\Auth\Providers;
+
+use Illuminate\Http\Request;
+use Modules\Core\Models\User;
+use Modules\Core\Models\License;
+use Laravel\Socialite\Facades\Socialite;
+use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
+
+class SocialiteProvider implements AuthenticationProviderInterface
+{
+    public function canHandle(Request $request): bool
+    {
+        return $request->has('provider') &&
+            in_array($request->provider, config('services.socialite.providers', []));
+    }
+
+    public function authenticate(Request $request): array
+    {
+        try {
+            $socialUser = Socialite::driver($request->provider)->user();
+
+            /** @var User $user */
+            $user = User::updateOrCreate([
+                'social_id' => $socialUser->getId(),
+            ], [
+                'name' => $socialUser->getName(),
+                'username' => $socialUser->getNickname(),
+                'email' => $socialUser->getEmail(),
+                'social_service' => $request->provider,
+                'social_token' => $socialUser->token,
+                'social_refresh_token' => $socialUser->refreshToken,
+                'social_token_secret' => $socialUser->tokenSecret,
+            ]);
+
+            // Verifica licenza
+            if ($error = $this->checkLicense($user)) {
+                return [
+                    'success' => false,
+                    'user' => null,
+                    'error' => $error,
+                    'license' => null
+                ];
+            }
+
+            return [
+                'success' => true,
+                'user' => $user,
+                'error' => null,
+                'license' => $user->license
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'user' => null,
+                'error' => 'Social authentication failed',
+                'license' => null
+            ];
+        }
+    }
+
+    public function isEnabled(): bool
+    {
+        return config('services.socialite.enabled', false);
+    }
+
+    public function getProviderName(): string
+    {
+        return 'social';
+    }
+
+    private function checkLicense(User $user): ?string
+    {
+        if (!config('core.enable_user_licenses')) {
+            return null;
+        }
+
+        if (!$user->license_id) {
+            $available_license = License::query()
+                ->doesntHave('user')
+                ->first();
+
+            if (
+                !$available_license &&
+                $user->roles->where('name', 'superadmin')->isEmpty()
+            ) {
+                return 'No free licenses available';
+            }
+        }
+
+        return null;
+    }
+}

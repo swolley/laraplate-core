@@ -16,6 +16,25 @@ use Illuminate\Cache\Repository;
 
 class CacheManager
 {
+    public static function getCurrentDriver(): string
+    {
+        $store = Cache::store()->getStore();
+
+        return match (true) {
+            $store instanceof \Illuminate\Cache\RedisStore => 'redis',
+            $store instanceof \Illuminate\Cache\DatabaseStore => 'database',
+            $store instanceof \Illuminate\Cache\FileStore => 'file',
+            $store instanceof \Illuminate\Cache\MemcachedStore => 'memcached',
+            $store instanceof \Illuminate\Cache\ArrayStore => 'array',
+            default => 'unknown'
+        };
+    }
+
+    public static function supportsTagging(): bool
+    {
+        return Cache::store()->getStore() instanceof \Illuminate\Contracts\Cache\Store;
+    }
+
     /**
      * contruct a cache key by request info
      */
@@ -32,7 +51,7 @@ class CacheManager
     /**
      * Try to extract from cache or by specified callback using request info
      */
-    public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, int $duration = null, ?Repository $cache = null): mixed
+    public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, ?int $duration = null, ?Repository $cache = null): mixed
     {
         $tags = [config('APP_NAME')];
         if ($entity) {
