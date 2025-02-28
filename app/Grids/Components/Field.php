@@ -266,7 +266,7 @@ class Field implements \JsonSerializable
         $validations = $this->model->getRules()[$this->getName()] ?? [];
         if (is_string($validations)) {
             preg_match("/regex:\/(?:.*)\//", $validations, $regex, PREG_UNMATCHED_AS_NULL);
-            if (!empty($regex) && $regex[0] !== null) {
+            if ($regex !== [] && $regex[0] !== null) {
                 $validations = trim(str_replace($regex[0], '', $validations), '|');
             }
             $validations = explode('|', $validations);

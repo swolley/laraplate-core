@@ -136,7 +136,7 @@ class TranslationsCheckCommand extends Command
 
                 $diff = array_diff($all_labels, $labels);
 
-                if (empty($diff)) {
+                if ($diff === []) {
                     $this->output->writeln("<info>{$realfile} labels are ok</info>");
                 } else {
                     $joined_labels = implode(', ', $diff);
@@ -152,7 +152,7 @@ class TranslationsCheckCommand extends Command
         foreach ($translations as $file => $langs) {
             $diff = array_diff($all_languages, array_keys($langs));
 
-            if (!empty($diff)) {
+            if ($diff !== []) {
                 $any_missing_file = true;
 
                 foreach ($diff as $lang) {

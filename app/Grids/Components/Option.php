@@ -25,7 +25,7 @@ class Option extends ListEntity
         $field_path = implode('.', $exploded);
         if ($field_path === $this->getPath()) {
             $model = $this->getModel();
-        } elseif (($relation = $this->getRelationDeeply($field_path)) !== null) {
+        } elseif (($relation = $this->getRelationDeeply($field_path)) instanceof \Modules\Core\Grids\Definitions\Relation) {
             $model = $relation->getModel();
         } else {
             Log::warning('No model found for grid option ' . $name);

@@ -44,12 +44,12 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $module_filter = $this->option('module');
 
         foreach (modules(true, false, false) as $module_name) {
-            if (($module_name !== 'App' && !class_exists(Module::class))
-                || ($module_filter && $module_name !== $module_filter)
-            ) {
+            if ($module_name !== 'App' && !class_exists(Module::class)) {
                 continue;
             }
-
+            if ($module_filter && $module_name !== $module_filter) {
+                continue;
+            }
             $this->moduleHandle($module_name);
         }
 
@@ -84,7 +84,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $doc = (new ModuleDocGenerator($config, $moduleName !== 'App' ? config('modules.namespace') . '\\' . $moduleName : $moduleName, $filter))->generate();
         $doc['tags'] = [$moduleName];
         // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
-        if (!empty(array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY))) {
+        if (array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
             $doc['tags'][] = 'Api';
         }
 

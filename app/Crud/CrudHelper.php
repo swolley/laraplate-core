@@ -73,7 +73,7 @@ class CrudHelper
 						$query->orderBy($column->property, $column->direction->value);
 					} else {
 						$index = str_replace($main_entity . '.', '', $column->property);
-						$splitted = self::splitColumnNameOnLastDot($index);
+						$splitted = $this->splitColumnNameOnLastDot($index);
 						$cloned_column = new Sort($splitted[1], $column->direction);
 						if (!array_key_exists($index, $columns['relations'])) {
 							$relations_sorts[$splitted[0]] = [$cloned_column];
@@ -109,7 +109,7 @@ class CrudHelper
 			$this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations']);
 		}
 
-		if (!empty($request_data->relations)) {
+		if ($request_data->relations !== []) {
 			$this->applyRelations($query, $request_data->relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters);
 		}
 	}
@@ -118,7 +118,7 @@ class CrudHelper
 	/**
 	 * @return non-empty-array<array-key, string>
 	 */
-	private static function splitColumnNameOnLastDot(string $name): array
+	private function splitColumnNameOnLastDot(string $name): array
 	{
 		return preg_split('/\.(?=[^.]*$)/', $name, 2);
 	}
@@ -132,7 +132,7 @@ class CrudHelper
 			'aggregates' => [],
 		];
 
-		if (!empty($columns_filters)) {
+		if ($columns_filters !== []) {
 			// used only for quick search instead of array_filter
 			/** @var string[] $all_relations_names */
 			$all_relations_names = [];
@@ -143,7 +143,7 @@ class CrudHelper
 				if (preg_match("/^\w+\.\w+$/", $column->name) && $column->type === ColumnType::COLUMN) {
 					$columns['main'][] = new Column($index, $column->type);
 				} else {
-					$splitted = self::splitColumnNameOnLastDot($index);
+					$splitted = $this->splitColumnNameOnLastDot($index);
 					if (!isset($splitted[1])) {
 						$splitted[1] = '*';
 					}
@@ -210,7 +210,7 @@ class CrudHelper
 		$relation = implode('.', $exploded);
 		$relation_model = $model instanceof Model ? $model : $model->getModel();
 		array_shift($exploded);
-		while (!empty($exploded)) {
+		while ($exploded !== []) {
 			$relation_model = $relation_model->{array_shift($exploded)}()->getModel();
 		}
 
