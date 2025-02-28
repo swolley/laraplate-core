@@ -95,7 +95,10 @@ class CreateUserCommand extends Command
 
                         $user->{$attribute} = $answer;
                     }
-                    $roles = multiselect('Roles', $all_roles, required: true);
+                    do {
+                        $roles = multiselect('Roles', $all_roles, required: false);
+                    } while (empty($roles) || confirm('You didn\'t choose any role, do you want to continue?', false));
+
                     $permissions = (confirm('Do you want to specify custom user permissions', false, hint: "user already inherits choosen Roles permissions"))
                         ? multiselect('Permissions', $all_permissions, required: false)
                         : [];
