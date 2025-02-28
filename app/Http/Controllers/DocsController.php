@@ -20,9 +20,7 @@ class DocsController extends OpenApiJsonController
 
     public function mergeDocs(Request $request, string $version = 'v1')
     {
-        return $this->cache->tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), function () use ($version) {
-            return response()->json($this->getJson($version));
-        });
+        return $this->cache->tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn() => response()->json($this->getJson($version)));
     }
 
     public function welcome(): View
@@ -91,6 +89,7 @@ class DocsController extends OpenApiJsonController
      *
      * @psalm-return \ArrayAccess|array{paths: mixed,...}
      */
+    #[\Override]
     protected function getJson(string $version): array
     {
         $assets = resource_path('swagger') . DIRECTORY_SEPARATOR;
@@ -106,7 +105,10 @@ class DocsController extends OpenApiJsonController
             /** @var array{paths: mixed,...} $json */
             $json = json_decode(file_get_contents($file), true);
             $json['paths'] = array_filter($json['paths'], function ($k) use ($version) {
-                return Str::contains($k, $version) || !Str::contains($k, '/api/');
+                if (Str::contains($k, $version)) {
+                    return true;
+                }
+                return !Str::contains($k, '/api/');
             }, ARRAY_FILTER_USE_KEY);
 
             if (Str::startsWith($short_name, 'App')) {
@@ -116,7 +118,7 @@ class DocsController extends OpenApiJsonController
             }
         }
 
-        if (!empty($additionalPaths)) {
+        if ($additionalPaths !== []) {
             $main_json['paths'] = array_merge($main_json['paths'], $additionalPaths);
         }
 

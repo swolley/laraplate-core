@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Facade;
  */
 class Locked extends Facade
 {
+    #[\Override]
     protected static function getFacadeAccessor()
     {
         return \Modules\Core\Locking\Locked::class;

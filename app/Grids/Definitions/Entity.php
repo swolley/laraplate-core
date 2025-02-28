@@ -101,7 +101,6 @@ abstract class Entity
     /**
      * gets model object
      *
-     * @return Model
      * @phpstan-return Model&HasGridUtils
      */
     public function getModel(): Model
@@ -260,16 +259,16 @@ abstract class Entity
     public function getFieldDeeply(Field|string $field): ?Field
     {
         $thisfield = $this->getField($field);
-        if ($thisfield) {
+        if ($thisfield instanceof \Modules\Core\Grids\Components\Field) {
             return $thisfield;
         }
 
         $prefix = $this instanceof Grid || $this instanceof Relation ? $this->getPath() : lcfirst($this->getModelName());
-        $fieldpath = preg_replace('/^' . $prefix . "\./", '', is_string($field) ? preg_replace("/\.\w+$/", '', $field) : $field->getPath());
-        if (!strlen($fieldpath)) {
+        $fieldpath = preg_replace('/^' . $prefix . "\./", '', (string) (is_string($field) ? preg_replace("/\.\w+$/", '', $field) : $field->getPath()));
+        if ((string) $fieldpath === '') {
             return null;
         }
-        $exploded_fieldpath = explode('.', $fieldpath);
+        $exploded_fieldpath = explode('.', (string) $fieldpath);
         if ($exploded_fieldpath[0] === lcfirst($this->getName())) {
             array_shift($exploded_fieldpath);
         }
@@ -289,7 +288,7 @@ abstract class Entity
      */
     public function getFields(?FieldType $type = null): Collection
     {
-        return !$type ? $this->fields : $this->fields->filter(fn($field) => $field->getFieldType() === $type);
+        return $type instanceof \Modules\Core\Grids\Definitions\FieldType ? $this->fields->filter(fn($field) => $field->getFieldType() === $type) : $this->fields;
     }
 
     /**
@@ -359,7 +358,7 @@ abstract class Entity
      */
     public function hasField(Field|string $field): bool
     {
-        return $this->getField($field) !== null;
+        return $this->getField($field) instanceof \Modules\Core\Grids\Components\Field;
     }
 
     /**
@@ -371,7 +370,7 @@ abstract class Entity
             return true;
         }
 
-        return $this->getFieldDeeply($field) !== null;
+        return $this->getFieldDeeply($field) instanceof \Modules\Core\Grids\Components\Field;
     }
 
     /**
@@ -474,11 +473,11 @@ abstract class Entity
      */
     public function getRelationDeeply(Relation|string $relation): ?Relation
     {
-        $subfix = strlen($this->getPath()) ? preg_replace('/^' . $this->getPath() . "\./", '', $relation) : preg_replace('/^' . lcfirst($this->getModelName()) . './', '', $relation);
-        $exploded = explode('.', $subfix);
+        $subfix = strlen($this->getPath()) !== 0 ? preg_replace('/^' . $this->getPath() . "\./", '', $relation) : preg_replace('/^' . lcfirst($this->getModelName()) . './', '', $relation);
+        $exploded = explode('.', (string) $subfix);
         $first = array_shift($exploded);
         $thisrelation = $this->getRelation($first);
-        if ($thisrelation && empty($exploded)) {
+        if ($thisrelation && $exploded === []) {
             return $thisrelation;
         }
 
@@ -510,7 +509,7 @@ abstract class Entity
     public function getAllFullRelationsNames(): Collection
     {
         $prefix = $this instanceof RelationInfo ? $this->getName() : lcfirst($this->getModelName());
-        $relations = collect(!($this instanceof RelationInfo) ? [] : [$prefix]);
+        $relations = collect($this instanceof RelationInfo ? [$prefix] : []);
         foreach ($this->getRelations() as $relation) {
             $thisname = $relation->getFullName();
             $subnames = $relation->getAllFullRelationsNames();
@@ -555,7 +554,7 @@ abstract class Entity
      */
     public function hasRelation(Relation|string $relation): bool
     {
-        return $this->getRelation($relation) !== null;
+        return $this->getRelation($relation) instanceof \Modules\Core\Grids\Definitions\Relation;
     }
 
     /**
@@ -584,7 +583,7 @@ abstract class Entity
         foreach ($relationList as $relation) {
             assertInstanceOf(RelationInfo::class, $relation);
             $subrelation = $parent->getRelation($relation->getName());
-            if (!$subrelation) {
+            if (!($subrelation instanceof \Modules\Core\Grids\Definitions\Relation)) {
                 $subrelation = new Relation($parent->getFullName(), $relation);
                 $parent->addRelation($subrelation);
             }
@@ -692,7 +691,7 @@ abstract class Entity
         switch ($operator->value) {
             case 'in':
                 $method = lcfirst($method . 'WhereIn');
-                array_push($params, $value);
+                $params[] = $value;
                 break;
             default:
                 if ($operator->value === '!=' && $value === null) {
@@ -736,7 +735,7 @@ abstract class Entity
     {
         foreach ($sorts as $order) {
             if (Str::contains($order['property'], '.')) {
-                $exploded = explode('.', $order['property']);
+                $exploded = explode('.', (string) $order['property']);
                 $order['property'] = array_pop($exploded);
             }
             $query->orderBy($order['property'], $order['direction']);

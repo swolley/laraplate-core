@@ -12,6 +12,7 @@ class UserInfoResponse extends JsonResource
     /**
      * Transform the resource into an array.
      */
+    #[\Override]
     public function toArray($request): array
     {
         if ($this->resource) {

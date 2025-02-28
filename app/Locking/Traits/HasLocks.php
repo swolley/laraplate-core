@@ -22,13 +22,13 @@ trait HasLocks
         });
     }
 
-    public function lock(User $user = null): self
+    public function lock(?User $user = null): self
     {
         /** @var Locked $locked */
         $locked = app('locked');
         $this->{$locked->lockedAtColumn()} = now();
 
-        if ($user) {
+        if ($user instanceof \Illuminate\Foundation\Auth\User) {
             $this->{$locked->lockedByColumn()} = $user->id;
         }
         $this->save();
@@ -120,9 +120,9 @@ trait HasLocks
         return $this;
     }
 
-    public function toggleLockBy(User $user = null): self
+    public function toggleLockBy(?User $user = null): self
     {
-        if (!$user) {
+        if (!$user instanceof \Illuminate\Foundation\Auth\User) {
             $user = Auth::user();
         }
 

@@ -18,6 +18,7 @@ class RouteServiceProvider extends ServiceProvider
      *
      * Register any model bindings or pattern based filters.
      */
+    #[\Override]
     public function boot(): void
     {
         parent::boot();
@@ -25,16 +26,14 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('embeddings', function (object $job) {
             return Limit::perMinute(60); // 60 jobs per minute
         });
-        RateLimiter::for('indexing', function (object $job) {
-            return app()->environment('production') ? [
-                // Single worker limit
-                Limit::perMinute(300)  // 300 operations per minute (5 per second)
-                    ->by('indexing.worker'),
-                // Global limit for all workers
-                Limit::perMinute(1200)  // 1200 operations per minute (20 per second)
-                    ->by('indexing.global'),
-            ] : Limit::perMinute(60);
-        });
+        RateLimiter::for('indexing', fn(object $job) => app()->environment('production') ? [
+            // Single worker limit
+            Limit::perMinute(300)  // 300 operations per minute (5 per second)
+                ->by('indexing.worker'),
+            // Global limit for all workers
+            Limit::perMinute(1200)  // 1200 operations per minute (20 per second)
+                ->by('indexing.global'),
+        ] : Limit::perMinute(60));
     }
 
     /**
@@ -91,9 +90,7 @@ class RouteServiceProvider extends ServiceProvider
             ->group(module_path($this->name, '/routes/info.php'));
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
-        Route::get("$route_prefix/auth/reset-password", function () {
-            return abort(Response::HTTP_MOVED_PERMANENTLY);
-        })->name('password.reset');
+        Route::get("$route_prefix/auth/reset-password", fn() => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
     }
 
     /**

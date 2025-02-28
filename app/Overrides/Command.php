@@ -17,7 +17,7 @@ class Command extends BaseCommand
         parent::__construct();
 
         // if (self::class !== $this::class) {
-        if ($db) {
+        if ($db instanceof \Illuminate\Database\DatabaseManager) {
             $this->db = $db;
         }
         if (config('app.debug')) {
@@ -29,7 +29,7 @@ class Command extends BaseCommand
     public function __destruct()
     {
         // if (self::class !== static::class) {
-        if (config('app.debug') && isset($this->benchmarkStartTime)) {
+        if (config('app.debug') && $this->benchmarkStartTime !== null) {
             $this->endBenchmark();
         }
         // }

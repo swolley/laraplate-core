@@ -48,11 +48,7 @@ trait HasBenchmark
         } else {
             $queriesCount = 0;
         }
-        if ($table && isset($this->startRowCount)) {
-            $rowDiff = $db->table($table)->count() - $this->startRowCount;
-        } else {
-            $rowDiff = 0;
-        }
+        $rowDiff = $table && isset($this->startRowCount) ? $db->table($table)->count() - $this->startRowCount : 0;
 
         $db->disableQueryLog();
 
@@ -72,10 +68,10 @@ trait HasBenchmark
         $output = '⚡';
         $this->addBlockToOutput($output, $output_values, 'TIME', $formattedTime, 'bright-blue', 'black', $is_in_console);
         $this->addBlockToOutput($output, $output_values, 'MEM', $memoryUsage, 'bright-green', 'black', $is_in_console);
-        if ($queriesCount) {
+        if ($queriesCount !== 0) {
             $this->addBlockToOutput($output, $output_values, 'SQL', number_format($queriesCount), 'bright-yellow', 'black', $is_in_console);
         }
-        if ($rowDiff) {
+        if ($rowDiff !== 0) {
             $this->addBlockToOutput($output, $output_values, 'ROWS', number_format($rowDiff), 'bright-magenta', 'black', $is_in_console);
         }
         $this->addBlockToOutput($output, $output_values, '', static::class, 'gray', 'black', $is_in_console);
@@ -85,7 +81,7 @@ trait HasBenchmark
             $this->command->newLine();
             $this->command->line($output);
             $this->command->newLine();
-        } else if ($this instanceof \Illuminate\Console\Command && isset($this->output)) {
+        } elseif ($this instanceof \Illuminate\Console\Command && $this->output !== null) {
             $this->newLine();
             $this->line($output);
             $this->newLine();
@@ -96,8 +92,8 @@ trait HasBenchmark
 
     private function addBlockToOutput(string &$output, array &$outputValues, string $blockName, mixed $blockValue, string $blockBgColor, string $blockFgColor, bool $isInConsole): void
     {
-        if (!empty($blockName)) {
-            $blockName = $blockName . ' ';
+        if ($blockName !== '' && $blockName !== '0') {
+            $blockName .= ' ';
         }
         $output .= $isInConsole ? " <bg=$blockBgColor;fg=$blockFgColor> $blockName%s </>" : " $blockName%s";
         $outputValues[] = $blockValue;

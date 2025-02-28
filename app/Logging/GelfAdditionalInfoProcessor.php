@@ -11,16 +11,15 @@ use Monolog\Processor\PsrLogMessageProcessor;
 
 class GelfAdditionalInfoProcessor implements ProcessorInterface
 {
-	private PsrLogMessageProcessor $psrLogMessageProcessor;
-	private $channel;
+	private readonly PsrLogMessageProcessor $psrLogMessageProcessor;
 
-	public function __construct(?string $channel = null)
+	public function __construct(private readonly ?string $channel = null)
 	{
-		$this->channel = $channel;
 		$this->psrLogMessageProcessor = new PsrLogMessageProcessor(removeUsedContextFields: true);
 	}
 
-	public function __invoke(LogRecord $record): LogRecord
+	#[\Override]
+ public function __invoke(LogRecord $record): LogRecord
 	{
 		$record = $this->psrLogMessageProcessor->__invoke($record);
 

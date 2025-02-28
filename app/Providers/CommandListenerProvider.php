@@ -14,6 +14,7 @@ class CommandListenerProvider extends ServiceProvider
     /**
      * Register the service provider.
      */
+    #[\Override]
     public function register(): void
     {
         //
@@ -22,6 +23,7 @@ class CommandListenerProvider extends ServiceProvider
     /**
      * Get the services provided by the provider.
      */
+    #[\Override]
     public function provides(): array
     {
         return [];

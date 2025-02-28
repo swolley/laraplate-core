@@ -31,7 +31,7 @@ class PermissionChecker
             $connection = 'default';
         }
 
-        if (!$permissions) {
+        if (!$permissions instanceof \Illuminate\Support\Collection) {
             $user = $request->user();
 
             if (!$permissions && $user && $user->isSuperAdmin()) {
@@ -48,11 +48,7 @@ class PermissionChecker
                     $request->setUserResolver(fn() => $user);
                 }
             }
-
-            if (!$permissions) {
-                return $user ? $user->can($connection . '.' . $entity . '.*') : false;
-            }
-            $permissions = $user?->getAllPermissions() ?: collect([]);
+            return $user ? $user->can($connection . '.' . $entity . '.*') : false;
         }
 
         return $permissions->filter(

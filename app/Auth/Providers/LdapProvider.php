@@ -13,12 +13,14 @@ class LdapProvider implements AuthenticationProviderInterface
 {
     use AuthenticatesWithLdap;
 
+    #[\Override]
     public function canHandle(Request $request): bool
     {
         return $request->has(['username', 'password']) &&
             config('auth.providers.ldap.enabled', false);
     }
 
+    #[\Override]
     public function authenticate(Request $request): array
     {
         try {
@@ -65,11 +67,13 @@ class LdapProvider implements AuthenticationProviderInterface
         }
     }
 
+    #[\Override]
     public function isEnabled(): bool
     {
         return config('auth.providers.ldap.enabled', false);
     }
 
+    #[\Override]
     public function getProviderName(): string
     {
         return 'ldap';

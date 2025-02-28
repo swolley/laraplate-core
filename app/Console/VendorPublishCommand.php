@@ -33,6 +33,7 @@ class VendorPublishCommand extends BaseVendorPublishCommand
         }
     }
 
+    #[\Override]
     protected function publishFile($from, $to): void
     {
         $found = false;
@@ -65,7 +66,7 @@ class VendorPublishCommand extends BaseVendorPublishCommand
     {
         foreach ($this->modules as $data) {
             foreach ($data['migrations'] as $migration) {
-                $only_description = preg_replace("/(?:.*)\d{4}_\d{2}_\d{2}_\d{6}/", '', $migration);
+                $only_description = preg_replace("/(?:.*)\d{4}_\d{2}_\d{2}_\d{6}/", '', (string) $migration);
 
                 if (Str::endsWith($file, $only_description)) {
                     return $migration;
@@ -80,7 +81,7 @@ class VendorPublishCommand extends BaseVendorPublishCommand
     {
         foreach ($this->modules as $data) {
             foreach ($data['config'] as $config) {
-                $only_name = basename($config);
+                $only_name = basename((string) $config);
 
                 if ($file === $only_name) {
                     return $config;

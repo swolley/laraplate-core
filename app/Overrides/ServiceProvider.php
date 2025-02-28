@@ -34,7 +34,8 @@ class ServiceProvider extends BaseServiceProvider
 		}
 	}
 
-	protected function mergeConfigFrom($path, $key)
+	#[\Override]
+ protected function mergeConfigFrom($path, $key)
 	{
 		if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {
 			$config = $this->app->make('config');
@@ -50,10 +51,10 @@ class ServiceProvider extends BaseServiceProvider
 	{
 		foreach ($array2 as $key => $value) {
 			if (!array_key_exists($key, $array1)) {
-				$array1[$key] = $value;
-			} else if (is_array($value)) {
-				$array1[$key] = self::mergeArrays($array1[$key], $value);
-			} else {
+       $array1[$key] = $value;
+   } elseif (is_array($value)) {
+       $array1[$key] = self::mergeArrays($array1[$key], $value);
+   } else {
 				$array1[$key] = $value;
 			}
 		}

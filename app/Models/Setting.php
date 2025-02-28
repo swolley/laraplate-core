@@ -51,6 +51,7 @@ class Setting extends Model
         return SettingFactory::new();
     }
 
+    #[\Override]
     protected function casts()
     {
         return [
@@ -66,10 +67,10 @@ class Setting extends Model
 
     protected function requiresApprovalWhen($modifications): bool
     {
-        return !empty(array_intersect(
+        return array_intersect(
             array_filter($this->getFillable(), fn($field) => $field !== 'description'),
             array_keys($modifications),
-        ));
+        ) !== [];
     }
 
     public function getRules()

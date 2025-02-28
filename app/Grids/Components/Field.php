@@ -28,21 +28,18 @@ class Field implements \JsonSerializable
 
     private bool $writable = true;
 
-    private FieldType $fieldType;
-
     /**
      * @param  Model  $model  field entity related model
      * @param  string  $path  field path (prefix of the full name)
      * @param  string  $name  field name (column)
      * @param  string|null  $alias  field alias (name will be used if nothing assigned)
      */
-    public function __construct(string $path, string $name, ?string $alias = null, FieldType $fieldType = FieldType::COLUMN, ?Model $model = null)
+    public function __construct(string $path, string $name, ?string $alias = null, private FieldType $fieldType = FieldType::COLUMN, ?Model $model = null)
     {
         $this->path = $path;
         $this->name = $name;
         $this->alias = $alias ?? $name;
-        $this->fieldType = $fieldType;
-        if ($model) {
+        if ($model instanceof \Illuminate\Database\Eloquent\Model) {
             $this->setModel($model);
         }
     }
@@ -90,7 +87,7 @@ class Field implements \JsonSerializable
      */
     public function getFullAlias(): ?string
     {
-        return $this->path ? $this->path . '.' . $this->getAlias() : null;
+        return $this->path !== '' && $this->path !== '0' ? $this->path . '.' . $this->getAlias() : null;
     }
 
     /**
@@ -98,11 +95,11 @@ class Field implements \JsonSerializable
      */
     public function getFullQueryAlias(): ?string
     {
-        if (!$this->path) {
+        if ($this->path === '' || $this->path === '0') {
             return null;
         }
 
-        $exploded = explode('.', $this->getFullAlias());
+        $exploded = explode('.', (string) $this->getFullAlias());
         $exploded[0] = $this->model->getTable();
 
         return implode('.', $exploded);
@@ -118,7 +115,7 @@ class Field implements \JsonSerializable
      */
     public function hasOption(): bool
     {
-        return $this->option !== null;
+        return $this->option instanceof \Modules\Core\Grids\Components\Option;
     }
 
     /**
@@ -154,7 +151,7 @@ class Field implements \JsonSerializable
      */
     public function hasFunnel(): bool
     {
-        return $this->funnel !== null;
+        return $this->funnel instanceof \Modules\Core\Grids\Components\Funnel;
     }
 
     /**

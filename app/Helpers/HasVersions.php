@@ -50,7 +50,7 @@ trait HasVersions
 	 */
 	public function createVersion(array $replacements = [], $time = null): ?Version
 	{
-		if ($this->shouldBeVersioning() || ! empty($replacements)) {
+		if ($this->shouldBeVersioning() || $replacements !== []) {
 			return tap(config('versionable.version_model')::createForModel($this, $replacements, $time), function () {
 				$this->removeOldVersions((int) $this->getKeepVersionsCount());
 			});

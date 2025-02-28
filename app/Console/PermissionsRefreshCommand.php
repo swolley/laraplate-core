@@ -30,7 +30,7 @@ class PermissionsRefreshCommand extends Command
     /**
      * @var string[]
      */
-    private const MODELS_BLACKLIST = [
+    private const array MODELS_BLACKLIST = [
         'App\\Models\\Version',
         'App\\Models\\Modification',
         'Modules\\Core\\Models\\DynamicEntity',
@@ -72,7 +72,7 @@ class PermissionsRefreshCommand extends Command
         $all_permissions = [];
 
         $permission_class = config('permission.models.permission');
-        $parental_class = "Parental\\HasChildren";
+        $parental_class = \Parental\HasChildren::class;
 
         $this->db->beginTransaction();
 

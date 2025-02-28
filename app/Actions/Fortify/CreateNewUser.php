@@ -16,6 +16,7 @@ class CreateNewUser implements CreatesNewUsers
      *
      * @inheritdoc
      */
+    #[\Override]
     public function create(array $input)
     {
         $user_class = user_class();

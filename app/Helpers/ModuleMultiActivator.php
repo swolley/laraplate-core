@@ -11,7 +11,7 @@ use Nwidart\Modules\Contracts\ActivatorInterface;
 
 class ModuleMultiActivator implements ActivatorInterface
 {
-    private ActivatorInterface $activator;
+    private readonly ActivatorInterface $activator;
 
     public function __construct(Container $app)
     {
@@ -20,36 +20,43 @@ class ModuleMultiActivator implements ActivatorInterface
             : new FileActivator($app);
     }
 
+    #[\Override]
     public function enable(Module $module): void
     {
         $this->activator->enable($module);
     }
 
+    #[\Override]
     public function disable(Module $module): void
     {
         $this->activator->disable($module);
     }
 
+    #[\Override]
     public function hasStatus(Module $module, bool $status): bool
     {
         return $this->activator->hasStatus($module, $status);
     }
 
+    #[\Override]
     public function setActive(Module $module, bool $active): void
     {
         $this->activator->setActive($module, $active);
     }
 
+    #[\Override]
     public function setActiveByName(string $name, bool $active): void
     {
         $this->activator->setActiveByName($name, $active);
     }
 
+    #[\Override]
     public function delete(Module $module): void
     {
         $this->activator->delete($module);
     }
 
+    #[\Override]
     public function reset(): void
     {
         $this->activator->reset();

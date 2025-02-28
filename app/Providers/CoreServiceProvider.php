@@ -70,19 +70,18 @@ class CoreServiceProvider extends ServiceProvider
 
         Model::preventSilentlyDiscardingAttributes(!$is_production);
 
-        Password::defaults(function () {
-            return Password::min(8)
-                ->letters()
-                ->mixedCase()
-                ->numbers()
-                ->symbols()
-                ->uncompromised();
-        });
+        Password::defaults(fn() => Password::min(8)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols()
+            ->uncompromised());
     }
 
     /**
      * Register the service provider.
      */
+    #[\Override]
     public function register(): void
     {
         $this->registerConfig();
@@ -223,6 +222,7 @@ class CoreServiceProvider extends ServiceProvider
     /**
      * Get the services provided by the provider.
      */
+    #[\Override]
     public function provides(): array
     {
         return [];

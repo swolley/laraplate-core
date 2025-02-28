@@ -15,7 +15,7 @@ trait HasValidations
      */
     public function getValidation(): ?array
     {
-        return isset($this->validation) ? $this->validation : null;
+        return $this->validation ?? null;
     }
 
     /**

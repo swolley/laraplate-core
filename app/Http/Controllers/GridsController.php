@@ -72,7 +72,7 @@ class GridsController extends Controller
             }
 
             if ($entity) {
-                if (empty($grids)) {
+                if ($grids === []) {
                     throw new UnexpectedValueException("'$entity' is not a Grid");
                 }
                 $grids = head($grids);

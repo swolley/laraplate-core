@@ -93,13 +93,11 @@ trait HasValidity
 
     /**
      * Check if the content is valid at a given date.
-     * @param Carbon|null $date 
-     * @return bool 
      * @throws \InvalidFormatException
      */
     public function isValid(?Carbon $date = null): bool
     {
-        if (!$date) {
+        if (!$date instanceof \Illuminate\Support\Carbon) {
             $date = Carbon::today();
         }
 
@@ -116,7 +114,6 @@ trait HasValidity
 
     /**
      * Check if the content is expired.
-     * @return bool 
      */
     public function isExpired(): bool
     {
@@ -125,7 +122,6 @@ trait HasValidity
 
     /**
      * Check if the content is draft (nor plublished yet).
-     * @return bool 
      */
     public function isDraft(): bool
     {
@@ -134,7 +130,6 @@ trait HasValidity
 
     /**
      * Check if the content is scheduled (published in the future).
-     * @return bool 
      */
     public function isScheduled(): bool
     {
@@ -143,14 +138,11 @@ trait HasValidity
 
     /**
      * Publish the content.
-     * @param null|Carbon $valid_from 
-     * @param null|Carbon $valid_to 
-     * @return void 
      */
     public function publish(?Carbon $valid_from = null, ?Carbon $valid_to = null): void
     {
-        $valid_from = $valid_from ?? now();
-        if ($valid_to) {
+        $valid_from ??= now();
+        if ($valid_to instanceof \Illuminate\Support\Carbon) {
             $min = min($valid_from, $valid_to);
             $max = max($valid_from, $valid_to);
             $valid_from = $min;
@@ -163,7 +155,6 @@ trait HasValidity
 
     /**
      * Unpublish the content.
-     * @return void 
      */
     public function unpublish(): void
     {

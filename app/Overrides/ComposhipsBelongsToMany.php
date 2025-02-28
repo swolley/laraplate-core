@@ -81,11 +81,7 @@ class ComposhipsBelongsToMany extends BelongsToMany
     {
         $keys = [];
         foreach ($models as $model) {
-            if (is_array($key)) {
-                $keys[] = array_map(fn($k) => $model->{$k}, $key);
-            } else {
-                $keys[] = $model->{$key};
-            }
+            $keys[] = is_array($key) ? array_map(fn($k) => $model->{$k}, $key) : $model->{$key};
         }
         return array_unique($keys, SORT_REGULAR);
     }
@@ -94,7 +90,7 @@ class ComposhipsBelongsToMany extends BelongsToMany
     protected function addWhereConstraints()
     {
         if (is_array($this->parentKey)) {
-            foreach ($this->parentKey as $index => $parentKey) {
+            foreach ($this->parentKey as $parentKey) {
                 $this->query->where(
                     $this->getQualifiedForeignPivotKeyName($parentKey), '=', $this->parent->{$parentKey}
                 );
@@ -113,7 +109,7 @@ class ComposhipsBelongsToMany extends BelongsToMany
     {
         $is_null = false;
         if (is_array($this->parentKey)) {
-            foreach ($this->parentKey as $index => $parentKey) {
+            foreach ($this->parentKey as $parentKey) {
                 if (is_null($this->parent->{$parentKey})) {
                     $is_null = true;
                     break;
@@ -122,8 +118,8 @@ class ComposhipsBelongsToMany extends BelongsToMany
         } else {
             $is_null = is_null($this->parent->{$this->parentKey});
         }
-        return ! $is_null
-                ? $this->get()
-                : $this->related->newCollection();
+        return $is_null
+                ? $this->related->newCollection()
+                : $this->get();
     }
 }

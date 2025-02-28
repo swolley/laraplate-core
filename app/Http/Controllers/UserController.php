@@ -29,16 +29,13 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 class UserController extends Controller
 {
-    protected Socialite $socialite;
-
     public function __construct(
         Repository $cache,
         AuthManager $auth,
         DatabaseManager $db,
-        Socialite $socialite
+        protected Socialite $socialite
     ) {
         parent::__construct($cache, $auth, $db);
-        $this->socialite = $socialite;
     }
 
     /**
@@ -74,7 +71,9 @@ class UserController extends Controller
         $user = $this->auth->user();
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
-            if ($user) AfterLoginListener::checkUserLicense($user);
+            if ($user) {
+                AfterLoginListener::checkUserLicense($user);
+            }
             return (new ResponseBuilder($request))
                 ->setData(static::parseUserInfo($user))
                 ->json();
@@ -166,7 +165,6 @@ class UserController extends Controller
      * Maintain user session.
      *
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {

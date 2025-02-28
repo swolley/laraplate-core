@@ -66,17 +66,16 @@ trait Searchable
 		return $data;
 	}
 
-	/**
-	 * @return string|null
-	 */
 	public function prepareDataToEmbed(): ?string
 	{
-		if (!isset($this->embed) || empty($this->embed)) return null;
+		if (!isset($this->embed) || empty($this->embed)) {
+      return null;
+  }
 
 		$data = "";
 		foreach ($this->embed as $attribute) {
 			$value = $this->$attribute;
-			if ($value && gettype($value) === "string" && !empty($value)) {
+			if ($value && gettype($value) === "string" && ($value !== '' && $value !== '0')) {
 				$data .= ' ' . $value;
 			}
 		}

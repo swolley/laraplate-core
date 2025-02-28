@@ -43,6 +43,7 @@ class CronJob extends Model
         'parameters' => '{}',
     ];
 
+    #[\Override]
     protected function casts()
     {
         return [
@@ -63,6 +64,7 @@ class CronJob extends Model
         return CronJobFactory::new();
     }
 
+    #[\Override]
     protected static function booted()
     {
         static::saved(function (CronJob $cronJob): void {

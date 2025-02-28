@@ -12,6 +12,7 @@ use Modules\Core\Casts\ModifyRequestData;
 
 class ModifyRequest extends CrudRequest implements IParsableRequest
 {
+    #[\Override]
     public function rules()
     {
         return [];
@@ -51,11 +52,7 @@ class ModifyRequest extends CrudRequest implements IParsableRequest
             $main_entity = $this->route()->entity;
             foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
                 $key = $this->$attribute ?? $this->{"$main_entity.$attribute"} ?? null;
-                if ($key) {
-                    $to_merge[$key] = array_unique([...$to_merge[$key], ...$rule]);
-                } else {
-                    $to_merge[$key] = $rule;
-                }
+                $to_merge[$key] = $key ? array_unique([...$to_merge[$key], ...$rule]) : $rule;
 
                 $to_merge['filters'][] = ['property' => $key, 'value' => $this->$key];
             }

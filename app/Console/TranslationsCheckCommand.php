@@ -91,13 +91,13 @@ class TranslationsCheckCommand extends Command
         $stringified = var_export($required, true);
         $imported = var_export(array_sort_keys($required), true);
 
-        if ($stringified == $imported) {
+        if ($stringified === $imported) {
             $this->output->writeln("<info>{$file} is ok</info>");
 
             return;
         }
 
-        $replaced = ltrim(preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
+        $replaced = ltrim((string) preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
         file_put_contents($file, "<?php\n\nreturn " . $replaced . ';');
         $this->output->writeln("<info>{$file} has been sorted</info>");
     }

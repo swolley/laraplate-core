@@ -56,7 +56,7 @@ class InitializeUsers extends Command
 
 			if (!$user_class::whereName($admin)->exists()) {
 				$email = text("Please specify a $admin user email or leave blank to skip", required: false, validate: fn(string $value) => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
-				if ($email) {
+				if ($email !== '' && $email !== '0') {
 					$password = password("Please specify a $admin user password", required: true);
 					password("Please confirm the password", required: true, validate: fn(string $value) => $password !== $value ? 'Passwords don\'t match' : null);
 					$admin_user = $user_class::make([

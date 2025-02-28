@@ -42,8 +42,12 @@ class SettingController extends Controller
 
             $default_locale = App::getLocale();
             usort($languages, function ($a, $b) use ($default_locale) {
-                if (Str::endsWith($a, DIRECTORY_SEPARATOR . $default_locale)) return -1;
-                if (Str::endsWith($b, DIRECTORY_SEPARATOR . $default_locale)) return 1;
+                if (Str::endsWith($a, DIRECTORY_SEPARATOR . $default_locale)) {
+                    return -1;
+                }
+                if (Str::endsWith($b, DIRECTORY_SEPARATOR . $default_locale)) {
+                    return 1;
+                }
                 return $a <=> $b;
             });
 
@@ -70,7 +74,9 @@ class SettingController extends Controller
 
                 $translations[$short_name] = Arr::dot($translations[$short_name]);
                 // key always exists because $languages is sorted with $default_locale as the first item
-                if ($short_name !== $default_locale && array_key_exists($default_locale, $translations)) $translations[$short_name] = array_merge($translations[$default_locale], $translations[$short_name]);
+                if ($short_name !== $default_locale && array_key_exists($default_locale, $translations)) {
+                    $translations[$short_name] = array_merge($translations[$default_locale], $translations[$short_name]);
+                }
             }
 
             return $translations;

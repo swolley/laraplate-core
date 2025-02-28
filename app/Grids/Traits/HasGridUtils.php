@@ -25,7 +25,7 @@ trait HasGridUtils
     {
         $instance = new static;
         // Get public methods declared without parameters and non inherited
-        $class = get_class($instance);
+        $class = $instance::class;
         $allMethods = (new ReflectionClass($class))->getMethods(\ReflectionMethod::IS_PUBLIC);
         $methods = array_filter(
             $allMethods,
@@ -57,7 +57,7 @@ trait HasGridUtils
     {
         $instance = new static;
         // Get public methods declared without parameters and non inherited
-        $class = get_class($instance);
+        $class = $instance::class;
         $reflection = new ReflectionClass($class);
         if (!$reflection->hasMethod($relation)) {
             return false;
@@ -88,10 +88,12 @@ trait HasGridUtils
             if (static::class instanceof $model) {
                 $r->setModel(static::class);
             }
-
-            return $r->getModel() === static::class || static::class instanceof $model;
+            if ($r->getModel() === static::class) {
+                return true;
+            }
+            return static::class instanceof $model;
         });
-        if (empty($relationships)) {
+        if ($relationships === []) {
             return false;
         }
         if (count($relationships) > 1) {
@@ -144,7 +146,7 @@ trait HasGridUtils
         }
 
         $found = static::getRelationshipDeeply($relation);
-        if ($found === false || empty($found)) {
+        if ($found === false || $found === []) {
             return false;
         }
 
@@ -221,7 +223,7 @@ trait HasGridUtils
             }
 
             if ($foreign) {
-                $exploded = explode('.', $foreign);
+                $exploded = explode('.', (string) $foreign);
                 $foreign = array_pop($exploded);
             }
 
@@ -272,14 +274,14 @@ trait HasGridUtils
             }
 
             $type = (new ReflectionClass($methodReturn))->getShortName();
-            $model = get_class($methodReturn->getRelated());
+            $model = $methodReturn->getRelated()::class;
             $relation = new RelationInfo($type, $methodName, $model, (new $model)->getTable(), $foreign, $owner);
             if (isset($pivot_table, $pivot_owner, $pivot_foreign)) {
-                $relation = PivotRelationInfo::fromRelationInfo($relation, $pivot_table, $pivot_owner, $pivot_foreign);
+                return PivotRelationInfo::fromRelationInfo($relation, $pivot_table, $pivot_owner, $pivot_foreign);
             }
 
             return $relation;
-        } catch (\Throwable $th) {
+        } catch (\Throwable) {
             return false;
         }
     }
@@ -392,7 +394,7 @@ trait HasGridUtils
 
     public function getAppendFields(): array
     {
-        return isset($this->appends) ? $this->appends : [];
+        return $this->appends ?? [];
     }
 
     private function getAppendAttributeMethod(string $operation, string $name): string

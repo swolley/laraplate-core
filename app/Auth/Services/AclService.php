@@ -11,11 +11,8 @@ use Modules\Core\Casts\ListRequestData;
 
 class AclService
 {
-    private CrudHelper $crudHelper;
-
-    public function __construct(CrudHelper $crudHelper)
+    public function __construct(private readonly CrudHelper $crudHelper)
     {
-        $this->crudHelper = $crudHelper;
     }
 
     public function applyAclToQuery(Builder $query, int $permission_id): Builder

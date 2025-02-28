@@ -14,9 +14,12 @@ class CronExpression implements CastsAttributes
 	 *
 	 * @param  array<string, mixed>  $attributes
 	 */
-	public function get(Model $model, string $key, mixed $value, array $attributes): ?CoreCronExpression
+	#[\Override]
+ public function get(Model $model, string $key, mixed $value, array $attributes): ?CoreCronExpression
 	{
-		if (!isset($value)) return null;
+		if (!isset($value)) {
+      return null;
+  }
 
 		/** @var CoreCronExpression|string $value */
 		return is_string($value) ? new CoreCronExpression($value) : $value;
@@ -28,9 +31,12 @@ class CronExpression implements CastsAttributes
 	 * @param  array<string, mixed>  $attributes
 	 * 
 	 */
-	public function set(Model $model, string $key, mixed $value, array $attributes): ?string
+	#[\Override]
+ public function set(Model $model, string $key, mixed $value, array $attributes): ?string
 	{
-		if (!isset($value)) return null;
+		if (!isset($value)) {
+      return null;
+  }
 
 		/** @var CoreCronExpression|string $value */
 		return is_string($value) ? $value : $value->getExpression();

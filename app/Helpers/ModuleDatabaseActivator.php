@@ -26,13 +26,13 @@ class ModuleDatabaseActivator implements ActivatorInterface
      */
     public const MODEL_NAME = Setting::class;
 
-    private \Illuminate\Cache\CacheManager $cache;
+    private readonly \Illuminate\Cache\CacheManager $cache;
 
-    private string $cacheKey;
+    private readonly string $cacheKey;
 
-    private int $cacheLifetime;
+    private readonly int $cacheLifetime;
 
-    private \Illuminate\Config\Repository $configs;
+    private readonly \Illuminate\Config\Repository $configs;
 
     private array $modulesStatuses;
 
@@ -68,7 +68,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
             }
 
             return true;
-        } catch (Exception $ex) {
+        } catch (Exception) {
             return false;
         }
     }
@@ -112,6 +112,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
         return $found;
     }
 
+    #[\Override]
     public function reset(): void
     {
         /** @psalm-suppress UndefinedClass */
@@ -119,16 +120,19 @@ class ModuleDatabaseActivator implements ActivatorInterface
         $this->flushCache();
     }
 
+    #[\Override]
     public function enable(Module $module): void
     {
         $this->setActiveByName($module->getName(), true);
     }
 
+    #[\Override]
     public function disable(Module $module): void
     {
         $this->setActiveByName($module->getName(), true);
     }
 
+    #[\Override]
     public function hasStatus(Module $module, bool $status): bool
     {
         if (!in_array($module->getName(), $this->modulesStatuses, true)) {
@@ -138,11 +142,13 @@ class ModuleDatabaseActivator implements ActivatorInterface
         return ($status && in_array($module->getName(), $this->modulesStatuses, true)) || (!$status && !in_array($module->getName(), $this->modulesStatuses, true));
     }
 
+    #[\Override]
     public function setActive(Module $module, bool $active): void
     {
         $this->setActiveByName($module->getName(), $active);
     }
 
+    #[\Override]
     public function setActiveByName(string $name, bool $active): void
     {
         if ($active && !in_array($name, $this->modulesStatuses, true)) {
@@ -155,6 +161,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
         }
     }
 
+    #[\Override]
     public function delete(Module $module): void
     {
         $this->setActiveByName($module->getName(), false);
@@ -177,9 +184,9 @@ class ModuleDatabaseActivator implements ActivatorInterface
             return $this->getQuery()->sole()->value;
 
             /** @psalm-suppress UndefinedClass */
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException) {
             return static::seedBackendModules()->value;
-        } catch (BadMethodCallException $e) {
+        } catch (BadMethodCallException) {
             return static::getAllModulesNames();
         }
     }

@@ -9,17 +9,15 @@ use Modules\Core\Grids\Requests\GridRequest;
 
 class GridRequestData extends ListRequestData
 {
-    public readonly GridAction $action;
     public readonly ?string $globalSearch;
-    public array $funnelsFilters;
-    public array $optionsFilters;
-    public array $changes;
+    public ?array $funnelsFilters;
+    public ?array $optionsFilters;
+    public ?array $changes;
     public readonly array $layout;
 
-    public function __construct(GridAction $action, GridRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(public readonly GridAction $action, GridRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {
         parent::__construct($request, $mainEntity, $validated, $primaryKey);
-        $this->action = $action;
         $this->layout = self::extractLayout($validated, $mainEntity);
         $this->fixQueryParamsNames($request, $primaryKey);
 
@@ -92,14 +90,10 @@ class GridRequestData extends ListRequestData
 
     /**
      * extract changes
-     *
-     * @return array|null
      */
     private function extractChanges(array $filters/*, string $entityName*/): ?array
     {
-        $changes = $filters['changes'] ?? null;
-
-        return $changes;
+        return $filters['changes'] ?? null;
     }
 
     /**

@@ -35,10 +35,10 @@ class CrudHelper
 		$relations_columns = [];
 		$relations_filters = [];
 
-		$columns = self::groupColumns($main_entity, $request_data->columns);
+		$columns = $this->groupColumns($main_entity, $request_data->columns);
 		foreach ($columns as $type => $cols) {
 			if ($type === 'main' && !empty($cols)) {
-				self::sortColumns($query, $cols);
+				$this->sortColumns($query, $cols);
 				$only_standard_columns = [];
 				foreach ($cols as $column) {
 					if ($column->type === ColumnType::COLUMN) {
@@ -48,9 +48,9 @@ class CrudHelper
 				// TODO: qui mancano ancora le colonne utili a fare le relation se la foreign key si trova sulla main table
 				$this->addForeignKeysToSelectedColumns($query, $only_standard_columns, $main_model, $main_entity);
 				$query->select($only_standard_columns);
-			} else if ($type === 'relations' && !empty($cols)) {
+			} elseif ($type === 'relations' && !empty($cols)) {
 				foreach ($cols as $relation => $relation_cols) {
-					self::sortColumns($query, $relation_cols);
+					$this->sortColumns($query, $relation_cols);
 					$only_relation_columns = [];
 					foreach ($relation_cols as $column) {
 						if ($column->type === ColumnType::COLUMN) {
@@ -124,7 +124,7 @@ class CrudHelper
 	}
 
 	/** @return array{main: Column[], relations: array<string, Column[]>, aggregates: array<string, Column[]>} */
-	private static function groupColumns(string &$mainEntity, array $columns_filters): array
+	private function groupColumns(string &$mainEntity, array $columns_filters): array
 	{
 		$columns = [
 			'main' => [],
@@ -155,7 +155,7 @@ class CrudHelper
 						} else {
 							$columns['relations'][$splitted[0]][] = $remapped_column;
 						}
-					} else if ($column->type->isAggregateColumn()) {
+					} elseif ($column->type->isAggregateColumn()) {
 						$cloned_column = new Column($splitted[1], $column->type);
 						if (!array_key_exists($index, $columns['aggregates'])) {
 							$columns['aggregates'][$splitted[0]] = [$cloned_column];
@@ -240,11 +240,11 @@ class CrudHelper
 			});
 		} elseif ($filter->value == null) {
 			// is or is not null
-			$method = $method . ($filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull');
+			$method .= $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
 			$query->$method($filter->property);
 		} elseif (in_array($filter->operator, [FilterOperator::LIKE, FilterOperator::NOT_LIKE])) {
 			// like not like
-			$method = $method . Str::studly($filter->operator->value);
+			$method .= Str::studly($filter->operator->value);
 			$query->$method($filter->property, $filter->value);
 		} else {
 			// all the others
@@ -269,7 +269,7 @@ class CrudHelper
 	 * @param  Column[]  $columns
 	 * @return void
 	 */
-	private static function sortColumns(Builder|Relation $query, array &$columns)
+	private function sortColumns(Builder|Relation $query, array &$columns)
 	{
 		usort($columns, fn(Column $a, Column $b) => $a->name <=> $b->name);
 		$all_columns_name = array_map(fn(Column $column) => $column->name, $columns);
@@ -283,12 +283,11 @@ class CrudHelper
 	}
 
 	/**
-	 * @param Builder|Relation $query
 	 * @param Column[] $relation_columns
 	 */
 	private function applyColumnsToSelect(Builder|Relation $query, array &$relation_columns)
 	{
-		self::sortColumns($query, $relation_columns);
+		$this->sortColumns($query, $relation_columns);
 		$simple_columns = [];
 		foreach ($relation_columns as $column) {
 			if ($column->type === ColumnType::COLUMN) {
@@ -305,7 +304,9 @@ class CrudHelper
 	{
 		foreach ($relations_aggregates as $aggregate_relation => $aggregates_cols) {
 			$escaped = preg_quote($relation);
-			if (preg_match('/^' . $escaped . '\.\w+$/', $aggregate_relation) !== 1) continue;
+			if (preg_match('/^' . $escaped . '\.\w+$/', $aggregate_relation) !== 1) {
+				continue;
+			}
 
 			$subrelation = preg_replace('/^' . $escaped . '\./', '', $aggregate_relation);
 			foreach ($aggregates_cols as $col) {
@@ -320,9 +321,9 @@ class CrudHelper
 		}
 	}
 
-	private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, Model $model = null, string $table = null)
+	private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, ?Model $model = null, ?string $table = null)
 	{
-		if (!$model) {
+		if (!$model instanceof \Illuminate\Database\Eloquent\Model) {
 			$model = $query->getModel();
 		}
 		if (!$table) {
@@ -367,7 +368,9 @@ class CrudHelper
 
 		// apply only direct aggregate relations on the main entity
 		foreach ($relations_aggregates as $relation => $aggregates_cols) {
-			if (Str::contains($relation, '.')) continue;
+			if (Str::contains($relation, '.')) {
+				continue;
+			}
 
 			foreach ($aggregates_cols as $col) {
 				$method = 'with' . ucfirst($col->type->value);

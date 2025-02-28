@@ -85,6 +85,7 @@ class User extends BaseUser
      *
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -103,13 +104,16 @@ class User extends BaseUser
 
     public function isGuest(): bool
     {
-        return !isset($this->email);
+        return !property_exists($this, 'email') || $this->email === null;
     }
 
     public function canImpersonate(): bool
     {
         /** @phpstan-ignore staticMethod.notFound */
-        return $this->isSuperAdmin() || $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+        return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
     }
 
     public function getImpersonator(): self

@@ -58,7 +58,7 @@ class Inspect
      */
     public static function columns(string $table, null|string $schema = null): Collection
     {
-        if ($table = self::table($table, $schema)) {
+        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->columns;
         }
 
@@ -70,7 +70,7 @@ class Inspect
      */
     public static function indexes(string $table, null|string $schema = null): Collection
     {
-        if ($table = self::table($table, $schema)) {
+        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->indexes;
         }
 
@@ -82,7 +82,7 @@ class Inspect
      */
     public static function foreignKeys(string $table, null|string $schema = null): Collection
     {
-        if ($table = self::table($table, $schema)) {
+        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->foreignKeys;
         }
 

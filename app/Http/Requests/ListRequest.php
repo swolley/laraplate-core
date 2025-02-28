@@ -36,13 +36,13 @@ class ListRequest extends SelectRequest
 
         $to_merge = [];
 
-        if (isset($this->sort)) {
+        if (property_exists($this, 'sort') && $this->sort !== null) {
             $to_merge['sort'] = is_string($this->sort) && is_json($this->sort) ? json_decode($this->sort, true) : (is_string($this->sort) ? preg_split("/,\s?/", $this->sort) : $this->sort);
         }
-        if (isset($this->filters)) {
+        if (property_exists($this, 'filters') && $this->filters !== null) {
             $to_merge['filters'] = (is_string($this->filters) && is_json($this->filters)) ? json_decode($this->filters, true) : $this->filters;
         }
-        if (isset($this->group_by)) {
+        if (property_exists($this, 'group_by') && $this->group_by !== null) {
             $to_merge['group_by'] = (is_string($this->group_by) && is_json($this->group_by)) ? json_decode($this->group_by, true) : $this->group_by;
         }
 

@@ -18,7 +18,7 @@ return [
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'unlock_allowed' => env('LOCKIN_UNLOCK_ALLOWED', true),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-        'can_be_unlocked' => explode(',', env('LOCKING_CAN_BE_UNLOCKED', '')),
+        'can_be_unlocked' => explode(',', (string) env('LOCKING_CAN_BE_UNLOCKED', '')),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'prevent_modifications_on_locked_objects' => env('LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED', false),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig

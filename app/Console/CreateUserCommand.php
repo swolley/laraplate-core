@@ -69,10 +69,10 @@ class CreateUserCommand extends Command
                             if (isset($validations[$attribute])) {
                                 if (is_string($validations[$attribute]) && preg_match('/in:([^|]*)/', $validations[$attribute], $matches)) {
                                     $options = explode(',', $matches[1]);
-                                } else if (is_array($validations[$attribute])) {
+                                } elseif (is_array($validations[$attribute])) {
                                     $found = array_filter($validations[$attribute], fn($v) => is_string($v) && Str::contains($v, 'in:'));
-                                    if (!empty($found)) {
-                                        preg_match('/in:([^|]*)/', head($found), $matches);
+                                    if ($found !== []) {
+                                        preg_match('/in:([^|]*)/', (string) head($found), $matches);
                                         $options = explode(',', $matches[1]);
                                     }
                                 }
@@ -97,7 +97,7 @@ class CreateUserCommand extends Command
                     }
                     do {
                         $roles = multiselect('Roles', $all_roles, required: false);
-                    } while (empty($roles) || confirm('You didn\'t choose any role, do you want to continue?', false));
+                    } while ($roles === [] || confirm('You didn\'t choose any role, do you want to continue?', false));
 
                     $permissions = (confirm('Do you want to specify custom user permissions', false, hint: "user already inherits choosen Roles permissions"))
                         ? multiselect('Permissions', $all_permissions, required: false)
@@ -106,7 +106,7 @@ class CreateUserCommand extends Command
                     $user->save();
                     $user->roles()->sync($roles);
 
-                    if (!empty($permissions)) {
+                    if ($permissions !== []) {
                         $user->permissions()->sync($permissions);
                     }
                     $this->output->info("User created");

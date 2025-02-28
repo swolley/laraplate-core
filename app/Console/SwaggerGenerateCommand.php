@@ -26,6 +26,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         parent::__construct();
     }
 
+    #[\Override]
     protected function getOptions(): array
     {
         return [
@@ -37,15 +38,17 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
      * Execute the console command.
      *
      */
+    #[\Override]
     public function handle(): int
     {
         $module_filter = $this->option('module');
 
         foreach (modules(true, false, false) as $module_name) {
-            if (
-                ($module_name !== 'App' && !class_exists(Module::class))
+            if (($module_name !== 'App' && !class_exists(Module::class))
                 || ($module_filter && $module_name !== $module_filter)
-            ) continue;
+            ) {
+                continue;
+            }
 
             $this->moduleHandle($module_name);
         }
@@ -70,7 +73,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $module_path = Module::getModulePath($moduleName);
             $module_json = json_decode(file_get_contents($module_path . DIRECTORY_SEPARATOR . 'module.json'), true);
             $config['title'] .= ' ' . $module_json['name'] . ' module';
-            $config['description'] = $module_json['description'] . (!empty($module_json['keywords']) ? ' (' . implode(', ', $module_json['keywords']) . ')' : '');
+            $config['description'] = $module_json['description'] . (empty($module_json['keywords']) ? '' : ' (' . implode(', ', $module_json['keywords']) . ')');
             $composer_json = json_decode(file_get_contents($module_path . 'composer.json'));
 
             if (isset($composer_json->version)) {
@@ -91,11 +94,12 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         if ($file) {
             $folder = Str::beforeLast($file, DIRECTORY_SEPARATOR);
-            if (!file_exists($folder)) mkdir($folder, recursive: true);
+            if (!file_exists($folder)) {
+                mkdir($folder, recursive: true);
+            }
             file_put_contents($file, $formattedDoc);
 
             $this->verboseGeneration($doc);
-
         } else {
             $this->line($formattedDoc);
         }
@@ -110,4 +114,3 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         }
     }
 }
-

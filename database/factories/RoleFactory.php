@@ -23,6 +23,7 @@ class RoleFactory extends Factory
      *
      * @psalm-return array{name: string, guard_name: mixed, description: string}
      */
+    #[\Override]
     public function definition(): array
     {
         return [

@@ -14,7 +14,9 @@ trait HasSeedersUtils
 	protected function create(string $class, array $attributes): Model
 	{
 		$model = $class::make($attributes);
-		if (class_uses_trait($model, HasApprovals::class)) $model->setForcedApprovalUpdate(true);
+		if (class_uses_trait($model, HasApprovals::class)) {
+      $model->setForcedApprovalUpdate(true);
+  }
 		$model->save();
 		return $model;
 	}
@@ -26,7 +28,7 @@ trait HasSeedersUtils
 	 */
 	protected function createMany(string $class, array $items): array
 	{
-		if (empty($items)) {
+		if ($items === []) {
 			return [];
 		}
 
@@ -68,10 +70,9 @@ trait HasSeedersUtils
 	}
 
 	/**
-	 * @param class-string $model
-	 * @return void 
-	 */
-	protected function logOperation(string $model): void
+  * @param class-string $model
+  */
+ protected function logOperation(string $model): void
 	{
 		$already_exists = $model::query()->exists();
 		$table = (new $model)->getTable();

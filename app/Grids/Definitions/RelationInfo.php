@@ -6,18 +6,6 @@ namespace Modules\Core\Grids\Definitions;
 
 class RelationInfo
 {
-    protected string $type;
-
-    protected string $name;
-
-    protected string $model;
-
-    protected string $table;
-
-    protected string $foreignKey;
-
-    protected string $ownerKey;
-
     /**
      * @param  string  $type  relation type (method name)
      * @param  string  $name  relation name (from the parent point of view)
@@ -26,14 +14,8 @@ class RelationInfo
      * @param  string  $foreignKey  db foreign key column
      * @param  string  $ownerKey  db local key (usually primary key)
      */
-    public function __construct(string $type, string $name, string $model, string $table, string $foreignKey, string $ownerKey)
+    public function __construct(protected string $type, protected string $name, protected string $model, protected string $table, protected string $foreignKey, protected string $ownerKey)
     {
-        $this->type = $type;
-        $this->name = $name;
-        $this->model = $model;
-        $this->table = $table;
-        $this->foreignKey = $foreignKey;
-        $this->ownerKey = $ownerKey;
     }
 
     /**

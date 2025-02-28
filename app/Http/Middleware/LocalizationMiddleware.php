@@ -23,7 +23,7 @@ class LocalizationMiddleware
 
         if ($user && $user->lang !== App::getLocale()) {
             App::setLocale($user->lang);
-        } else if (!$user) {
+        } elseif (!$user) {
             $lang = $request->getPreferredLanguage();
             if ($lang) {
                 $lang = Str::of($lang)->before('_')->value();

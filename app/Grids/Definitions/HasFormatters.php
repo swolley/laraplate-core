@@ -15,13 +15,13 @@ trait HasFormatters
      * @var null|callable
      * @phpstan-var FormatterCallable
      */
-    private $getFormatter = null;
+    private $getFormatter;
 
     /** 
      * @var null|callable 
      * @phpstan-var FormatterCallable
      */
-    private $setFormatter = null;
+    private $setFormatter;
 
     /**
      * returns if read formatter is set

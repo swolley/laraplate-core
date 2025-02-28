@@ -35,6 +35,7 @@ class UserGridConfig extends Model
         return $this->belongsTo(user_class());
     }
 
+    #[\Override]
     protected function casts()
     {
         return [

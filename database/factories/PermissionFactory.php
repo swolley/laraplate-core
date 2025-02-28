@@ -22,6 +22,7 @@ class PermissionFactory extends Factory
      *
      * @return array<string, mixed>
      */
+    #[\Override]
     public function definition(): array
     {
         $connection = fake()->randomElement(['default', mb_strtolower(fake()->word())]);

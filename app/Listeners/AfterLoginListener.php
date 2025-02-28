@@ -27,7 +27,7 @@ class AfterLoginListener
             $impersonator = $user->getImpersonator();
             Log::info('{impersonator} is impersonating {impersonated}', ['impersonator' => $impersonator->username, 'impersonated' => $user->username]);
         } else {
-            $this->checkUserLicense($user);
+            static::checkUserLicense($user);
             $user->update(['last_login_at' => Carbon::now()]);
             if ($user->isUnlocked()) {
                 Auth::logoutOtherDevices($user->password);
@@ -38,15 +38,12 @@ class AfterLoginListener
 
     public static function checkUserLicense(Authenticatable $user)
     {
-        if (config('core.enable_user_licenses') && class_uses_trait($user, Impersonate::class)) {
-            if (!$user->isGuest() && !$user->isSuperadmin() && $user->license_id === null) {
-                $available_licenses = License::query()->whereDoesntHave('user')->get();
-                if ($available_licenses->isEmpty()) {
-                    throw new UnauthorizedException("No licenses available");
-                }
-
-                $user->license()->associate($available_licenses->first());
+        if (config('core.enable_user_licenses') && class_uses_trait($user, Impersonate::class) && (!$user->isGuest() && !$user->isSuperadmin() && $user->license_id === null)) {
+            $available_licenses = License::query()->whereDoesntHave('user')->get();
+            if ($available_licenses->isEmpty()) {
+                throw new UnauthorizedException("No licenses available");
             }
+            $user->license()->associate($available_licenses->first());
         }
     }
 }

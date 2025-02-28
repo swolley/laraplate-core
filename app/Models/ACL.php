@@ -27,6 +27,7 @@ class ACL extends Model
         'description'   // Optional: human readable description
     ];
 
+    #[\Override]
     protected function casts()
     {
         return [

@@ -68,7 +68,7 @@ class Permission extends ModelsPermission
 
     protected function getActionAttribute(): ?ActionEnum
     {
-        if (!isset($this->name)) {
+        if ($this->name === null) {
             return null;
         }
         $splitted = explode('.', $this->name);

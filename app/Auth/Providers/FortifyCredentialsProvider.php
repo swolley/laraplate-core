@@ -11,12 +11,16 @@ use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
 class FortifyCredentialsProvider implements AuthenticationProviderInterface
 {
-    public function canHandle(Request $request): bool
+    #[\Override]
+    public function canHandle(Request $request) : bool
     {
-        return $request->has(['email', 'password']) ||
-            $request->has(['username', 'password']);
+        if ($request->has(['email', 'password'])) {
+            return true;
+        }
+        return $request->has(['username', 'password']);
     }
 
+    #[\Override]
     public function authenticate(Request $request): array
     {
         $username = $request->get('username');
@@ -70,11 +74,13 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
         ];
     }
 
+    #[\Override]
     public function isEnabled(): bool
     {
         return config('auth.providers.users.driver') === 'eloquent';
     }
 
+    #[\Override]
     public function getProviderName(): string
     {
         return 'credentials';

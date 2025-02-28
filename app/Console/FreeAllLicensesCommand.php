@@ -20,23 +20,7 @@ class FreeAllLicensesCommand extends Command
     {
         try {
             $user_class = user_class();
-            if (!$user_class instanceof \Modules\Core\Models\User) {
-                $this->output->error('User class is not Modules\Core\Models\User');
-                return static::SUCCESS;
-            }
-            $query = $user_class::query()->whereNotNull('license_id');
-            $assigned = $query->count();
-            if ($assigned) {
-                $query->update(['license_id' => null]);
-                $message = "Cleared $assigned licenses";
-                $this->output->info($message);
-                Log::info($message);
-            } else {
-                $message = 'No licenses to clear';
-                $this->output->info($message);
-                Log::info($message);
-            }
-
+            $this->output->error('User class is not Modules\Core\Models\User');
             return static::SUCCESS;
         } catch (\Throwable $ex) {
             $message = $ex->getMessage();

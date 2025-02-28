@@ -88,7 +88,10 @@ trait HasValidations
 
         if ($user = Auth::user()) {
             /** @var User $user */
-            return $user->isSuperAdmin() || $user->hasPermission($permission);
+            if ($user->isSuperAdmin()) {
+                return true;
+            }
+            return (bool) $user->hasPermission($permission);
         }
 
         return true;

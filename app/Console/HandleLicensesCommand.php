@@ -46,7 +46,7 @@ class HandleLicensesCommand extends Command
                     table(
                         ['Status', 'Expiration', 'Licenses Qt.'],
                         $licenses_groups->map(fn($data) => [
-                            $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : (!$data->valid_to ? 'perpetual' : 'expired'),
+                            $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
                         ]),
@@ -65,7 +65,9 @@ class HandleLicensesCommand extends Command
                         validate: fn($value) => $this->validationCallback('number', $value, ['number' => 'numeric|min:0'])
                     );
 
-                    if ($number === 0) return static::SUCCESS;
+                    if ($number === 0) {
+                        return static::SUCCESS;
+                    }
 
                     $validations = (new License)->getOperationRules('create');
 
@@ -74,7 +76,7 @@ class HandleLicensesCommand extends Command
                         'yyyy-mm-dd',
                         validate: fn($value) => $this->validationCallback('valid_to', $value, $validations)
                     );
-                    $valid_to = $valid_to ? new Carbon($valid_to) : null;
+                    $valid_to = $valid_to !== '' && $valid_to !== '0' ? new Carbon($valid_to) : null;
                 }
 
 
@@ -94,14 +96,8 @@ class HandleLicensesCommand extends Command
                 }
 
                 $user_class = user_class();
-                if (!$user_class instanceof \Modules\Core\Models\User) {
-                    $this->output->info('User class is not Modules\Core\Models\User');
-                    $this->db->commit();
-                    return static::SUCCESS;
-                }
-                $user_class::query()->whereNotNull('license_id')->update([
-                    'license_id' => null
-                ]);
+                $this->output->info('User class is not Modules\Core\Models\User');
+                $this->db->commit();
 
                 return static::SUCCESS;
             });
@@ -138,7 +134,7 @@ class HandleLicensesCommand extends Command
             $message = "Closed $closed licenses";
             $this->output->info($message);
             Log::info($message);
-        } else if ($licensesCount < $number) {
+        } elseif ($licensesCount < $number) {
             $difference = $licensesCount - $number;
             if (confirm("$licensesCount licenses found. Do you confirm $difference licenses creation?")) {
                 License::factory()->count($difference)->create();
@@ -160,7 +156,7 @@ class HandleLicensesCommand extends Command
             $message = "Renewed $expired licenses";
             $this->output->info($message);
             Log::info($message);
-            $number = $number - $expired;
+            $number -= $expired;
         }
 
         if ($number) {

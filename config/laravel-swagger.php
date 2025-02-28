@@ -18,7 +18,7 @@ return [
 
     'appVersion' => version(),
 
-    'host' => preg_replace('/http(?:s?):\/\//', '', env('APP_URL')) . (!in_array(env('APP_PORT'), ['443', '80']) ? ':' . env('APP_PORT') : ''),
+    'host' => preg_replace('/http(?:s?):\/\//', '', (string) env('APP_URL')) . (in_array(env('APP_PORT'), ['443', '80']) ? '' : ':' . env('APP_PORT')),
 
     'basePath' => '/',
 

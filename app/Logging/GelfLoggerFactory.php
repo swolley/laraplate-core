@@ -44,7 +44,9 @@ class GelfLoggerFactory extends BaseGelfLoggerGelfLoggerFactory
 
 		foreach ($this->parseProcessors($config) as $processor) {
 			if (is_array($processor)) {
-				if (!array_key_exists('processor', $processor)) throw new \Exception("Not a valid processor configuration. array key 'processor' expected");
+				if (!array_key_exists('processor', $processor)) {
+        throw new \Exception("Not a valid processor configuration. array key 'processor' expected");
+    }
 				$class = $processor['processor'];
 				$args = $processor['with'] ?? [];
 				$instance = new $class(...$args);

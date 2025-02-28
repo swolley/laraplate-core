@@ -26,6 +26,7 @@ class SettingFactory extends Factory
      * @return array<string, mixed>
      *
      */
+    #[\Override]
     public function definition(): array
     {
         $type = fake()->randomElement(SettingTypeEnum::cases())->value;

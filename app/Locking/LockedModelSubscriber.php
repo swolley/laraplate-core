@@ -114,12 +114,9 @@ class LockedModelSubscriber
 
     private function getModelFromPassedParams($params)
     {
-        $model = null;
-
-        if (is_array($params) && count($params) > 0) {
-            $model = $params[0];
+        if (is_array($params) && $params !== []) {
+            return $params[0];
         }
-
-        return $model;
+        return null;
     }
 }

@@ -44,6 +44,7 @@ final class DynamicEntity extends Model
     /**
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return $this->_casts;
@@ -51,7 +52,7 @@ final class DynamicEntity extends Model
 
     public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
-        if ($model = static::tryResolveModel($tableName, $connection)) {
+        if ($model = self::tryResolveModel($tableName, $connection)) {
             return new $model($attributes);
         }
 
@@ -59,7 +60,7 @@ final class DynamicEntity extends Model
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
             
             return Cache::remember($cache_key, config('cache.duration'), function() use ($tableName, $connection, $attributes, $request) {
-                $model = new static($attributes);
+                $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
                 return $model;
             });
@@ -134,7 +135,7 @@ final class DynamicEntity extends Model
         }
         $this->setDirectRelationsInfo($inspected->foreignKeys);
 
-        if ($request) {
+        if ($request instanceof \Illuminate\Http\Request) {
             $this->setReverseRelationsInfo($request);
         }
         $this->setColumnsInfo($inspected->columns, $inspected->foreignKeys, $inspected->indexes);

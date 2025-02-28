@@ -94,7 +94,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         // $this->availableClasses = $this->possibleModels();
     }
 
-    private static function array_last(string $needle, array $array): int|false
+    private function array_last(string $needle, array $array): int|false
     {
         $reversed_array = array_reverse($array);
 
@@ -108,9 +108,9 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return count($array) - $pos - 1;
     }
 
-    private static function addDefaultSections(string $className, string $classCode): string
+    private function addDefaultSections(string $className, string $classCode): string
     {
-        $short_name = ModelMakeCommand::stripModelsNamespace($className);
+        $short_name = $this->stripModelsNamespace($className);
 
         /** @var int $pos */
         $pos = Str::position($classCode, 'class ' . $short_name);
@@ -125,7 +125,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
          *
          * @var int $eoc_idx
          */
-        $eoc_idx = ModelMakeCommand::array_last('}', $injected_class_code);
+        $eoc_idx = $this->array_last('}', $injected_class_code);
         $table_name = Str::plural(Str::snake($short_name));
         $default_comments = <<<EOL
 
@@ -174,11 +174,12 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return implode("\n", $injected_class_code);
     }
 
-    private static function stripModelsNamespace(string $className): string
+    private function stripModelsNamespace(string $className): string
     {
         return str_replace('App\\Models\\', '', $className);
     }
 
+    #[\Override]
     public function handle(): void
     {
         $name = Str::studly($this->getNameInput());
@@ -203,7 +204,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
             $class_code = $this->sortImports($this->buildClass($name));
             $class_code = $this->addDefaultSections($name, $class_code);
-            $dynamicEntityClass = 'Modules\Core\Models\DynamicEntity';
+            $dynamicEntityClass = \Modules\Core\Models\DynamicEntity::class;
 
             if (Schema::hasTable($table_name) && class_exists($dynamicEntityClass)) {
                 $this->info('An unmapped table with the same name was found in the schema');
@@ -258,10 +259,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
             $info = $this->type;
 
-            if (class_uses_trait($name, CreatesMatchingTest::class)) {
-                if ($this->handleTestCreation($path)) {
-                    $info .= ' and test';
-                }
+            if (class_uses_trait($name, CreatesMatchingTest::class) && $this->handleTestCreation($path)) {
+                $info .= ' and test';
             }
 
             $this->info(sprintf('%s [%s] created successfully.', $info, $path));
@@ -275,11 +274,13 @@ class ModelMakeCommand extends BaseModelMakeCommand
         }
     }
 
+    #[\Override]
     protected function possibleModels()
     {
         return models(false);
     }
 
+    #[\Override]
     protected function qualifyClass($name)
     {
         $name = ltrim($name, '\\/');
@@ -297,6 +298,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         );
     }
 
+    #[\Override]
     protected function getPath($name)
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
@@ -308,6 +310,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         ) . DIRECTORY_SEPARATOR . str_replace('\\', '/', $name) . '.php';
     }
 
+    #[\Override]
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->availableClasses = $this->possibleModels();
@@ -315,6 +318,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return parent::execute($input, $output);
     }
 
+    #[\Override]
     protected function promptForMissingArguments(InputInterface $input, OutputInterface $output): void
     {
         $this->availableClasses = $this->possibleModels();
@@ -339,6 +343,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         }
     }
 
+    #[\Override]
     protected function afterPromptingForMissingArguments(InputInterface $input, OutputInterface $output): void
     {
         $this->isNewClass = !in_array($this->getNameInput(), $this->availableClasses, true);
@@ -371,12 +376,12 @@ class ModelMakeCommand extends BaseModelMakeCommand
                 'form requests' => 'requests',
                 default => $option,
             })
-            ->each(function ($option) use ($input) {
+            ->each(fn($option) =>
                 /** @var string $option */
-                return $input->setOption($option, true);
-            });
+                $input->setOption($option, true));
     }
 
+    #[\Override]
     protected function createMigration(): void
     {
         /** @var string $name */
@@ -558,7 +563,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     private function addNewPropertyAnnotation(string $className, string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): array|string
     {
         /** @var int $pos */
-        $pos = Str::position($classCode, 'class ' . ModelMakeCommand::stripModelsNamespace($className));
+        $pos = Str::position($classCode, 'class ' . $this->stripModelsNamespace($className));
 
         /** @var int $pos */
         $pos = Str::position($classCode, ' */', $pos - 20);
@@ -620,12 +625,10 @@ class ModelMakeCommand extends BaseModelMakeCommand
             $pos = Str::position($classCode, '];', $pos);
 
             /** @var string $pos */
-            $classCode = Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s',\n\t", $needs_newline ? "\n" : '', $fieldName, $fieldType), $pos, 0);
-        } else {
-            $classCode = $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s',\n\t];", $search, $fieldName, $fieldType));
+            return Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s',\n\t", $needs_newline ? "\n" : '', $fieldName, $fieldType), $pos, 0);
         }
 
-        return $classCode;
+        return $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s',\n\t];", $search, $fieldName, $fieldType));
     }
 
     private function addPropertyIntoValidations(string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): string
@@ -652,12 +655,10 @@ class ModelMakeCommand extends BaseModelMakeCommand
             $pos = Str::position($classCode, '];', $pos);
 
             /** @var string $classCode */
-            $classCode = Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s%s',\n\t", $needs_newline ? "\n" : '', $fieldName, Str::startsWith($fieldType, 'date') ? 'date' : $fieldType, !$fieldNullable ? '|required' : ''), $pos, 0);
-        } else {
-            $classCode = $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s%s',\n\t];", $search, $fieldName, $fieldType, !$fieldNullable ? '|required' : ''));
+            return Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s%s',\n\t", $needs_newline ? "\n" : '', $fieldName, Str::startsWith($fieldType, 'date') ? 'date' : $fieldType, $fieldNullable ? '' : '|required'), $pos, 0);
         }
 
-        return $classCode;
+        return $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s%s',\n\t];", $search, $fieldName, $fieldType, $fieldNullable ? '' : '|required'));
     }
 
     private function injectImportClass(string &$classCode, string $importName): bool
@@ -691,10 +692,10 @@ class ModelMakeCommand extends BaseModelMakeCommand
             $method_name = Str::studly($fieldName);
 
             if ($field_real_type === 'datetime') {
-                $imported_carbon_class = $this->injectImportClass($classCode, 'Illuminate\Support\Carbon');
+                $imported_carbon_class = $this->injectImportClass($classCode, \Illuminate\Support\Carbon::class);
 
                 if (!$imported_carbon_class) {
-                    $field_real_type = 'Illuminate\Support\Carbon';
+                    $field_real_type = \Illuminate\Support\Carbon::class;
                 }
             }
 
@@ -761,7 +762,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
     private function handleAskInversedRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
     {
-        $short_class = ModelMakeCommand::stripModelsNamespace($className);
+        $short_class = $this->stripModelsNamespace($className);
         $create_reverse_relation = $this->confirm("Do you want to create a method into class {$relatedClass} to access {$short_class}?", true);
 
         if (!$create_reverse_relation) {
@@ -785,12 +786,12 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
     private function updateClassWithNewRelation(string $className, string $classCode, string $classPath, string $relationName, string $relationType, string $relatedClass, bool $isInversed = false): string
     {
-        $added_relation_import = $this->injectImportClass($classCode, 'Illuminate\Database\Eloquent\Relations\Relation');
+        $added_relation_import = $this->injectImportClass($classCode, \Illuminate\Database\Eloquent\Relations\Relation::class);
         $full_related_class = $this->qualifyModel($relatedClass);
         $added_model_import = $this->injectImportClass($classCode, $full_related_class);
 
         $relation_method = $this->availableTypes['Relationships/Associations'][$relationType];
-        $class_relation_import = $added_relation_import ? 'Relation' : 'Illuminate\Database\Eloquent\Relations\Relation';
+        $class_relation_import = $added_relation_import ? 'Relation' : \Illuminate\Database\Eloquent\Relations\Relation::class;
         $class_model_import = $added_model_import ? $relatedClass : $full_related_class;
         $snippet = <<<EOL
 
@@ -828,7 +829,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     private function askForPropertyName(array $newFields, array $alreadyExistentFields): string|false
     {
         $field_name = text(
-            (!empty($newFields) ? 'Add another property? ' : '') . 'New property name',
+            ($newFields === [] ? '' : 'Add another property? ') . 'New property name',
             hint: 'press <return> to stop adding fields',
             validate: function (string $field_name) use ($newFields, $alreadyExistentFields) {
                 $field_name = Str::snake(trim($field_name));
@@ -841,7 +842,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
             },
         );
 
-        return $field_name ? Str::snake(trim($field_name)) : false;
+        return $field_name !== '' && $field_name !== '0' ? Str::snake(trim($field_name)) : false;
     }
 
     /**
@@ -876,11 +877,9 @@ class ModelMakeCommand extends BaseModelMakeCommand
                 "\"{$field_name}\" field type [{$default_type}]:",
                 $all_input_types,
                 placeholder: $default_type,
-                validate: function (string $value) use ($all_input_types) {
-                    return match (true) {
-                        !in_array($value, $all_input_types, true) => "Invalid type \"{$value}\"",
-                        default => null,
-                    };
+                validate: fn(string $value) => match (true) {
+                    !in_array($value, $all_input_types, true) => "Invalid type \"{$value}\"",
+                    default => null,
                 },
             );
 

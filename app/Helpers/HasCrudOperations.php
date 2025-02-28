@@ -45,7 +45,7 @@ trait HasCrudOperations
      */
     private function applyGroupBy(Collection &$data, array $groupBy)
     {
-        if (empty($groupBy)) {
+        if ($groupBy === []) {
             return $data;
         }
 

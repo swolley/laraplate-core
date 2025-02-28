@@ -10,12 +10,14 @@ use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
 class SocialiteProvider implements AuthenticationProviderInterface
 {
+    #[\Override]
     public function canHandle(Request $request): bool
     {
         return $request->has('provider') &&
             in_array($request->provider, config('services.socialite.providers', []));
     }
 
+    #[\Override]
     public function authenticate(Request $request): array
     {
         try {
@@ -50,7 +52,7 @@ class SocialiteProvider implements AuthenticationProviderInterface
                 'error' => null,
                 'license' => $user->license
             ];
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return [
                 'success' => false,
                 'user' => null,
@@ -60,11 +62,13 @@ class SocialiteProvider implements AuthenticationProviderInterface
         }
     }
 
+    #[\Override]
     public function isEnabled(): bool
     {
         return config('services.socialite.enabled', false);
     }
 
+    #[\Override]
     public function getProviderName(): string
     {
         return 'social';

@@ -59,7 +59,7 @@ class IndexInElasticsearchJob implements ShouldQueue
                 'body' => $data
             ]);
         } catch (\Exception $e) {
-            \Log::error('Elasticsearch indexing failed for model: ' . get_class($this->model), [
+            \Log::error('Elasticsearch indexing failed for model: ' . $this->model::class, [
                 'model_id' => $this->model->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -72,7 +72,7 @@ class IndexInElasticsearchJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         \Log::error('IndexInElasticsearchJob failed', [
-            'model' => get_class($this->model),
+            'model' => $this->model::class,
             'model_id' => $this->model->id,
             'error' => $exception->getMessage()
         ]);

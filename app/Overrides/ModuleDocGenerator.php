@@ -10,12 +10,9 @@ use Mtrajano\LaravelSwagger\Generator;
 
 class ModuleDocGenerator extends Generator
 {
-    private string $module;
-
-    public function __construct($config, string $module, $routeFilter = null)
+    public function __construct($config, private readonly string $module, $routeFilter = null)
     {
         parent::__construct($config, $routeFilter);
-        $this->module = $module;
     }
 
     /**
@@ -23,6 +20,7 @@ class ModuleDocGenerator extends Generator
      *
      * @psalm-return list{0?: ModuleDocRoute,...}
      */
+    #[\Override]
     protected function getAppRoutes(): array
     {
         $module = Str::replace('Modules\\', '', $this->module);
@@ -50,12 +48,12 @@ class ModuleDocGenerator extends Generator
                     ? explode('|', $value) 
                     : (array)$value;
 
-                if (!empty($values)) {
+                if ($values !== []) {
                     $parameter_values[$key] = $values;
                 }
             }
 
-            if (empty($parameter_values)) {
+            if ($parameter_values === []) {
                 $module_routes[] = new ModuleDocRoute($route);
                 continue;
             }
@@ -77,10 +75,6 @@ class ModuleDocGenerator extends Generator
         return $module_routes;
     }
 
-    /**
-     * @param Route $route
-     * @return bool
-     */
     private function shouldIgnoreRoute(Route $route): bool
     {
         if (!isset($this->config['ignoredRoutes'])) {
@@ -100,7 +94,7 @@ class ModuleDocGenerator extends Generator
                 continue;
             }
 
-            $regex = str_replace('\*', '.*', preg_quote($pattern, '/'));
+            $regex = str_replace('\*', '.*', preg_quote((string) $pattern, '/'));
             if (preg_match('/^' . $regex . '$/', $route_name)) {
                 return true;
             }
@@ -117,7 +111,7 @@ class ModuleDocGenerator extends Generator
      */
     private function generateCombinations(array $parameters): array
     {
-        if (empty($parameters)) {
+        if ($parameters === []) {
             return [[]];
         }
 
@@ -136,6 +130,7 @@ class ModuleDocGenerator extends Generator
         return $combinations;
     }
 
+    #[\Override]
     protected function generatePath(): void
     {
         parent::generatePath();

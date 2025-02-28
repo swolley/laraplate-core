@@ -133,7 +133,7 @@ trait HasOptimisticLocking
      */
     protected function lockingEnabled(): bool
     {
-        return $this->lock === null ? true : $this->lock;
+        return $this->lock ?? true;
     }
 
     /**

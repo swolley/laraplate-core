@@ -103,9 +103,8 @@ abstract class ListEntity extends Entity
     public function getLabelField(): array|Field|null
     {
         $fields = $this->getFields()->filter(fn($field) => in_array($field->getName(), $this->labelFieldsName));
-        $label = $fields->count() === 1 ? $fields->first() : $fields->toArray();
 
-        return $label;
+        return $fields->count() === 1 ? $fields->first() : $fields->toArray();
     }
 
     /**
@@ -116,7 +115,7 @@ abstract class ListEntity extends Entity
      */
     private function setLabelField(Field|array &$labelField)
     {
-        foreach ((!is_array($labelField) ? [$labelField] : $labelField) as $field) {
+        foreach ((is_array($labelField) ? $labelField : [$labelField]) as $field) {
             $this->addField($field);
             $this->labelFieldsName[] = $field->getName();
         }

@@ -51,11 +51,8 @@ class ResponseBuilder
 
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
-    private Request $request;
-
-    public function __construct(Request $request)
+    public function __construct(private Request $request)
     {
-        $this->request = $request;
         $this->preview = preview();
     }
 
@@ -135,7 +132,7 @@ class ResponseBuilder
 
     public function isEmpty(): bool
     {
-        return !isset($this->resourceResponse) || !isset($this->resourceResponse->resource);
+        return !$this->resourceResponse instanceof \Illuminate\Http\Resources\Json\JsonResource || $this->resourceResponse->resource === null;
     }
 
     public function isNotEmpty(): bool
@@ -310,7 +307,7 @@ class ResponseBuilder
      */
     public function setClass(object|string|null $class): static
     {
-        $this->class = is_object($class) ? get_class($class) : $class;
+        $this->class = is_object($class) ? $class::class : $class;
 
         if ($class instanceof Model) {
             $this->table = $class->getTable();
@@ -402,7 +399,7 @@ class ResponseBuilder
             ],
         ];
 
-        if (isset($this->error)) {
+        if ($this->error !== null) {
             if ($this->error instanceof \Exception) {
                 $payload['error'] = $this->error->getMessage();
 
@@ -419,49 +416,49 @@ class ResponseBuilder
             }
         }
 
-        if (!$this->resourceResponse) {
+        if (!$this->resourceResponse instanceof \Illuminate\Http\Resources\Json\JsonResource) {
             $this->resourceResponse = new JsonResource(null);
         } elseif ($this->resourceResponse instanceof ResourceCollection) {
-            if (isset($this->totalRecords)) {
+            if ($this->totalRecords !== null) {
                 $payload['meta']['totalRecords'] = $this->totalRecords;
             }
 
-            if (isset($this->currentRecords)) {
+            if ($this->currentRecords !== null) {
                 $payload['meta']['currentRecords'] = $this->currentRecords;
             }
 
-            if (isset($this->currentPage)) {
+            if ($this->currentPage !== null) {
                 $payload['meta']['currentPage'] = $this->currentPage;
             }
 
-            if (isset($this->totalPages)) {
+            if ($this->totalPages !== null) {
                 $payload['meta']['totalPages'] = $this->totalPages;
             }
 
-            if (isset($this->pagination)) {
+            if ($this->pagination !== null) {
                 $payload['meta']['pagination'] = $this->pagination;
             }
 
-            if (isset($this->from)) {
+            if ($this->from !== null) {
                 $payload['meta']['from'] = $this->from;
 
-                if (isset($this->to)) {
+                if ($this->to !== null) {
                     $count = $this->data()->count();
                     $payload['meta']['to'] = $count < $this->to - $this->from + 1 ? $this->from + $count - 1 : $this->to;
                 }
             }
         }
 
-        if (isset($this->cachedAt)) {
+        if ($this->cachedAt instanceof \Illuminate\Support\Carbon) {
             $payload['meta']['cachedAt'] = $this->cachedAt;
         }
 
         if (config('app.debug')) {
-            if (isset($this->class)) {
+            if ($this->class !== null) {
                 $payload['meta']['class'] = $this->class;
             }
 
-            if (isset($this->table)) {
+            if ($this->table !== null) {
                 $payload['meta']['table'] = $this->table;
             }
             $route = request()->route();
@@ -515,9 +512,7 @@ class ResponseBuilder
     {
         $responseProperties = unserialize($serializedResponse);
 
-        $response = $this->buildResponse($responseProperties);
-
-        return $response;
+        return $this->buildResponse($responseProperties);
     }
 
     private function buildResponse(array $responseProperties): JsonResponse

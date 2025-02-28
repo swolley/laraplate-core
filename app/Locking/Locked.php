@@ -21,7 +21,7 @@ class Locked
 
     public function canBeUnlocked($model): bool
     {
-        $modelClass = get_class($model);
+        $modelClass = $model::class;
         $canBeUnlocked = $this->classesThatCanBeUnlocked();
         $unlockAllowed = $this->unlockAllowed();
 

@@ -10,7 +10,7 @@ use Mtrajano\LaravelSwagger\DataObjects\Route;
 
 class ModuleDocRoute extends Route
 {
-    private LaravelRoute $reflectedRoute;
+    private readonly LaravelRoute $reflectedRoute;
 
     public function __construct(LaravelRoute $route)
     {
@@ -32,7 +32,9 @@ class ModuleDocRoute extends Route
     public function group()
     {
         $name = $this->name();
-        if (!$name) return '';
+        if (!$name) {
+            return '';
+        }
         $exploded = explode('.', $name);
 
         return array_shift($exploded);

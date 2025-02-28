@@ -26,11 +26,7 @@ class Table
     ) {
         $primaryKey = $indexes->filter(fn($index) => $index->attributes->contains('primary'));
 
-        if ($primaryKey->isNotEmpty()) {
-            $this->primaryKey = $primaryKey->first();
-        } else {
-            $this->primaryKey = null;
-        }
+        $this->primaryKey = $primaryKey->isNotEmpty() ? $primaryKey->first() : null;
     }
 
     /**

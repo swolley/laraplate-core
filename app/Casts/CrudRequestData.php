@@ -10,22 +10,13 @@ use Modules\Core\Models\DynamicEntity;
 
 class CrudRequestData
 {
-    public readonly Request $request;
-
-    public readonly string $mainEntity;
-
     public readonly ?string $connection;
 
     /** @phpstan-ignore property.uninitializedReadonly */
     public readonly Model $model;
 
-    public readonly string|array $primaryKey;
-
-    public function __construct(Request $request, string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey)
     {
-        $this->request = $request;
-        $this->mainEntity = $mainEntity;
-        $this->primaryKey = $primaryKey;
         $this->connection = $validated['connection'] ?? null;
         if ($this->mainEntity !== '') {
             $this->model = DynamicEntity::resolve($this->mainEntity, $this->connection, request: $this->request);

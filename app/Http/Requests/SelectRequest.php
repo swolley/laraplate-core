@@ -30,11 +30,11 @@ abstract class SelectRequest extends CrudRequest
 
         $to_merge = [];
 
-        if (isset($this->columns) && is_string($this->columns)) {
+        if (property_exists($this, 'columns') && $this->columns !== null && is_string($this->columns)) {
             $to_merge['columns'] = static::decode($this->columns);
         }
 
-        if (isset($this->relations) && is_string($this->relations)) {
+        if (property_exists($this, 'relations') && $this->relations !== null && is_string($this->relations)) {
             $to_merge['relations'] = static::decode($this->relations);
         }
 

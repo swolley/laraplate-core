@@ -12,6 +12,7 @@ class CronExpression implements ValidationRule
     /**
      * Run the validation rule.
      */
+    #[\Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (isset($value)) {

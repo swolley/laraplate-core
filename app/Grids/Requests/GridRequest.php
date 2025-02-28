@@ -31,9 +31,9 @@ class GridRequest extends FormRequest implements IParsableRequest
         $url = $this->url();
         if (Str::contains($url, '/' . GridAction::FUNNELS->value)) {
             $grid_rules = $this->remapListRules('funnels.*');
-        } else if (Str::contains($url, '/' . GridAction::OPTIONS->value)) {
+        } elseif (Str::contains($url, '/' . GridAction::OPTIONS->value)) {
             $grid_rules = $this->remapListRules('options.*');
-        } else if (Str::contains($url, '/' . GridAction::SELECT->value)) {
+        } elseif (Str::contains($url, '/' . GridAction::SELECT->value)) {
             $grid_rules = [
                 'options' => ['sometimes'],
                 'funnels' => ['sometimes'],
@@ -41,7 +41,7 @@ class GridRequest extends FormRequest implements IParsableRequest
                 ...$this->remapListRules('options.*'),
             ];
             // TODO: serve anche l'entità o parto da quella della griglia e poi guardo che colonne vengono chieste?
-        } else if (Str::contains($url, [
+        } elseif (Str::contains($url, [
             '/' . GridAction::INSERT->value,
             '/' . GridAction::UPDATE->value,
             '/' . GridAction::DELETE->value,
@@ -92,7 +92,7 @@ class GridRequest extends FormRequest implements IParsableRequest
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ListRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
-                if (isset($this->funnels)) {
+                if (property_exists($this, 'funnels') && $this->funnels !== null) {
                     foreach ($this->funnels as $funnel) {
                         /** @phpstan-ignore staticMethod.notFound */
                         $sub_request = ListRequest::createFrom($this);
@@ -101,7 +101,7 @@ class GridRequest extends FormRequest implements IParsableRequest
                         $this->realFunnelRequests[] = $sub_request;
                     }
                 }
-                if (isset($this->options)) {
+                if (property_exists($this, 'options') && $this->options !== null) {
                     foreach ($this->options as $option) {
                         /** @phpstan-ignore staticMethod.notFound */
                         $sub_request = ListRequest::createFrom($this);
@@ -137,18 +137,15 @@ class GridRequest extends FormRequest implements IParsableRequest
         if (isset($this->realMainRequest)) {
             $this->realMainRequest->validateResolved();
         }
-        if (!empty($this->realOptionRequests)) {
-            foreach ($this->realOptionRequests as $request) {
-                $request->validateResolved();
-            }
+        foreach ($this->realOptionRequests as $request) {
+            $request->validateResolved();
         }
-        if (!empty($this->realFunnelRequests)) {
-            foreach ($this->realFunnelRequests as $request) {
-                $request->validateResolved();
-            }
+        foreach ($this->realFunnelRequests as $request) {
+            $request->validateResolved();
         }
     }
 
+    #[\Override]
     public function validated($key = null, $default = null)
     {
         $validated = $this->realMainRequest->validated($key, $default);

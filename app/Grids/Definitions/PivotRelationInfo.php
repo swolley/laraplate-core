@@ -6,12 +6,6 @@ namespace Modules\Core\Grids\Definitions;
 
 class PivotRelationInfo extends RelationInfo
 {
-    private string $pivotTable;
-
-    private string $pivotOwnerKey;
-
-    private string $pivotForeignKey;
-
     /**
      * {@inheritDoc}
      *
@@ -19,12 +13,9 @@ class PivotRelationInfo extends RelationInfo
      * @param  string  $pivotOwnerKey  pivot owner key
      * @param  string  $pivotForeignKey  pivot foreign key
      */
-    final public function __construct(string $type, string $name, string $model, string $table, string $foreignKey, string $ownerKey, string $pivotTable, string $pivotOwnerKey, string $pivotForeignKey)
+    final public function __construct(string $type, string $name, string $model, string $table, string $foreignKey, string $ownerKey, private readonly string $pivotTable, private readonly string $pivotOwnerKey, private readonly string $pivotForeignKey)
     {
         parent::__construct($type, $name, $model, $table, $foreignKey, $ownerKey);
-        $this->pivotTable = $pivotTable;
-        $this->pivotOwnerKey = $pivotOwnerKey;
-        $this->pivotForeignKey = $pivotForeignKey;
     }
 
     /**

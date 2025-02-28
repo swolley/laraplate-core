@@ -41,7 +41,7 @@ class ResponseBuilder extends BaseResponseBuilder
         $meta = [];
         // unset($payload['meta']);
 
-        if (!empty($this->rules)) {
+        if ($this->rules !== []) {
             $meta['validations'] = $this->rules;
         }
         if ($this->options) {

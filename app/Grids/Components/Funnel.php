@@ -65,13 +65,14 @@ class Funnel extends ListEntity
     /**
      * {@inheritDoc}
      */
+    #[\Override]
     protected function getData(): array
     {
         $name = $this->getValueField()->getFullAlias();
         $funnels_data = $this->requestData->funnelsFilters[$name];
         $columns_filters = $this->requestData->filters ?? [];
 
-        $exploded = explode('.', $name);
+        $exploded = explode('.', (string) $name);
         $subfix = array_pop($exploded);
         array_shift($exploded);
         $imploded = implode('.', $exploded);
@@ -97,7 +98,7 @@ class Funnel extends ListEntity
         }
 
         $last_relation = array_pop($inversed_relationships)->getName();
-        if (!empty($inversed_relationships)) {
+        if ($inversed_relationships !== []) {
             // deep relation
             $imploded_inversed_relation = implode('.', array_map(fn($r) => $r->getName(), $inversed_relationships));
             $query->with([$imploded_inversed_relation => function ($q) use ($last_relation, $columns_filters, $name) {

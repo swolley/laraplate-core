@@ -31,7 +31,7 @@ trait HasPath
      */
     public function getFullName(): string
     {
-        return (strlen($this->getPath()) ? ($this->getPath() . '.') : '') . $this->getName();
+        return (strlen($this->getPath()) !== 0 ? ($this->getPath() . '.') : '') . $this->getName();
     }
 
     /**

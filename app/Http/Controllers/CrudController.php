@@ -62,12 +62,9 @@ class CrudController extends Controller
 {
     use HasCrudOperations;
 
-    protected DatabaseManager $db;
-
-    public function __construct(DatabaseManager $db)
+    public function __construct(protected DatabaseManager $db)
     {
         parent::__construct();
-        $this->db = $db;
     }
 
     /**
@@ -96,7 +93,7 @@ class CrudController extends Controller
 
     private function isParsableRequest(Request $request): bool
     {
-        return in_array('Modules\Core\Casts\IParsableRequest', class_implements($request));
+        return in_array(\Modules\Core\Casts\IParsableRequest::class, class_implements($request));
     }
 
     /**
@@ -236,7 +233,7 @@ class CrudController extends Controller
         });
     }
 
-    private function getElasticSearchQuery(SearchRequestData $filters, array $embeddings = null): array
+    private function getElasticSearchQuery(SearchRequestData $filters, ?array $embeddings = null): array
     {
         $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
 
@@ -277,7 +274,7 @@ class CrudController extends Controller
         $params['body']['_source'] = ['includes' => $filters->fields ?? ['*']];
         $params['body']['sort'] = ['_score' => ['order' => 'desc']];
 
-        if ($filters->mainEntity) {
+        if ($filters->mainEntity !== '' && $filters->mainEntity !== '0') {
             $params['index'] = $filters->mainEntity;
         }
 
@@ -408,13 +405,13 @@ class CrudController extends Controller
             if (!isset($filters->model) || $is_searchable_class) {
                 $embeddedDocument = null;
 
-                if (isset($filters->model->embed) && !empty($filters->model->embed)) {
+                if (property_exists($filters->model, 'embed') && $filters->model->embed !== null && !empty($filters->model->embed)) {
                     $embeddingGenerator = new OpenAI3SmallEmbeddingGenerator();
                     $embeddedDocument = $embeddingGenerator->embedText($filters->qs);
                 }
 
                 // Pass both embeddedDocument and filters->filters to the query
-                $elastic_query = $this->getElasticSearchQuery($filters, $embeddedDocument, $filters->filters ?? []);
+                $elastic_query = $this->getElasticSearchQuery($filters, $embeddedDocument);
 
                 $client = ClientBuilder::create()->build();
                 $response = $client->search($elastic_query);
@@ -519,7 +516,6 @@ class CrudController extends Controller
 
     private function removeNotFillableProperties(Model $model, array &$values): array
     {
-        $non_fillables = [];
         $non_fillables = array_diff(array_keys($model->getFillable()), array_keys($values));
         foreach ($non_fillables as $property) {
             unset($values[$property]);
@@ -555,7 +551,7 @@ class CrudController extends Controller
             return $responseBuilder
                 ->setData($created)
                 ->setStatus(Response::HTTP_CREATED)
-                ->setError(!empty($discarded_values) ? $discarded_values : null)
+                ->setError($discarded_values === [] ? null : $discarded_values)
                 ->getResponse();
         });
     }
@@ -600,7 +596,7 @@ class CrudController extends Controller
                 }
             });
 
-            if (!empty($discarded_values)) {
+            if ($discarded_values !== []) {
                 $responseBuilder->setError($discarded_values);
             }
 
@@ -663,7 +659,8 @@ class CrudController extends Controller
             $found_record = $model->withTrashed()->findOrFail($key_value);
             if ($operation === 'activate' && !$found_record->restore()) {
                 throw new \LogicException('Record not activated');
-            } elseif (!$found_record->delete()) {
+            }
+            if (!$found_record->delete()) {
                 throw new \LogicException('Record not inactivated');
             }
 

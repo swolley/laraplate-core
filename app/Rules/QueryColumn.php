@@ -12,10 +12,7 @@ class QueryColumn implements ValidationRule
     /**
      * Run the validation rule.
      *
-     * @param  string  $attribute
-     * @param  mixed  $value
      * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
-     * @return void
      */
     #[\Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void

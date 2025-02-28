@@ -39,7 +39,7 @@ class ModelLockingRefreshCommand extends Command
         $this->quiet_mode = $this->option('quiet');
 
         $all_models = models();
-        $parental_class = "Parental\\HasParent";
+        $parental_class = \Parental\HasParent::class;
         $this->changes = false;
 
         foreach ($all_models as $model) {

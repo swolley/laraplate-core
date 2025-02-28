@@ -14,17 +14,18 @@ class Option extends ListEntity
     /**
      * {@inheritDoc}
      */
+    #[\Override]
     protected function getData(): array
     {
         $name = $this->getValueField()->getFullAlias();
         $option_data = $this->requestData->optionsFilters[$name];
 
-        $exploded = explode('.', $name);
+        $exploded = explode('.', (string) $name);
         $subfix = array_pop($exploded);
         $field_path = implode('.', $exploded);
         if ($field_path === $this->getPath()) {
             $model = $this->getModel();
-        } elseif ($relation = $this->getRelationDeeply($field_path)) {
+        } elseif (($relation = $this->getRelationDeeply($field_path)) !== null) {
             $model = $relation->getModel();
         } else {
             Log::warning('No model found for grid option ' . $name);
@@ -43,7 +44,7 @@ class Option extends ListEntity
         // $columns = array_unique($columns);
         $columns = $this->getAllQueryFields();
         $this->getAllFields()->diff($columns);
-        $additional_columns = $this->getAllFields()->diff($columns);
+        $this->getAllFields()->diff($columns);
         $columns = $columns->map(fn($field) => $field->getName())->toArray();
 
         $query = $model::query()->select($columns);

@@ -86,7 +86,9 @@ class Version extends OvertrueVersion
     {
         /** @var Model $versionable */
         $versionable = $this->versionable;
-        if (!$versionable) return null;
+        if (!$versionable) {
+            return null;
+        }
 
         /** @phpstan-ignore property.notFound */
         if ($this->versionable_type) {
@@ -107,7 +109,9 @@ class Version extends OvertrueVersion
     public function revertWithoutSaving(): ?Model
     {
         $versionable = $this->getCompleteVersionable();
-        if (!$versionable) return null;
+        if (!$versionable instanceof \Illuminate\Database\Eloquent\Model) {
+            return null;
+        }
 
         $original = $versionable->getRawOriginal();
         switch ($versionable->getVersionStrategy()) {

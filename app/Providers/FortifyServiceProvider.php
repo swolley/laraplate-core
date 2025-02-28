@@ -33,6 +33,7 @@ class FortifyServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
+    #[\Override]
     public function register(): void
     {
         $this->app->instance(LogoutResponse::class, new class implements LogoutResponse
@@ -65,12 +66,10 @@ class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(AuthenticationService::class, function ($app) {
-            return new AuthenticationService([
-                $app->make(FortifyCredentialsProvider::class),
-                $app->make(SocialiteProvider::class),
-            ]);
-        });
+        $this->app->singleton(AuthenticationService::class, fn($app) => new AuthenticationService([
+            $app->make(FortifyCredentialsProvider::class),
+            $app->make(SocialiteProvider::class),
+        ]));
     }
 
     /**
@@ -89,13 +88,9 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey);
         });
 
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
-        });
+        RateLimiter::for('two-factor', fn(Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
 
-        RateLimiter::for('im-still-here', function (Request $request) {
-            return Limit::perMinute(6)->by($request->session()->get('login.id'));
-        });
+        RateLimiter::for('im-still-here', fn(Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
         Fortify::authenticateUsing(function ($request) {
             $service = $this->app->make(AuthenticationService::class);

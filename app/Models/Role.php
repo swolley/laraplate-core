@@ -65,6 +65,7 @@ class Role extends BaseRole
     /**
      *
      */
+    #[\Override]
     public function getAllPermissions(): Collection
     {
         /** @psalm-suppress UndefinedThisPropertyFetch */

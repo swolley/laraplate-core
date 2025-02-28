@@ -8,6 +8,7 @@ use Illuminate\Foundation\Http\Middleware\TransformsRequest;
 
 class ConvertStringToBoolean extends TransformsRequest
 {
+    #[\Override]
     protected function transform($key, $value)
     {
         if ($value === 'true' || $value === 'TRUE') {

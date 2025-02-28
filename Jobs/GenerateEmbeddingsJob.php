@@ -68,12 +68,12 @@ class GenerateEmbeddingsJob implements ShouldQueue
                 $this->model->embeddings()->create(['embedding' => $embeddedDocument]);
             }
         } catch (\Exception $e) {
-            \Log::error('Embedding generation failed for model: ' . get_class($this->model), [
+            \Log::error('Embedding generation failed for model: ' . $this->model::class, [
                 'model_id' => $this->model->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             throw $e; // Rethrow per far fallire il job chain
         }
     }
@@ -81,7 +81,7 @@ class GenerateEmbeddingsJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         \Log::error('GenerateEmbeddingsJob failed', [
-            'model' => get_class($this->model),
+            'model' => $this->model::class,
             'model_id' => $this->model->id,
             'error' => $exception->getMessage()
         ]);

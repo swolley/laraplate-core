@@ -64,7 +64,7 @@ class ListRequestData extends SelectRequestData
     protected function extractPagination(array $validated)
     {
         if (isset($validated['pagination']) || isset($validated['page'])) {
-            $this->take = $this->pagination = (int) ($validated['pagination'] ?? self::getDefaultPagination());
+            $this->take = $this->pagination = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
             $this->page = (int) ($validated['page'] ?? 1);
             /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = ($this->page - 1) * $this->pagination;
@@ -87,11 +87,11 @@ class ListRequestData extends SelectRequestData
             $this->page = 1;
             /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = 0;
-            $this->take = $this->pagination = self::getDefaultPagination();
+            $this->take = $this->pagination = $this->getDefaultPagination();
         }
     }
 
-    private static function getDefaultPagination(): int
+    private function getDefaultPagination(): int
     {
         return Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
     }
@@ -132,7 +132,7 @@ class ListRequestData extends SelectRequestData
             }
             unset($filter);
         } elseif (Arr::has($filters, 'filters')) {
-            $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower($filters['operator'])) : WhereClause::AND;
+            $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower((string) $filters['operator'])) : WhereClause::AND;
             $this->conformFiltersToQueryBuilderFormat($filters['filters'], $level + 1);
             $filters = new FiltersGroup($filters['filters'], $filters['operator']);
         } else {
@@ -168,7 +168,7 @@ class ListRequestData extends SelectRequestData
      */
     private function addGroupsToColumns(array $groups): void
     {
-        if (!empty($this->columns)) {
+        if ($this->columns !== []) {
             $all_columns_name = array_map(fn(Column $column) => $column->name, $this->columns);
 
             foreach ($groups as $group) {
