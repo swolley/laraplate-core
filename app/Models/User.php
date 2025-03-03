@@ -136,16 +136,25 @@ class User extends BaseUser
     //     return $this->defaultRoles();
     // }
 
+    /**
+     * @return HasMany<UserGridConfig>
+     */
     public function grid_configs(): HasMany
     {
         return $this->hasMany(UserGridConfig::class);
     }
 
+    /**
+     * @return BelongsTo<License>
+     */
     public function license(): BelongsTo
     {
         return $this->belongsTo(License::class);
     }
 
+    /**
+     * @return BelongsToMany<Role>
+     */
     public function roles(): BelongsToMany
     {
         return $this->rolesTrait()->using(ModelHasRole::class);
