@@ -7,13 +7,14 @@
         "laraplate",
         "core"
     ],
+    "license": "MIT",
+    "type": "library",
     "authors": [
         {
             "name": "Swolley",
             "email": "myentity@inwind.it"
         }
     ],
-    "license": "MIT",
     "require": {
         "php": ">=8.3",
         "ext-curl": "*",
@@ -25,28 +26,26 @@
         "ext-ldap": "*",
         "ext-sockets": "*",
         "doctrine/dbal": "*",
-        "laravel/fortify": "^1.21",
-        "hedii/laravel-gelf-logger": "^9.0",
+        "laravel/framework": "^12.0",
+        "laravel/fortify": "^1.25",
+        "hedii/laravel-gelf-logger": "^10.0",
         "lab404/laravel-impersonate": "^1.7",
-        "overtrue/laravel-versionable": "^5.2",
-        "spatie/laravel-permission": "^6.4",
-        "staudenmeir/laravel-adjacency-list": "^1.23",
-        "laravel/socialite": "^5.15",
+        "overtrue/laravel-versionable": "^5.4",
+        "spatie/laravel-permission": "^6.16",
+        "staudenmeir/laravel-adjacency-list": "^1.24",
+        "laravel/socialite": "^5.18",
         "stephenlake/laravel-approval": "^1.1",
-        "wotz/laravel-swagger-ui": "^1.0",
-        "elasticsearch/elasticsearch": "^8.15",
-        "theodo-group/llphant": "^0.8.8",
-        "laravel/horizon": "^5.30",
-        "laravel/octane": "^2.6",
-        "awobaz/compoships": "^2.3",
-        "directorytree/ldaprecord-laravel": "^3.3"
+        "wotz/laravel-swagger-ui": "^1.2",
+        "elasticsearch/elasticsearch": "^8.17",
+        "theodo-group/llphant": "^0.9.7",
+        "laravel/horizon": "^5.31",
+        "laravel/octane": "^2.8",
+        "awobaz/compoships": "^2.4",
+        "directorytree/ldaprecord-laravel": "^3.4"
+
     },
     "require-dev": {
-        "mtrajano/laravel-swagger": "^0.6.4",
-        "pestphp/pest": "^3.5",
-        "pestphp/pest-plugin-laravel": "^3.0",
-        "mockery/mockery": "^1.6"
-        
+        "mtrajano/laravel-swagger": "^0.6.4"
     },
     "scripts": {
         "version:major": "./scripts/version.sh major",
@@ -57,7 +56,9 @@
     "extra": {
         "laravel": {
             "providers": [],
-            "aliases": []
+            "aliases": {
+
+            }
         }
     },
     "autoload": {

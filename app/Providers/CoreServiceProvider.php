@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\SoftDeletes;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Schema;
@@ -29,6 +28,9 @@ use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Cache\CacheManager;
 
+/**
+ * @property \Illuminate\Foundation\Application $app
+ */
 class CoreServiceProvider extends ServiceProvider
 {
     use PathNamespace;
@@ -60,9 +62,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        /** @var \Illuminate\Foundation\Application $app */
-        $app = $this->app;
-        $is_production = $app->isProduction();
+        $is_production = $this->app->isProduction();
 
         if ($is_production && config('core.force_https')) {
             URL::forceScheme('https');
@@ -86,20 +86,17 @@ class CoreServiceProvider extends ServiceProvider
     {
         $this->registerConfig();
 
-        /** @var \Illuminate\Foundation\Application $app */
-        $app = $this->app;
+        $this->app->register(EventServiceProvider::class);
+        $this->app->register(RouteServiceProvider::class);
 
-        $app->register(EventServiceProvider::class);
-        $app->register(RouteServiceProvider::class);
+        $this->app->singleton(Locked::class, fn() => new Locked());
+        $this->app->alias(Locked::class, 'locked');
 
-        $app->singleton(Locked::class, fn() => new Locked());
-        $app->alias(Locked::class, 'locked');
-
-        $app->alias(BaseSoftDeletes::class, SoftDeletes::class);
+        $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
         // $app->alias('App\\Models\\User', user_class());
 
-        if ($app->isLocal()) {
-            $app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
+        if ($this->app->isLocal()) {
+            $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
         }
     }
 
@@ -172,14 +169,6 @@ class CoreServiceProvider extends ServiceProvider
             $this->loadJsonTranslationsFrom(module_path($this->name, 'lang'));
         }
     }
-
-    // /**
-    //  * Register config.
-    //  */
-    // protected function registerConfig(): void
-    // {
-    //     parent::registerConfig();
-    // }
 
     /**
      * Register views.
