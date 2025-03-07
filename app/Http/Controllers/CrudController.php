@@ -57,14 +57,16 @@ use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
 use Modules\Core\Helpers\HasCrudOperations;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Auth\AuthManager;
+use Illuminate\Cache\Repository;
 
 class CrudController extends Controller
 {
     use HasCrudOperations;
 
-    public function __construct(protected DatabaseManager $db)
+    public function __construct(Repository $cache, AuthManager $auth, DatabaseManager $db)
     {
-        parent::__construct();
+        parent::__construct($cache, $auth, $db);
     }
 
     /**
@@ -430,7 +432,7 @@ class CrudController extends Controller
                     ->getResponse();
             }
 
-            return $responseBuilder->setError('Full-search operation can be done only on Searchable entities');
+            return $responseBuilder->setError('Full-search operation can be done only on Searchable entities')->getResponse();
         });
     }
 

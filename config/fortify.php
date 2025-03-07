@@ -143,17 +143,26 @@ return [
     |
     */
 
-    'features' => [
-        Features::resetPasswords(),
-        Features::updateProfileInformation(),
-        Features::updatePasswords(),
-        Features::twoFactorAuthentication([
-            'confirm' => true,
-            'confirmPassword' => true,
-            // 'window' => 0,
-        ]),
-    ] +
-        (config('core.enable_user_registration') ? [Features::registration()] : []) +
-        (config('core.verify_new_user') ? [Features::emailVerification()] : []),
+    'features' => function () {
+        $features = [
+            Features::resetPasswords(),
+            Features::updateProfileInformation(),
+            Features::updatePasswords(),
+        ];
 
+        if (config('core.enable_user_registration')) {
+            $features[] = Features::registration();
+        }
+        if (config('core.verify_new_user')) {
+            $features[] = Features::emailVerification();
+        }
+        if (config('core.enable_user_2fa')) {
+            $features[] = Features::twoFactorAuthentication([
+                'confirm' => true,
+                'confirmPassword' => true,
+                // 'window' => 0,
+            ]);
+        }
+        return $features;
+    },
 ];
