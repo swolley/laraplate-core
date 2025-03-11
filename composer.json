@@ -1,7 +1,7 @@
 {
     "name": "swolley/laraplate-core",
     "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
-    "version": "1.8.1",
+    "version": "1.9.0",
     "keywords": [
         "laravel",
         "laraplate",
