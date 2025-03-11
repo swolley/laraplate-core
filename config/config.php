@@ -35,6 +35,8 @@ return [
     'enable_user_licenses' => env('ENABLE_USER_LICENSE', false),
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'force_https' => env('FORCE_HTTPS', false),
+    // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+    'soft_deletes_expiration_days' => env('SOFT_DELETES_EXPIRATION_DAYS'),
 
     'extended_class_suffix' => '_extended',
 ];
