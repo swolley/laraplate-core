@@ -14,7 +14,7 @@ class VendorPublishCommand extends BaseVendorPublishCommand
 
     public function __construct(Filesystem $files)
     {
-        $this->description .= ' <comment>(⛭ Modules\Core)</comment>';
+        $this->description .= ' <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
         parent::__construct($files);
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Cache;
 
+use Illuminate\Support\Carbon;
+use Elastic\Elasticsearch\Client;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
@@ -11,47 +13,58 @@ use Modules\Core\Models\ModelEmbedding;
 use Elastic\Elasticsearch\ClientBuilder;
 use Modules\Core\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Jobs\IndexInElasticsearchJob;
+use Modules\Core\Jobs\ReindexElasticsearchJob;
+use Elastic\Elasticsearch\Response\Elasticsearch;
+use Modules\Core\Jobs\DeleteFromElasticsearchJob;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 trait Searchable
 {
-	/** @class-property string[]|null $embed */
-	
-	protected static function booted()
-    {
-        static::created(function (Model $model) {
-            $model->dispatchSearchableJobs();
-        });
+	const INDEXED_AT_FIELD = 'indexed_at';
 
-        static::updated(function (Model $model) {
-            $model->dispatchSearchableJobs();
-        });
-    }
+	/** @class-property string[]|null $embed */
+
+	protected static function booted()
+	{
+		static::saved(function (Model $model) {
+			$model->dispatchSearchableJobs();
+		});
+
+		// static::updated(function (Model $model) {
+		// 	$model->dispatchSearchableJobs();
+		// });
+
+		static::deleted(function (Model $model) {
+			$model->dispatchSearchableJobs(true);
+		});
+	}
 
 	/**
-     * Dispatch jobs for embedding generation and elasticsearch indexing
-     */
-    public function dispatchSearchableJobs(): void
-    {
+	 * Dispatch jobs for embedding generation and elasticsearch indexing
+	 */
+	public function dispatchSearchableJobs($delete = false): void
+	{
 		if (!config('explorer.connection.host')) {
 			return;
 		}
 
-        if ($this->isDirty() || !$this->id) {
-            throw new \Exception("Model hasn't been saved yet or has pending changes. Jobs dispatch aborted.");
-        }
+		if ($this->isDirty() || !$this->id) {
+			throw new \Exception("Model hasn't been saved yet or has pending changes. Jobs dispatch aborted.");
+		}
 
-		if (config('ai.openai_api_key')) {
+		if ($delete) {
+			DeleteFromElasticsearchJob::dispatch($this);
+		} elseif (config('ai.openai_api_key')) {
 			Bus::chain([
 				// Generate embeddings
-        	    new GenerateEmbeddingsJob($this),
+				new GenerateEmbeddingsJob($this),
 				// Index in Elasticsearch with embeddings
 				new IndexInElasticsearchJob($this)
 			])->dispatch();
 		} else {
 			IndexInElasticsearchJob::dispatch($this);
 		}
-    }
+	}
 
 	/** 
 	 * generate document for Alasticseaerch from entty attributes
@@ -59,9 +72,16 @@ trait Searchable
 	 */
 	public function prepareElasticDocument(): array
 	{
+		$index = $this->toSearchableIndex();
 		foreach ($this->getFillable() as $attribute) {
-			$data[$attribute] = $this->{$attribute};
+			if (isset($index[$attribute]['type']) && $index[$attribute]['type'] === 'date') {
+				$data[$attribute] = Carbon::parse($this->{$attribute})->utc()->toIso8601ZuluString();
+			} else {
+				$data[$attribute] = $this->{$attribute};
+			}
 		}
+
+		$data[self::INDEXED_AT_FIELD] = now()->utc()->toZuluString();
 
 		return $data;
 	}
@@ -69,8 +89,8 @@ trait Searchable
 	public function prepareDataToEmbed(): ?string
 	{
 		if (!isset($this->embed) || empty($this->embed)) {
-      return null;
-  }
+			return null;
+		}
 
 		$data = "";
 		foreach ($this->embed as $attribute) {
@@ -128,6 +148,11 @@ trait Searchable
 			];
 		}
 
+		$mapping[self::INDEXED_AT_FIELD] = [
+			'type' => 'date',
+			'format' => 'yyyy-MM-dd\TH:mm:ss\Z',
+		];
+
 		// Add embedding field mapping if model uses embeddings
 		// if (method_exists($this, 'embeddings')) {
 		$mapping['embedding'] = [
@@ -153,8 +178,8 @@ trait Searchable
 			'boolean', 'bool' => 'boolean',
 			'datetime', 'date', 'timestamp' => 'date',
 			'array', 'json', 'object', 'collection' => 'object',
-				// 'latitude', 'longitude' => 'geo_point',
-				// 'string', 'text' => 'text',
+			// 'latitude', 'longitude' => 'geo_point',
+			// 'string', 'text' => 'text',
 			default => 'text'
 		};
 	}
@@ -164,9 +189,56 @@ trait Searchable
 		return $this->getTable();
 	}
 
+	public function getElasticsearchClient(): Client
+	{
+		$builder = ClientBuilder::create();
+		$builder->setHosts([
+			config('elasticsearch.host') . ':' . config('elasticsearch.port')
+		]);
+		if (config('elasticsearch.username') || config('elasticsearch.password')) {
+			$builder->setBasicAuthentication(config('elasticsearch.username'), config('elasticsearch.password'));
+		}
+		return $builder->build();
+	}
+
+	public function getIndex(bool $createIfMissing = false): ?Elasticsearch
+	{
+		$elasticsearch_client = $this->getElasticsearchClient();
+		$index_name = $this->searchableAs();
+		$index_exists = $elasticsearch_client->indices()->exists(['index' => $index_name]);
+
+		if (!$index_exists && $createIfMissing) {
+			$this->createIndex();
+		} else {
+			return null;
+		}
+
+		return $elasticsearch_client->indices()->getMapping(['index' => $index_name]);
+	}
+
+	public function checkIndex(bool $createIfMissing = false): bool
+	{
+		$remote_index = $this->getIndex($createIfMissing);
+		if (!$remote_index) {
+			return false;
+		}
+
+		$local_index = $this->toSearchableIndex();
+
+		if (json_encode($remote_index[$this->searchableAs()]['mappings']) !== json_encode($local_index)) {
+			if ($createIfMissing) {
+				$this->createIndex();
+			} else {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	public function createIndex()
 	{
-		$elasticsearch_client = ClientBuilder::create()->build();
+		$elasticsearch_client = $this->getElasticsearchClient();
 		$index_name = $this->searchableAs();
 		$temp_index = $index_name . '_temp_' . time();
 
@@ -227,6 +299,34 @@ trait Searchable
 			]);
 			throw $e;
 		}
+	}
+
+	public function searchable()
+	{
+		$this->dispatchSearchableJobs();
+	}
+
+	public function unsearchable()
+	{
+		$this->dispatchSearchableJobs(true);
+	}
+
+	public function reindex()
+	{
+		ReindexElasticsearchJob::dispatch(static::class);
+	}
+
+	public function getLastIndexedTimestamp(): string
+	{
+		$last_sync = ClientBuilder::create()->build()->get([
+			'index' => $this->searchableAs(),
+			'body' => [
+				'size' => 1,
+				'sort' => [static::INDEXED_AT_FIELD => 'desc']
+			]
+		]);
+
+		return $last_sync['hits']['hits'][0]['_source'][$this::INDEXED_AT_FIELD];
 	}
 
 	public function embeddings(): MorphMany

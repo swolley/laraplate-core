@@ -23,7 +23,7 @@ class TranslationsCheckCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Verify languages, labels coherence and sort all translations keys <comment>(⛭ Modules\Core)</comment>';
+    protected $description = 'Verify languages, labels coherence and sort all translations keys <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     /**
      * Execute the console command.

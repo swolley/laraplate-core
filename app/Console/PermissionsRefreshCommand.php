@@ -25,7 +25,7 @@ class PermissionsRefreshCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Refresh the Permission table with inspected rules <comment>(⛭ Modules\Core)</comment>';
+    protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     /**
      * @var string[]

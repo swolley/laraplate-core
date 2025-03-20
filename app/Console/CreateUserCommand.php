@@ -32,7 +32,7 @@ class CreateUserCommand extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Create new user <comment>(⛭ Modules\Core)</comment>';
+    protected $description = 'Create new user <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     public function __construct(DatabaseManager $db)
     {

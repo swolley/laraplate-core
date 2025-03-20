@@ -32,7 +32,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
 {
     use PromptsForMissingInput;
 
-    protected $description = 'Create or modify an Eloquent model class <comment>(⛭ Modules\Core)</comment>';
+    protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     private bool $isNewClass = false;
 
@@ -377,8 +377,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
                 default => $option,
             })
             ->each(fn($option) =>
-                /** @var string $option */
-                $input->setOption($option, true));
+            /** @var string $option */
+            $input->setOption($option, true));
     }
 
     #[\Override]

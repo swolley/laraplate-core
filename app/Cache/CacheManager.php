@@ -53,7 +53,7 @@ class CacheManager
      */
     public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, ?int $duration = null, ?Repository $cache = null): mixed
     {
-        $tags = [config('APP_NAME')];
+        $tags = [config('app.name')];
         if ($entity) {
             $models = Arr::wrap($entity);
 
@@ -104,8 +104,8 @@ class CacheManager
 
             if (method_exists($model, 'usesCache') && $model->usesCache()) {
                 ($cache instanceof \Illuminate\Cache\Repository
-                    ? $cache->tags([config('APP_NAME'), self::getTableName($model)])
-                    : Cache::tags([config('APP_NAME'), self::getTableName($model)]))->flush();
+                    ? $cache->tags([config('app.name'), self::getTableName($model)])
+                    : Cache::tags([config('app.name'), self::getTableName($model)]))->flush();
             }
         }
     }
@@ -126,14 +126,14 @@ class CacheManager
 
                 if (!method_exists($model, 'usesCache') || $model->usesCache()) {
                     ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('APP_NAME'), self::getTableName($model)])
-                        : Cache::tags([config('APP_NAME'), self::getTableName($model)]))->forget($key);
+                        ? $cache->tags([config('app.name'), self::getTableName($model)])
+                        : Cache::tags([config('app.name'), self::getTableName($model)]))->forget($key);
                 }
             }
         } else {
             ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('APP_NAME')])
-                : Cache::tags([config('APP_NAME')]))->forget($key);
+                ? $cache->tags([config('app.name')])
+                : Cache::tags([config('app.name')]))->forget($key);
         }
     }
 
@@ -153,14 +153,14 @@ class CacheManager
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
                     ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('APP_NAME'), self::getTableName($model), $user_key])
-                        : Cache::tags([config('APP_NAME'), self::getTableName($model), $user_key]))->flush();
+                        ? $cache->tags([config('app.name'), self::getTableName($model), $user_key])
+                        : Cache::tags([config('app.name'), self::getTableName($model), $user_key]))->flush();
                 }
             }
         } else {
             ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('APP_NAME'), $user_key])
-                : Cache::tags([config('APP_NAME'), $user_key]))->flush();
+                ? $cache->tags([config('app.name'), $user_key])
+                : Cache::tags([config('app.name'), $user_key]))->flush();
         }
     }
 
@@ -180,14 +180,14 @@ class CacheManager
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
                     ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('APP_NAME'), self::getTableName($model), $role_key])
-                        : Cache::tags([config('APP_NAME'), self::getTableName($model), $role_key]))->flush();
+                        ? $cache->tags([config('app.name'), self::getTableName($model), $role_key])
+                        : Cache::tags([config('app.name'), self::getTableName($model), $role_key]))->flush();
                 }
             }
         } else {
             ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('APP_NAME'), $role_key])
-                : Cache::tags([config('APP_NAME'), $role_key]))->flush();
+                ? $cache->tags([config('app.name'), $role_key])
+                : Cache::tags([config('app.name'), $role_key]))->flush();
         }
     }
 

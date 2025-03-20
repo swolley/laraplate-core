@@ -21,7 +21,7 @@ class GenerateEmbeddingsJob implements ShouldQueue
     public $tries = 3;
 
     public $backoff = [30, 60, 120];
-    
+
     /**
      * Job timeout in seconds
      * 180s (3 min) considering:
@@ -36,11 +36,11 @@ class GenerateEmbeddingsJob implements ShouldQueue
      */
     public $maxExceptionsThenWait = 300;
 
-    public $queue = 'embeddings';
-
     public function __construct(
         private readonly object $model
-    ) {}
+    ) {
+        $this->onQueue('embeddings');
+    }
 
     public function middleware(): array
     {
@@ -63,7 +63,7 @@ class GenerateEmbeddingsJob implements ShouldQueue
             $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
             $embeddingGenerator = new OpenAI3SmallEmbeddingGenerator();
             $embeddedDocuments = $embeddingGenerator->embedDocuments($formattedDocuments);
-            
+
             foreach ($embeddedDocuments as $embeddedDocument) {
                 $this->model->embeddings()->create(['embedding' => $embeddedDocument]);
             }
@@ -86,4 +86,4 @@ class GenerateEmbeddingsJob implements ShouldQueue
             'error' => $exception->getMessage()
         ]);
     }
-} 
+}
