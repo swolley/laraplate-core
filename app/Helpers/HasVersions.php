@@ -25,6 +25,20 @@ trait HasVersions
 
 	protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
+	protected static function bootHasVersions(): void
+	{
+		static::deleted(function (Model $model) {
+			/* @var \Overtrue\LaravelVersionable\Versionable|\Overtrue\LaravelVersionable\Version$model */
+			if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
+				$model->createVersion(['deleted_at' => $model->deleted_at]);
+			}
+		});
+
+		static::restored(function (Model $model) {
+			$model->createVersion(['deleted_at' => null]);
+		});
+	}
+
 	protected function getCreatedBy(): ?User
 	{
 		$first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};

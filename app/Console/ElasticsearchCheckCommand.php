@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Cache\Searchable;
 use Illuminate\Support\Facades\Log;

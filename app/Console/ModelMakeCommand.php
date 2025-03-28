@@ -302,12 +302,13 @@ class ModelMakeCommand extends BaseModelMakeCommand
     protected function getPath($name)
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
+        $path_suffix = Str::after($name, 'Models\\');
 
         return (
             Str::startsWith($name, config('modules.namespace'))
-            ? base_path()
+            ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
             : $this->laravel['path']
-        ) . DIRECTORY_SEPARATOR . str_replace('\\', '/', $name) . '.php';
+        ) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
     }
 
     #[\Override]
@@ -406,6 +407,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     private function getClassFields(string $className): array
     {
         $ref = new ReflectionClass($className);
+        $temp_instance = $ref->newInstance();
         $already_existent_fields = [];
 
         if ($ref->hasProperty('fillable')) {
@@ -421,7 +423,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
             /** @psalm-suppress UnusedMethodCall */
             $method->setAccessible(true);
-            $already_existent_fields = array_merge($already_existent_fields, array_keys($method->invoke($ref)));
+            $already_existent_fields = array_merge($already_existent_fields, array_keys($method->invoke($temp_instance)));
         }
 
         if ($ref->hasProperty('hidden')) {

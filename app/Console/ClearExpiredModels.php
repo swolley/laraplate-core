@@ -2,10 +2,8 @@
 
 namespace Modules\Core\Console;
 
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Input\InputArgument;
 
 class ClearExpiredModels extends Command
 {

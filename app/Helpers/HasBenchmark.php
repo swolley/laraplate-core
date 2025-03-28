@@ -36,19 +36,25 @@ trait HasBenchmark
         $db = property_exists($this, 'db') && isset($this->db) ? $this->db : app(DatabaseManager::class);
         $executionTime = microtime(true) - $this->benchmarkStartTime;
         $memoryUsage = round((memory_get_usage() - $this->benchmarkStartMemory) / 1024 / 1024, 2);
-        if (isset($this->startQueries)) {
-            // Get row count after we've stopped tracking queries
-            $queriesCount = match ($db->connection()->getDriverName()) {
-                'mysql' => (int) $db->select("SHOW SESSION STATUS LIKE 'Questions'")[0]->Value,
-                'pgsql' => (int) $db->select("SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count")[0]->count,
-                'sqlite' => count($db->getQueryLog()),  // Richiede DB::enableQueryLog()
-                default => 0
-            };
-            $queriesCount = $queriesCount - $this->startQueries + ($this->startQueries > 0 ? -1 : 0); // Subtract the Questions query itself
-        } else {
+        try {
+            if (isset($this->startQueries)) {
+                // Get row count after we've stopped tracking queries
+                $queriesCount = match ($db->connection()->getDriverName()) {
+                    'mysql' => (int) $db->select("SHOW SESSION STATUS LIKE 'Questions'")[0]->Value,
+                    'pgsql' => (int) $db->select("SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count")[0]->count,
+                    'sqlite' => count($db->getQueryLog()),  // Richiede DB::enableQueryLog()
+                    default => 0
+                };
+                $queriesCount = $queriesCount - $this->startQueries + ($this->startQueries > 0 ? -1 : 0); // Subtract the Questions query itself
+            } else {
+                $queriesCount = 0;
+            }
+
+            $rowDiff = $table && isset($this->startRowCount) ? $db->table($table)->count() - $this->startRowCount : 0;
+        } catch (\Throwable $e) {
             $queriesCount = 0;
+            $rowDiff = 0;
         }
-        $rowDiff = $table && isset($this->startRowCount) ? $db->table($table)->count() - $this->startRowCount : 0;
 
         $db->disableQueryLog();
 

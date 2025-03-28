@@ -6,7 +6,7 @@ namespace Modules\Core\Console;
 
 use Laravel\Prompts\Progress;
 use Illuminate\Support\Carbon;
-use Illuminate\Console\Command;
+use Modules\Core\Overrides\Command;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Cache\Searchable;
 use Illuminate\Support\Facades\Log;

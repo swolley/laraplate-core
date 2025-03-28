@@ -51,6 +51,10 @@ class Permission extends ModelsPermission
         'action',
     ];
 
+    protected $attributes = [
+        'guard_name' => 'web',
+    ];
+
     public function __construct($attributes = [])
     {
         parent::__construct($attributes);

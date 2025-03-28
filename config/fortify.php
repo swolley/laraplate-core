@@ -143,7 +143,7 @@ return [
     |
     */
 
-    'features' => function () {
+    'features' => (function () {
         $features = [
             Features::resetPasswords(),
             Features::updateProfileInformation(),
@@ -164,5 +164,5 @@ return [
             ]);
         }
         return $features;
-    },
+    })(),
 ];

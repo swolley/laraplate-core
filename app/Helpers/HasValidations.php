@@ -26,15 +26,12 @@ trait HasValidations
 
     protected static function bootHasValidations(): void
     {
-        // non esiste un evento prima del retrieved, purtroppo in questo caso faccio la query e poi controllo se l'utente può leggere
+        //FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
         static::retrieved(function (Model $model): void {
             if (!static::checkUserCanDo($model, 'select')) {
                 throw new UnauthorizedException('User cannot select ' . $model->getTable());
             }
         });
-        // static::addGlobalScope('selectPermissions', function (Builder $query) {
-        // 	if (!static::checkUserCanDo($query->getModel(), 'select')) throw new \Junges\ACL\Exceptions\UnauthorizedException('User cannot select ' . $query->getTable());
-        // });
         static::creating(function (Model $model): void {
             if (!static::checkUserCanDo($model, 'insert')) {
                 throw new UnauthorizedException('User cannot insert ' . $model->getTable());
