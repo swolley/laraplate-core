@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Core\Console\Commands;
+namespace Modules\Core\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 class AddRouteCommentsCommand extends Command
 {
     protected $signature = 'route:add-comments';
-    protected $description = 'Add route comments to controller methods';
+    protected $description = 'Add route comments to controller methods <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     private const ROUTE_COMMENT_MARKER = '@route-comment';
 
