@@ -13,8 +13,8 @@ Route::controller(UserController::class)->name('auth.')->group(function (): void
     Route::get('/still-here', 'maintainSession')->name('maintainSession');
 
     if (config('auth.enable_social_login')) {
-        $social_services = 'facebook|twitter|twitter-oauth-2|linkedin-openid|google|github|gitlab|bitbucket|slack|slack-openid';
-        Route::get('/{service}/redirect', 'socialLoginRedirect')->where('service', $social_services);
-        Route::get('/{service}/callback', 'socialLoginCallback')->where('service', $social_services);
+        $social_services = ['facebook', 'twitter', 'twitter-oauth-2', 'linkedin-openid', 'google', 'github', 'gitlab', 'bitbucket', 'slack', 'slack-openid'];
+        Route::get('/{service}/redirect', 'socialLoginRedirect')->whereIn('service', $social_services);
+        Route::get('/{service}/callback', 'socialLoginCallback')->whereIn('service', $social_services);
     }
 });

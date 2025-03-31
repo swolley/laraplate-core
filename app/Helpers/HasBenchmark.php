@@ -35,7 +35,9 @@ trait HasBenchmark
     {
         $db = property_exists($this, 'db') && isset($this->db) ? $this->db : app(DatabaseManager::class);
         $executionTime = microtime(true) - $this->benchmarkStartTime;
-        $memoryUsage = round((memory_get_usage() - $this->benchmarkStartMemory) / 1024 / 1024, 2);
+        $usage = memory_get_usage() - $this->benchmarkStartMemory;
+        $unit = ['b', 'K', 'M', 'G', 'T', 'P'];
+        $memoryUsage = round($usage / pow(1024, ($i = floor(log($usage, 1024)))), 2) . $unit[$i];
         try {
             if (isset($this->startQueries)) {
                 // Get row count after we've stopped tracking queries

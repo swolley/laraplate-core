@@ -31,9 +31,12 @@ class UserFactory extends Factory
     #[\Override]
     public function definition(): array
     {
+        $name = fake()->boolean() ? fake()->name() : fake()->userName();
+        $username = Str::slug($name) . fake()->boolean() ? fake()->numberBetween(0, 999999) : '';
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'name' => $name,
+            'username' => $username,
+            'email' => sprintf('%s@%s', Str::lower(fake()->boolean() ? str_replace(' ', '.', $name) : $username), fake()->domainName()),
             'email_verified_at' => now(),
             'password' => Hash::make(Str::random(16)),
             'remember_token' => Str::random(10),

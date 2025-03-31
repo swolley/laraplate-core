@@ -23,8 +23,6 @@ trait HasApprovals
         $this->deleteWhenDisapproved = true;
     }
 
-    /**
-     */
     public function getPreviewAttribute(): ?array
     {
         if (!session('preview', false)) {

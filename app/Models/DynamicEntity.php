@@ -13,6 +13,7 @@ use InvalidArgumentException;
 use UnexpectedValueException;
 use Illuminate\Support\Collection;
 use Modules\Core\Inspector\Inspect;
+use Modules\Core\Cache\CacheManager;
 use Modules\Core\Helpers\HasVersions;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
@@ -58,8 +59,8 @@ final class DynamicEntity extends Model
 
         if (config('crud.dynamic_entities', false)) {
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
-            
-            return Cache::remember($cache_key, config('cache.duration'), function() use ($tableName, $connection, $attributes, $request) {
+
+            return CacheManager::remember($cache_key, function () use ($tableName, $connection, $attributes, $request) {
                 $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
                 return $model;

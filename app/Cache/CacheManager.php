@@ -30,6 +30,30 @@ class CacheManager
         };
     }
 
+    public static function getCacheDuration(): int|array
+    {
+        if ($threshold = self::getCacheThreshold()) {
+            return [$threshold, config('cache.duration')];
+        }
+
+        return config('cache.duration');
+    }
+
+    public static function getCacheThreshold(): int|null
+    {
+        return config('cache.threshold');
+    }
+
+    public static function remember(string $key, Closure $callback, int|array|null $ttl = null): mixed
+    {
+        if ($ttl === null) {
+            $ttl = self::getCacheDuration();
+        }
+        $method = is_array($ttl) ? 'flexible' : 'remember';
+
+        return Cache::$method($key, $ttl, $callback);
+    }
+
     public static function supportsTagging(): bool
     {
         return Cache::store()->getStore() instanceof \Illuminate\Contracts\Cache\Store;
