@@ -44,6 +44,10 @@ class License extends Model
         $query->has('user');
     }
 
+    /**
+     * The user that belongs to the license.
+     * @return HasOne<User>
+     */
     public function user(): HasOne
     {
         return $this->hasOne(User::class);

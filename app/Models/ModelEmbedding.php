@@ -29,6 +29,10 @@ class ModelEmbedding extends Model
         ];
     }
 
+    /**
+     * The model that belongs to the embedding.
+     * @return MorphTo<Model>
+     */
     public function model(): MorphTo
     {
         return $this->morphTo();

@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -20,9 +20,13 @@ return new class() extends Migration
             $table->string('command')->nullable(false);
             $table->json('parameters')->nullable(false);
             $table->string('schedule')->nullable(false);
-            $table->boolean('is_active')->nullable(false);
+            $table->boolean('is_active')->nullable(false)->index('cron_jobs_is_active_IDX');
             $table->string('description')->nullable();
-            CommonMigrationColumns::timestamps($table, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
         });
     }
 

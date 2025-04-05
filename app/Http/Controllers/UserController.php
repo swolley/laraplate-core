@@ -64,6 +64,10 @@ class UserController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: GET|HEAD app/auth/user/profile-information
+     * Name: core.auth.userInfo
+     * Middleware: auth
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
@@ -74,11 +78,11 @@ class UserController extends Controller
             if ($user) {
                 AfterLoginListener::checkUserLicense($user);
             }
-            return (new ResponseBuilder($request))
+            return new ResponseBuilder($request)
                 ->setData(static::parseUserInfo($user))
                 ->json();
         } catch (UnauthorizedException $ex) {
-            return (new ResponseBuilder($request))
+            return new ResponseBuilder($request)
                 ->setError($ex->getMessage())
                 ->setStatus(Response::HTTP_UNAUTHORIZED)
                 ->json();
@@ -97,6 +101,10 @@ class UserController extends Controller
      * @throws PermissionDoesNotExist
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: POST app/auth/impersonate
+     * Name: core.auth.impersonate
+     * Middleware: auth, can:impersonate
      */
     public function impersonate(ImpersonationRequest $request): HttpFoundationResponse
     {
@@ -106,7 +114,7 @@ class UserController extends Controller
         $current_user = $this->auth->user();
         $current_user->impersonate($user_to_impersonate);
 
-        return (new ResponseBuilder($request))
+        return new ResponseBuilder($request)
             ->setData(static::parseUserInfo())
             ->json();
     }
@@ -122,6 +130,10 @@ class UserController extends Controller
      * @throws PermissionDoesNotExist
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: POST app/auth/leave-impersonate
+     * Name: core.auth.leaveImpersonate
+     * Middleware: auth, can:impersonate
      */
     public function leaveImpersonate(Request $request): HttpFoundationResponse
     {
@@ -129,7 +141,7 @@ class UserController extends Controller
         $current_user = $this->auth->user();
         $current_user->leaveImpersonation();
 
-        return (new ResponseBuilder($request))
+        return new ResponseBuilder($request)
             ->setData(static::parseUserInfo())
             ->json();
     }
@@ -165,6 +177,10 @@ class UserController extends Controller
      * Maintain user session.
      *
      * @param Request $request
+     * @route-comment
+     * Route: GET|HEAD app/auth/still-here
+     * Name: core.auth.maintainSession
+     * Middleware: auth
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {

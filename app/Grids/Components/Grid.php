@@ -194,7 +194,7 @@ class Grid extends Entity
                 }
 
                 // force injection of necessary fields (primay, timestamps)
-                if (!empty($necessary_fields)) {
+                if ($necessary_fields !== []) {
                     $this->addNecessaryFields($necessary_fields);
                 }
                 $necessary_fields = array_filter($necessary_fields, fn($name) => !$this->hasField($name), ARRAY_FILTER_USE_KEY);
@@ -676,7 +676,7 @@ class Grid extends Entity
             GridAction::UPDATE => $this->updateRecords(),
             GridAction::DELETE => $this->softDeleteRecords(),
             GridAction::FORCE_DELETE => $this->forceDeleteRecords(),
-                // GridAction::RESTORE => $this->restoreRecords(),
+            // GridAction::RESTORE => $this->restoreRecords(),
             default => throw new \InvalidArgumentException('Not a valid action'),
         };
 

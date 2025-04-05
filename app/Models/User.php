@@ -93,7 +93,6 @@ class User extends BaseUser
             'password' => 'hashed',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
         ];
     }
 
@@ -184,7 +183,14 @@ class User extends BaseUser
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],
-            'username' => ['max:255', 'unique:users,username'],
+            'username' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('users')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })
+            ],
             'email' => [
                 'required',
                 'email',
@@ -195,12 +201,21 @@ class User extends BaseUser
         ]);
         $rules['update'] = array_merge($rules['update'], [
             'name' => ['sometimes', 'string', 'max:255'],
-            'username' => ['sometimes', 'max:255', 'unique:users,username,' . $this->id],
+            'username' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('users')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })->ignore($this->id, 'id')
+            ],
             'email' => [
                 'sometimes',
                 'email',
                 'max:255',
-                'unique:users,email,' . $this->id,
+                Rule::unique('users')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })->ignore($this->id, 'id')
             ],
             'password' => ['sometimes', Password::default()],
         ]);

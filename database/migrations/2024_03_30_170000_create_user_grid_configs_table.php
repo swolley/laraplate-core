@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -23,9 +23,12 @@ return new class() extends Migration
             $table->unsignedBigInteger('user_id')->nullable(true);
             $table->string('grid_name')->nullable(false);
             $table->string('layout_name')->nullable(false);
-            $table->boolean('is_public')->default(false);
+            $table->boolean('is_public')->default(false)->index('user_grid_configs_is_public_IDX');
             $table->json('config');
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
 
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->unique(['user_id', 'grid_name', 'layout_name']);

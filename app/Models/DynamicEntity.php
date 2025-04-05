@@ -24,6 +24,7 @@ use Modules\Core\Inspector\Entities\Column;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Validation\Rule;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 
 /**
@@ -237,6 +238,8 @@ final class DynamicEntity extends Model
         $rules = $this->getRules();
         $rules[static::DEFAULT_RULE][$column->name] = [$is_date ? 'date' : $column->type->value];
 
+        $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
+
         if (!$column->isUnsigned()) {
             $rules[static::DEFAULT_RULE][$column->name][] = 'min:0';
         }
@@ -254,7 +257,9 @@ final class DynamicEntity extends Model
         }
 
         if (in_array($column->name, $remapped_uidxs, true)) {
-            $rules[static::DEFAULT_RULE][$column->name][] = sprintf('unique:%s.%s,%s', $this->connection ?? 'default', $this->table, $column->name);
+            $rules[static::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete) {
+                if ($soft_delete) $query->whereNull('deleted_at');
+            });
         }
 
         if (in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting) {

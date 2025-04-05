@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Database\Eloquent\Model;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 // use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -34,9 +35,11 @@ trait HasVersions
 			}
 		});
 
-		static::restored(function (Model $model) {
-			$model->createVersion(['deleted_at' => null]);
-		});
+		if (class_uses_trait(static::class, SoftDeletes::class)) {
+			static::restored(function (Model $model) {
+				$model->createVersion(['deleted_at' => null]);
+			});
+		}
 	}
 
 	protected function getCreatedBy(): ?User

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -20,7 +21,11 @@ return new class() extends Migration
             $uuid ? $table->uuidMorphs('versionable') : $table->morphs('versionable');
 
             $table->json('contents')->nullable();
-            $table->timestamps();
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
         });
     }
 

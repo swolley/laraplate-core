@@ -13,7 +13,5 @@ readonly class FiltersGroup
          */
         public array $filters,
         public WhereClause $operator = WhereClause::AND
-    )
-    {
-    }
+    ) {}
 }

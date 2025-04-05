@@ -31,7 +31,7 @@ trait HasApprovals
 
         $preview = $this->attributesToArray();
 
-        foreach ($this->modifications()->oldest()->get(['modifications']) as $modification) {
+        foreach ($this->modifications()->oldest()->select(['modifications'])->cursor() as $modification) {
             foreach ($modification->modifications as $key => $mod) {
                 $preview[$key] = $mod['modified'];
             }
@@ -61,6 +61,11 @@ trait HasApprovals
 
     protected function requiresApprovalWhen($modifications): bool
     {
+        $user = auth()?->user();
+        if ($user && ($user->isAdmin() || $user->isSuperAdmin() && $user->can('approve.' . $this->getTable()))) {
+            return false;
+        }
+
         return !empty($modifications);
     }
 }

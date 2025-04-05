@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
 return new class() extends Migration
@@ -33,7 +33,11 @@ return new class() extends Migration
             $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20]);
             $table->string('group_name', 50)->nullable(false);
             $table->string('description')->nullable(false);
-            CommonMigrationColumns::timestamps($table, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
         });
     }
 

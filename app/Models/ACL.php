@@ -36,6 +36,10 @@ class ACL extends Model
         ];
     }
 
+    /**
+     * The permission that belongs to the ACL.
+     * @return BelongsTo<Permission>
+     */
     public function permission(): BelongsTo
     {
         return $this->belongsTo(Permission::class);
@@ -43,7 +47,7 @@ class ACL extends Model
 
     public function scopeForPermission($query, $permission_id)
     {
-        return $query->where('permission_id', $permission_id);
+        $query->where('permission_id', $permission_id);
     }
 
     public function getRules()

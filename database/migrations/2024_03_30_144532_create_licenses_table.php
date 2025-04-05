@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class extends Migration
 {
@@ -14,7 +14,13 @@ return new class extends Migration
     {
         Schema::create('licenses', function (Blueprint $table) {
             $table->uuid('id')->primary(true)->nullable(false);
-            CommonMigrationColumns::timestamps($table, true, false, false, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: false,
+                hasLocks: false,
+                hasValidity: true
+            );
         });
     }
 

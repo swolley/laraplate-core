@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Validation\Rule;
 use Modules\Core\Cache\HasCache;
 use Illuminate\Support\Collection;
 use Modules\Core\Helpers\HasVersions;
@@ -115,13 +116,27 @@ class Role extends BaseRole
         $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
             'guard_name' => ['string', 'max:255'],
             'description' => ['string', 'max:255', 'nullable'],
-            'locked_at' => ['date', 'nullable'],
+            // 'locked_at' => ['date', 'nullable'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('roles')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })
+            ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,' . $this->id],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('roles')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })->ignore($this->id, 'id')
+            ],
         ]);
         return $rules;
     }

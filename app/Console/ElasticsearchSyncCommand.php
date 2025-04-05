@@ -44,7 +44,7 @@ class ElasticsearchSyncCommand extends Command
 
             if ($id) {
                 $model->where('id', $id);
-            } else if ($from) {
+            } elseif ($from) {
                 $model->where('updated_at', '>', Carbon::parse($from));
             } else {
                 $last_indexed = $model->getLastIndexedTimestamp();

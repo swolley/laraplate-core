@@ -14,6 +14,7 @@ use Modules\Core\Helpers\HasValidations;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Database\Factories\SettingFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Validation\Rule;
 
 /**
  * @mixin IdeHelperSetting
@@ -61,7 +62,6 @@ class Setting extends Model
             'type' => SettingTypeEnum::class,
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
         ];
     }
 
@@ -86,10 +86,24 @@ class Setting extends Model
             'locked_at' => ['date', 'nullable'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:50', 'unique:settings,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('settings')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })
+            ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:50', 'unique:settings,name,' . $this->id],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:50',
+                Rule::unique('settings')->where(function ($query) {
+                    $query->where('deleted_at', null);
+                })->ignore($this->id, 'id')
+            ],
         ]);
         return $rules;
     }

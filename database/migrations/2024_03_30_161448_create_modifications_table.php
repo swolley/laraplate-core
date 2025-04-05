@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -27,7 +27,10 @@ return new class() extends Migration
             $table->unsignedInteger('disapprovers_required')->default(1);
             $table->string('md5');
             $table->json('modifications');
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
 
             $table->index(['modifier_id', 'modifier_type'], 'modifications_modifierable_IDX');
         });

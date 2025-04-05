@@ -30,11 +30,6 @@ class UserGridConfig extends Model
         'config',
     ];
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(user_class());
-    }
-
     #[\Override]
     protected function casts()
     {
@@ -45,6 +40,15 @@ class UserGridConfig extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The user that belongs to the user grid config.
+     * @return BelongsTo<User>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(user_class());
     }
 
     public function getRules()

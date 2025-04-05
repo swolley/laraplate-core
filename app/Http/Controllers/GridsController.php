@@ -38,6 +38,10 @@ class GridsController extends Controller
      * @throws GlobalException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: GET|HEAD app/crud/grid/configs/{entity?}
+     * Name: core.crud.grids.getGridsConfigs
+     * Middleware: web
      */
     public function getGridsConfigs(Request $request, ?string $entity = null)
     {
@@ -98,6 +102,32 @@ class GridsController extends Controller
      * @throws ValidationException
      * @throws DBALException
      * @throws UnauthorizedException
+     * @route-comment
+     * Routes:
+     * - GET|POST|HEAD app/crud/grid/select/{entity}
+     *   Name: core.crud.select
+     *   Middleware: web
+     * - GET|POST|HEAD app/crud/grid/data/{entity}
+     *   Name: core.crud.data
+     *   Middleware: web
+     * - GET|HEAD app/crud/grid/check/{entity}
+     *   Name: core.crud.check
+     *   Middleware: web
+     * - GET|POST|PUT|PATCH|DELETE|HEAD app/crud/grid/layout/{entity}
+     *   Name: core.crud.layout
+     *   Middleware: web
+     * - GET|POST|HEAD app/crud/grid/export/{entity}
+     *   Name: core.crud.export
+     *   Middleware: web
+     * - POST app/crud/grid/insert/{entity}
+     *   Name: core.crud.insert
+     *   Middleware: web
+     * - PATCH|PUT app/crud/grid/update/{entity}
+     *   Name: core.crud.replace
+     *   Middleware: web
+     * - DELETE|POST app/crud/grid/delete/{entity}
+     *   Name: core.crud.delete
+     *   Middleware: web
      */
     public function grid(GridRequest $request, string $entity): Response
     {
@@ -109,7 +139,7 @@ class GridsController extends Controller
 
             return $grid->process($request);
         } catch (UnexpectedValueException | UnauthorizedException $ex) {
-            return (new ResponseBuilder($request))
+            return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();
         }

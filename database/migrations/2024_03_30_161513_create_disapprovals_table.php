@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -21,7 +21,10 @@ return new class() extends Migration
             $table->unsignedBigInteger('disapprover_id');
             $table->string('disapprover_type');
             $table->text('reason')->nullable();
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
 
             $table->foreign(['modification_id'])->references('id')->on('modifications')->cascadeOnDelete();
             $table->index(['disapprover_id', 'disapprover_type'], 'disapprovals_disapproverable_IDX');

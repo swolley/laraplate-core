@@ -15,15 +15,19 @@ trait HasSeedersUtils
 		/** @var Model $model */
 		$model = new $class;
 
-		// Estraiamo le relazioni dall'array di attributi
+		// Extract the relations from the attributes array
 		$callables = array_filter($attributes, function ($value, $key) use ($class, $model) {
 			return (is_callable($value) || method_exists($class, $key)) && !in_array($key, [...$model->getFillable(), ...$model->getHidden(), ...$model->getGuarded()]);
 		}, ARRAY_FILTER_USE_BOTH);
 
-		// Rimuoviamo le relazioni dagli attributi
+		// Remove the relations from the attributes array
 		$model_attributes = array_diff_key($attributes, $callables);
 
-		$model->fill($model_attributes);
+		foreach ($model_attributes as $key => $value) {
+			if (is_array($value) || is_object($value)) {
+				$model->$key = json_encode($value);
+			}
+		}
 
 		if (class_uses_trait($model, HasApprovals::class)) {
 			$model->setForcedApprovalUpdate(true);

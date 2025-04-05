@@ -133,7 +133,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->booted(function (): void {
             $schedule = $this->app->make(Schedule::class);
             $crons = [];
-            $cache_key = (new CronJob())->getTable();
+            $cache_key = new CronJob()->getTable();
             $cache = $this->app->make(CacheManager::class);
             if ($cache->has($cache_key)) {
                 $crons = $cache->get($cache_key);

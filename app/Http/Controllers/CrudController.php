@@ -177,6 +177,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - GET|POST|HEAD api/v1/select/{entity}
+     *   Name: core.api.list
+     *   Middleware: api
+     * - GET|POST|HEAD app/crud/select/{entity}
+     *   Name: core.crud.list
+     *   Middleware: web
      */
     public function list(ListRequest $request): Response
     {
@@ -400,6 +408,16 @@ class CrudController extends Controller
         return $query;
     }
 
+    /**
+     * @route-comment
+     * Routes:
+     * - GET|POST|HEAD api/v1/search/{entity?}
+     *   Name: core.api.search
+     *   Middleware: api
+     * - GET|POST|HEAD app/crud/search/{entity?}
+     *   Name: core.crud.search
+     *   Middleware: web
+     */
     public function search(SearchRequest $request): Response
     {
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, SearchRequestData $filters): Response {
@@ -442,6 +460,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - GET|HEAD api/v1/history/{entity}
+     *   Name: core.api.history
+     *   Middleware: api
+     * - GET|HEAD app/crud/history/{entity}
+     *   Name: core.crud.history
+     *   Middleware: web
      */
     public function history(HistoryRequest $request): Response
     {
@@ -480,6 +506,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - GET|HEAD api/v1/tree/{entity}
+     *   Name: core.api.tree
+     *   Middleware: api
+     * - GET|HEAD app/crud/tree/{entity}
+     *   Name: core.crud.tree
+     *   Middleware: web
      */
     public function tree(TreeRequest $request): Response
     {
@@ -532,6 +566,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - POST api/v1/insert/{entity}
+     *   Name: core.api.insert
+     *   Middleware: api
+     * - POST app/crud/insert/{entity}
+     *   Name: core.crud.insert
+     *   Middleware: web
      */
     public function insert(Request $request): Response
     {
@@ -564,6 +606,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - PATCH|PUT api/v1/update/{entity}
+     *   Name: core.api.replace
+     *   Middleware: api
+     * - PATCH|PUT app/crud/update/{entity}
+     *   Name: core.crud.replace
+     *   Middleware: web
      */
     public function update(ModifyRequest $request): Response
     {
@@ -614,6 +664,14 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Routes:
+     * - DELETE|POST api/v1/delete/{entity}
+     *   Name: core.api.delete
+     *   Middleware: api
+     * - DELETE|POST app/crud/delete/{entity}
+     *   Name: core.crud.delete
+     *   Middleware: web
      */
     public function delete(ModifyRequest $request): Response
     {
@@ -680,6 +738,10 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: PATCH app/crud/activate/{entity}
+     * Name: core.crud.activate
+     * Middleware: web
      */
     public function activate(ModifyRequest $request): Response
     {
@@ -693,6 +755,10 @@ class CrudController extends Controller
      * @throws Exception
      * @throws BindingResolutionException
      * @throws Throwable
+     * @route-comment
+     * Route: PATCH app/crud/inactivate/{entity}
+     * Name: core.crud.inactivate
+     * Middleware: web
      */
     public function inactivate(ModifyRequest $request): Response
     {
@@ -721,7 +787,7 @@ class CrudController extends Controller
                     $user->disapprove($modification);
                 }
             } else {
-                $modifications = $model::query()->findOrFail($filters->primaryKey)->modifications()->activeOnly()->oldest()->get();
+                $modifications = $model::query()->findOrFail($filters->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
                 if ($modifications->isEmpty()) {
                     throw new \LogicException("No modifications to be {$operation}d");
                 }
@@ -748,6 +814,10 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: PATCH app/crud/approve/{entity}
+     * Name: core.crud.approve
+     * Middleware: web
      */
     public function approve(ModifyRequest $request): Response
     {
@@ -760,6 +830,10 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: PATCH app/crud/disapprove/{entity}
+     * Name: core.crud.disapprove
+     * Middleware: web
      */
     public function disapprove(ModifyRequest $request): Response
     {
@@ -816,6 +890,10 @@ class CrudController extends Controller
      * @throws Exception
      * @throws BindingResolutionException
      * @throws Throwable
+     * @route-comment
+     * Route: PATCH app/crud/lock/{entity}
+     * Name: core.crud.lock
+     * Middleware: web
      */
     public function lock(ModifyRequest $request): Response
     {
@@ -829,6 +907,10 @@ class CrudController extends Controller
      * @throws Exception
      * @throws BindingResolutionException
      * @throws Throwable
+     * @route-comment
+     * Route: PATCH app/crud/unlock/{entity}
+     * Name: core.crud.unlock
+     * Middleware: web
      */
     public function unlock(ModifyRequest $request): Response
     {
@@ -842,6 +924,10 @@ class CrudController extends Controller
      * @throws Exception
      * @throws BindingResolutionException
      * @throws Throwable
+     * @route-comment
+     * Route: DELETE app/crud/cache-clear/{entity}
+     * Name: core.crud.cache-clear
+     * Middleware: web
      */
     public function clearModelCache(Request $request): Response
     {

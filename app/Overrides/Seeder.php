@@ -11,9 +11,7 @@ class Seeder extends BaseSeeder
 {
     use HasSeedersUtils, HasBenchmark;
 
-    protected DatabaseManager $db;
-
-    public function __construct(DatabaseManager $db)
+    public function __construct(protected DatabaseManager $db)
     {
         $this->db = $db;
         if (config('app.debug')) {

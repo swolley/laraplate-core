@@ -37,7 +37,7 @@ trait HasBenchmark
         $executionTime = microtime(true) - $this->benchmarkStartTime;
         $usage = memory_get_usage() - $this->benchmarkStartMemory;
         $unit = ['b', 'K', 'M', 'G', 'T', 'P'];
-        $memoryUsage = round($usage / pow(1024, ($i = floor(log($usage, 1024)))), 2) . $unit[$i];
+        $memoryUsage = round($usage / 1024 ** $i = floor(log($usage, 1024)), 2) . $unit[$i];
         try {
             if (isset($this->startQueries)) {
                 // Get row count after we've stopped tracking queries
@@ -53,7 +53,7 @@ trait HasBenchmark
             }
 
             $rowDiff = $table && isset($this->startRowCount) ? $db->table($table)->count() - $this->startRowCount : 0;
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $queriesCount = 0;
             $rowDiff = 0;
         }

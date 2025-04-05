@@ -14,7 +14,6 @@ use InvalidArgumentException;
 use UnexpectedValueException;
 use Illuminate\Support\Facades\App;
 use Modules\Core\Models\Setting;
-use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -29,6 +28,10 @@ class SettingController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: GET|HEAD app/translations/{lang?}
+     * Name: core.info.translations
+     * Middleware: info
      */
     public function getTranslations(Request $request, ?string $lang = null): HttpFoundationResponse
     {
@@ -82,7 +85,7 @@ class SettingController extends Controller
             return $translations;
         });
 
-        return (new ResponseBuilder($request))
+        return new ResponseBuilder($request)
             ->setData($translations)
             ->json();
     }
@@ -94,6 +97,10 @@ class SettingController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: GET|HEAD app/configs
+     * Name: core.info.getSiteConfigs
+     * Middleware: info
      */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
@@ -107,7 +114,7 @@ class SettingController extends Controller
             return $settings;
         });
 
-        return (new ResponseBuilder($request))
+        return new ResponseBuilder($request)
             ->setData($settings)
             ->json();
     }
@@ -122,6 +129,10 @@ class SettingController extends Controller
      * @throws RuntimeException
      * @throws Throwable
      * @throws UnexpectedValueException
+     * @route-comment
+     * Route: GET|HEAD app/info
+     * Name: core.info.siteInfo
+     * Middleware: info
      */
     public function siteInfo(Request $request): HttpFoundationResponse
     {
@@ -130,7 +141,7 @@ class SettingController extends Controller
             'version' => version(),
         ];
 
-        return (new ResponseBuilder($request))
+        return new ResponseBuilder($request)
             ->setData($data)
             ->json();
     }

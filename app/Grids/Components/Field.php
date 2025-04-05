@@ -53,7 +53,7 @@ class Field implements \JsonSerializable
     {
         [$path, $name] = self::splitPath($fullpath);
 
-        return fn(Model $model): static => (new self($path, $name, $alias ?? $name, $fieldType, $model))->readable($readable)->writable($writable);
+        return fn(Model $model): static => new self($path, $name, $alias ?? $name, $fieldType, $model)->readable($readable)->writable($writable);
     }
 
     public function getModel(): ?Model

@@ -41,7 +41,7 @@ class ElasticsearchCheckCommand extends Command
 
             $wrong_or_missing_indexes = [];
 
-            foreach ($model_classes as $model_class) {
+            foreach ($model_classes as &$model_class) {
                 $this->info('Checking model ' . $model_class);
                 $model = new $model_class;
                 if (!$model->checkIndex()) {
@@ -50,13 +50,13 @@ class ElasticsearchCheckCommand extends Command
                 }
             }
 
-            if (empty($wrong_or_missing_indexes)) {
+            if ($wrong_or_missing_indexes === []) {
                 $this->info('All models have the correct indexes.');
                 return static::SUCCESS;
             }
 
             if (confirm('Do you want to reindex the unmathced models?')) {
-                foreach ($wrong_or_missing_indexes as $model_class) {
+                foreach ($wrong_or_missing_indexes as &$model_class) {
                     ReindexElasticsearchJob::dispatch($model_class);
                     // Se il modello usa il trait HasCache, invalida la cache
                     if (in_array(HasCache::class, class_uses_recursive($model_class))) {

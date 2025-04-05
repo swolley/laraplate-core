@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\HasVersions;
 use Illuminate\Database\Eloquent\Model;
@@ -55,7 +56,6 @@ class CronJob extends Model
             'is_active' => 'boolean',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
         ];
     }
 
@@ -86,10 +86,24 @@ class CronJob extends Model
             'is_active' => ['boolean', 'required'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:cron_jobs,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('cron_jobs')->where(function ($query) {
+                    return $query->whereNull('deleted_at');
+                })
+            ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:cron_jobs,name,' . $this->id],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('cron_jobs')->where(function ($query) {
+                    return $query->whereNull('deleted_at');
+                })->ignore($this->id, 'id')
+            ],
         ]);
         return $rules;
     }

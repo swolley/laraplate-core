@@ -11,9 +11,7 @@ use Modules\Core\Casts\ListRequestData;
 
 class AclService
 {
-    public function __construct(private readonly CrudHelper $crudHelper)
-    {
-    }
+    public function __construct(private readonly CrudHelper $crudHelper) {}
 
     public function applyAclToQuery(Builder $query, int $permission_id): Builder
     {
@@ -26,8 +24,8 @@ class AclService
                     request(),           // Current request
                     $query->getModel()->getTable(),  // Entity
                     [
-                        'filters' => $acl->filters->toArray(),
-                        'sort' => $acl->sort?->toArray(),
+                        'filters' => $acl->filters ? (array) $acl->filters : [],
+                        'sort' => $acl->sort ? (array) $acl->sort : [],
                     ],
                     $query->getModel()->getKeyName()
                 );

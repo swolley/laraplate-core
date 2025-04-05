@@ -77,6 +77,12 @@ class DocsController extends OpenApiJsonController
         ]);
     }
 
+    /**
+     * @route-comment
+     * Route: GET|HEAD phpinfo
+     * Name: core.docs.phpinfo
+     * Middleware: web
+     */
     public function phpinfo(): View
     {
         return view('core::phpinfo');

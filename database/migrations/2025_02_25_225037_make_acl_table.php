@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class extends Migration
 {
@@ -18,7 +18,11 @@ return new class extends Migration
             $table->json('filters')->nullable();
             $table->json('sort')->nullable();
             $table->string('description')->nullable();
-            CommonMigrationColumns::timestamps($table, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
 
             $table->index(['permission_id', 'deleted_at']);
         });

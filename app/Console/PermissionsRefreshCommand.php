@@ -106,7 +106,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di cancellazione logica
                 if ($permission === ActionEnum::DELETE && !class_uses_trait($model, SoftDeletes::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->forceDelete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -118,7 +118,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di approvazione
                 if ($permission === ActionEnum::APPROVE && !class_uses_trait($model, RequiresApproval::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->forceDelete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -130,7 +130,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di pubblicazione
                 if ($permission === ActionEnum::PUBLISH && !class_uses_trait($model, HasValidity::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->forceDelete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -141,7 +141,7 @@ class PermissionsRefreshCommand extends Command
                 }
 
                 if (!in_array($permission_name, $found_permissions, true)) {
-                    $query = $permission_class::where('name', $permission_name)->withTrashed();
+                    $query = $permission_class::where('name', $permission_name);
                     if ($query->exists()) {
                         $query->restore();
 

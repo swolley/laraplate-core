@@ -26,7 +26,7 @@ trait HasGridUtils
         $instance = new static;
         // Get public methods declared without parameters and non inherited
         $class = $instance::class;
-        $allMethods = (new ReflectionClass($class))->getMethods(\ReflectionMethod::IS_PUBLIC);
+        $allMethods = new ReflectionClass($class)->getMethods(\ReflectionMethod::IS_PUBLIC);
         $methods = array_filter(
             $allMethods,
             fn($method) => $method->isUserDefined() &&
@@ -120,7 +120,7 @@ trait HasGridUtils
         $splitted = explode('.', $relation);
         $found = [];
         $current = static::class;
-        if ($splitted[0] === lcfirst((new ReflectionClass($current))->getShortName())) {
+        if ($splitted[0] === lcfirst(new ReflectionClass($current)->getShortName())) {
             array_shift($splitted);
         }
         foreach ($splitted as $relation) {
@@ -141,7 +141,6 @@ trait HasGridUtils
     {
         if (count(explode('.', $relation)) <= 2) {
             $subrelation = static::getInverseRelationship($relation);
-
             return $subrelation ? [$subrelation] : false;
         }
 
@@ -273,7 +272,7 @@ trait HasGridUtils
                 $owner = $p->getValue($methodReturn);
             }
 
-            $type = (new ReflectionClass($methodReturn))->getShortName();
+            $type = new ReflectionClass($methodReturn)->getShortName();
             $model = $methodReturn->getRelated()::class;
             $relation = new RelationInfo($type, $methodName, $model, (new $model)->getTable(), $foreign, $owner);
             if (isset($pivot_table, $pivot_owner, $pivot_foreign)) {

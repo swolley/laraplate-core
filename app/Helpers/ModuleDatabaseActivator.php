@@ -58,7 +58,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
                 throw new BadMethodCallException('No Setting model found in the application');
             }
 
-            if (!Schema::hasTable((new $model())->getTable())) {
+            if (!Schema::hasTable(new $model()->getTable())) {
                 throw new BadMethodCallException('No settings table found in the database schema');
             }
 

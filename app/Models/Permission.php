@@ -16,7 +16,7 @@ use Spatie\Permission\Models\Permission as ModelsPermission;
  */
 class Permission extends ModelsPermission
 {
-    use HasValidations, SoftDeletes, HasCache {
+    use HasValidations, HasCache {
         getRules as protected getRulesTrait;
     }
 

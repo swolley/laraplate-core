@@ -69,7 +69,7 @@ class CrudHelper
 			// check for sorts and prepare data
 			if (isset($request_data->sort)) {
 				foreach ($request_data->sort as $column) {
-					if (preg_match("/^\w+\.\w+$/", $column->property)) {
+					if (preg_match("/^\w+\.\w+$/", (string) $column->property)) {
 						$query->orderBy($column->property, $column->direction->value);
 					} else {
 						$index = str_replace($main_entity . '.', '', $column->property);
@@ -310,7 +310,7 @@ class CrudHelper
 
 			$subrelation = preg_replace('/^' . $escaped . '\./', '', $aggregate_relation);
 			foreach ($aggregates_cols as $col) {
-				$method = 'with' . ucfirst($col->type->value);
+				$method = 'with' . ucfirst((string) $col->type->value);
 				if ($col->type === ColumnType::SUM || $col->type === ColumnType::COUNT) {
 					$query->$method([$subrelation]);
 				} else {
@@ -373,7 +373,7 @@ class CrudHelper
 			}
 
 			foreach ($aggregates_cols as $col) {
-				$method = 'with' . ucfirst($col->type->value);
+				$method = 'with' . ucfirst((string) $col->type->value);
 				if ($col->type === ColumnType::SUM || $col->type === ColumnType::COUNT) {
 					$query->$method([$relation]);
 				} else {

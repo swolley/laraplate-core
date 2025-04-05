@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -17,7 +17,11 @@ return new class() extends Migration
     {
         Schema::table('permissions', function (Blueprint $table): void {
             $table->string('description')->after('guard_name')->nullable(true);
-            CommonMigrationColumns::timestamps($table, false, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: false,
+                hasSoftDelete: true
+            );
 
             $table->unique(['name', 'guard_name'], 'permissions_UN');
 
@@ -43,19 +47,33 @@ return new class() extends Migration
 
         Schema::table('roles', function (Blueprint $table): void {
             $table->string('description')->after('guard_name')->nullable(true);
-            CommonMigrationColumns::timestamps($table, false, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: false,
+                hasSoftDelete: true,
+                hasLocks: true
+            );
         });
 
         Schema::table('model_has_permissions', function (Blueprint $table): void {
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::table('model_has_roles', function (Blueprint $table): void {
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::table('role_has_permissions', function (Blueprint $table): void {
-            CommonMigrationColumns::timestamps($table, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         app('cache')
@@ -70,7 +88,11 @@ return new class() extends Migration
     {
         Schema::table('permissions', function (Blueprint $table): void {
             $table->dropColumn('description');
-            CommonMigrationColumns::dropTimestamps($table, false, true);
+            CommonMigrationFunctions::dropTimestamps(
+                $table,
+                hasCreateUpdate: false,
+                hasSoftDelete: true
+            );
 
             $table->dropUnique('permissions_UN');
 
@@ -85,19 +107,33 @@ return new class() extends Migration
 
         Schema::table('roles', function (Blueprint $table): void {
             $table->dropColumn('description');
-            CommonMigrationColumns::dropTimestamps($table, false, true, true);
+            CommonMigrationFunctions::dropTimestamps(
+                $table,
+                hasCreateUpdate: false,
+                hasSoftDelete: true,
+                hasLocks: true
+            );
         });
 
         Schema::table('model_has_permissions', function (Blueprint $table): void {
-            CommonMigrationColumns::dropTimestamps($table, true);
+            CommonMigrationFunctions::dropTimestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::table('model_has_roles', function (Blueprint $table): void {
-            CommonMigrationColumns::dropTimestamps($table, true);
+            CommonMigrationFunctions::dropTimestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::table('role_has_permissions', function (Blueprint $table): void {
-            CommonMigrationColumns::dropTimestamps($table, true);
+            CommonMigrationFunctions::dropTimestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
     }
 };

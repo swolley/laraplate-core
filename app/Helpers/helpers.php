@@ -88,7 +88,7 @@ if (!function_exists('connections')) {
         }
 
         foreach (models($onlyActive) as $model) {
-            $connection = (new $model())->getConnection();
+            $connection = new $model()->getConnection();
             $driver = $connection->getDriverName();
 
             if (!in_array($driver, $connections, true)) {
@@ -222,7 +222,7 @@ if (!function_exists('models')) {
                     continue;
                 }
 
-                if ((new ReflectionClass($class_subnamespace))->isAbstract()) {
+                if (new ReflectionClass($class_subnamespace)->isAbstract()) {
                     continue;
                 }
                 $models[] = $class_subnamespace;
@@ -338,7 +338,7 @@ if (!function_exists('api_versions')) {
         foreach ($routes as $route) {
             $uri = $route->uri;
             $matches = [];
-            preg_match("/^api\/(v\d)\//", $uri, $matches);
+            preg_match("/^api\/(v\d+)\//", (string) $uri, $matches);
 
             if (count($matches) === 2 && !in_array($matches[1], $versions, true)) {
                 $versions[] = $matches[1];

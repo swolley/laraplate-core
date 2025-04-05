@@ -24,6 +24,27 @@ trait HasValidations
         // 'always' => [],
     ];
 
+    /**
+     * Flag per saltare le validazioni
+     */
+    private bool $skip_validation = false;
+
+    /**
+     * Imposta il flag per saltare le validazioni
+     */
+    public function setSkipValidation(bool $skip = true): void
+    {
+        $this->skip_validation = $skip;
+    }
+
+    /**
+     * Verifica se le validazioni devono essere saltate
+     */
+    public function shouldSkipValidation(): bool
+    {
+        return $this->skip_validation;
+    }
+
     protected static function bootHasValidations(): void
     {
         //FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
@@ -36,14 +57,16 @@ trait HasValidations
             if (!static::checkUserCanDo($model, 'insert')) {
                 throw new UnauthorizedException('User cannot insert ' . $model->getTable());
             }
-            $model->validateWithRules(CrudExecutor::INSERT);
+            if (!$model->shouldSkipValidation()) {
+                $model->validateWithRules(CrudExecutor::INSERT);
+            }
         });
         static::updating(function (Model $model): void {
             if (!static::checkUserCanDo($model, 'update')) {
                 throw new UnauthorizedException('User cannot update ' . $model->getTable());
             }
 
-            if (!$model->isDirty('deleted_at')) {
+            if (!$model->isDirty('deleted_at') && !$model->shouldSkipValidation()) {
                 $model->validateWithRules(CrudExecutor::UPDATE);
             }
         });
@@ -115,6 +138,10 @@ trait HasValidations
 
     public function validateWithRules(string $operation): void
     {
+        if ($this->shouldSkipValidation()) {
+            return;
+        }
+
         $rules = $this->getOperationRules($operation);
 
         if (!empty($rules)) {

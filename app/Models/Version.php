@@ -140,6 +140,10 @@ class Version extends OvertrueVersion
         return $versionable;
     }
 
+    /**
+     * The previous versions that belong to the version.
+     * @return MorphMany<Version>
+     */
     #[\Override]
     public function previousVersions(): MorphMany
     {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationColumns;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration
 {
@@ -21,7 +21,12 @@ return new class() extends Migration
             $table->datetime('last_login_at')->nullable(true);
             $table->uuid('license_id')->nullable(true);
             $table->foreign('license_id', 'FK_users_licenses')->references('id')->on('licenses')->nullOnDelete();
-            CommonMigrationColumns::timestamps($table, false, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true,
+                hasLocks: true
+            );
         });
     }
 
@@ -35,7 +40,11 @@ return new class() extends Migration
             $table->dropColumn('username');
             $table->dropColumn('lang');
             $table->dropColumn('last_login_at');
-            CommonMigrationColumns::timestamps($table, true, true);
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
         });
     }
 };
