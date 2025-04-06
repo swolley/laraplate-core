@@ -32,11 +32,13 @@ class UserFactory extends Factory
     public function definition(): array
     {
         $name = fake()->boolean() ? fake()->name() : fake()->userName();
-        $username = Str::slug($name) . fake()->boolean() ? fake()->numberBetween(0, 999999) : '';
+        $username = Str::slug($name) . (fake()->boolean() ? fake()->numberBetween(0, 999999) : '');
+        $email_name = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
+        $suffix = fake()->boolean() ? substr('0' . fake()->numberBetween(1, 99), -2) : '';
         return [
             'name' => $name,
             'username' => $username,
-            'email' => sprintf('%s@%s', Str::lower(fake()->boolean() ? str_replace(' ', '.', $name) : $username), fake()->domainName()),
+            'email' => sprintf('%s%s@%s', $email_name, $suffix, fake()->domainName()),
             'email_verified_at' => now(),
             'password' => Hash::make(Str::random(16)),
             'remember_token' => Str::random(10),

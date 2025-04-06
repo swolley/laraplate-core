@@ -3,7 +3,7 @@
     "alias": "core",
     "description": "",
     "keywords": [],
-    "priority": 0,
+    "priority": 999,
     "providers": [
         "Modules\\Core\\Providers\\CoreServiceProvider"
     ],
