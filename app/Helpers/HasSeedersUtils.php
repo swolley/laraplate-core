@@ -24,9 +24,7 @@ trait HasSeedersUtils
 		$model_attributes = array_diff_key($attributes, $callables);
 
 		foreach ($model_attributes as $key => $value) {
-			if (is_array($value) || is_object($value)) {
-				$model->$key = json_encode($value);
-			}
+			$model->$key = $value;
 		}
 
 		if (class_uses_trait($model, HasApprovals::class)) {
@@ -35,20 +33,22 @@ trait HasSeedersUtils
 
 		$model->save();
 
-		$reflected_class = new \ReflectionClass($class);
+		if ($callables !== []) {
+			$reflected_class = new \ReflectionClass($class);
 
-		// Gestiamo le relazioni dopo il salvataggio
-		foreach ($callables as $method => $value) {
-			$value = is_callable($value) ? $value($model) : $value;
-			$return_type = $reflected_class->getMethod($method)->getReturnType()?->getName();
-			if ($return_type && is_subclass_of($return_type, \Illuminate\Database\Eloquent\Relations\Relation::class)) {
-				if ($return_type === \Illuminate\Database\Eloquent\Relations\BelongsToMany::class) {
-					$model->$method()->sync($value->pluck('id'));
+			// Gestiamo le relazioni dopo il salvataggio
+			foreach ($callables as $method => $value) {
+				$value = is_callable($value) ? $value($model) : $value;
+				$return_type = $reflected_class->getMethod($method)->getReturnType()?->getName();
+				if ($return_type && is_subclass_of($return_type, \Illuminate\Database\Eloquent\Relations\Relation::class)) {
+					if ($return_type === \Illuminate\Database\Eloquent\Relations\BelongsToMany::class) {
+						$model->$method()->sync($value->pluck('id'));
+					} else {
+						$model->$method()->associate($value);
+					}
 				} else {
-					$model->$method()->associate($value);
+					$model->$method($value);
 				}
-			} else {
-				$model->$method($value);
 			}
 		}
 

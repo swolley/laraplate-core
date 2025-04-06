@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Modules\Core\Overrides\Command;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Overrides\Command;
 use Approval\Traits\RequiresApproval;
 use Modules\Core\Helpers\HasValidity;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\DatabaseManager;
+use Spatie\Permission\Models\Permission;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PermissionsRefreshCommand extends Command
 {
@@ -71,6 +72,7 @@ class PermissionsRefreshCommand extends Command
         $changes = false;
         $all_permissions = [];
 
+        /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
         $parental_class = \Parental\HasChildren::class;
 
@@ -97,6 +99,7 @@ class PermissionsRefreshCommand extends Command
             $table = $instance->getTable();
 
             $permission_class::flushEventListeners();
+            /** @var string[] $found_permissions */
             $found_permissions = $permission_class::where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
             $new_model_suffix = empty($found_permissions) ? " for new model {$model}" : '';
 
