@@ -7,7 +7,7 @@ namespace Modules\Core\Helpers;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\UnauthorizedException;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
-use Modules\Core\Helpers\CustomSoftDeletingScope;
+use Modules\Core\Overrides\CustomSoftDeletingScope;
 
 trait SoftDeletes
 {

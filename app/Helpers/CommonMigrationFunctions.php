@@ -134,20 +134,26 @@ class CommonMigrationFunctions
 
         if (!Schema::hasColumn($table->getTable(), 'is_deleted')) {
             if (DB::connection()->getDriverName() === 'pgsql') {
-                $table->boolean('is_deleted')->default(false)->stored()->index($table->getTable() . '_is_deleted_idx');
-            } else {
+                $table->boolean('is_deleted')->storedAs('deleted_at IS NOT NULL')->index($table->getTable() . '_is_deleted_idx');
+            } elseif (DB::connection()->getDriverName() === 'oracle') {
+                // Oracle richiede ancora i trigger
                 $table->boolean('is_deleted')->default(false)->index($table->getTable() . '_is_deleted_idx');
+                DB::afterCommit(function () use ($table) {
+                    self::createBooleanTriggers($table, 'deleted');
+                });
+            } else {
+                // MySQL supporta generated columns
+                $table->boolean('is_deleted')->storedAs('IF(deleted_at IS NULL, 0, 1)')->index($table->getTable() . '_is_deleted_idx');
             }
         }
-
-        DB::afterCommit(function () use ($table) {
-            self::createBooleanTriggers($table, 'deleted');
-        });
     }
 
     private static function dropSoftDeletes(Blueprint $table): void
     {
-        self::dropBooleanTriggers($table, 'deleted');
+        // Rimuoviamo i trigger solo per Oracle
+        if (DB::connection()->getDriverName() === 'oracle') {
+            self::dropBooleanTriggers($table, 'deleted');
+        }
 
         if (Schema::hasColumn($table->getTable(), 'deleted_at')) {
             $table->dropSoftDeletes();
@@ -172,20 +178,26 @@ class CommonMigrationFunctions
 
         if (!Schema::hasColumn($table->getTable(), 'is_locked')) {
             if (DB::connection()->getDriverName() === 'pgsql') {
-                $table->boolean('is_locked')->default(false)->stored()->index($table->getTable() . '_is_locked_idx');
-            } else {
+                $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx');
+            } elseif (DB::connection()->getDriverName() === 'oracle') {
+                // Oracle richiede ancora i trigger
                 $table->boolean('is_locked')->default(false)->index($table->getTable() . '_is_locked_idx');
+                DB::afterCommit(function () use ($table) {
+                    self::createBooleanTriggers($table, 'locked');
+                });
+            } else {
+                // MySQL supporta generated columns
+                $table->boolean('is_locked')->storedAs('IF(' . $locked_at_column . ' IS NULL, 0, 1)')->index($table->getTable() . '_is_locked_idx');
             }
         }
-
-        DB::afterCommit(function () use ($table) {
-            self::createBooleanTriggers($table, 'locked');
-        });
     }
 
     private static function dropLocked(Blueprint $table): void
     {
-        self::dropBooleanTriggers($table, 'locked');
+        // Rimuoviamo i trigger solo per Oracle
+        if (DB::connection()->getDriverName() === 'oracle') {
+            self::dropBooleanTriggers($table, 'locked');
+        }
 
         if ($locked_at_column = app('locked')->lockedAtColumn()) {
             if (Schema::hasColumn($table->getTable(), $locked_at_column)) {
@@ -205,7 +217,7 @@ class CommonMigrationFunctions
 
     private static function createBooleanTriggers(Blueprint $table, string $suffix): void
     {
-        if (DB::connection()->getDriverName() === 'pgsql') {
+        /* if (DB::connection()->getDriverName() === 'pgsql') {
             // Create trigger function
             DB::unprepared('
                 DO $$ 
@@ -240,7 +252,8 @@ class CommonMigrationFunctions
                     END IF;
                 END $$;
             ');
-        } elseif (DB::connection()->getDriverName() === 'oracle') {
+        } else*/
+        if (DB::connection()->getDriverName() === 'oracle') {
             // In Oracle we use a virtual column with a check constraint
             // Create trigger for Oracle
             DB::unprepared('
@@ -254,7 +267,7 @@ class CommonMigrationFunctions
                     END;
                 END;
             ');
-        } else {
+        } /*else {
             // Create trigger for MySQL
             DB::unprepared('
                 CREATE TRIGGER IF NOT EXISTS ' . $table->getTable() . '_is_' . $suffix . '_trigger
@@ -269,14 +282,15 @@ class CommonMigrationFunctions
                 FOR EACH ROW
                 SET NEW.is_' . $suffix . ' = IF(NEW.' . $suffix . '_at IS NOT NULL, true, false);
             ');
-        }
+        }*/
     }
 
     private static function dropBooleanTriggers(Blueprint $table, string $suffix): void
     {
-        if (DB::connection()->getDriverName() === 'pgsql') {
+        /* if (DB::connection()->getDriverName() === 'pgsql') {
             DB::unprepared('DROP TRIGGER IF EXISTS ' . $table->getTable() . '_is_' . $suffix . '_trigger ON ' . $table->getTable() . ';');
-        } elseif (DB::connection()->getDriverName() === 'oracle') {
+        } else*/
+        if (DB::connection()->getDriverName() === 'oracle') {
             DB::unprepared('
                 BEGIN
                     EXECUTE IMMEDIATE \'DROP TRIGGER ' . $table->getTable() . '_is_' . $suffix . '_trigger\';
@@ -287,8 +301,8 @@ class CommonMigrationFunctions
                         END IF;
                 END;
             ');
-        } else {
+        } /*else {
             DB::unprepared('DROP TRIGGER IF EXISTS ' . $table->getTable() . '_is_' . $suffix . '_trigger;');
-        }
+        }*/
     }
 }

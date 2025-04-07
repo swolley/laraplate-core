@@ -20,6 +20,8 @@ return new class() extends Migration
 
             $uuid ? $table->uuidMorphs('versionable') : $table->morphs('versionable');
 
+            // TODO: serve aggiungere un indice su versionable_type e versionable_id?
+
             $table->json('contents')->nullable();
             CommonMigrationFunctions::timestamps(
                 $table,
