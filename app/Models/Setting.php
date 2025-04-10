@@ -11,7 +11,7 @@ use Modules\Core\Helpers\HasApprovals;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\HasValidations;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Database\Factories\SettingFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Validation\Rule;

@@ -20,7 +20,7 @@ class CustomSoftDeletingScope extends SoftDeletingScope
     #[\Override]
     public function apply(Builder $builder, Model $model): void
     {
-        $builder->where($model->getIsDeletedColumn(), false);
+        $builder->where($model->getQualifiedIsDeletedColumn(), false);
     }
 
     /**

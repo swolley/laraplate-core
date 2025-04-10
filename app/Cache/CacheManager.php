@@ -16,9 +16,14 @@ use Illuminate\Cache\Repository;
 
 class CacheManager
 {
+    private static function getStore(): \Illuminate\Contracts\Cache\Store
+    {
+        return Cache::store()->getStore();
+    }
+
     public static function getCurrentDriver(): string
     {
-        $store = Cache::store()->getStore();
+        $store = self::getStore();
 
         return match (true) {
             $store instanceof \Illuminate\Cache\RedisStore => 'redis',
@@ -56,7 +61,7 @@ class CacheManager
 
     public static function supportsTagging(): bool
     {
-        return Cache::store()->getStore() instanceof \Illuminate\Contracts\Cache\Store;
+        return self::getStore() instanceof \Illuminate\Contracts\Cache\Store;
     }
 
     /**

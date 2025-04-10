@@ -10,7 +10,7 @@ use Modules\Core\Helpers\HasVersions;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;

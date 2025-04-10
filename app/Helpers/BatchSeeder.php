@@ -8,10 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Overrides\Seeder;
 
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Models\Modification;
 use function Laravel\Prompts\progress;
 use Modules\Core\Helpers\HasApprovals;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Models\Modification;
+use Illuminate\Database\QueryException;
 
 abstract class BatchSeeder extends Seeder
 {
@@ -55,15 +56,15 @@ abstract class BatchSeeder extends Seeder
     {
         $current_count = $model_class::withoutGlobalScopes()->count();
         $count_to_create = $total_count - $current_count;
+        $entity_name = (new $model_class)->getTable();
 
         if ($count_to_create <= 0) {
-            $this->command->info('Users already at target count.');
+            $this->command->info($entity_name . ' already at target count.');
             return;
         }
 
         $batches = ceil($count_to_create / self::BATCH_SIZE);
         $created = 0;
-        $entity_name = (new $model_class)->getTable();
 
         $progress = progress("Creating {$entity_name}", $count_to_create);
         $progress->start();
@@ -94,17 +95,15 @@ abstract class BatchSeeder extends Seeder
                     $created += $batch_size;
                     $progress->hint("");
                     $progress->advance($batch_size);
+                } catch (QueryException $e) {
+                    $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+                    $progress->render();
+                    throw $e;
                 } catch (\Exception $e) {
                     DB::rollBack();
                     $retry_count++;
 
                     if ($retry_count >= self::MAX_RETRIES) {
-                        $this->command->error("<fg=red>Failed to create {$entity_name} after {$retry_count} attempts: " . $e->getMessage() . "</>");
-                        Log::error("Seeding error for {$entity_name}: " . $e->getMessage(), [
-                            'exception' => $e,
-                            'batch' => $batch,
-                            'retry_count' => $retry_count
-                        ]);
                         throw $e;
                     }
 

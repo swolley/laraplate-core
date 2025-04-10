@@ -10,6 +10,8 @@ use Illuminate\Support\Carbon;
 // use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Exceptions\InvalidFormatException;
+use InvalidArgumentException;
+
 // use Illuminate\Validation\UnauthorizedException;
 
 trait HasValidity
@@ -46,9 +48,9 @@ trait HasValidity
         //     }
         // }
 
-        static::addGlobalScope('valid', function (Builder $query): void {
-            static::withValidityFilter($query, Carbon::today());
-        });
+        // static::addGlobalScope('valid', function (Builder $query): void {
+        //     static::withValidityFilter($query, Carbon::today());
+        // });
 
         // static::creating(function (Model $model): void {
         //     if (($model->isDirty($model->validFromKey()) && $model->{$model->validFromKey()} !== null) || ($model->isDirty($model->validToKey()) && $model->{$model->validToKey()} !== null)) {
@@ -63,7 +65,11 @@ trait HasValidity
     }
 
     /**
-     * @throws \InvalidArgumentException
+     * Filter records by validity on specified date
+     * @param Builder $query 
+     * @param Carbon $date 
+     * @return Builder 
+     * @throws InvalidArgumentException 
      */
     protected static function withValidityFilter(Builder $query, Carbon $date): Builder
     {
@@ -72,23 +78,48 @@ trait HasValidity
         });
     }
 
-    protected function scopeExpired(Builder $query)
+    /**
+     * Currently valid records
+     * @param Builder $query 
+     * @throws InvalidArgumentException 
+     */
+    protected function scopeValid(Builder $query): void
     {
-        $query->withoutGlobalScopes()->whereNotNull('valid_to')->where('valid_to', '<', now());
+        $query->where(static::$valid_from_column, '<=', now())->where(function ($q) {
+            $q->where(static::$valid_to_column, '>=', now())->orWhereNull(static::$valid_to_column);
+        });
     }
 
-    protected function scopeExpiredAt(Builder $query, Carbon $date)
+    /**
+     * Expired records
+     * @param Builder $query 
+     * @throws InvalidArgumentException 
+     */
+    protected function scopeExpired(Builder $query): void
+    {
+        $query->withoutGlobalScope('valid')->whereNotNull('valid_to')->where('valid_to', '<', now());
+    }
+
+    /**
+     * Expired records at a given date
+     * @param Builder $query 
+     * @param Carbon $date 
+     * @throws InvalidArgumentException 
+     */
+    protected function scopeExpiredAt(Builder $query, Carbon $date): void
     {
         $query->expired()->validAt($date);
     }
 
     /**
-     *
-     * @throws \InvalidArgumentException
+     * Filter records by validity on specified date
+     * @param Builder $query 
+     * @param Carbon $date
+     * @throws InvalidArgumentException 
      */
     public function scopeValidAt(Builder $query, Carbon $date): void
     {
-        static::withValidityFilter($query, $date);
+        static::withoutGlobalScope('valid')->withValidityFilter($query, $date);
     }
 
     /**

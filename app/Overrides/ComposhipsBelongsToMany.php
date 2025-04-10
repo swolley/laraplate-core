@@ -2,6 +2,9 @@
 
 namespace Modules\Core\Overrides;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ComposhipsBelongsToMany extends BelongsToMany
@@ -10,28 +13,9 @@ class ComposhipsBelongsToMany extends BelongsToMany
     protected function performJoin($query = null)
     {
         $query = $query ?: $this->query;
-        $baseTable = $this->related->getTable();
 
-        $query->join($this->table, function ($join) use ($baseTable) {
-            // Gestione chiavi composite per la tabella pivot -> parent
-            if (is_array($this->foreignPivotKey)) {
-                foreach ($this->foreignPivotKey as $index => $foreignPivotKey) {
-                    $parentKey = is_array($this->parentKey) ? $this->parentKey[$index] : $this->parentKey;
-                    $join->on(
-                        $this->getQualifiedForeignPivotKeyName($foreignPivotKey),
-                        '=',
-                        $this->parent->qualifyColumn($parentKey)
-                    );
-                }
-            } else {
-                $join->on(
-                    $this->getQualifiedForeignPivotKeyName(),
-                    '=',
-                    $this->parent->qualifyColumn($this->parentKey)
-                );
-            }
-
-            // Gestione chiavi composite per la tabella pivot -> related
+        $query->join($this->table, function (JoinClause $join) {
+            // Join pivot -> parent
             if (is_array($this->relatedPivotKey)) {
                 foreach ($this->relatedPivotKey as $index => $relatedPivotKey) {
                     $relatedKey = is_array($this->relatedKey) ? $this->relatedKey[$index] : $this->relatedKey;
@@ -50,18 +34,27 @@ class ComposhipsBelongsToMany extends BelongsToMany
             }
         });
 
-        return $this;
-    }
+        $query->join($this->parent->getTable(), function (JoinClause $join) {
+            // Join pivot -> related
+            if (is_array($this->foreignPivotKey)) {
+                foreach ($this->foreignPivotKey as $index => $foreignPivotKey) {
+                    $parentKey = is_array($this->parentKey) ? $this->parentKey[$index] : $this->parentKey;
+                    $join->on(
+                        $this->getQualifiedForeignPivotKeyName($foreignPivotKey),
+                        '=',
+                        $this->parent->qualifyColumn($parentKey)
+                    );
+                }
+            } else {
+                $join->on(
+                    $this->getQualifiedForeignPivotKeyName(),
+                    '=',
+                    $this->parent->qualifyColumn($this->parentKey)
+                );
+            }
+        });
 
-    #[\Override]
-    public function addEagerConstraints(array $models)
-    {
-        $this->query->whereIn(
-            is_array($this->foreignPivotKey) 
-                ? array_map(fn($key) => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey)
-                : $this->getQualifiedForeignPivotKeyName(),
-            $this->getKeys($models, is_array($this->parentKey) ? $this->parentKey : $this->parentKey)
-        );
+        return $this;
     }
 
     #[\Override]
@@ -76,6 +69,12 @@ class ComposhipsBelongsToMany extends BelongsToMany
         return $this->qualifyPivotColumn($key ?? $this->relatedPivotKey);
     }
 
+    /**
+     * 
+     * @param Model[] $models 
+     * @param string|array $key 
+     * @return array 
+     */
     #[\Override]
     protected function getKeys(array $models, $key = null): array
     {
@@ -83,7 +82,19 @@ class ComposhipsBelongsToMany extends BelongsToMany
         foreach ($models as $model) {
             $keys[] = is_array($key) ? array_map(fn($k) => $model->{$k}, $key) : $model->{$key};
         }
-        return array_unique($keys, SORT_REGULAR);
+        $keys = array_unique($keys, SORT_REGULAR);
+        sort($keys);
+        return $keys;
+    }
+
+    #[\Override]
+    public function addConstraints()
+    {
+        $this->performJoin();
+
+        if (static::$constraints) {
+            $this->addWhereConstraints();
+        }
     }
 
     #[\Override]
@@ -92,34 +103,66 @@ class ComposhipsBelongsToMany extends BelongsToMany
         if (is_array($this->parentKey)) {
             foreach ($this->parentKey as $parentKey) {
                 $this->query->where(
-                    $this->getQualifiedForeignPivotKeyName($parentKey), '=', $this->parent->{$parentKey}
+                    $this->parent->qualifyColumn($parentKey),
+                    '=',
+                    $this->parent->{$parentKey}
                 );
             }
-        } else {
-            $this->query->where(
-                $this->getQualifiedForeignPivotKeyName(), '=', $this->parent->{$this->parentKey}
-            );
+            return $this;
         }
 
+        parent::addWhereConstraints();
         return $this;
     }
 
     #[\Override]
     public function getResults()
     {
-        $is_null = false;
-        if (is_array($this->parentKey)) {
-            foreach ($this->parentKey as $parentKey) {
-                if (is_null($this->parent->{$parentKey})) {
-                    $is_null = true;
-                    break;
-                }
-            }
-        } else {
-            $is_null = is_null($this->parent->{$this->parentKey});
+        if (is_string($this->parentKey)) {
+            return parent::getResults();
         }
-        return $is_null
-                ? $this->related->newCollection()
-                : $this->get();
+
+        $is_null = 0;
+        foreach ($this->parentKey as $parentKey) {
+            if (is_null($this->parent->{$parentKey})) {
+                $is_null++;
+            }
+        }
+
+        return $is_null === count($this->parentKey)
+            ? $this->related->newCollection()
+            : $this->get();
+    }
+
+    #[\Override]
+    public function qualifyPivotColumn($column)
+    {
+        if (is_array($column)) {
+            return array_map(fn($c) => parent::qualifyPivotColumn($c), $column);
+        }
+
+        return parent::qualifyPivotColumn($column);
+    }
+
+    #[\Override]
+    protected function aliasedPivotColumns()
+    {
+        $collection = new BaseCollection([]);
+        if (is_array($this->foreignPivotKey)) {
+            $collection = $collection->merge($this->foreignPivotKey);
+        } else {
+            $collection->push($this->foreignPivotKey);
+        }
+        if (is_array($this->relatedPivotKey)) {
+            $collection = $collection->merge($this->relatedPivotKey);
+        } else {
+            $collection->push($this->relatedPivotKey);
+        }
+        $collection = $collection->merge($this->pivotColumns);
+
+        return $collection
+            ->map(fn($column) => $this->qualifyPivotColumn($column) . ' as pivot_' . $column)
+            ->unique()
+            ->all();
     }
 }

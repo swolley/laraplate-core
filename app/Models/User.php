@@ -17,7 +17,7 @@ use Illuminate\Validation\Rules\Password;
 use Modules\Core\Locking\Traits\HasLocks;
 use Lab404\Impersonate\Models\Impersonate;
 use Modules\Core\Models\Pivot\ModelHasRole;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Helpers\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Modules\Core\Database\Factories\UserFactory;

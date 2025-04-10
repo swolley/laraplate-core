@@ -11,7 +11,7 @@ use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Helpers\SoftDeletes;
 use Spatie\Permission\Models\Role as BaseRole;
 use Modules\Core\Database\Factories\RoleFactory;
 use Spatie\Permission\Exceptions\GuardDoesNotMatch;

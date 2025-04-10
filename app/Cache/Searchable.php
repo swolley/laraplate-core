@@ -54,7 +54,7 @@ trait Searchable
 
 		if ($delete) {
 			DeleteFromElasticsearchJob::dispatch($this);
-		} elseif (config('ai.openai_api_key')) {
+		} elseif (config('ai.openai_api_key') && config('ai.enable_model_embedding')) {
 			Bus::chain([
 				// Generate embeddings
 				new GenerateEmbeddingsJob($this),

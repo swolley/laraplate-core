@@ -86,6 +86,7 @@ HORIZON_PREFIX=									#horizon prefix
 
 #ai
 OPENAI_API_KEY=									#openai api key
+ENABLE_MODEL_EMBEDDING=true                     #enable model embedding generation by ai before elastic indexing
 
 #social login
 FACEBOOK_CLIENT_ID=								#facebook client id

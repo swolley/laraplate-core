@@ -20,6 +20,37 @@ trait HasLocks
                 $model->lock_version = $lock_version;
             }
         });
+
+        static::saving(function (Model $model): void {
+            // Rimuovi is_locked dai dati da salvare
+            unset($model->attributes[$model->getIsLockedColumn()]);
+            unset($model->original[$model->getIsLockedColumn()]);
+        });
+    }
+
+    /**
+     * Initialize the locking trait for an instance.
+     *
+     * @return void
+     */
+    public function initializeLocks()
+    {
+        if (! in_array($this->getIsLockedColumn(), $this->guarded)) {
+            $this->guarded[] = $this->getIsLockedColumn();
+        }
+        if (! in_array($this->getLockedAtColumn(), $this->hidden)) {
+            $this->hidden[] = $this->getLockedAtColumn();
+        }
+    }
+
+    /**
+     * Get the name of the "is locked" column.
+     *
+     * @return string
+     */
+    public function getIsLockedColumn(): string
+    {
+        return 'is_locked';
     }
 
     public function lock(?User $user = null): self

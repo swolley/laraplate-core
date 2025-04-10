@@ -32,6 +32,12 @@ trait SoftDeletes
 		static::updating(function (Model $model): void {
 			throw new UnauthorizedException('Cannot update a softdeleted model');
 		});
+
+		static::saving(function (Model $model): void {
+			// Rimuovi is_deleted dai dati da salvare
+			unset($model->attributes[$model->getIsDeletedColumn()]);
+			unset($model->original[$model->getIsDeletedColumn()]);
+		});
 	}
 
 	/**
@@ -42,8 +48,11 @@ trait SoftDeletes
 	public function initializeSoftDeletes()
 	{
 		$this->baseInitializeSoftDeletes();
-		if (! isset($this->casts[$this->getIsDeletedColumn()])) {
-			$this->casts[$this->getIsDeletedColumn()] = 'boolean';
+		// if (! isset($this->casts[$this->getIsDeletedColumn()])) {
+		// 	$this->casts[$this->getIsDeletedColumn()] = 'boolean';
+		// }
+		if (! in_array($this->getIsDeletedColumn(), $this->guarded)) {
+			$this->guarded[] = $this->getIsDeletedColumn();
 		}
 		if (! in_array($this->getDeletedAtColumn(), $this->hidden)) {
 			$this->hidden[] = $this->getDeletedAtColumn();
