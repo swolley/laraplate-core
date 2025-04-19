@@ -20,14 +20,6 @@ trait HasValidity
 
     protected static $valid_to_column = 'valid_to';
 
-    protected function casts()
-    {
-        return [
-            'valid_from' => 'date',
-            'valid_to' => 'date',
-        ];
-    }
-
     public static function validFromKey(): string
     {
         return static::$valid_from_column;
@@ -38,30 +30,20 @@ trait HasValidity
         return static::$valid_to_column;
     }
 
-    protected static function bootHasValidity(): void
+    public function initializeHasValidity()
     {
-        // function check_authorization(Model $model): void
-        // {
-        //     $user = Auth::user();
-        //     if ($user && !$user->hasRole(($model->getConnection() ?? 'default') . '.' . $model->getTable() . '.' . ActionEnum::APPROVE->value)) {
-        //         throw new UnauthorizedException('User ' . $user->name . ' is not authorized to publish the model');
-        //     }
+        // if (!isset($this->casts[static::$valid_from_column])) {
+        //     $this->casts[static::$valid_from_column] = 'date';
         // }
-
-        // static::addGlobalScope('valid', function (Builder $query): void {
-        //     static::withValidityFilter($query, Carbon::today());
-        // });
-
-        // static::creating(function (Model $model): void {
-        //     if (($model->isDirty($model->validFromKey()) && $model->{$model->validFromKey()} !== null) || ($model->isDirty($model->validToKey()) && $model->{$model->validToKey()} !== null)) {
-        //         check_authorization($model);
-        //     }
-        // });
-        // static::updating(function (Model $model): void {
-        //     if ($model->isDirty($model->validFromKey()) || $model->isDirty($model->validToKey())) {
-        //         check_authorization($model);
-        //     }
-        // });
+        // if (!isset($this->casts[static::$valid_to_column])) {
+        //     $this->casts[static::$valid_to_column] = 'date';
+        // }
+        if (!in_array(static::$valid_from_column, $this->fillable)) {
+            $this->fillable[] = static::$valid_from_column;
+        }
+        if (!in_array(static::$valid_to_column, $this->fillable)) {
+            $this->fillable[] = static::$valid_to_column;
+        }
     }
 
     /**
@@ -71,55 +53,102 @@ trait HasValidity
      * @return Builder 
      * @throws InvalidArgumentException 
      */
-    protected static function withValidityFilter(Builder $query, Carbon $date): Builder
+    protected function withValidityFilter(Builder $query, Carbon $date): Builder
     {
-        return $query->where(static::$valid_from_column, '<=', $date)->where(function ($q) use ($date): void {
-            $q->where(static::$valid_to_column, '>=', $date)->orWhereNull(static::$valid_to_column);
+        return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', $date)->where(function ($q) use ($date): void {
+            $q->where($this->qualifyColumn(static::$valid_to_column), '>=', $date)->orWhereNull($this->qualifyColumn(static::$valid_to_column));
         });
+    }
+
+    protected function scopeValidityOrdered(Builder $query)
+    {
+        $query->orderBy(static::$valid_from_column, 'desc')/*->orderBy(static::$valid_to_column, 'desc')*/;
     }
 
     /**
      * Currently valid records
      * @param Builder $query 
+     * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeValid(Builder $query): void
+    protected function scopeValid(Builder $query): Builder
     {
-        $query->where(static::$valid_from_column, '<=', now())->where(function ($q) {
-            $q->where(static::$valid_to_column, '>=', now())->orWhereNull(static::$valid_to_column);
+        return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($q) {
+            $q->where($this->qualifyColumn(static::$valid_to_column), '>=', now())->orWhereNull($this->qualifyColumn(static::$valid_to_column));
         });
     }
 
     /**
      * Expired records
      * @param Builder $query 
+     * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeExpired(Builder $query): void
+    protected function scopeExpired(Builder $query): Builder
     {
-        $query->withoutGlobalScope('valid')->whereNotNull('valid_to')->where('valid_to', '<', now());
+        return $query->withoutGlobalScope('valid')->whereNotNull($this->qualifyColumn(static::$valid_to_column))->where($this->qualifyColumn(static::$valid_to_column), '<', now());
     }
 
     /**
      * Expired records at a given date
      * @param Builder $query 
      * @param Carbon $date 
+     * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeExpiredAt(Builder $query, Carbon $date): void
+    protected function scopeExpiredAt(Builder $query, Carbon $date): Builder
     {
-        $query->expired()->validAt($date);
+        return $query->expired()->validAt($date);
     }
 
     /**
      * Filter records by validity on specified date
      * @param Builder $query 
      * @param Carbon $date
+     * @return Builder
      * @throws InvalidArgumentException 
      */
-    public function scopeValidAt(Builder $query, Carbon $date): void
+    public function scopeValidAt(Builder $query, Carbon $date): Builder
     {
-        static::withoutGlobalScope('valid')->withValidityFilter($query, $date);
+        return static::withoutGlobalScope('valid')->withValidityFilter($query, $date);
+    }
+
+    /**
+     * Filter records by validity on specified date
+     * @param Builder $query 
+     * @param Carbon $date
+     * @return Builder
+     * @throws InvalidArgumentException 
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($query) {
+            $query->where($this->qualifyColumn(static::$valid_to_column), '>=', now())->orWhereNull($this->qualifyColumn(static::$valid_to_column));
+        });
+    }
+
+    /**
+     * Filter records by validity on specified date
+     * @param Builder $query 
+     * @param Carbon $date
+     * @return Builder
+     * @throws InvalidArgumentException 
+     */
+    public function scopeDraft(Builder $query): Builder
+    {
+        return $query->whereNull($this->qualifyColumn(static::$valid_from_column));
+    }
+
+    /**
+     * Filter records by validity on specified date
+     * @param Builder $query 
+     * @param Carbon $date
+     * @return Builder
+     * @throws InvalidArgumentException 
+     */
+    public function scopeScheduled(Builder $query): Builder
+    {
+        return $query->whereNotNull($this->qualifyColumn(static::$valid_from_column))->where($this->qualifyColumn(static::$valid_from_column), '>', now());
     }
 
     /**

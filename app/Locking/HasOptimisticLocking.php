@@ -25,7 +25,7 @@ trait HasOptimisticLocking
     {
         static::creating(function (Model $model) {
             // @phpstan-ignore method.notFound
-            if ($model->currentLockVersion() == null) {
+            if ($model->currentLockVersion() === null) {
                 $model->{static::lockVersionColumn()} = 1;
             }
 

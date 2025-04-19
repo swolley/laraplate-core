@@ -3,6 +3,7 @@
 namespace Modules\Core\Overrides;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -19,18 +20,10 @@ class ComposhipsBelongsToMany extends BelongsToMany
             if (is_array($this->relatedPivotKey)) {
                 foreach ($this->relatedPivotKey as $index => $relatedPivotKey) {
                     $relatedKey = is_array($this->relatedKey) ? $this->relatedKey[$index] : $this->relatedKey;
-                    $join->on(
-                        $this->getQualifiedRelatedPivotKeyName($relatedPivotKey),
-                        '=',
-                        $this->related->qualifyColumn($relatedKey)
-                    );
+                    $join->on($this->getQualifiedRelatedPivotKeyName($relatedPivotKey), '=', $this->related->qualifyColumn($relatedKey));
                 }
             } else {
-                $join->on(
-                    $this->getQualifiedRelatedPivotKeyName(),
-                    '=',
-                    $this->related->qualifyColumn($this->relatedKey)
-                );
+                $join->on($this->getQualifiedRelatedPivotKeyName(), '=', $this->related->qualifyColumn($this->relatedKey));
             }
         });
 
@@ -39,18 +32,10 @@ class ComposhipsBelongsToMany extends BelongsToMany
             if (is_array($this->foreignPivotKey)) {
                 foreach ($this->foreignPivotKey as $index => $foreignPivotKey) {
                     $parentKey = is_array($this->parentKey) ? $this->parentKey[$index] : $this->parentKey;
-                    $join->on(
-                        $this->getQualifiedForeignPivotKeyName($foreignPivotKey),
-                        '=',
-                        $this->parent->qualifyColumn($parentKey)
-                    );
+                    $join->on($this->getQualifiedForeignPivotKeyName($foreignPivotKey), '=', $this->parent->qualifyColumn($parentKey));
                 }
             } else {
-                $join->on(
-                    $this->getQualifiedForeignPivotKeyName(),
-                    '=',
-                    $this->parent->qualifyColumn($this->parentKey)
-                );
+                $join->on($this->getQualifiedForeignPivotKeyName($this->foreignPivotKey), '=', $this->parent->qualifyColumn($this->parentKey));
             }
         });
 
@@ -67,6 +52,42 @@ class ComposhipsBelongsToMany extends BelongsToMany
     public function getQualifiedRelatedPivotKeyName($key = null): string
     {
         return $this->qualifyPivotColumn($key ?? $this->relatedPivotKey);
+    }
+
+    #[\Override]
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        if ($parentQuery->getQuery()->from === $query->getQuery()->from) {
+            return $this->getRelationExistenceQueryForSelfJoin($query, $parentQuery, $columns);
+        }
+
+        $this->performJoin($query);
+
+        // return parent::getRelationExistenceQuery($query, $parentQuery, $columns);
+        $parent_key = $this->getQualifiedParentKeyName();
+        $compare_key = $this->getExistenceCompareKey();
+        if (is_array($parent_key)) {
+            foreach ($parent_key as $index => $key) {
+                $query->whereColumn($key, '=', $compare_key[$index]);
+            }
+            return $query;
+        }
+
+        return $query->select($columns)->whereColumn(
+            $parent_key,
+            '=',
+            $compare_key
+        );
+    }
+
+    #[\Override]
+    public function getExistenceCompareKey()
+    {
+        if (is_array($this->foreignPivotKey)) {
+            return array_map(fn($key) => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
+        }
+
+        return $this->getQualifiedForeignPivotKeyName();
     }
 
     /**
@@ -102,11 +123,7 @@ class ComposhipsBelongsToMany extends BelongsToMany
     {
         if (is_array($this->parentKey)) {
             foreach ($this->parentKey as $parentKey) {
-                $this->query->where(
-                    $this->parent->qualifyColumn($parentKey),
-                    '=',
-                    $this->parent->{$parentKey}
-                );
+                $this->query->where($this->parent->qualifyColumn($parentKey), '=', $this->parent->{$parentKey});
             }
             return $this;
         }

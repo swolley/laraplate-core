@@ -115,7 +115,7 @@ class ListRequestData extends SelectRequestData
      */
     protected function conformFilterValue(array &$filter): void
     {
-        if ($filter['value'] == 'null') {
+        if ($filter['value'] === 'null' || $filter['value'] === null) {
             $filter['value'] = null;
         } elseif (in_array($filter['operator'], [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
             $filter['value'] = !Str::startsWith($filter['value'], '%') && !Str::endsWith($filter['value'], '%') ? '%' . $filter['value'] . '%' : $filter['value'];

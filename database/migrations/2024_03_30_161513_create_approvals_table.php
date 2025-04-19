@@ -17,10 +17,10 @@ return new class() extends Migration
     {
         Schema::create('approvals', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('modification_id');
-            $table->unsignedBigInteger('approver_id');
-            $table->string('approver_type');
-            $table->text('reason')->nullable();
+            $table->unsignedBigInteger('modification_id')->comment('The id of the modification');
+            $table->unsignedBigInteger('approver_id')->comment('The id of the approver');
+            $table->string('approver_type')->comment('The type of the approver');
+            $table->text('reason')->nullable()->comment('The reason for the approval');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true

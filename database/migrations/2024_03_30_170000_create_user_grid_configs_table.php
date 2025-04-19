@@ -20,18 +20,18 @@ return new class() extends Migration
     {
         Schema::create($this->table_name, function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('user_id')->nullable(true);
-            $table->string('grid_name')->nullable(false);
-            $table->string('layout_name')->nullable(false);
-            $table->boolean('is_public')->default(false)->index('user_grid_configs_is_public_IDX');
-            $table->json('config');
+            $table->unsignedBigInteger('user_id')->nullable(true)->comment('The user id of the user grid config');
+            $table->string('grid_name')->nullable(false)->comment('The grid name of the user grid config');
+            $table->string('layout_name')->nullable(false)->comment('The layout name of the user grid config');
+            $table->boolean('is_public')->default(false)->index('user_grid_configs_is_public_IDX')->comment('The is public of the user grid config');
+            $table->json('config')->comment('The config of the user grid config');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true
             );
 
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-            $table->unique(['user_id', 'grid_name', 'layout_name']);
+            $table->foreign('user_id', 'user_grid_configs_users_FK')->references('id')->on('users')->cascadeOnDelete();
+            $table->unique(['user_id', 'grid_name', 'layout_name'], 'user_grid_configs_UN');
         });
 
         $driver = DB::connection()->getDriverName();

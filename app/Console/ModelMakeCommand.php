@@ -479,24 +479,12 @@ class ModelMakeCommand extends BaseModelMakeCommand
         foreach (array_keys($filtered_relation_types) as $key) {
             $message = '';
 
-            switch (Str::replace('relation\\', '', $key)) {
-                case 'ManyToOne':
-                    $message = "Each <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.";
-
-                    break;
-                case 'OneToMany':
-                    $message = "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.";
-
-                    break;
-                case 'ManyToMany':
-                    $message = "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> can also relate to (can also have) <info>many</info> <comment>%s</comment> objects.";
-
-                    break;
-                case 'OneToOne':
-                    $message = "Each <comment>%s</comment> relates to (has) exactly <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> also relates to (has) exactly <info>one</info> <comment>%s</comment>.";
-
-                    break;
-            }
+            $message = match (Str::replace('relation\\', '', $key)) {
+                'ManyToOne' => "Each <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.",
+                'OneToMany' => "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.",
+                'OneToOne' => "Each <comment>%s</comment> relates to (has) exactly <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> also relates to (has) exactly <info>one</info> <comment>%s</comment>.",
+                'ManyToMany' => "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> can also relate to (can also have) <info>many</info> <comment>%s</comment> objects.",
+            };
 
             $key = Str::replace('relation\\', '', $key);
             $rows->add([$key, sprintf($message, $originalEntityShort, $targetEntityShort, $targetEntityShort, $originalEntityShort)]);

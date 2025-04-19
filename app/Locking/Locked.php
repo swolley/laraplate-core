@@ -11,12 +11,12 @@ class Locked
 {
     public function lockedAtColumn(): string
     {
-        return config('core.locking.lock_at_column');
+        return config('core.locking.lock_at_column', 'locked_at');
     }
 
     public function lockedByColumn(): string
     {
-        return config('core.locking.lock_by_column');
+        return config('core.locking.lock_by_column', 'locked_user_id');
     }
 
     public function canBeUnlocked($model): bool

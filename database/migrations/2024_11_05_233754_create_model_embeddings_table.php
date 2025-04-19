@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class extends Migration
 {
@@ -14,8 +15,11 @@ return new class extends Migration
         Schema::create('model_embeddings', function (Blueprint $table) {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
-            $table->json('embedding')->nullable(false);
-            $table->timestamps();
+            $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
     }
 

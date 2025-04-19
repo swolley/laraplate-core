@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Override;
+use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
 
 /**
@@ -31,7 +32,9 @@ trait HasApprovals
 
         $preview = $this->attributesToArray();
 
+        /** @var Modification $modification */
         foreach ($this->modifications()->oldest()->select(['modifications'])->cursor() as $modification) {
+            /** @phpstan-ignore property.notFound */
             foreach ($modification->modifications as $key => $mod) {
                 $preview[$key] = $mod['modified'];
             }
@@ -40,7 +43,6 @@ trait HasApprovals
         return $preview;
     }
 
-    #[Override]
     public function toArray()
     {
         if (!$this->preview) {
@@ -62,6 +64,7 @@ trait HasApprovals
     protected function requiresApprovalWhen($modifications): bool
     {
         $user = auth()?->user();
+        /** @phpstan-ignore method.notFound */
         if ($user && ($user->isAdmin() || $user->isSuperAdmin() && $user->can('approve.' . $this->getTable()))) {
             return false;
         }

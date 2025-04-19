@@ -376,7 +376,7 @@ if (!function_exists('is_json')) {
         /** @psalm-suppress UnusedFunctionCall */
         json_decode($string);
 
-        return json_last_error() == JSON_ERROR_NONE;
+        return json_last_error() === JSON_ERROR_NONE;
     }
 }
 

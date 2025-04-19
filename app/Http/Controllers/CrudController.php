@@ -172,19 +172,9 @@ class CrudController extends Controller
     //region READ OPERATIONS
 
     /**
-     * List the specified resource
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - GET|POST|HEAD api/v1/select/{entity}
-     *   Name: core.api.list
-     *   Middleware: api
-     * - GET|POST|HEAD app/crud/select/{entity}
-     *   Name: core.crud.list
-     *   Middleware: web
+     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api])
+     * Route(path: 'app/crud/select/{entity}', name: 'core.crud.list', methods: [GET, POST, HEAD], middleware: [web])
      */
     public function list(ListRequest $request): Response
     {
@@ -223,6 +213,11 @@ class CrudController extends Controller
      * @throws BindingResolutionException
      * @throws Throwable
      * @throws UnexpectedValueException
+     */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/detail/{entity}', name: 'core.api.detail', methods: [GET, HEAD], middleware: [api])
+     * Route(path: 'app/crud/detail/{entity}', name: 'core.crud.detail', methods: [GET, HEAD], middleware: [web])
      */
     public function detail(DetailRequest $request): Response
     {
@@ -319,104 +314,24 @@ class CrudController extends Controller
 
     private function translateFilterToElasticsearch(Filter $filter): array
     {
-        $query = [];
-
-        switch ($filter->operator) {
-            case FilterOperator::EQUALS:
-                $query = [
-                    'term' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::NOT_EQUALS:
-                $query = [
-                    'bool' => [
-                        'must_not' => [
-                            'term' => [
-                                $filter->property => $filter->value,
-                            ],
-                        ],
-                    ],
-                ];
-                break;
-            case FilterOperator::LIKE:
-                $query = [
-                    'wildcard' => [
-                        $filter->property => '*' . $filter->value . '*',
-                    ],
-                ];
-                break;
-            case FilterOperator::NOT_LIKE:
-                $query = [
-                    'bool' => [
-                        'must_not' => [
-                            'wildcard' => [
-                                $filter->property => '*' . $filter->value . '*',
-                            ],
-                        ],
-                    ],
-                ];
-                break;
-            case FilterOperator::IN:
-                $query = [
-                    'terms' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::GREAT:
-                $query = [
-                    'gt' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::GREAT_EQUALS:
-                $query = [
-                    'gte' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::LESS:
-                $query = [
-                    'lt' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::LESS_EQUALS:
-                $query = [
-                    'lte' => [
-                        $filter->property => $filter->value,
-                    ],
-                ];
-                break;
-            case FilterOperator::BETWEEN:
-                $query = [
-                    'range' => [
-                        $filter->property => [
-                            'gte' => $filter->value[0],
-                            'lte' => $filter->value[1],
-                        ],
-                    ],
-                ];
-                break;
-        }
-
-        return $query;
+        return match ($filter->operator) {
+            FilterOperator::EQUALS => ['term' => [$filter->property => $filter->value]],
+            FilterOperator::NOT_EQUALS => ['bool' => ['must_not' => ['term' => [$filter->property => $filter->value]]]],
+            FilterOperator::LIKE => ['wildcard' => [$filter->property => '*' . $filter->value . '*']],
+            FilterOperator::NOT_LIKE => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $filter->value . '*']]]],
+            FilterOperator::IN => ['terms' => [$filter->property => $filter->value]],
+            FilterOperator::GREAT => ['gt' => [$filter->property => $filter->value]],
+            FilterOperator::GREAT_EQUALS => ['gte' => [$filter->property => $filter->value]],
+            FilterOperator::LESS => ['lt' => [$filter->property => $filter->value]],
+            FilterOperator::LESS_EQUALS => ['lte' => [$filter->property => $filter->value]],
+            FilterOperator::BETWEEN => ['range' => [$filter->property => ['gte' => $filter->value[0], 'lte' => $filter->value[1]]]],
+        };
     }
 
     /**
      * @route-comment
-     * Routes:
-     * - GET|POST|HEAD api/v1/search/{entity?}
-     *   Name: core.api.search
-     *   Middleware: api
-     * - GET|POST|HEAD app/crud/search/{entity?}
-     *   Name: core.crud.search
-     *   Middleware: web
+     * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api])
+     * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
      */
     public function search(SearchRequest $request): Response
     {
@@ -455,19 +370,9 @@ class CrudController extends Controller
     }
 
     /**
-     * Show resource history
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - GET|HEAD api/v1/history/{entity}
-     *   Name: core.api.history
-     *   Middleware: api
-     * - GET|HEAD app/crud/history/{entity}
-     *   Name: core.crud.history
-     *   Middleware: web
+     * Route(path: 'api/v1/history/{entity}', name: 'core.api.history', methods: [GET, HEAD], middleware: [api])
+     * Route(path: 'app/crud/history/{entity}', name: 'core.crud.history', methods: [GET, HEAD], middleware: [web])
      */
     public function history(HistoryRequest $request): Response
     {
@@ -501,19 +406,9 @@ class CrudController extends Controller
     }
 
     /**
-     * Get the specified resource data
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - GET|HEAD api/v1/tree/{entity}
-     *   Name: core.api.tree
-     *   Middleware: api
-     * - GET|HEAD app/crud/tree/{entity}
-     *   Name: core.crud.tree
-     *   Middleware: web
+     * Route(path: 'api/v1/tree/{entity}', name: 'core.api.tree', methods: [GET, HEAD], middleware: [api])
+     * Route(path: 'app/crud/tree/{entity}', name: 'core.crud.tree', methods: [GET, HEAD], middleware: [web])
      */
     public function tree(TreeRequest $request): Response
     {
@@ -561,19 +456,9 @@ class CrudController extends Controller
     }
 
     /**
-     * Insert the specified resource
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - POST api/v1/insert/{entity}
-     *   Name: core.api.insert
-     *   Middleware: api
-     * - POST app/crud/insert/{entity}
-     *   Name: core.crud.insert
-     *   Middleware: web
+     * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api])
+     * Route(path: 'app/crud/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
      */
     public function insert(Request $request): Response
     {
@@ -601,19 +486,9 @@ class CrudController extends Controller
     }
 
     /**
-     * Update the specified resource
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - PATCH|PUT api/v1/update/{entity}
-     *   Name: core.api.replace
-     *   Middleware: api
-     * - PATCH|PUT app/crud/update/{entity}
-     *   Name: core.crud.replace
-     *   Middleware: web
+     * Route(path: 'api/v1/update/{entity}', name: 'core.api.replace', methods: [PATCH, PUT], middleware: [api])
+     * Route(path: 'app/crud/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
      */
     public function update(ModifyRequest $request): Response
     {
@@ -659,19 +534,9 @@ class CrudController extends Controller
     }
 
     /**
-     * Remove the specified resource
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Routes:
-     * - DELETE|POST api/v1/delete/{entity}
-     *   Name: core.api.delete
-     *   Middleware: api
-     * - DELETE|POST app/crud/delete/{entity}
-     *   Name: core.crud.delete
-     *   Middleware: web
+     * Route(path: 'api/v1/delete/{entity}', name: 'core.api.delete', methods: [DELETE, POST], middleware: [api])
+     * Route(path: 'app/crud/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
      */
     public function delete(ModifyRequest $request): Response
     {
@@ -733,15 +598,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Logically restore the specified resource
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: PATCH app/crud/activate/{entity}
-     * Name: core.crud.activate
-     * Middleware: web
+     * Route(path: 'app/crud/activate/{entity}', name: 'core.crud.activate', methods: [PATCH], middleware: [web])
      */
     public function activate(ModifyRequest $request): Response
     {
@@ -749,16 +607,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Logically delete the specified resource
-     *
-     * @throws UnexpectedValueException
-     * @throws Exception
-     * @throws BindingResolutionException
-     * @throws Throwable
      * @route-comment
-     * Route: PATCH app/crud/inactivate/{entity}
-     * Name: core.crud.inactivate
-     * Middleware: web
+     * Route(path: 'app/crud/inactivate/{entity}', name: 'core.crud.inactivate', methods: [PATCH], middleware: [web])
      */
     public function inactivate(ModifyRequest $request): Response
     {
@@ -809,15 +659,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Approve current pending record modifications
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: PATCH app/crud/approve/{entity}
-     * Name: core.crud.approve
-     * Middleware: web
+     * Route(path: 'app/crud/approve/{entity}', name: 'core.crud.approve', methods: [PATCH], middleware: [web])
      */
     public function approve(ModifyRequest $request): Response
     {
@@ -825,15 +668,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Register user disapprovation for pending record modifications
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: PATCH app/crud/disapprove/{entity}
-     * Name: core.crud.disapprove
-     * Middleware: web
+     * Route(path: 'app/crud/disapprove/{entity}', name: 'core.crud.disapprove', methods: [PATCH], middleware: [web])
      */
     public function disapprove(ModifyRequest $request): Response
     {
@@ -884,16 +720,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Lock resource
-     *
-     * @throws UnexpectedValueException
-     * @throws Exception
-     * @throws BindingResolutionException
-     * @throws Throwable
      * @route-comment
-     * Route: PATCH app/crud/lock/{entity}
-     * Name: core.crud.lock
-     * Middleware: web
+     * Route(path: 'app/crud/lock/{entity}', name: 'core.crud.lock', methods: [PATCH], middleware: [web])
      */
     public function lock(ModifyRequest $request): Response
     {
@@ -901,16 +729,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Unlock resource
-     *
-     * @throws UnexpectedValueException
-     * @throws Exception
-     * @throws BindingResolutionException
-     * @throws Throwable
      * @route-comment
-     * Route: PATCH app/crud/unlock/{entity}
-     * Name: core.crud.unlock
-     * Middleware: web
+     * Route(path: 'app/crud/unlock/{entity}', name: 'core.crud.unlock', methods: [PATCH], middleware: [web])
      */
     public function unlock(ModifyRequest $request): Response
     {
@@ -918,16 +738,8 @@ class CrudController extends Controller
     }
 
     /**
-     * Clear model cache
-     *
-     * @throws UnexpectedValueException
-     * @throws Exception
-     * @throws BindingResolutionException
-     * @throws Throwable
      * @route-comment
-     * Route: DELETE app/crud/cache-clear/{entity}
-     * Name: core.crud.cache-clear
-     * Middleware: web
+     * Route(path: 'app/crud/cache-clear/{entity}', name: 'core.crud.cache-clear', methods: [DELETE], middleware: [web])
      */
     public function clearModelCache(Request $request): Response
     {

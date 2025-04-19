@@ -4,27 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Throwable;
-use TypeError;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use InvalidArgumentException;
-use UnexpectedValueException;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Database\DatabaseManager;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Validation\ValidationException;
 use Modules\Core\Listeners\AfterLoginListener;
 use Illuminate\Validation\UnauthorizedException;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Laravel\Socialite\Contracts\User as SocialUser;
 use Modules\Core\Http\Requests\ImpersonationRequest;
-use Spatie\Permission\Exceptions\PermissionDoesNotExist;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 class UserController extends Controller
@@ -54,20 +46,8 @@ class UserController extends Controller
     }
 
     /**
-     * get current session user info.
-     *
-     *
-     * @throws InvalidArgumentException
-     * @throws BadRequestException
-     * @throws TypeError
-     * @throws PermissionDoesNotExist
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: GET|HEAD app/auth/user/profile-information
-     * Name: core.auth.userInfo
-     * Middleware: auth
+     * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [auth])
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
@@ -90,21 +70,8 @@ class UserController extends Controller
     }
 
     /**
-     * Impersonate a user.
-     *
-     *
-     * @throws ValidationException
-     * @throws InvalidArgumentException
-     * @throws BadRequestException
-     * @throws BindingResolutionException
-     * @throws TypeError
-     * @throws PermissionDoesNotExist
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: POST app/auth/impersonate
-     * Name: core.auth.impersonate
-     * Middleware: auth, can:impersonate
+     * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [auth, can:impersonate])
      */
     public function impersonate(ImpersonationRequest $request): HttpFoundationResponse
     {
@@ -120,20 +87,8 @@ class UserController extends Controller
     }
 
     /**
-     * Leave user impersonation.
-     *
-     *
-     * @throws InvalidArgumentException
-     * @throws BadRequestException
-     * @throws BindingResolutionException
-     * @throws TypeError
-     * @throws PermissionDoesNotExist
-     * @throws Throwable
-     * @throws UnexpectedValueException
      * @route-comment
-     * Route: POST app/auth/leave-impersonate
-     * Name: core.auth.leaveImpersonate
-     * Middleware: auth, can:impersonate
+     * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [auth, can:impersonate])
      */
     public function leaveImpersonate(Request $request): HttpFoundationResponse
     {
@@ -174,13 +129,8 @@ class UserController extends Controller
     }
 
     /**
-     * Maintain user session.
-     *
-     * @param Request $request
      * @route-comment
-     * Route: GET|HEAD app/auth/still-here
-     * Name: core.auth.maintainSession
-     * Middleware: auth
+     * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [auth])
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {

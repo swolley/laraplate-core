@@ -57,6 +57,9 @@ trait SoftDeletes
 		if (! in_array($this->getDeletedAtColumn(), $this->hidden)) {
 			$this->hidden[] = $this->getDeletedAtColumn();
 		}
+		if (! in_array($this->getIsDeletedColumn(), $this->hidden)) {
+			$this->hidden[] = $this->getIsDeletedColumn();
+		}
 	}
 
 	/**

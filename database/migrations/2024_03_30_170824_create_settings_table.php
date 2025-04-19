@@ -26,13 +26,13 @@ return new class() extends Migration
             ];
 
             $table->id();
-            $table->string('name', 50)->nullable(false);
-            $table->json('value')->nullable(false);
-            $table->boolean('encrypted')->nullable(false);
-            $table->json('choices')->nullable(true);
-            $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20]);
-            $table->string('group_name', 50)->nullable(false);
-            $table->string('description')->nullable(false);
+            $table->string('name', 50)->nullable(false)->comment('The name of the setting');
+            $table->json('value')->nullable(false)->comment('The value of the setting');
+            $table->boolean('encrypted')->nullable(false)->comment('Is the value encrypted');
+            $table->json('choices')->nullable(true)->comment('Constrained available values');
+            $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20])->comment('The type of the setting');
+            $table->string('group_name', 50)->nullable(false)->comment('The group name of the setting');
+            $table->string('description')->nullable(false)->comment('The description of the setting');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true,

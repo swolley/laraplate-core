@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Modules\Core\Locking\Locked;
 
 class CommonMigrationFunctions
 {
@@ -134,16 +135,16 @@ class CommonMigrationFunctions
 
         if (!Schema::hasColumn($table->getTable(), 'is_deleted')) {
             if (DB::connection()->getDriverName() === 'pgsql') {
-                $table->boolean('is_deleted')->storedAs('deleted_at IS NOT NULL')->index($table->getTable() . '_is_deleted_idx');
+                $table->boolean('is_deleted')->storedAs('deleted_at IS NOT NULL')->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
             } elseif (DB::connection()->getDriverName() === 'oracle') {
                 // Oracle richiede ancora i trigger
-                $table->boolean('is_deleted')->default(false)->index($table->getTable() . '_is_deleted_idx');
+                $table->boolean('is_deleted')->default(false)->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
                 DB::afterCommit(function () use ($table) {
                     self::createBooleanTriggers($table, 'deleted');
                 });
             } else {
                 // MySQL supporta generated columns
-                $table->boolean('is_deleted')->storedAs('IF(deleted_at IS NULL, 0, 1)')->index($table->getTable() . '_is_deleted_idx');
+                $table->boolean('is_deleted')->storedAs('IF(deleted_at IS NULL, 0, 1)')->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
             }
         }
     }
@@ -165,29 +166,30 @@ class CommonMigrationFunctions
 
     private static function locked(Blueprint $table): void
     {
-        if ($locked_at_column = app('locked')->lockedAtColumn()) {
+        $locked = new Locked();
+        if ($locked_at_column = $locked->lockedAtColumn()) {
             if (!Schema::hasColumn($table->getTable(), $locked_at_column)) {
-                $table->timestamp($locked_at_column)->nullable();
+                $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
             }
         }
-        if ($locked_by_column = app('locked')->lockedByColumn()) {
+        if ($locked_by_column = $locked->lockedByColumn()) {
             if (!Schema::hasColumn($table->getTable(), $locked_by_column)) {
-                $table->timestamp($locked_by_column)->nullable();
+                $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
             }
         }
 
         if (!Schema::hasColumn($table->getTable(), 'is_locked')) {
             if (DB::connection()->getDriverName() === 'pgsql') {
-                $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx');
+                $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
             } elseif (DB::connection()->getDriverName() === 'oracle') {
                 // Oracle richiede ancora i trigger
-                $table->boolean('is_locked')->default(false)->index($table->getTable() . '_is_locked_idx');
+                $table->boolean('is_locked')->default(false)->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
                 DB::afterCommit(function () use ($table) {
                     self::createBooleanTriggers($table, 'locked');
                 });
             } else {
                 // MySQL supporta generated columns
-                $table->boolean('is_locked')->storedAs('IF(' . $locked_at_column . ' IS NULL, 0, 1)')->index($table->getTable() . '_is_locked_idx');
+                $table->boolean('is_locked')->storedAs('IF(' . $locked_at_column . ' IS NULL, 0, 1)')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
             }
         }
     }
@@ -199,12 +201,13 @@ class CommonMigrationFunctions
             self::dropBooleanTriggers($table, 'locked');
         }
 
-        if ($locked_at_column = app('locked')->lockedAtColumn()) {
+        $locked = new Locked();
+        if ($locked_at_column = $locked->lockedAtColumn()) {
             if (Schema::hasColumn($table->getTable(), $locked_at_column)) {
                 $table->dropColumn($locked_at_column);
             }
         }
-        if ($locked_by_column = app('locked')->lockedByColumn()) {
+        if ($locked_by_column = $locked->lockedByColumn()) {
             if (Schema::hasColumn($table->getTable(), $locked_by_column)) {
                 $table->dropColumn($locked_by_column);
             }

@@ -2,7 +2,8 @@
 
 namespace Modules\Core\Console;
 
-use Illuminate\Console\Command;
+use Illuminate\Support\Str;
+use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\Route;
 
 class AddRouteCommentsCommand extends Command
@@ -19,10 +20,14 @@ class AddRouteCommentsCommand extends Command
         $method_routes = [];
 
         // First collect all routes for each method
-        foreach ($routes as $route) {
+        /** @var \Illuminate\Routing\Route $route */
+        foreach ($routes as &$route) {
             $action = $route->getActionName();
+            if (!Str::startsWith($action, ['Modules\\', 'App\\'])) {
+                continue;
+            }
 
-            if (!str_contains((string) $action, '@')) {
+            if (!Str::contains((string) $action, '@')) {
                 continue;
             }
 
@@ -32,15 +37,16 @@ class AddRouteCommentsCommand extends Command
                 continue;
             }
 
-            $key = $controller . '@' . $method;
-            if (!isset($method_routes[$key])) {
-                $method_routes[$key] = [];
+
+            // $key = $controller . '@' . $method;
+            if (!isset($method_routes[$action])) {
+                $method_routes[$action] = [];
             }
-            $method_routes[$key][] = $route;
+            $method_routes[$action][] = $route;
         }
 
         // Then process each method with all its routes
-        foreach ($method_routes as $key => $routes) {
+        foreach ($method_routes as $key => &$routes) {
             [$controller, $method] = explode('@', $key);
 
             $reflection_class = new \ReflectionClass($controller);
@@ -64,7 +70,7 @@ class AddRouteCommentsCommand extends Command
             }
 
             $route_comments = [];
-            foreach ($routes as $route) {
+            foreach ($routes as &$route) {
                 $route_info = $this->getRouteInfo($route);
                 $route_comments[] = $route_info;
             }
@@ -93,31 +99,13 @@ class AddRouteCommentsCommand extends Command
 
     private function generateComment(array $route_comments): string
     {
-        $comment = "/**\n * " . self::ROUTE_COMMENT_MARKER . "\n\n";
+        $comment = "\t/**\n\t * " . self::ROUTE_COMMENT_MARKER . "\n";
 
-        if (count($route_comments) > 1) {
-            $comment .= " * Routes:\n";
-            foreach ($route_comments as $route_info) {
-                $comment .= " * - " . implode('|', $route_info['methods']) . " {$route_info['uri']}\n";
-                if ($route_info['name']) {
-                    $comment .= " *   Name: {$route_info['name']}\n";
-                }
-                if (!empty($route_info['middleware'])) {
-                    $comment .= " *   Middleware: " . implode(', ', $route_info['middleware']) . "\n";
-                }
-            }
-        } else {
-            $route_info = $route_comments[0];
-            $comment .= " * Route: " . implode('|', $route_info['methods']) . " {$route_info['uri']}\n";
-            if ($route_info['name']) {
-                $comment .= " * Name: {$route_info['name']}\n";
-            }
-            if (!empty($route_info['middleware'])) {
-                $comment .= " * Middleware: " . implode(', ', $route_info['middleware']) . "\n";
-            }
+        foreach ($route_comments as &$route_info) {
+            $comment .= "\t * Route(path: '{$route_info['uri']}', name: '{$route_info['name']}', methods: [" . implode(', ', $route_info['methods']) . "], middleware: [" . implode(', ', $route_info['middleware']) . "])\n";
         }
 
-        return $comment . " */";
+        return $comment . "\t */";
     }
 
     private function addCommentToMethod(string $file_path, string $method_name, string $comment): void

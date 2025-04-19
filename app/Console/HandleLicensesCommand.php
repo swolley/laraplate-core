@@ -95,7 +95,6 @@ class HandleLicensesCommand extends Command
                         break;
                 }
 
-                $user_class = user_class();
                 $this->output->info('User class is not Modules\Core\Models\User');
                 $this->db->commit();
 

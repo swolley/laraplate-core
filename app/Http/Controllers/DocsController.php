@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use UnexpectedValueException;
 use Illuminate\Contracts\View\View;
 use Nwidart\Modules\Facades\Module;
+use Symfony\Component\Routing\Annotation\Route;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 class DocsController extends OpenApiJsonController
@@ -18,11 +19,19 @@ class DocsController extends OpenApiJsonController
         protected \Illuminate\Cache\Repository $cache,
     ) {}
 
+	/**
+	 * @route-comment
+	 * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
+	 */
     public function mergeDocs(Request $request, string $version = 'v1')
     {
         return $this->cache->tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn() => response()->json($this->getJson($version)));
     }
 
+	/**
+	 * @route-comment
+	 * Route(path: '/', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
+	 */
     public function welcome(): View
     {
         $all_modules = modules(true, false, false);
@@ -77,12 +86,10 @@ class DocsController extends OpenApiJsonController
         ]);
     }
 
-    /**
-     * @route-comment
-     * Route: GET|HEAD phpinfo
-     * Name: core.docs.phpinfo
-     * Middleware: web
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
+	 */
     public function phpinfo(): View
     {
         return view('core::phpinfo');
@@ -91,8 +98,6 @@ class DocsController extends OpenApiJsonController
     /**
      * @throws UnexpectedValueException if no documentation is found
      * @return ArrayAccess|array
-     *
-     *
      * @psalm-return \ArrayAccess|array{paths: mixed,...}
      */
     #[\Override]

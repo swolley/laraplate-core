@@ -17,10 +17,10 @@ return new class() extends Migration
     {
         Schema::create('disapprovals', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('modification_id');
-            $table->unsignedBigInteger('disapprover_id');
-            $table->string('disapprover_type');
-            $table->text('reason')->nullable();
+            $table->unsignedBigInteger('modification_id')->comment('The id of the modification');
+            $table->unsignedBigInteger('disapprover_id')->comment('The id of the disapprover');
+            $table->string('disapprover_type')->comment('The type of the disapprover');
+            $table->text('reason')->nullable()->comment('The reason for the disapproval');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true

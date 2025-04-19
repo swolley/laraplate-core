@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Modules\Core\Helpers\CommonMigrationFunctions;
 
 return new class() extends Migration {
     /**
@@ -28,37 +29,72 @@ return new class() extends Migration {
 
         Schema::create($tableNames['permissions'], function (Blueprint $table): void {
             $table->bigIncrements('id'); // permission id
-            $table->string('name');       // For MySQL 8.0 use string('name', 125);
-            $table->string('guard_name')->default('web'); // For MySQL 8.0 use string('guard_name', 125);
-            $table->timestamps();
+            $table->string('name', 125)->nullable(false)->comment('The name of the permission');       // For MySQL 8.0 use string('name', 125);
+            $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the permission'); // For MySQL 8.0 use string('guard_name', 125);
+            $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the permission');
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true
+            );
 
-            $table->unique(['name', 'guard_name']);
+            $table->unique(['name', 'guard_name'], 'permissions_UN');
         });
+
+        $connection = DB::connection();
+        if ($connection->getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE permissions ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
+            DB::statement("ALTER TABLE permissions ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
+            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+            DB::statement("ALTER TABLE permissions ADD CONSTRAINT permissions_name_CHECK CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
+        } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'])) {
+            DB::statement("ALTER TABLE permissions ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
+            DB::statement("ALTER TABLE permissions ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
+            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+            DB::statement("ALTER TABLE permissions ADD CONSTRAINT permissions_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
+        } elseif ($connection->getDriverName() === 'sqlite') {
+            DB::statement("ALTER TABLE permissions ADD COLUMN connection_name TEXT AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
+            DB::statement("ALTER TABLE permissions ADD COLUMN table_name TEXT AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
+            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+        } else {
+            throw new \Exception('Unsupported database driver');
+        }
 
         Schema::create($tableNames['roles'], function (Blueprint $table) use ($teams, $columnNames): void {
             $table->bigIncrements('id'); // role id
 
             if ($teams || config('permission.testing')) { // permission.testing is a fix for sqlite testing
-                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable();
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable()->comment('The team foreign key of the role');
                 $table->index($columnNames['team_foreign_key'], 'roles_team_foreign_key_index');
             }
-            $table->string('name');       // For MySQL 8.0 use string('name', 125);
-            $table->string('guard_name')->default('web'); // For MySQL 8.0 use string('guard_name', 125);
-            $table->timestamps();
+            $table->string('name', 125)->nullable(false)->comment('The name of the role');       // For MySQL 8.0 use string('name', 125);
+            $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the role'); // For MySQL 8.0 use string('guard_name', 125);
+            $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the role');
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                hasSoftDelete: true,
+                hasLocks: true
+            );
 
             if ($teams || config('permission.testing')) {
-                $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);
+                $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name'], 'roles_UN');
             } else {
-                $table->unique(['name', 'guard_name']);
+                $table->unique(['name', 'guard_name'], 'roles_UN');
             }
+        });
+
+        Schema::table($tableNames['roles'], function (Blueprint $table) use ($tableNames): void {
+            $table->unsignedBigInteger('parent_id')->nullable()->comment('The parent id of the role');
+            $table->foreign('parent_id', 'parent_role_FK')->references('id')->on($tableNames['roles'])->nullOnDelete();
         });
 
         Schema::create($tableNames['model_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotPermission, $teams): void {
             $table->unsignedBigInteger($pivotPermission);
 
-            $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
-            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_model_id_model_type_index');
+            $table->string('model_type')->nullable(false)->comment('The model type of the permission');
+            $table->unsignedBigInteger($columnNames['model_morph_key'])->nullable(false)->comment('The model id of the permission');
+            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_morph_idx');
 
             $table->foreign($pivotPermission)
                 ->references('id') // permission id
@@ -66,8 +102,8 @@ return new class() extends Migration {
                 ->onDelete('cascade');
 
             if ($teams) {
-                $table->unsignedBigInteger($columnNames['team_foreign_key']);
-                $table->index($columnNames['team_foreign_key'], 'model_has_permissions_team_foreign_key_index');
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable(false)->comment('The team foreign key of the permission');
+                $table->index($columnNames['team_foreign_key'], 'model_has_permissions_team_idx');
 
                 $table->primary(
                     [$columnNames['team_foreign_key'], $pivotPermission, $columnNames['model_morph_key'], 'model_type'],
@@ -79,14 +115,19 @@ return new class() extends Migration {
                     'model_has_permissions_permission_model_type_primary',
                 );
             }
+
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::create($tableNames['model_has_roles'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotRole, $teams): void {
             $table->unsignedBigInteger($pivotRole);
 
-            $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
-            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_roles_model_id_model_type_index');
+            $table->string('model_type')->nullable(false)->comment('The model type of the role');
+            $table->unsignedBigInteger($columnNames['model_morph_key'])->nullable(false)->comment('The model id of the role');
+            $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_roles_morph_idx');
 
             $table->foreign($pivotRole)
                 ->references('id') // role id
@@ -94,8 +135,8 @@ return new class() extends Migration {
                 ->onDelete('cascade');
 
             if ($teams) {
-                $table->unsignedBigInteger($columnNames['team_foreign_key']);
-                $table->index($columnNames['team_foreign_key'], 'model_has_roles_team_foreign_key_index');
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable(false)->comment('The team foreign key of the role');
+                $table->index($columnNames['team_foreign_key'], 'model_has_roles_team_idx');
 
                 $table->primary(
                     [$columnNames['team_foreign_key'], $pivotRole, $columnNames['model_morph_key'], 'model_type'],
@@ -107,11 +148,16 @@ return new class() extends Migration {
                     'model_has_roles_role_model_type_primary',
                 );
             }
+
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
         });
 
         Schema::create($tableNames['role_has_permissions'], function (Blueprint $table) use ($tableNames, $pivotRole, $pivotPermission): void {
-            $table->unsignedBigInteger($pivotPermission);
-            $table->unsignedBigInteger($pivotRole);
+            $table->unsignedBigInteger($pivotPermission)->nullable(false)->comment('The permission id of the role');
+            $table->unsignedBigInteger($pivotRole)->nullable(false)->comment('The role id of the permission');
 
             $table->foreign($pivotPermission)
                 ->references('id') // permission id
@@ -123,7 +169,12 @@ return new class() extends Migration {
                 ->on($tableNames['roles'])
                 ->onDelete('cascade');
 
-            $table->primary([$pivotPermission, $pivotRole], 'role_has_permissions_permission_id_role_id_primary');
+            CommonMigrationFunctions::timestamps(
+                $table,
+                hasCreateUpdate: true
+            );
+
+            $table->primary([$pivotPermission, $pivotRole], 'role_has_permissions_primary');
         });
 
         app('cache')

@@ -21,18 +21,10 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 class SettingController extends Controller
 {
-    /**
-     * Get app translations for the specified locale.
-     *
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
-     * @route-comment
-     * Route: GET|HEAD app/translations/{lang?}
-     * Name: core.info.translations
-     * Middleware: info
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
+	 */
     public function getTranslations(Request $request, ?string $lang = null): HttpFoundationResponse
     {
         if ($lang) {
@@ -90,18 +82,10 @@ class SettingController extends Controller
             ->json();
     }
 
-    /**
-     * Get site configs.
-     *
-     *
-     * @throws BindingResolutionException
-     * @throws Throwable
-     * @throws UnexpectedValueException
-     * @route-comment
-     * Route: GET|HEAD app/configs
-     * Name: core.info.getSiteConfigs
-     * Middleware: info
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
+	 */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
         $settings = $this->cache->tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
@@ -119,21 +103,10 @@ class SettingController extends Controller
             ->json();
     }
 
-    /**
-     * Get site info.
-     *
-     *
-     * @throws InvalidArgumentException
-     * @throws BindingResolutionException
-     * @throws Exception
-     * @throws RuntimeException
-     * @throws Throwable
-     * @throws UnexpectedValueException
-     * @route-comment
-     * Route: GET|HEAD app/info
-     * Name: core.info.siteInfo
-     * Middleware: info
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
+	 */
     public function siteInfo(Request $request): HttpFoundationResponse
     {
         $data = [

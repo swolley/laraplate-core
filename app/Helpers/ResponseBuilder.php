@@ -403,7 +403,7 @@ class ResponseBuilder
             if ($this->error instanceof \Exception) {
                 $payload['error'] = $this->error->getMessage();
 
-                if (config('app.debug') == true) {
+                if (config('app.debug') === true) {
                     $payload['exception'] = [
                         'code' => $this->error->getCode(),
                         'file' => $this->error->getFile(),

@@ -371,7 +371,7 @@ trait HasGridUtils
      */
     public function getModelCasts(): array
     {
-        $casts = $this->casts;
+        $casts = $this->casts();
         if (property_exists($this, 'dates')) {
             foreach ($this->dates as $date) {
                 $casts[$date] = 'date';

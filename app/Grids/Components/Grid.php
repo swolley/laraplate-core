@@ -835,7 +835,7 @@ class Grid extends Entity
             if ($field && isset($filter['value'])) {
                 $operator = FilterOperator::tryFrom($filter['operator']);
                 if ($operator instanceof \Modules\Core\Casts\FilterOperator) {
-                    static::applyCorrectWhereMethod($query, $field, $operator, $filter['value'] == 'null' ? null : $filter['value']);
+                    static::applyCorrectWhereMethod($query, $field, $operator, $filter['value'] === 'null' ? null : $filter['value']);
                 }
             }
         }

@@ -6,9 +6,7 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Overrides\Seeder;
-
 use Illuminate\Support\Facades\Log;
-use Modules\Core\Models\Modification;
 use function Laravel\Prompts\progress;
 use Modules\Core\Helpers\HasApprovals;
 use Illuminate\Database\Eloquent\Model;
@@ -49,7 +47,7 @@ abstract class BatchSeeder extends Seeder
      * Create the data in batches
      * @param class-string<Model> $model_class The model class to create the data for
      * @param int $total_count The total number of data to create
-     * @param string $entity_name The name of the entity to create the data for
+     * @param bool $force_approve Whether to force approval of the created data
      * @return void
      */
     protected function createInBatches(string $model_class, int $total_count, bool $force_approve = true): void
@@ -70,6 +68,7 @@ abstract class BatchSeeder extends Seeder
         $progress->start();
         for ($batch = 0; $batch < $batches; $batch++) {
             $remaining = $count_to_create - $created;
+            /** @var int $batch_size */
             $batch_size = min(self::BATCH_SIZE, $remaining);
 
             $retry_count = 0;
@@ -80,10 +79,12 @@ abstract class BatchSeeder extends Seeder
                     DB::beginTransaction();
 
                     /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
+                    /** @phpstan-ignore staticMethod.notFound */
                     $factory = $model_class::factory();
                     $created_models = $factory->count($batch_size)->create();
 
                     if ($force_approve && class_uses_trait($model_class, HasApprovals::class)) {
+                        /** @var Model $model */
                         foreach ($created_models as $model) {
                             $model->approve();
                         }

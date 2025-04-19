@@ -26,23 +26,10 @@ use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 
 class GridsController extends Controller
 {
-    /**
-     * get all grid models configurations
-     *
-     * @return Response
-     *
-     * @throws DirectoryNotFoundException
-     * @throws BindingResolutionException
-     * @throws Exception
-     * @throws ExpectationFailedException
-     * @throws GlobalException
-     * @throws Throwable
-     * @throws UnexpectedValueException
-     * @route-comment
-     * Route: GET|HEAD app/crud/grid/configs/{entity?}
-     * Name: core.crud.grids.getGridsConfigs
-     * Middleware: web
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
+	 */
     public function getGridsConfigs(Request $request, ?string $entity = null)
     {
         $response_builder = new ResponseBuilder($request);
@@ -96,39 +83,17 @@ class GridsController extends Controller
         }
     }
 
-    /**
-     * @throws UnexpectedValueException
-     * @throws BindingResolutionException
-     * @throws ValidationException
-     * @throws DBALException
-     * @throws UnauthorizedException
-     * @route-comment
-     * Routes:
-     * - GET|POST|HEAD app/crud/grid/select/{entity}
-     *   Name: core.crud.select
-     *   Middleware: web
-     * - GET|POST|HEAD app/crud/grid/data/{entity}
-     *   Name: core.crud.data
-     *   Middleware: web
-     * - GET|HEAD app/crud/grid/check/{entity}
-     *   Name: core.crud.check
-     *   Middleware: web
-     * - GET|POST|PUT|PATCH|DELETE|HEAD app/crud/grid/layout/{entity}
-     *   Name: core.crud.layout
-     *   Middleware: web
-     * - GET|POST|HEAD app/crud/grid/export/{entity}
-     *   Name: core.crud.export
-     *   Middleware: web
-     * - POST app/crud/grid/insert/{entity}
-     *   Name: core.crud.insert
-     *   Middleware: web
-     * - PATCH|PUT app/crud/grid/update/{entity}
-     *   Name: core.crud.replace
-     *   Middleware: web
-     * - DELETE|POST app/crud/grid/delete/{entity}
-     *   Name: core.crud.delete
-     *   Middleware: web
-     */
+	/**
+	 * @route-comment
+	 * Route(path: 'app/crud/grid/select/{entity}', name: 'core.crud.select', methods: [GET, POST, HEAD], middleware: [web])
+	 * Route(path: 'app/crud/grid/data/{entity}', name: 'core.crud.data', methods: [GET, POST, HEAD], middleware: [web])
+	 * Route(path: 'app/crud/grid/check/{entity}', name: 'core.crud.check', methods: [GET, HEAD], middleware: [web])
+	 * Route(path: 'app/crud/grid/layout/{entity}', name: 'core.crud.layout', methods: [GET, POST, PUT, PATCH, DELETE, HEAD], middleware: [web])
+	 * Route(path: 'app/crud/grid/export/{entity}', name: 'core.crud.export', methods: [GET, POST, HEAD], middleware: [web])
+	 * Route(path: 'app/crud/grid/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
+	 * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
+	 * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
+	 */
     public function grid(GridRequest $request, string $entity): Response
     {
         try {

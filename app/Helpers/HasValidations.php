@@ -12,6 +12,14 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\UnauthorizedException;
 
 /**
+ * Trait per aggiungere validazioni ai modelli
+ * 
+ * @method void setSkipValidation(bool $skip = true) Imposta il flag per saltare le validazioni
+ * @method bool shouldSkipValidation() Verifica se le validazioni devono essere saltate
+ * @method array getRules() Ottiene le regole di validazione
+ * @method array getOperationRules(?string $operation = null) Ottiene le regole di validazione per un'operazione specifica
+ * @method void validateWithRules(string $operation) Valida il modello con le regole
+ * 
  * @phpstan-type HasValidationsType HasValidations
  */
 trait HasValidations

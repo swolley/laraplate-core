@@ -13,7 +13,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('licenses', function (Blueprint $table) {
-            $table->uuid('id')->primary(true)->nullable(false);
+            $table->uuid('id')->primary(true)->nullable(false)->comment('The unique identifier for the license');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true,

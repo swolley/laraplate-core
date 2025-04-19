@@ -18,7 +18,7 @@ class PreviewMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->has('preview')) {
-            preview($request->get('preview', 'false') == 'true');
+            preview($request->get('preview', 'false') === 'true' || $request->get('preview', 'false') === true);
         }
 
         return $next($request);

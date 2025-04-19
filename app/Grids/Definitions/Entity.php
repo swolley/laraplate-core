@@ -702,7 +702,7 @@ abstract class Entity
                     $method = lcfirst($method . 'Where');
                     if ($operator->value === 'like' && is_string($value)) {
                         $percent_pos = Str::position($value, '%');
-                        if ($percent_pos == false || ($percent_pos !== 0 && $percent_pos !== strlen($value) - 1)) {
+                        if ($percent_pos === false || ($percent_pos !== 0 && $percent_pos !== strlen($value) - 1)) {
                             $value = '%' . strtolower($value) . '%';
                         }
                     }

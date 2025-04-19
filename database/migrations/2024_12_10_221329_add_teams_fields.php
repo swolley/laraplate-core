@@ -30,7 +30,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn($tableNames['roles'], $columnNames['team_foreign_key'])) {
             Schema::table($tableNames['roles'], function (Blueprint $table) use ($columnNames) {
-                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable()->after('id')->default('1');
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable()->after('id')->default('1')->comment('The team id');
                 $table->index($columnNames['team_foreign_key'], 'roles_team_foreign_key_index');
 
                 $table->dropUnique('roles_name_guard_name_unique');
@@ -40,7 +40,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn($tableNames['model_has_permissions'], $columnNames['team_foreign_key'])) {
             Schema::table($tableNames['model_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotPermission) {
-                $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1');
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1')->comment('The team id');
                 $table->index($columnNames['team_foreign_key'], 'model_has_permissions_team_foreign_key_index');
 
                 if (DB::getDriverName() !== 'sqlite') {
@@ -61,7 +61,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn($tableNames['model_has_roles'], $columnNames['team_foreign_key'])) {
             Schema::table($tableNames['model_has_roles'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotRole) {
-                $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1');
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1')->comment('The team id');
                 $table->index($columnNames['team_foreign_key'], 'model_has_roles_team_foreign_key_index');
 
                 if (DB::getDriverName() !== 'sqlite') {

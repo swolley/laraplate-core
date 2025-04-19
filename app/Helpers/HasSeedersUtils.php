@@ -28,6 +28,7 @@ trait HasSeedersUtils
 		}
 
 		if (class_uses_trait($model, HasApprovals::class)) {
+			/** @phpstan-ignore method.notFound */
 			$model->setForcedApprovalUpdate(true);
 		}
 
@@ -75,6 +76,7 @@ trait HasSeedersUtils
 			$model = $class::make($attributes);
 
 			if (class_uses_trait($model, HasApprovals::class)) {
+				/** @phpstan-ignore method.notFound */
 				$model->setForcedApprovalUpdate(true);
 			}
 

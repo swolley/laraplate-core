@@ -17,16 +17,16 @@ return new class() extends Migration
     {
         Schema::create('modifications', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('modifiable_id')->nullable();
-            $table->string('modifiable_type')->nullable();
-            $table->unsignedBigInteger('modifier_id')->nullable();
-            $table->string('modifier_type')->nullable();
-            $table->boolean('active')->default(true);
-            $table->boolean('is_update')->default(true);
-            $table->unsignedInteger('approvers_required')->default(1);
-            $table->unsignedInteger('disapprovers_required')->default(1);
-            $table->string('md5');
-            $table->json('modifications');
+            $table->unsignedBigInteger('modifiable_id')->nullable()->comment('The id of the modifiable model');
+            $table->string('modifiable_type')->nullable()->comment('The type of the modifiable model');
+            $table->unsignedBigInteger('modifier_id')->nullable()->comment('The id of the modifier model');
+            $table->string('modifier_type')->nullable()->comment('The type of the modifier model');
+            $table->boolean('active')->default(true)->comment('Whether the modification is active');
+            $table->boolean('is_update')->default(true)->comment('Whether the modification is an update');
+            $table->unsignedInteger('approvers_required')->default(1)->comment('The number of approvers required');
+            $table->unsignedInteger('disapprovers_required')->default(1)->comment('The number of disapprovers required');
+            $table->string('md5')->comment('The md5 hash of the modifications');
+            $table->json('modifications')->comment('The modifications');
             CommonMigrationFunctions::timestamps(
                 $table,
                 hasCreateUpdate: true

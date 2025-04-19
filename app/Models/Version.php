@@ -117,8 +117,7 @@ class Version extends OvertrueVersion
         switch ($versionable->getVersionStrategy()) {
             case VersionStrategy::DIFF:
                 // v1 + ... + vN
-                $versionsBeforeThis = $this->previousVersions()->orderOldestFirst()->get();
-                foreach ($versionsBeforeThis as $version) {
+                foreach ($this->previousVersions()->orderOldestFirst()->get() as $version) {
                     if (!empty($version->contents)) {
                         $versionable->setRawAttributes(array_merge($original, $version->contents));
                     }

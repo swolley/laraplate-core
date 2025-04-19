@@ -238,7 +238,7 @@ class CrudHelper
 				$cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
 				$this->applyFilter($q, $cloned_filter, $method, $relations_columns);
 			});
-		} elseif ($filter->value == null) {
+		} elseif ($filter->value === null) {
 			// is or is not null
 			$method .= $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
 			$query->$method($filter->property);
