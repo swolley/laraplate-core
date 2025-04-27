@@ -118,9 +118,9 @@ class CoreServiceProvider extends ServiceProvider
         $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
         array_push($commands, ...$locking_commands);
 
-        $cache_commands_subpath = Str::replace('Console', 'Cache/Console', $module_commands_subpath);
-        $cache_commands = $this->inspectFolderCommands($cache_commands_subpath);
-        array_push($commands, ...$cache_commands);
+        $search_commands_subpath = Str::replace('Console', 'Search/Console', $module_commands_subpath);
+        $search_commands = $this->inspectFolderCommands($search_commands_subpath);
+        array_push($commands, ...$search_commands);
 
         $this->commands($commands);
     }

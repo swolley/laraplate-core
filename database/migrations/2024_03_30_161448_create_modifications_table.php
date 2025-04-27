@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -27,7 +27,7 @@ return new class() extends Migration
             $table->unsignedInteger('disapprovers_required')->default(1)->comment('The number of disapprovers required');
             $table->string('md5')->comment('The md5 hash of the modifications');
             $table->json('modifications')->comment('The modifications');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );

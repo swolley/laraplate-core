@@ -1,7 +1,9 @@
 <?php
 
-namespace Modules\Core\Jobs;
+namespace Modules\Core\Search\Jobs;
 
+use LLPhant\OllamaConfig;
+use LLPhant\OpenAIConfig;
 use Illuminate\Bus\Queueable;
 use LLPhant\Embeddings\Document;
 use Illuminate\Queue\SerializesModels;
@@ -12,6 +14,7 @@ use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use LLPhant\Embeddings\DocumentSplitter\DocumentSplitter;
 use LLPhant\Embeddings\EmbeddingFormatter\EmbeddingFormatter;
+use LLPhant\Embeddings\EmbeddingGenerator\Ollama\OllamaEmbeddingGenerator;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
 
 class GenerateEmbeddingsJob implements ShouldQueue
@@ -61,8 +64,32 @@ class GenerateEmbeddingsJob implements ShouldQueue
             $document = new Document($data);
             $splitDocuments = DocumentSplitter::splitDocument($document, 800);
             $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
-            $embeddingGenerator = new OpenAI3SmallEmbeddingGenerator();
-            $embeddedDocuments = $embeddingGenerator->embedDocuments($formattedDocuments);
+            switch (config('search.vector_search.provider')) {
+                case 'openai':
+                    $config = new OpenAIConfig();
+                    $config->apiKey = config('ai.openai_api_key');
+                    if (config('ai.openai_api_url')) {
+                        $config->url = config('ai.openai_api_url');
+                    }
+                    if (config('ai.openai_model')) {
+                        $config->model = config('ai.openai_model');
+                    }
+                    $embeddingGenerator = new OpenAI3SmallEmbeddingGenerator($config);
+                    $embeddedDocuments = $embeddingGenerator->embedDocuments($formattedDocuments);
+                    break;
+                case 'ollama':
+                    $config = new OllamaConfig();
+                    $config->model = config('ai.ollama_model');
+                    if (config('ai.ollama_api_url')) {
+                        $config->url = config('ai.ollama_api_url');
+                    }
+                    $embeddingGenerator = new OllamaEmbeddingGenerator($config);
+                    $embeddedDocuments = $embeddingGenerator->embedDocuments($formattedDocuments);
+                    break;
+                default:
+                    $embeddedDocuments = [];
+                    break;
+            }
 
             foreach ($embeddedDocuments as $embeddedDocument) {
                 $this->model->embeddings()->create(['embedding' => $embeddedDocument]);

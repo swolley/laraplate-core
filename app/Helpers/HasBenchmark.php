@@ -150,7 +150,7 @@ trait HasBenchmark
             $command->newLine();
         }
 
-        Log::debug($output);
+        Log::debug(preg_replace("/\<bg=[\w-]+;fg=[\w-]+\>|\<\/\>/", '', $output));
     }
 
     /**

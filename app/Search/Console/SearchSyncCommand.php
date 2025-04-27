@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Console;
+namespace Modules\Core\Search\Console;
 
 use Laravel\Prompts\Progress;
 use Illuminate\Support\Carbon;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Cache\HasCache;
-use Modules\Core\Cache\Searchable;
+use Modules\Core\Search\Traits\Searchable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class ElasticsearchSyncCommand extends Command
+class SearchSyncCommand extends Command
 {
-    protected $signature = 'model:sync {model : The model to sync} {--id= : The ID of the document to sync} {--from= : The date to sync from}';
+    protected $signature = 'scout:sync {model : The model to sync} {--id= : The ID of the document to sync} {--from= : The date to sync from}';
 
-    protected $description = 'Sync documents modified after the last indexing in Elasticsearch <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Sync documents modified after the last indexing in Search Engine <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     public function handle(): int
     {
@@ -84,7 +84,7 @@ class ElasticsearchSyncCommand extends Command
 
             return 0;
         } catch (\Exception $e) {
-            Log::error('Error in elasticsearch:sync command', [
+            Log::error('Error in model:sync command', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

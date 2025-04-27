@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
 return new class() extends Migration
@@ -33,7 +33,7 @@ return new class() extends Migration
             $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20])->comment('The type of the setting');
             $table->string('group_name', 50)->nullable(false)->comment('The group name of the setting');
             $table->string('description')->nullable(false)->comment('The description of the setting');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true

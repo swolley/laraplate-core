@@ -86,13 +86,21 @@ HORIZON_PREFIX=									#horizon prefix
 
 #ai
 OPENAI_API_KEY=									#openai api key
-ENABLE_MODEL_EMBEDDING=true                     #enable model embedding generation by ai before elastic indexing
+OPENAI_API_URL=                                 #openai compatible api url
+OPENAI_MODEL=                                   #openai model
+OLLAMA_API_URL=                                 #ollama compatible api url
+OLLAMA_MODEL="llama3.2:3b"						#ollama model
+
+#search
+SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
+VECTOR_SEARCH_ENABLED=true                      #create embeddings with ai functionalities before indexing in search engine
+EMBEDDING_PROVIDER=openai                       #actually supported embedding generator provider (openai, ollama)
 
 #social login
 FACEBOOK_CLIENT_ID=								#facebook client id
 FACEBOOK_CLIENT_SECRET=							#facebook client secret
-X_CLIENT_ID=										#x client id
-X_CLIENT_SECRET=									#x client secret
+X_CLIENT_ID=									#x client id
+X_CLIENT_SECRET=								#x client secret
 LINKEDIN_OPENID_CLIENT_ID=						#linkedin openid client id
 LINKEDIN_OPENID_CLIENT_SECRET=					#linkedin openid client secret
 GOOGLE_CLIENT_ID=								#google client id
@@ -105,9 +113,9 @@ BITBUCKET_CLIENT_ID=							#bitbucket client id
 BITBUCKET_CLIENT_SECRET=						#bitbucket client secret
 SLACK_CLIENT_ID=								#slack client id
 SLACK_CLIENT_SECRET=							#slack client secret
-SLACK_OPENID_CLIENT_ID=						#slack openid client id
+SLACK_OPENID_CLIENT_ID= 						#slack openid client id
 SLACK_OPENID_CLIENT_SECRET=						#slack openid client secret
-SOCIALITE_REDIRECT=							#socialite redirect
+SOCIALITE_REDIRECT= 							#socialite redirect
 ```
 
 ### Versioning configuration
@@ -135,18 +143,18 @@ class ... extends Model
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Cache\Searchable;
+use Modules\Core\Search\Traits\Searchable;
 
 class ... extends Model
 {
     use Searchable {
-        prepareElasticDocument as prepareElasticDocumentTrait;
+        toSearchableArray as toSearchableArrayTrait;
     }
 
-	protected function prepareElasticDocument(): array
+	protected function toSearchableArray(): array
     {
 		// get default model data if you like
-		$document = $this->prepareElasticDocumentTrait();
+		$document = $this->toSearchableArrayTrait();
         // add your customizations
 		return $document + [
             'id' => 'keyword',

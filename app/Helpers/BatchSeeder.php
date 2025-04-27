@@ -14,7 +14,7 @@ use Illuminate\Database\QueryException;
 
 abstract class BatchSeeder extends Seeder
 {
-    private const BATCH_SIZE = 25;
+    private const BATCH_SIZE = 20;
     private const MAX_RETRIES = 3;
     private const RETRY_DELAY = 2; // seconds
 
@@ -52,7 +52,7 @@ abstract class BatchSeeder extends Seeder
      */
     protected function createInBatches(string $model_class, int $total_count, bool $force_approve = true): void
     {
-        $current_count = $model_class::withoutGlobalScopes()->count();
+        $current_count = $this->command->option('force') ? 0 : $model_class::withoutGlobalScopes()->count();
         $count_to_create = $total_count - $current_count;
         $entity_name = (new $model_class)->getTable();
 

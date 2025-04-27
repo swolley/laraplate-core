@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -25,7 +25,7 @@ return new class() extends Migration
             // TODO: serve aggiungere un indice su versionable_type e versionable_id?
 
             $table->json('contents')->nullable()->comment('The changed model attributes');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true

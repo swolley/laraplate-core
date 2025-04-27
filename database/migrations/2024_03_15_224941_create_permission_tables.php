@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration {
     /**
@@ -32,7 +32,7 @@ return new class() extends Migration {
             $table->string('name', 125)->nullable(false)->comment('The name of the permission');       // For MySQL 8.0 use string('name', 125);
             $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the permission'); // For MySQL 8.0 use string('guard_name', 125);
             $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the permission');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true
@@ -70,7 +70,7 @@ return new class() extends Migration {
             $table->string('name', 125)->nullable(false)->comment('The name of the role');       // For MySQL 8.0 use string('name', 125);
             $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the role'); // For MySQL 8.0 use string('guard_name', 125);
             $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the role');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
@@ -116,7 +116,7 @@ return new class() extends Migration {
                 );
             }
 
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );
@@ -149,7 +149,7 @@ return new class() extends Migration {
                 );
             }
 
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );
@@ -169,7 +169,7 @@ return new class() extends Migration {
                 ->on($tableNames['roles'])
                 ->onDelete('cascade');
 
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );

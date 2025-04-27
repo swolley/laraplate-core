@@ -1,0 +1,376 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Core\Services;
+
+use Elastic\Elasticsearch\Client;
+use Elastic\Elasticsearch\ClientBuilder;
+use Elastic\Elasticsearch\Exception\ClientResponseException;
+use Elastic\Elasticsearch\Exception\ServerResponseException;
+use Illuminate\Support\Facades\Log;
+use Modules\Core\Search\Exceptions\ElasticsearchException;
+
+class ElasticsearchService
+{
+    /**
+     * Elasticsearch client instance
+     */
+    protected Client $client;
+
+    /**
+     * Singleton instance of the service
+     */
+    protected static ?self $instance = null;
+
+    /**
+     * Create a new elasticsearch service instance
+     */
+    protected function __construct()
+    {
+        $this->client = $this->createClient();
+    }
+
+    /**
+     * Get service instance (singleton pattern)
+     */
+    public static function getInstance(): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * Create elasticsearch client
+     */
+    protected function createClient(): Client
+    {
+        $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
+
+        $builder = ClientBuilder::create();
+        $builder->setHosts($config['hosts']);
+
+        // Set authentication if configured
+        if (!empty($config['username']) && !empty($config['password'])) {
+            $builder->setBasicAuthentication($config['username'], $config['password']);
+        }
+
+        // Set retry configuration
+        if (!empty($config['retries'])) {
+            $builder->setRetries($config['retries']);
+        }
+
+        // Set timeout options
+        $builder->setHttpClientOptions([
+            'timeout' => $config['timeout'] ?? 60,
+            'connect_timeout' => $config['connect_timeout'] ?? 10,
+        ]);
+
+        // Set cloud ID if available
+        if (!empty($config['cloud_id'])) {
+            $builder->setElasticCloudId($config['cloud_id']);
+        }
+
+        // Set SSL configuration
+        if (isset($config['ssl_verification'])) {
+            $builder->setSSLVerification($config['ssl_verification']);
+        }
+
+        return $builder->build();
+    }
+
+    /**
+     * Get the Elasticsearch client
+     */
+    public function getClient(): Client
+    {
+        return $this->client;
+    }
+
+    /**
+     * Create or update index
+     *
+     * @param string $index Index name
+     * @param array $settings Index settings
+     * @param array $mappings Index mappings
+     * @return bool
+     * @throws ElasticsearchException
+     */
+    public function createIndex(string $index, array $settings = [], array $mappings = []): bool
+    {
+        try {
+            // Check if the index already exists
+            $exists = $this->client->indices()->exists(['index' => $index])->asBool();
+
+            if ($exists) {
+                // Update mappings and settings of existing index
+                if (!empty($mappings)) {
+                    $this->client->indices()->putMapping([
+                        'index' => $index,
+                        'body' => $mappings
+                    ]);
+                }
+
+                if (!empty($settings)) {
+                    $this->client->indices()->putSettings([
+                        'index' => $index,
+                        'body' => ['settings' => $settings]
+                    ]);
+                }
+
+                return true;
+            }
+
+            // Create a new index
+            $params = ['index' => $index, 'body' => []];
+
+            if (!empty($settings)) {
+                $params['body']['settings'] = $settings;
+            }
+
+            if (!empty($mappings)) {
+                $params['body']['mappings'] = $mappings;
+            }
+
+            $response = $this->client->indices()->create($params);
+
+            return $response->asBool();
+        } catch (ClientResponseException | ServerResponseException $e) {
+            Log::error('Elasticsearch create index error', [
+                'index' => $index,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error creating index: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Delete index if exists
+     *
+     * @param string $index Index name
+     * @return bool
+     * @throws ElasticsearchException
+     */
+    public function deleteIndex(string $index): bool
+    {
+        try {
+            // Check if the index exists
+            $exists = $this->client->indices()->exists(['index' => $index])->asBool();
+
+            if (!$exists) {
+                return true;
+            }
+
+            // Delete the index
+            $response = $this->client->indices()->delete(['index' => $index]);
+
+            return $response->asBool();
+        } catch (ClientResponseException | ServerResponseException $e) {
+            Log::error('Elasticsearch delete index error', [
+                'index' => $index,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error deleting index: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Bulk index documents
+     *
+     * @param string $index Index name
+     * @param array $documents Documents to index
+     * @return array Response with success/error counts
+     * @throws ElasticsearchException
+     */
+    public function bulkIndex(string $index, array $documents): array
+    {
+        if (empty($documents)) {
+            return ['indexed' => 0, 'failed' => 0, 'errors' => []];
+        }
+
+        $params = ['body' => []];
+        $errors = [];
+
+        // Prepare documents for bulk indexing
+        foreach ($documents as $id => $document) {
+            $params['body'][] = [
+                'index' => [
+                    '_index' => $index,
+                    '_id' => $id
+                ]
+            ];
+
+            $params['body'][] = $document;
+        }
+
+        try {
+            $response = $this->client->bulk($params);
+            $result = $response->asArray();
+
+            // Analyze results
+            $indexed = 0;
+            $failed = 0;
+
+            if (isset($result['items'])) {
+                foreach ($result['items'] as $item) {
+                    if (isset($item['index']['status']) && $item['index']['status'] >= 200 && $item['index']['status'] < 300) {
+                        $indexed++;
+                    } else {
+                        $failed++;
+                        $errors[] = $item['index']['error'] ?? 'Unknown error';
+                    }
+                }
+            }
+
+            return [
+                'indexed' => $indexed,
+                'failed' => $failed,
+                'errors' => $errors
+            ];
+        } catch (ClientResponseException | ServerResponseException $e) {
+            Log::error('Elasticsearch bulk index error', [
+                'index' => $index,
+                'documents_count' => count($documents),
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error in bulk indexing: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Search documents
+     *
+     * @param string $index Index name
+     * @param array $query Elasticsearch query
+     * @return array Search results
+     * @throws ElasticsearchException
+     */
+    public function search(string $index, array $query): array
+    {
+        try {
+            $params = [
+                'index' => $index,
+                'body' => $query
+            ];
+
+            $response = $this->client->search($params);
+
+            return $response->asArray();
+        } catch (ClientResponseException | ServerResponseException $e) {
+            Log::error('Elasticsearch search error', [
+                'index' => $index,
+                'query' => $query,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Search error: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Get document by ID
+     *
+     * @param string $index Index name
+     * @param string $id Document ID
+     * @return array|null Document data or null if not found
+     * @throws ElasticsearchException
+     */
+    public function getDocument(string $index, string $id): ?array
+    {
+        try {
+            $params = [
+                'index' => $index,
+                'id' => $id
+            ];
+
+            $response = $this->client->get($params);
+
+            return $response->asArray();
+        } catch (ClientResponseException $e) {
+            // 404 is normal case, return null
+            if ($e->getCode() === 404) {
+                return null;
+            }
+
+            Log::error('Elasticsearch get document error', [
+                'index' => $index,
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error retrieving document: {$e->getMessage()}");
+        } catch (ServerResponseException $e) {
+            Log::error('Elasticsearch get document error', [
+                'index' => $index,
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error retrieving document: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Delete document by ID
+     *
+     * @param string $index Index name
+     * @param string|int $id Document ID
+     * @param bool $refresh Whether to refresh the index immediately
+     * @return bool Success or failure
+     * @throws ElasticsearchException
+     */
+    public function deleteDocument(string $index, string|int $id, bool $refresh = false): bool
+    {
+        try {
+            // Check if the document exists
+            $exists = $this->client->exists([
+                'index' => $index,
+                'id' => $id
+            ])->asBool();
+
+            if (!$exists) {
+                return false;
+            }
+
+            // Delete the document
+            $params = [
+                'index' => $index,
+                'id' => $id
+            ];
+
+            if ($refresh) {
+                $params['refresh'] = true;
+            }
+
+            $response = $this->client->delete($params);
+            return $response->asBool();
+        } catch (ClientResponseException $e) {
+            // 404 is not an error in this context
+            if ($e->getCode() === 404) {
+                return false;
+            }
+
+            Log::error('Elasticsearch delete document error', [
+                'index' => $index,
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error deleting document: {$e->getMessage()}");
+        } catch (ServerResponseException $e) {
+            Log::error('Elasticsearch delete document error', [
+                'index' => $index,
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ElasticsearchException("Error deleting document: {$e->getMessage()}");
+        }
+    }
+}

@@ -18,6 +18,7 @@ if (!function_exists('modules')) {
      * @param  bool  $fullpath  return only module name or full path on file system
      * @param  bool  $onlyActive  return only active modules
      * @param  string|null  $onlyModule  filter for specified module
+     * @param  bool|null  $prioritySort  sort modules by priority
      * @return string[]
      */
     function modules(bool $showMainApp = false, bool $fullpath = false, bool $onlyActive = true, ?string $onlyModule = null, ?bool $prioritySort = false): array
@@ -69,6 +70,7 @@ if (!function_exists('connections')) {
     /**
      * get list of connections from models.
      *
+     * @param bool $onlyActive filter for only active modules
      * @return array<string>
      */
     function connections(bool $onlyActive = true): array
@@ -105,6 +107,7 @@ if (!function_exists('translations')) {
      * get list of available translations.
      *
      * @param  bool  $fullpath  return only unique translation code or full all paths on file system
+     * @param  bool  $onlyActive  filter for only active modules
      * @return array<string>
      */
     function translations(bool $fullpath = false, bool $onlyActive = true): array
@@ -352,6 +355,9 @@ if (!function_exists('api_versions')) {
 if (!function_exists('preview')) {
     /**
      * Getter/Setter for session preview flag.
+     *
+     * @param  bool|null  $enablePreview  enable preview flag
+     * @return bool
      */
     function preview(?bool $enablePreview = null): bool
     {
@@ -364,6 +370,13 @@ if (!function_exists('preview')) {
 }
 
 if (!function_exists('class_uses_trait')) {
+    /**
+     * Check if a class uses a trait.
+     *
+     * @param  string|object  $class  The class to check
+     * @param  string  $uses  The trait to check for
+     * @return bool
+     */
     function class_uses_trait(string|object $class, string $uses): bool
     {
         return in_array($uses, class_uses_recursive(is_string($class) ? $class : $class::class), true);
@@ -371,6 +384,12 @@ if (!function_exists('class_uses_trait')) {
 }
 
 if (!function_exists('is_json')) {
+    /**
+     * Check if a string is a valid JSON.
+     *
+     * @param  string  $string  The string to check
+     * @return bool
+     */
     function is_json(string $string): bool
     {
         /** @psalm-suppress UnusedFunctionCall */
@@ -382,7 +401,10 @@ if (!function_exists('is_json')) {
 
 if (!function_exists('array_sort_keys')) {
     /**
+     * Sort the keys of an array.
+     * 
      * @param  array  $array  l'array non deve avere chiavi numeriche
+     * @return array
      */
     function array_sort_keys(array $array): array
     {
@@ -402,10 +424,90 @@ if (!function_exists('array_sort_keys')) {
 
 if (!function_exists('user_class')) {
     /**
+     * Get the user model class.
+     *
      * @return class-string
      */
     function user_class(): string
     {
         return config('auth.providers.users.model');
+    }
+}
+
+if (!function_exists('cast_value')) {
+    /**
+     * Cast a value to a specific type.
+     *
+     * @param  mixed  $value  The value to cast
+     * @param  string|null  $type  The type to cast to
+     * @return mixed
+     */
+    function cast_value(mixed $value, ?string $type = null): mixed
+    {
+
+        if ($type) {
+            return match (strtolower($type)) {
+                'int', 'integer' => (int) $value,
+                'float', 'double', 'real' => (float) $value,
+                'string' => (string) $value,
+                'bool', 'boolean' => (bool) $value,
+                'array' => (array) $value,
+                'object' => (object) $value,
+                'null' => null,
+                default => throw new \InvalidArgumentException("Unsupported type: {$type}")
+            };
+        }
+
+        if ($value === null || $value === 'null') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            // Check if the value is an integer
+            if (filter_var($value, FILTER_VALIDATE_INT) !== false) {
+                return (int) $value;
+            }
+
+            // Otherwise treat as float
+            return (float) $value;
+        }
+
+        if (strtolower($value) === 'true') {
+            return true;
+        }
+
+        if (strtolower($value) === 'false') {
+            return false;
+        }
+
+        // JSON array or object
+        if ((substr($value, 0, 1) === '[' && substr($value, -1) === ']') ||
+            (substr($value, 0, 1) === '{' && substr($value, -1) === '}')
+        ) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        // Default to string
+        return (string) $value;
+    }
+}
+
+if (!function_exists('class_module')) {
+    /**
+     * Get the module of a class.
+     *
+     * @param  string  $class  The class to get the module of
+     * @return string|null
+     */
+    function class_module(string $class): ?string
+    {
+        if (!class_exists($class)) {
+            return null;
+        }
+
+        return Str::startsWith($class, 'Modules\\') ? Str::before(Str::after($class, 'Modules\\'), '\\') : null;
     }
 }

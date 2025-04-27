@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -25,7 +25,7 @@ return new class() extends Migration
             $table->string('layout_name')->nullable(false)->comment('The layout name of the user grid config');
             $table->boolean('is_public')->default(false)->index('user_grid_configs_is_public_IDX')->comment('The is public of the user grid config');
             $table->json('config')->comment('The config of the user grid config');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );

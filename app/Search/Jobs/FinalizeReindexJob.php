@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Jobs;
+namespace Modules\Core\Search\Jobs;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Queue\SerializesModels;
 use Elastic\Elasticsearch\ClientBuilder;
 use Illuminate\Queue\InteractsWithQueue;
@@ -12,7 +13,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
-use Illuminate\Support\Facades\Redis;
 
 class FinalizeReindexJob implements ShouldQueue
 {
@@ -62,7 +62,7 @@ class FinalizeReindexJob implements ShouldQueue
             ]);
 
             // Rimuoviamo il flag di reindicizzazione
-            Redis::del($this->reindex_key);
+            Cache::forget($this->reindex_key);
 
             \Log::info('Elasticsearch reindexing completed', [
                 'index' => $this->index_name,
@@ -83,7 +83,7 @@ class FinalizeReindexJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         // Rimuoviamo il flag di reindicizzazione anche in caso di fallimento
-        Redis::del($this->reindex_key);
+        Cache::forget($this->reindex_key);
 
         \Log::error('FinalizeReindexJob failed', [
             'index' => $this->index_name,

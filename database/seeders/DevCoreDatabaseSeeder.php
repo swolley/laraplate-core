@@ -5,6 +5,8 @@ namespace Modules\Core\Database\Seeders;
 use Modules\Core\Models\User;
 use Modules\Core\Models\License;
 use Modules\Core\Helpers\BatchSeeder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Artisan;
 
 class DevCoreDatabaseSeeder extends BatchSeeder
 {
@@ -13,8 +15,12 @@ class DevCoreDatabaseSeeder extends BatchSeeder
 
     protected function execute(): void
     {
-        $this->seedUsers();
-        $this->seedLicenses();
+        Artisan::call('module:seed', ['module' => 'Core', '--force' => $this->command->option('force')], outputBuffer: $this->command->getOutput());
+
+        Model::unguarded(function (): void {
+            $this->seedUsers();
+            $this->seedLicenses();
+        });
     }
 
     private function seedUsers(): void

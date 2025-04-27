@@ -77,7 +77,13 @@ class User extends BaseUser
         'password',
         'remember_token',
         'pivot',
-        'licence_id',
+        'license_id',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'last_login_at',
+        'updated_at',
+        'created_at',
+        'email_verified_at',
     ];
 
     /**

@@ -39,9 +39,13 @@
         "elasticsearch/elasticsearch": "^8.17",
         "theodo-group/llphant": "^0.9.7",
         "laravel/horizon": "^5.31",
-        "laravel/octane": "^2.8",
         "awobaz/compoships": "^2.4",
-        "directorytree/ldaprecord-laravel": "^3.4"
+        "directorytree/ldaprecord-laravel": "^3.4",
+        "babenkoivan/elastic-scout-driver": "^4.0",
+        "typesense/typesense-php": "^5.0",
+        "laravel/scout": "^10.14",
+        "matanyadaev/laravel-eloquent-spatial": "^4.5",
+        "babenkoivan/elastic-scout-driver-plus": "^5.1"
 
     },
     "require-dev": {

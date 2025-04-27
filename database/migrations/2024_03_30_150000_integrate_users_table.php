@@ -6,7 +6,7 @@ use Laravel\Fortify\Fortify;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -26,7 +26,7 @@ return new class() extends Migration
             if (Fortify::confirmsTwoFactorAuthentication()) {
                 $table->timestamp('two_factor_confirmed_at')->after('two_factor_recovery_codes')->nullable()->comment('The two factor confirmed date of the user');
             }
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
@@ -47,7 +47,7 @@ return new class() extends Migration
             $table->dropColumn('username');
             $table->dropColumn('lang');
             $table->dropColumn('last_login_at');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true

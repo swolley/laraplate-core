@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -21,7 +21,7 @@ return new class() extends Migration
             $table->unsignedBigInteger('disapprover_id')->comment('The id of the disapprover');
             $table->string('disapprover_type')->comment('The type of the disapprover');
             $table->text('reason')->nullable()->comment('The reason for the disapproval');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true
             );

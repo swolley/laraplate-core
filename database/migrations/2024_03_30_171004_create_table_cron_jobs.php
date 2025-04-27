@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\CommonMigrationFunctions;
+use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -22,7 +22,7 @@ return new class() extends Migration
             $table->string('schedule')->nullable(false)->comment('The schedule of the cron job');
             $table->boolean('is_active')->nullable(false)->index('cron_jobs_is_active_IDX')->comment('Is the cron job active');
             $table->string('description')->nullable()->comment('The description of the cron job');
-            CommonMigrationFunctions::timestamps(
+            MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true
