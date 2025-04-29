@@ -46,7 +46,6 @@
         "laravel/scout": "^10.14",
         "matanyadaev/laravel-eloquent-spatial": "^4.5",
         "babenkoivan/elastic-scout-driver-plus": "^5.1"
-
     },
     "require-dev": {
         "mtrajano/laravel-swagger": "^0.6.4"

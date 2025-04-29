@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\Redis;
 
 class FreeExpiredLicensesCommand extends Command
 {

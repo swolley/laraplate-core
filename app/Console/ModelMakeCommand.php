@@ -24,13 +24,14 @@ use Illuminate\Console\Concerns\CreatesMatchingTest;
 use Symfony\Component\Console\Output\OutputInterface;
 use Illuminate\Console\Concerns\PromptsForMissingInput;
 use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
+use Modules\Core\Helpers\HasBenchmark;
 
 /**
  * @psalm-suppress PropertyNotSetInConstructor
  */
 class ModelMakeCommand extends BaseModelMakeCommand
 {
-    use PromptsForMissingInput;
+    use PromptsForMissingInput, HasBenchmark;
 
     protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 

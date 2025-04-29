@@ -30,7 +30,9 @@ trait SoftDeletes
 		static::addGlobalScope(new CustomSoftDeletingScope);
 
 		static::updating(function (Model $model): void {
-			throw new UnauthorizedException('Cannot update a softdeleted model');
+			if ($model->trashed()) {
+				throw new UnauthorizedException('Cannot update a softdeleted model');
+			}
 		});
 
 		static::saving(function (Model $model): void {

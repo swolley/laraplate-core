@@ -57,9 +57,9 @@ class CoreDatabaseSeeder extends Seeder
 
         $this->logOperation($role_class);
 
-        $superadmin = 'superadmin';
-        $admin = 'admin';
-        $guest = 'guest';
+        $superadmin = config('permission.roles.superadmin');
+        $admin = config('permission.roles.admin');
+        $guest = config('permission.roles.guest');
 
         $roles_data = [
             [
@@ -106,9 +106,9 @@ class CoreDatabaseSeeder extends Seeder
 
         $this->logOperation($user_class);
 
-        $anonymous = 'anonymous';
-        $superadmin = 'superadmin';
-        $admin = 'admin';
+        $anonymous = config('permission.users.guest');
+        $superadmin = config('permission.users.superadmin');
+        $admin = config('permission.users.admin');
 
         $users_data = [
             [

@@ -4,10 +4,11 @@ namespace Modules\Core\Search\Console;
 
 use Laravel\Scout\EngineManager;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Modules\Core\Helpers\HasBenchmark;
 
 class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
 {
-    use SearchableCommandUtils;
+    use SearchableCommandUtils, HasBenchmark;
 
     protected $signature = 'scout:delete-index {model : The model to delete the index for}';
 

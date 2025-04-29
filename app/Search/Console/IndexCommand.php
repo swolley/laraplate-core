@@ -5,10 +5,11 @@ namespace Modules\Core\Search\Console;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Engines\Engine;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Modules\Core\Helpers\HasBenchmark;
 
 class IndexCommand extends \Laravel\Scout\Console\IndexCommand
 {
-    use SearchableCommandUtils;
+    use SearchableCommandUtils, HasBenchmark;
 
     protected $signature = 'scout:index {model : The model to create an index for}';
 

@@ -179,4 +179,16 @@ return [
 
         'store' => 'default',
     ],
+
+    'roles' => [
+        'superadmin' => env('SUPERADMIN_ROLE', 'superadmin'),
+        'admin' => env('ADMIN_ROLE', 'admin'),
+        'guest' => env('GUEST_ROLE', 'guest'),
+    ],
+
+    'users' => [
+        'superadmin' => env('SUPERADMIN_USER', 'superadmin'),
+        'admin' => env('ADMIN_USER', 'admin'),
+        'guest' => env('GUEST_USER', 'anonymous'),
+    ],
 ];

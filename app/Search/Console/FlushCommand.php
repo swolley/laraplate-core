@@ -3,10 +3,11 @@
 namespace Modules\Core\Search\Console;
 
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Modules\Core\Helpers\HasBenchmark;
 
 class FlushCommand extends \Laravel\Scout\Console\FlushCommand
 {
-    use SearchableCommandUtils;
+    use SearchableCommandUtils, HasBenchmark;
 
     protected $description = 'Flush all of the model\'s records from the index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 

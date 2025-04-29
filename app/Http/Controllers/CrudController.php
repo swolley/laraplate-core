@@ -242,7 +242,7 @@ class CrudController extends Controller
     {
         $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
 
-        $cache = Cache::store('redis'); // o altro store configurato per Octane
+        $cache = Cache::store();
         if ($cachedTemplate = $cache->get($templateKey)) {
             return $cachedTemplate;
         }

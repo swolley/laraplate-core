@@ -7,9 +7,12 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Str;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
+use Modules\Core\Helpers\HasBenchmark;
 
 class VendorPublishCommand extends BaseVendorPublishCommand
 {
+    use HasBenchmark;
+
     private array $modules = [];
 
     public function __construct(Filesystem $files)

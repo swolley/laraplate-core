@@ -13,9 +13,12 @@ use Mtrajano\LaravelSwagger\LaravelSwaggerException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Mtrajano\LaravelSwagger\GenerateSwaggerDoc as BaseGenerateSwaggerDoc;
+use Modules\Core\Helpers\HasBenchmark;
 
 class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 {
+    use HasBenchmark;
+
     public function __construct()
     {
         $this->signature .= '
