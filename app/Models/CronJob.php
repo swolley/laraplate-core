@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Override;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
@@ -19,9 +20,9 @@ use Modules\Core\Rules\CronExpression as CronExpressionRule;
 /**
  * @mixin IdeHelperCronJob
  */
-class CronJob extends Model
+final class CronJob extends Model
 {
-    use HasFactory, HasLocks, SoftDeletes, HasVersions, HasValidations {
+    use HasFactory, HasLocks, HasValidations, HasVersions, SoftDeletes {
         getRules as protected getRulesTrait;
     }
 
@@ -44,37 +45,6 @@ class CronJob extends Model
         'parameters' => '{}',
     ];
 
-    #[\Override]
-    protected function casts()
-    {
-        return [
-            'name' => 'string',
-            'command' => 'string',
-            'parameters' => 'json',
-            'schedule' => CronExpressionCast::class,
-            'description' => 'string',
-            'is_active' => 'boolean',
-            'created_at' => 'immutable_datetime',
-            'updated_at' => 'datetime',
-        ];
-    }
-
-    protected static function newFactory(): CronJobFactory
-    {
-        return CronJobFactory::new();
-    }
-
-    #[\Override]
-    protected static function booted()
-    {
-        static::saved(function (CronJob $cronJob): void {
-            Cache::forget($cronJob->getTable());
-        });
-        static::deleted(function (CronJob $cronJob): void {
-            Cache::forget($cronJob->getTable());
-        });
-    }
-
     public function getRules()
     {
         $rules = $this->getRulesTrait();
@@ -92,7 +62,7 @@ class CronJob extends Model
                 'max:255',
                 Rule::unique('cron_jobs')->where(function ($query) {
                     return $query->whereNull('deleted_at');
-                })
+                }),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -102,9 +72,41 @@ class CronJob extends Model
                 'max:255',
                 Rule::unique('cron_jobs')->where(function ($query) {
                     return $query->whereNull('deleted_at');
-                })->ignore($this->id, 'id')
+                })->ignore($this->id, 'id'),
             ],
         ]);
+
         return $rules;
+    }
+
+    protected static function newFactory(): CronJobFactory
+    {
+        return CronJobFactory::new();
+    }
+
+    #[Override]
+    protected static function booted(): void
+    {
+        self::saved(function (CronJob $cronJob): void {
+            Cache::forget($cronJob->getTable());
+        });
+        self::deleted(function (CronJob $cronJob): void {
+            Cache::forget($cronJob->getTable());
+        });
+    }
+
+    #[Override]
+    protected function casts()
+    {
+        return [
+            'name' => 'string',
+            'command' => 'string',
+            'parameters' => 'json',
+            'schedule' => CronExpressionCast::class,
+            'description' => 'string',
+            'is_active' => 'boolean',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'datetime',
+        ];
     }
 }

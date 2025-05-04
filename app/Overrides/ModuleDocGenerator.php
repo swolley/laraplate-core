@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Override;
 use Illuminate\Support\Str;
 use Illuminate\Routing\Route;
 use Mtrajano\LaravelSwagger\Generator;
 
-class ModuleDocGenerator extends Generator
+final class ModuleDocGenerator extends Generator
 {
     public function __construct($config, private readonly string $module, $routeFilter = null)
     {
@@ -18,7 +19,7 @@ class ModuleDocGenerator extends Generator
     /**
      * @return array<int, ModuleDocRoute>
      */
-    #[\Override]
+    #[Override]
     protected function getAppRoutes(): array
     {
         $module = Str::replace('Modules\\', '', $this->module);
@@ -30,15 +31,16 @@ class ModuleDocGenerator extends Generator
                 continue;
             }
 
-            if (!$route->wheres) {
+            if (! $route->wheres) {
                 $module_routes[] = new ModuleDocRoute($route);
+
                 continue;
             }
 
             $parameter_values = [];
 
             foreach ($route->wheres as $key => $value) {
-                if (!is_string($value) && !is_array($value)) {
+                if (! is_string($value) && ! is_array($value)) {
                     continue;
                 }
 
@@ -53,6 +55,7 @@ class ModuleDocGenerator extends Generator
 
             if ($parameter_values === []) {
                 $module_routes[] = new ModuleDocRoute($route);
+
                 continue;
             }
 
@@ -73,26 +76,47 @@ class ModuleDocGenerator extends Generator
         return $module_routes;
     }
 
+    #[Override]
+    protected function generatePath(): void
+    {
+        parent::generatePath();
+        $uri = $this->route->uri();
+        $operationId = $this->method . str_replace(['/', '{', '}'], ['-', '', ''], $uri);
+        $group = Str::contains($uri, '/app/') ? 'App' : (Str::contains($uri, '/api/') ? 'Api' : 'Others');
+        $path_method = &$this->docs['paths'][$this->route->uri()][$this->method];
+        $path_method['operationId'] = $operationId;
+        $path_method['tags'] = array_unique([$group, Str::replace('Modules\\', '', $this->module)]);
+
+        if ($this->route->uri() === '/up') {
+            $path_method['responses']['200']['content'] = [
+                'text/html' => [],
+            ];
+        }
+    }
+
     private function shouldIgnoreRoute(Route $route): bool
     {
-        if (!isset($this->config['ignoredRoutes'])) {
+        if (! isset($this->config['ignoredRoutes'])) {
             return false;
         }
 
         $route_name = $route->getName();
+
         if ($route_name === '' || Str::startsWith($route->uri(), ['_', '/_'])) {
             return true;
         }
 
         foreach ($this->config['ignoredRoutes'] as $pattern) {
-            if (!Str::contains($pattern, '*')) {
+            if (! Str::contains($pattern, '*')) {
                 if ($route_name === $pattern) {
                     return true;
                 }
+
                 continue;
             }
 
             $regex = str_replace('\*', '.*', preg_quote((string) $pattern, '/'));
+
             if (preg_match('/^' . $regex . '$/', $route_name)) {
                 return true;
             }
@@ -102,9 +126,9 @@ class ModuleDocGenerator extends Generator
     }
 
     /**
-     * Generates all possible combinations of parameter values
-     * 
-     * @param array $parameters Array of parameters and their possible values
+     * Generates all possible combinations of parameter values.
+     *
+     * @param  array  $parameters  Array of parameters and their possible values
      * @return array Array of all possible combinations
      */
     private function generateCombinations(array $parameters): array
@@ -126,23 +150,5 @@ class ModuleDocGenerator extends Generator
         }
 
         return $combinations;
-    }
-
-    #[\Override]
-    protected function generatePath(): void
-    {
-        parent::generatePath();
-        $uri = $this->route->uri();
-        $operationId = $this->method . str_replace(['/', '{', '}'], ['-', '', ''], $uri);
-        $group = Str::contains($uri, '/app/') ? 'App' : (Str::contains($uri, '/api/') ? 'Api' : 'Others');
-        $path_method = &$this->docs['paths'][$this->route->uri()][$this->method];
-        $path_method['operationId'] = $operationId;
-        $path_method['tags'] = array_unique([$group, Str::replace('Modules\\', '', $this->module)]);
-
-        if ($this->route->uri() === '/up') {
-            $path_method['responses']['200']['content'] = [
-                'text/html' => [],
-            ];
-        }
     }
 }

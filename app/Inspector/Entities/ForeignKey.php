@@ -6,14 +6,16 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-class ForeignKey
+final class ForeignKey
 {
-    /** @phpstan-ignore property.uninitializedReadonly */
+    /**
+     * @phpstan-ignore property.uninitializedReadonly
+     */
     public readonly ?string $foreignConnection;
 
-    /** 
-     * @param Collection<string> $columns 
-     * @param Collection<string> $foreignColumns
+    /**
+     * @param  Collection<string>  $columns
+     * @param  Collection<string>  $foreignColumns
      */
     public function __construct(
         public readonly string $name,
@@ -36,8 +38,9 @@ class ForeignKey
                     break;
                 }
             }
+
             /** @phpstan-ignore property.uninitializedReadonly */
-            if (!isset($this->foreignConnection)) {
+            if (! isset($this->foreignConnection)) {
                 /** @phpstan-ignore assign.readOnlyProperty */
                 $this->foreignConnection = null;
             }

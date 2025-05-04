@@ -16,6 +16,7 @@ trait HasLocks
     {
         static::saving(function (Model $model): void {
             $lock_version = request('lock_version');
+
             if ($lock_version) {
                 // @phpstan-ignore property.notFound
                 $model->lock_version = $lock_version;
@@ -31,29 +32,28 @@ trait HasLocks
 
     /**
      * Initialize the locking trait for an instance.
-     *
-     * @return void
      */
-    public function initializeHasLocks()
+    public function initializeHasLocks(): void
     {
-        if (! in_array($this->getIsLockedColumn(), $this->guarded)) {
+        if (! in_array($this->getIsLockedColumn(), $this->guarded, true)) {
             $this->guarded[] = $this->getIsLockedColumn();
         }
-        if (! in_array($this->getIsLockedColumn(), $this->hidden)) {
+
+        if (! in_array($this->getIsLockedColumn(), $this->hidden, true)) {
             $this->hidden[] = $this->getIsLockedColumn();
         }
-        if (! in_array($this->getLocketAtColumn(), $this->hidden)) {
+
+        if (! in_array($this->getLocketAtColumn(), $this->hidden, true)) {
             $this->hidden[] = $this->getLocketAtColumn();
         }
-        if (! in_array($this->getLockedByColumn(), $this->hidden)) {
+
+        if (! in_array($this->getLockedByColumn(), $this->hidden, true)) {
             $this->hidden[] = $this->getLockedByColumn();
         }
     }
 
     /**
      * Get the name of the "is locked" column.
-     *
-     * @return string
      */
     public function getIsLockedColumn(): string
     {
@@ -74,7 +74,7 @@ trait HasLocks
     {
         $this->{$this->getLocketAtColumn()} = now();
 
-        if ($user instanceof \Illuminate\Foundation\Auth\User) {
+        if ($user instanceof User) {
             $this->{$this->getLockedByColumn()} = $user->id;
         }
         $this->save();
@@ -99,7 +99,7 @@ trait HasLocks
 
     public function isNotLocked(): bool
     {
-        return !$this->isLocked();
+        return ! $this->isLocked();
     }
 
     public function isNotLockedBy(User $user): bool
@@ -130,22 +130,22 @@ trait HasLocks
 
     public function isUnlocked(): bool
     {
-        return !$this->isLocked();
+        return ! $this->isLocked();
     }
 
     public function isUnlockedBy(User $user): bool
     {
-        return !$this->isLockedBy($user);
+        return ! $this->isLockedBy($user);
     }
 
     public function isNotUnlocked(): bool
     {
-        return !$this->isUnlocked();
+        return ! $this->isUnlocked();
     }
 
     public function isNotUnlockedBy(User $user): bool
     {
-        return !$this->isUnlockedBy($user);
+        return ! $this->isUnlockedBy($user);
     }
 
     public function toggleLock(?User $user = null): self
@@ -161,7 +161,7 @@ trait HasLocks
 
     public function toggleLockBy(?User $user = null): self
     {
-        if (!$user instanceof \Illuminate\Foundation\Auth\User) {
+        if (! $user instanceof User) {
             $user = Auth::user();
         }
 

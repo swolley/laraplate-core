@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Database\Factories;
 
+use Override;
 use Modules\Core\Models\License;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-class LicenseFactory extends Factory
+final class LicenseFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -17,7 +20,7 @@ class LicenseFactory extends Factory
     /**
      * Define the model's default state.
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         return [

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Override;
 use Modules\Core\Casts\HistoryRequestData;
 
-class HistoryRequest extends DetailRequest
+final class HistoryRequest extends DetailRequest
 {
-    #[\Override]
+    #[Override]
     public function rules()
     {
         return parent::rules() + [
@@ -16,7 +17,7 @@ class HistoryRequest extends DetailRequest
         ];
     }
 
-    #[\Override]
+    #[Override]
     public function parsed(): HistoryRequestData
     {
         /** @phpstan-ignore method.notFound */

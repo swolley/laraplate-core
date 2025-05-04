@@ -7,7 +7,7 @@ namespace Modules\Core\Casts;
 use Illuminate\Support\Str;
 use Modules\Core\Http\Requests\SelectRequest;
 
-class SelectRequestData extends CrudRequestData
+final class SelectRequestData extends CrudRequestData
 {
     /**
      * @var array<int, Column>
@@ -20,7 +20,7 @@ class SelectRequestData extends CrudRequestData
     public array $relations;
 
     /**
-     * @param string|array<string> $primaryKey
+     * @param  string|array<string>  $primaryKey
      */
     public function __construct(SelectRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {
@@ -31,7 +31,7 @@ class SelectRequestData extends CrudRequestData
 
     private function conformColumnName(string $column): string
     {
-        if (!Str::startsWith($column, $this->mainEntity)) {
+        if (! Str::startsWith($column, $this->mainEntity)) {
             return $this->mainEntity . '.' . $column;
         }
 
@@ -39,7 +39,7 @@ class SelectRequestData extends CrudRequestData
     }
 
     /**
-     * @param array<int,string|array{name:string,type:string}> $columns
+     * @param  array<int,string|array{name:string,type:string}>  $columns
      * @return array<int,Column>
      */
     private function conformColumns(array $columns): array
@@ -56,7 +56,7 @@ class SelectRequestData extends CrudRequestData
     }
 
     /**
-     * @param array<int,string> $relations
+     * @param  array<int,string>  $relations
      * @return array<int,string>
      */
     private function conformRelations(array $relations): array

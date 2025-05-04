@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\app\Helpers;
 
 use Parental\HasChildren as ParentalHasChildren;
@@ -9,18 +11,18 @@ use Parental\HasChildren as ParentalHasChildren;
  */
 trait HasChildren
 {
-	use ParentalHasChildren;
+    use ParentalHasChildren;
 
-	public function getChildTypes(): array
-	{
-		if (property_exists(static::class, 'childTypes') && isset(static::$childTypes)) {
-			return static::$childTypes;
-		}
+    public function getChildTypes(): array
+    {
+        if (property_exists(static::class, 'childTypes') && isset(static::$childTypes)) {
+            return static::$childTypes;
+        }
 
-		if (method_exists($this, 'childTypes')) {
-			return $this->childTypes();
-		}
+        if (method_exists($this, 'childTypes')) {
+            return $this->childTypes();
+        }
 
-		return [];
-	}
+        return [];
+    }
 }

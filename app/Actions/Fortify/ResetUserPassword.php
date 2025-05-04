@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Actions\Fortify;
 
 use Illuminate\Support\Facades\Hash;
@@ -8,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
-class ResetUserPassword implements ResetsUserPasswords
+final class ResetUserPassword implements ResetsUserPasswords
 {
     use PasswordValidationRules;
 

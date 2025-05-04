@@ -13,9 +13,9 @@ use Spatie\Permission\Models\Permission as ModelsPermission;
 /**
  * @mixin IdeHelperPermission
  */
-class Permission extends ModelsPermission
+final class Permission extends ModelsPermission
 {
-    use HasValidations, HasCache {
+    use HasCache, HasValidations {
         getRules as protected getRulesTrait;
     }
 
@@ -64,21 +64,6 @@ class Permission extends ModelsPermission
         ]);
     }
 
-    protected static function newFactory(): PermissionFactory
-    {
-        return PermissionFactory::new();
-    }
-
-    protected function getActionAttribute(): ?ActionEnum
-    {
-        if ($this->name === null) {
-            return null;
-        }
-        $splitted = explode('.', $this->name);
-
-        return ActionEnum::tryFrom(array_pop($splitted));
-    }
-
     public function getRules()
     {
         $rules = $this->getRulesTrait();
@@ -92,6 +77,22 @@ class Permission extends ModelsPermission
         $rules['update'] = array_merge($rules['update'], [
             'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:permissions,name,' . $this->id],
         ]);
+
         return $rules;
+    }
+
+    protected static function newFactory(): PermissionFactory
+    {
+        return PermissionFactory::new();
+    }
+
+    protected function getActionAttribute(): ?ActionEnum
+    {
+        if ($this->name === null) {
+            return null;
+        }
+        $splitted = explode('.', $this->name);
+
+        return ActionEnum::tryFrom(array_pop($splitted));
     }
 }

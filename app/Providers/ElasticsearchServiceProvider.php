@@ -7,7 +7,7 @@ namespace Modules\Core\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Services\ElasticsearchService;
 
-class ElasticsearchServiceProvider extends ServiceProvider
+final class ElasticsearchServiceProvider extends ServiceProvider
 {
     /**
      * Register the service provider.
@@ -17,14 +17,14 @@ class ElasticsearchServiceProvider extends ServiceProvider
         // Load custom Elasticsearch configuration
         $this->mergeConfigFrom(
             __DIR__ . '/../config/elastic.php',
-            'elastic'
+            'elastic',
         );
 
         // Load Elasticsearch client configuration (if not already loaded by the package)
         // if (!$this->app['config']->has('elastic.connections')) {
         $this->mergeConfigFrom(
             __DIR__ . '/../config/elastic.client.php',
-            'elastic'
+            'elastic',
         );
         // }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Cache;
 
+use Override;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
@@ -12,23 +13,9 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Cache\Repository as BaseRepository;
 
-class Repository extends BaseRepository
+final class Repository extends BaseRepository
 {
-    private function getDuration(): int|array
-    {
-        if ($threshold = $this->getThreshold()) {
-            return [$threshold, config('cache.duration')];
-        }
-
-        return config('cache.duration');
-    }
-
-    private function getThreshold(): int|null
-    {
-        return config('cache.threshold');
-    }
-
-    #[\Override]
+    #[Override]
     public function remember($key, $ttl, \Closure $callback): mixed
     {
         $ttl ??= $this->getDuration();
@@ -38,33 +25,17 @@ class Repository extends BaseRepository
     }
 
     /**
-     * contruct a cache key by request info
-     */
-    private static function getKeyFromRequest(Request $request): string
-    {
-        $path = $request->getPathInfo();
-        $params = $request->query();
-        $user = self::getKeyPartsFromUser($request->user());
-        if ($user) {
-            self::recursiveKSort($params);
-        }
-
-        return base64_encode($path . ($user ? implode('_', $user) . '_' : '') . serialize($params));
-    }
-
-    /**
-     * Try to extract from cache or by specified callback using request info
-     * 
+     * Try to extract from cache or by specified callback using request info.
+     *
      * @template TCacheValue
-     * @param Model|string|array|null $entity
-     * @param Request $request
-     * @param Closure(TCacheValue): mixed $callback
-     * @param int|null $duration
+     *
+     * @param  Closure(TCacheValue): mixed  $callback
      * @return TCacheValue
      */
     final public function tryByRequest(Model|string|array|null $entity, Request $request, \Closure $callback, ?int $duration = null): mixed
     {
         $tags = [config('app.name')];
+
         if ($entity) {
             $models = Arr::wrap($entity);
 
@@ -73,7 +44,7 @@ class Repository extends BaseRepository
                     $model = new $model();
                 }
 
-                if (!method_exists($model, 'usesCache') || !$model->usesCache()) {
+                if (! method_exists($model, 'usesCache') || ! $model->usesCache()) {
                     return $callback();
                 }
                 $tags[] = self::getTableName($model);
@@ -83,7 +54,7 @@ class Repository extends BaseRepository
         if ($user = self::getKeyPartsFromUser($request->user())) {
             array_push($tags, ...$user);
         }
-        $key = static::getKeyFromRequest($request);
+        $key = self::getKeyFromRequest($request);
         $duration ??= config('cache.duration');
 
         if ($this->has($key)) {
@@ -91,6 +62,7 @@ class Repository extends BaseRepository
         }
 
         $data = $callback();
+
         if ($data instanceof ResponseBuilder) {
             $data = $data->getResponse();
         }
@@ -101,7 +73,7 @@ class Repository extends BaseRepository
     }
 
     /**
-     * clear cache by specified entity
+     * clear cache by specified entity.
      */
     final public function clearByEntity(Model|string|array $entity): void
     {
@@ -119,11 +91,12 @@ class Repository extends BaseRepository
     }
 
     /**
-     * clear cache by request extracted info
+     * clear cache by request extracted info.
      */
     final public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
-        $key = static::getKeyFromRequest($request);
+        $key = self::getKeyFromRequest($request);
+
         if ($entity) {
             $entity = Arr::wrap($entity);
 
@@ -132,7 +105,7 @@ class Repository extends BaseRepository
                     $model = new $model();
                 }
 
-                if (!method_exists($model, 'usesCache') || $model->usesCache()) {
+                if (! method_exists($model, 'usesCache') || $model->usesCache()) {
                     $this->tags([config('app.name'), self::getTableName($model)])->forget($key);
                 }
             }
@@ -142,11 +115,12 @@ class Repository extends BaseRepository
     }
 
     /**
-     * clear cache elements by user and only by entity if specified
+     * clear cache elements by user and only by entity if specified.
      */
     final public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
         $user_key = 'U' . $user->id;
+
         if ($entity) {
             $models = Arr::wrap($entity);
 
@@ -165,11 +139,12 @@ class Repository extends BaseRepository
     }
 
     /**
-     * clear cache elements by user group and only by entity if specified
+     * clear cache elements by user group and only by entity if specified.
      */
     final public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
         $role_key = 'R' . $role->id;
+
         if ($entity) {
             $models = Arr::wrap($entity);
 
@@ -187,13 +162,29 @@ class Repository extends BaseRepository
         }
     }
 
+    /**
+     * contruct a cache key by request info.
+     */
+    private static function getKeyFromRequest(Request $request): string
+    {
+        $path = $request->getPathInfo();
+        $params = $request->query();
+        $user = self::getKeyPartsFromUser($request->user());
+
+        if ($user) {
+            self::recursiveKSort($params);
+        }
+
+        return base64_encode($path . ($user ? implode('_', $user) . '_' : '') . serialize($params));
+    }
+
     private static function getTableName(string|Model $entity): string
     {
         return is_string($entity) ? $entity : $entity->getTable();
     }
 
-    /** 
-     * recursively sorts array by keys
+    /**
+     * recursively sorts array by keys.
      */
     private static function recursiveKSort(array|string|null &$array): void
     {
@@ -207,9 +198,9 @@ class Repository extends BaseRepository
     }
 
     /**
-     * compose key parts by user and groups
-     * 
-     * @return array<int,string>|null
+     * compose key parts by user and groups.
+     *
+     * @return null|array<int,string>
      */
     private static function getKeyPartsFromUser(User $user): ?array
     {
@@ -227,11 +218,25 @@ class Repository extends BaseRepository
         }
 
         if ($group_method) {
-            $groups = $user->{$group_method}->map(fn(Model $r): string => 'R' . (int) $r->id)->toArray();
+            $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
             sort($groups);
             array_push($tags, ...$groups);
         }
 
         return array_map('strval', $tags);
+    }
+
+    private function getDuration(): int|array
+    {
+        if ($threshold = $this->getThreshold()) {
+            return [$threshold, config('cache.duration')];
+        }
+
+        return config('cache.duration');
+    }
+
+    private function getThreshold(): ?int
+    {
+        return config('cache.threshold');
     }
 }

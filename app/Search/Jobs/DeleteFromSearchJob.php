@@ -4,52 +4,53 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
+use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Modules\Core\Services\ElasticsearchService;
 
 /**
  * Job for deleting a document from a search index
- * Supports both Elasticsearch and Typesense
+ * Supports both Elasticsearch and Typesense.
  */
-class DeleteFromSearchJob implements ShouldQueue
+final class DeleteFromSearchJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Maximum number of attempts
+     * Maximum number of attempts.
      */
     public int $tries;
 
     /**
-     * Job timeout in seconds
+     * Job timeout in seconds.
      */
     public int $timeout;
 
     /**
-     * Backoff time between retries (in seconds)
+     * Backoff time between retries (in seconds).
      */
     public array $backoff;
 
     /**
-     * Search index name
+     * Search index name.
      */
     protected string $index;
 
     /**
-     * Document ID to delete
+     * Document ID to delete.
      */
     protected string|int $document_id;
 
     /**
-     * Create a new job instance
+     * Create a new job instance.
      *
-     * @param string $index Search index name
-     * @param string|int $document_id Document ID to delete
+     * @param  string  $index  Search index name
+     * @param  string|int  $document_id  Document ID to delete
      */
     public function __construct(string $index, string|int $document_id)
     {
@@ -64,7 +65,7 @@ class DeleteFromSearchJob implements ShouldQueue
     }
 
     /**
-     * Execute the job
+     * Execute the job.
      */
     public function handle(): void
     {
@@ -84,9 +85,9 @@ class DeleteFromSearchJob implements ShouldQueue
                     $client = app('typesense');
                     $client->collections[$this->index]->documents[$this->document_id]->delete();
                     $success = true;
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     // Document not found is not an error
-                    if (strpos($e->getMessage(), 'Not Found') !== false || $e->getCode() === 404) {
+                    if (mb_strpos($e->getMessage(), 'Not Found') !== false || $e->getCode() === 404) {
                         $success = false;
                     } else {
                         throw $e;
@@ -95,21 +96,22 @@ class DeleteFromSearchJob implements ShouldQueue
             }
 
             if ($success) {
-                Log::debug("Document deletion completed successfully");
+                Log::debug('Document deletion completed successfully');
             } else {
                 Log::warning("Document deletion failed, document {$this->document_id} not found or other error");
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error deleting document {$this->document_id}", [
                 'index' => $this->index,
                 'driver' => config('scout.driver'),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // If there are attempts left, retry
-            if ($this->attempts() < $this->tries) {
+            if ($this->tries > $this->attempts()) {
                 $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+
                 return;
             }
 

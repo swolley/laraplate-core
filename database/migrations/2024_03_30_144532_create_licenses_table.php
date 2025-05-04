@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
 {
@@ -12,14 +14,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('licenses', function (Blueprint $table) {
+        Schema::create('licenses', function (Blueprint $table): void {
             $table->uuid('id')->primary(true)->nullable(false)->comment('The unique identifier for the license');
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: false,
                 hasLocks: false,
-                hasValidity: true
+                hasValidity: true,
             );
         });
     }

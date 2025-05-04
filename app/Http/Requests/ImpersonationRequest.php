@@ -8,14 +8,14 @@ use Lab404\Impersonate\Impersonate;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Http\FormRequest;
 
-class ImpersonationRequest extends FormRequest
+final class ImpersonationRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        /** @var User|null $user */
+        /** @var null|User $user */
         $user = auth()->user();
 
         return $user && class_uses_trait($user, Impersonate::class) && $user->canImpersonate();

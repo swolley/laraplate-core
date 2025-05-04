@@ -19,13 +19,13 @@ use Laravel\Socialite\Contracts\User as SocialUser;
 use Modules\Core\Http\Requests\ImpersonationRequest;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
-class UserController extends Controller
+final class UserController extends Controller
 {
     public function __construct(
         Repository $cache,
         AuthManager $auth,
         DatabaseManager $db,
-        protected Socialite $socialite
+        protected Socialite $socialite,
     ) {
         parent::__construct($cache, $auth, $db);
     }
@@ -42,7 +42,7 @@ class UserController extends Controller
 
     public static function parseAnonymousUserInfo(): array
     {
-        return static::parseUserInfo();
+        return self::parseUserInfo();
     }
 
     /**
@@ -51,15 +51,17 @@ class UserController extends Controller
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
-        /** @var User|null $user */
+        /** @var null|User $user */
         $user = $this->auth->user();
+
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
             if ($user) {
                 AfterLoginListener::checkUserLicense($user);
             }
+
             return new ResponseBuilder($request)
-                ->setData(static::parseUserInfo($user))
+                ->setData(self::parseUserInfo($user))
                 ->json();
         } catch (UnauthorizedException $ex) {
             return new ResponseBuilder($request)
@@ -77,12 +79,13 @@ class UserController extends Controller
     {
         $user_to_impersonate_id = $request->validated()['user'];
         $user_to_impersonate = user_class()::findOrFail($user_to_impersonate_id);
-        /** @var User $current_user  */
+
+        /** @var User $current_user */
         $current_user = $this->auth->user();
         $current_user->impersonate($user_to_impersonate);
 
         return new ResponseBuilder($request)
-            ->setData(static::parseUserInfo())
+            ->setData(self::parseUserInfo())
             ->json();
     }
 
@@ -97,7 +100,7 @@ class UserController extends Controller
         $current_user->leaveImpersonation();
 
         return new ResponseBuilder($request)
-            ->setData(static::parseUserInfo())
+            ->setData(self::parseUserInfo())
             ->json();
     }
 

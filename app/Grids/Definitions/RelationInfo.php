@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-class RelationInfo
+final class RelationInfo
 {
     /**
      * @param  string  $type  relation type (method name)
@@ -14,12 +14,10 @@ class RelationInfo
      * @param  string  $foreignKey  db foreign key column
      * @param  string  $ownerKey  db local key (usually primary key)
      */
-    public function __construct(protected string $type, protected string $name, protected string $model, protected string $table, protected string $foreignKey, protected string $ownerKey)
-    {
-    }
+    public function __construct(protected string $type, protected string $name, protected string $model, protected string $table, protected string $foreignKey, protected string $ownerKey) {}
 
     /**
-     * gets relation type
+     * gets relation type.
      */
     public function getType(): string
     {
@@ -27,7 +25,7 @@ class RelationInfo
     }
 
     /**
-     * gets relation name
+     * gets relation name.
      */
     public function getName(): string
     {
@@ -35,7 +33,7 @@ class RelationInfo
     }
 
     /**
-     * gets related model
+     * gets related model.
      */
     public function getModel(): string
     {
@@ -43,7 +41,7 @@ class RelationInfo
     }
 
     /**
-     * gets relation foreign key
+     * gets relation foreign key.
      */
     public function getForeignKey(): string
     {
@@ -51,7 +49,7 @@ class RelationInfo
     }
 
     /**
-     * get relation owner key
+     * get relation owner key.
      */
     public function getOwnerKey(): string
     {
@@ -59,7 +57,7 @@ class RelationInfo
     }
 
     /**
-     * gets related table
+     * gets related table.
      */
     public function getTable(): string
     {

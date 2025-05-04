@@ -6,7 +6,7 @@ namespace Modules\Core\Casts;
 
 use ReflectionClass;
 
-class CrudExecutor
+final class CrudExecutor
 {
     public const SELECT = 'get';
 
@@ -27,7 +27,7 @@ class CrudExecutor
      */
     public static function tryFrom(string $value): ?string
     {
-        $values = static::values();
+        $values = self::values();
 
         foreach ($values as $const) {
             if ($const === $value) {
@@ -44,7 +44,7 @@ class CrudExecutor
     public static function isWriteAction(string $action): bool
     {
         return match ($action) {
-            CrudExecutor::INSERT, CrudExecutor::UPDATE, CrudExecutor::DELETE, CrudExecutor::FORCE_DELETE, CrudExecutor::RESTORE => true,
+            self::INSERT, self::UPDATE, self::DELETE, self::FORCE_DELETE, self::RESTORE => true,
             default => false,
         };
     }
@@ -54,7 +54,7 @@ class CrudExecutor
      */
     public static function isReadAction(string $action): bool
     {
-        return !static::isWriteAction($action);
+        return ! self::isWriteAction($action);
     }
 
     /**
@@ -64,7 +64,7 @@ class CrudExecutor
      */
     public static function values(): array
     {
-        $refl = new ReflectionClass(static::class);
+        $refl = new ReflectionClass(self::class);
         $constants = $refl->getConstants();
 
         return array_values($constants);

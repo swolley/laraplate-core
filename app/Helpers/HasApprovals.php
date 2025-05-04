@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Override;
 use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
 
@@ -26,7 +25,7 @@ trait HasApprovals
 
     public function getPreviewAttribute(): ?array
     {
-        if (!session('preview', false)) {
+        if (! session('preview', false)) {
             return null;
         }
 
@@ -45,7 +44,7 @@ trait HasApprovals
 
     public function toArray()
     {
-        if (!$this->preview) {
+        if (! $this->preview) {
             return parent::toArray();
         }
 
@@ -64,11 +63,12 @@ trait HasApprovals
     protected function requiresApprovalWhen($modifications): bool
     {
         $user = auth()?->user();
+
         /** @phpstan-ignore method.notFound */
         if ($user && ($user->isAdmin() || $user->isSuperAdmin() && $user->can('approve.' . $this->getTable()))) {
             return false;
         }
 
-        return !empty($modifications);
+        return ! empty($modifications);
     }
 }

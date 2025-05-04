@@ -4,49 +4,51 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
+use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Laravel\Scout\Searchable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
 
 /**
  * Job for indexing a model in search engines
- * Supports both Elasticsearch and Typesense via Laravel Scout
+ * Supports both Elasticsearch and Typesense via Laravel Scout.
  */
-class IndexInSearchJob implements ShouldQueue
+final class IndexInSearchJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Maximum number of attempts for the job
+     * Maximum number of attempts for the job.
      */
     public int $tries;
 
     /**
-     * Job timeout in seconds
+     * Job timeout in seconds.
      */
     public int $timeout;
 
     /**
-     * Backoff time between attempts, in seconds
+     * Backoff time between attempts, in seconds.
      */
     public array $backoff;
 
     /**
-     * Constructor
-     * 
-     * @param Model $model The model to index
+     * Constructor.
+     *
+     * @param  Model  $model  The model to index
      */
     public function __construct(
-        protected Model $model
+        protected Model $model,
     ) {
         // Validate that the model implements Searchable
-        if (!in_array(Searchable::class, class_uses_recursive($model::class))) {
-            throw new \InvalidArgumentException("Model " . $model::class . " does not implement the Searchable trait");
+        if (! in_array(Searchable::class, class_uses_recursive($model::class), true)) {
+            throw new InvalidArgumentException('Model ' . $model::class . ' does not implement the Searchable trait');
         }
 
         $this->onQueue(config('scout.queue_name', 'indexing'));
@@ -58,7 +60,7 @@ class IndexInSearchJob implements ShouldQueue
     }
 
     /**
-     * Execute the job
+     * Execute the job.
      */
     public function handle(): void
     {
@@ -69,8 +71,9 @@ class IndexInSearchJob implements ShouldQueue
         Log::debug("Indexing document {$document_id} in {$index_name} using {$driver} driver");
 
         // If the model implements shouldBeSearchable method and should not be searchable, delete the document
-        if (method_exists($this->model, 'shouldBeSearchable') && !$this->model->shouldBeSearchable()) {
+        if (method_exists($this->model, 'shouldBeSearchable') && ! $this->model->shouldBeSearchable()) {
             $this->model->unsearchable();
+
             return;
         }
 
@@ -85,16 +88,17 @@ class IndexInSearchJob implements ShouldQueue
             }
 
             Log::debug("Document {$document_id} successfully indexed in {$index_name}");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error indexing document {$document_id} in {$index_name}", [
                 'driver' => $driver,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // If there are attempts left, retry
-            if ($this->attempts() < $this->tries) {
+            if ($this->tries > $this->attempts()) {
                 $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+
                 return;
             }
 
@@ -104,7 +108,7 @@ class IndexInSearchJob implements ShouldQueue
     }
 
     /**
-     * Delete a document from the index
+     * Delete a document from the index.
      */
     // protected function deleteDocument(): void
     // {

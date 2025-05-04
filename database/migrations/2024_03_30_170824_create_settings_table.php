@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
 return new class() extends Migration
@@ -36,7 +36,7 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
-                hasSoftDelete: true
+                hasSoftDelete: true,
             );
         });
     }

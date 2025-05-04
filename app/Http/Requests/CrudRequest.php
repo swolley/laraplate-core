@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Illuminate\Database\Eloquent\Model;
+use Override;
 use Modules\Core\Models\DynamicEntity;
-use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\IParsableRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
 abstract class CrudRequest extends FormRequest implements IParsableRequest
 {
@@ -17,31 +18,32 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
 
     protected Model $model;
 
-    public function rules()
+    final public function rules()
     {
         return [
             'connection' => ['string', 'sometimes'],
         ];
     }
 
-    public function getPrimaryKey(): array|string
+    final public function getPrimaryKey(): array|string
     {
         return $this->primaryKey;
     }
 
-    #[\Override]
-    protected function prepareForValidation()
-    {
-        $connection = $this->connection ?? null;
-        /** @phpstan-ignore method.notFound */
-        $this->model = DynamicEntity::resolve($this->route('entity'), $connection);
-        $this->primaryKey = $this->model->getKeyName();
-    }
-
-    #[\Override]
-    public function parsed(): CrudRequestData
+    #[Override]
+    final public function parsed(): CrudRequestData
     {
         /** @phpstan-ignore method.notFound */
         return new CrudRequestData($this, $this->route('entity'), $this->validated(), $this->primaryKey ?? 'id');
+    }
+
+    #[Override]
+    protected function prepareForValidation(): void
+    {
+        $connection = $this->connection ?? null;
+
+        /** @phpstan-ignore method.notFound */
+        $this->model = DynamicEntity::resolve($this->route('entity'), $connection);
+        $this->primaryKey = $this->model->getKeyName();
     }
 }

@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace Modules\Core\Rules;
 
 use Closure;
+use Override;
 use Illuminate\Contracts\Validation\ValidationRule;
 
-class QueryColumn implements ValidationRule
+final class QueryColumn implements ValidationRule
 {
     /**
      * Run the validation rule.
      *
-     * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
      */
-    #[\Override]
+    #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (
-            !is_string($value) && !is_array($value) ||
-            (is_array($value) && (!array_key_exists('name', $value) || !array_key_exists('type', $value)))
+            ! is_string($value) && ! is_array($value)
+            || (is_array($value) && (! array_key_exists('name', $value) || ! array_key_exists('type', $value)))
         ) {
             $fail("{$attribute} doesn't have a correct format");
         }

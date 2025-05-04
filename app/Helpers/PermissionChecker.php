@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\UnauthorizedException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 
-class PermissionChecker
+final class PermissionChecker
 {
     /**
      * check user permission on requested resource.
@@ -29,28 +29,29 @@ class PermissionChecker
 
         $connection ??= 'default';
 
-        if (!$permissions instanceof \Illuminate\Support\Collection) {
+        if (! $permissions instanceof Collection) {
             $user = $request->user();
 
-            if (!$permissions && $user && $user->isSuperAdmin()) {
+            if (! $permissions && $user && $user->isSuperAdmin()) {
                 return true;
             }
 
-            if (!$user) {
+            if (! $user) {
                 // TODO: temporaneo da eliminare dopo lo sviluppo dei componenti e i test
                 $user = user_class()::whereName('root')->first();
 
                 // $user = user_class()::whereName('anonymous')->first();
                 if ($user) {
                     Auth::login($user);
-                    $request->setUserResolver(fn() => $user);
+                    $request->setUserResolver(fn () => $user);
                 }
             }
+
             return $user ? $user->can($connection . '.' . $entity . '.*') : false;
         }
 
         return $permissions->filter(
-            fn($permission) => $permission->guard === $guard_name && $operation && $operation !== '*'
+            fn ($permission) => $permission->guard === $guard_name && $operation && $operation !== '*'
                 ? $permission->name === $connection . '.' . $entity . '.' . $operation
                 : Str::startsWith($permission->name, $connection . '.' . $entity . '.'),
         )->isNotEmpty();
@@ -66,7 +67,7 @@ class PermissionChecker
      */
     public static function ensurePermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null, ?Collection $permissions = null): true
     {
-        if (!static::checkPermissions($request, $entity, $operation, $connection, $permissions)) {
+        if (! self::checkPermissions($request, $entity, $operation, $connection, $permissions)) {
             throw new UnauthorizedException('User not allowed to access this resource');
         }
 

@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Models;
 
+use Override;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Rules\QueryBuilder;
@@ -14,9 +17,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @mixin IdeHelperACL
  */
-class ACL extends Model
+final class ACL extends Model
 {
-    use HasVersions, SoftDeletes, HasValidations {
+    use HasValidations, HasVersions, SoftDeletes {
         getRules as protected getRulesTrait;
     }
 
@@ -24,20 +27,12 @@ class ACL extends Model
         'permission_id',
         'filters',      // Stored as JSON
         'sort',         // Optional: stored as JSON
-        'description'   // Optional: human readable description
+        'description',   // Optional: human readable description
     ];
-
-    #[\Override]
-    protected function casts()
-    {
-        return [
-            'filters' => FiltersGroup::class,
-            'sort' => Sort::class,
-        ];
-    }
 
     /**
      * The permission that belongs to the ACL.
+     *
      * @return BelongsTo<Permission>
      */
     public function permission(): BelongsTo
@@ -45,7 +40,7 @@ class ACL extends Model
         return $this->belongsTo(Permission::class);
     }
 
-    public function scopeForPermission($query, $permission_id)
+    public function scopeForPermission($query, $permission_id): void
     {
         $query->where('permission_id', $permission_id);
     }
@@ -60,6 +55,16 @@ class ACL extends Model
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'description' => ['string', 'max:255', 'nullable'],
         ]);
+
         return $rules;
+    }
+
+    #[Override]
+    protected function casts()
+    {
+        return [
+            'filters' => FiltersGroup::class,
+            'sort' => Sort::class,
+        ];
     }
 }

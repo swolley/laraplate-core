@@ -15,16 +15,16 @@ use Modules\Core\Search\Contracts\SearchEngineInterface;
 
 /**
  * Extended search service provider
- * Adds support for vector search and custom features on top of Laravel Scout
+ * Adds support for vector search and custom features on top of Laravel Scout.
  */
-class SearchServiceProvider extends ServiceProvider
+final class SearchServiceProvider extends ServiceProvider
 {
     public array $bindings = [
         Engine::class => ElasticsearchEngine::class,
     ];
 
     /**
-     * Register services in the container
+     * Register services in the container.
      */
     public function register(): void
     {
@@ -36,6 +36,7 @@ class SearchServiceProvider extends ServiceProvider
         // Register Typesense client
         $this->app->singleton('typesense', function ($app) {
             $config = $app['config']['scout.typesense.client-settings'];
+
             return new TypesenseClient($config);
         });
 

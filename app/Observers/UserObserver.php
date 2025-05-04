@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\User;
 
-class UserObserver
+final class UserObserver
 {
     /**
      * Handle the User "created" event.
@@ -25,7 +25,7 @@ class UserObserver
 
     public function created(User $user): void
     {
-        if (!$user->hasVerifiedEmail() && config('core.verify_new_user')) {
+        if (! $user->hasVerifiedEmail() && config('core.verify_new_user')) {
             $user->sendEmailVerificationNotification();
         }
     }

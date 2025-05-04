@@ -1,22 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Search\Console;
 
-use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
 use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Search\Traits\SearchableCommandUtils;
 
-class FlushCommand extends \Laravel\Scout\Console\FlushCommand
+final class FlushCommand extends \Laravel\Scout\Console\FlushCommand
 {
-    use SearchableCommandUtils, HasBenchmark;
+    use HasBenchmark, SearchableCommandUtils;
 
     protected $description = 'Flush all of the model\'s records from the index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
-    #[\Override]
+    #[Override]
     public function handle()
     {
-        if (!$this->getModelClass()) {
+        if (! $this->getModelClass()) {
             return self::FAILURE;
         }
+
         return parent::handle();
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Traits;
 
-use Modules\Core\Auth\Services\AclService;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Auth\Services\AclService;
 
 trait HasAcl
 {

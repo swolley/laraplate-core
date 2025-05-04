@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Override;
 use Illuminate\Support\Str;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
 use Modules\Core\Helpers\HasBenchmark;
+use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
 
-class VendorPublishCommand extends BaseVendorPublishCommand
+final class VendorPublishCommand extends BaseVendorPublishCommand
 {
     use HasBenchmark;
 
@@ -31,12 +32,12 @@ class VendorPublishCommand extends BaseVendorPublishCommand
             $this->modules[$module_name] = [
                 'path' => $module,
                 'migrations' => glob(module_path($module_name, $migrations_subpath . DIRECTORY_SEPARATOR . '*.php')),
-                'config' => array_filter(glob(module_path($module_name, $configs_subpath . DIRECTORY_SEPARATOR . '*.php')), fn(string $c) => !Str::endsWith($c, 'config.php')),
+                'config' => array_filter(glob(module_path($module_name, $configs_subpath . DIRECTORY_SEPARATOR . '*.php')), fn (string $c) => ! Str::endsWith($c, 'config.php')),
             ];
         }
     }
 
-    #[\Override]
+    #[Override]
     protected function publishFile($from, $to): void
     {
         $found = false;

@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class ClearExpiredModels extends Command
+final class ClearExpiredModels extends Command
 {
     /**
      * The name and signature of the console command.
@@ -20,7 +22,7 @@ class ClearExpiredModels extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): void
     {
         $expirationDays = config('core.soft_deletes_expiration_days');
 

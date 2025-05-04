@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Console;
 
-class OptimisticLockRemoveCommand extends OptimisticLockAddCommand
+final class OptimisticLockRemoveCommand extends OptimisticLockAddCommand
 {
     public $signature = 'lock:optimistic-remove {model} {--namespace=}';
 

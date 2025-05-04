@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Actions\Fortify;
 
 use Illuminate\Validation\Rules\Password;

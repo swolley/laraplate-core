@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Relations\MorphPivot;
 /**
  * @mixin IdeHelperModelHasRole
  */
-class ModelHasRole extends MorphPivot
+final class ModelHasRole extends MorphPivot
 {
-	// protected $attributes = [
-	// 	'team_id' => 1,
-	// ];
+    // protected $attributes = [
+    // 	'team_id' => 1,
+    // ];
 }

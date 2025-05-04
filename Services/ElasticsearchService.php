@@ -5,34 +5,34 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Elastic\Elasticsearch\Client;
+use Illuminate\Support\Facades\Log;
 use Elastic\Elasticsearch\ClientBuilder;
+use Modules\Core\Search\Exceptions\ElasticsearchException;
 use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
-use Illuminate\Support\Facades\Log;
-use Modules\Core\Search\Exceptions\ElasticsearchException;
 
-class ElasticsearchService
+final class ElasticsearchService
 {
     /**
-     * Elasticsearch client instance
+     * Elasticsearch client instance.
      */
-    protected Client $client;
+    private Client $client;
 
     /**
-     * Singleton instance of the service
+     * Singleton instance of the service.
      */
-    protected static ?self $instance = null;
+    private static ?self $instance = null;
 
     /**
-     * Create a new elasticsearch service instance
+     * Create a new elasticsearch service instance.
      */
-    protected function __construct()
+    private function __construct()
     {
         $this->client = $this->createClient();
     }
 
     /**
-     * Get service instance (singleton pattern)
+     * Get service instance (singleton pattern).
      */
     public static function getInstance(): self
     {
@@ -40,46 +40,7 @@ class ElasticsearchService
     }
 
     /**
-     * Create elasticsearch client
-     */
-    protected function createClient(): Client
-    {
-        $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
-
-        $builder = ClientBuilder::create();
-        $builder->setHosts($config['hosts']);
-
-        // Set authentication if configured
-        if (!empty($config['username']) && !empty($config['password'])) {
-            $builder->setBasicAuthentication($config['username'], $config['password']);
-        }
-
-        // Set retry configuration
-        if (!empty($config['retries'])) {
-            $builder->setRetries($config['retries']);
-        }
-
-        // Set timeout options
-        $builder->setHttpClientOptions([
-            'timeout' => $config['timeout'] ?? 60,
-            'connect_timeout' => $config['connect_timeout'] ?? 10,
-        ]);
-
-        // Set cloud ID if available
-        if (!empty($config['cloud_id'])) {
-            $builder->setElasticCloudId($config['cloud_id']);
-        }
-
-        // Set SSL configuration
-        if (isset($config['ssl_verification'])) {
-            $builder->setSSLVerification($config['ssl_verification']);
-        }
-
-        return $builder->build();
-    }
-
-    /**
-     * Get the Elasticsearch client
+     * Get the Elasticsearch client.
      */
     public function getClient(): Client
     {
@@ -87,12 +48,12 @@ class ElasticsearchService
     }
 
     /**
-     * Create or update index
+     * Create or update index.
      *
-     * @param string $index Index name
-     * @param array $settings Index settings
-     * @param array $mappings Index mappings
-     * @return bool
+     * @param  string  $index  Index name
+     * @param  array  $settings  Index settings
+     * @param  array  $mappings  Index mappings
+     *
      * @throws ElasticsearchException
      */
     public function createIndex(string $index, array $settings = [], array $mappings = []): bool
@@ -103,17 +64,17 @@ class ElasticsearchService
 
             if ($exists) {
                 // Update mappings and settings of existing index
-                if (!empty($mappings)) {
+                if (! empty($mappings)) {
                     $this->client->indices()->putMapping([
                         'index' => $index,
-                        'body' => $mappings
+                        'body' => $mappings,
                     ]);
                 }
 
-                if (!empty($settings)) {
+                if (! empty($settings)) {
                     $this->client->indices()->putSettings([
                         'index' => $index,
-                        'body' => ['settings' => $settings]
+                        'body' => ['settings' => $settings],
                     ]);
                 }
 
@@ -123,21 +84,21 @@ class ElasticsearchService
             // Create a new index
             $params = ['index' => $index, 'body' => []];
 
-            if (!empty($settings)) {
+            if (! empty($settings)) {
                 $params['body']['settings'] = $settings;
             }
 
-            if (!empty($mappings)) {
+            if (! empty($mappings)) {
                 $params['body']['mappings'] = $mappings;
             }
 
             $response = $this->client->indices()->create($params);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch create index error', [
                 'index' => $index,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error creating index: {$e->getMessage()}");
@@ -145,10 +106,10 @@ class ElasticsearchService
     }
 
     /**
-     * Delete index if exists
+     * Delete index if exists.
      *
-     * @param string $index Index name
-     * @return bool
+     * @param  string  $index  Index name
+     *
      * @throws ElasticsearchException
      */
     public function deleteIndex(string $index): bool
@@ -157,7 +118,7 @@ class ElasticsearchService
             // Check if the index exists
             $exists = $this->client->indices()->exists(['index' => $index])->asBool();
 
-            if (!$exists) {
+            if (! $exists) {
                 return true;
             }
 
@@ -165,10 +126,10 @@ class ElasticsearchService
             $response = $this->client->indices()->delete(['index' => $index]);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch delete index error', [
                 'index' => $index,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error deleting index: {$e->getMessage()}");
@@ -176,12 +137,14 @@ class ElasticsearchService
     }
 
     /**
-     * Bulk index documents
+     * Bulk index documents.
      *
-     * @param string $index Index name
-     * @param array $documents Documents to index
-     * @return array Response with success/error counts
+     * @param  string  $index  Index name
+     * @param  array  $documents  Documents to index
+     *
      * @throws ElasticsearchException
+     *
+     * @return array Response with success/error counts
      */
     public function bulkIndex(string $index, array $documents): array
     {
@@ -197,8 +160,8 @@ class ElasticsearchService
             $params['body'][] = [
                 'index' => [
                     '_index' => $index,
-                    '_id' => $id
-                ]
+                    '_id' => $id,
+                ],
             ];
 
             $params['body'][] = $document;
@@ -226,13 +189,13 @@ class ElasticsearchService
             return [
                 'indexed' => $indexed,
                 'failed' => $failed,
-                'errors' => $errors
+                'errors' => $errors,
             ];
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch bulk index error', [
                 'index' => $index,
                 'documents_count' => count($documents),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error in bulk indexing: {$e->getMessage()}");
@@ -240,29 +203,31 @@ class ElasticsearchService
     }
 
     /**
-     * Search documents
+     * Search documents.
      *
-     * @param string $index Index name
-     * @param array $query Elasticsearch query
-     * @return array Search results
+     * @param  string  $index  Index name
+     * @param  array  $query  Elasticsearch query
+     *
      * @throws ElasticsearchException
+     *
+     * @return array Search results
      */
     public function search(string $index, array $query): array
     {
         try {
             $params = [
                 'index' => $index,
-                'body' => $query
+                'body' => $query,
             ];
 
             $response = $this->client->search($params);
 
             return $response->asArray();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch search error', [
                 'index' => $index,
                 'query' => $query,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Search error: {$e->getMessage()}");
@@ -270,19 +235,21 @@ class ElasticsearchService
     }
 
     /**
-     * Get document by ID
+     * Get document by ID.
      *
-     * @param string $index Index name
-     * @param string $id Document ID
-     * @return array|null Document data or null if not found
+     * @param  string  $index  Index name
+     * @param  string  $id  Document ID
+     *
      * @throws ElasticsearchException
+     *
+     * @return null|array Document data or null if not found
      */
     public function getDocument(string $index, string $id): ?array
     {
         try {
             $params = [
                 'index' => $index,
-                'id' => $id
+                'id' => $id,
             ];
 
             $response = $this->client->get($params);
@@ -297,7 +264,7 @@ class ElasticsearchService
             Log::error('Elasticsearch get document error', [
                 'index' => $index,
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error retrieving document: {$e->getMessage()}");
@@ -305,7 +272,7 @@ class ElasticsearchService
             Log::error('Elasticsearch get document error', [
                 'index' => $index,
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error retrieving document: {$e->getMessage()}");
@@ -313,13 +280,15 @@ class ElasticsearchService
     }
 
     /**
-     * Delete document by ID
+     * Delete document by ID.
      *
-     * @param string $index Index name
-     * @param string|int $id Document ID
-     * @param bool $refresh Whether to refresh the index immediately
-     * @return bool Success or failure
+     * @param  string  $index  Index name
+     * @param  string|int  $id  Document ID
+     * @param  bool  $refresh  Whether to refresh the index immediately
+     *
      * @throws ElasticsearchException
+     *
+     * @return bool Success or failure
      */
     public function deleteDocument(string $index, string|int $id, bool $refresh = false): bool
     {
@@ -327,17 +296,17 @@ class ElasticsearchService
             // Check if the document exists
             $exists = $this->client->exists([
                 'index' => $index,
-                'id' => $id
+                'id' => $id,
             ])->asBool();
 
-            if (!$exists) {
+            if (! $exists) {
                 return true;
             }
 
             // Delete the document
             $params = [
                 'index' => $index,
-                'id' => $id
+                'id' => $id,
             ];
 
             if ($refresh) {
@@ -345,6 +314,7 @@ class ElasticsearchService
             }
 
             $response = $this->client->delete($params);
+
             return $response->asBool();
         } catch (ClientResponseException $e) {
             // 404 is not an error in this context
@@ -355,7 +325,7 @@ class ElasticsearchService
             Log::error('Elasticsearch delete document error', [
                 'index' => $index,
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error deleting document: {$e->getMessage()}");
@@ -363,10 +333,49 @@ class ElasticsearchService
             Log::error('Elasticsearch delete document error', [
                 'index' => $index,
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             throw new ElasticsearchException("Error deleting document: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Create elasticsearch client.
+     */
+    private function createClient(): Client
+    {
+        $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
+
+        $builder = ClientBuilder::create();
+        $builder->setHosts($config['hosts']);
+
+        // Set authentication if configured
+        if (! empty($config['username']) && ! empty($config['password'])) {
+            $builder->setBasicAuthentication($config['username'], $config['password']);
+        }
+
+        // Set retry configuration
+        if (! empty($config['retries'])) {
+            $builder->setRetries($config['retries']);
+        }
+
+        // Set timeout options
+        $builder->setHttpClientOptions([
+            'timeout' => $config['timeout'] ?? 60,
+            'connect_timeout' => $config['connect_timeout'] ?? 10,
+        ]);
+
+        // Set cloud ID if available
+        if (! empty($config['cloud_id'])) {
+            $builder->setElasticCloudId($config['cloud_id']);
+        }
+
+        // Set SSL configuration
+        if (isset($config['ssl_verification'])) {
+            $builder->setSSLVerification($config['ssl_verification']);
+        }
+
+        return $builder->build();
     }
 }

@@ -4,4 +4,4 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-class DetailRequestData extends SelectRequestData {}
+final class DetailRequestData extends SelectRequestData {}

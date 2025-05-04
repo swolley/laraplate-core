@@ -6,7 +6,6 @@ namespace Modules\Core\Casts;
 
 enum FilterOperator: string
 {
-
     case GREAT = '>';
     case GREAT_EQUALS = '>=';
     case LESS = '<';

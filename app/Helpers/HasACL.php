@@ -12,13 +12,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 trait HasACL
 {
-    protected static function bootHasACL(): void
-    {
-        static::addGlobalScope('acl', function (Builder $builder): void {});
-    }
-
     public function acl(): HasMany
     {
         return $this->hasMany();
+    }
+
+    protected static function bootHasACL(): void
+    {
+        static::addGlobalScope('acl', function (Builder $builder): void {});
     }
 }

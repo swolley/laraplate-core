@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-readonly class Sort
+final readonly class Sort
 {
     public SortDirection $direction;
 

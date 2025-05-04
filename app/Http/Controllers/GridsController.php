@@ -4,27 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Exception;
-use Throwable;
 use Illuminate\Http\Request;
 use UnexpectedValueException;
-use Exception as GlobalException;
+use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Models\DynamicEntity;
-use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Grids\Requests\GridRequest;
-use Doctrine\DBAL\Exception as DBALException;
 use Modules\Core\Helpers\ResponseBuilder;
-use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
 use Modules\Core\Helpers\PermissionChecker;
+use Modules\Core\Grids\Requests\GridRequest;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\UnauthorizedException;
-use PHPUnit\Framework\ExpectationFailedException;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 
-class GridsController extends Controller
+final class GridsController extends Controller
 {
     /**
      * @route-comment
@@ -40,7 +31,8 @@ class GridsController extends Controller
 
             if ($entity) {
                 $entity_instance = DynamicEntity::tryResolveModel($entity);
-                if (!$entity_instance) {
+
+                if (! $entity_instance) {
                     throw new UnexpectedValueException("Unable to find entity '{$entity}'");
                 }
                 $entity = $entity_instance;
@@ -50,10 +42,11 @@ class GridsController extends Controller
                 /** @var Model $instance */
                 $instance = new $model;
                 $table = $instance->getTable();
+
                 if (
-                    (!$entity || $instance::class === $entity::class) &&
-                    Grid::useGridUtils($instance) &&
-                    PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
+                    (! $entity || $instance::class === $entity::class)
+                    && Grid::useGridUtils($instance)
+                    && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
                 ) {
                     /** @var Grid $grid */
                     $grid = $instance->getGrid();
@@ -102,7 +95,7 @@ class GridsController extends Controller
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException | UnauthorizedException $ex) {
+        } catch (UnexpectedValueException|UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();

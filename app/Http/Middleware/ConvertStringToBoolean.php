@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Middleware;
 
+use Override;
 use Illuminate\Foundation\Http\Middleware\TransformsRequest;
 
-class ConvertStringToBoolean extends TransformsRequest
+final class ConvertStringToBoolean extends TransformsRequest
 {
-    #[\Override]
+    #[Override]
     protected function transform($key, $value)
     {
         if ($value === 'true' || $value === 'TRUE') {

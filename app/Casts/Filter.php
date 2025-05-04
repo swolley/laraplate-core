@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-readonly class Filter
+final readonly class Filter
 {
-    public function __construct(public string $property, public mixed $value, public FilterOperator $operator = FilterOperator::EQUALS)
-    {
-    }
+    public function __construct(public string $property, public mixed $value, public FilterOperator $operator = FilterOperator::EQUALS) {}
 }

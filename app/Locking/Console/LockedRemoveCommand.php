@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Console;
 
-class LockedRemoveCommand extends LockedAddCommand
+final class LockedRemoveCommand extends LockedAddCommand
 {
     public $signature = 'lock:locked-remove {model} {--namespace=}';
 

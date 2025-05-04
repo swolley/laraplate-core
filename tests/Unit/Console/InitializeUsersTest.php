@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 use Modules\Core\Models\Role;
 use Illuminate\Database\DatabaseManager;
 use Modules\Core\Console\InitializeUsers;
 
-it('can initialize users', function () {
-    /** @var DatabaseManager&\Mockery\MockInterface $db */
+it('can initialize users', function (): void {
+    /** @var DatabaseManager&Mockery\MockInterface $db */
     $db = Mockery::mock(DatabaseManager::class);
     $command = Mockery::mock(InitializeUsers::class, [$db])
         ->makePartial()
@@ -18,7 +20,7 @@ it('can initialize users', function () {
         'guest' => Mockery::mock(Role::class),
     ]);
 
-    $db->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) use ($groups) {
+    $db->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) use ($groups): void {
         $callback($groups['admin']->name, 'root', 'anonymous', 'UserClassMock', $groups);
     });
 

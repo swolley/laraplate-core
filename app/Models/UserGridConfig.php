@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Override;
 use Modules\Core\Cache\HasCache;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasValidations;
@@ -13,9 +14,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 /**
  * @mixin IdeHelperUserGridConfig
  */
-class UserGridConfig extends Model
+final class UserGridConfig extends Model
 {
-    use HasFactory, HasValidations, HasCache {
+    use HasCache, HasFactory, HasValidations {
         getRules as protected getRulesTrait;
     }
 
@@ -30,20 +31,9 @@ class UserGridConfig extends Model
         'config',
     ];
 
-    #[\Override]
-    protected function casts()
-    {
-        return [
-            'user_id' => 'integer',
-            'is_public' => 'boolean',
-            'config' => 'json',
-            'created_at' => 'immutable_datetime',
-            'updated_at' => 'datetime',
-        ];
-    }
-
     /**
      * The user that belongs to the user grid config.
+     *
      * @return BelongsTo<User>
      */
     public function user(): BelongsTo
@@ -61,6 +51,19 @@ class UserGridConfig extends Model
             'is_public' => ['boolean', 'required'],
             'config' => ['required'],
         ]);
+
         return $rules;
+    }
+
+    #[Override]
+    protected function casts()
+    {
+        return [
+            'user_id' => 'integer',
+            'is_public' => 'boolean',
+            'config' => 'json',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'datetime',
+        ];
     }
 }

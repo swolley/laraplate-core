@@ -10,7 +10,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 #[AsCommand(name: 'lang:check-translations')]
-class TranslationsCheckCommand extends Command
+final class TranslationsCheckCommand extends Command
 {
     /**
      * The name and signature of the console command.
@@ -77,7 +77,7 @@ class TranslationsCheckCommand extends Command
         $required = require $file;
         $file_identifier = str_replace(DIRECTORY_SEPARATOR . $langname . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, $file);
 
-        if (!array_key_exists($file_identifier, $translations)) {
+        if (! array_key_exists($file_identifier, $translations)) {
             $translations[$file_identifier] = [];
         }
         $translations[$file_identifier][$langname] = $this->compactTranslations($required);
@@ -98,7 +98,7 @@ class TranslationsCheckCommand extends Command
             return;
         }
 
-        $replaced = ltrim((string) preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
+        $replaced = mb_ltrim((string) preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
         file_put_contents($file, "<?php\n\nreturn " . $replaced . ';');
         $this->output->writeln("<info>{$file} has been sorted</info>");
     }
@@ -114,12 +114,12 @@ class TranslationsCheckCommand extends Command
 
             // prima accumulo tutte le labels
             foreach ($langs as $lang => $labels) {
-                if (!in_array($lang, $all_languages, true)) {
+                if (! in_array($lang, $all_languages, true)) {
                     $all_languages[] = $lang;
                 }
 
                 foreach ($labels as $label) {
-                    if (!in_array($label, $all_labels, true)) {
+                    if (! in_array($label, $all_labels, true)) {
                         $all_labels[] = $label;
                     }
                 }
@@ -163,7 +163,7 @@ class TranslationsCheckCommand extends Command
             }
         }
 
-        if (!$any_missing_file) {
+        if (! $any_missing_file) {
             $this->output->writeln('<info>All languages are correctly translated</info>');
         }
     }

@@ -3,15 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
     /**
      * Run the migrations.
-     *
      */
     public function up(): void
     {
@@ -29,7 +28,7 @@ return new class() extends Migration
             $table->json('modifications')->comment('The modifications');
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
 
             $table->index(['modifier_id', 'modifier_type'], 'modifications_modifierable_IDX');
@@ -38,7 +37,6 @@ return new class() extends Migration
 
     /**
      * Reverse the migrations.
-     *
      */
     public function down(): void
     {

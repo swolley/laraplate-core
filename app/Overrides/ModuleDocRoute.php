@@ -8,7 +8,7 @@ use ReflectionClass;
 use Illuminate\Routing\Route as LaravelRoute;
 use Mtrajano\LaravelSwagger\DataObjects\Route;
 
-class ModuleDocRoute extends Route
+final class ModuleDocRoute extends Route
 {
     private readonly LaravelRoute $reflectedRoute;
 
@@ -32,7 +32,8 @@ class ModuleDocRoute extends Route
     public function group()
     {
         $name = $this->name();
-        if (!$name) {
+
+        if (! $name) {
             return '';
         }
         $exploded = explode('.', $name);

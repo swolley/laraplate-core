@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use Override;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Laravel\Fortify\Fortify;
@@ -14,19 +15,19 @@ use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Modules\Core\Actions\Fortify\CreateNewUser;
+use Modules\Core\Auth\Providers\SocialiteProvider;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserPassword;
-use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
 use Modules\Core\Auth\Services\AuthenticationService;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
-use Modules\Core\Auth\Providers\SocialiteProvider;
+use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
 
-class FortifyServiceProvider extends ServiceProvider
+final class FortifyServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
      */
-    #[\Override]
+    #[Override]
     public function register(): void
     {
         $this->app->instance(LogoutResponse::class, new class() implements LogoutResponse
@@ -80,7 +81,7 @@ class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(AuthenticationService::class, fn($app) => new AuthenticationService([
+        $this->app->singleton(AuthenticationService::class, fn ($app) => new AuthenticationService([
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),
         ]));
@@ -102,9 +103,9 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey);
         });
 
-        RateLimiter::for('two-factor', fn(Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
 
-        RateLimiter::for('im-still-here', fn(Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
+        RateLimiter::for('im-still-here', fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
         Fortify::authenticateUsing(function ($request) {
             $service = $this->app->make(AuthenticationService::class);
@@ -114,6 +115,7 @@ class FortifyServiceProvider extends ServiceProvider
                 if (config('auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
                 }
+
                 return $result['user'];
             }
 

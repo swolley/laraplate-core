@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Helpers;
 
-use Illuminate\Support\Str;
 use function Laravel\Prompts\select;
+
+use Illuminate\Support\Str;
 
 trait HasCommandModelResolution
 {
@@ -16,6 +19,7 @@ trait HasCommandModelResolution
         } else {
             $model = null;
         }
+
         if (! $model && $required) {
             $all_models = models(false);
             $model = select(
@@ -23,7 +27,7 @@ trait HasCommandModelResolution
                 options: $all_models,
                 required: true,
             );
-        } else if (! $model) {
+        } elseif (! $model) {
             return false;
         }
 
@@ -31,20 +35,27 @@ trait HasCommandModelResolution
             $model = "{$namespace}\\{$model}";
         }
 
-        if (!class_exists($model)) {
-            $model = array_filter($all_models ?? models(false), fn(string $m) => (Str::contains($model, '\\') && $model === $m) || Str::endsWith($m, $model));
+        if (! class_exists($model)) {
+            $model = array_filter($all_models ?? models(false), fn (string $m) => (Str::contains($model, '\\') && $model === $m) || Str::endsWith($m, $model));
+
             if (count($model) === 0) {
                 $this->error('Model not found');
+
                 return false;
             }
+
             if (count($model) > 1) {
                 $this->error('Multiple models found: ' . implode(', ', $model));
+
                 return false;
             }
+
             /** @var class-string<Model> $model */
             $model = head($model);
-            if (!class_exists($model)) {
+
+            if (! class_exists($model)) {
                 $this->error('Model not found');
+
                 return false;
             }
         }

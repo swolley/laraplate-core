@@ -6,6 +6,4 @@ namespace Modules\Core\Locking\Exceptions;
 
 use RuntimeException;
 
-class StaleModelLockingException extends RuntimeException
-{
-}
+final class StaleModelLockingException extends RuntimeException {}

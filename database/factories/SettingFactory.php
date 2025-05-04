@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
+use Override;
 use Illuminate\Support\Carbon;
 use Modules\Core\Models\Setting;
 use Faker\Extension\ExtensionNotFound;
@@ -11,7 +12,7 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Contracts\Container\BindingResolutionException;
 
-class SettingFactory extends Factory
+final class SettingFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -23,10 +24,10 @@ class SettingFactory extends Factory
     /**
      * @throws BindingResolutionException
      * @throws ExtensionNotFound
-     * @return array<string, mixed>
      *
+     * @return array<string, mixed>
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         $type = fake()->randomElement(SettingTypeEnum::cases())->value;

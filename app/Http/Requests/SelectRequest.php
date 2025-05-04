@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Override;
 use Modules\Core\Rules\QueryColumn;
 use Modules\Core\Casts\SelectRequestData;
 
 abstract class SelectRequest extends CrudRequest
 {
-    #[\Override]
-    public function rules()
+    #[Override]
+    final public function rules()
     {
         return parent::rules() + [
             'columns.*' => [new QueryColumn()],
@@ -18,13 +19,20 @@ abstract class SelectRequest extends CrudRequest
         ];
     }
 
+    #[Override]
+    final public function parsed(): SelectRequestData
+    {
+        /** @phpstan-ignore method.notFound */
+        return new SelectRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+    }
+
     protected static function decode(string $value): array
     {
         return is_json($value) ? json_decode($value, true) : preg_split("/,\s?/", $value);
     }
 
-    #[\Override]
-    protected function prepareForValidation()
+    #[Override]
+    protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
 
@@ -40,12 +48,5 @@ abstract class SelectRequest extends CrudRequest
 
         /** @phpstan-ignore method.notFound */
         $this->merge($to_merge);
-    }
-
-    #[\Override]
-    public function parsed(): SelectRequestData
-    {
-        /** @phpstan-ignore method.notFound */
-        return new SelectRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
     }
 }

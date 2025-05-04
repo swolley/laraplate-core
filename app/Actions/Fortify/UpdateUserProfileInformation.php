@@ -1,18 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Actions\Fortify;
 
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Validator;
 use Modules\Core\Helpers\HasValidations;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
 
-class UpdateUserProfileInformation implements UpdatesUserProfileInformation
+final class UpdateUserProfileInformation implements UpdatesUserProfileInformation
 {
     /**
      * Validate and update the given user's profile information.
@@ -43,14 +45,15 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
 
         $validated = Validator::make($input, $rules)->validate();
         Arr::forget($validated, ['current_password', 'password_confirmation']);
+
         if (isset($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         }
 
         if (
             // @phpstan-ignore property.notFound
-            isset($validated['email']) && $validated['email'] !== $user->email &&
-            $user instanceof MustVerifyEmail
+            isset($validated['email']) && $validated['email'] !== $user->email
+            && $user instanceof MustVerifyEmail
         ) {
             $this->updateVerifiedUser($user, $validated);
         } else {
@@ -63,7 +66,7 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
      *
      * @param  array<string, string>  $input
      */
-    protected function updateVerifiedUser(Model&MustVerifyEmail $user, array $input): void
+    private function updateVerifiedUser(Model&MustVerifyEmail $user, array $input): void
     {
         $user->forceFill([
             'name' => $input['name'],

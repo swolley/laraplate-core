@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Services;
 
-use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Models\ACL;
 use Modules\Core\Crud\CrudHelper;
 use Modules\Core\Casts\ListRequestData;
+use Illuminate\Database\Eloquent\Builder;
 
-class AclService
+final class AclService
 {
     public function __construct(private readonly CrudHelper $crudHelper) {}
 
@@ -17,7 +17,7 @@ class AclService
     {
         $acls = ACL::forPermission($permission_id)->get();
 
-        return $query->where(function ($mainQuery) use ($acls, $query) {
+        return $query->where(function ($mainQuery) use ($acls, $query): void {
             foreach ($acls as $acl) {
                 // Creiamo un ListRequestData simulato con i dati dell'ACL
                 $requestData = new ListRequestData(
@@ -27,7 +27,7 @@ class AclService
                         'filters' => $acl->filters ? (array) $acl->filters : [],
                         'sort' => $acl->sort ? (array) $acl->sort : [],
                     ],
-                    $query->getModel()->getKeyName()
+                    $query->getModel()->getKeyName(),
                 );
 
                 // Utilizziamo direttamente il CrudHelper

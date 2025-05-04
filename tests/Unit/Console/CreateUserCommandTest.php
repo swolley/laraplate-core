@@ -1,9 +1,11 @@
 <?php
 
-use Modules\Core\Console\CreateUserCommand;
-use Illuminate\Database\DatabaseManager;
+declare(strict_types=1);
 
-it('creates a new user', function () {
+use Illuminate\Database\DatabaseManager;
+use Modules\Core\Console\CreateUserCommand;
+
+it('creates a new user', function (): void {
     $db = $this->createMock(DatabaseManager::class);
     $command = new CreateUserCommand($db);
 
@@ -17,7 +19,7 @@ it('creates a new user', function () {
     expect($output)->toContain('Created 1 users');
 });
 
-it('fails to create a new user with invalid input', function () {
+it('fails to create a new user with invalid input', function (): void {
     $db = $this->createMock(DatabaseManager::class);
     $command = new CreateUserCommand($db);
 

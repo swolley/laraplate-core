@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Grids\Requests;
 
+use Override;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\IParsableRequest;
@@ -11,15 +14,17 @@ use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Http\Requests\ModifyRequest;
 
-class GridRequest extends FormRequest implements IParsableRequest
+final class GridRequest extends FormRequest implements IParsableRequest
 {
     private GridAction $action;
 
     private ListRequest|ModifyRequest $realMainRequest;
+
     /**
      * @var array<int,ListRequest>
      */
     private array $realOptionRequests = [];
+
     /**
      * @var array<int,ListRequest>
      */
@@ -29,6 +34,7 @@ class GridRequest extends FormRequest implements IParsableRequest
     {
         /** @phpstan-ignore method.notFound */
         $url = $this->url();
+
         if (Str::contains($url, '/' . GridAction::FUNNELS->value)) {
             $grid_rules = $this->remapListRules('funnels.*');
         } elseif (Str::contains($url, '/' . GridAction::OPTIONS->value)) {
@@ -58,24 +64,57 @@ class GridRequest extends FormRequest implements IParsableRequest
         return $grid_rules;
     }
 
-    private function remapListRules(string $prefix): array
+    #[Override]
+    public function validateResolved(): void
     {
-        $list_rules = Arr::except((new ListRequest)->rules(), ['count', 'group_by.*']);
-        return $this->remapRules($list_rules, $prefix);
-    }
+        parent::validateResolved();
 
-    private function remapRules(array $rules, string $prefix): array
-    {
-        $remapped = [];
-        foreach ($rules as $name => $validations) {
-            $remapped["$prefix.$name"] = $validations;
+        if (isset($this->realMainRequest)) {
+            $this->realMainRequest->validateResolved();
         }
 
-        return $remapped;
+        foreach ($this->realOptionRequests as $request) {
+            $request->validateResolved();
+        }
+
+        foreach ($this->realFunnelRequests as $request) {
+            $request->validateResolved();
+        }
     }
 
-    #[\Override]
-    protected function prepareForValidation()
+    #[Override]
+    public function validated($key = null, $default = null)
+    {
+        $validated = $this->realMainRequest->validated($key, $default);
+
+        if ($this->funnels) {
+            for ($i = 0; count($this->funnels); $i++) {
+                $validated['funnels'][$i] = $this->realFunnelRequests[$i]->validated();
+            }
+        }
+
+        if ($this->options) {
+            for ($i = 0; count($this->options); $i++) {
+                $validated['options'][$i] = $this->realOptionRequests[$i]->validated();
+            }
+        }
+
+        return $validated;
+    }
+
+    #[Override]
+    public function parsed(): GridRequestData
+    {
+        /** @var string $main_entity */
+        /** @phpstan-ignore method.notFound */
+        $main_entity = $this->route()->entity;
+        $remapped = $this->validated();
+
+        return new GridRequestData($this->action, $this, $main_entity, $remapped, $this->realMainRequest->getPrimaryKey());
+    }
+
+    #[Override]
+    protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
 
@@ -92,6 +131,7 @@ class GridRequest extends FormRequest implements IParsableRequest
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ListRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
+
                 if (property_exists($this, 'funnels') && $this->funnels !== null) {
                     foreach ($this->funnels as $funnel) {
                         /** @phpstan-ignore staticMethod.notFound */
@@ -101,6 +141,7 @@ class GridRequest extends FormRequest implements IParsableRequest
                         $this->realFunnelRequests[] = $sub_request;
                     }
                 }
+
                 if (property_exists($this, 'options') && $this->options !== null) {
                     foreach ($this->options as $option) {
                         /** @phpstan-ignore staticMethod.notFound */
@@ -110,12 +151,13 @@ class GridRequest extends FormRequest implements IParsableRequest
                         $this->realOptionRequests[] = $sub_request;
                     }
                 }
+
                 break;
-            // case GridAction::LAYOUT:
-            // case GridAction::COUNT:
+                // case GridAction::LAYOUT:
+                // case GridAction::COUNT:
             case GridAction::INSERT:
             case GridAction::UPDATE:
-            /** @phpstan-ignore staticMethod.notFound */
+                /** @phpstan-ignore staticMethod.notFound */
                 // $this->realMainRequest = ModifyRequest::createFrom($this);
             case GridAction::CHECK:
             case GridAction::FORCE_DELETE:
@@ -124,52 +166,26 @@ class GridRequest extends FormRequest implements IParsableRequest
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ModifyRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
+
                 break;
         }
     }
 
-    #[\Override]
-    public function validateResolved()
+    private function remapListRules(string $prefix): array
     {
-        parent::validateResolved();
+        $list_rules = Arr::except((new ListRequest)->rules(), ['count', 'group_by.*']);
 
-        if (isset($this->realMainRequest)) {
-            $this->realMainRequest->validateResolved();
-        }
-        foreach ($this->realOptionRequests as $request) {
-            $request->validateResolved();
-        }
-        foreach ($this->realFunnelRequests as $request) {
-            $request->validateResolved();
-        }
+        return $this->remapRules($list_rules, $prefix);
     }
 
-    #[\Override]
-    public function validated($key = null, $default = null)
+    private function remapRules(array $rules, string $prefix): array
     {
-        $validated = $this->realMainRequest->validated($key, $default);
-        if ($this->funnels) {
-            for ($i = 0; count($this->funnels); $i++) {
-                $validated['funnels'][$i] = $this->realFunnelRequests[$i]->validated();
-            }
-        }
-        if ($this->options) {
-            for ($i = 0; count($this->options); $i++) {
-                $validated['options'][$i] = $this->realOptionRequests[$i]->validated();
-            }
+        $remapped = [];
+
+        foreach ($rules as $name => $validations) {
+            $remapped["{$prefix}.{$name}"] = $validations;
         }
 
-        return $validated;
-    }
-
-    #[\Override]
-    public function parsed(): GridRequestData
-    {
-        /** @var string $main_entity */
-        /** @phpstan-ignore method.notFound */
-        $main_entity = $this->route()->entity;
-        $remapped = $this->validated();
-
-        return new GridRequestData($this->action, $this, $main_entity, $remapped, $this->realMainRequest->getPrimaryKey());
+        return $remapped;
     }
 }

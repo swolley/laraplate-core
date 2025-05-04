@@ -10,18 +10,18 @@ enum ActionEnum: string
     case INSERT = 'insert';
     case UPDATE = 'update';
     case DELETE = 'delete';
-        // case RESTORE = 'restore';
+    // case RESTORE = 'restore';
     case FORCE_DELETE = 'forceDelete';
     case APPROVE = 'approve';
-        // case DISAPPROVE = 'disapprove';
+    // case DISAPPROVE = 'disapprove';
     case PUBLISH = 'publish';
-        // case UNPUBLISH = 'unpublish';
+    // case UNPUBLISH = 'unpublish';
     case IMPERSONATE = 'impersonate';
     case LOCK = 'lock';
     // case UNLOCK = 'unlock';
 
     /**
-     * returns if is a read action
+     * returns if is a read action.
      */
     public static function isReadAction(string $action): bool
     {
@@ -29,10 +29,10 @@ enum ActionEnum: string
     }
 
     /**
-     * returns if is a write action
+     * returns if is a write action.
      */
     public static function isWriteAction(string $action): bool
     {
-        return !static::isReadAction($action);
+        return ! self::isReadAction($action);
     }
 }

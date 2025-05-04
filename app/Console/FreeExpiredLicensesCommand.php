@@ -7,7 +7,7 @@ namespace Modules\Core\Console;
 use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
-class FreeExpiredLicensesCommand extends Command
+final class FreeExpiredLicensesCommand extends Command
 {
     protected $signature = 'auth:free-expired-licenses';
 
@@ -18,6 +18,7 @@ class FreeExpiredLicensesCommand extends Command
         $this->info('Freeing expired licenses...');
         user_class();
         $this->output->error('User class is not Modules\Core\Models\User');
+
         return BaseCommand::SUCCESS;
     }
 }

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Override;
 use Nwidart\Modules\Module;
 use Illuminate\Container\Container;
 use Nwidart\Modules\Activators\FileActivator;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 
-class ModuleMultiActivator implements ActivatorInterface
+final class ModuleMultiActivator implements ActivatorInterface
 {
     private readonly ActivatorInterface $activator;
 
@@ -20,43 +21,43 @@ class ModuleMultiActivator implements ActivatorInterface
             : new FileActivator($app);
     }
 
-    #[\Override]
+    #[Override]
     public function enable(Module $module): void
     {
         $this->activator->enable($module);
     }
 
-    #[\Override]
+    #[Override]
     public function disable(Module $module): void
     {
         $this->activator->disable($module);
     }
 
-    #[\Override]
+    #[Override]
     public function hasStatus(Module $module, bool $status): bool
     {
         return $this->activator->hasStatus($module, $status);
     }
 
-    #[\Override]
+    #[Override]
     public function setActive(Module $module, bool $active): void
     {
         $this->activator->setActive($module, $active);
     }
 
-    #[\Override]
+    #[Override]
     public function setActiveByName(string $name, bool $active): void
     {
         $this->activator->setActiveByName($name, $active);
     }
 
-    #[\Override]
+    #[Override]
     public function delete(Module $module): void
     {
         $this->activator->delete($module);
     }
 
-    #[\Override]
+    #[Override]
     public function reset(): void
     {
         $this->activator->reset();

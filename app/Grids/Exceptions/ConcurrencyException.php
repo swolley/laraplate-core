@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Exceptions;
 
+use Exception;
 use Symfony\Component\HttpFoundation\Response;
 
-class ConcurrencyException extends \Exception
+final class ConcurrencyException extends Exception
 {
     public function __construct(string $message = "You don't have the last version of the records")
     {

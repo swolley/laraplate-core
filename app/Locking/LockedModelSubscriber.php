@@ -8,11 +8,10 @@ use Illuminate\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationSending;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 
-class LockedModelSubscriber
+final class LockedModelSubscriber
 {
     /**
      * Register the listeners for the subscriber.
-     *
      */
     public function subscribe(Dispatcher $events): array
     {
@@ -59,6 +58,7 @@ class LockedModelSubscriber
         $model = $this->getModelFromPassedParams($entity);
 
         $locked = new Locked();
+
         if ($locked->doesNotUseHasLocks($model)) {
             return true;
         }
@@ -73,6 +73,7 @@ class LockedModelSubscriber
     public function replicating(string $event, $entity): bool
     {
         $locked = new Locked();
+
         if ($locked->allowsModificationsOnLockedObjects()) {
             return true;
         }
@@ -92,6 +93,7 @@ class LockedModelSubscriber
     public function notificationSending(NotificationSending $event)
     {
         $locked = new Locked();
+
         if ($locked->allowsNotificationsToLockedObjects()) {
             return false;
         }
@@ -113,6 +115,7 @@ class LockedModelSubscriber
         if (is_array($params) && $params !== []) {
             return $params[0];
         }
+
         return null;
     }
 }

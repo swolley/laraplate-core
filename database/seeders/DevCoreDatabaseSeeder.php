@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Database\Seeders;
 
 use Modules\Core\Models\User;
@@ -8,9 +10,10 @@ use Modules\Core\Helpers\BatchSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 
-class DevCoreDatabaseSeeder extends BatchSeeder
+final class DevCoreDatabaseSeeder extends BatchSeeder
 {
     private const TARGET_COUNT_USERS = 1000;
+
     private const TARGET_COUNT_LICENSES = 200;
 
     protected function execute(): void

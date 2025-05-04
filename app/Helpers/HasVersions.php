@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Illuminate\Foundation\Auth\User;
+use DateTimeInterface;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Database\Eloquent\Model;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
+
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 // use Illuminate\Database\Eloquent\Relations\MorphMany;
 // use Illuminate\Database\Eloquent\Relations\Pivot;
@@ -20,86 +22,89 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 trait HasVersions
 {
-	use Versionable;
+    use Versionable;
 
-	protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+    protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
-	protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
+    protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
-	protected static function bootHasVersions(): void
-	{
-		static::deleted(function (Model $model) {
-			/** @var \Overtrue\LaravelVersionable\Versionable|\Overtrue\LaravelVersionable\Version $model */
-			if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
-				$model->createVersion(['deleted_at' => $model->deleted_at]);
-			}
-		});
+    /**
+     * @param  null|string|DateTimeInterface  $time
+     *
+     * @throws \Carbon\Exceptions\InvalidFormatException
+     */
+    public function createVersion(array $replacements = [], $time = null): ?Version
+    {
+        if ($this->shouldBeVersioning() || $replacements !== []) {
+            return tap(config('versionable.version_model')::createForModel($this, $replacements, $time), function (): void {
+                $this->removeOldVersions((int) $this->getKeepVersionsCount());
+            });
+        }
 
-		if (class_uses_trait(static::class, SoftDeletes::class)) {
-			/** @phpstan-ignore staticMethod.notFound */
-			static::restored(function (Model $model) {
-				$model->createVersion(['deleted_at' => null]);
-			});
-		}
-	}
+        return null;
+    }
 
-	protected function getCreatedBy(): ?User
-	{
-		$first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
-		return $first_version ? $this->getuser($first_version) : null;
-	}
+    public function createInitialVersion(Model $model): Version
+    {
+        /** @var Versionable|Model $refreshedModel */
+        $refreshedModel = static::query()->withoutGlobalScopes()->findOrFail($model->getKey());
 
-	protected function getModifiedBy(): ?User
-	{
-		$last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
-		return $last_version ? $this->getuser($last_version) : null;
-	}
+        /**
+         * As initial version should include all $versionable fields,
+         * we need to get the latest version from database.
+         * so we force to create a snapshot version.
+         */
+        $attributes = $refreshedModel->getVersionableAttributes(VersionStrategy::SNAPSHOT);
 
-	private function getUser(int $userId): ?User
-	{
-		$user_class = user_class();
-		return $user_class::withoutGlobalScopes()->find($userId);
-	}
+        return config('versionable.version_model')::createForModel($refreshedModel, $attributes, $refreshedModel->updated_at);
+    }
 
-	/**
-	 * @param  string|\DateTimeInterface|null  $time
-	 *
-	 * @throws \Carbon\Exceptions\InvalidFormatException
-	 */
-	public function createVersion(array $replacements = [], $time = null): ?Version
-	{
-		if ($this->shouldBeVersioning() || $replacements !== []) {
-			return tap(config('versionable.version_model')::createForModel($this, $replacements, $time), function () {
-				$this->removeOldVersions((int) $this->getKeepVersionsCount());
-			});
-		}
+    protected static function bootHasVersions(): void
+    {
+        static::deleted(function (Model $model): void {
+            /** @var Versionable|Version $model */
+            if (method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting()) {
+                $model->createVersion(['deleted_at' => $model->deleted_at]);
+            }
+        });
 
-		return null;
-	}
+        if (class_uses_trait(static::class, SoftDeletes::class)) {
+            /** @phpstan-ignore staticMethod.notFound */
+            static::restored(function (Model $model): void {
+                $model->createVersion(['deleted_at' => null]);
+            });
+        }
+    }
 
-	public function createInitialVersion(Model $model): Version
-	{
-		/** @var \Overtrue\LaravelVersionable\Versionable|Model $refreshedModel */
-		$refreshedModel = static::query()->withoutGlobalScopes()->findOrFail($model->getKey());
+    protected function getCreatedBy(): ?User
+    {
+        $first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
 
-		/**
-		 * As initial version should include all $versionable fields,
-		 * we need to get the latest version from database.
-		 * so we force to create a snapshot version.
-		 */
-		$attributes = $refreshedModel->getVersionableAttributes(VersionStrategy::SNAPSHOT);
+        return $first_version ? $this->getuser($first_version) : null;
+    }
 
-		return config('versionable.version_model')::createForModel($refreshedModel, $attributes, $refreshedModel->updated_at);
-	}
+    protected function getModifiedBy(): ?User
+    {
+        $last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
 
-	// // TODO: sarà sicuramente da overridare per via delle primary key multiple
-	// public function versions(): MorphMany
-	// {
-	// 	$version_model = $this->getVersionModel();
-	// 	if (class_uses_trait($version_model, HasCompositeKey::class) || is_a($version_model, Pivot::class)) {
-	// 		//TODO: da finire di scrivere, devo in qualche modo 
-	// 		return $this->morphMany($version_model, 'versionable', 'versionable_type', 'versionable_id');
-	// 	}
-	// 	return $this->morphMany($version_model, 'versionable');
-	// }
+        return $last_version ? $this->getuser($last_version) : null;
+    }
+
+    private function getUser(int $userId): ?User
+    {
+        $user_class = user_class();
+
+        return $user_class::withoutGlobalScopes()->find($userId);
+    }
+
+    // // TODO: sarà sicuramente da overridare per via delle primary key multiple
+    // public function versions(): MorphMany
+    // {
+    // 	$version_model = $this->getVersionModel();
+    // 	if (class_uses_trait($version_model, HasCompositeKey::class) || is_a($version_model, Pivot::class)) {
+    // 		//TODO: da finire di scrivere, devo in qualche modo
+    // 		return $this->morphMany($version_model, 'versionable', 'versionable_type', 'versionable_id');
+    // 	}
+    // 	return $this->morphMany($version_model, 'versionable');
+    // }
 }

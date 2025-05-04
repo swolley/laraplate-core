@@ -9,7 +9,7 @@ use Approval\Models\Modification as ApprovalModification;
 /**
  * @mixin IdeHelperModification
  */
-class Modification extends ApprovalModification
+final class Modification extends ApprovalModification
 {
     /**
      * @var array<int,string>

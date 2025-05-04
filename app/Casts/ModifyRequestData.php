@@ -7,7 +7,7 @@ namespace Modules\Core\Casts;
 use Illuminate\Support\Str;
 use Modules\Core\Http\Requests\ModifyRequest;
 
-class ModifyRequestData extends CrudRequestData
+final class ModifyRequestData extends CrudRequestData
 {
     public array $changes = [];
 

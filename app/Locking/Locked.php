@@ -7,7 +7,7 @@ namespace Modules\Core\Locking;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Locking\Traits\HasLocks;
 
-class Locked
+final class Locked
 {
     public function lockedAtColumn(): string
     {
@@ -30,7 +30,7 @@ class Locked
 
     public function cannotBeUnlocked($model): bool
     {
-        return !$this->canBeUnlocked($model);
+        return ! $this->canBeUnlocked($model);
     }
 
     public function unlockAllowed(): bool
@@ -50,7 +50,7 @@ class Locked
 
     public function doesNotUseHasLocks(Model $model): bool
     {
-        return !$this->usesHasLocks($model);
+        return ! $this->usesHasLocks($model);
     }
 
     public function preventsModificationsOnLockedObjects(): bool
@@ -60,7 +60,7 @@ class Locked
 
     public function allowsModificationsOnLockedObjects(): bool
     {
-        return !$this->preventsModificationsOnLockedObjects();
+        return ! $this->preventsModificationsOnLockedObjects();
     }
 
     public function allowsNotificationsToLockedObjects(): bool

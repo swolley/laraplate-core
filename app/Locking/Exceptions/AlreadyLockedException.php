@@ -6,6 +6,4 @@ namespace Modules\Core\Locking\Exceptions;
 
 use Exception;
 
-class AlreadyLockedException extends Exception
-{
-}
+final class AlreadyLockedException extends Exception {}

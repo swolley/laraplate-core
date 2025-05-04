@@ -11,22 +11,11 @@ trait HasValidations
     private array $validation;
 
     /**
-     * get validation
+     * get validation.
      */
     public function getValidation(): ?array
     {
         return $this->validation ?? null;
-    }
-
-    /**
-     * Undocumented function
-
-     *
-     * @return void
-     */
-    private function setValidation(array|string|null $rule)
-    {
-        $this->validation = is_string($rule) ? explode('|', $rule) : $rule;
     }
 
     public function validation($rule = null): static
@@ -34,5 +23,13 @@ trait HasValidations
         $this->setValidation($rule);
 
         return $this;
+    }
+
+    /**
+     * Undocumented function.
+     */
+    private function setValidation(array|string|null $rule): void
+    {
+        $this->validation = is_string($rule) ? explode('|', $rule) : $rule;
     }
 }

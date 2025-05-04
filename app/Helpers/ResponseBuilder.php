@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Exception;
 use Throwable;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
@@ -16,38 +17,38 @@ use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 
-class ResponseBuilder
+final class ResponseBuilder
 {
-    protected int $status = Response::HTTP_OK;
+    private int $status = Response::HTTP_OK;
 
-    protected mixed $error = null;
+    private mixed $error = null;
 
-    protected ?int $totalRecords = null;
+    private ?int $totalRecords = null;
 
-    protected ?int $currentRecords = null;
+    private ?int $currentRecords = null;
 
-    protected ?int $currentPage = null;
+    private ?int $currentPage = null;
 
-    protected ?int $totalPages = null;
+    private ?int $totalPages = null;
 
-    protected ?int $pagination = null;
+    private ?int $pagination = null;
 
-    protected ?int $from = null;
+    private ?int $from = null;
 
-    protected ?int $to = null;
+    private ?int $to = null;
 
-    protected ?string $class = null;
+    private ?string $class = null;
 
-    protected ?string $table = null;
+    private ?string $table = null;
 
-    protected bool $preview = false;
+    private bool $preview = false;
 
     /**
      * @var array<string, string>
      */
-    protected array $headers = [];
+    private array $headers = [];
 
-    protected ?Carbon $cachedAt = null;
+    private ?Carbon $cachedAt = null;
 
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
@@ -58,22 +59,9 @@ class ResponseBuilder
 
     public static function getHttpErrorStatus(int|string $errorCode): int
     {
-        $http_statuses = array_flip(static::getHttpStatuses());
+        $http_statuses = array_flip(self::getHttpStatuses());
 
         return $errorCode !== 0 && is_int($errorCode) && isset($http_statuses[$errorCode]) ? $errorCode : Response::HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /**
-     * @return array<int|string>
-     *
-     * @psalm-return array<array-key>
-     */
-    protected static function getHttpStatuses(): array
-    {
-        $https_statuses = Response::$statusTexts;
-        $https_statuses[419] = 'Session expired';
-
-        return array_flip($https_statuses);
     }
 
     public function getResourceResponse(): ResourceCollection|JsonResource|null
@@ -83,8 +71,6 @@ class ResponseBuilder
 
     /**
      * Set the value of data.
-     *
-     *
      */
     public function setData(mixed $data): static
     {
@@ -108,7 +94,7 @@ class ResponseBuilder
             $this->resourceResponse = new JsonResource(null);
             $this->setError($data);
             $this->setClass($data);
-            $this->setStatus(static::getHttpErrorStatus($data->getCode()));
+            $this->setStatus(self::getHttpErrorStatus($data->getCode()));
         } else {
             $this->resourceResponse = new JsonResource($data);
 
@@ -122,22 +108,22 @@ class ResponseBuilder
 
     public function isOk(): bool
     {
-        return !$this->error && $this->getStatus() < 400;
+        return ! $this->error && $this->getStatus() < 400;
     }
 
     public function isError(): bool
     {
-        return !$this->isOk();
+        return ! $this->isOk();
     }
 
     public function isEmpty(): bool
     {
-        return !$this->resourceResponse instanceof \Illuminate\Http\Resources\Json\JsonResource || $this->resourceResponse->resource === null;
+        return ! $this->resourceResponse instanceof JsonResource || $this->resourceResponse->resource === null;
     }
 
     public function isNotEmpty(): bool
     {
-        return !$this->isEmpty();
+        return ! $this->isEmpty();
     }
 
     public function getStatus(): int
@@ -150,7 +136,7 @@ class ResponseBuilder
      */
     public function setStatus(int $status): static
     {
-        if (!in_array($status, static::getHttpStatuses(), true)) {
+        if (! in_array($status, static::getHttpStatuses(), true)) {
             throw new UnexpectedValueException("{$status} is not a valid status");
         }
         $this->status = $status;
@@ -166,13 +152,13 @@ class ResponseBuilder
     /**
      * Set the value of error.
      *
-     * @param  string|array<int,string>|Throwable|null  $error
+     * @param  null|string|array<int,string>|Throwable  $error
      */
     public function setError(string|array|Throwable|null $error): static
     {
         $this->error = $error;
 
-        if (!$this->error) {
+        if (! $this->error) {
             $this->setStatus(Response::HTTP_OK);
         } elseif ($this->error instanceof Throwable) {
             $this->setStatus(static::getHttpErrorStatus($this->error->getCode()));
@@ -230,7 +216,6 @@ class ResponseBuilder
         return $this;
     }
 
-
     public function getTotalPages(): ?int
     {
         return $this->totalPages;
@@ -245,7 +230,6 @@ class ResponseBuilder
 
         return $this;
     }
-
 
     public function getPagination(): ?int
     {
@@ -262,7 +246,6 @@ class ResponseBuilder
         return $this;
     }
 
-
     public function getFrom(): ?int
     {
         return $this->from;
@@ -277,7 +260,6 @@ class ResponseBuilder
 
         return $this;
     }
-
 
     public function getTo(): ?int
     {
@@ -294,7 +276,6 @@ class ResponseBuilder
         return $this;
     }
 
-
     public function getClass(): ?string
     {
         return $this->class;
@@ -303,7 +284,7 @@ class ResponseBuilder
     /**
      * Set the value of class.
      *
-     * @param  object|class-string|null  $class
+     * @param  null|object|class-string  $class
      */
     public function setClass(object|string|null $class): static
     {
@@ -315,7 +296,6 @@ class ResponseBuilder
 
         return $this;
     }
-
 
     public function getTable(): ?string
     {
@@ -390,97 +370,13 @@ class ResponseBuilder
         return $this->resourceResponse->resource;
     }
 
-    private function getResponseData(): array
-    {
-        $payload = [
-            'meta' => [
-                'status' => $this->status,
-                'preview' => $this->preview,
-            ],
-        ];
-
-        if ($this->error !== null) {
-            if ($this->error instanceof \Exception) {
-                $payload['error'] = $this->error->getMessage();
-
-                if (config('app.debug') === true) {
-                    $payload['exception'] = [
-                        'code' => $this->error->getCode(),
-                        'file' => $this->error->getFile(),
-                        'line' => $this->error->getLine(),
-                        'trace' => $this->error->getTrace(),
-                    ];
-                }
-            } else {
-                $payload['error'] = $this->error;
-            }
-        }
-
-        if (!$this->resourceResponse instanceof \Illuminate\Http\Resources\Json\JsonResource) {
-            $this->resourceResponse = new JsonResource(null);
-        } elseif ($this->resourceResponse instanceof ResourceCollection) {
-            if ($this->totalRecords !== null) {
-                $payload['meta']['totalRecords'] = $this->totalRecords;
-            }
-
-            if ($this->currentRecords !== null) {
-                $payload['meta']['currentRecords'] = $this->currentRecords;
-            }
-
-            if ($this->currentPage !== null) {
-                $payload['meta']['currentPage'] = $this->currentPage;
-            }
-
-            if ($this->totalPages !== null) {
-                $payload['meta']['totalPages'] = $this->totalPages;
-            }
-
-            if ($this->pagination !== null) {
-                $payload['meta']['pagination'] = $this->pagination;
-            }
-
-            if ($this->from !== null) {
-                $payload['meta']['from'] = $this->from;
-
-                if ($this->to !== null) {
-                    $count = $this->data()->count();
-                    $payload['meta']['to'] = $count < $this->to - $this->from + 1 ? $this->from + $count - 1 : $this->to;
-                }
-            }
-        }
-
-        if ($this->cachedAt instanceof \Illuminate\Support\Carbon) {
-            $payload['meta']['cachedAt'] = $this->cachedAt;
-        }
-
-        if (config('app.debug')) {
-            if ($this->class !== null) {
-                $payload['meta']['class'] = $this->class;
-            }
-
-            if ($this->table !== null) {
-                $payload['meta']['table'] = $this->table;
-            }
-            $route = request()->route();
-            $payload['meta']['controller'] = $route->getControllerClass();
-            $payload['meta']['action'] = $route->getActionMethod();
-        }
-
-        $this->resourceResponse->with = $payload;
-
-        return [
-            'payload' => $this->resourceResponse,
-            'statusCode' => $this->status,
-            'headers' => $this->headers,
-        ];
-    }
-
     public function getResponse(): JsonResponse
     {
         $data = $this->getResponseData();
 
         $response = $data['payload']->toResponse($this->request);
         $response->setStatusCode($data['statusCode']);
+
         foreach ($data['headers'] as $key => $value) {
             $response->headers->set($key, $value);
         }
@@ -513,6 +409,104 @@ class ResponseBuilder
         $responseProperties = unserialize($serializedResponse);
 
         return $this->buildResponse($responseProperties);
+    }
+
+    /**
+     * @return array<int|string>
+     *
+     * @psalm-return array<array-key>
+     */
+    private static function getHttpStatuses(): array
+    {
+        $https_statuses = Response::$statusTexts;
+        $https_statuses[419] = 'Session expired';
+
+        return array_flip($https_statuses);
+    }
+
+    private function getResponseData(): array
+    {
+        $payload = [
+            'meta' => [
+                'status' => $this->status,
+                'preview' => $this->preview,
+            ],
+        ];
+
+        if ($this->error !== null) {
+            if ($this->error instanceof Exception) {
+                $payload['error'] = $this->error->getMessage();
+
+                if (config('app.debug') === true) {
+                    $payload['exception'] = [
+                        'code' => $this->error->getCode(),
+                        'file' => $this->error->getFile(),
+                        'line' => $this->error->getLine(),
+                        'trace' => $this->error->getTrace(),
+                    ];
+                }
+            } else {
+                $payload['error'] = $this->error;
+            }
+        }
+
+        if (! $this->resourceResponse instanceof JsonResource) {
+            $this->resourceResponse = new JsonResource(null);
+        } elseif ($this->resourceResponse instanceof ResourceCollection) {
+            if ($this->totalRecords !== null) {
+                $payload['meta']['totalRecords'] = $this->totalRecords;
+            }
+
+            if ($this->currentRecords !== null) {
+                $payload['meta']['currentRecords'] = $this->currentRecords;
+            }
+
+            if ($this->currentPage !== null) {
+                $payload['meta']['currentPage'] = $this->currentPage;
+            }
+
+            if ($this->totalPages !== null) {
+                $payload['meta']['totalPages'] = $this->totalPages;
+            }
+
+            if ($this->pagination !== null) {
+                $payload['meta']['pagination'] = $this->pagination;
+            }
+
+            if ($this->from !== null) {
+                $payload['meta']['from'] = $this->from;
+
+                if ($this->to !== null) {
+                    $count = $this->data()->count();
+                    $payload['meta']['to'] = $count < $this->to - $this->from + 1 ? $this->from + $count - 1 : $this->to;
+                }
+            }
+        }
+
+        if ($this->cachedAt instanceof Carbon) {
+            $payload['meta']['cachedAt'] = $this->cachedAt;
+        }
+
+        if (config('app.debug')) {
+            if ($this->class !== null) {
+                $payload['meta']['class'] = $this->class;
+            }
+
+            if ($this->table !== null) {
+                $payload['meta']['table'] = $this->table;
+            }
+            $route = request()->route();
+            $payload['meta']['controller'] = $route->getControllerClass();
+            $payload['meta']['action'] = $route->getActionMethod();
+        }
+
+        $this->resourceResponse->with = $payload;
+
+        return [
+            'payload' => $this->resourceResponse,
+            'statusCode' => $this->status,
+            'headers' => $this->headers,
+        ];
     }
 
     private function buildResponse(array $responseProperties): JsonResponse

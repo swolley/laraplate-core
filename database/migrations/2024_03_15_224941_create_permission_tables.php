@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
-return new class() extends Migration {
+return new class() extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -35,29 +36,30 @@ return new class() extends Migration {
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
-                hasSoftDelete: true
+                hasSoftDelete: true,
             );
 
             $table->unique(['name', 'guard_name'], 'permissions_UN');
         });
 
         $connection = DB::connection();
+
         if ($connection->getDriverName() === 'pgsql') {
             DB::statement("ALTER TABLE permissions ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
             DB::statement("ALTER TABLE permissions ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
-            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+            DB::statement('CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)');
             DB::statement("ALTER TABLE permissions ADD CONSTRAINT permissions_name_CHECK CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
-        } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'])) {
+        } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'], true)) {
             DB::statement("ALTER TABLE permissions ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
             DB::statement("ALTER TABLE permissions ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
-            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+            DB::statement('CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)');
             DB::statement("ALTER TABLE permissions ADD CONSTRAINT permissions_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
         } elseif ($connection->getDriverName() === 'sqlite') {
             DB::statement("ALTER TABLE permissions ADD COLUMN connection_name TEXT AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
             DB::statement("ALTER TABLE permissions ADD COLUMN table_name TEXT AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
-            DB::statement("CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)");
+            DB::statement('CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)');
         } else {
-            throw new \Exception('Unsupported database driver');
+            throw new Exception('Unsupported database driver');
         }
 
         Schema::create($tableNames['roles'], function (Blueprint $table) use ($teams, $columnNames): void {
@@ -74,7 +76,7 @@ return new class() extends Migration {
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
-                hasLocks: true
+                hasLocks: true,
             );
 
             if ($teams || config('permission.testing')) {
@@ -118,7 +120,7 @@ return new class() extends Migration {
 
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
         });
 
@@ -151,7 +153,7 @@ return new class() extends Migration {
 
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
         });
 
@@ -171,7 +173,7 @@ return new class() extends Migration {
 
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
 
             $table->primary([$pivotPermission, $pivotRole], 'role_has_permissions_primary');

@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Providers;
 
+use Override;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
-class EventServiceProvider extends ServiceProvider
+final class EventServiceProvider extends ServiceProvider
 {
     /**
      * The event handler mappings for the application.
@@ -23,7 +26,7 @@ class EventServiceProvider extends ServiceProvider
     /**
      * Configure the proper event listeners for email verification.
      */
-    #[\Override]
+    #[Override]
     protected function configureEmailVerification(): void
     {
         //

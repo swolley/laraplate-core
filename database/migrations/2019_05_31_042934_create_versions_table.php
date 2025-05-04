@@ -1,18 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
-        Schema::create('versions', function (Blueprint $table) {
+        Schema::create('versions', function (Blueprint $table): void {
             $uuid = config('versionable.uuid');
 
             $uuid ? $table->uuid('id')->primary() : $table->bigIncrements('id');
@@ -28,7 +30,7 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
-                hasSoftDelete: true
+                hasSoftDelete: true,
             );
 
             $table->index(['versionable_id', 'versionable_type'], 'versions_versionable_IDX');
@@ -38,7 +40,7 @@ return new class() extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('versions');
     }

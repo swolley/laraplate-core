@@ -6,11 +6,11 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-class Index
+final class Index
 {
-    /** 
-     * @param Collection<string> $columns 
-     * @param Collection<string> $attributes
+    /**
+     * @param  Collection<string>  $columns
+     * @param  Collection<string>  $attributes
      */
     public function __construct(
         public readonly string $name,
@@ -22,6 +22,7 @@ class Index
     {
         return $this->columns->count() > 1;
     }
+
     public function isPrimaryKey(): bool
     {
         return $this->attributes->contains('primary');

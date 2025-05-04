@@ -10,7 +10,7 @@ trait HasWriteHooks
 
     public function onPreInsert(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::PRE_INSERT->value] ?? null;
         }
 
@@ -21,7 +21,7 @@ trait HasWriteHooks
 
     public function onPostInsert(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::POST_INSERT->value] ?? null;
         }
 
@@ -32,7 +32,7 @@ trait HasWriteHooks
 
     public function onPreUpdate(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::PRE_UPDATE->value] ?? null;
         }
 
@@ -43,7 +43,7 @@ trait HasWriteHooks
 
     public function onPostUpdate(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::POST_UPDATE->value] ?? null;
         }
 
@@ -54,7 +54,7 @@ trait HasWriteHooks
 
     public function onPreDelete(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::PRE_DELETE->value] ?? null;
         }
 
@@ -65,7 +65,7 @@ trait HasWriteHooks
 
     public function onPostDelete(?callable $callback = null)
     {
-        if (!$callback) {
+        if (! $callback) {
             return $this->writeEvents[EventType::POST_DELETE->value] ?? null;
         }
 

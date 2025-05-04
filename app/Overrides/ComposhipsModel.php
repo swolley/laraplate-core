@@ -1,18 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Overrides;
 
+use Override;
+use InvalidArgumentException;
 use Awobaz\Compoships\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model as BaseModel;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
-class ComposhipsModel extends Model
+final class ComposhipsModel extends Model
 {
-    #[\Override]
+    #[Override]
     public function belongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null, $parentKey = null, $relatedKey = null, $relation = null)
     {
         // Se non è un array di chiavi, usa il comportamento standard
-        if (!is_array($foreignPivotKey) && !is_array($relatedPivotKey)) {
+        if (! is_array($foreignPivotKey) && ! is_array($relatedPivotKey)) {
             return parent::belongsToMany($related, $table, $foreignPivotKey, $relatedPivotKey, $parentKey, $relatedKey, $relation);
         }
 
@@ -38,11 +42,11 @@ class ComposhipsModel extends Model
             $relatedPivotKey,
             $parentKey ?: $this->getKeyName(),
             $relatedKey ?: $instance->getKeyName(),
-            $relation
+            $relation,
         );
     }
 
-    #[\Override]
+    #[Override]
     protected function newBelongsToMany(
         EloquentBuilder $query,
         BaseModel $parent,
@@ -51,7 +55,7 @@ class ComposhipsModel extends Model
         $relatedPivotKey,
         $parentKey,
         $relatedKey,
-        $relationName = null
+        $relationName = null,
     ) {
         return new ComposhipsBelongsToMany(
             $query,
@@ -61,7 +65,7 @@ class ComposhipsModel extends Model
             $relatedPivotKey,
             $parentKey,
             $relatedKey,
-            $relationName
+            $relationName,
         );
     }
 
@@ -70,9 +74,9 @@ class ComposhipsModel extends Model
      */
     protected function validateRelatedModel($related): void
     {
-        if (!is_subclass_of($related, self::class)) {
-            throw new \InvalidArgumentException(
-                "The related model '{$related}' must extend " . self::class
+        if (! is_subclass_of($related, self::class)) {
+            throw new InvalidArgumentException(
+                "The related model '{$related}' must extend " . self::class,
             );
         }
     }

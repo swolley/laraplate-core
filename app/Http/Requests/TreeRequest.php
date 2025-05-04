@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Override;
 use Modules\Core\Casts\TreeRequestData;
 
-class TreeRequest extends DetailRequest
+final class TreeRequest extends DetailRequest
 {
     /**
      * Get the validation rules that apply to the request.
@@ -15,7 +16,7 @@ class TreeRequest extends DetailRequest
      *
      * @return array
      */
-    #[\Override]
+    #[Override]
     public function rules()
     {
         return parent::rules() + [
@@ -24,7 +25,7 @@ class TreeRequest extends DetailRequest
         ];
     }
 
-    #[\Override]
+    #[Override]
     public function parsed(): TreeRequestData
     {
         /** @phpstan-ignore method.notFound */

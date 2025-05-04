@@ -12,23 +12,6 @@ use Illuminate\Database\Eloquent\Model;
  */
 trait HasCache
 {
-    /**
-     * define $cacheKey to override the default one
-     * @var string
-     */
-    // protected static string $cacheKey;
-
-    protected static function bootHasCache(): void
-    {
-        static::saved(function (Model $model): void {
-            $model->invalidateCache();
-        });
-
-        static::deleted(function (Model $model): void {
-            $model->invalidateCache();
-        });
-    }
-
     public function getCacheKey(): string
     {
         return property_exists($this, 'cacheKey') ? $this->cacheKey : $this->getTable();
@@ -46,5 +29,23 @@ trait HasCache
         } else {
             Cache::forget($this->getCacheKey());
         }
+    }
+
+    /**
+     * define $cacheKey to override the default one.
+     *
+     * @var string
+     */
+    // protected static string $cacheKey;
+
+    protected static function bootHasCache(): void
+    {
+        static::saved(function (Model $model): void {
+            $model->invalidateCache();
+        });
+
+        static::deleted(function (Model $model): void {
+            $model->invalidateCache();
+        });
     }
 }

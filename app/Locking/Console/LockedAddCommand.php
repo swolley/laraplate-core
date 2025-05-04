@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Core\Locking\Console;
 
 use Illuminate\Support\Str;
-use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\App;
+use Modules\Core\Overrides\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
-class LockedAddCommand extends Command
+final class LockedAddCommand extends Command
 {
     public $signature = 'lock:locked-add {model} {--namespace=}';
 
@@ -48,7 +48,7 @@ class LockedAddCommand extends Command
 
         $className = $namespace . '\\' . $model;
 
-        if (!class_exists($className)) {
+        if (! class_exists($className)) {
             $this->error("Model {$className} does not exist");
 
             return BaseCommand::FAILURE;
@@ -62,7 +62,7 @@ class LockedAddCommand extends Command
         $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($instance->getTable());
         $path = App::databasePath('migrations/' . $filePath);
 
-        if (!$this->files->exists($path)) {
+        if (! $this->files->exists($path)) {
             $this->files->put($path, $fileContents);
         } else {
             $this->info("File : {$path} already exists");
@@ -94,7 +94,6 @@ class LockedAddCommand extends Command
 
     /**
      * Return the stub file path.
-     *
      */
     public function getStubPath(): string
     {

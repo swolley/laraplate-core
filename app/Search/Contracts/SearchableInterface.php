@@ -6,55 +6,42 @@ namespace Modules\Core\Search\Contracts;
 
 /**
  * Interface that defines extended methods for searchable models
- * Extends the base functionality of Laravel Scout
+ * Extends the base functionality of Laravel Scout.
  */
 interface SearchableInterface
 {
     /**
-     * Get the search mapping schema for the search engine
-     * 
-     * @return array
+     * Get the search mapping schema for the search engine.
      */
     public function getSearchMapping(): array;
 
     /**
-     * Prepare data for embedding (if supported)
-     * 
-     * @return string|null
+     * Prepare data for embedding (if supported).
      */
     public function prepareDataToEmbed(): ?string;
 
     /**
-     * Start a complete reindexing for this model
+     * Start a complete reindexing for this model.
      */
     public function reindex(): void;
 
     /**
-     * Check the index and create it if necessary
-     * 
-     * @param bool $createIfMissing
-     * @return bool
+     * Check the index and create it if necessary.
      */
     public function checkIndex(bool $createIfMissing = false): bool;
 
     /**
-     * Create or update the index for this model
+     * Create or update the index for this model.
      */
     public function createIndex(): void;
 
     /**
-     * Get the timestamp of the last indexing
-     * 
-     * @return string|null
+     * Get the timestamp of the last indexing.
      */
     public function getLastIndexedTimestamp(): ?string;
 
     /**
-     * Perform vector search with embedding
-     * 
-     * @param array $vector
-     * @param array $options
-     * @return mixed
+     * Perform vector search with embedding.
      */
-    public function vectorSearch(array $vector, array $options = []);
+    public function vectorSearch(array $vector, array $options = []): mixed;
 }

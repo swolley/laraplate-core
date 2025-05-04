@@ -6,81 +6,76 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\UnauthorizedException;
-use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 
 trait SoftDeletes
 {
-	use BaseSoftDeletes {
-		bootSoftDeletes as protected baseBootSoftDeletes;
-		initializeSoftDeletes as protected baseInitializeSoftDeletes;
-	}
+    use BaseSoftDeletes {
+        bootSoftDeletes as protected baseBootSoftDeletes;
+        initializeSoftDeletes as protected baseInitializeSoftDeletes;
+    }
 
-	/**
-	 * Boot the soft deleting trait for a model.
-	 *
-	 * @return void
-	 */
-	protected static function bootSoftDeletes(): void
-	{
-		// Rimuoviamo lo scope predefinito che usa deleted_at
-		static::withoutGlobalScope(new \Illuminate\Database\Eloquent\SoftDeletingScope);
+    /**
+     * Initialize the soft deleting trait for an instance.
+     */
+    public function initializeSoftDeletes(): void
+    {
+        $this->baseInitializeSoftDeletes();
 
-		// Aggiungiamo il nostro scope personalizzato che usa is_deleted
-		static::addGlobalScope(new CustomSoftDeletingScope);
+        // if (! isset($this->casts[$this->getIsDeletedColumn()])) {
+        // 	$this->casts[$this->getIsDeletedColumn()] = 'boolean';
+        // }
+        if (! in_array($this->getIsDeletedColumn(), $this->guarded, true)) {
+            $this->guarded[] = $this->getIsDeletedColumn();
+        }
 
-		static::updating(function (Model $model): void {
-			if ($model->trashed()) {
-				throw new UnauthorizedException('Cannot update a softdeleted model');
-			}
-		});
+        if (! in_array($this->getDeletedAtColumn(), $this->hidden, true)) {
+            $this->hidden[] = $this->getDeletedAtColumn();
+        }
 
-		static::saving(function (Model $model): void {
-			// Rimuovi is_deleted dai dati da salvare
-			unset($model->attributes[$model->getIsDeletedColumn()]);
-			unset($model->original[$model->getIsDeletedColumn()]);
-		});
-	}
+        if (! in_array($this->getIsDeletedColumn(), $this->hidden, true)) {
+            $this->hidden[] = $this->getIsDeletedColumn();
+        }
+    }
 
-	/**
-	 * Initialize the soft deleting trait for an instance.
-	 *
-	 * @return void
-	 */
-	public function initializeSoftDeletes()
-	{
-		$this->baseInitializeSoftDeletes();
-		// if (! isset($this->casts[$this->getIsDeletedColumn()])) {
-		// 	$this->casts[$this->getIsDeletedColumn()] = 'boolean';
-		// }
-		if (! in_array($this->getIsDeletedColumn(), $this->guarded)) {
-			$this->guarded[] = $this->getIsDeletedColumn();
-		}
-		if (! in_array($this->getDeletedAtColumn(), $this->hidden)) {
-			$this->hidden[] = $this->getDeletedAtColumn();
-		}
-		if (! in_array($this->getIsDeletedColumn(), $this->hidden)) {
-			$this->hidden[] = $this->getIsDeletedColumn();
-		}
-	}
+    /**
+     * Get the name of the "is deleted" column.
+     */
+    public function getIsDeletedColumn(): string
+    {
+        return 'is_deleted';
+    }
 
-	/**
-	 * Get the name of the "is deleted" column.
-	 *
-	 * @return string
-	 */
-	public function getIsDeletedColumn(): string
-	{
-		return 'is_deleted';
-	}
+    /**
+     * Get the fully qualified "is deleted" column.
+     */
+    public function getQualifiedIsDeletedColumn(): string
+    {
+        return $this->qualifyColumn($this->getIsDeletedColumn());
+    }
 
-	/**
-	 * Get the fully qualified "is deleted" column.
-	 *
-	 * @return string
-	 */
-	public function getQualifiedIsDeletedColumn(): string
-	{
-		return $this->qualifyColumn($this->getIsDeletedColumn());
-	}
+    /**
+     * Boot the soft deleting trait for a model.
+     */
+    protected static function bootSoftDeletes(): void
+    {
+        // Rimuoviamo lo scope predefinito che usa deleted_at
+        static::withoutGlobalScope(new \Illuminate\Database\Eloquent\SoftDeletingScope);
+
+        // Aggiungiamo il nostro scope personalizzato che usa is_deleted
+        static::addGlobalScope(new CustomSoftDeletingScope);
+
+        static::updating(function (Model $model): void {
+            if ($model->trashed()) {
+                throw new UnauthorizedException('Cannot update a softdeleted model');
+            }
+        });
+
+        static::saving(function (Model $model): void {
+            // Rimuovi is_deleted dai dati da salvare
+            unset($model->attributes[$model->getIsDeletedColumn()]);
+            unset($model->original[$model->getIsDeletedColumn()]);
+        });
+    }
 }

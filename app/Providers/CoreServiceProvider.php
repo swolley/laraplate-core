@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Providers;
 
+use Override;
+use Exception;
 use Illuminate\Support\Str;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
@@ -36,7 +40,7 @@ use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 /**
  * @property \Illuminate\Foundation\Application $app
  */
-class CoreServiceProvider extends ServiceProvider
+final class CoreServiceProvider extends ServiceProvider
 {
     use PathNamespace;
 
@@ -72,7 +76,7 @@ class CoreServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        Password::defaults(fn() => Password::min(8)
+        Password::defaults(fn () => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -83,7 +87,7 @@ class CoreServiceProvider extends ServiceProvider
     /**
      * Register the service provider.
      */
-    #[\Override]
+    #[Override]
     public function register(): void
     {
         $this->registerConfig();
@@ -92,7 +96,7 @@ class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
-        $this->app->singleton(Locked::class, fn() => new Locked());
+        $this->app->singleton(Locked::class, fn () => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -106,62 +110,7 @@ class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if user is super admin
-        Gate::before(fn(?User $user) => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
-    }
-
-    protected function registerModels(): void
-    {
-        Model::preventSilentlyDiscardingAttributes(!$this->app->isProduction());
-        Model::shouldBeStrict();
-    }
-
-    /**
-     * Register commands in the format of Command::class
-     */
-    protected function registerCommands(): void
-    {
-        $module_commands_subpath = config('modules.paths.generator.command.path');
-        $commands = $this->inspectFolderCommands($module_commands_subpath);
-
-        $locking_commands_subpath = Str::replace('Console', 'Locking/Console', $module_commands_subpath);
-        $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
-        array_push($commands, ...$locking_commands);
-
-        $search_commands_subpath = Str::replace('Console', 'Search/Console', $module_commands_subpath);
-        $search_commands = $this->inspectFolderCommands($search_commands_subpath);
-        array_push($commands, ...$search_commands);
-
-        $this->commands($commands);
-
-        DB::prohibitDestructiveCommands($this->app->isProduction());
-    }
-
-    /**
-     * Register command Schedules.
-     */
-    protected function registerCommandSchedules(): void
-    {
-        $this->app->booted(function (): void {
-            $schedule = $this->app->make(Schedule::class);
-            $crons = [];
-            $cache_key = new CronJob()->getTable();
-            if (Cache::has($cache_key)) {
-                $crons = Cache::get($cache_key);
-            } else {
-                try {
-                    if (Schema::hasTable($cache_key)) {
-                        $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
-                        Cache::put($cache_key, $crons);
-                    }
-                } catch (\Exception $e) {
-                    report($e);
-                }
-            }
-
-            foreach ($crons as $cron) {
-                $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
-            }
-        });
+        Gate::before(fn (?User $user) => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -196,7 +145,72 @@ class CoreServiceProvider extends ServiceProvider
         Blade::componentNamespace($componentNamespace, $this->nameLower);
     }
 
-    protected function registerMiddlewares()
+    /**
+     * Get the services provided by the provider.
+     */
+    #[Override]
+    public function provides(): array
+    {
+        return [];
+    }
+
+    protected function registerModels(): void
+    {
+        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
+        Model::shouldBeStrict();
+    }
+
+    /**
+     * Register commands in the format of Command::class.
+     */
+    protected function registerCommands(): void
+    {
+        $module_commands_subpath = config('modules.paths.generator.command.path');
+        $commands = $this->inspectFolderCommands($module_commands_subpath);
+
+        $locking_commands_subpath = Str::replace('Console', 'Locking/Console', $module_commands_subpath);
+        $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
+        array_push($commands, ...$locking_commands);
+
+        $search_commands_subpath = Str::replace('Console', 'Search/Console', $module_commands_subpath);
+        $search_commands = $this->inspectFolderCommands($search_commands_subpath);
+        array_push($commands, ...$search_commands);
+
+        $this->commands($commands);
+
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    /**
+     * Register command Schedules.
+     */
+    protected function registerCommandSchedules(): void
+    {
+        $this->app->booted(function (): void {
+            $schedule = $this->app->make(Schedule::class);
+            $crons = [];
+            $cache_key = new CronJob()->getTable();
+
+            if (Cache::has($cache_key)) {
+                $crons = Cache::get($cache_key);
+            } else {
+                try {
+                    if (Schema::hasTable($cache_key)) {
+                        $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
+                        Cache::put($cache_key, $crons);
+                    }
+                } catch (Exception $e) {
+                    report($e);
+                }
+            }
+
+            foreach ($crons as $cron) {
+                $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
+            }
+        });
+    }
+
+    protected function registerMiddlewares(): void
     {
         $router = app('router');
         $router->middleware(LocalizationMiddleware::class);
@@ -207,39 +221,7 @@ class CoreServiceProvider extends ServiceProvider
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
     }
 
-    private function inspectFolderCommands(string $commandsSubpath)
-    {
-        $modules_namespace = config('modules.namespace');
-        $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
-
-        return array_map(
-            fn($file) => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
-            $files,
-        );
-    }
-
-    /**
-     * Get the services provided by the provider.
-     */
-    #[\Override]
-    public function provides(): array
-    {
-        return [];
-    }
-
-    private function getPublishableViewPaths(): array
-    {
-        $paths = [];
-        foreach (config('view.paths') as $path) {
-            if (is_dir($path . '/modules/' . $this->nameLower)) {
-                $paths[] = $path . '/modules/' . $this->nameLower;
-            }
-        }
-
-        return $paths;
-    }
-
-    protected function registerCache()
+    protected function registerCache(): void
     {
         // Override the binding for the Repository
         $this->app->bind(BaseRepository::class, function ($app) {
@@ -268,5 +250,29 @@ class CoreServiceProvider extends ServiceProvider
         Cache::macro('clearByGroup', function (...$args) {
             return app(Repository::class)->clearByGroup(...$args);
         });
+    }
+
+    private function inspectFolderCommands(string $commandsSubpath)
+    {
+        $modules_namespace = config('modules.namespace');
+        $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
+
+        return array_map(
+            fn ($file) => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            $files,
+        );
+    }
+
+    private function getPublishableViewPaths(): array
+    {
+        $paths = [];
+
+        foreach (config('view.paths') as $path) {
+            if (is_dir($path . '/modules/' . $this->nameLower)) {
+                $paths[] = $path . '/modules/' . $this->nameLower;
+            }
+        }
+
+        return $paths;
     }
 }

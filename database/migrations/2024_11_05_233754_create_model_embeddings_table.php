@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
 {
@@ -12,13 +14,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('model_embeddings', function (Blueprint $table) {
+        Schema::create('model_embeddings', function (Blueprint $table): void {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
             $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
         });
     }

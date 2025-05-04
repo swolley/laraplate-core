@@ -1,34 +1,39 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Auth\Providers;
 
+use Override;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Auth\MustVerifyEmail;
 use Modules\Core\Models\User;
 use Modules\Core\Models\License;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Support\Facades\Hash;
 use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
-class FortifyCredentialsProvider implements AuthenticationProviderInterface
+final class FortifyCredentialsProvider implements AuthenticationProviderInterface
 {
-    #[\Override]
+    #[Override]
     public function canHandle(Request $request): bool
     {
         if ($request->has(['email', 'password'])) {
             return true;
         }
+
         return $request->has(['username', 'password']);
     }
 
-    #[\Override]
+    #[Override]
     public function authenticate(Request $request): array
     {
         $username = $request->get('username');
         $email = $request->get('email');
         $password = $request->get('password');
 
-        /** @var User|null $user */
+        /** @var null|User $user */
         $query = User::query()->has('roles');
+
         if ($username) {
             $query->where('username', $username);
         } else {
@@ -37,12 +42,12 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
 
         $user = $query->first();
 
-        if (!$user || !Hash::check($password, $user->password)) {
+        if (! $user || ! Hash::check($password, $user->password)) {
             return [
                 'success' => false,
                 'user' => null,
                 'error' => 'Invalid credentials',
-                'license' => null
+                'license' => null,
             ];
         }
 
@@ -52,7 +57,7 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
                 'success' => false,
                 'user' => null,
                 'error' => 'Email not verified',
-                'license' => null
+                'license' => null,
             ];
         }
 
@@ -62,7 +67,7 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
                 'success' => false,
                 'user' => null,
                 'error' => $error,
-                'license' => null
+                'license' => null,
             ];
         }
 
@@ -70,17 +75,17 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
             'success' => true,
             'user' => $user,
             'error' => null,
-            'license' => $user->license
+            'license' => $user->license,
         ];
     }
 
-    #[\Override]
+    #[Override]
     public function isEnabled(): bool
     {
         return config('auth.providers.users.driver') === 'eloquent';
     }
 
-    #[\Override]
+    #[Override]
     public function getProviderName(): string
     {
         return 'credentials';
@@ -88,24 +93,24 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
 
     private function shouldVerifyEmail(User $user): bool
     {
-        return class_uses_trait($user, MustVerifyEmail::class) &&
-            !$user->hasVerifiedEmail();
+        return class_uses_trait($user, MustVerifyEmail::class)
+            && ! $user->hasVerifiedEmail();
     }
 
     private function checkLicense(User $user): ?string
     {
-        if (!config('auth.enable_user_licenses')) {
+        if (! config('auth.enable_user_licenses')) {
             return null;
         }
 
-        if (!$user->license_id) {
+        if (! $user->license_id) {
             $available_license = License::query()
                 ->doesntHave('user')
                 ->first();
 
             if (
-                !$available_license &&
-                $user->roles->where('name', 'superadmin')->isEmpty()
+                ! $available_license
+                && $user->roles->where('name', 'superadmin')->isEmpty()
             ) {
                 return 'No free licenses available';
             }

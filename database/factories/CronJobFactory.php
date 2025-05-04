@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Override;
 use Modules\Core\Models\CronJob;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
-class CronJobFactory extends Factory
+final class CronJobFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -21,7 +22,7 @@ class CronJobFactory extends Factory
      *
      * @return array<string, mixed>
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         return [

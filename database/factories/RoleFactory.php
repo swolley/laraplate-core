@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Override;
 use Modules\Core\Models\Role;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
-class RoleFactory extends Factory
+final class RoleFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -23,7 +24,7 @@ class RoleFactory extends Factory
      *
      * @psalm-return array{name: string, guard_name: mixed, description: string}
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         return [

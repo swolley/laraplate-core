@@ -6,6 +6,4 @@ namespace Modules\Core\Locking\Exceptions;
 
 use Exception;
 
-class LockedModelException extends Exception
-{
-}
+final class LockedModelException extends Exception {}

@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Auth\Providers;
 
+use Override;
+use Exception;
 use Illuminate\Http\Request;
 use Modules\Core\Models\User;
 use Modules\Core\Models\License;
@@ -9,16 +13,16 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
-class SocialiteProvider implements AuthenticationProviderInterface
+final class SocialiteProvider implements AuthenticationProviderInterface
 {
-    #[\Override]
+    #[Override]
     public function canHandle(Request $request): bool
     {
-        return $request->has('provider') &&
-            in_array($request->provider, config('services.socialite.providers', []));
+        return $request->has('provider')
+            && in_array($request->provider, config('services.socialite.providers', []), true);
     }
 
-    #[\Override]
+    #[Override]
     public function authenticate(Request $request): array
     {
         try {
@@ -27,14 +31,14 @@ class SocialiteProvider implements AuthenticationProviderInterface
             // check if the user is already registered
             if (
                 User::where('email', $socialUser->getEmail())
-                ->where(fn(Builder $q) => $q->whereNull('social_id')->orWhere('social_id', '!=', $socialUser->getId()))
-                ->exists()
+                    ->where(fn (Builder $q) => $q->whereNull('social_id')->orWhere('social_id', '!=', $socialUser->getId()))
+                    ->exists()
             ) {
                 return [
                     'success' => false,
                     'user' => null,
                     'error' => 'User already registered with another account type',
-                    'license' => null
+                    'license' => null,
                 ];
             }
 
@@ -57,7 +61,7 @@ class SocialiteProvider implements AuthenticationProviderInterface
                     'success' => false,
                     'user' => null,
                     'error' => $error,
-                    'license' => null
+                    'license' => null,
                 ];
             }
 
@@ -65,25 +69,25 @@ class SocialiteProvider implements AuthenticationProviderInterface
                 'success' => true,
                 'user' => $user,
                 'error' => null,
-                'license' => $user->license
+                'license' => $user->license,
             ];
-        } catch (\Exception) {
+        } catch (Exception) {
             return [
                 'success' => false,
                 'user' => null,
                 'error' => 'Social authentication failed',
-                'license' => null
+                'license' => null,
             ];
         }
     }
 
-    #[\Override]
+    #[Override]
     public function isEnabled(): bool
     {
         return config('auth.providers.socialite.enabled', false);
     }
 
-    #[\Override]
+    #[Override]
     public function getProviderName(): string
     {
         return 'social';
@@ -91,18 +95,18 @@ class SocialiteProvider implements AuthenticationProviderInterface
 
     private function checkLicense(User $user): ?string
     {
-        if (!config('auth.enable_user_licenses')) {
+        if (! config('auth.enable_user_licenses')) {
             return null;
         }
 
-        if (!$user->license_id) {
+        if (! $user->license_id) {
             $available_license = License::query()
                 ->doesntHave('user')
                 ->first();
 
             if (
-                !$available_license &&
-                $user->roles->where('name', 'superadmin')->isEmpty()
+                ! $available_license
+                && $user->roles->where('name', 'superadmin')->isEmpty()
             ) {
                 return 'No free licenses available';
             }

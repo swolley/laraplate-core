@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Override;
 use Illuminate\Validation\Rule;
 use Modules\Core\Cache\HasCache;
 use Illuminate\Support\Collection;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
-use Modules\Core\Helpers\SoftDeletes;
 use Spatie\Permission\Models\Role as BaseRole;
 use Modules\Core\Database\Factories\RoleFactory;
 use Spatie\Permission\Exceptions\GuardDoesNotMatch;
@@ -23,9 +24,9 @@ use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 /**
  * @mixin IdeHelperRole
  */
-class Role extends BaseRole
+final class Role extends BaseRole
 {
-    use HasFactory, HasLocks, HasRecursiveRelationships, HasValidations, SoftDeletes, HasCache, HasVersions {
+    use HasCache, HasFactory, HasLocks, HasRecursiveRelationships, HasValidations, HasVersions, SoftDeletes {
         getRules as protected getRulesTrait;
     }
 
@@ -52,21 +53,13 @@ class Role extends BaseRole
         'pivot',
     ];
 
-    protected static function newFactory(): RoleFactory
-    {
-        return RoleFactory::new();
-    }
-
-    #[\Override]
+    #[Override]
     public function users(): BelongsToMany
     {
         return parent::users()->using(ModelHasRole::class);
     }
 
-    /**
-     *
-     */
-    #[\Override]
+    #[Override]
     public function getAllPermissions(): Collection
     {
         /** @psalm-suppress UndefinedThisPropertyFetch */
@@ -123,9 +116,9 @@ class Role extends BaseRole
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('roles')->where(function ($query) {
+                Rule::unique('roles')->where(function ($query): void {
                     $query->where('deleted_at', null);
-                })
+                }),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -133,11 +126,17 @@ class Role extends BaseRole
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('roles')->where(function ($query) {
+                Rule::unique('roles')->where(function ($query): void {
                     $query->where('deleted_at', null);
-                })->ignore($this->id, 'id')
+                })->ignore($this->id, 'id'),
             ],
         ]);
+
         return $rules;
+    }
+
+    protected static function newFactory(): RoleFactory
+    {
+        return RoleFactory::new();
     }
 }

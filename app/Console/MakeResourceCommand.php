@@ -1,28 +1,33 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Console;
 
+use function Laravel\Prompts\select;
+
+use Override;
 use Filament\Panel;
+use ReflectionClass;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Filament\Clusters\Cluster;
 use Filament\Facades\Filament;
-use function Laravel\Prompts\select;
 use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Console\Command\Command;
 use Modules\Core\Helpers\HasCommandModelResolution;
 use Filament\Commands\MakeResourceCommand as FilamentMakeResourceCommand;
-use Symfony\Component\Console\Command\Command;
 
-class MakeResourceCommand extends FilamentMakeResourceCommand
+final class MakeResourceCommand extends FilamentMakeResourceCommand
 {
-    use HasCommandModelResolution, HasBenchmark;
+    use HasBenchmark, HasCommandModelResolution;
 
     protected $description = 'Create a new Filament resource class and default page classes <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     public function handle(): int
     {
-        $model = $this->getModelClass('name', $this->option('model-namespace'), !$this->option('model'));
+        $model = $this->getModelClass('name', $this->option('model-namespace'), ! $this->option('model'));
 
         if ($match = Str::match('/(?:App|Modules)\\\\(?:\\w+\\\\)*Models/', $model ?: '')) {
             $modelNamespace = $match;
@@ -38,20 +43,24 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
 
         if ($this->option('model')) {
             $class_name ??= $this->argument('name');
+
             if ($is_module && $module_name && class_exists('Nwidart\Modules\Facades\Module')) {
                 $this->callSilently('make:model', ['name' => "{$class_name}", 'module' => $module_name]);
             } else {
                 $this->callSilently('make:model', ['name' => "{$class_name}"]);
             }
-            if (!$model) {
+
+            if (! $model) {
                 $this->input->setArgument('name', $modelNamespace . '\\' . $class_name);
                 $this->input->setOption('model', false);
+
                 return $this->handle();
             }
         }
 
-        if (!$model) {
+        if (! $model) {
             $this->error('Model not found');
+
             return self::FAILURE;
         }
 
@@ -94,10 +103,10 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
             $panel = count($panels) > 1 ? $panels[select(
                 label: 'Which panel would you like to create this in?',
                 options: array_map(
-                    fn(Panel $panel): string => $panel->getId(),
+                    fn (Panel $panel): string => $panel->getId(),
                     $panels,
                 ),
-                default: Filament::getDefaultPanel()->getId()
+                default: Filament::getDefaultPanel()->getId(),
             )] : Arr::first($panels);
         }
 
@@ -111,16 +120,16 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
             }
         }
 
-        $namespace = count($resourceNamespaces) > 1 ?
-            select(
+        $namespace = count($resourceNamespaces) > 1
+            ? select(
                 label: 'Which namespace would you like to create this in?',
-                options: $resourceNamespaces
+                options: $resourceNamespaces,
             ) : (Arr::first($resourceNamespaces) ?? 'App\\Filament\\Resources');
-        $path = count($resourceDirectories) > 1 ?
-            $resourceDirectories[array_search($namespace, $resourceNamespaces)] : (Arr::first($resourceDirectories) ?? app_path('Filament/Resources/'));
+        $path = count($resourceDirectories) > 1
+            ? $resourceDirectories[array_search($namespace, $resourceNamespaces, true)] : (Arr::first($resourceDirectories) ?? app_path('Filament/Resources/'));
 
         $resourceClass = "{$modelClass}Resource";
-        $resourceNamespace = trim($module_name ? $module_name . '\\' . $modelSubNamespace : $modelSubNamespace, '\\');
+        $resourceNamespace = mb_trim($module_name ? $module_name . '\\' . $modelSubNamespace : $modelSubNamespace, '\\');
 
         $namespace .= $resourceNamespace !== '' ? "\\{$resourceNamespace}" : '';
         $listResourcePageClass = "List{$pluralModelClass}";
@@ -129,8 +138,8 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
         $editResourcePageClass = "Edit{$modelClass}";
         $viewResourcePageClass = "View{$modelClass}";
 
-        $baseResourcePath =
-            (string) str($resourceClass)
+        $baseResourcePath
+            = (string) str($resourceClass)
                 ->prepend('/' . $resourceNamespace . '/')
                 ->prepend($path)
                 ->replace('\\', '/')
@@ -211,6 +220,7 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
             $eloquentQuery .= PHP_EOL . PHP_EOL . 'public static function getEloquentQuery(): Builder';
             $eloquentQuery .= PHP_EOL . '{';
             $eloquentQuery .= PHP_EOL . '    return parent::getEloquentQuery()';
+
             if ($panel->getId() === 'admin') {
                 $eloquentQuery .= PHP_EOL . '        ->withoutGlobalScopes();';
             } else {
@@ -228,8 +238,8 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
         $clusterImport = null;
 
         if (
-            class_exists($potentialCluster) &&
-            is_subclass_of($potentialCluster, Cluster::class)
+            class_exists($potentialCluster)
+            && is_subclass_of($potentialCluster, Cluster::class)
         ) {
             $clusterAssignment = $this->indentString(PHP_EOL . PHP_EOL . 'protected static ?string $cluster = ' . class_basename($potentialCluster) . '::class;');
             $clusterImport = "use {$potentialCluster};" . PHP_EOL;
@@ -327,13 +337,13 @@ class MakeResourceCommand extends FilamentMakeResourceCommand
         return Command::SUCCESS;
     }
 
-    #[\Override]
+    #[Override]
     protected function getDefaultStubPath(): string
     {
         $stubPath = parent::getDefaultStubPath();
 
         if (! $this->fileExists($stubPath)) {
-            $reflectionClass = new \ReflectionClass(FilamentMakeResourceCommand::class);
+            $reflectionClass = new ReflectionClass(FilamentMakeResourceCommand::class);
 
             $stubPath = (string) str($reflectionClass->getFileName())
                 ->beforeLast('Commands')

@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Override;
 use Illuminate\Support\Str;
 use Nwidart\Modules\Facades\Module;
+use Modules\Core\Helpers\HasBenchmark;
 use Mtrajano\LaravelSwagger\FormatterManager;
 use Modules\Core\Overrides\ModuleDocGenerator;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
 use Mtrajano\LaravelSwagger\LaravelSwaggerException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Mtrajano\LaravelSwagger\GenerateSwaggerDoc as BaseGenerateSwaggerDoc;
-use Modules\Core\Helpers\HasBenchmark;
-use Symfony\Component\Console\Command\Command;
 
-class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
+final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 {
     use HasBenchmark;
 
@@ -30,27 +31,19 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         parent::__construct();
     }
 
-    #[\Override]
-    protected function getOptions(): array
-    {
-        return [
-            ['module', null, InputOption::VALUE_OPTIONAL, 'Filter to a specific Module', null],
-        ];
-    }
-
     /**
      * Execute the console command.
-     *
      */
-    #[\Override]
+    #[Override]
     public function handle(): int
     {
         $module_filter = $this->option('module');
 
         foreach (modules(true, false, false) as $module_name) {
-            if ($module_name !== 'App' && !class_exists(Module::class)) {
+            if ($module_name !== 'App' && ! class_exists(Module::class)) {
                 continue;
             }
+
             if ($module_filter && $module_name !== $module_filter) {
                 continue;
             }
@@ -69,7 +62,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     {
         $filter = $this->option('filter') ?: null;
 
-        /** @var string|null $file */
+        /** @var null|string $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
         $config = config('laravel-swagger');
 
@@ -87,8 +80,9 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         $doc = new ModuleDocGenerator($config, $moduleName !== 'App' ? config('modules.namespace') . '\\' . $moduleName : $moduleName, $filter)->generate();
         $doc['tags'] = [$moduleName];
+
         // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
-        if (array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
+        if (array_filter($doc['paths'], fn ($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
             $doc['tags'][] = 'Api';
         }
 
@@ -98,7 +92,8 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         if ($file) {
             $folder = Str::beforeLast($file, DIRECTORY_SEPARATOR);
-            if (!file_exists($folder)) {
+
+            if (! file_exists($folder)) {
                 mkdir($folder, recursive: true);
             }
             file_put_contents($file, $formattedDoc);
@@ -109,12 +104,21 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         }
     }
 
+    #[Override]
+    protected function getOptions(): array
+    {
+        return [
+            ['module', null, InputOption::VALUE_OPTIONAL, 'Filter to a specific Module', null],
+        ];
+    }
+
     private function verboseGeneration(array $doc): void
     {
         $this->info($doc['info']['title']);
+
         foreach ($doc['paths'] as $path => $methods) {
             $methods = array_map('strtoupper', array_keys($methods));
-            $this->line(implode("|", $methods) . (count($methods) > 1 ? "\t" : "\t\t") . $path);
+            $this->line(implode('|', $methods) . (count($methods) > 1 ? "\t" : "\t\t") . $path);
         }
     }
 }

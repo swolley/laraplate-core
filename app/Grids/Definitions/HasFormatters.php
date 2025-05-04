@@ -11,20 +11,45 @@ use Modules\Core\Grids\Components\Field;
 /** @phpstan-type FormatterCallable callable(mixed, Model):void|null */
 trait HasFormatters
 {
-    /** 
-     * @var callable|null
+    /**
+     * @var null|callable
+     *
      * @phpstan-var FormatterCallable
      */
     private $getFormatter;
 
-    /** 
-     * @var callable|null 
+    /**
+     * @var null|callable
+     *
      * @phpstan-var FormatterCallable
      */
     private $setFormatter;
 
     /**
-     * returns if read formatter is set
+     * apply massively write formatter.
+     *
+     * @template T of array<string, mixed>
+     *
+     * @param  Collection<string, Field>  $fields  fields to format
+     * @param  T  $data  to be formatted
+     * @return T
+     */
+    public static function applySetFormatter(Collection $fields, array $data): array
+    {
+        foreach ($fields as $field) {
+            $field_name = $field->getFullName();
+            $formatter = $field->getWriteFormatter();
+
+            if ($formatter && array_key_exists($field_name, $data)) {
+                $data[$field_name] = $formatter($data[$field_name], $data);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * returns if read formatter is set.
      */
     public function hasReadFormatter(): bool
     {
@@ -32,7 +57,7 @@ trait HasFormatters
     }
 
     /**
-     * gets read formatter if set
+     * gets read formatter if set.
      *
      * @psalm-return callable(mixed, Model)|null
      */
@@ -42,15 +67,7 @@ trait HasFormatters
     }
 
     /**
-     * sets read formatter if set
-     */
-    private function setReadFormatter(?callable $callback = null): void
-    {
-        $this->getFormatter = $callback;
-    }
-
-    /**
-     * returns if read formatter is set
+     * returns if read formatter is set.
      */
     public function hasWriteFormatter(): bool
     {
@@ -58,7 +75,7 @@ trait HasFormatters
     }
 
     /**
-     * gets write formatter if set
+     * gets write formatter if set.
      *
      * @psalm-return callable(mixed, array)|null
      */
@@ -68,20 +85,11 @@ trait HasFormatters
     }
 
     /**
-     * sets write formatter if set
-     */
-    private function setWriteFormatter(?callable $callback = null): void
-    {
-        $this->setFormatter = $callback;
-    }
-
-    /**
-     * alias for write formatter getter that returns static for pipes
+     * alias for write formatter getter that returns static for pipes.
      *
-     * @param callable|null $callback read formatter callback
-     * @return static
+     * @param  null|callable  $callback  read formatter callback
      */
-    public function getFormatter(?callable $callback)
+    public function getFormatter(?callable $callback): static
     {
         $this->setReadFormatter($callback);
 
@@ -89,12 +97,11 @@ trait HasFormatters
     }
 
     /**
-     * alias for write formatter getter that returns static for pipes
+     * alias for write formatter getter that returns static for pipes.
      *
-     * @param callable|null $callback write formatter callback
-     * @return static
+     * @param  null|callable  $callback  write formatter callback
      */
-    public function setFormatter(?callable $callback)
+    public function setFormatter(?callable $callback): static
     {
         $this->setWriteFormatter($callback);
 
@@ -102,23 +109,18 @@ trait HasFormatters
     }
 
     /**
-     * apply massively write formatter
-     * 
-     * @template T of array<string, mixed>
-     * @param  Collection<string, Field>  $fields  fields to format
-     * @param  T  $data  to be formatted
-     * @return  T
+     * sets read formatter if set.
      */
-    public static function applySetFormatter(Collection $fields, array $data): array
+    private function setReadFormatter(?callable $callback = null): void
     {
-        foreach ($fields as $field) {
-            $field_name = $field->getFullName();
-            $formatter = $field->getWriteFormatter();
-            if ($formatter && array_key_exists($field_name, $data)) {
-                $data[$field_name] = $formatter($data[$field_name], $data);
-            }
-        }
+        $this->getFormatter = $callback;
+    }
 
-        return $data;
+    /**
+     * sets write formatter if set.
+     */
+    private function setWriteFormatter(?callable $callback = null): void
+    {
+        $this->setFormatter = $callback;
     }
 }

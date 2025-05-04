@@ -12,14 +12,14 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\UnauthorizedException;
 
 /**
- * Trait per aggiungere validazioni ai modelli
- * 
+ * Trait per aggiungere validazioni ai modelli.
+ *
  * @method void setSkipValidation(bool $skip = true) Imposta il flag per saltare le validazioni
  * @method bool shouldSkipValidation() Verifica se le validazioni devono essere saltate
  * @method array getRules() Ottiene le regole di validazione
  * @method array getOperationRules(?string $operation = null) Ottiene le regole di validazione per un'operazione specifica
  * @method void validateWithRules(string $operation) Valida il modello con le regole
- * 
+ *
  * @phpstan-type HasValidationsType HasValidations
  */
 trait HasValidations
@@ -33,12 +33,12 @@ trait HasValidations
     ];
 
     /**
-     * Flag per saltare le validazioni
+     * Flag per saltare le validazioni.
      */
     private bool $skip_validation = false;
 
     /**
-     * Imposta il flag per saltare le validazioni
+     * Imposta il flag per saltare le validazioni.
      */
     public function setSkipValidation(bool $skip = true): void
     {
@@ -46,101 +46,32 @@ trait HasValidations
     }
 
     /**
-     * Verifica se le validazioni devono essere saltate
+     * Verifica se le validazioni devono essere saltate.
      */
     public function shouldSkipValidation(): bool
     {
         return $this->skip_validation;
     }
 
-    protected static function bootHasValidations(): void
-    {
-        //FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
-        static::retrieved(function (Model $model): void {
-            if (!static::checkUserCanDo($model, 'select')) {
-                throw new UnauthorizedException('User cannot select ' . $model->getTable());
-            }
-        });
-        static::creating(function (Model $model): void {
-            if (!static::checkUserCanDo($model, 'insert')) {
-                throw new UnauthorizedException('User cannot insert ' . $model->getTable());
-            }
-            if (!$model->shouldSkipValidation()) {
-                $model->validateWithRules(CrudExecutor::INSERT);
-            }
-        });
-        static::updating(function (Model $model): void {
-            if (!static::checkUserCanDo($model, 'update')) {
-                throw new UnauthorizedException('User cannot update ' . $model->getTable());
-            }
-
-            if (!$model->isDirty('deleted_at') && !$model->shouldSkipValidation()) {
-                $model->validateWithRules(CrudExecutor::UPDATE);
-            }
-        });
-        static::deleting(function (Model $model): void {
-            if ((!method_exists($model, 'isForceDeleting') || $model->isForceDeleting()) && !static::checkUserCanDo($model, 'forceDelete')) {
-                throw new UnauthorizedException('User cannot delete ' . $model->getTable());
-            }
-
-            if (!static::checkUserCanDo($model, 'delete')) {
-                throw new UnauthorizedException('User cannot soft delete ' . $model->getTable());
-            }
-        });
-
-        if (method_exists(static::class, 'forceDeleting')) {
-            static::forceDeleting(function (Model $model): void {
-                if (!static::checkUserCanDo($model, 'forceDelete')) {
-                    throw new UnauthorizedException('User cannot delete ' . $model->getTable());
-                }
-            });
-        }
-
-        if (method_exists(static::class, 'restoring')) {
-            static::restoring(function (Model $model): void {
-                if (!static::checkUserCanDo($model, 'restore')) {
-                    throw new UnauthorizedException('User cannot restore ' . $model->getTable());
-                }
-            });
-        }
-    }
-
-    protected static function checkUserCanDo(Model $model, string $operation): bool
-    {
-        $permission = $model->getTable() . '.' . $operation;
-        $permission_class = config('permission.models.permission');
-
-        if (!$permission_class::whereName($permission)->count()) {
-            return true;
-        }
-
-        $user = Auth::user();
-        if ($user) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
-            return (bool) $user->hasPermission($permission);
-        }
-
-        return true;
-    }
-
     public function getRules(): array
     {
         $primary_key = $this->getKeyName();
         $rules = $this->rules;
-        if (!isset($rules[self::DEFAULT_RULE])) {
+
+        if (! isset($rules[self::DEFAULT_RULE])) {
             $rules[self::DEFAULT_RULE] = [];
         }
         $rules['update'] = array_merge($rules['update'], [
             $primary_key => 'required|exists:' . $this->getTable() . ',' . $primary_key,
         ]);
+
         return $rules;
     }
 
     public function getOperationRules(?string $operation = null): array
     {
         $rules = $this->getRules();
+
         return $operation && array_key_exists($operation, $rules) ? array_merge($rules[self::DEFAULT_RULE] ?? [], $rules[$operation]) : $rules[self::DEFAULT_RULE] ?? [];
     }
 
@@ -155,5 +86,80 @@ trait HasValidations
         if ($rules !== []) {
             Validator::make($this->getAttributes(), $rules)->validate();
         }
+    }
+
+    protected static function bootHasValidations(): void
+    {
+        // FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
+        static::retrieved(function (Model $model): void {
+            if (! static::checkUserCanDo($model, 'select')) {
+                throw new UnauthorizedException('User cannot select ' . $model->getTable());
+            }
+        });
+        static::creating(function (Model $model): void {
+            if (! static::checkUserCanDo($model, 'insert')) {
+                throw new UnauthorizedException('User cannot insert ' . $model->getTable());
+            }
+
+            if (! $model->shouldSkipValidation()) {
+                $model->validateWithRules(CrudExecutor::INSERT);
+            }
+        });
+        static::updating(function (Model $model): void {
+            if (! static::checkUserCanDo($model, 'update')) {
+                throw new UnauthorizedException('User cannot update ' . $model->getTable());
+            }
+
+            if (! $model->isDirty('deleted_at') && ! $model->shouldSkipValidation()) {
+                $model->validateWithRules(CrudExecutor::UPDATE);
+            }
+        });
+        static::deleting(function (Model $model): void {
+            if ((! method_exists($model, 'isForceDeleting') || $model->isForceDeleting()) && ! static::checkUserCanDo($model, 'forceDelete')) {
+                throw new UnauthorizedException('User cannot delete ' . $model->getTable());
+            }
+
+            if (! static::checkUserCanDo($model, 'delete')) {
+                throw new UnauthorizedException('User cannot soft delete ' . $model->getTable());
+            }
+        });
+
+        if (method_exists(static::class, 'forceDeleting')) {
+            static::forceDeleting(function (Model $model): void {
+                if (! static::checkUserCanDo($model, 'forceDelete')) {
+                    throw new UnauthorizedException('User cannot delete ' . $model->getTable());
+                }
+            });
+        }
+
+        if (method_exists(static::class, 'restoring')) {
+            static::restoring(function (Model $model): void {
+                if (! static::checkUserCanDo($model, 'restore')) {
+                    throw new UnauthorizedException('User cannot restore ' . $model->getTable());
+                }
+            });
+        }
+    }
+
+    protected static function checkUserCanDo(Model $model, string $operation): bool
+    {
+        $permission = $model->getTable() . '.' . $operation;
+        $permission_class = config('permission.models.permission');
+
+        if (! $permission_class::whereName($permission)->count()) {
+            return true;
+        }
+
+        $user = Auth::user();
+
+        if ($user) {
+            if ($user->isSuperAdmin()) {
+                return true;
+            }
+
+            return (bool) $user->hasPermission($permission);
+        }
+
+        return true;
     }
 }

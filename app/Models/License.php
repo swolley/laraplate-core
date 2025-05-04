@@ -16,9 +16,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 /**
  * @mixin IdeHelperLicense
  */
-class License extends Model
+final class License extends Model
 {
-    use HasFactory, HasUuids, HasValidity, HasValidations {
+    use HasFactory, HasUuids, HasValidations, HasValidity {
         getRules as protected getRulesTrait;
     }
 
@@ -29,23 +29,19 @@ class License extends Model
      */
     protected $fillable = [];
 
-    protected static function newFactory(): LicenseFactory
-    {
-        return LicenseFactory::new();
-    }
-
-    public function scopeFree(Builder $query)
+    public function scopeFree(Builder $query): void
     {
         $query->doesntHave('user');
     }
 
-    public function scopeOccupied(Builder $query)
+    public function scopeOccupied(Builder $query): void
     {
         $query->has('user');
     }
 
     /**
      * The user that belongs to the license.
+     *
      * @return HasOne<User>
      */
     public function user(): HasOne
@@ -60,6 +56,12 @@ class License extends Model
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],
         ]);
+
         return $rules;
+    }
+
+    protected static function newFactory(): LicenseFactory
+    {
+        return LicenseFactory::new();
     }
 }

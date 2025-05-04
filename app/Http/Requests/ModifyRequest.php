@@ -4,36 +4,42 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Override;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Casts\ModifyRequestData;
+
 // use Illuminate\Foundation\Http\FormRequest;
 
-class ModifyRequest extends CrudRequest implements IParsableRequest
+final class ModifyRequest extends CrudRequest implements IParsableRequest
 {
-    #[\Override]
+    #[Override]
     public function rules()
     {
         return [];
     }
 
-    #[\Override]
-    public function prepareForValidation()
+    #[Override]
+    public function prepareForValidation(): void
     {
         parent::prepareForValidation();
 
         $to_merge = [
             'filters' => $this->filters ?? [],
         ];
+
         /** @phpstan-ignore method.notFound */
         $is_insert = Str::contains($this->url(), '/insert/');
+
         /** @phpstan-ignore method.notFound */
         $is_update = Str::contains($this->url(), '/update/');
         $is_autoincrement = $this->model->incrementing;
+
         // force remove unwanted keys if insert and autoincrement
-        if (!$is_autoincrement || !$is_insert) {
+        if (! $is_autoincrement || ! $is_insert) {
             $validation = ['required'];
+
             if ($this->model->getKeyType() === 'int') {
                 $validation[] = 'integer';
                 $validation[] = 'numeric';
@@ -50,11 +56,12 @@ class ModifyRequest extends CrudRequest implements IParsableRequest
         if (class_uses_trait($this->model, HasValidations::class)) {
             /** @phpstan-ignore method.notFound */
             $main_entity = $this->route()->entity;
+
             foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
-                $key = $this->$attribute ?? $this->{"{$main_entity}.{$attribute}"} ?? null;
+                $key = $this->{$attribute} ?? $this->{"{$main_entity}.{$attribute}"} ?? null;
                 $to_merge[$key] = $key ? array_unique([...$to_merge[$key], ...$rule]) : $rule;
 
-                $to_merge['filters'][] = ['property' => $key, 'value' => $this->$key];
+                $to_merge['filters'][] = ['property' => $key, 'value' => $this->{$key}];
             }
         }
 
@@ -62,7 +69,7 @@ class ModifyRequest extends CrudRequest implements IParsableRequest
         $this->merge($to_merge);
     }
 
-    #[\Override]
+    #[Override]
     public function parsed(): ModifyRequestData
     {
         /** @phpstan-ignore method.notFound */

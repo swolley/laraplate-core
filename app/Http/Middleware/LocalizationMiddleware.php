@@ -10,12 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Symfony\Component\HttpFoundation\Response;
 
-class LocalizationMiddleware
+final class LocalizationMiddleware
 {
     /**
      * Handle an incoming request.
      *
-     * @param  Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -23,8 +23,9 @@ class LocalizationMiddleware
 
         if ($user && $user->lang !== App::getLocale()) {
             App::setLocale($user->lang);
-        } elseif (!$user) {
+        } elseif (! $user) {
             $lang = $request->getPreferredLanguage();
+
             if ($lang) {
                 $lang = Str::of($lang)->before('_')->value();
                 App::setLocale($lang);

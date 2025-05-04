@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Models
@@ -15,9 +16,8 @@ return [
     */
 
     'models' => [
-      'modification' => \Approval\Models\Modification::class,
-      'approval'     => \Approval\Models\Approval::class,
-      'disapproval'  => \Approval\Models\Disapproval::class,
+        'modification' => Approval\Models\Modification::class,
+        'approval' => Approval\Models\Approval::class,
+        'disapproval' => Approval\Models\Disapproval::class,
     ],
-
 ];

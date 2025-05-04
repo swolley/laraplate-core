@@ -4,23 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Throwable;
-use RuntimeException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Doctrine\DBAL\Exception;
 use Illuminate\Http\Request;
-use InvalidArgumentException;
-use UnexpectedValueException;
 use Modules\Core\Models\Setting;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Support\Facades\Request as RequestFacade;
-use Illuminate\Contracts\Container\BindingResolutionException;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
-class SettingController extends Controller
+final class SettingController extends Controller
 {
     /**
      * @route-comment
@@ -41,9 +35,11 @@ class SettingController extends Controller
                 if (Str::endsWith($a, DIRECTORY_SEPARATOR . $default_locale)) {
                     return -1;
                 }
+
                 if (Str::endsWith($b, DIRECTORY_SEPARATOR . $default_locale)) {
                     return 1;
                 }
+
                 return $a <=> $b;
             });
 
@@ -69,6 +65,7 @@ class SettingController extends Controller
                 }
 
                 $translations[$short_name] = Arr::dot($translations[$short_name]);
+
                 // key always exists because $languages is sorted with $default_locale as the first item
                 if ($short_name !== $default_locale && array_key_exists($default_locale, $translations)) {
                     $translations[$short_name] = array_merge($translations[$default_locale], $translations[$short_name]);
@@ -91,11 +88,13 @@ class SettingController extends Controller
     {
         $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
             $settings = [];
+
             foreach (Setting::get() as $s) {
                 $settings[$s->name] = $s->value;
             }
 
             $settings['active_modules'] = modules();
+
             return $settings;
         });
 

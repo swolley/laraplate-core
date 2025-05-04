@@ -1,21 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Auth\Contracts;
 
 use Illuminate\Http\Request;
-use Illuminate\Foundation\Auth\User;
 use Modules\Core\Models\License;
+use Illuminate\Foundation\Auth\User;
 
 interface AuthenticationProviderInterface
 {
     /**
-     * Verifica se questo provider può gestire la richiesta
+     * Verifica se questo provider può gestire la richiesta.
      */
     public function canHandle(Request $request): bool;
 
     /**
-     * Autentica l'utente
-     * 
+     * Autentica l'utente.
+     *
      * @return array{
      *   success: bool,
      *   user: ?User,
@@ -26,12 +28,12 @@ interface AuthenticationProviderInterface
     public function authenticate(Request $request): array;
 
     /**
-     * Verifica se il provider è abilitato nella configurazione
+     * Verifica se il provider è abilitato nella configurazione.
      */
     public function isEnabled(): bool;
 
     /**
-     * Ritorna il nome del provider
+     * Ritorna il nome del provider.
      */
     public function getProviderName(): string;
 }

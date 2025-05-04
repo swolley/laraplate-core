@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Providers;
 
+use Override;
 use Illuminate\Support\Str;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
@@ -9,7 +12,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 
-class RouteServiceProvider extends ServiceProvider
+final class RouteServiceProvider extends ServiceProvider
 {
     protected string $name = 'Core';
 
@@ -18,7 +21,7 @@ class RouteServiceProvider extends ServiceProvider
      *
      * Register any model bindings or pattern based filters.
      */
-    #[\Override]
+    #[Override]
     public function boot(): void
     {
         parent::boot();
@@ -26,7 +29,7 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('embeddings', function () {
             return Limit::perMinute(60); // 60 jobs per minute
         });
-        RateLimiter::for('indexing', fn() => app()->environment('production') ? [
+        RateLimiter::for('indexing', fn () => app()->environment('production') ? [
             // Single worker limit
             Limit::perMinute(300)  // 300 operations per minute (5 per second)
                 ->by('indexing.worker'),
@@ -71,7 +74,7 @@ class RouteServiceProvider extends ServiceProvider
             ]);
 
         $route_prefix = 'app';
-        Route::middleware(['web'/*, 'verified'*/])
+        Route::middleware(['web'/* , 'verified' */])
             ->namespace($this->namespace)
             ->prefix($route_prefix)
             ->name("{$name_prefix}.")
@@ -90,7 +93,7 @@ class RouteServiceProvider extends ServiceProvider
             ->group(module_path($this->name, '/routes/info.php'));
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
-        Route::get("{$route_prefix}/auth/reset-password", fn() => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
+        Route::get("{$route_prefix}/auth/reset-password", fn () => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
     }
 
     /**

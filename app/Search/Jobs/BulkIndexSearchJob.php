@@ -4,62 +4,66 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
+use Exception;
+use Throwable;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Laravel\Scout\Searchable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Job for bulk indexing documents in search engines
- * Supports both Elasticsearch and Typesense via Laravel Scout
+ * Supports both Elasticsearch and Typesense via Laravel Scout.
  */
-class BulkIndexSearchJob implements ShouldQueue
+final class BulkIndexSearchJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Maximum number of job attempts
+     * Maximum number of job attempts.
      */
     public int $tries;
 
     /**
-     * Job timeout in seconds
+     * Job timeout in seconds.
      */
     public int $timeout;
 
     /**
-     * Backoff time between attempts (in seconds)
+     * Backoff time between attempts (in seconds).
      */
     public array $backoff;
 
     /**
-     * Create a new job instance
-     * 
-     * @param Collection $models Collection of models to index
-     * @param bool $force If true, forces indexing even if model shouldn't be searchable
+     * Create a new job instance.
+     *
+     * @param  Collection  $models  Collection of models to index
+     * @param  bool  $force  If true, forces indexing even if model shouldn't be searchable
      */
     public function __construct(
         protected Collection $models,
-        protected bool $force = false
+        protected bool $force = false,
     ) {
         // Validate that collection is not empty
         if ($models->isEmpty()) {
-            throw new \InvalidArgumentException('Cannot index an empty collection');
+            throw new InvalidArgumentException('Cannot index an empty collection');
         }
 
         // Validate that all models are of the same class
         $model_class = $models->first()::class;
-        if (!$models->every(fn($model) => $model instanceof $model_class)) {
-            throw new \InvalidArgumentException('All models must be of the same class');
+
+        if (! $models->every(fn ($model) => $model instanceof $model_class)) {
+            throw new InvalidArgumentException('All models must be of the same class');
         }
 
         // Validate that the model implements Searchable
-        if (!$this->force && !in_array(Searchable::class, class_uses_recursive($model_class))) {
-            throw new \InvalidArgumentException("Model {$model_class} does not use the Searchable trait");
+        if (! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true)) {
+            throw new InvalidArgumentException("Model {$model_class} does not use the Searchable trait");
         }
 
         $this->onQueue(config('scout.queue_name', 'indexing'));
@@ -71,7 +75,7 @@ class BulkIndexSearchJob implements ShouldQueue
     }
 
     /**
-     * Execute the job
+     * Execute the job.
      */
     public function handle(): void
     {
@@ -79,31 +83,32 @@ class BulkIndexSearchJob implements ShouldQueue
             $model_class = $this->models->first()::class;
             $driver = config('scout.driver');
 
-            Log::info("Starting bulk index job", [
+            Log::info('Starting bulk index job', [
                 'model' => $model_class,
                 'count' => $this->models->count(),
-                'driver' => $driver
+                'driver' => $driver,
             ]);
 
             // Use the searchable method which will respect the Scout driver configuration
             $this->models->searchable();
 
-            Log::info("Bulk index job completed", [
+            Log::info('Bulk index job completed', [
                 'model' => $model_class,
                 'count' => $this->models->count(),
-                'driver' => $driver
+                'driver' => $driver,
             ]);
-        } catch (\Exception $e) {
-            Log::error("Error in bulk index job", [
+        } catch (Exception $e) {
+            Log::error('Error in bulk index job', [
                 'model' => $this->models->first()::class,
                 'count' => $this->models->count(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // If there are attempts left, retry
-            if ($this->attempts() < $this->tries) {
+            if ($this->tries > $this->attempts()) {
                 $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+
                 return;
             }
 
@@ -113,18 +118,18 @@ class BulkIndexSearchJob implements ShouldQueue
     }
 
     /**
-     * Handle job failure
+     * Handle job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         $model_class = $this->models->first()::class;
         $count = $this->models->count();
 
-        Log::error("Bulk indexing job failed", [
+        Log::error('Bulk indexing job failed', [
             'model_class' => $model_class,
             'count' => $count,
             'driver' => config('scout.driver'),
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

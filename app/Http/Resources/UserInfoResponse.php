@@ -4,28 +4,29 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Resources;
 
+use Override;
 use Modules\Core\Models\Permission;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class UserInfoResponse extends JsonResource
+final class UserInfoResponse extends JsonResource
 {
     /**
      * Transform the resource into an array.
      */
-    #[\Override]
+    #[Override]
     public function toArray($request): array
     {
         if ($this->resource) {
             $permissions = [];
 
             foreach ($this->resource->isSuperAdmin() ? Permission::all() : $this->resource->getAllPermissions() as $permission) {
-                if (!isset($permissions[$permission->guard])) {
+                if (! isset($permissions[$permission->guard])) {
                     $permissions[$permission->guard] = [$permission->name];
                 } else {
                     $permissions[$permission->guard][] = $permission->name;
                 }
             }
-            $roles = $this->resource->roles->map(fn($role) => $role->name);
+            $roles = $this->resource->roles->map(fn ($role) => $role->name);
 
             return [
                 'id' => $this->resource->id,

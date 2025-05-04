@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
 {
@@ -14,7 +14,6 @@ return new class() extends Migration
 
     /**
      * Run the migrations.
-     *
      */
     public function up(): void
     {
@@ -27,7 +26,7 @@ return new class() extends Migration
             $table->json('config')->comment('The config of the user grid config');
             MigrateUtils::timestamps(
                 $table,
-                hasCreateUpdate: true
+                hasCreateUpdate: true,
             );
 
             $table->foreign('user_id', 'user_grid_configs_users_FK')->references('id')->on('users')->cascadeOnDelete();
@@ -35,12 +34,13 @@ return new class() extends Migration
         });
 
         $driver = DB::connection()->getDriverName();
+
         if ($driver === 'pgsql') {
             $true = 'TRUE';
-        } elseif (in_array($driver, ['mysql', 'mariadb', 'sqlite'])) {
+        } elseif (in_array($driver, ['mysql', 'mariadb', 'sqlite'], true)) {
             $true = 1;
         } else {
-            throw new \Exception('Unsupported database driver');
+            throw new Exception('Unsupported database driver');
         }
 
         if ($driver !== 'sqlite') {
@@ -54,7 +54,6 @@ return new class() extends Migration
 
     /**
      * Reverse the migrations.
-     *
      */
     public function down(): void
     {

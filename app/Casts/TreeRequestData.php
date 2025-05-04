@@ -6,15 +6,15 @@ namespace Modules\Core\Casts;
 
 use Modules\Core\Http\Requests\TreeRequest;
 
-class TreeRequestData extends DetailRequestData
+final class TreeRequestData extends DetailRequestData
 {
     public bool $parents;
 
     public bool $children;
 
     /**
-     * @param array{parents:bool,children:bool} $validated
-     * @param string|array<string> $primaryKey
+     * @param  array{parents:bool,children:bool}  $validated
+     * @param  string|array<string>  $primaryKey
      */
     public function __construct(TreeRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {

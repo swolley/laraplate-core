@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Overrides;
 
-use Illuminate\Console\Command as BaseCommand;
 use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Console\Command as BaseCommand;
 
-class Command extends BaseCommand
+final class Command extends BaseCommand
 {
     use HasBenchmark;
 
@@ -17,9 +19,10 @@ class Command extends BaseCommand
         parent::__construct();
 
         // if (self::class !== $this::class) {
-        if ($db instanceof \Illuminate\Database\DatabaseManager) {
+        if ($db instanceof DatabaseManager) {
             $this->db = $db;
         }
+
         if (config('app.debug')) {
             $this->startBenchmark();
         }

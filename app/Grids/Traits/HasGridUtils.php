@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Traits;
 
+use Exception;
+use Throwable;
 use ReflectionClass;
+use ReflectionMethod;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +20,7 @@ use Modules\Core\Grids\Definitions\PivotRelationInfo;
 trait HasGridUtils
 {
     /**
-     * Get eloquent relationships
+     * Get eloquent relationships.
      *
      * @return array<string, RelationInfo>
      */
@@ -26,23 +29,25 @@ trait HasGridUtils
         $instance = new static;
         // Get public methods declared without parameters and non inherited
         $class = $instance::class;
-        $allMethods = new ReflectionClass($class)->getMethods(\ReflectionMethod::IS_PUBLIC);
+        $allMethods = new ReflectionClass($class)->getMethods(ReflectionMethod::IS_PUBLIC);
         $methods = array_filter(
             $allMethods,
-            fn($method) => $method->isUserDefined() &&
-                $method->hasReturnType() && (
-                    $method->getReturnType()->__toString() === Relation::class ||
-                    is_subclass_of($method->getReturnType()->__toString(), Relation::class)
-                )
+            fn ($method) => $method->isUserDefined()
+                && $method->hasReturnType() && (
+                    $method->getReturnType()->__toString() === Relation::class
+                    || is_subclass_of($method->getReturnType()->__toString(), Relation::class)
+                ),
         );
 
         DB::beginTransaction();
 
         /** @var array<string, RelationInfo> $relations */
         $relations = [];
+
         foreach ($methods as $method) {
             $methodName = $method->getName();
             $relation = static::getRelationData($instance, $methodName);
+
             if ($relation) {
                 $relations[$methodName] = $relation;
             }
@@ -59,12 +64,14 @@ trait HasGridUtils
         // Get public methods declared without parameters and non inherited
         $class = $instance::class;
         $reflection = new ReflectionClass($class);
-        if (!$reflection->hasMethod($relation)) {
+
+        if (! $reflection->hasMethod($relation)) {
             return false;
         }
 
         $method = $reflection->getMethod($relation);
-        if (!$method->isPublic()) {
+
+        if (! $method->isPublic()) {
             return false;
         }
 
@@ -74,30 +81,37 @@ trait HasGridUtils
     public static function getInverseRelationship(string $relation): RelationInfo|false
     {
         $relationship = static::getRelationship($relation);
-        if (!$relationship) {
+
+        if (! $relationship) {
             return false;
         }
 
         $model = $relationship->getModel();
-        if (!class_uses_trait($model, HasGridUtils::class)) {
+
+        if (! class_uses_trait($model, HasGridUtils::class)) {
             return false;
         }
 
         $relationships = array_filter($model::getRelationships(), function ($r) {
             $model = $r->getModel();
+
             if (static::class instanceof $model) {
                 $r->setModel(static::class);
             }
-            if ($r->getModel() === static::class) {
+
+            if (static::class === $r->getModel()) {
                 return true;
             }
+
             return static::class instanceof $model;
         });
+
         if ($relationships === []) {
             return false;
         }
+
         if (count($relationships) > 1) {
-            throw new \Exception('Too many relationships found for the same model');
+            throw new Exception('Too many relationships found for the same model');
         }
 
         return head($relationships);
@@ -114,18 +128,23 @@ trait HasGridUtils
         return null;
     }
 
-    /** @return array<int,RelationInfo>|false */
+    /**
+     * @return array<int,RelationInfo>|false
+     */
     public static function getRelationshipDeeply(string $relation): array|false
     {
         $splitted = explode('.', $relation);
         $found = [];
         $current = static::class;
+
         if ($splitted[0] === lcfirst(new ReflectionClass($current)->getShortName())) {
             array_shift($splitted);
         }
+
         foreach ($splitted as $relation) {
             $subrelation = $current::getRelationship($relation);
-            if (!$subrelation) {
+
+            if (! $subrelation) {
                 break;
             }
 
@@ -136,15 +155,19 @@ trait HasGridUtils
         return count($found) === count($splitted) ? $found : false;
     }
 
-    /** @return array<int,RelationInfo>|false */
+    /**
+     * @return array<int,RelationInfo>|false
+     */
     public static function getInverseRelationshipDeeply(string $relation): array|false
     {
         if (count(explode('.', $relation)) <= 2) {
             $subrelation = static::getInverseRelationship($relation);
+
             return $subrelation ? [$subrelation] : false;
         }
 
         $found = static::getRelationshipDeeply($relation);
+
         if ($found === false || $found === []) {
             return false;
         }
@@ -153,9 +176,11 @@ trait HasGridUtils
         $i = count($found);
         $current = $found[$i - 1];
         $prev = $found[$i - 2]->getModel();
+
         while ($prev) {
             $subrelation = $prev::getInverseRelationship($current->getName());
-            if (!$subrelation) {
+
+            if (! $subrelation) {
                 break;
             }
 
@@ -168,7 +193,7 @@ trait HasGridUtils
     }
 
     /**
-     * @param string $relation	relation method / table name / model class name
+     * @param  string  $relation  relation method / table name / model class name
      */
     public static function hasRelation(string $relation): bool
     {
@@ -176,7 +201,7 @@ trait HasGridUtils
     }
 
     /**
-     * @param string $relation	relation method / table name / model class name
+     * @param  string  $relation  relation method / table name / model class name
      */
     public static function hasRelationDeeply(string $relation): bool
     {
@@ -184,7 +209,7 @@ trait HasGridUtils
     }
 
     /**
-     * @param string $relation	relation method / table name / model class name
+     * @param  string  $relation  relation method / table name / model class name
      */
     public static function isDeepRelation(string $relation): bool
     {
@@ -194,19 +219,158 @@ trait HasGridUtils
     }
 
     /**
-     * Undocumented function
+     * @return array{createdAt:null|string,updatedAt:null|string,deletedAt:null|string,lockedAt:null|string}
+     */
+    public static function getTimestampColumns(Model $model, bool $fullnames = false): array
+    {
+        $timestamps = [
+            'createdAt' => null,
+            'updatedAt' => null,
+            'deletedAt' => null,
+            'lockedAt' => null,
+        ];
+
+        /** @var Model $model */
+        $prefix = $fullnames ? $model->getTable() . '.' : '';
+
+        if ($model->timestamps) {
+            $timestamps['createdAt'] = $prefix . $model->getCreatedAtColumn();
+            $timestamps['updatedAt'] = $prefix . $model->getUpdatedAtColumn();
+        }
+        $uses = class_uses_recursive($model);
+
+        if (method_exists($model, 'getDeletedAtColumn')) {
+            $timestamps['deletedAt'] = $prefix . $model->getDeletedAtColumn();
+        }
+
+        if (in_array(HasLocks::class, $uses, true)) {
+            /** @phpstan-ignore method.notFound  */
+            $timestamps['lockedAt'] = $prefix . app('locked')->getLockedColumnName();
+        }
+
+        return $timestamps;
+    }
+
+    public static function grid(): Grid
+    {
+        return new Grid(static::class);
+    }
+
+    public function getColumns(bool $getTypes = false, bool $filterVisible = false, bool $filterWritable = false): array
+    {
+        $hidden = $this->getHiddenFields();
+        $fillable = $this->getFillableFields();
+
+        $columns = [];
+
+        if (! $filterVisible) {
+            array_push($columns, ...$hidden);
+        }
+
+        if (! $filterWritable) {
+            array_push($columns, ...$fillable);
+        }
+        $columns = array_unique($columns);
+
+        if ($getTypes) {
+            $casts = $this->getModelCasts();
+            $mapped_columns = [];
+
+            foreach ($columns as $column) {
+                $mapped_columns[$column] = array_key_exists($column, $casts) ? $casts[$column] : 'string';
+            }
+
+            $columns = $mapped_columns;
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    public function getHiddenFields(): array
+    {
+        return $this->hidden ?? [];
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    public function getFillableFields(): array
+    {
+        return $this->fillable ?? [];
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    public function getModelCasts(): array
+    {
+        $casts = $this->casts();
+
+        if (property_exists($this, 'dates')) {
+            foreach ($this->dates as $date) {
+                $casts[$date] = 'date';
+            }
+        }
+
+        foreach ($this->getFillableFields() as $fillable) {
+            if (! array_key_exists($fillable, $casts)) {
+                $casts[$fillable] = 'string';
+            }
+        }
+
+        foreach ($this->getTimestampColumns($this) as $name) {
+            if ($name && ! array_key_exists($name, $casts)) {
+                $casts[$name] = 'date';
+            }
+        }
+
+        return $casts;
+    }
+
+    public function getAppendFields(): array
+    {
+        return $this->appends ?? [];
+    }
+
+    public function isAppend(string $name): bool
+    {
+        return in_array($name, $this->getAppendFields(), true);
+    }
+
+    public function hasGetAppend(string $name): bool
+    {
+        return method_exists($this, $this->getAppendAttributeMethod('get', $name));
+    }
+
+    public function hasSetAppend(string $name): bool
+    {
+        return method_exists($this, $this->getAppendAttributeMethod('set', $name));
+    }
+
+    public function getGrid(): Grid
+    {
+        return new Grid($this);
+    }
+
+    /**
+     * Undocumented function.
      */
     private static function getRelationData(Model $instance, string $methodName): RelationInfo|false
     {
         try {
-            $methodReturn = $instance->$methodName();
-            if (!$methodReturn instanceof Relation) {
+            $methodReturn = $instance->{$methodName}();
+
+            if (! $methodReturn instanceof Relation) {
                 return false;
             }
             $ref = new ReflectionClass($methodReturn);
 
-            //chiave partenza dell'entità in oggetto
+            // chiave partenza dell'entità in oggetto
             $foreign = null;
+
             if ($ref->hasProperty('foreignKey')) {
                 $p = $ref->getProperty('foreignKey');
                 $p->setAccessible(true);
@@ -226,10 +390,11 @@ trait HasGridUtils
                 $foreign = array_pop($exploded);
             }
 
-            //tabella di cross join
+            // tabella di cross join
             $pivot_table = null;
             $pivot_foreign = null;
             $pivot_owner = null;
+
             if ($ref->hasProperty('foreignPivotKey')) {
                 $t = $ref->getProperty('table');
                 $t->setAccessible(true);
@@ -256,8 +421,9 @@ trait HasGridUtils
                 $pivot_owner = $p->getValue($methodReturn);
             }
 
-            //chiave destinazione dell'entità relazionata
+            // chiave destinazione dell'entità relazionata
             $owner = null;
+
             if ($ref->hasProperty('relatedKey')) {
                 $p = $ref->getProperty('relatedKey');
                 $p->setAccessible(true);
@@ -275,146 +441,19 @@ trait HasGridUtils
             $type = new ReflectionClass($methodReturn)->getShortName();
             $model = $methodReturn->getRelated()::class;
             $relation = new RelationInfo($type, $methodName, $model, (new $model)->getTable(), $foreign, $owner);
+
             if (isset($pivot_table, $pivot_owner, $pivot_foreign)) {
                 return PivotRelationInfo::fromRelationInfo($relation, $pivot_table, $pivot_owner, $pivot_foreign);
             }
 
             return $relation;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
-    }
-
-    public function getColumns(bool $getTypes = false, bool $filterVisible = false, bool $filterWritable = false): array
-    {
-        $hidden = $this->getHiddenFields();
-        $fillable = $this->getFillableFields();
-
-        $columns = [];
-        if (!$filterVisible) {
-            array_push($columns, ...$hidden);
-        }
-        if (!$filterWritable) {
-            array_push($columns, ...$fillable);
-        }
-        $columns = array_unique($columns);
-
-        if ($getTypes) {
-            $casts = $this->getModelCasts();
-            $mapped_columns = [];
-            foreach ($columns as $column) {
-                $mapped_columns[$column] = array_key_exists($column, $casts) ? $casts[$column] : 'string';
-            }
-
-            $columns = $mapped_columns;
-        }
-
-        return $columns;
-    }
-
-    /**
-     * @return array{createdAt:string|null,updatedAt:string|null,deletedAt:string|null,lockedAt:string|null}
-     */
-    public static function getTimestampColumns(Model $model, bool $fullnames = false): array
-    {
-        $timestamps = [
-            'createdAt' => null,
-            'updatedAt' => null,
-            'deletedAt' => null,
-            'lockedAt' => null,
-        ];
-
-        /** @var Model $model */
-        $prefix = $fullnames ? $model->getTable() . '.' : '';
-        if ($model->timestamps) {
-            $timestamps['createdAt'] = $prefix . $model->getCreatedAtColumn();
-            $timestamps['updatedAt'] = $prefix . $model->getUpdatedAtColumn();
-        }
-        $uses = class_uses_recursive($model);
-        if (method_exists($model, 'getDeletedAtColumn')) {
-            $timestamps['deletedAt'] = $prefix . $model->getDeletedAtColumn();
-        }
-        if (in_array(HasLocks::class, $uses)) {
-            /** @phpstan-ignore method.notFound  */
-            $timestamps['lockedAt'] = $prefix . app('locked')->getLockedColumnName();
-        }
-
-        return $timestamps;
-    }
-
-    /**
-     * @return array<int,string>
-     */
-    public function getHiddenFields(): array
-    {
-        return $this->hidden ?? [];
-    }
-
-    /**
-     * @return array<int,string>
-     */
-    public function getFillableFields(): array
-    {
-        return $this->fillable ?? [];
-    }
-
-    /**
-     * @return array<int,string>
-     */
-    public function getModelCasts(): array
-    {
-        $casts = $this->casts();
-        if (property_exists($this, 'dates')) {
-            foreach ($this->dates as $date) {
-                $casts[$date] = 'date';
-            }
-        }
-        foreach ($this->getFillableFields() as $fillable) {
-            if (!array_key_exists($fillable, $casts)) {
-                $casts[$fillable] = 'string';
-            }
-        }
-        foreach ($this->getTimestampColumns($this) as $name) {
-            if ($name && !array_key_exists($name, $casts)) {
-                $casts[$name] = 'date';
-            }
-        }
-
-        return $casts;
-    }
-
-    public function getAppendFields(): array
-    {
-        return $this->appends ?? [];
     }
 
     private function getAppendAttributeMethod(string $operation, string $name): string
     {
         return $operation . Str::camel($name) . 'Attribute';
-    }
-
-    public function isAppend(string $name): bool
-    {
-        return in_array($name, $this->getAppendFields());
-    }
-
-    public function hasGetAppend(string $name): bool
-    {
-        return method_exists($this, $this->getAppendAttributeMethod('get', $name));
-    }
-
-    public function hasSetAppend(string $name): bool
-    {
-        return method_exists($this, $this->getAppendAttributeMethod('set', $name));
-    }
-
-    public function getGrid(): Grid
-    {
-        return new Grid($this);
-    }
-
-    public static function grid(): Grid
-    {
-        return new Grid(static::class);
     }
 }

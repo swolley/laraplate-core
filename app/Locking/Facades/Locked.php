@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Facades;
 
+use Override;
 use Illuminate\Support\Facades\Facade;
 
 /**
  * @see \Sfolador\Locked\Locked
  */
-class Locked extends Facade
+final class Locked extends Facade
 {
-    #[\Override]
+    #[Override]
     protected static function getFacadeAccessor()
     {
         return \Modules\Core\Locking\Locked::class;

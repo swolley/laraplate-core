@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Illuminate\Support\Str;
-use Doctrine\DBAL\Types\Type;
-use InvalidArgumentException;
 use function Laravel\Prompts\text;
-use Illuminate\Support\Collection;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\suggest;
+use function Laravel\Prompts\multiselect;
+
+use Override;
+use ReflectionClass;
+use ReflectionMethod;
+use Illuminate\Support\Str;
+use Doctrine\DBAL\Types\Type;
+use InvalidArgumentException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasValidations;
-use function Laravel\Prompts\multiselect;
 use Symfony\Component\Console\Input\InputInterface;
 use Illuminate\Console\Concerns\CreatesMatchingTest;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -27,9 +31,9 @@ use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
 /**
  * @psalm-suppress PropertyNotSetInConstructor
  */
-class ModelMakeCommand extends BaseModelMakeCommand
+final class ModelMakeCommand extends BaseModelMakeCommand
 {
-    use PromptsForMissingInput, HasBenchmark;
+    use HasBenchmark, PromptsForMissingInput;
 
     protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
@@ -72,7 +76,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
             'timestamp' => 'datetime',
         ],
         'Other Types' => [
-            /*'ascii_string',
+        /*'ascii_string',
             'decimal',
             'guid'*/],
         'Relationships/Associations' => [
@@ -83,6 +87,227 @@ class ModelMakeCommand extends BaseModelMakeCommand
             'relation\OneToOne' => 'hasOne',
         ],
     ];
+
+    #[Override]
+    public function handle(): void
+    {
+        $name = Str::studly($this->getNameInput());
+        $table_name = Str::plural(Str::snake($name));
+
+        if ($this->isReservedName($name)) {
+            $this->error('The name ' . $name . ' is reserved by PHP.');
+
+            return;
+        }
+
+        /** @var class-string $name */
+        $name = $this->qualifyClass($name);
+        $path = $this->getPath($name);
+
+        $bypass_interaction = false;
+
+        $this->isNewClass = ! in_array($this->getNameInput(), $this->availableClasses, true);
+
+        if ($this->isNewClass) {
+            $this->makeDirectory($path);
+
+            $class_code = $this->sortImports($this->buildClass($name));
+            $class_code = $this->addDefaultSections($name, $class_code);
+
+            if (Schema::hasTable($table_name)) {
+                $this->info('An unmapped table with the same name was found in the schema');
+
+                if (confirm(sprintf("Would you like to automatically map '%s' table?", $table_name))) {
+                    $all_types = array_merge(...array_values($this->availableTypes));
+
+                    /** @var Model $class */
+                    $class = DynamicEntity::resolve($table_name);
+
+                    foreach ($class->getFillable() as $fillable) {
+                        /** @var string $class_code */
+                        $class_code = $this->addPropertyIntoFillables($class_code, $fillable);
+                    }
+                    $casts = $class->casts();
+
+                    foreach ($casts as $property => $cast) {
+                        $class_code = $this->addPropertyIntoCasts($class_code, $property, $cast);
+                    }
+
+                    foreach ($class->getHidden() as $hidden) {
+                        /** @var string $class_code */
+                        $class_code = $this->addPropertyIntoHidden($class_code, $hidden);
+                    }
+                    $found_rules = [];
+
+                    if (class_uses_trait($class, HasValidations::class)) {
+                        foreach ($class->getRules() as $property => $rules) {
+                            $found_rules[$property] = $rules;
+                        }
+                    }
+
+                    foreach ($class->getAppends() as $append) {
+                        $type = $casts[$append] ?? 'text';
+                        $nullable = isset($found_rules[$append]) ? (gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)) : true;
+                        $method_subfix = Str::studly($append) . 'Attribute';
+
+                        if (method_exists($class, 'get' . $method_subfix)) {
+                            $getter = new ReflectionMethod($class, 'get' . $method_subfix);
+                            $type = $getter->getReturnType() ?? 'text';
+                        } elseif (method_exists($class, 'set' . $method_subfix)) {
+                            $setter = new ReflectionMethod($class, 'set' . $method_subfix);
+                            $type = $setter->getReturnType() ?? 'text';
+                        }
+                        $class_code = $this->addPropertyIntoAccessorsMutators($class_code, $append, $type, $nullable, $all_types);
+                    }
+
+                    $bypass_interaction = true;
+                }
+            }
+
+            $this->files->put($path, $class_code);
+
+            $info = $this->type;
+
+            if (class_uses_trait($name, CreatesMatchingTest::class) && $this->handleTestCreation($path)) {
+                $info .= ' and test';
+            }
+
+            $this->info(sprintf('%s [%s] created successfully.', $info, $path));
+            $this->newLine();
+        } else {
+            $class_code = $this->files->get($path);
+        }
+
+        if (! $bypass_interaction) {
+            $this->proceedWithModelAttributes($name, $class_code, $path);
+        }
+    }
+
+    #[Override]
+    protected function possibleModels()
+    {
+        return models(false);
+    }
+
+    #[Override]
+    protected function qualifyClass($name)
+    {
+        $name = mb_ltrim($name, '\\/');
+
+        $name = str_replace('/', '\\', $name);
+
+        $rootNamespace = $this->rootNamespace();
+
+        if (Str::startsWith($name, $rootNamespace) || Str::startsWith($name, config('modules.namespace'))) {
+            return $name;
+        }
+
+        return $this->qualifyClass(
+            $this->getDefaultNamespace(mb_trim($rootNamespace, '\\')) . '\\' . $name,
+        );
+    }
+
+    #[Override]
+    protected function getPath($name)
+    {
+        $name = Str::replaceFirst($this->rootNamespace(), '', $name);
+        $path_suffix = Str::after($name, 'Models\\');
+
+        return (
+            Str::startsWith($name, config('modules.namespace'))
+            ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
+            : $this->laravel['path']
+        ) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
+    }
+
+    #[Override]
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $this->availableClasses = $this->possibleModels();
+
+        return parent::execute($input, $output);
+    }
+
+    #[Override]
+    protected function promptForMissingArguments(InputInterface $input, OutputInterface $output): void
+    {
+        $this->availableClasses = $this->possibleModels();
+
+        $prompted = collect($this->getDefinition()->getArguments())
+            ->filter(fn ($argument) => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
+            ->filter(fn ($argument) => $argument->getName() !== 'command')
+            ->each(function ($argument) use ($input): void {
+                $question = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst($argument->getDescription()) . '?';
+                $arg_name = $argument->getName();
+
+                /** @psalm-suppress ArgumentTypeCoercion */
+                $cb = $arg_name === 'name'
+                    ? $this->askPersistentlyWithCompletion($question, $this->availableClasses)
+                    : text($question, required: true);
+                $input->setArgument($arg_name, $cb);
+            })
+            ->isNotEmpty();
+
+        if ($prompted) {
+            $this->afterPromptingForMissingArguments($input, $output);
+        }
+    }
+
+    #[Override]
+    protected function afterPromptingForMissingArguments(InputInterface $input, OutputInterface $output): void
+    {
+        $this->isNewClass = ! in_array($this->getNameInput(), $this->availableClasses, true);
+
+        if (! $this->isNewClass) {
+            $this->info(sprintf('%s already exists.', $this->qualifyClass($this->getNameInput())));
+        }
+
+        if ($this->isReservedName($this->getNameInput()) || $this->didReceiveOptions($input)) {
+            return;
+        }
+
+        collect(
+            multiselect(
+                'Would you like any of the following?',
+                [
+                    'all',
+                    'factory',
+                    'form requests',
+                    'migration',
+                    'policy',
+                    'resource controller',
+                    'seed',
+                ],
+                default: $this->isNewClass ? ['migration'] : [],
+            ),
+        )
+            ->map(fn ($option) => match ($option) {
+                'resource controller' => 'resource',
+                'form requests' => 'requests',
+                default => $option,
+            })
+            ->each(fn ($option)
+            /** @var string $option */
+            => $input->setOption($option, true));
+    }
+
+    #[Override]
+    protected function createMigration(): void
+    {
+        /** @var string $name */
+        $name = $this->argument('name');
+        $table = Str::snake(Str::pluralStudly(class_basename($name)));
+
+        if ($this->option('pivot')) {
+            $table = Str::singular($table);
+        }
+
+        $this->call('make:migration', [
+            'name' => ($this->isNewClass ? 'create' : 'update') . "_{$table}_table",
+            ($this->isNewClass ? '--create' : '--update') => $table,
+            '--fullpath' => true,
+        ]);
+    }
 
     private function array_last(string $needle, array $array): int|false
     {
@@ -169,233 +394,13 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return str_replace('App\\Models\\', '', $className);
     }
 
-    #[\Override]
-    public function handle(): void
-    {
-        $name = Str::studly($this->getNameInput());
-        $table_name = Str::plural(Str::snake($name));
-
-        if ($this->isReservedName($name)) {
-            $this->error('The name ' . $name . ' is reserved by PHP.');
-
-            return;
-        }
-
-        /** @var class-string $name */
-        $name = $this->qualifyClass($name);
-        $path = $this->getPath($name);
-
-        $bypass_interaction = false;
-
-        $this->isNewClass = !in_array($this->getNameInput(), $this->availableClasses, true);
-
-        if ($this->isNewClass) {
-            $this->makeDirectory($path);
-
-            $class_code = $this->sortImports($this->buildClass($name));
-            $class_code = $this->addDefaultSections($name, $class_code);
-
-            if (Schema::hasTable($table_name)) {
-                $this->info('An unmapped table with the same name was found in the schema');
-
-                if (confirm(sprintf("Would you like to automatically map '%s' table?", $table_name))) {
-                    $all_types = array_merge(...array_values($this->availableTypes));
-                    /** @var Model $class */
-                    $class = DynamicEntity::resolve($table_name);
-
-                    foreach ($class->getFillable() as $fillable) {
-                        /** @var string $class_code */
-                        $class_code = $this->addPropertyIntoFillables($class_code, $fillable);
-                    }
-                    $casts = $class->casts();
-
-                    foreach ($casts as $property => $cast) {
-                        $class_code = $this->addPropertyIntoCasts($class_code, $property, $cast);
-                    }
-
-                    foreach ($class->getHidden() as $hidden) {
-                        /** @var string $class_code */
-                        $class_code = $this->addPropertyIntoHidden($class_code, $hidden);
-                    }
-                    $found_rules = [];
-
-                    if (class_uses_trait($class, HasValidations::class)) {
-                        foreach ($class->getRules() as $property => $rules) {
-                            $found_rules[$property] = $rules;
-                        }
-                    }
-
-                    foreach ($class->getAppends() as $append) {
-                        $type = $casts[$append] ?? 'text';
-                        $nullable = isset($found_rules[$append]) ? (gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)) : true;
-                        $method_subfix = Str::studly($append) . 'Attribute';
-
-                        if (method_exists($class, 'get' . $method_subfix)) {
-                            $getter = new \ReflectionMethod($class, 'get' . $method_subfix);
-                            $type = $getter->getReturnType() ?? 'text';
-                        } elseif (method_exists($class, 'set' . $method_subfix)) {
-                            $setter = new \ReflectionMethod($class, 'set' . $method_subfix);
-                            $type = $setter->getReturnType() ?? 'text';
-                        }
-                        $class_code = $this->addPropertyIntoAccessorsMutators($class_code, $append, $type, $nullable, $all_types);
-                    }
-
-                    $bypass_interaction = true;
-                }
-            }
-
-            $this->files->put($path, $class_code);
-
-            $info = $this->type;
-
-            if (class_uses_trait($name, CreatesMatchingTest::class) && $this->handleTestCreation($path)) {
-                $info .= ' and test';
-            }
-
-            $this->info(sprintf('%s [%s] created successfully.', $info, $path));
-            $this->newLine();
-        } else {
-            $class_code = $this->files->get($path);
-        }
-
-        if (!$bypass_interaction) {
-            $this->proceedWithModelAttributes($name, $class_code, $path);
-        }
-    }
-
-    #[\Override]
-    protected function possibleModels()
-    {
-        return models(false);
-    }
-
-    #[\Override]
-    protected function qualifyClass($name)
-    {
-        $name = ltrim($name, '\\/');
-
-        $name = str_replace('/', '\\', $name);
-
-        $rootNamespace = $this->rootNamespace();
-
-        if (Str::startsWith($name, $rootNamespace) || Str::startsWith($name, config('modules.namespace'))) {
-            return $name;
-        }
-
-        return $this->qualifyClass(
-            $this->getDefaultNamespace(trim($rootNamespace, '\\')) . '\\' . $name,
-        );
-    }
-
-    #[\Override]
-    protected function getPath($name)
-    {
-        $name = Str::replaceFirst($this->rootNamespace(), '', $name);
-        $path_suffix = Str::after($name, 'Models\\');
-
-        return (
-            Str::startsWith($name, config('modules.namespace'))
-            ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
-            : $this->laravel['path']
-        ) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
-    }
-
-    #[\Override]
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $this->availableClasses = $this->possibleModels();
-
-        return parent::execute($input, $output);
-    }
-
-    #[\Override]
-    protected function promptForMissingArguments(InputInterface $input, OutputInterface $output): void
-    {
-        $this->availableClasses = $this->possibleModels();
-
-        $prompted = collect($this->getDefinition()->getArguments())
-            ->filter(fn($argument) => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
-            ->filter(fn($argument) => $argument->getName() !== 'command')
-            ->each(function ($argument) use ($input): void {
-                $question = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst($argument->getDescription()) . '?';
-                $arg_name = $argument->getName();
-
-                /** @psalm-suppress ArgumentTypeCoercion */
-                $cb = $arg_name === 'name'
-                    ? $this->askPersistentlyWithCompletion($question, $this->availableClasses)
-                    : text($question, required: true);
-                $input->setArgument($arg_name, $cb);
-            })
-            ->isNotEmpty();
-
-        if ($prompted) {
-            $this->afterPromptingForMissingArguments($input, $output);
-        }
-    }
-
-    #[\Override]
-    protected function afterPromptingForMissingArguments(InputInterface $input, OutputInterface $output): void
-    {
-        $this->isNewClass = !in_array($this->getNameInput(), $this->availableClasses, true);
-
-        if (!$this->isNewClass) {
-            $this->info(sprintf('%s already exists.', $this->qualifyClass($this->getNameInput())));
-        }
-
-        if ($this->isReservedName($this->getNameInput()) || $this->didReceiveOptions($input)) {
-            return;
-        }
-
-        collect(
-            multiselect(
-                'Would you like any of the following?',
-                [
-                    'all',
-                    'factory',
-                    'form requests',
-                    'migration',
-                    'policy',
-                    'resource controller',
-                    'seed',
-                ],
-                default: $this->isNewClass ? ['migration'] : [],
-            ),
-        )
-            ->map(fn($option) => match ($option) {
-                'resource controller' => 'resource',
-                'form requests' => 'requests',
-                default => $option,
-            })
-            ->each(fn($option) =>
-            /** @var string $option */
-            $input->setOption($option, true));
-    }
-
-    #[\Override]
-    protected function createMigration(): void
-    {
-        /** @var string $name */
-        $name = $this->argument('name');
-        $table = Str::snake(Str::pluralStudly(class_basename($name)));
-
-        if ($this->option('pivot')) {
-            $table = Str::singular($table);
-        }
-
-        $this->call('make:migration', [
-            'name' => ($this->isNewClass ? 'create' : 'update') . "_{$table}_table",
-            ($this->isNewClass ? '--create' : '--update') => $table,
-            '--fullpath' => true,
-        ]);
-    }
-
     /**
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $className
+     * @param  class-string<Model>  $className
      * @return array<int,mixed>
      */
     private function getClassFields(string $className): array
     {
-        $ref = new \ReflectionClass($className);
+        $ref = new ReflectionClass($className);
         $temp_instance = $ref->newInstance();
         $already_existent_fields = [];
 
@@ -449,7 +454,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         $exploded = explode('\\', $relatedName);
         $targetEntityShort = end($exploded);
 
-        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn($type) => $type !== 'relation');
+        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn ($type) => $type !== 'relation');
 
         /** @var Collection<int, list{array<array-key, string>|string, string}> */
         $rows = new Collection();
@@ -494,6 +499,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         $defaultType = 'string';
 
         $suffix = mb_substr($fieldName, -3);
+
         if ($suffix === '_at') {
             $defaultType = 'datetime';
         } elseif ($suffix === '_id') {
@@ -645,12 +651,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param array<string,array<string,string>> $allTypes 
-     * @return string 
+     * @param  array<string,array<string,string>>  $allTypes
      */
     private function addPropertyIntoAccessorsMutators(string $classCode, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
-        if (!$fieldNullable) {
+        if (! $fieldNullable) {
             $search = '#region [ACCESSORS_MUTATORS]';
             $pos = Str::position($classCode, $search);
             $field_real_type = $allTypes[$fieldType];
@@ -659,7 +664,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
             if ($field_real_type === 'datetime') {
                 $imported_carbon_class = $this->injectImportClass($classCode, \Illuminate\Support\Carbon::class);
 
-                if (!$imported_carbon_class) {
+                if (! $imported_carbon_class) {
                     $field_real_type = \Illuminate\Support\Carbon::class;
                 }
             }
@@ -688,9 +693,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param class-string $className
-     * @param array<string,array<string,string>> $allTypes
-     * @return string
+     * @param  class-string  $className
+     * @param  array<string,array<string,string>>  $allTypes
      */
     private function updateClassWithNewProperty(string $className, string $classCode, string $classPath, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
@@ -731,26 +735,26 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param class-string $className
-     * @param class-string $relatedClass
-     * @param class-string $fullRelatedClass
+     * @param  class-string  $className
+     * @param  class-string  $relatedClass
+     * @param  class-string  $fullRelatedClass
      */
     private function handleAskInversedRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
     {
         $short_class = $this->stripModelsNamespace($className);
         $create_reverse_relation = $this->confirm("Do you want to create a method into class {$relatedClass} to access {$short_class}?", true);
 
-        if (!$create_reverse_relation) {
+        if (! $create_reverse_relation) {
             return;
         }
         $reversed_relation = $this->getReversedRelationType($relationType);
 
-        if (!$reversed_relation) {
+        if (! $reversed_relation) {
             return;
         }
         $proposed_name = $this->proposeInversedName($short_class, $reversed_relation);
 
-        if (!$proposed_name) {
+        if (! $proposed_name) {
             return;
         }
         $inverted_relation_name = text("What is the name of the reversed relation? [{$proposed_name}]", default: $proposed_name);
@@ -760,9 +764,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param class-string $className
-     * @param class-string $relatedClass
-     * @return string
+     * @param  class-string  $className
+     * @param  class-string  $relatedClass
      */
     private function updateClassWithNewRelation(string $className, string $classCode, string $classPath, string $relationName, string $relationType, string $relatedClass, bool $isInversed = false): string
     {
@@ -799,7 +802,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
         $this->files->put($classPath, $classCode);
 
         // reverse relation
-        if (!$isInversed) {
+        if (! $isInversed) {
             $this->handleAskInversedRelation($className, $relatedClass, $full_related_class, $relationType);
         }
 
@@ -807,9 +810,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param array<int,string> $newFields
-     * @param array<int,string> $alreadyExistentFields
-     * @return string|false
+     * @param  array<int,string>  $newFields
+     * @param  array<int,string>  $alreadyExistentFields
      */
     private function askForPropertyName(array $newFields, array $alreadyExistentFields): string|false
     {
@@ -817,7 +819,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
             ($newFields === [] ? '' : 'Add another property? ') . 'New property name',
             hint: 'press <return> to stop adding fields',
             validate: function (string $field_name) use ($newFields, $alreadyExistentFields) {
-                $field_name = Str::snake(trim($field_name));
+                $field_name = Str::snake(mb_trim($field_name));
 
                 if (in_array($field_name, $newFields, true) || in_array($field_name, $alreadyExistentFields, true)) {
                     return "The \"{$field_name}\" property already exists.";
@@ -827,11 +829,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
             },
         );
 
-        return $field_name !== '' && $field_name !== '0' ? Str::snake(trim($field_name)) : false;
+        return $field_name !== '' && $field_name !== '0' ? Str::snake(mb_trim($field_name)) : false;
     }
 
     /**
-     * @param class-string $className
+     * @param  class-string  $className
      */
     private function proceedWithModelAttributes(string $className, string $classCode, string $classPath): void
     {
@@ -862,8 +864,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
                 "\"{$field_name}\" field type [{$default_type}]:",
                 $all_input_types,
                 placeholder: $default_type,
-                validate: fn(string $value) => match (true) {
-                    !in_array($value, $all_input_types, true) => "Invalid type \"{$value}\"",
+                validate: fn (string $value) => match (true) {
+                    ! in_array($value, $all_input_types, true) => "Invalid type \"{$value}\"",
                     default => null,
                 },
             );
@@ -873,7 +875,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
             }
 
             if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {
-                if (!$related_class) {
+                if (! $related_class) {
                     throw new InvalidArgumentException('Missing related class attribute');
                 }
 
@@ -898,7 +900,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     {
         return suggest(
             $question,
-            fn($value) => array_filter($choices, fn($name) => Str::contains($name, $value, ignoreCase: true)),
+            fn ($value) => array_filter($choices, fn ($name) => Str::contains($name, $value, ignoreCase: true)),
             required: true,
         );
     }

@@ -11,7 +11,7 @@ trait HasPath
     protected string $path = '';
 
     /**
-     * gets the object name property
+     * gets the object name property.
      */
     public function getName(): string
     {
@@ -19,7 +19,7 @@ trait HasPath
     }
 
     /**
-     * gets the object path property
+     * gets the object path property.
      */
     public function getPath(): string
     {
@@ -27,15 +27,15 @@ trait HasPath
     }
 
     /**
-     * gets the object full name (path + name)
+     * gets the object full name (path + name).
      */
     public function getFullName(): string
     {
-        return (strlen($this->getPath()) !== 0 ? ($this->getPath() . '.') : '') . $this->getName();
+        return (mb_strlen($this->getPath()) !== 0 ? ($this->getPath() . '.') : '') . $this->getName();
     }
 
     /**
-     * splits full path into a [path, name] tuuple
+     * splits full path into a [path, name] tuuple.
      *
      *
      * @return string[]

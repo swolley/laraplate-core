@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Override;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -29,7 +30,7 @@ use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
  */
 final class DynamicEntity extends Model
 {
-    use HasValidations, SoftDeletes, HasGridUtils /* , HasAcl? */, HasVersions;
+    use HasGridUtils, HasValidations, HasVersions /* , HasAcl? */, SoftDeletes;
 
     /**
      * @var bool
@@ -40,18 +41,10 @@ final class DynamicEntity extends Model
 
     private array $dynamic_casts = [];
 
-    /**
-     * @return array<string, string>
-     */
-    #[\Override]
-    protected function casts(): array
-    {
-        return $this->dynamic_casts;
-    }
-
     public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
         $model = self::tryResolveModel($tableName, $connection);
+
         if ($model) {
             return new $model($attributes);
         }
@@ -62,14 +55,13 @@ final class DynamicEntity extends Model
             return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request) {
                 $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
+
                 return $model;
             });
         }
 
         throw new UnexpectedValueException('Dynamic tables mapping is not enabled');
     }
-
-
 
     /**
      * @psalm-suppress MoreSpecificReturnType
@@ -78,8 +70,8 @@ final class DynamicEntity extends Model
      * @throws BindingResolutionException
      * @throws Exception
      * @throws InvalidArgumentException
-     * @return class-string<Model>|null
      *
+     * @return null|class-string<Model>
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
     {
@@ -88,7 +80,7 @@ final class DynamicEntity extends Model
 
         $found ??= self::findModel($models, Str::singular($requestEntity));
 
-        if (!$found) {
+        if (! $found) {
             return null;
         }
 
@@ -96,22 +88,6 @@ final class DynamicEntity extends Model
         $connection = $instance->getConnectionName();
 
         return $connection === $requestConnection ? $found : null;
-    }
-
-    /**
-     * @throws Exception
-     * @return class-string<Model>|null
-     *
-     */
-    private static function findModel(array $models, string $modelName): ?string
-    {
-        $found = array_filter($models, fn($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
-
-        if (count($found) > 1) {
-            throw new \Exception("Too many models found for '{$modelName}'");
-        }
-
-        return count($found) === 1 ? head($found) : null;
     }
 
     public function getDynamicRelations(): array
@@ -133,27 +109,50 @@ final class DynamicEntity extends Model
         }
         $this->setDirectRelationsInfo($inspected->foreignKeys);
 
-        if ($request instanceof \Illuminate\Http\Request) {
+        if ($request instanceof Request) {
             $this->setReverseRelationsInfo($request);
         }
         $this->setColumnsInfo($inspected->columns, $inspected->foreignKeys, $inspected->indexes);
     }
 
-    #[\Override]
+    #[Override]
     public function jsonSerialize(): mixed
     {
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, fn($v) => gettype($v) !== 'string' || !(mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, fn ($v) => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     /**
+     * @return array<string, string>
      */
+    #[Override]
+    protected function casts(): array
+    {
+        return $this->dynamic_casts;
+    }
+
+    /**
+     * @throws Exception
+     *
+     * @return null|class-string<Model>
+     */
+    private static function findModel(array $models, string $modelName): ?string
+    {
+        $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
+
+        if (count($found) > 1) {
+            throw new \Exception("Too many models found for '{$modelName}'");
+        }
+
+        return count($found) === 1 ? head($found) : null;
+    }
+
     private function verifyTableEsistance(): void
     {
         /** @phpstan-ignore staticMethod.notFound */
-        if (!Schema::connection($this->connection)->hasTable($this->table)) {
+        if (! Schema::connection($this->connection)->hasTable($this->table)) {
             throw new UnexpectedValueException("Table '{$this->table}' doesn't exists on '{$this->connection}' connection");
         }
     }
@@ -168,9 +167,8 @@ final class DynamicEntity extends Model
     }
 
     /**
-     *
-     * @param Collection<Index> $primaryKeyIndex
-     * @param Collection<Column> $primaryKeyColumns
+     * @param  Collection<Index>  $primaryKeyIndex
+     * @param  Collection<Column>  $primaryKeyColumns
      */
     private function setPrimaryKeyInfo(Index $primaryKeyIndex, Collection $primaryKeyColumns): void
     {
@@ -180,19 +178,19 @@ final class DynamicEntity extends Model
             $this->incrementing = false;
         } else {
             $first_column = $primaryKeyColumns->first();
+
             if ($first_column) {
                 $this->primaryKey = $first_column->name;
                 $this->incrementing = $first_column->autoincrement;
-                $this->keyType = $first_column->type->value && !Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
+                $this->keyType = $first_column->type->value && ! Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
             }
         }
     }
 
     /**
-     *
-     * @param Collection<Column> $columns
-     * @param Collection<ForeignKey> $foreignKeys
-     * @param Collection<Index> $indexes
+     * @param  Collection<Column>  $columns
+     * @param  Collection<ForeignKey>  $foreignKeys
+     * @param  Collection<Index>  $indexes
      */
     private function setColumnsInfo(Collection $columns, Collection $foreignKeys, Collection $indexes): void
     {
@@ -202,9 +200,8 @@ final class DynamicEntity extends Model
     }
 
     /**
-     *
-     * @param Collection<ForeignKey> $foreignKeys
-     * @param Collection<Index> $indexes
+     * @param  Collection<ForeignKey>  $foreignKeys
+     * @param  Collection<Index>  $indexes
      */
     private function setColumnInfo(Column $column, Collection $foreignKeys, Collection $indexes): void
     {
@@ -224,7 +221,7 @@ final class DynamicEntity extends Model
         }
 
         // add to fillabless if is not readonly or autoincrement
-        if (!$column->isAutoincrement()) {
+        if (! $column->isAutoincrement()) {
             $this->fillable[] = $column->name;
         }
 
@@ -239,11 +236,11 @@ final class DynamicEntity extends Model
 
         $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
 
-        if (!$column->isUnsigned()) {
+        if (! $column->isUnsigned()) {
             $rules[self::DEFAULT_RULE][$column->name][] = 'min:0';
         }
 
-        if (!$column->isNullable()) {
+        if (! $column->isNullable()) {
             $rules[self::DEFAULT_RULE][$column->name][] = 'required';
         }
 
@@ -256,7 +253,7 @@ final class DynamicEntity extends Model
         }
 
         if (in_array($column->name, $remapped_uidxs, true)) {
-            $rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete) {
+            $rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void {
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');
                 }
@@ -269,8 +266,7 @@ final class DynamicEntity extends Model
     }
 
     /**
-     *
-     * @param Collection<ForeignKey> $foreignKeys
+     * @param  Collection<ForeignKey>  $foreignKeys
      */
     private function setDirectRelationsInfo(Collection $foreignKeys): void
     {
@@ -287,11 +283,9 @@ final class DynamicEntity extends Model
         ];
     }
 
-    /**
-     */
     private function setReverseRelationsInfo(Request $request): void
     {
-        if (!$request->has('relations')) {
+        if (! $request->has('relations')) {
             return;
         }
 
@@ -302,7 +296,7 @@ final class DynamicEntity extends Model
 
     private function setReverseRelationInfo(string $relationName): void
     {
-        $resolved_model = DynamicEntity::resolve($relationName, $this->getConnectionName());
+        $resolved_model = self::resolve($relationName, $this->getConnectionName());
         $reverse_relations = $resolved_model->getDynamicRelations();
 
         foreach ($reverse_relations as $relation => $relation_data) {

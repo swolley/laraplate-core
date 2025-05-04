@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-class PivotRelationInfo extends RelationInfo
+final class PivotRelationInfo extends RelationInfo
 {
     /**
-     * {@inheritDoc}
-     *
      * @param  string  $pivotTable  pivot table name for many-to-many relations
      * @param  string  $pivotOwnerKey  pivot owner key
      * @param  string  $pivotForeignKey  pivot foreign key
@@ -19,7 +17,7 @@ class PivotRelationInfo extends RelationInfo
     }
 
     /**
-     * creates new instance of PivotRelationInfo from simpler RelationInfo object
+     * creates new instance of PivotRelationInfo from simpler RelationInfo object.
      *
      * @param  RelationInfo  $relationInfo  simpler relation info data
      * @param  string  $pivotTable  pivot table name for many-to-many relations
@@ -28,7 +26,7 @@ class PivotRelationInfo extends RelationInfo
      */
     public static function fromRelationInfo(RelationInfo $relationInfo, string $pivotTable, string $pivotOwnerKey, string $pivotForeignKey): static
     {
-        return new static(
+        return new self(
             $relationInfo->getType(),
             $relationInfo->getName(),
             $relationInfo->getModel(),
@@ -42,7 +40,7 @@ class PivotRelationInfo extends RelationInfo
     }
 
     /**
-     * gets pivot table name
+     * gets pivot table name.
      */
     public function getPivotTable(): string
     {
@@ -50,7 +48,7 @@ class PivotRelationInfo extends RelationInfo
     }
 
     /**
-     * gets pivot owner key
+     * gets pivot owner key.
      */
     public function getPivotOwnerKey(): string
     {
@@ -58,7 +56,7 @@ class PivotRelationInfo extends RelationInfo
     }
 
     /**
-     * gets pivot foreign key
+     * gets pivot foreign key.
      */
     public function getPivotForeignKey(): string
     {

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
+use Override;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\Permission;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-class PermissionFactory extends Factory
+final class PermissionFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -22,7 +23,7 @@ class PermissionFactory extends Factory
      *
      * @return array<string, mixed>
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         $connection = fake()->randomElement(['default', mb_strtolower(fake()->word())]);

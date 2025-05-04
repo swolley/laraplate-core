@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
+use Override;
 use Illuminate\Support\Str;
 use Modules\Core\Models\User;
 use Illuminate\Support\Carbon;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\Modules\Core\Models\User>
  */
-class UserFactory extends Factory
+final class UserFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
@@ -27,15 +28,16 @@ class UserFactory extends Factory
      *
      * @return array<Carbon|string>
      *
-     * @psalm-return array{name: string, email: string, email_verified_at: \Illuminate\Support\Carbon, password: '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', remember_token: string}
+     * @psalm-return array{name: string, email: string, email_verified_at: Carbon, password: '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', remember_token: string}
      */
-    #[\Override]
+    #[Override]
     public function definition(): array
     {
         $name = fake()->boolean() ? fake()->name() : fake()->userName();
         $username = Str::slug($name) . (fake()->boolean() ? fake()->numberBetween(0, 999999) : '');
         $email_name = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
-        $suffix = fake()->boolean() ? substr('0' . fake()->numberBetween(1, 99), -2) : '';
+        $suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
+
         return [
             'name' => $name,
             'username' => $username,
@@ -51,7 +53,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn() => [
+        return $this->state(fn () => [
             'email_verified_at' => null,
         ]);
     }

@@ -25,20 +25,20 @@ return [
                     'italian_analyzer' => [
                         'type' => 'custom',
                         'tokenizer' => 'standard',
-                        'filter' => ['lowercase', 'italian_stemmer', 'italian_stop']
-                    ]
+                        'filter' => ['lowercase', 'italian_stemmer', 'italian_stop'],
+                    ],
                 ],
                 'filter' => [
                     'italian_stemmer' => [
                         'type' => 'stemmer',
-                        'language' => 'italian'
+                        'language' => 'italian',
                     ],
                     'italian_stop' => [
                         'type' => 'stop',
-                        'stopwords' => '_italian_'
-                    ]
-                ]
-            ]
+                        'stopwords' => '_italian_',
+                    ],
+                ],
+            ],
         ],
 
         // Index prefix

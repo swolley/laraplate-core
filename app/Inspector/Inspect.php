@@ -13,7 +13,7 @@ use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 
-class Inspect
+final class Inspect
 {
     /**
      * Retrieve a particular table for a given database connection.
@@ -22,6 +22,7 @@ class Inspect
     {
         $key_name = ($schema ?? 'default') . '_' . $name;
         $inspected_data = Cache::tags(['inspector', $schema ?? 'default'])->get($key_name);
+
         if ($inspected_data) {
             return $inspected_data;
         }
@@ -29,9 +30,9 @@ class Inspect
         /** @phpstan-ignore staticMethod.notFound */
         $connection = Schema::connection($schema);
         $tables = $connection->getTables();
-        $table = Arr::first($tables, fn($table) => $table['name'] === $name);
+        $table = Arr::first($tables, fn ($table) => $table['name'] === $name);
 
-        if (!$table) {
+        if (! $table) {
             return null;
         }
 
@@ -40,7 +41,7 @@ class Inspect
         $indexes = self::parseIndexes($connection->getIndexes($table['name']));
         $foreignKeys = self::parseForeignKeys($connection->getForeignKeys($table['name']), $database_name, $schema);
 
-        $inspected_data =  new Table(
+        $inspected_data = new Table(
             $table['name'],
             $columns,
             $indexes,
@@ -60,7 +61,8 @@ class Inspect
     public static function columns(string $table, ?string $schema = null): Collection
     {
         $table = self::table($table, $schema);
-        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
+
+        if ($table instanceof Table) {
             return $table->columns;
         }
 
@@ -73,7 +75,8 @@ class Inspect
     public static function indexes(string $table, ?string $schema = null): Collection
     {
         $table = self::table($table, $schema);
-        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
+
+        if ($table instanceof Table) {
             return $table->indexes;
         }
 
@@ -86,7 +89,8 @@ class Inspect
     public static function foreignKeys(string $table, ?string $schema = null): Collection
     {
         $table = self::table($table, $schema);
-        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
+
+        if ($table instanceof Table) {
             return $table->foreignKeys;
         }
 
@@ -96,37 +100,34 @@ class Inspect
     /**
      * Retrieve a particular column of a particular table for a given
      * database connection.
-     *
      */
     public static function column(string $name, string $table, ?string $schema = null): ?Column
     {
         $columns = self::columns($table, $schema);
 
-        return Arr::first($columns, fn($column) => $column['name'] === $name);
+        return Arr::first($columns, fn ($column) => $column['name'] === $name);
     }
 
     /**
      * Retrieve a particular index of a particular table for a given
      * database connection.
-     *
      */
     public static function index(string $name, string $table, ?string $schema = null): ?Index
     {
         $indexes = self::indexes($table, $schema);
 
-        return Arr::first($indexes, fn($index) => $index['name'] === $name);
+        return Arr::first($indexes, fn ($index) => $index['name'] === $name);
     }
 
     /**
      * Retrieve a particular foreign key of a particular table for a given
      * database connection.
-     *
      */
     public static function foreignKey(string $name, string $table, ?string $schema = null): ?ForeignKey
     {
         $foreigns = self::foreignKeys($table, $schema);
 
-        return Arr::first($foreigns, fn($foreign) => $foreign['name'] === $name);
+        return Arr::first($foreigns, fn ($foreign) => $foreign['name'] === $name);
     }
 
     private static function getAttributesForColumn(array $column): Collection
@@ -140,12 +141,11 @@ class Inspect
     }
 
     /**
-     *
      * @return Collection<Column>
      */
     private static function parseColumns(array $columns): Collection
     {
-        return collect($columns)->map(fn($column) => new Column(
+        return collect($columns)->map(fn ($column) => new Column(
             $column['name'],
             self::getAttributesForColumn($column),
             $column['default'],
@@ -158,18 +158,17 @@ class Inspect
         return collect([
             $index['type'],
             count($index['columns']) > 1 ? 'compound' : null,
-            $index['unique'] && !$index['primary'] ? 'unique' : null,
+            $index['unique'] && ! $index['primary'] ? 'unique' : null,
             $index['primary'] ? 'primary' : null,
         ])->filter();
     }
 
     /**
-     *
      * @return Collection<Index>
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(fn($index) => new Index(
+        return collect($indexes)->map(fn ($index) => new Index(
             $index['name'],
             collect($index['columns']),
             self::getAttributesForIndex($index),
@@ -181,7 +180,7 @@ class Inspect
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
-        return collect($keys)->map(fn($foreignKey) => new ForeignKey(
+        return collect($keys)->map(fn ($foreignKey) => new ForeignKey(
             $foreignKey['name'],
             collect($foreignKey['columns']),
             $foreignKey['foreign_schema'],

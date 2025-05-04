@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Laravel\Fortify\Features;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Fortify Guard
@@ -153,9 +154,11 @@ return [
         if (config('core.enable_user_registration')) {
             $features[] = Features::registration();
         }
+
         if (config('core.verify_new_user')) {
             $features[] = Features::emailVerification();
         }
+
         if (config('core.enable_user_2fa')) {
             $features[] = Features::twoFactorAuthentication([
                 'confirm' => true,
@@ -163,6 +166,7 @@ return [
                 // 'window' => 0,
             ]);
         }
+
         return $features;
     })(),
 ];

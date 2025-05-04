@@ -1,24 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Search\Console;
 
-use Illuminate\Contracts\Events\Dispatcher;
-use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
 use Modules\Core\Helpers\HasBenchmark;
+use Illuminate\Contracts\Events\Dispatcher;
 use Symfony\Component\Console\Command\Command;
+use Modules\Core\Search\Traits\SearchableCommandUtils;
 
-class ImportCommand extends \Laravel\Scout\Console\ImportCommand
+final class ImportCommand extends \Laravel\Scout\Console\ImportCommand
 {
-    use SearchableCommandUtils, HasBenchmark;
+    use HasBenchmark, SearchableCommandUtils;
 
     protected $description = 'Import the given model into the search index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
-    #[\Override]
+    #[Override]
     public function handle(Dispatcher $events)
     {
-        if (!$this->getModelClass()) {
+        if (! $this->getModelClass()) {
             return Command::FAILURE;
         }
+
         return parent::handle($events);
     }
 }

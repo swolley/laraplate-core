@@ -6,15 +6,14 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-class Table
+final class Table
 {
-    public readonly Index|null $primaryKey;
+    public readonly ?Index $primaryKey;
 
     /**
-     * 
-     * @param Collection<Column> $columns
-     * @param Collection<Index> $indexes
-     * @param Collection<ForeignKey> $foreignKeys
+     * @param  Collection<Column>  $columns
+     * @param  Collection<Index>  $indexes
+     * @param  Collection<ForeignKey>  $foreignKeys
      */
     public function __construct(
         public readonly string $name,
@@ -24,17 +23,16 @@ class Table
         public readonly string $schema,
         public readonly ?string $connection = null,
     ) {
-        $primaryKey = $indexes->filter(fn($index) => $index->attributes->contains('primary'));
+        $primaryKey = $indexes->filter(fn ($index) => $index->attributes->contains('primary'));
 
         $this->primaryKey = $primaryKey->isNotEmpty() ? $primaryKey->first() : null;
     }
 
     /**
-     *
      * @return Collection<Column>
      */
     public function getPrimaryKeyColumns(): Collection
     {
-        return $this->columns->filter(fn($c) => $this->primaryKey->columns->contains($c->name));
+        return $this->columns->filter(fn ($c) => $this->primaryKey->columns->contains($c->name));
     }
 }

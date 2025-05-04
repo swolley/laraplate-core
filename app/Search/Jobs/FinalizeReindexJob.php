@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
+use Log;
+use Exception;
+use Throwable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Queue\SerializesModels;
@@ -14,7 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 
-class FinalizeReindexJob implements ShouldQueue
+final class FinalizeReindexJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -27,7 +30,7 @@ class FinalizeReindexJob implements ShouldQueue
     public function __construct(
         private readonly string $index_name,
         private readonly string $temp_index,
-        private readonly string $reindex_key
+        private readonly string $reindex_key,
     ) {
         $this->onQueue('indexing');
     }
@@ -46,8 +49,8 @@ class FinalizeReindexJob implements ShouldQueue
             $elasticsearch_client = ClientBuilder::create()->build();
 
             // Verifichiamo che l'indice temporaneo esista
-            if (!$elasticsearch_client->indices()->exists(['index' => $this->temp_index])) {
-                throw new \Exception("Temporary index {$this->temp_index} does not exist");
+            if (! $elasticsearch_client->indices()->exists(['index' => $this->temp_index])) {
+                throw new Exception("Temporary index {$this->temp_index} does not exist");
             }
 
             // Se l'indice originale esiste, lo eliminiamo
@@ -58,37 +61,37 @@ class FinalizeReindexJob implements ShouldQueue
             // Rinominiamo l'indice temporaneo
             $elasticsearch_client->indices()->putAlias([
                 'index' => $this->temp_index,
-                'name' => $this->index_name
+                'name' => $this->index_name,
             ]);
 
             // Rimuoviamo il flag di reindicizzazione
             Cache::forget($this->reindex_key);
 
-            \Log::info('Elasticsearch reindexing completed', [
+            Log::info('Elasticsearch reindexing completed', [
                 'index' => $this->index_name,
-                'temp_index' => $this->temp_index
+                'temp_index' => $this->temp_index,
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Elasticsearch index finalization failed', [
+        } catch (Exception $e) {
+            Log::error('Elasticsearch index finalization failed', [
                 'index' => $this->index_name,
                 'temp_index' => $this->temp_index,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             throw $e;
         }
     }
 
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         // Rimuoviamo il flag di reindicizzazione anche in caso di fallimento
         Cache::forget($this->reindex_key);
 
-        \Log::error('FinalizeReindexJob failed', [
+        Log::error('FinalizeReindexJob failed', [
             'index' => $this->index_name,
             'temp_index' => $this->temp_index,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

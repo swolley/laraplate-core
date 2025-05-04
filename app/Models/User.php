@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Override;
 use Filament\Panel;
 use Illuminate\Validation\Rule;
 use Approval\Models\Modification;
@@ -32,24 +33,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[ObservedBy([UserObserver::class])]
 /**
- * @property \Illuminate\Database\Eloquent\Relations\BelongsToMany $roles
+ * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
-class User extends BaseUser implements FilamentUser
+final class User extends BaseUser implements FilamentUser
 {
     use ApprovesChanges,
         HasFactory,
         HasLocks,
+        HasRoles,
         HasValidations,
+        HasVersions,
         Impersonate,
-        TwoFactorAuthenticatable,
         Notifiable,
         SoftDeletes,
-        HasVersions,
-        HasRoles {
-        getRules as protected getRulesTrait;
-        roles as protected rolesTrait;
-    }
+        TwoFactorAuthenticatable {
+            getRules as protected getRulesTrait;
+            roles as protected rolesTrait;
+        }
 
     /**
      * The attributes that are mass assignable.
@@ -63,7 +65,7 @@ class User extends BaseUser implements FilamentUser
         'username',
         'email',
         'password',
-        'lang'
+        'lang',
     ];
 
     /**
@@ -86,30 +88,9 @@ class User extends BaseUser implements FilamentUser
         'email_verified_at',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    #[\Override]
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'created_at' => 'immutable_datetime',
-            'updated_at' => 'datetime',
-        ];
-    }
-
-    protected static function newFactory(): UserFactory
-    {
-        return UserFactory::new();
-    }
-
     public function isGuest(): bool
     {
-        return !property_exists($this, 'email') || $this->email === null;
+        return ! property_exists($this, 'email') || $this->email === null;
     }
 
     public function isSuperAdmin(): bool
@@ -128,6 +109,7 @@ class User extends BaseUser implements FilamentUser
         if ($this->isSuperAdmin()) {
             return true;
         }
+
         return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
     }
 
@@ -144,16 +126,6 @@ class User extends BaseUser implements FilamentUser
     public function getImpersonator(): self
     {
         return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
-    }
-
-    protected static function scopeSuperAdmin(Builder $query): Builder
-    {
-        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.superadmin')));
-    }
-
-    protected static function scopeAdmin(Builder $query): Builder
-    {
-        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.admin')));
     }
 
     /**
@@ -180,21 +152,6 @@ class User extends BaseUser implements FilamentUser
         return $this->rolesTrait()->using(ModelHasRole::class);
     }
 
-    protected function authorizedToApprove(Modification $mod): bool
-    {
-        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.approve');
-    }
-
-    protected function authorizedToDisapprove(Modification $mod): bool
-    {
-        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.disapprove');
-    }
-
-    protected function getDefaultGuardName(): string
-    {
-        return 'web';
-    }
-
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
@@ -208,9 +165,9 @@ class User extends BaseUser implements FilamentUser
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('users')->where(function ($query) {
+                Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
-                })
+                }),
             ],
             'email' => [
                 'required',
@@ -226,21 +183,67 @@ class User extends BaseUser implements FilamentUser
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('users')->where(function ($query) {
+                Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
-                })->ignore($this->id, 'id')
+                })->ignore($this->id, 'id'),
             ],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('users')->where(function ($query) {
+                Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
-                })->ignore($this->id, 'id')
+                })->ignore($this->id, 'id'),
             ],
             'password' => ['nullable', Password::default()],
         ]);
 
         return $rules;
+    }
+
+    protected static function newFactory(): UserFactory
+    {
+        return UserFactory::new();
+    }
+
+    protected static function scopeSuperAdmin(Builder $query): Builder
+    {
+        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
+    }
+
+    protected static function scopeAdmin(Builder $query): Builder
+    {
+        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    #[Override]
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'datetime',
+        ];
+    }
+
+    protected function authorizedToApprove(Modification $mod): bool
+    {
+        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.approve');
+    }
+
+    protected function authorizedToDisapprove(Modification $mod): bool
+    {
+        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.disapprove');
+    }
+
+    protected function getDefaultGuardName(): string
+    {
+        return 'web';
     }
 }

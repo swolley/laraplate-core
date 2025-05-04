@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-readonly class Column
+final readonly class Column
 {
     public ColumnType $type;
 

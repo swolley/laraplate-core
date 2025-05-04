@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Override;
 use Exception;
 use BadMethodCallException;
 use Illuminate\Support\Str;
 use Nwidart\Modules\Module;
+use Modules\Core\Models\Setting;
 use Illuminate\Container\Container;
 use Illuminate\Support\Facades\Log;
-use Modules\Core\Models\Setting;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
-class ModuleDatabaseActivator implements ActivatorInterface
+final class ModuleDatabaseActivator implements ActivatorInterface
 {
     public static string $RECORD_NAME = 'backendModules';
 
@@ -46,7 +47,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
         $this->cacheLifetime = $this->config('cache-lifetime');
         $this->modulesStatuses = $this->getModulesStatuses();
 
-        static::checkSettingTable();
+        self::checkSettingTable();
     }
 
     public static function checkSettingTable(): bool
@@ -54,16 +55,16 @@ class ModuleDatabaseActivator implements ActivatorInterface
         try {
             $model = self::$MODEL_NAME;
 
-            if (!class_exists($model)) {
+            if (! class_exists($model)) {
                 throw new BadMethodCallException('No Setting model found in the application');
             }
 
-            if (!Schema::hasTable(new $model()->getTable())) {
+            if (! Schema::hasTable(new $model()->getTable())) {
                 throw new BadMethodCallException('No settings table found in the database schema');
             }
 
-            if (!Setting::where('name', self::$RECORD_NAME)->exists()) {
-                static::seedBackendModules();
+            if (! Setting::where('name', self::$RECORD_NAME)->exists()) {
+                self::seedBackendModules();
                 Log::info("Created Setting '{name}' config record", ['name' => self::$RECORD_NAME]);
             }
 
@@ -96,7 +97,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
         $found = $model::where('name', self::$RECORD_NAME)->first();
         $all_modules = self::getAllModulesNames();
 
-        if (!$found) {
+        if (! $found) {
             $found = $model::create([
                 'value' => $all_modules,
                 'choices' => $all_modules,
@@ -112,56 +113,56 @@ class ModuleDatabaseActivator implements ActivatorInterface
         return $found;
     }
 
-    #[\Override]
+    #[Override]
     public function reset(): void
     {
         /** @psalm-suppress UndefinedClass */
-        $this->getQuery()->update(['value' => static::getAllModulesNames()]);
+        $this->getQuery()->update(['value' => self::getAllModulesNames()]);
         $this->flushCache();
     }
 
-    #[\Override]
+    #[Override]
     public function enable(Module $module): void
     {
         $this->setActiveByName($module->getName(), true);
     }
 
-    #[\Override]
+    #[Override]
     public function disable(Module $module): void
     {
         $this->setActiveByName($module->getName(), true);
     }
 
-    #[\Override]
+    #[Override]
     public function hasStatus(Module $module, bool $status): bool
     {
-        if (!in_array($module->getName(), $this->modulesStatuses, true)) {
+        if (! in_array($module->getName(), $this->modulesStatuses, true)) {
             return $status === false;
         }
 
-        return ($status && in_array($module->getName(), $this->modulesStatuses, true)) || (!$status && !in_array($module->getName(), $this->modulesStatuses, true));
+        return ($status && in_array($module->getName(), $this->modulesStatuses, true)) || (! $status && ! in_array($module->getName(), $this->modulesStatuses, true));
     }
 
-    #[\Override]
+    #[Override]
     public function setActive(Module $module, bool $active): void
     {
         $this->setActiveByName($module->getName(), $active);
     }
 
-    #[\Override]
+    #[Override]
     public function setActiveByName(string $name, bool $active): void
     {
-        if ($active && !in_array($name, $this->modulesStatuses, true)) {
+        if ($active && ! in_array($name, $this->modulesStatuses, true)) {
             $this->modulesStatuses[] = $name;
             $this->getQuery()->update(['value' => $this->modulesStatuses]);
             $this->flushCache();
-        } elseif (!$active && in_array($name, $this->modulesStatuses, true)) {
-            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn($m) => $m !== $name)]);
+        } elseif (! $active && in_array($name, $this->modulesStatuses, true)) {
+            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn ($m) => $m !== $name)]);
             $this->flushCache();
         }
     }
 
-    #[\Override]
+    #[Override]
     public function delete(Module $module): void
     {
         $this->setActiveByName($module->getName(), false);
@@ -193,11 +194,11 @@ class ModuleDatabaseActivator implements ActivatorInterface
 
     private function getModulesStatuses(): array
     {
-        if (!$this->configs->get('modules.cache.enabled')) {
+        if (! $this->configs->get('modules.cache.enabled')) {
             return $this->readSettings();
         }
 
-        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn() => $this->readSettings());
+        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn () => $this->readSettings());
     }
 
     private function config(string $key, mixed $default = null): mixed

@@ -18,33 +18,7 @@ trait HasOptimisticLocking
     protected $lock = true;
 
     /**
-     * Hooks model events to add lock version if not set.
-     *
-     */
-    protected static function bootOptimisticLocking(): void
-    {
-        static::creating(function (Model $model) {
-            // @phpstan-ignore method.notFound
-            if ($model->currentLockVersion() === null) {
-                $model->{static::lockVersionColumn()} = 1;
-            }
-
-            return $model;
-        });
-    }
-
-    /**
-     * Name of the lock version column.
-     *
-     */
-    protected static function lockVersionColumn(): string
-    {
-        return config('core.locking.lock_version_column');
-    }
-
-    /**
      * Current lock version value.
-     *
      */
     public function currentLockVersion(): int
     {
@@ -64,9 +38,31 @@ trait HasOptimisticLocking
     }
 
     /**
+     * Hooks model events to add lock version if not set.
+     */
+    protected static function bootOptimisticLocking(): void
+    {
+        static::creating(function (Model $model) {
+            // @phpstan-ignore method.notFound
+            if ($model->currentLockVersion() === null) {
+                $model->{static::lockVersionColumn()} = 1;
+            }
+
+            return $model;
+        });
+    }
+
+    /**
+     * Name of the lock version column.
+     */
+    protected static function lockVersionColumn(): string
+    {
+        return config('core.locking.lock_version_column');
+    }
+
+    /**
      * Perform a model update operation respecting optimistic locking.
      * If the lock fails it will throw a "StaleModelLockingException".
-     *
      */
     protected function performUpdate(Builder $query): bool
     {
@@ -115,7 +111,7 @@ trait HasOptimisticLocking
             if ($affected === 0) {
                 $this->setAttribute($versionColumn, $beforeUpdateVersion);
 
-                throw new StaleModelLockingException("Model has been changed during update.");
+                throw new StaleModelLockingException('Model has been changed during update.');
             }
 
             $this->fireModelEvent('updated', false);
@@ -129,7 +125,6 @@ trait HasOptimisticLocking
     /**
      * Indicates that optimistic locking is enabled for this model
      * instance or not.
-     *
      */
     protected function lockingEnabled(): bool
     {

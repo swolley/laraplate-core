@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Components;
 
+use Override;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Grids\Definitions\ListEntity;
 
-class Option extends ListEntity
+final class Option extends ListEntity
 {
-    /**
-     * {@inheritDoc}
-     */
-    #[\Override]
+    #[Override]
     protected function getData(): array
     {
         $name = $this->getValueField()->getFullAlias();
@@ -23,6 +21,7 @@ class Option extends ListEntity
         $exploded = explode('.', (string) $name);
         $subfix = array_pop($exploded);
         $field_path = implode('.', $exploded);
+
         if ($field_path === $this->getPath()) {
             $model = $this->getModel();
         } elseif (($relation = $this->getRelationDeeply($field_path)) instanceof \Modules\Core\Grids\Definitions\Relation) {
@@ -45,12 +44,13 @@ class Option extends ListEntity
         $columns = $this->getAllQueryFields();
         $this->getAllFields()->diff($columns);
         $this->getAllFields()->diff($columns);
-        $columns = $columns->map(fn($field) => $field->getName())->toArray();
+        $columns = $columns->map(fn ($field) => $field->getName())->toArray();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $option_data['sort'] ?? $this->getDefaultSorts($columns, $model));
+
         if (isset($option_data['value'])) {
-            static::applyCorrectWhereMethod($query, $subfix, FilterOperator::tryFrom($option_data['operator']), $option_data['value']);
+            self::applyCorrectWhereMethod($query, $subfix, FilterOperator::tryFrom($option_data['operator']), $option_data['value']);
         }
 
         // Log::debug(static::dumpQuery($query));

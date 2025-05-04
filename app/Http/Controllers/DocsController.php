@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
+use Override;
 use ArrayAccess;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use UnexpectedValueException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Cache;
 use Nwidart\Modules\Facades\Module;
+use Illuminate\Support\Facades\Cache;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
-class DocsController extends OpenApiJsonController
+final class DocsController extends OpenApiJsonController
 {
     /**
      * @route-comment
@@ -21,7 +22,7 @@ class DocsController extends OpenApiJsonController
      */
     public function mergeDocs(Request $request, string $version = 'v1')
     {
-        return Cache::tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn() => response()->json($this->getJson($version)));
+        return Cache::tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn () => response()->json($this->getJson($version)));
     }
 
     /**
@@ -37,7 +38,7 @@ class DocsController extends OpenApiJsonController
         $grouped = [];
 
         foreach ($all_modules as $module) {
-            if (!array_key_exists($module, $grouped)) {
+            if (! array_key_exists($module, $grouped)) {
                 $grouped[$module] = ['models' => [], 'controllers' => [], 'routes' => [], 'authors' => []];
             }
 
@@ -57,7 +58,7 @@ class DocsController extends OpenApiJsonController
             $composer = json_decode(file_get_contents($module === 'App' ? base_path('composer.json') : module_path($module, 'composer.json')), true);
 
             foreach ($composer['authors'] ?? [] as $author) {
-                $grouped[$module]['authors'][] = ['name' => is_string($author) ? $author : $author['name'], 'email' => !is_string($author) && isset($author['email']) ? $author['email'] : null];
+                $grouped[$module]['authors'][] = ['name' => is_string($author) ? $author : $author['name'], 'email' => ! is_string($author) && isset($author['email']) ? $author['email'] : null];
             }
             $grouped[$module]['description'] = $composer['description'] ?? null;
             $grouped[$module]['version'] = $composer['version'] ?? null;
@@ -78,7 +79,7 @@ class DocsController extends OpenApiJsonController
 
         return view('core::welcome', [
             'grouped_modules' => $grouped,
-            'translations' => translations()
+            'translations' => translations(),
         ]);
     }
 
@@ -93,10 +94,12 @@ class DocsController extends OpenApiJsonController
 
     /**
      * @throws UnexpectedValueException if no documentation is found
+     *
      * @return ArrayAccess|array
-     * @psalm-return \ArrayAccess|array{paths: mixed,...}
+     *
+     * @psalm-return ArrayAccess|array{paths: mixed,...}
      */
-    #[\Override]
+    #[Override]
     protected function getJson(string $version): array
     {
         $assets = resource_path('swagger') . DIRECTORY_SEPARATOR;
@@ -115,13 +118,14 @@ class DocsController extends OpenApiJsonController
                 if (Str::contains($k, $version)) {
                     return true;
                 }
-                return !Str::contains($k, '/api/');
+
+                return ! Str::contains($k, '/api/');
             }, ARRAY_FILTER_USE_KEY);
 
             if (Str::startsWith($short_name, 'App')) {
                 $main_json = $json;
             } elseif (in_array(str_replace([$assets, '-swagger.json'], '', $file), $modules, true)) {
-                $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn(string $k) => Str::contains($k, $version) || !Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
+                $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn (string $k) => Str::contains($k, $version) || ! Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
             }
         }
 

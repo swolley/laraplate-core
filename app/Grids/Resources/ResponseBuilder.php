@@ -7,7 +7,7 @@ namespace Modules\Core\Grids\Resources;
 use Illuminate\Support\Collection;
 use Modules\Core\Helpers\ResponseBuilder as BaseResponseBuilder;
 
-class ResponseBuilder extends BaseResponseBuilder
+final class ResponseBuilder extends BaseResponseBuilder
 {
     private ?string $primaryKey = null;
 
@@ -44,20 +44,25 @@ class ResponseBuilder extends BaseResponseBuilder
         if ($this->rules !== []) {
             $meta['validations'] = $this->rules;
         }
+
         if ($this->options) {
             $remapped = [];
+
             foreach ($this->options as $option) {
                 $remapped[] = $option->getPayload();
             }
             $payload['options'] = $remapped;
         }
+
         if ($this->funnels) {
             $remapped = [];
+
             foreach ($this->funnels as $funnel) {
                 $remapped[] = $funnel->getPayload();
             }
             $payload['funnels'] = $remapped;
         }
+
         if ($this->layouts) {
             $payload['layouts'] = $this->layouts;
         }
@@ -74,7 +79,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of primaryKey
+     * Set the value of primaryKey.
      */
     public function setPrimaryKey(?string $primaryKey): static
     {
@@ -84,7 +89,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of created
+     * Set the value of created.
      */
     public function setCreated(?string $created): static
     {
@@ -94,7 +99,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of updated
+     * Set the value of updated.
      */
     public function setUpdated(?string $updated): static
     {
@@ -104,7 +109,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of deleted
+     * Set the value of deleted.
      */
     public function setDeleted(?string $deleted): static
     {
@@ -114,7 +119,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of locked
+     * Set the value of locked.
      */
     public function setLocked(?string $locked): static
     {
@@ -124,7 +129,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of rules
+     * Set the value of rules.
      *
      * @param  array<string, string|array>  $rules
      */
@@ -136,9 +141,9 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of options
+     * Set the value of options.
      *
-     * @psalm-param Collection<string, \Modules\Core\Helpers\ResponseBuilder>|null $options
+     * @psalm-param Collection<string, BaseResponseBuilder>|null $options
      */
     public function setOptions(Collection|array|null $options): static
     {
@@ -148,9 +153,9 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of funnels
+     * Set the value of funnels.
      *
-     * @psalm-param Collection<string, \Modules\Core\Helpers\ResponseBuilder>|null $funnels
+     * @psalm-param Collection<string, BaseResponseBuilder>|null $funnels
      */
     public function setFunnels(Collection|array|null $funnels): static
     {
@@ -160,7 +165,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of layouts
+     * Set the value of layouts.
      */
     public function setLayouts(array|Collection|null $layouts): static
     {
@@ -170,7 +175,7 @@ class ResponseBuilder extends BaseResponseBuilder
     }
 
     /**
-     * Set the value of action
+     * Set the value of action.
      */
     public function setAction(?string $action): static
     {

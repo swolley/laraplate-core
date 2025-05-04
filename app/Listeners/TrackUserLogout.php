@@ -6,7 +6,7 @@ namespace Modules\Core\Listeners;
 
 use Illuminate\Auth\Events\Logout;
 
-class TrackUserLogout
+final class TrackUserLogout
 {
     public function handle(Logout $event): void
     {

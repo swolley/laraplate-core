@@ -1,23 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Auth\Services;
 
 use Illuminate\Http\Request;
 use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
-class AuthenticationService
+final class AuthenticationService
 {
     /**
-     * @param array<int,AuthenticationProviderInterface> $providers
+     * @param  array<int,AuthenticationProviderInterface>  $providers
      */
     public function __construct(
-        private readonly array $providers
+        private readonly array $providers,
     ) {}
 
     public function authenticate(Request $request): array
     {
         foreach ($this->providers as $provider) {
-            if (!$provider->isEnabled()) {
+            if (! $provider->isEnabled()) {
                 continue;
             }
 
@@ -30,15 +32,15 @@ class AuthenticationService
             'success' => false,
             'user' => null,
             'error' => 'No suitable authentication provider found',
-            'license' => null
+            'license' => null,
         ];
     }
 
     public function getAvailableProviders(): array
     {
         return array_map(
-            fn(AuthenticationProviderInterface $provider) => $provider->getProviderName(),
-            array_filter($this->providers, fn($p) => $p->isEnabled())
+            fn (AuthenticationProviderInterface $provider) => $provider->getProviderName(),
+            array_filter($this->providers, fn ($p) => $p->isEnabled()),
         );
     }
 }

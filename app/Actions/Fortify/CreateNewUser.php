@@ -1,22 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Actions\Fortify;
 
+use Override;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
-class CreateNewUser implements CreatesNewUsers
+final class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules;
 
     /**
      * Validate and create a newly registered user.
      *
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    #[\Override]
+    #[Override]
     public function create(array $input)
     {
         $user_class = user_class();

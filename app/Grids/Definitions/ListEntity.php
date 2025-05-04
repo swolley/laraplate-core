@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
+use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Grids\Components\Field;
-use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Grids\Casts\GridRequestData;
 
 /**
- * enanched entity class with common funcionalities for value/label lists
+ * enanched entity class with common funcionalities for value/label lists.
  */
 abstract class ListEntity extends Entity
 {
@@ -31,32 +32,26 @@ abstract class ListEntity extends Entity
     }
 
     /**
-     * list entity generator
+     * get entity data.
      *
-     * @param  Field|string|string[]|Field[]|null  $labelField
-     * @return \Closure construct callback
-     *
-     * @return \Closure(Model, Field): static
+     * @return array{0: Collection, 1: int}
      */
-    public static function create(Field|string|array|null $labelField = null): \Closure
-    {
-        if ($labelField && !($labelField instanceof Field)) {
-            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn($label) => self::createField($label), $labelField);
-        }
-
-        return fn(Model $model, Field $valueField) => new static($model, $valueField, $labelField ?? $valueField);
-    }
+    abstract protected function getData(): array;
 
     /**
-     * create field object by path
+     * list entity generator.
+     *
+     * @param  null|Field|string|string[]|Field[]  $labelField
+     * @return Closure construct callback
+     * @return Closure(Model, Field): static
      */
-    private static function createField(string $name): Field
+    final public static function create(Field|string|array|null $labelField = null): Closure
     {
-        $fullpath = explode('.', $name);
-        $name = array_pop($fullpath);
-        $path = implode('.', $fullpath);
+        if ($labelField && ! ($labelField instanceof Field)) {
+            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label) => self::createField($label), $labelField);
+        }
 
-        return new Field($path, $name);
+        return fn (Model $model, Field $valueField) => new static($model, $valueField, $labelField ?? $valueField);
     }
 
     // public function getName(): string
@@ -75,72 +70,46 @@ abstract class ListEntity extends Entity
     // }
 
     /**
-     * gets field used for value data
+     * gets field used for value data.
      */
-    public function getValueField(): Field
+    final public function getValueField(): Field
     {
         return $this->getFields()->offsetGet($this->valueFieldName);
     }
 
     /**
-     * sets field used for value data
+     * gets field used for label data.
      *
-     * @return void
+     * @return null|Field|array<string, mixed>
      */
-    private function setValueField(Field &$valueField)
+    final public function getLabelField(): array|Field|null
     {
-        $this->path = $valueField->getPath();
-        $this->name = $valueField->getName();
-        $this->addField($valueField);
-        $this->valueFieldName = $valueField->getName();
-    }
-
-    /**
-     * gets field used for label data
-     *
-     * @return Field|array<string, mixed>|null
-     */
-    public function getLabelField(): array|Field|null
-    {
-        $fields = $this->getFields()->filter(fn($field) => in_array($field->getName(), $this->labelFieldsName));
+        $fields = $this->getFields()->filter(fn ($field) => in_array($field->getName(), $this->labelFieldsName, true));
 
         return $fields->count() === 1 ? $fields->first() : $fields->toArray();
     }
 
     /**
-     * sets field used for label field
-     *
-     * @param  Field|Field[]  $labelField
-     * @return void
-     */
-    private function setLabelField(Field|array &$labelField)
-    {
-        foreach ((is_array($labelField) ? $labelField : [$labelField]) as $field) {
-            $this->addField($field);
-            $this->labelFieldsName[] = $field->getName();
-        }
-    }
-
-    /**
-     * gets funnel additional fields
+     * gets funnel additional fields.
      *
      *
      * @return Collection<string, Field>
      */
-    public function getAdditionalFields(): Collection
+    final public function getAdditionalFields(): Collection
     {
         $value_field = $this->getValueField();
         $label_field = $this->getLabelField();
 
-        return $this->getFields()->filter(fn($field, $key) => $key !== $label_field->getName() && $key !== $value_field->getName());
+        return $this->getFields()->filter(fn ($field, $key) => $key !== $label_field->getName() && $key !== $value_field->getName());
     }
 
     /**
-     * sets additional fields through relationships
+     * sets additional fields through relationships.
      */
-    public function getAdditionalFieldsDeeply(): Collection
+    final public function getAdditionalFieldsDeeply(): Collection
     {
         $additional_fields = clone $this->getAdditionalFields();
+
         foreach ($this->getRelations() as $relation) {
             $additional_fields = $additional_fields->merge($relation->getFields());
         }
@@ -149,18 +118,11 @@ abstract class ListEntity extends Entity
     }
 
     /**
-     * get entity data
-     *
-     * @return array{0: Collection, 1: int}
-     */
-    abstract protected function getData(): array;
-
-    /**
-     * start processing Entity with request filters
+     * start processing Entity with request filters.
      *
      * {@inheritDoc}
      */
-    public function process(GridRequest|GridRequestData $request): ResponseBuilder
+    final public function process(GridRequest|GridRequestData $request): ResponseBuilder
     {
         if ($request instanceof GridRequest) {
             $this->parseRequest($request);
@@ -178,5 +140,41 @@ abstract class ListEntity extends Entity
         $response_builder->setTable($this->getModel()->getTable());
 
         return $response_builder;
+    }
+
+    /**
+     * create field object by path.
+     */
+    private static function createField(string $name): Field
+    {
+        $fullpath = explode('.', $name);
+        $name = array_pop($fullpath);
+        $path = implode('.', $fullpath);
+
+        return new Field($path, $name);
+    }
+
+    /**
+     * sets field used for value data.
+     */
+    private function setValueField(Field &$valueField): void
+    {
+        $this->path = $valueField->getPath();
+        $this->name = $valueField->getName();
+        $this->addField($valueField);
+        $this->valueFieldName = $valueField->getName();
+    }
+
+    /**
+     * sets field used for label field.
+     *
+     * @param  Field|Field[]  $labelField
+     */
+    private function setLabelField(Field|array &$labelField): void
+    {
+        foreach ((is_array($labelField) ? $labelField : [$labelField]) as $field) {
+            $this->addField($field);
+            $this->labelFieldsName[] = $field->getName();
+        }
     }
 }
