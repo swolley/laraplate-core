@@ -16,17 +16,11 @@ class UserObserver
      */
     public function creating(User $user): void
     {
-        if (!$user->username) {
-            $user->username = $user->email;
-        }
+        $user->username ??= $user->email;
 
-        if (!$user->lang) {
-            $user->lang = App::getLocale();
-        }
+        $user->lang ??= App::getLocale();
 
-        if (!$user->password) {
-            $user->password = Hash::make(Str::password());
-        }
+        $user->password ??= Hash::make(Str::password());
     }
 
     public function created(User $user): void
@@ -38,7 +32,7 @@ class UserObserver
 
     public function deleted(User $user): void
     {
-        if (config('core.enable_user_licenses') && $user->license_id) {
+        if (config('auth.enable_user_licenses') && $user->license_id) {
             $user->license_id = null;
             $user->save();
         }

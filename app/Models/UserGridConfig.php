@@ -54,7 +54,7 @@ class UserGridConfig extends Model
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'user_id' => ['integer', 'exists:users,id'],
             'grid_name' => ['required', 'max:255'],
             'layout_name' => ['required', 'max:255'],

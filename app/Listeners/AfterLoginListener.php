@@ -38,7 +38,7 @@ class AfterLoginListener
 
     public static function checkUserLicense(Authenticatable $user)
     {
-        if (config('core.enable_user_licenses') && class_uses_trait($user, Impersonate::class) && (!$user->isGuest() && !$user->isSuperadmin() && $user->license_id === null)) {
+        if (config('auth.enable_user_licenses') && class_uses_trait($user, Impersonate::class) && (!$user->isGuest() && !$user->isSuperadmin() && $user->license_id === null)) {
             $available_licenses = License::query()->whereDoesntHave('user')->get();
             if ($available_licenses->isEmpty()) {
                 throw new UnauthorizedException("No licenses available");

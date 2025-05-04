@@ -12,6 +12,7 @@ use function Laravel\Prompts\confirm;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class CheckIndexCommand extends Command
 {
@@ -23,11 +24,9 @@ class CheckIndexCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param  \Laravel\Scout\EngineManager  $manager
-     * @return void
+     * @return int
      */
-    public function handle(EngineManager $manager): int
+    public function handle(): int
     {
         try {
             $model = $this->getModelClass();
@@ -42,7 +41,7 @@ class CheckIndexCommand extends Command
 
             foreach ($modeles as &$model) {
                 $this->info('Checking model ' . $model);
-                $model = new $model;
+                $model = new $model();
                 if (!$model->checkIndex()) {
                     $wrong_or_missing_indexes[] = $model;
                     $this->warn('Model ' . $model . ' has a wrong or missing index.');
@@ -51,7 +50,7 @@ class CheckIndexCommand extends Command
 
             if ($wrong_or_missing_indexes === []) {
                 $this->info('All models have the correct indexes.');
-                return static::SUCCESS;
+                return BaseCommand::SUCCESS;
             }
 
             if (confirm('Do you want to reindex the unmathced models?')) {
@@ -59,13 +58,13 @@ class CheckIndexCommand extends Command
                     ReindexSearchJob::dispatch($model);
                     // Se il modello usa il trait HasCache, invalida la cache
                     if (in_array(HasCache::class, class_uses_recursive($model))) {
-                        (new $model)->invalidateCache();
+                        (new $model())->invalidateCache();
                         $this->info('Cache has been invalidated for model ' . $model);
                     }
                 }
             }
 
-            return static::SUCCESS;
+            return BaseCommand::SUCCESS;
         } catch (\Exception $e) {
             Log::error('Error in elasticsearch:reindex command', [
                 'message' => $e->getMessage(),

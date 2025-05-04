@@ -4,83 +4,65 @@ declare(strict_types=1);
 
 namespace Modules\Core\Cache;
 
-use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\ResponseBuilder;
-use Illuminate\Cache\Repository;
+use Illuminate\Cache\Repository as BaseRepository;
 
-class CacheManager
+class Repository extends BaseRepository
 {
-    private static function getStore(): \Illuminate\Contracts\Cache\Store
+    private function getDuration(): int|array
     {
-        return Cache::store()->getStore();
-    }
-
-    public static function getCurrentDriver(): string
-    {
-        $store = self::getStore();
-
-        return match (true) {
-            $store instanceof \Illuminate\Cache\RedisStore => 'redis',
-            $store instanceof \Illuminate\Cache\DatabaseStore => 'database',
-            $store instanceof \Illuminate\Cache\FileStore => 'file',
-            $store instanceof \Illuminate\Cache\MemcachedStore => 'memcached',
-            $store instanceof \Illuminate\Cache\ArrayStore => 'array',
-            default => 'unknown'
-        };
-    }
-
-    public static function getCacheDuration(): int|array
-    {
-        if ($threshold = self::getCacheThreshold()) {
+        if ($threshold = $this->getThreshold()) {
             return [$threshold, config('cache.duration')];
         }
 
         return config('cache.duration');
     }
 
-    public static function getCacheThreshold(): int|null
+    private function getThreshold(): int|null
     {
         return config('cache.threshold');
     }
 
-    public static function remember(string $key, Closure $callback, int|array|null $ttl = null): mixed
+    #[\Override]
+    public function remember($key, $ttl, \Closure $callback): mixed
     {
-        if ($ttl === null) {
-            $ttl = self::getCacheDuration();
-        }
+        $ttl ??= $this->getDuration();
         $method = is_array($ttl) ? 'flexible' : 'remember';
 
-        return Cache::$method($key, $ttl, $callback);
-    }
-
-    public static function supportsTagging(): bool
-    {
-        return self::getStore() instanceof \Illuminate\Contracts\Cache\Store;
+        return parent::$method($key, $ttl, $callback);
     }
 
     /**
      * contruct a cache key by request info
      */
-    public static function getKeyFromRequest(Request $request): string
+    private static function getKeyFromRequest(Request $request): string
     {
         $path = $request->getPathInfo();
         $params = $request->query();
         $user = self::getKeyPartsFromUser($request->user());
-        self::recursiveKSort($params);
+        if ($user) {
+            self::recursiveKSort($params);
+        }
 
         return base64_encode($path . ($user ? implode('_', $user) . '_' : '') . serialize($params));
     }
 
     /**
      * Try to extract from cache or by specified callback using request info
+     * 
+     * @template TCacheValue
+     * @param Model|string|array|null $entity
+     * @param Request $request
+     * @param Closure(TCacheValue): mixed $callback
+     * @param int|null $duration
+     * @return TCacheValue
      */
-    public static function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, ?int $duration = null, ?Repository $cache = null): mixed
+    final public function tryByRequest(Model|string|array|null $entity, Request $request, \Closure $callback, ?int $duration = null): mixed
     {
         $tags = [config('app.name')];
         if ($entity) {
@@ -102,11 +84,10 @@ class CacheManager
             array_push($tags, ...$user);
         }
         $key = static::getKeyFromRequest($request);
-        $cache = $cache instanceof \Illuminate\Cache\Repository ? $cache->tags($tags) : Cache::tags($tags);
         $duration ??= config('cache.duration');
 
-        if ($cache->has($key)) {
-            return $cache->get($key);
+        if ($this->has($key)) {
+            return $this->get($key);
         }
 
         $data = $callback();
@@ -114,7 +95,7 @@ class CacheManager
             $data = $data->getResponse();
         }
 
-        $cache->put($key, $data, $duration ?: config('cache.duration'));
+        $this->put($key, $data, $duration ?: config('cache.duration'));
 
         return $data;
     }
@@ -122,7 +103,7 @@ class CacheManager
     /**
      * clear cache by specified entity
      */
-    public static function clearByEntity(Model|string|array $entity, ?Repository $cache = null): void
+    final public function clearByEntity(Model|string|array $entity): void
     {
         $models = Arr::wrap($entity);
 
@@ -132,9 +113,7 @@ class CacheManager
             }
 
             if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                ($cache instanceof \Illuminate\Cache\Repository
-                    ? $cache->tags([config('app.name'), self::getTableName($model)])
-                    : Cache::tags([config('app.name'), self::getTableName($model)]))->flush();
+                $this->tags([config('app.name'), self::getTableName($model)])->flush();
             }
         }
     }
@@ -142,7 +121,7 @@ class CacheManager
     /**
      * clear cache by request extracted info
      */
-    public static function clearByRequest(Request $request, Model|string|array|null $entity = null, ?Repository $cache = null): void
+    final public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
         $key = static::getKeyFromRequest($request);
         if ($entity) {
@@ -154,22 +133,18 @@ class CacheManager
                 }
 
                 if (!method_exists($model, 'usesCache') || $model->usesCache()) {
-                    ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('app.name'), self::getTableName($model)])
-                        : Cache::tags([config('app.name'), self::getTableName($model)]))->forget($key);
+                    $this->tags([config('app.name'), self::getTableName($model)])->forget($key);
                 }
             }
         } else {
-            ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('app.name')])
-                : Cache::tags([config('app.name')]))->forget($key);
+            $this->tags([config('app.name')])->forget($key);
         }
     }
 
     /**
      * clear cache elements by user and only by entity if specified
      */
-    public static function clearByUser(User $user, Model|string|array|null $entity = null, ?Repository $cache = null): void
+    final public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
         $user_key = 'U' . $user->id;
         if ($entity) {
@@ -181,22 +156,18 @@ class CacheManager
                 }
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                    ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('app.name'), self::getTableName($model), $user_key])
-                        : Cache::tags([config('app.name'), self::getTableName($model), $user_key]))->flush();
+                    $this->tags([config('app.name'), self::getTableName($model), $user_key])->flush();
                 }
             }
         } else {
-            ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('app.name'), $user_key])
-                : Cache::tags([config('app.name'), $user_key]))->flush();
+            $this->tags([config('app.name'), $user_key])->flush();
         }
     }
 
     /**
      * clear cache elements by user group and only by entity if specified
      */
-    public static function clearByGroup(Role $role, Model|string|array|null $entity = null, ?Repository $cache = null): void
+    final public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
         $role_key = 'R' . $role->id;
         if ($entity) {
@@ -208,15 +179,11 @@ class CacheManager
                 }
 
                 if (method_exists($model, 'usesCache') && $model->usesCache()) {
-                    ($cache instanceof \Illuminate\Cache\Repository
-                        ? $cache->tags([config('app.name'), self::getTableName($model), $role_key])
-                        : Cache::tags([config('app.name'), self::getTableName($model), $role_key]))->flush();
+                    $this->tags([config('app.name'), self::getTableName($model), $role_key])->flush();
                 }
             }
         } else {
-            ($cache instanceof \Illuminate\Cache\Repository
-                ? $cache->tags([config('app.name'), $role_key])
-                : Cache::tags([config('app.name'), $role_key]))->flush();
+            $this->tags([config('app.name'), $role_key])->flush();
         }
     }
 
@@ -242,8 +209,7 @@ class CacheManager
     /**
      * compose key parts by user and groups
      * 
-     * @return null|(mixed|string)[]
-     * @psalm-return list{0?: mixed|string,...}|null
+     * @return array<int,string>|null
      */
     private static function getKeyPartsFromUser(User $user): ?array
     {
@@ -266,6 +232,6 @@ class CacheManager
             array_push($tags, ...$groups);
         }
 
-        return $tags;
+        return array_map('strval', $tags);
     }
 }

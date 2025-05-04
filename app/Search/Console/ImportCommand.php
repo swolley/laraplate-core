@@ -5,6 +5,7 @@ namespace Modules\Core\Search\Console;
 use Illuminate\Contracts\Events\Dispatcher;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Modules\Core\Helpers\HasBenchmark;
+use Symfony\Component\Console\Command\Command;
 
 class ImportCommand extends \Laravel\Scout\Console\ImportCommand
 {
@@ -15,7 +16,9 @@ class ImportCommand extends \Laravel\Scout\Console\ImportCommand
     #[\Override]
     public function handle(Dispatcher $events)
     {
-        if (!$this->getModelClass()) return static::FAILURE;
+        if (!$this->getModelClass()) {
+            return Command::FAILURE;
+        }
         return parent::handle($events);
     }
 }

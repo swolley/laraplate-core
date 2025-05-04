@@ -45,8 +45,8 @@ class IndexInSearchJob implements ShouldQueue
         protected Model $model
     ) {
         // Validate that the model implements Searchable
-        if (!in_array(Searchable::class, class_uses_recursive(get_class($model)))) {
-            throw new \InvalidArgumentException("Model " . get_class($model) . " does not implement the Searchable trait");
+        if (!in_array(Searchable::class, class_uses_recursive($model::class))) {
+            throw new \InvalidArgumentException("Model " . $model::class . " does not implement the Searchable trait");
         }
 
         $this->onQueue(config('scout.queue_name', 'indexing'));
@@ -70,14 +70,14 @@ class IndexInSearchJob implements ShouldQueue
 
         // If the model implements shouldBeSearchable method and should not be searchable, delete the document
         if (method_exists($this->model, 'shouldBeSearchable') && !$this->model->shouldBeSearchable()) {
-            $this->deleteDocument();
+            $this->model->unsearchable();
             return;
         }
 
         try {
             // Use the Scout searchable method to index the model
-            // This automatically uses the correct driver (Elasticsearch or Typesense)
-            $this->model->searchable();
+            // This automatically uses the correct driver
+            $this->model->searchableUsing()->update($this->model);
 
             // Update indexing timestamp if the model supports that functionality
             if (method_exists($this->model, 'updateSearchIndexTimestamp')) {
@@ -106,26 +106,26 @@ class IndexInSearchJob implements ShouldQueue
     /**
      * Delete a document from the index
      */
-    protected function deleteDocument(): void
-    {
-        $driver = config('scout.driver');
-        $index_name = $this->model->searchableAs();
-        $document_id = $this->model->getKey();
+    // protected function deleteDocument(): void
+    // {
+    //     $driver = config('scout.driver');
+    //     $index_name = $this->model->searchableAs();
+    //     $document_id = $this->model->getKey();
 
-        try {
-            // Use Scout's method to remove from index
-            // This automatically uses the correct driver
-            $this->model->unsearchable();
+    //     try {
+    //         // Use Scout's method to remove from index
+    //         // This automatically uses the correct driver
+    //         $this->model->unsearchable();
 
-            Log::debug("Document {$document_id} successfully deleted from {$index_name}");
-        } catch (\Exception $e) {
-            Log::error("Error deleting document {$document_id} from {$index_name}", [
-                'driver' => $driver,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+    //         Log::debug("Document {$document_id} successfully deleted from {$index_name}");
+    //     } catch (\Exception $e) {
+    //         Log::error("Error deleting document {$document_id} from {$index_name}", [
+    //             'driver' => $driver,
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString()
+    //         ]);
 
-            throw $e;
-        }
-    }
+    //         throw $e;
+    //     }
+    // }
 }

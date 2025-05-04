@@ -8,7 +8,7 @@ class SearchRequestData extends ListRequestData
 {
 	public readonly string $qs;
 	/**
-	 * @param string|string[] $primaryKey
+	 * @param string|array<string> $primaryKey
 	 */
 	public function __construct(SearchRequest $request, string|null $mainEntity, array $validated, string|array $primaryKey)
 	{

@@ -26,10 +26,10 @@ use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 
 class GridsController extends Controller
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
+     */
     public function getGridsConfigs(Request $request, ?string $entity = null)
     {
         $response_builder = new ResponseBuilder($request);
@@ -41,7 +41,7 @@ class GridsController extends Controller
             if ($entity) {
                 $entity_instance = DynamicEntity::tryResolveModel($entity);
                 if (!$entity_instance) {
-                    throw new UnexpectedValueException("Unable to find entity '$entity'");
+                    throw new UnexpectedValueException("Unable to find entity '{$entity}'");
                 }
                 $entity = $entity_instance;
             }
@@ -55,7 +55,6 @@ class GridsController extends Controller
                     Grid::useGridUtils($instance) &&
                     PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
                 ) {
-                    /** @var Model&HasGridUtils $instance */
                     /** @var Grid $grid */
                     $grid = $instance->getGrid();
                     $grids[$table] = $grid->getConfigs();
@@ -64,7 +63,7 @@ class GridsController extends Controller
 
             if ($entity) {
                 if ($grids === []) {
-                    throw new UnexpectedValueException("'$entity' is not a Grid");
+                    throw new UnexpectedValueException("'{$entity}' is not a Grid");
                 }
                 $grids = head($grids);
             }
@@ -83,17 +82,17 @@ class GridsController extends Controller
         }
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/grid/select/{entity}', name: 'core.crud.select', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/data/{entity}', name: 'core.crud.data', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/check/{entity}', name: 'core.crud.check', methods: [GET, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/layout/{entity}', name: 'core.crud.layout', methods: [GET, POST, PUT, PATCH, DELETE, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/export/{entity}', name: 'core.crud.export', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
-	 * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
-	 * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/grid/select/{entity}', name: 'core.crud.select', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/data/{entity}', name: 'core.crud.data', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/check/{entity}', name: 'core.crud.check', methods: [GET, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/layout/{entity}', name: 'core.crud.layout', methods: [GET, POST, PUT, PATCH, DELETE, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/export/{entity}', name: 'core.crud.export', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
+     * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
+     * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
+     */
     public function grid(GridRequest $request, string $entity): Response
     {
         try {

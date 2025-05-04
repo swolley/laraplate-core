@@ -29,13 +29,14 @@ trait HasVersions
 	protected static function bootHasVersions(): void
 	{
 		static::deleted(function (Model $model) {
-			/* @var \Overtrue\LaravelVersionable\Versionable|\Overtrue\LaravelVersionable\Version$model */
+			/** @var \Overtrue\LaravelVersionable\Versionable|\Overtrue\LaravelVersionable\Version $model */
 			if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
 				$model->createVersion(['deleted_at' => $model->deleted_at]);
 			}
 		});
 
 		if (class_uses_trait(static::class, SoftDeletes::class)) {
+			/** @phpstan-ignore staticMethod.notFound */
 			static::restored(function (Model $model) {
 				$model->createVersion(['deleted_at' => null]);
 			});

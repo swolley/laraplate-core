@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Casts\ListRequestData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Grids\Resources\ResponseBuilder;
-use Modules\Core\Casts\ListRequestData;
 
 trait HasCrudOperations
 {
@@ -17,10 +17,8 @@ trait HasCrudOperations
     /**
      * removes non fillable request values from model
      *
-     *
-     * @return string[]
-     *
-     * @psalm-return list<non-empty-string>
+     * @param  array<string,mixed>  $values
+     * @return array<int,string>
      */
     private function removeNonFillableProperties(Model $model, array &$values): array
     {
@@ -40,10 +38,13 @@ trait HasCrudOperations
     }
 
     /**
-     * @param  string[]  $groupBy
+     * @template TItem
+     *
+     * @param  Collection<int,TItem>  $data
+     * @param  array<int,string>  $groupBy
      * @return Collection
      */
-    private function applyGroupBy(Collection &$data, array $groupBy)
+    private function applyGroupBy(Collection &$data, array $groupBy): Collection
     {
         if ($groupBy === []) {
             return $data;
@@ -55,8 +56,7 @@ trait HasCrudOperations
 
     protected function listByPagination(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
     {
-        $query->skip($filters->from - 1)
-            ->take($filters->to - $filters->from + 1);
+        $query->skip($filters->from - 1)->take($filters->to - $filters->from + 1);
 
         $data = $query->get();
         $responseBuilder
@@ -101,6 +101,7 @@ trait HasCrudOperations
 
     protected function applyFilters(Builder $query, array $filters): void
     {
+        // FIXME: non ricorso più cosa doveva essere
         $queryKey = $this->getQueryKey($query, $filters);
 
         if (isset($this->preparedQueries[$queryKey])) {
@@ -133,8 +134,8 @@ trait HasCrudOperations
 
         match ($operator) {
             'like' => $query->where($field, 'like', "%{$value}%"),
-            'in' => $query->whereIn($field, (array)$value),
-            'between' => $query->whereBetween($field, (array)$value),
+            'in' => $query->whereIn($field, (array) $value),
+            'between' => $query->whereBetween($field, (array) $value),
             default => $query->where($field, $operator, $value)
         };
     }

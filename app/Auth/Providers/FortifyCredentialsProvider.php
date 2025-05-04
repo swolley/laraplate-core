@@ -12,7 +12,7 @@ use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 class FortifyCredentialsProvider implements AuthenticationProviderInterface
 {
     #[\Override]
-    public function canHandle(Request $request) : bool
+    public function canHandle(Request $request): bool
     {
         if ($request->has(['email', 'password'])) {
             return true;
@@ -94,7 +94,7 @@ class FortifyCredentialsProvider implements AuthenticationProviderInterface
 
     private function checkLicense(User $user): ?string
     {
-        if (!config('core.enable_user_licenses')) {
+        if (!config('auth.enable_user_licenses')) {
             return null;
         }
 

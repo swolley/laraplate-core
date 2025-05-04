@@ -142,9 +142,9 @@ class MigrateUtils
         if ($hasValidity) {
             $valid_from_column = HasValidity::validFromKey();
             $valid_to_column = HasValidity::validToKey();
-            $index_name = $table_name . '_validity_range';
-            if (Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) || Schema::hasIndex($table_name, $table_name . '_validity_range')) {
-                $table->dropIndex($table_name . '_validity_range');
+            $index_name = "{$table_name}.validity_range";
+            if (Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) || Schema::hasIndex($table_name, $index_name)) {
+                $table->dropIndex($index_name);
             }
             if (Schema::hasColumn($table_name, $valid_from_column)) {
                 $table->dropColumn($valid_from_column);
@@ -199,12 +199,14 @@ class MigrateUtils
     private static function locked(Blueprint $table): void
     {
         $locked = new Locked();
-        if ($locked_at_column = $locked->lockedAtColumn()) {
+        $locked_at_column = $locked->lockedAtColumn();
+        if ($locked_at_column) {
             if (!Schema::hasColumn($table->getTable(), $locked_at_column)) {
                 $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
             }
         }
-        if ($locked_by_column = $locked->lockedByColumn()) {
+        $locked_by_column = $locked->lockedByColumn();
+        if ($locked_by_column) {
             if (!Schema::hasColumn($table->getTable(), $locked_by_column)) {
                 $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
             }
@@ -238,12 +240,14 @@ class MigrateUtils
         }
 
         $locked = new Locked();
-        if ($locked_at_column = $locked->lockedAtColumn()) {
+        $locked_at_column = $locked->lockedAtColumn();
+        if ($locked_at_column) {
             if (Schema::hasColumn($table->getTable(), $locked_at_column)) {
                 $table->dropColumn($locked_at_column);
             }
         }
-        if ($locked_by_column = $locked->lockedByColumn()) {
+        $locked_by_column = $locked->lockedByColumn();
+        if ($locked_by_column) {
             if (Schema::hasColumn($table->getTable(), $locked_by_column)) {
                 $table->dropColumn($locked_by_column);
             }

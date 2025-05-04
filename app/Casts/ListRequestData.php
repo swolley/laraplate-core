@@ -11,26 +11,20 @@ use Modules\Core\Http\Requests\ListRequest;
 
 class ListRequestData extends SelectRequestData
 {
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly int $pagination;
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly ?int $page;
-    public readonly ?int $skip;
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly ?int $take;
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly ?int $from;
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly ?int $to;
-    /** @phpstan-ignore property.uninitializedReadonly */
-    public readonly ?int $limit;
-    public readonly bool $count;
-    public readonly array $sort;
-    public readonly ?FiltersGroup $filters;
+    public protected(set) int $pagination;
+    public protected(set) int|null $page;
+    public protected(set) int|null $skip;
+    public protected(set) int|null $take;
+    public protected(set) int|null $from;
+    public protected(set) int|null $to;
+    public protected(set) int|null $limit;
+    public protected(set) bool $count;
+    public protected(set) array $sort;
+    public protected(set) FiltersGroup|null $filters;
     public array $group_by = [];
 
     /**
-     * @param string|string[] $primaryKey
+     * @param string|array<string> $primaryKey
      */
     public function __construct(ListRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {
@@ -38,9 +32,7 @@ class ListRequestData extends SelectRequestData
 
         $this->extractPagination($validated);
 
-        /** @phpstan-ignore property.uninitializedReadonly */
         if (!isset($this->limit)) {
-            /** @phpstan-ignore property.uninitializedReadonly, assign.readOnlyProperty */
             $this->limit = (int) ($validated['limit'] ?? $this->pagination);
         }
 
@@ -66,13 +58,11 @@ class ListRequestData extends SelectRequestData
         if (isset($validated['pagination']) || isset($validated['page'])) {
             $this->take = $this->pagination = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
             $this->page = (int) ($validated['page'] ?? 1);
-            /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = ($this->page - 1) * $this->pagination;
             $this->from = $this->skip + 1;
             $this->to = $this->from + $this->pagination;
         } elseif (isset($validated['from']) || isset($validated['to'])) {
             $this->from = (int) ($validated['from'] ?? 1);
-            /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = $this->from - 1;
             if ($this->to = isset($validated['to']) ? (int) $validated['to'] : null) {
                 $this->take = $this->pagination = $this->to - $this->from;
@@ -80,12 +70,10 @@ class ListRequestData extends SelectRequestData
         } elseif (isset($validated['limit'])) {
             $this->take = $this->limit = (int) $validated['limit'];
             $this->page = 1;
-            /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = 0;
             $this->pagination = $this->limit;
         } else {
             $this->page = 1;
-            /** @phpstan-ignore assign.readOnlyProperty */
             $this->skip = 0;
             $this->take = $this->pagination = $this->getDefaultPagination();
         }
@@ -111,7 +99,7 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     * @param array{property: string, value: mixed, operator: FilterOperator} $filter
+     * @param array{property:string,value:mixed,operator:FilterOperator} $filter
      */
     protected function conformFilterValue(array &$filter): void
     {
@@ -147,8 +135,8 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     *
-     * @return Sort[]
+     * @param array<int, string|array{property:string,direction:SortDirection}> $sorts
+     * @return array<int, Sort>
      */
     private function conformSorts(array $sorts): array
     {
@@ -164,7 +152,7 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     * @param  string[]  $groups
+     * @param  array<int, string>  $groups
      */
     private function addGroupsToColumns(array $groups): void
     {

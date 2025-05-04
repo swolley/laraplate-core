@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Support\Carbon;
-use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -18,11 +17,11 @@ use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 class Version extends OvertrueVersion
 {
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      */
-    protected $hidden = [
+    protected array $hidden = [
         'user_id',
         'connection_ref',
         'table_ref',
@@ -45,12 +44,11 @@ class Version extends OvertrueVersion
     {
         // parent logic because it's not possible to bypass the save action
 
-        /* @var \Overtrue\LaravelVersionable\Versionable|Model $model */
         $versionClass = $model->getVersionModel();
         $versionConnection = $model->getConnectionName();
         $userForeignKeyName = $model->getUserForeignKeyName();
 
-        $version = new $versionClass;
+        $version = new $versionClass();
         $version->setConnection($versionConnection);
 
         $version->versionable_id = $model->getKey();
@@ -117,8 +115,9 @@ class Version extends OvertrueVersion
         switch ($versionable->getVersionStrategy()) {
             case VersionStrategy::DIFF:
                 // v1 + ... + vN
+                /** @var \Overtrue\LaravelVersionable\Version $version */
                 foreach ($this->previousVersions()->orderOldestFirst()->get() as $version) {
-                    if (!empty($version->contents)) {
+                    if ($version->contents !== []) {
                         $versionable->setRawAttributes(array_merge($original, $version->contents));
                     }
                 }
@@ -127,14 +126,15 @@ class Version extends OvertrueVersion
                 // v1 + vN
                 /** @var \Overtrue\LaravelVersionable\Version $initVersion */
                 $initVersion = $versionable->versions()->first();
-                if (!empty($initVersion->contents)) {
+                if ($initVersion->contents !== []) {
                     $versionable->setRawAttributes(array_merge($original, $initVersion->contents));
                 }
         }
 
-        if (!empty($this->contents)) {
+        if ($this->contents !== []) {
             $versionable->setRawAttributes(array_merge($original, $this->contents));
         }
+
 
         return $versionable;
     }

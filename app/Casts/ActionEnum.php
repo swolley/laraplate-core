@@ -25,7 +25,7 @@ enum ActionEnum: string
      */
     public static function isReadAction(string $action): bool
     {
-        return $action === static::SELECT->value;
+        return $action === self::SELECT->value;
     }
 
     /**

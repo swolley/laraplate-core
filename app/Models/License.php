@@ -34,12 +34,12 @@ class License extends Model
         return LicenseFactory::new();
     }
 
-    protected function scopeFree(Builder $query)
+    public function scopeFree(Builder $query)
     {
         $query->doesntHave('user');
     }
 
-    protected function scopeOccupied(Builder $query)
+    public function scopeOccupied(Builder $query)
     {
         $query->has('user');
     }
@@ -56,7 +56,7 @@ class License extends Model
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],
         ]);

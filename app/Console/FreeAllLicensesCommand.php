@@ -6,6 +6,7 @@ namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class FreeAllLicensesCommand extends Command
 {
@@ -20,14 +21,15 @@ class FreeAllLicensesCommand extends Command
     {
         try {
             $user_class = user_class();
-            $this->output->error('User class is not Modules\Core\Models\User');
-            return static::SUCCESS;
+            $user_class::whereNotNull('license_id')->update(['license_id' => null]);
+            $this->output->success('All licenses have been freed');
+            return BaseCommand::SUCCESS;
         } catch (\Throwable $ex) {
             $message = $ex->getMessage();
             $this->output->error($message);
             Log::error($message);
 
-            return static::FAILURE;
+            return BaseCommand::FAILURE;
         }
     }
 }

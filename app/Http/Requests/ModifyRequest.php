@@ -51,7 +51,7 @@ class ModifyRequest extends CrudRequest implements IParsableRequest
             /** @phpstan-ignore method.notFound */
             $main_entity = $this->route()->entity;
             foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
-                $key = $this->$attribute ?? $this->{"$main_entity.$attribute"} ?? null;
+                $key = $this->$attribute ?? $this->{"{$main_entity}.{$attribute}"} ?? null;
                 $to_merge[$key] = $key ? array_unique([...$to_merge[$key], ...$rule]) : $rule;
 
                 $to_merge['filters'][] = ['property' => $key, 'value' => $this->$key];

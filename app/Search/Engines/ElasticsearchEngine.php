@@ -9,10 +9,10 @@ use Elastic\ScoutDriverPlus\Engine;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Jobs\IndexInSearchJob;
-use Modules\Core\Jobs\ReindexSearchJob;
-use Modules\Core\Jobs\BulkIndexSearchJob;
-use Modules\Core\Jobs\GenerateEmbeddingsJob;
+use Modules\Core\Search\Jobs\IndexInSearchJob;
+use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Jobs\BulkIndexSearchJob;
+use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Contracts\SearchAnalyticsInterface;
 use Modules\Core\Search\Contracts\SearchEngineInterface;
 
@@ -21,9 +21,6 @@ use Modules\Core\Search\Contracts\SearchEngineInterface;
  */
 class ElasticsearchEngine extends Engine implements SearchEngineInterface, SearchAnalyticsInterface
 {
-    /**
-     * {@inheritdoc}
-     */
     public function supportsVectorSearch(): bool
     {
         return true;
@@ -38,12 +35,9 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
     //     IndexInSearchJob::dispatch($model);
     // }
 
-    /**
-     * {@inheritdoc}
-     */
     public function indexDocumentWithEmbedding(Model $model): void
     {
-        $this->ensureSearchable($model);
+        // $this->ensureSearchable($model);
 
         // Prima generiamo l'embedding, poi indichiamo
         Bus::chain([
@@ -52,9 +46,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         ])->dispatch();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function bulkIndex(iterable $models): void
     {
         if (!count($models)) {
@@ -62,14 +53,11 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         $firstModel = $models[0] ?? $models->first();
-        $this->ensureSearchable($firstModel);
+        // $this->ensureSearchable($firstModel);
 
         BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function checkIndexExists(Model $model): bool
     {
         $client = $this->createClient();
@@ -78,12 +66,9 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $client->indices()->exists(['index' => $indexName])->asBool();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function createIndex(Model $model): void
     {
-        $this->ensureSearchable($model);
+        // $this->ensureSearchable($model);
 
         $client = $this->createClient();
         $indexName = $this->getIndexName($model);
@@ -151,9 +136,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function search(string $query, array $options = []): array
     {
         $client = $this->createClient();
@@ -220,9 +202,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $results->asArray();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function vectorSearch(array $vector, array $options = []): array
     {
         $client = $this->createClient();
@@ -285,9 +264,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $results->asArray();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function buildSearchFilters(array $filters): array|string
     {
         $esFilters = [];
@@ -342,25 +318,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $esFilters;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function reindexModel(string $modelClass): void
     {
         ReindexSearchJob::dispatch($modelClass);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function syncModel(string $modelClass, ?int $id = null, ?string $from = null): int
     {
         if (!class_exists($modelClass)) {
-            throw new \InvalidArgumentException("La classe {$modelClass} non esiste");
+            throw new \InvalidArgumentException("Class {$modelClass} does not exist");
         }
 
         if (!$this->usesSearchableTrait(new $modelClass())) {
-            throw new \InvalidArgumentException("Il modello {$modelClass} non implementa il trait Searchable");
+            throw new \InvalidArgumentException("Model {$modelClass} does not implement the Searchable trait");
         }
 
         $query = $modelClass::query();
@@ -414,9 +384,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $indexName;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
     {
         $client = $this->createClient();
@@ -459,9 +426,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $response['aggregations']['over_time']['buckets'] ?? [];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
     {
         $client = $this->createClient();
@@ -503,10 +467,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         $response = $client->search($query);
         return $response['aggregations']['by_term']['buckets'] ?? [];
     }
-
-    /**
-     * {@inheritdoc}
-     */
+d
     public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
     {
         $client = $this->createClient();

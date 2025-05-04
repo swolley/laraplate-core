@@ -5,6 +5,7 @@ namespace Modules\Core\Search\Console;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Modules\Core\Helpers\HasBenchmark;
+use Symfony\Component\Console\Command\Command;
 
 class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
 {
@@ -18,10 +19,12 @@ class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
     public function handle(EngineManager $manager)
     {
         $model = $this->getModelClass();
-        if (!$model) return static::FAILURE;
+        if (!$model) {
+            return Command::FAILURE;
+        }
 
         $this->addArgument('name');
-        $this->input->setArgument('name', (new $model)->indexableAs());
+        $this->input->setArgument('name', (new $model())->indexableAs());
         return parent::handle($manager);
     }
 }

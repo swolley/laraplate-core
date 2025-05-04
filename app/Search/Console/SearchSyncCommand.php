@@ -78,7 +78,7 @@ class SearchSyncCommand extends Command
 
             // Se il modello usa il trait HasCache, invalida la cache
             if (in_array(HasCache::class, class_uses_recursive($model_class))) {
-                (new $model_class)->invalidateCache();
+                (new $model_class())->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model_class);
             }
 

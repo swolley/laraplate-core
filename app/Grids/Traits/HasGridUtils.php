@@ -114,7 +114,7 @@ trait HasGridUtils
         return null;
     }
 
-    /** @return RelationInfo[]|false */
+    /** @return array<int,RelationInfo>|false */
     public static function getRelationshipDeeply(string $relation): array|false
     {
         $splitted = explode('.', $relation);
@@ -136,7 +136,7 @@ trait HasGridUtils
         return count($found) === count($splitted) ? $found : false;
     }
 
-    /** @return RelationInfo[]|false */
+    /** @return array<int,RelationInfo>|false */
     public static function getInverseRelationshipDeeply(string $relation): array|false
     {
         if (count(explode('.', $relation)) <= 2) {
@@ -313,9 +313,7 @@ trait HasGridUtils
     }
 
     /**
-     * @return (null|string)[]
-     *
-     * @psalm-return array{createdAt: null|string, updatedAt: null|string, deletedAt: null|string, lockedAt: null|string}
+     * @return array{createdAt:string|null,updatedAt:string|null,deletedAt:string|null,lockedAt:string|null}
      */
     public static function getTimestampColumns(Model $model, bool $fullnames = false): array
     {
@@ -345,9 +343,7 @@ trait HasGridUtils
     }
 
     /**
-     * @return string[]
-     *
-     * @psalm-return array<int, string>
+     * @return array<int,string>
      */
     public function getHiddenFields(): array
     {
@@ -355,9 +351,7 @@ trait HasGridUtils
     }
 
     /**
-     * @return string[]
-     *
-     * @psalm-return array<string>
+     * @return array<int,string>
      */
     public function getFillableFields(): array
     {
@@ -365,9 +359,7 @@ trait HasGridUtils
     }
 
     /**
-     * @return string[]
-     *
-     * @psalm-return array<string>
+     * @return array<int,string>
      */
     public function getModelCasts(): array
     {

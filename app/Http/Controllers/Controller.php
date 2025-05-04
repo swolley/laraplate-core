@@ -12,7 +12,6 @@ use Illuminate\Routing\Controller as RoutingController;
 abstract class Controller extends RoutingController
 {
     public function __construct(
-        protected Repository $cache,
         protected AuthManager $auth,
         protected DatabaseManager $db
     ) {}

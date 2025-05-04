@@ -92,9 +92,9 @@ class ComposhipsBelongsToMany extends BelongsToMany
 
     /**
      * 
-     * @param Model[] $models 
-     * @param string|array $key 
-     * @return array 
+     * @param array<int,Model> $models 
+     * @param string|array<int,string> $key 
+     * @return array<int,string>
      */
     #[\Override]
     protected function getKeys(array $models, $key = null): array

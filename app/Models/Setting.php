@@ -26,12 +26,12 @@ class Setting extends Model
     }
 
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected $fillable = [
+    protected array $fillable = [
         'name',
         'value',
         'encrypted',
@@ -41,7 +41,7 @@ class Setting extends Model
         'description',
     ];
 
-    protected $attributes = [
+    protected array $attributes = [
         'encrypted' => false,
         'type' => 'string',
         'group_name' => 'base',
@@ -76,7 +76,7 @@ class Setting extends Model
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'encrypted' => ['boolean', 'required'],
             'choices' => ['sometimes', 'nullable'],
             'choices.*' => ['filled'],

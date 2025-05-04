@@ -16,9 +16,7 @@ class ModuleDocGenerator extends Generator
     }
 
     /**
-     * @return ModuleDocRoute[]
-     *
-     * @psalm-return list{0?: ModuleDocRoute,...}
+     * @return array<int, ModuleDocRoute>
      */
     #[\Override]
     protected function getAppRoutes(): array
@@ -44,9 +42,9 @@ class ModuleDocGenerator extends Generator
                     continue;
                 }
 
-                $values = is_string($value) && Str::contains($value, '|') 
-                    ? explode('|', $value) 
-                    : (array)$value;
+                $values = is_string($value) && Str::contains($value, '|')
+                    ? explode('|', $value)
+                    : (array) $value;
 
                 if ($values !== []) {
                     $parameter_values[$key] = $values;
@@ -61,12 +59,12 @@ class ModuleDocGenerator extends Generator
             foreach ($this->generateCombinations($parameter_values) as $combination) {
                 $new_route = clone $route;
                 $new_uri = $new_route->uri;
-                
+
                 foreach ($combination as $param => $value) {
                     $new_uri = str_replace('{' . $param . '}', $value, $new_uri);
                     unset($new_route->wheres[$param]);
                 }
-                
+
                 $new_route->uri = $new_uri;
                 $module_routes[] = new ModuleDocRoute($new_route);
             }
@@ -82,7 +80,7 @@ class ModuleDocGenerator extends Generator
         }
 
         $route_name = $route->getName();
-        if (empty($route_name) || Str::startsWith($route->uri(), ['_', '/_'])) {
+        if ($route_name === '' || Str::startsWith($route->uri(), ['_', '/_'])) {
             return true;
         }
 

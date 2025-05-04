@@ -6,6 +6,7 @@ namespace Modules\Core\Database\Factories;
 
 use Illuminate\Support\Str;
 use Modules\Core\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -24,7 +25,7 @@ class UserFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * @return (\Illuminate\Support\Carbon|string)[]
+     * @return array<Carbon|string>
      *
      * @psalm-return array{name: string, email: string, email_verified_at: \Illuminate\Support\Carbon, password: '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', remember_token: string}
      */

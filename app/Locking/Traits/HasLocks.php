@@ -15,7 +15,8 @@ trait HasLocks
     public static function bootHasLocks(): void
     {
         static::saving(function (Model $model): void {
-            if ($lock_version = request('lock_version')) {
+            $lock_version = request('lock_version');
+            if ($lock_version) {
                 // @phpstan-ignore property.notFound
                 $model->lock_version = $lock_version;
             }
@@ -129,12 +130,12 @@ trait HasLocks
 
     public function isUnlocked(): bool
     {
-        return  !$this->isLocked();
+        return !$this->isLocked();
     }
 
     public function isUnlockedBy(User $user): bool
     {
-        return  !$this->isLockedBy($user);
+        return !$this->isLockedBy($user);
     }
 
     public function isNotUnlocked(): bool

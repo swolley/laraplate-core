@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Cache;
-use Override;
-use Exception;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use UnexpectedValueException;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Collection;
 use Modules\Core\Inspector\Inspect;
-use Modules\Core\Cache\CacheManager;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\HasVersions;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +22,6 @@ use Modules\Core\Inspector\Entities\Column;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Illuminate\Contracts\Container\BindingResolutionException;
-use Illuminate\Validation\Rule;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 
 /**
@@ -41,7 +38,7 @@ final class DynamicEntity extends Model
 
     private array $dynamic_relations = [];
 
-    private array $_casts = [];
+    private array $dynamic_casts = [];
 
     /**
      * @return array<string, string>
@@ -49,19 +46,20 @@ final class DynamicEntity extends Model
     #[\Override]
     protected function casts(): array
     {
-        return $this->_casts;
+        return $this->dynamic_casts;
     }
 
     public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
-        if ($model = self::tryResolveModel($tableName, $connection)) {
+        $model = self::tryResolveModel($tableName, $connection);
+        if ($model) {
             return new $model($attributes);
         }
 
         if (config('crud.dynamic_entities', false)) {
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 
-            return CacheManager::remember($cache_key, function () use ($tableName, $connection, $attributes, $request) {
+            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request) {
                 $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
                 return $model;
@@ -80,7 +78,7 @@ final class DynamicEntity extends Model
      * @throws BindingResolutionException
      * @throws Exception
      * @throws InvalidArgumentException
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      *
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
@@ -88,9 +86,7 @@ final class DynamicEntity extends Model
         $models = models();
         $found = self::findModel($models, $requestEntity);
 
-        if (!$found) {
-            $found = self::findModel($models, Str::singular($requestEntity));
-        }
+        $found ??= self::findModel($models, Str::singular($requestEntity));
 
         if (!$found) {
             return null;
@@ -104,7 +100,7 @@ final class DynamicEntity extends Model
 
     /**
      * @throws Exception
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      *
      */
     private static function findModel(array $models, string $modelName): ?string
@@ -112,7 +108,7 @@ final class DynamicEntity extends Model
         $found = array_filter($models, fn($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
         if (count($found) > 1) {
-            throw new Exception("Too many models found for '{$modelName}'");
+            throw new \Exception("Too many models found for '{$modelName}'");
         }
 
         return count($found) === 1 ? head($found) : null;
@@ -143,7 +139,7 @@ final class DynamicEntity extends Model
         $this->setColumnsInfo($inspected->columns, $inspected->foreignKeys, $inspected->indexes);
     }
 
-    #[Override]
+    #[\Override]
     public function jsonSerialize(): mixed
     {
         $serialized = $this->toArray();
@@ -182,10 +178,13 @@ final class DynamicEntity extends Model
             $this->primaryKey = $primaryKeyIndex->columns;
             $this->keyType = 'string';
             $this->incrementing = false;
-        } elseif ($first_column = $primaryKeyColumns->first()) {
-            $this->primaryKey = $first_column->name;
-            $this->incrementing = $first_column->autoincrement;
-            $this->keyType = $first_column->type->value && !Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
+        } else {
+            $first_column = $primaryKeyColumns->first();
+            if ($first_column) {
+                $this->primaryKey = $first_column->name;
+                $this->incrementing = $first_column->autoincrement;
+                $this->keyType = $first_column->type->value && !Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
+            }
         }
     }
 
@@ -232,33 +231,35 @@ final class DynamicEntity extends Model
         // set correct cast
         $is_date = $column->type->value && Str::contains($column->type->value, 'date');
 
-        $this->_casts[$column->name] = $column->type->value;
+        $this->dynamic_casts[$column->name] = $column->type->value;
 
         // validations
         $rules = $this->getRules();
-        $rules[static::DEFAULT_RULE][$column->name] = [$is_date ? 'date' : $column->type->value];
+        $rules[self::DEFAULT_RULE][$column->name] = [$is_date ? 'date' : $column->type->value];
 
         $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
 
         if (!$column->isUnsigned()) {
-            $rules[static::DEFAULT_RULE][$column->name][] = 'min:0';
+            $rules[self::DEFAULT_RULE][$column->name][] = 'min:0';
         }
 
         if (!$column->isNullable()) {
-            $rules[static::DEFAULT_RULE][$column->name][] = 'required';
+            $rules[self::DEFAULT_RULE][$column->name][] = 'required';
         }
 
         if ($column->getLength() && $column->type->value === 'string') {
-            $rules[static::DEFAULT_RULE][$column->name][] = 'max:' . $column->getLength();
+            $rules[self::DEFAULT_RULE][$column->name][] = 'max:' . $column->getLength();
         }
 
         if (array_key_exists($column->name, $remapped_fks)) {
-            $rules[static::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
+            $rules[self::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
         }
 
         if (in_array($column->name, $remapped_uidxs, true)) {
-            $rules[static::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete) {
-                if ($soft_delete) $query->whereNull('deleted_at');
+            $rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete) {
+                if ($soft_delete) {
+                    $query->whereNull('deleted_at');
+                }
             });
         }
 

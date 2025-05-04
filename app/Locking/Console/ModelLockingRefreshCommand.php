@@ -27,7 +27,7 @@ class ModelLockingRefreshCommand extends Command
     private bool $changes = false;
 
     /**
-     * @var string[]
+     * @var array<int,string>
      */
     private array $models_blacklist = [];
 

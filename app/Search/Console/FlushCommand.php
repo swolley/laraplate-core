@@ -14,7 +14,9 @@ class FlushCommand extends \Laravel\Scout\Console\FlushCommand
     #[\Override]
     public function handle()
     {
-        if (!$this->getModelClass()) return static::FAILURE;
+        if (!$this->getModelClass()) {
+            return self::FAILURE;
+        }
         return parent::handle();
     }
 }

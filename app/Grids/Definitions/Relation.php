@@ -14,7 +14,7 @@ class Relation extends Entity
     /**
      * @param  string  $path  relation path (prefix before current relation name in full relation name)
      * @param  RelationInfo  $info  data about current relation from her parent point of view
-     * @param Field[]|Collection<string, Field>|null $fields fields's list
+     * @param array<Field>|Collection<string,Field>|null $fields fields's list
      * */
     public function __construct(string $path, RelationInfo $info, ?iterable $fields = null)
     {

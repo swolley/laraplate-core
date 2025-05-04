@@ -14,18 +14,13 @@ use Illuminate\Support\Facades\Log;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\confirm;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Database\DatabaseManager;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class HandleLicensesCommand extends Command
 {
     protected $signature = 'auth:licenses';
 
     protected $description = 'Renew, add or delete user licenses. <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
-
-    public function __construct(DatabaseManager $db)
-    {
-        parent::__construct($db);
-    }
 
     public function handle()
     {
@@ -66,7 +61,7 @@ class HandleLicensesCommand extends Command
                     );
 
                     if ($number === 0) {
-                        return static::SUCCESS;
+                        return BaseCommand::SUCCESS;
                     }
 
                     $validations = (new License)->getOperationRules('create');
@@ -98,11 +93,11 @@ class HandleLicensesCommand extends Command
                 $this->output->info('User class is not Modules\Core\Models\User');
                 $this->db->commit();
 
-                return static::SUCCESS;
+                return BaseCommand::SUCCESS;
             });
         } catch (\Throwable $ex) {
             $this->output->error($ex->getMessage());
-            return static::FAILURE;
+            return BaseCommand::FAILURE;
         }
     }
 

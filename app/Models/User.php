@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Filament\Panel;
 use Illuminate\Validation\Rule;
-use Modules\Core\Models\License;
 use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Modules\Core\Helpers\HasValidations;
@@ -16,11 +17,12 @@ use Modules\Core\Observers\UserObserver;
 use Illuminate\Validation\Rules\Password;
 use Modules\Core\Locking\Traits\HasLocks;
 use Lab404\Impersonate\Models\Impersonate;
+use Filament\Models\Contracts\FilamentUser;
 use Modules\Core\Models\Pivot\ModelHasRole;
-use Modules\Core\Helpers\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Modules\Core\Database\Factories\UserFactory;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,12 +32,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[ObservedBy([UserObserver::class])]
 /**
+ * @property \Illuminate\Database\Eloquent\Relations\BelongsToMany $roles
  * @mixin IdeHelperUser
  */
-class User extends BaseUser
+class User extends BaseUser implements FilamentUser
 {
     use ApprovesChanges,
-        // HasApiTokens,
         HasFactory,
         HasLocks,
         HasValidations,
@@ -45,8 +47,6 @@ class User extends BaseUser
         SoftDeletes,
         HasVersions,
         HasRoles {
-        // roles as defaultRoles;
-        // permissions as defaultPermissions;
         getRules as protected getRulesTrait;
         roles as protected rolesTrait;
     }
@@ -112,6 +112,16 @@ class User extends BaseUser
         return !property_exists($this, 'email') || $this->email === null;
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole(config('permission.roles.superadmin'));
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(config('permission.roles.admin'));
+    }
+
     public function canImpersonate(): bool
     {
         /** @phpstan-ignore staticMethod.notFound */
@@ -121,25 +131,30 @@ class User extends BaseUser
         return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
     }
 
+    public function canAccessPanel(Panel $panel): bool
+    {
+        switch ($panel->getId()) {
+            case 'admin':
+                return $this->isSuperAdmin();
+            default:
+                return true;
+        }
+    }
+
     public function getImpersonator(): self
     {
         return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
     }
 
-    public function isSuperAdmin(): bool
+    protected static function scopeSuperAdmin(Builder $query): Builder
     {
-        return $this->hasRole('superadmin');
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
-    // public function permissions(): BelongsToMany
-    // {
-    //     return $this->defaultPermissions();
-    // }
-
-    // public function roles(): BelongsToMany
-    // {
-    //     return $this->defaultRoles();
-    // }
+    protected static function scopeAdmin(Builder $query): Builder
+    {
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.admin')));
+    }
 
     /**
      * @return HasMany<UserGridConfig>
@@ -183,9 +198,9 @@ class User extends BaseUser
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
-            'lang' => ['sometimes', 'in:' . implode(',', translations())],
-            'locked_at' => ['sometimes', 'date'],
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+            'lang' => ['nullable', 'in:' . implode(',', translations())],
+            'locked_at' => ['nullable', 'date'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],
@@ -206,9 +221,9 @@ class User extends BaseUser
             'password' => [Password::required()],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
             'username' => [
-                'sometimes',
+                'nullable',
                 'string',
                 'max:255',
                 Rule::unique('users')->where(function ($query) {
@@ -216,14 +231,14 @@ class User extends BaseUser
                 })->ignore($this->id, 'id')
             ],
             'email' => [
-                'sometimes',
+                'nullable',
                 'email',
                 'max:255',
                 Rule::unique('users')->where(function ($query) {
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id')
             ],
-            'password' => ['sometimes', Password::default()],
+            'password' => ['nullable', Password::default()],
         ]);
 
         return $rules;

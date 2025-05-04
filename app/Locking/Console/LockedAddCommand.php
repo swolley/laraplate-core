@@ -9,6 +9,7 @@ use Modules\Core\Overrides\Command;
 use Illuminate\Support\Facades\App;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class LockedAddCommand extends Command
 {
@@ -50,7 +51,7 @@ class LockedAddCommand extends Command
         if (!class_exists($className)) {
             $this->error("Model {$className} does not exist");
 
-            return static::FAILURE;
+            return BaseCommand::FAILURE;
         }
 
         $instance = new $className();
@@ -67,7 +68,7 @@ class LockedAddCommand extends Command
             $this->info("File : {$path} already exists");
         }
 
-        return static::SUCCESS;
+        return BaseCommand::SUCCESS;
     }
 
     public function generateMigrationPath(Model $instance)

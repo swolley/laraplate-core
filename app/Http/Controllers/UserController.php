@@ -31,7 +31,7 @@ class UserController extends Controller
     }
 
     /**
-     * @return ((mixed|string[])[]|false|int|mixed|string)[]
+     * @return array<array<mixed|array<string>>|false|int|mixed|string>
      *
      * @psalm-return array{id: 'anonymous'|int, name: string, username: string, email: string, groups: array<int, mixed>, canImpersonate: false|mixed, permissions: array<list<string>>}
      */
@@ -51,7 +51,7 @@ class UserController extends Controller
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
-        /** @var null|User $user */
+        /** @var User|null $user */
         $user = $this->auth->user();
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
@@ -108,7 +108,7 @@ class UserController extends Controller
 
     public function socialLoginCallback(string $service)
     {
-        /** @var SocialUser $user */
+        /** @var SocialUser $social_user */
         $social_user = $this->socialite->driver($service)->user();
 
         $user = User::updateOrCreate([
@@ -134,11 +134,8 @@ class UserController extends Controller
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {
-        $user = $this->auth->user();
-        if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
-        return response()->json(['message' => 'Session maintained successfully.']);
+        return $this->auth->user()
+            ? response()->json(['message' => 'Session maintained successfully.'])
+            : response()->json(['error' => 'Unauthorized'], 401);
     }
 }

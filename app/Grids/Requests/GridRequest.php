@@ -17,11 +17,11 @@ class GridRequest extends FormRequest implements IParsableRequest
 
     private ListRequest|ModifyRequest $realMainRequest;
     /**
-     * @var ListRequest[]
+     * @var array<int,ListRequest>
      */
     private array $realOptionRequests = [];
     /**
-     * @var ListRequest[]
+     * @var array<int,ListRequest>
      */
     private array $realFunnelRequests = [];
 
@@ -115,9 +115,8 @@ class GridRequest extends FormRequest implements IParsableRequest
             // case GridAction::COUNT:
             case GridAction::INSERT:
             case GridAction::UPDATE:
-                /** @phpstan-ignore staticMethod.notFound */
+            /** @phpstan-ignore staticMethod.notFound */
                 // $this->realMainRequest = ModifyRequest::createFrom($this);
-                // break;
             case GridAction::CHECK:
             case GridAction::FORCE_DELETE:
             case GridAction::DELETE:

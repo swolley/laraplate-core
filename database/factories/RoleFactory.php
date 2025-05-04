@@ -19,7 +19,7 @@ class RoleFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * @return (mixed|string)[]
+     * @return array<int,mixed|string>
      *
      * @psalm-return array{name: string, guard_name: mixed, description: string}
      */

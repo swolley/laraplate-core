@@ -25,7 +25,7 @@ class ServiceProvider extends BaseServiceProvider
 				if ($file->isFile() && $file->getExtension() === 'php') {
 					$relativePath = str_replace($configPath . DIRECTORY_SEPARATOR, '', $file->getPathname());
 					$configKey = str_replace([DIRECTORY_SEPARATOR, '.php'], ['.', ''], $relativePath);
-					$key = ($relativePath === 'config.php') ? $this->nameLower : $configKey;
+					$key = $relativePath === 'config.php' ? $this->nameLower : $configKey;
 
 					$this->publishes([$file->getPathname() => config_path($relativePath)], $configPath);
 					$this->mergeConfigFrom($file->getPathname(), $key);

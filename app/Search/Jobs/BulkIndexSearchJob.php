@@ -52,7 +52,7 @@ class BulkIndexSearchJob implements ShouldQueue
         }
 
         // Validate that all models are of the same class
-        $model_class = get_class($models->first());
+        $model_class = $models->first()::class;
         if (!$models->every(fn($model) => $model instanceof $model_class)) {
             throw new \InvalidArgumentException('All models must be of the same class');
         }
@@ -76,7 +76,7 @@ class BulkIndexSearchJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $model_class = get_class($this->models->first());
+            $model_class = $this->models->first()::class;
             $driver = config('scout.driver');
 
             Log::info("Starting bulk index job", [
@@ -95,7 +95,7 @@ class BulkIndexSearchJob implements ShouldQueue
             ]);
         } catch (\Exception $e) {
             Log::error("Error in bulk index job", [
-                'model' => get_class($this->models->first()),
+                'model' => $this->models->first()::class,
                 'count' => $this->models->count(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -117,7 +117,7 @@ class BulkIndexSearchJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        $model_class = get_class($this->models->first());
+        $model_class = $this->models->first()::class;
         $count = $this->models->count();
 
         Log::error("Bulk indexing job failed", [

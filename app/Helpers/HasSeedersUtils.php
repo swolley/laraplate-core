@@ -2,7 +2,6 @@
 
 namespace Modules\Core\Helpers;
 
-use Modules\Core\Helpers\HasApprovals;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasSeedersUtils

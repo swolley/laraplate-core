@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Illuminate\Cache\CacheManager;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Events\MigrationsEnded;
@@ -15,10 +15,7 @@ class CommandListenerProvider extends ServiceProvider
      * Register the service provider.
      */
     #[\Override]
-    public function register(): void
-    {
-        //
-    }
+    public function register(): void {}
 
     /**
      * Get the services provided by the provider.
@@ -36,9 +33,9 @@ class CommandListenerProvider extends ServiceProvider
      */
     public function boot()
     {
-        Event::listen(MigrationsEnded::class, function (MigrationsEnded $event) {
+        Event::listen(MigrationsEnded::class, function () {
             info("Cleaning Inspected entities");
-            $this->app->make(CacheManager::class)->tags(['inspector'])->flush();
+            Cache::tags(['inspector'])->flush();
         });
     }
 }

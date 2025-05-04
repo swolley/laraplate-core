@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Laravel\Scout\EngineManager;
+use Illuminate\Support\Facades\Bus;
+use Modules\Core\Models\ModelEmbedding;
+use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Services\ElasticsearchService;
-use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Modules\Core\Search\Engines\AbstractSearchEngine;
+use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
 
 /**
  * Extended searchable trait that supports multiple engines
@@ -18,12 +22,47 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 trait Searchable
 {
-    use ScoutSearchable;
+    use ScoutSearchable {
+        searchable as protected baseSearchable;
+        searchableSync as protected baseSearchableSync;
+    }
 
     /**
      * Field name for indexing timestamp
      */
     public const INDEXED_AT_FIELD = 'indexed_at';
+
+    public function searchable()
+    {
+        if (config('scout.vector_search.enabled')) {
+            $engine = $this->searchableUsing();
+            if ($engine instanceof AbstractSearchEngine && $engine->supportsVectorSearch()) {
+                Bus::chain([
+                    // start with embeddings
+                    new GenerateEmbeddingsJob($this),
+                    // then proceed with indexing
+                    new IndexInSearchJob($this),
+                ])->dispatch();
+                return;
+            }
+        }
+
+        // proceed with indexing
+        $this->baseSearchable();
+    }
+
+    public function searchableSync()
+    {
+        if (config('scout.vector_search.enabled')) {
+            $engine = $this->searchableUsing();
+            if ($engine instanceof AbstractSearchEngine && $engine->supportsVectorSearch()) {
+                new GenerateEmbeddingsJob($this)->dispatchSync();
+            }
+        }
+
+        // then proceed with indexing
+        $this->baseSearchableSync();
+    }
 
     /**
      * Extends the standard method with support for embeddings and other data
@@ -49,7 +88,7 @@ trait Searchable
         // Add embeddings if available
         if (method_exists($this, 'embeddings')) {
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
-            if (!empty($embeddings)) {
+            if ($embeddings !== []) {
                 $array['embedding'] = $embeddings[0] ?? []; // Use first embedding
             }
         }
@@ -62,7 +101,7 @@ trait Searchable
      */
     public function prepareDataToEmbed(): ?string
     {
-        if (!isset($this->embed) || empty($this->embed)) {
+        if (!isset($this->embed) || $this->embed === []) {
             return null;
         }
 
@@ -77,25 +116,25 @@ trait Searchable
         return $data;
     }
 
-    /**
-     * Generate embeddings for the model
-     * 
-     * @param bool $force If true, force generation even if embeddings already exist
-     * @return void
-     */
-    public function generateEmbeddings(bool $force = false): void
-    {
-        if (config('scout.vector_search.enabled')) {
-            GenerateEmbeddingsJob::dispatch($this, $force);
-        }
-    }
+    // /**
+    //  * Generate embeddings for the model
+    //  * 
+    //  * @param bool $force If true, force generation even if embeddings already exist
+    //  * @return void
+    //  */
+    // public function generateEmbeddings(bool $force = false): void
+    // {
+    //     if (config('scout.vector_search.enabled')) {
+    //         GenerateEmbeddingsJob::dispatch($this, $force);
+    //     }
+    // }
 
     /**
      * Relationship with model embeddings
      */
     public function embeddings(): MorphMany
     {
-        return $this->morphMany(\Modules\Core\Models\ModelEmbedding::class, 'model');
+        return $this->morphMany(ModelEmbedding::class, 'model');
     }
 
     /**
@@ -111,7 +150,8 @@ trait Searchable
 
         if ($driver === 'elastic') {
             return $this->convertToElasticsearchMapping($fields);
-        } elseif ($driver === 'typesense') {
+        }
+        if ($driver === 'typesense') {
             return $this->convertToTypesenseSchema($fields);
         }
 
@@ -392,7 +432,7 @@ trait Searchable
         } catch (\Exception $e) {
             // Log error
             \Illuminate\Support\Facades\Log::error('Error creating Elasticsearch index', [
-                'model' => get_class($this),
+                'model' => static::class,
                 'error' => $e->getMessage()
             ]);
 
@@ -423,7 +463,7 @@ trait Searchable
         } catch (\Exception $e) {
             // Log error
             \Illuminate\Support\Facades\Log::error('Error creating Typesense collection', [
-                'model' => get_class($this),
+                'model' => static::class,
                 'error' => $e->getMessage()
             ]);
 
@@ -440,7 +480,8 @@ trait Searchable
 
         if ($driver === 'elastic') {
             return $this->getElasticsearchLastIndexedTimestamp();
-        } elseif ($driver === 'typesense') {
+        }
+        if ($driver === 'typesense') {
             return $this->getTypesenseLastIndexedTimestamp();
         }
 
@@ -519,7 +560,8 @@ trait Searchable
                 ])
                 ->take($size)
                 ->get();
-        } elseif ($driver === 'typesense') {
+        }
+        if ($driver === 'typesense') {
             // For Typesense, we use the vector search capability
             $client = app('typesense');
             $collection = $this->searchableAs();
@@ -538,11 +580,8 @@ trait Searchable
 
             // Convert to Eloquent collection
             $ids = collect($response['hits'])->pluck('document.id')->toArray();
-            return static::whereIn($this->getKeyName(), $ids)
-                ->get()
-                ->sortBy(function ($model) use ($ids) {
-                    return array_search($model->getKey(), $ids);
-                });
+            return static::whereIn($this->getKeyName(), $ids)->get()
+                ->sortBy(fn($model) => array_search($model->getKey(), $ids));
         }
 
         return collect();
@@ -559,18 +598,18 @@ trait Searchable
             if (is_array($value)) {
                 if (count($value) === 2 && is_numeric($value[0]) && is_numeric($value[1])) {
                     // Range filter
-                    $filterStrings[] = "$field:>=" . $value[0] . " && $field:<=" . $value[1];
+                    $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
                     $values = implode(',', array_map(function ($val) {
-                        return is_string($val) ? "\"$val\"" : $val;
+                        return is_string($val) ? "\"{$val}\"" : $val;
                     }, $value));
-                    $filterStrings[] = "$field:[$values]";
+                    $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {
                 // Exact match
-                $formattedValue = is_string($value) ? "\"$value\"" : $value;
-                $filterStrings[] = "$field:=$formattedValue";
+                $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
+                $filterStrings[] = "{$field}:={$formattedValue}";
             }
         }
 

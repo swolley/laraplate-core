@@ -13,7 +13,8 @@ class TreeRequestData extends DetailRequestData
     public bool $children;
 
     /**
-     * @param string|string[] $primaryKey
+     * @param array{parents:bool,children:bool} $validated
+     * @param string|array<string> $primaryKey
      */
     public function __construct(TreeRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {

@@ -8,7 +8,7 @@ use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 class AuthenticationService
 {
     /**
-     * @param AuthenticationProviderInterface[] $providers
+     * @param array<int,AuthenticationProviderInterface> $providers
      */
     public function __construct(
         private readonly array $providers

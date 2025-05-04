@@ -21,7 +21,7 @@ class QueryColumn implements ValidationRule
             !is_string($value) && !is_array($value) ||
             (is_array($value) && (!array_key_exists('name', $value) || !array_key_exists('type', $value)))
         ) {
-            $fail("$attribute doesn't have a correct format");
+            $fail("{$attribute} doesn't have a correct format");
         }
     }
 }

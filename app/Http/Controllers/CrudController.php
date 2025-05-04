@@ -13,12 +13,11 @@ use UnexpectedValueException;
 use Illuminate\Support\Carbon;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Crud\CrudHelper;
-use Modules\Core\Cache\Searchable;
 use Modules\Core\Casts\WhereClause;
 use Illuminate\Foundation\Auth\User;
-use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\FiltersGroup;
 use Approval\Traits\RequiresApproval;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Models\Modification;
 use Modules\Core\Casts\FilterOperator;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +26,6 @@ use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Elastic\Elasticsearch\ClientBuilder;
-use Illuminate\Database\DatabaseManager;
 use Modules\Core\Casts\IParsableRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Casts\DetailRequestData;
@@ -37,6 +35,8 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Casts\HistoryRequestData;
+use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Helpers\HasCrudOperations;
 use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\TreeRequest;
@@ -55,19 +55,10 @@ use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
-use Modules\Core\Helpers\HasCrudOperations;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Auth\AuthManager;
-use Illuminate\Cache\Repository;
 
 class CrudController extends Controller
 {
     use HasCrudOperations;
-
-    public function __construct(Repository $cache, AuthManager $auth, DatabaseManager $db)
-    {
-        parent::__construct($cache, $auth, $db);
-    }
 
     /**
      * checks if model uses recursive relationships trait
@@ -99,11 +90,11 @@ class CrudController extends Controller
     }
 
     /**
-     * @return string|mixed[]
+     * @return string|array<int,string>
      */
     private function getModelKeyValue(CrudRequestData $filters): string|array
     {
-        /** @var string|string[] $key */
+        /** @var string|array<int,string> $key */
         $key = $filters->model->getKeyName();
         if (is_string($key)) {
             return $filters->$key;
@@ -182,7 +173,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return CacheManager::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -203,7 +194,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($data)
                     ->setCachedAt(Carbon::now());
-            }, cache: $this->cache);
+            });
         });
     }
 
@@ -225,7 +216,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return CacheManager::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -234,7 +225,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            }, cache: $this->cache);
+            });
         });
     }
 
@@ -243,7 +234,8 @@ class CrudController extends Controller
         $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
 
         $cache = Cache::store();
-        if ($cachedTemplate = $cache->get($templateKey)) {
+        $cachedTemplate = $cache->get($templateKey);
+        if ($cachedTemplate) {
             return $cachedTemplate;
         }
 
@@ -340,7 +332,7 @@ class CrudController extends Controller
             if (!isset($filters->model) || $is_searchable_class) {
                 $embeddedDocument = null;
 
-                if (property_exists($filters->model, 'embed') && $filters->model->embed !== null && !empty($filters->model->embed)) {
+                if (property_exists($filters->model, 'embed') && $filters->model->embed !== null && $filters->model->embed !== []) {
                     $embeddingGenerator = new OpenAI3SmallEmbeddingGenerator();
                     $embeddedDocument = $embeddingGenerator->embedText($filters->qs);
                 }
@@ -383,7 +375,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return CacheManager::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -401,7 +393,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            }, cache: $this->cache);
+            });
         });
     }
 
@@ -419,7 +411,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return CacheManager::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
                 $tree_relation_type = [];
                 if ($filters->parents && $filters->children) {
                     $tree_relation_type = 'bloodline';
@@ -437,7 +429,7 @@ class CrudController extends Controller
                     ->setClass($model)
                     ->setData($query->sole())
                     ->setCachedAt(Carbon::now());
-            }, cache: $this->cache);
+            });
         });
     }
 
@@ -693,7 +685,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'lock', $model->getConnectionName());
             $key_value = $this->getModelKeyValue($filters);
-            /** @var Model&HasLocks */
+            /** @var Model&HasLocks $found_records */
             $found_records = $model->where($key_value)->get();
 
             if ($found_records->isEmpty() && $filters->request->has('id')) {
@@ -746,7 +738,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, CrudRequestData $filters): Response {
             $model = $filters->model;
             $table = $model->getTable();
-            CacheManager::clearByEntity($model, $this->cache);
+            Cache::clearByEntity($model);
 
             return $responseBuilder
                 ->setData("$table cached cleared")

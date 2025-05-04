@@ -51,6 +51,6 @@ class Column
     {
         $length = filter_var($this->type->value, FILTER_SANITIZE_NUMBER_INT);
 
-        return empty($length) ? null : (int) $length;
+        return $length === [] ? null : (int) $length;
     }
 }

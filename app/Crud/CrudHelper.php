@@ -39,6 +39,7 @@ class CrudHelper
 		foreach ($columns as $type => $cols) {
 			if ($type === 'main' && !empty($cols)) {
 				$this->sortColumns($query, $cols);
+				/** @var array<int,string> $only_standard_columns */
 				$only_standard_columns = [];
 				foreach ($cols as $column) {
 					if ($column->type === ColumnType::COLUMN) {
@@ -123,7 +124,10 @@ class CrudHelper
 		return preg_split('/\.(?=[^.]*$)/', $name, 2);
 	}
 
-	/** @return array{main: Column[], relations: array<string, Column[]>, aggregates: array<string, Column[]>} */
+	/**
+	 * @param  array<int,Column>  $columns_filters
+	 * @return array{main:array<Column>,relations:array<string,array<Column>>,aggregates:array<string,array<Column>>}
+	 */
 	private function groupColumns(string &$mainEntity, array $columns_filters): array
 	{
 		$columns = [
@@ -134,10 +138,9 @@ class CrudHelper
 
 		if ($columns_filters !== []) {
 			// used only for quick search instead of array_filter
-			/** @var string[] $all_relations_names */
+			/** @var array<int,string> $all_relations_names */
 			$all_relations_names = [];
 
-			/** @var object{name: string, type: ColumnType} $column */
 			foreach ($columns_filters as $column) {
 				$index = str_replace($mainEntity . '.', '', $column->name);
 				if (preg_match("/^\w+\.\w+$/", $column->name) && $column->type === ColumnType::COLUMN) {
@@ -172,6 +175,8 @@ class CrudHelper
 
 	/**
 	 * removes unnecessary unnecessary relationships
+	 * 
+	 * @param  array<int,string>  $relations
 	 */
 	private function cleanRelations(array &$relations): void
 	{
@@ -195,13 +200,11 @@ class CrudHelper
 	}
 
 	/**
-	 * @return (mixed|null|string)[]
-	 *
-	 * @psalm-return array{relation: string, connection: 'default'|mixed, table: mixed, field: null|string}
+	 * @return array{relation:string,connection:'default'|mixed,table:mixed,field:string|null}
 	 */
 	private function splitProperty(Builder|Model $model, string $property): array
 	{
-		/** @var string[] $exploded */
+		/** @var array<int,string> $exploded */
 		$exploded = explode('.', $property);
 		if (!empty($exploded) && $exploded[0] === $model->getTable()) {
 			array_shift($exploded);
@@ -222,21 +225,24 @@ class CrudHelper
 		];
 	}
 
-	private function applyFilter(Builder $query, Filter $filter, string &$method, array &$relations_columns): void
+	/**
+	 * @param  array<string,array<int,Column>>  $relation_columns
+	 */
+	private function applyFilter(Builder $query, Filter $filter, string &$method, array &$relation_columns): void
 	{
 		if (substr_count($filter->property, '.') > 1) {
 			// relations
 			$splitted = $this->splitProperty($query->getModel(), $filter->property);
-			$query->{$method . 'Has'}($splitted['relation'], function (Builder $q) use ($filter, $method, $splitted, $relations_columns) {
+			$query->{$method . 'Has'}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns) {
 				if ($splitted['field'] === 'deleted_at') {
-					$permission = $splitted['connection'] . '.' . $splitted['table'] . '.' . 'delete';
+					$permission = "{$splitted['connection']}.{$splitted['table']}.delete";
 					$user = Auth::user();
-					if ($user->can($permission)) {
+					if ($user && $user->can($permission)) {
 						$q->withTrashed();
 					}
 				}
 				$cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
-				$this->applyFilter($q, $cloned_filter, $method, $relations_columns);
+				$this->applyFilter($q, $cloned_filter, $method, $relation_columns);
 			});
 		} elseif ($filter->value === null) {
 			// is or is not null
@@ -252,7 +258,10 @@ class CrudHelper
 		}
 	}
 
-	private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array $relation_columns): void
+	/**
+	 * @param  array<string,array<int,Column>>  $relation_columns
+	 */
+	private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
 	{
 		$iterable = is_array($filters) && Arr::isList($filters) ? $filters : $filters->filters;
 		$method = $filters->operator === WhereClause::AND ? 'where' : 'orWhere';
@@ -266,7 +275,7 @@ class CrudHelper
 	}
 
 	/**
-	 * @param  Column[]  $columns
+	 * @param  array<int,Column>  $columns
 	 * @return void
 	 */
 	private function sortColumns(Builder|Relation $query, array &$columns)
@@ -283,7 +292,7 @@ class CrudHelper
 	}
 
 	/**
-	 * @param Column[] $relation_columns
+	 * @param  array<string,array<int,Column>>  $relation_columns
 	 */
 	private function applyColumnsToSelect(Builder|Relation $query, array &$relation_columns)
 	{
@@ -299,6 +308,8 @@ class CrudHelper
 
 	/**
 	 * apply only direct aggregate relations on the current related entity
+	 * 
+	 * @param  array<string,array<int,Column>>  $relations_aggregates
 	 */
 	private function applyAggregatesToQuery(Builder|Relation $query, array &$relations_aggregates, string $relation)
 	{
@@ -321,14 +332,15 @@ class CrudHelper
 		}
 	}
 
+	/**
+	 * @param  array<int,string>  $selectColumns
+	 */
 	private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, ?Model $model = null, ?string $table = null)
 	{
 		if (!$model instanceof \Illuminate\Database\Eloquent\Model) {
 			$model = $query->getModel();
 		}
-		if (!$table) {
-			$table = $model->getTable();
-		}
+		$table ??= $model->getTable();
 		foreach (Inspect::foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
 			foreach ($foreign->columns as $column) {
 				$selectColumns[] = new Column($column);
@@ -336,6 +348,12 @@ class CrudHelper
 		}
 	}
 
+	/**
+	 * @param  array<string,array<int,string>>  $relations_columns
+	 * @param  array<string,array<int,Sort>>  $relations_sorts
+	 * @param  array<string,array<int,Column>>  $relations_aggregates
+	 * @param  array<string,array<int,Filter>>  $relations_filters
+	 */
 	private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
 	{
 		if (!empty($relations_columns[$relation])) {
@@ -357,12 +375,15 @@ class CrudHelper
 	}
 
 	/**
-	 * @param  string[]  $relations
-	 * @param  array<array-key, Column[]>  $relations_columns
-	 * @param  array<string, Sort[]>  $relations_sorts
+	 * @param  array<int,string>  $relations
+	 * @param  array<string,array<int,Column>>  $relations_columns
+	 * @param  array<string,array<int,Sort>>  $relations_sorts
+	 * @param  array<string,array<int,Column>>  $relations_aggregates
+	 * @param  array<string,array<int,Filter>>  $relations_filters
 	 */
 	private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
 	{
+		/** @var array<int,string> $merged_relations */
 		$merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
 		$this->cleanRelations($relations);
 
@@ -383,6 +404,7 @@ class CrudHelper
 			unset($relations_aggregates[$relation]);
 		}
 
+		/** @var array<string,callable(Relation):void> $withs */
 		$withs = [];
 		foreach ($merged_relations as $relation) {
 			$withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters) {

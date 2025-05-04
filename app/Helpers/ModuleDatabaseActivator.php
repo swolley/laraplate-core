@@ -19,14 +19,14 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ModuleDatabaseActivator implements ActivatorInterface
 {
-    public const RECORD_NAME = 'backendModules';
+    public static string $RECORD_NAME = 'backendModules';
 
     /**
      * @var class-string
      */
-    public const MODEL_NAME = Setting::class;
+    public static string $MODEL_NAME = Setting::class;
 
-    private readonly \Illuminate\Cache\CacheManager $cache;
+    private readonly \Modules\Core\Cache\Repository $cache;
 
     private readonly string $cacheKey;
 
@@ -52,7 +52,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
     public static function checkSettingTable(): bool
     {
         try {
-            $model = static::MODEL_NAME;
+            $model = self::$MODEL_NAME;
 
             if (!class_exists($model)) {
                 throw new BadMethodCallException('No Setting model found in the application');
@@ -62,9 +62,9 @@ class ModuleDatabaseActivator implements ActivatorInterface
                 throw new BadMethodCallException('No settings table found in the database schema');
             }
 
-            if (!Setting::where('name', static::RECORD_NAME)->exists()) {
+            if (!Setting::where('name', self::$RECORD_NAME)->exists()) {
                 static::seedBackendModules();
-                Log::info("Created Setting '{name}' config record", ['name' => static::RECORD_NAME]);
+                Log::info("Created Setting '{name}' config record", ['name' => self::$RECORD_NAME]);
             }
 
             return true;
@@ -74,7 +74,7 @@ class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
-     * @return string[]
+     * @return array<int,string>
      *
      * @psalm-return list<string>
      */
@@ -92,15 +92,15 @@ class ModuleDatabaseActivator implements ActivatorInterface
 
     public static function seedBackendModules(): Model
     {
-        $model = static::MODEL_NAME;
-        $found = $model::where('name', static::RECORD_NAME)->first();
-        $all_modules = static::getAllModulesNames();
+        $model = self::$MODEL_NAME;
+        $found = $model::where('name', self::$RECORD_NAME)->first();
+        $all_modules = self::getAllModulesNames();
 
         if (!$found) {
             $found = $model::create([
                 'value' => $all_modules,
                 'choices' => $all_modules,
-                'name' => static::RECORD_NAME,
+                'name' => self::$RECORD_NAME,
                 'type' => 'json',
                 'group_name' => 'backend',
                 'description' => 'backend modules',
@@ -170,12 +170,12 @@ class ModuleDatabaseActivator implements ActivatorInterface
     private function getQuery(): Builder
     {
         // static::checkSettingTable();
-        $model = static::MODEL_NAME;
+        $model = self::$MODEL_NAME;
 
         /** @var Builder $query */
         $query = $model::query();
 
-        return $query->where('name', static::RECORD_NAME);
+        return $query->where('name', self::$RECORD_NAME);
     }
 
     private function readSettings(): array
@@ -185,9 +185,9 @@ class ModuleDatabaseActivator implements ActivatorInterface
 
             /** @psalm-suppress UndefinedClass */
         } catch (ModelNotFoundException) {
-            return static::seedBackendModules()->value;
+            return self::seedBackendModules()->value;
         } catch (BadMethodCallException) {
-            return static::getAllModulesNames();
+            return self::getAllModulesNames();
         }
     }
 

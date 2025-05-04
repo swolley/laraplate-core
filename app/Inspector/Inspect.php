@@ -18,10 +18,11 @@ class Inspect
     /**
      * Retrieve a particular table for a given database connection.
      */
-    public static function table(string $name, null|string $schema = null): ?Table
+    public static function table(string $name, ?string $schema = null): ?Table
     {
         $key_name = ($schema ?? 'default') . '_' . $name;
-        if ($inspected_data = Cache::tags(['inspector', $schema ?? 'default'])->get($key_name)) {
+        $inspected_data = Cache::tags(['inspector', $schema ?? 'default'])->get($key_name);
+        if ($inspected_data) {
             return $inspected_data;
         }
 
@@ -56,9 +57,10 @@ class Inspect
     /**
      * Retrieve the columns of a particular table for a given database connection.
      */
-    public static function columns(string $table, null|string $schema = null): Collection
+    public static function columns(string $table, ?string $schema = null): Collection
     {
-        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
+        $table = self::table($table, $schema);
+        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->columns;
         }
 
@@ -68,9 +70,10 @@ class Inspect
     /**
      * Retrieve the indexes of a particular table for a given database connection.
      */
-    public static function indexes(string $table, null|string $schema = null): Collection
+    public static function indexes(string $table, ?string $schema = null): Collection
     {
-        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
+        $table = self::table($table, $schema);
+        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->indexes;
         }
 
@@ -80,9 +83,10 @@ class Inspect
     /**
      * Retrieve the foreign keys of a particular table for a given database connection.
      */
-    public static function foreignKeys(string $table, null|string $schema = null): Collection
+    public static function foreignKeys(string $table, ?string $schema = null): Collection
     {
-        if (($table = self::table($table, $schema)) instanceof \Modules\Core\Inspector\Entities\Table) {
+        $table = self::table($table, $schema);
+        if ($table instanceof \Modules\Core\Inspector\Entities\Table) {
             return $table->foreignKeys;
         }
 
@@ -94,7 +98,7 @@ class Inspect
      * database connection.
      *
      */
-    public static function column(string $name, string $table, null|string $schema = null): ?Column
+    public static function column(string $name, string $table, ?string $schema = null): ?Column
     {
         $columns = self::columns($table, $schema);
 
@@ -106,7 +110,7 @@ class Inspect
      * database connection.
      *
      */
-    public static function index(string $name, string $table, null|string $schema = null): ?Index
+    public static function index(string $name, string $table, ?string $schema = null): ?Index
     {
         $indexes = self::indexes($table, $schema);
 
@@ -118,7 +122,7 @@ class Inspect
      * database connection.
      *
      */
-    public static function foreignKey(string $name, string $table, null|string $schema = null): ?ForeignKey
+    public static function foreignKey(string $name, string $table, ?string $schema = null): ?ForeignKey
     {
         $foreigns = self::foreignKeys($table, $schema);
 

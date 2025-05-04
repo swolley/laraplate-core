@@ -53,14 +53,11 @@ abstract class AbstractSearchEngine extends Engine implements SearchEngineInterf
     // {
     //     if (!$this->isSearchable($model)) {
     //         throw new \InvalidArgumentException(
-    //             sprintf('Model %s does not implement a supported Searchable trait', get_class($model))
+    //             sprintf('Model %s does not implement a supported Searchable trait', $model::class)
     //         );
     //     }
     // }
 
-    /**
-     * {@inheritdoc}
-     */
     public function checkIndex(Model $model, bool $createIfMissing = false): bool
     {
         // $this->ensureIsSearchable($model);
@@ -81,7 +78,7 @@ abstract class AbstractSearchEngine extends Engine implements SearchEngineInterf
             return $result;
         } catch (\Exception $e) {
             Log::error('Error checking index', [
-                'model' => get_class($model),
+                'model' => $model::class,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -90,14 +87,8 @@ abstract class AbstractSearchEngine extends Engine implements SearchEngineInterf
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     abstract public function supportsVectorSearch(): bool;
 
-    /**
-     * {@inheritdoc}
-     */
     // abstract public function createIndex(Model $model): void;
 
     /**
@@ -105,23 +96,11 @@ abstract class AbstractSearchEngine extends Engine implements SearchEngineInterf
      */
     abstract protected function checkIndexExists(Model $model): bool;
 
-    /**
-     * {@inheritdoc}
-     */
     // abstract public function search(string $query, array $options = []): array;
 
-    /**
-     * {@inheritdoc}
-     */
     abstract public function vectorSearch(array $vector, array $options = []): array;
 
-    /**
-     * {@inheritdoc}
-     */
     abstract public function buildSearchFilters(array $filters): array|string;
 
-    /**
-     * {@inheritdoc}
-     */
     abstract public function reindexModel(string $modelClass): void;
 }

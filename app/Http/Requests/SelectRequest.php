@@ -13,7 +13,7 @@ abstract class SelectRequest extends CrudRequest
     public function rules()
     {
         return parent::rules() + [
-            'columns.*' => [new QueryColumn],
+            'columns.*' => [new QueryColumn()],
             'relations.*' => ['string'],
         ];
     }

@@ -114,8 +114,8 @@ trait HasValidations
             return true;
         }
 
-        if ($user = Auth::user()) {
-            /** @var User $user */
+        $user = Auth::user();
+        if ($user) {
             if ($user->isSuperAdmin()) {
                 return true;
             }
@@ -129,8 +129,8 @@ trait HasValidations
     {
         $primary_key = $this->getKeyName();
         $rules = $this->rules;
-        if (!isset($rules[static::DEFAULT_RULE])) {
-            $rules[static::DEFAULT_RULE] = [];
+        if (!isset($rules[self::DEFAULT_RULE])) {
+            $rules[self::DEFAULT_RULE] = [];
         }
         $rules['update'] = array_merge($rules['update'], [
             $primary_key => 'required|exists:' . $this->getTable() . ',' . $primary_key,
@@ -141,7 +141,7 @@ trait HasValidations
     public function getOperationRules(?string $operation = null): array
     {
         $rules = $this->getRules();
-        return $operation && array_key_exists($operation, $rules) ? array_merge($rules[static::DEFAULT_RULE] ?? [], $rules[$operation]) : $rules[static::DEFAULT_RULE] ?? [];
+        return $operation && array_key_exists($operation, $rules) ? array_merge($rules[self::DEFAULT_RULE] ?? [], $rules[$operation]) : $rules[self::DEFAULT_RULE] ?? [];
     }
 
     public function validateWithRules(string $operation): void
@@ -152,7 +152,7 @@ trait HasValidations
 
         $rules = $this->getOperationRules($operation);
 
-        if (!empty($rules)) {
+        if ($rules !== []) {
             Validator::make($this->getAttributes(), $rules)->validate();
         }
     }

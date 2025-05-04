@@ -11,8 +11,6 @@ class SwaggerUiServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        Gate::define('viewSwaggerUI', fn($user = null) => in_array(optional($user)->email, [
-            //
-        ]));
+        Gate::define('viewSwaggerUI', fn($user = null) => in_array(optional($user)->email, []));
     }
 }

@@ -58,13 +58,13 @@ class ResponseBuilder
 
     public static function getHttpErrorStatus(int|string $errorCode): int
     {
-        $http_statuses = @array_flip(static::getHttpStatuses());
+        $http_statuses = array_flip(static::getHttpStatuses());
 
         return $errorCode !== 0 && is_int($errorCode) && isset($http_statuses[$errorCode]) ? $errorCode : Response::HTTP_INTERNAL_SERVER_ERROR;
     }
 
     /**
-     * @return (int|string)[]
+     * @return array<int|string>
      *
      * @psalm-return array<array-key>
      */
@@ -100,7 +100,7 @@ class ResponseBuilder
         } elseif ($data instanceof Collection || (is_array($data) && Arr::isList($data))) {
             $this->resourceResponse = new ResourceCollection($data);
 
-            if (!empty($data)) {
+            if (count($data) > 0) {
                 $this->setClass($data instanceof Collection ? $data->first() : $data[0]);
             }
         } elseif ($data instanceof Throwable) {
@@ -166,9 +166,9 @@ class ResponseBuilder
     /**
      * Set the value of error.
      *
-     * @param  null|string|string[]|Throwable  $error
+     * @param  string|array<int,string>|Throwable|null  $error
      */
-    public function setError(string|array|null|Throwable $error): static
+    public function setError(string|array|Throwable|null $error): static
     {
         $this->error = $error;
 
@@ -303,7 +303,7 @@ class ResponseBuilder
     /**
      * Set the value of class.
      *
-     * @param  null|object|class-string  $class
+     * @param  object|class-string|null  $class
      */
     public function setClass(object|string|null $class): static
     {

@@ -10,17 +10,17 @@ use Modules\Core\Http\Requests\SelectRequest;
 class SelectRequestData extends CrudRequestData
 {
     /**
-     * @var Column[]
+     * @var array<int, Column>
      */
     public array $columns;
 
     /**
-     * @var string[]
+     * @var array<int, string>
      */
     public array $relations;
 
     /**
-     * @param string|string[] $primaryKey
+     * @param string|array<string> $primaryKey
      */
     public function __construct(SelectRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {
@@ -39,8 +39,8 @@ class SelectRequestData extends CrudRequestData
     }
 
     /**
-     *
-     * @return Column[]
+     * @param array<int,string|array{name:string,type:string}> $columns
+     * @return array<int,Column>
      */
     private function conformColumns(array $columns): array
     {
@@ -56,8 +56,8 @@ class SelectRequestData extends CrudRequestData
     }
 
     /**
-     *
-     * @return string[]
+     * @param array<int,string> $relations
+     * @return array<int,string>
      */
     private function conformRelations(array $relations): array
     {

@@ -12,8 +12,9 @@ use Doctrine\DBAL\Exception;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use UnexpectedValueException;
-use Illuminate\Support\Facades\App;
 use Modules\Core\Models\Setting;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -21,17 +22,17 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 class SettingController extends Controller
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
+     */
     public function getTranslations(Request $request, ?string $lang = null): HttpFoundationResponse
     {
         if ($lang) {
             $lang = mb_substr($lang, 0, 2);
         }
 
-        $translations = $this->cache->tags([config('app.name')])->remember(RequestFacade::route()->getName() . $lang, config('cache.duration'), function () use ($lang) {
+        $translations = Cache::tags([config('app.name')])->remember(RequestFacade::route()->getName() . $lang, config('cache.duration'), function () use ($lang) {
             $languages = translations(true, true);
             $translations = [];
 
@@ -54,7 +55,7 @@ class SettingController extends Controller
                     continue;
                 }
 
-                /** @var string[] $files */
+                /** @var array<int,string> $files */
                 $files = glob($language . '/*.php');
 
                 foreach ($files as $file) {
@@ -82,13 +83,13 @@ class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
+     */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
-        $settings = $this->cache->tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
+        $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
             $settings = [];
             foreach (Setting::get() as $s) {
                 $settings[$s->name] = $s->value;
@@ -103,10 +104,10 @@ class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
+     */
     public function siteInfo(Request $request): HttpFoundationResponse
     {
         $data = [

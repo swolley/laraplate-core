@@ -27,9 +27,7 @@ class PermissionChecker
         $guard = Auth::guard();
         $guard_name = $guard->name;
 
-        if (!$connection) {
-            $connection = 'default';
-        }
+        $connection ??= 'default';
 
         if (!$permissions instanceof \Illuminate\Support\Collection) {
             $user = $request->user();

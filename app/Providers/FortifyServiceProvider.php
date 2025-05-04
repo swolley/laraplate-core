@@ -29,33 +29,54 @@ class FortifyServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
-        $this->app->instance(LogoutResponse::class, new class implements LogoutResponse
+        $this->app->instance(LogoutResponse::class, new class() implements LogoutResponse
         {
             public function toResponse($request)
             {
-                return $request->wantsJson()
-                    ? redirect()->route('core.auth.userInfo')
-                    : redirect()->intended(Fortify::redirects('logout', '/'));
+                if ($request->wantsJson()) {
+                    return redirect()->route('core.auth.userInfo');
+                }
+
+                // If we are in a Filament context, redirect to Filament login
+                if (str_contains($request->path(), 'admin')) {
+                    return redirect()->route('filament.auth.login');
+                }
+
+                return redirect()->intended(Fortify::redirects('logout', '/'));
             }
         });
 
-        $this->app->instance(LoginResponse::class, new class implements LoginResponse
+        $this->app->instance(LoginResponse::class, new class() implements LoginResponse
         {
             public function toResponse($request)
             {
-                return $request->wantsJson()
-                    ? redirect()->route('core.auth.userInfo')
-                    : redirect()->intended(Fortify::redirects('login'));
+                if ($request->wantsJson()) {
+                    return redirect()->route('core.auth.userInfo');
+                }
+
+                // If we are in a Filament context, redirect to Filament dashboard
+                if (str_contains($request->path(), 'admin')) {
+                    return redirect()->route('filament.pages.dashboard');
+                }
+
+                return redirect()->intended(Fortify::redirects('login'));
             }
         });
 
-        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse
+        $this->app->instance(RegisterResponse::class, new class() implements RegisterResponse
         {
             public function toResponse($request)
             {
-                return $request->wantsJson()
-                    ? redirect()->route('core.auth.userInfo')
-                    : redirect()->intended(Fortify::redirects('register'));
+                if ($request->wantsJson()) {
+                    return redirect()->route('core.auth.userInfo');
+                }
+
+                // If we are in a Filament context, redirect to Filament dashboard
+                if (str_contains($request->path(), 'admin')) {
+                    return redirect()->route('filament.pages.dashboard');
+                }
+
+                return redirect()->intended(Fortify::redirects('register'));
             }
         });
 
@@ -90,7 +111,7 @@ class FortifyServiceProvider extends ServiceProvider
             $result = $service->authenticate($request);
 
             if ($result['success']) {
-                if (config('core.enable_user_licenses') && $result['license']) {
+                if (config('auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
                 }
                 return $result['user'];

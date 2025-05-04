@@ -7,6 +7,7 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 #[AsCommand(name: 'lang:check-translations')]
 class TranslationsCheckCommand extends Command
@@ -48,7 +49,7 @@ class TranslationsCheckCommand extends Command
 
         $this->output->writeln('');
 
-        return static::SUCCESS;
+        return BaseCommand::SUCCESS;
     }
 
     private function compactTranslations(array &$translations, ?string $subgroup = null): array

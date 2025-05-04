@@ -12,7 +12,7 @@ use Modules\Core\Casts\IParsableRequest;
 
 abstract class CrudRequest extends FormRequest implements IParsableRequest
 {
-    /** @var string|string[] */
+    /** @var string|array<int,string> */
     protected string|array $primaryKey;
 
     protected Model $model;

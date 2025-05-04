@@ -15,7 +15,7 @@ class ImpersonationRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        /** @var null|User $user */
+        /** @var User|null $user */
         $user = auth()->user();
 
         return $user && class_uses_trait($user, Impersonate::class) && $user->canImpersonate();

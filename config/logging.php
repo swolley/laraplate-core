@@ -3,22 +3,23 @@
 declare(strict_types=1);
 
 use Modules\Core\Logging\GelfLoggerFactory;
-use Monolog\Formatter\GelfMessageFormatter;
+// use Monolog\Formatter\GelfMessageFormatter;
 use Modules\Core\Logging\GelfAdditionalInfoProcessor;
+use Hedii\LaravelGelfLogger\Processors\RenameIdFieldProcessor;
 
 return [
 	'channels' => [
-		'graylog' => [
+		'gelf' => [
 			'driver' => 'custom',
-			'level' => env('GRAYLOG_LEVEL', 'error'),
+			'level' => env('GELF_LEVEL', 'error'),
 			'via' => GelfLoggerFactory::class,
-			'host' => env('GRAYLOG_URL'),
-			'port' => env('GRAYLOG_PORT', 12201),
-			'formatter' => GelfMessageFormatter::class,
+			'host' => env('GELF_URL'),
+			'port' => env('GELF_PORT', 12201),
+			// 'formatter' => GelfMessageFormatter::class,
 			'processors' => [
 				[
-					'processor' => GelfAdditionalInfoProcessor::class,
-					// 'with' => ['channel' => $channel],
+					GelfAdditionalInfoProcessor::class,
+					RenameIdFieldProcessor::class,
 				],
 			],
 		],

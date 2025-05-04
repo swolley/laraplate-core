@@ -60,7 +60,7 @@ trait HasValidity
         });
     }
 
-    protected function scopeValidityOrdered(Builder $query)
+    public function scopeValidityOrdered(Builder $query)
     {
         $query->orderBy(static::$valid_from_column, 'desc')/*->orderBy(static::$valid_to_column, 'desc')*/;
     }
@@ -71,7 +71,7 @@ trait HasValidity
      * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeValid(Builder $query): Builder
+    public function scopeValid(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($q) {
             $q->where($this->qualifyColumn(static::$valid_to_column), '>=', now())->orWhereNull($this->qualifyColumn(static::$valid_to_column));
@@ -84,7 +84,7 @@ trait HasValidity
      * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeExpired(Builder $query): Builder
+    public function scopeExpired(Builder $query): Builder
     {
         return $query->withoutGlobalScope('valid')->whereNotNull($this->qualifyColumn(static::$valid_to_column))->where($this->qualifyColumn(static::$valid_to_column), '<', now());
     }
@@ -96,7 +96,7 @@ trait HasValidity
      * @return Builder
      * @throws InvalidArgumentException 
      */
-    protected function scopeExpiredAt(Builder $query, Carbon $date): Builder
+    public function scopeExpiredAt(Builder $query, Carbon $date): Builder
     {
         return $query->expired()->validAt($date);
     }

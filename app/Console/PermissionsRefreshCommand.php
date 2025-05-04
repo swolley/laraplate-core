@@ -8,7 +8,6 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Overrides\Command;
 use Approval\Traits\RequiresApproval;
 use Modules\Core\Helpers\HasValidity;
-use Illuminate\Database\DatabaseManager;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -29,9 +28,9 @@ class PermissionsRefreshCommand extends Command
     protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     /**
-     * @var string[]
+     * @var array<int,string>
      */
-    private const array MODELS_BLACKLIST = [
+    private static array $MODELS_BLACKLIST = [
         'App\\Models\\Version',
         'App\\Models\\Modification',
         'Modules\\Core\\Models\\DynamicEntity',
@@ -39,11 +38,6 @@ class PermissionsRefreshCommand extends Command
         'Modules\\Core\\Models\\ModelEmbedding',
         'Illuminate\\Database\\Eloquent\\Relations\\Pivot',
     ];
-
-    public function __construct(DatabaseManager $db)
-    {
-        parent::__construct($db);
-    }
 
     /**
      * Execute the console command.
@@ -99,8 +93,8 @@ class PermissionsRefreshCommand extends Command
             $table = $instance->getTable();
 
             $permission_class::flushEventListeners();
-            /** @var string[] $found_permissions */
-            $found_permissions = $permission_class::where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
+            /** @var array<int,string> $found_permissions */
+            $found_permissions = $permission_class::query()->where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
             $new_model_suffix = empty($found_permissions) ? " for new model {$model}" : '';
 
             foreach ($common_permissions as $permission) {
@@ -109,7 +103,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di cancellazione logica
                 if ($permission === ActionEnum::DELETE && !class_uses_trait($model, SoftDeletes::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -121,7 +115,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di approvazione
                 if ($permission === ActionEnum::APPROVE && !class_uses_trait($model, RequiresApproval::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -133,7 +127,7 @@ class PermissionsRefreshCommand extends Command
 
                 // permessi di pubblicazione
                 if ($permission === ActionEnum::PUBLISH && !class_uses_trait($model, HasValidity::class)) {
-                    if (in_array($permission_name, $found_permissions, true) && $permission_class::where('name', $permission_name)->delete()) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (!$quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
                         }
@@ -144,7 +138,7 @@ class PermissionsRefreshCommand extends Command
                 }
 
                 if (!in_array($permission_name, $found_permissions, true)) {
-                    $query = $permission_class::where('name', $permission_name);
+                    $query = $permission_class::query()->where('name', $permission_name);
                     if ($query->exists()) {
                         $query->restore();
 
@@ -172,7 +166,7 @@ class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 if (!in_array($permission_name, $found_permissions, true)) {
-                    $permission_class::updateOrCreate(
+                    $permission_class::query()->updateOrCreate(
                         ['name' => $permission_name],
                         ['name' => $permission_name]
                     );
@@ -189,7 +183,7 @@ class PermissionsRefreshCommand extends Command
         // eliminare cache di un modello (commentato perché da decidere in che modo renderla fattibile)
         // Permission::firstOrCreate(['name' => 'flush_cache'], ['name' => 'flush_cache']);
 
-        $query = $permission_class::whereNotIn('name', $all_permissions);
+        $query = $permission_class::query()->whereNotIn('name', $all_permissions);
         $to_be_deleted = $query->pluck('name')->toArray();
 
         if (!empty($to_be_deleted) && $query->delete()) {
@@ -211,7 +205,7 @@ class PermissionsRefreshCommand extends Command
 
     private function checkIfBlacklisted(string $model): bool
     {
-        foreach (self::MODELS_BLACKLIST as $blacklisted) {
+        foreach (self::$MODELS_BLACKLIST as $blacklisted) {
             if ($model === $blacklisted || is_subclass_of($model, $blacklisted)) {
                 return true;
             }

@@ -12,7 +12,7 @@ use Approval\Models\Modification as ApprovalModification;
 class Modification extends ApprovalModification
 {
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      */

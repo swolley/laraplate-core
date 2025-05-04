@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use ReflectionClass;
-use ReflectionMethod;
 use Illuminate\Support\Str;
 use Doctrine\DBAL\Types\Type;
 use InvalidArgumentException;
@@ -14,8 +12,9 @@ use Illuminate\Support\Collection;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\suggest;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasValidations;
 use function Laravel\Prompts\multiselect;
@@ -24,7 +23,6 @@ use Illuminate\Console\Concerns\CreatesMatchingTest;
 use Symfony\Component\Console\Output\OutputInterface;
 use Illuminate\Console\Concerns\PromptsForMissingInput;
 use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
-use Modules\Core\Helpers\HasBenchmark;
 
 /**
  * @psalm-suppress PropertyNotSetInConstructor
@@ -43,9 +41,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     private $availableClasses = [];
 
     /**
-     * @var string[][]
-     *
-     * @psalm-var array<string, array<string, string>>
+     * @var array<string,array<string,string>>
      */
     private array $availableTypes = [
         'Main Types' => [
@@ -87,13 +83,6 @@ class ModelMakeCommand extends BaseModelMakeCommand
             'relation\OneToOne' => 'hasOne',
         ],
     ];
-
-    public function __construct(Filesystem $files)
-    {
-        parent::__construct($files);
-
-        // $this->availableClasses = $this->possibleModels();
-    }
 
     private function array_last(string $needle, array $array): int|false
     {
@@ -205,15 +194,14 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
             $class_code = $this->sortImports($this->buildClass($name));
             $class_code = $this->addDefaultSections($name, $class_code);
-            $dynamicEntityClass = \Modules\Core\Models\DynamicEntity::class;
 
-            if (Schema::hasTable($table_name) && class_exists($dynamicEntityClass)) {
+            if (Schema::hasTable($table_name)) {
                 $this->info('An unmapped table with the same name was found in the schema');
 
                 if (confirm(sprintf("Would you like to automatically map '%s' table?", $table_name))) {
                     $all_types = array_merge(...array_values($this->availableTypes));
                     /** @var Model $class */
-                    $class = $dynamicEntityClass::resolve($table_name);
+                    $class = DynamicEntity::resolve($table_name);
 
                     foreach ($class->getFillable() as $fillable) {
                         /** @var string $class_code */
@@ -243,10 +231,10 @@ class ModelMakeCommand extends BaseModelMakeCommand
                         $method_subfix = Str::studly($append) . 'Attribute';
 
                         if (method_exists($class, 'get' . $method_subfix)) {
-                            $getter = new ReflectionMethod($class, 'get' . $method_subfix);
+                            $getter = new \ReflectionMethod($class, 'get' . $method_subfix);
                             $type = $getter->getReturnType() ?? 'text';
                         } elseif (method_exists($class, 'set' . $method_subfix)) {
-                            $setter = new ReflectionMethod($class, 'set' . $method_subfix);
+                            $setter = new \ReflectionMethod($class, 'set' . $method_subfix);
                             $type = $setter->getReturnType() ?? 'text';
                         }
                         $class_code = $this->addPropertyIntoAccessorsMutators($class_code, $append, $type, $nullable, $all_types);
@@ -403,11 +391,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
 
     /**
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $className
-     * @return array<int, mixed>
+     * @return array<int,mixed>
      */
     private function getClassFields(string $className): array
     {
-        $ref = new ReflectionClass($className);
+        $ref = new \ReflectionClass($className);
         $temp_instance = $ref->newInstance();
         $already_existent_fields = [];
 
@@ -454,17 +442,6 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return $already_existent_fields;
     }
 
-    // private function printAllAvailableTypes(): void
-    // {
-    //     foreach ($this->availableTypes as $title => $types) {
-    //         if (!empty($types)) {
-    //             $property_types = array_keys($types);
-    //             $this->line($title);
-    //             $this->bulletList($property_types);
-    //         }
-    //     }
-    // }
-
     private function printRelationsChoiceHelper(string $className, string $fieldName, string $relatedName): string
     {
         $exploded = explode('\\', $className);
@@ -498,9 +475,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @return string|string[]
-     *
-     * @psalm-return array<string>|string
+     * @return string|array<string>
      */
     private function handleRelationDetailsChoice(string $className, string $fieldName, string &$fieldType): array|string
     {
@@ -518,7 +493,8 @@ class ModelMakeCommand extends BaseModelMakeCommand
     {
         $defaultType = 'string';
 
-        if ('_at' === $suffix = mb_substr($fieldName, -3)) {
+        $suffix = mb_substr($fieldName, -3);
+        if ($suffix === '_at') {
             $defaultType = 'datetime';
         } elseif ($suffix === '_id') {
             $defaultType = 'integer';
@@ -547,9 +523,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @return string|string[]
-     *
-     * @psalm-return array<string>|string
+     * @return string|array<string>
      */
     private function addNewPropertyAnnotation(string $className, string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): array|string
     {
@@ -563,9 +537,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @return string|string[]
-     *
-     * @psalm-return array<string>|string
+     * @return string|array<string>
      */
     private function addPropertyIntoFillables(string $classCode, string $fieldName): array|string
     {
@@ -584,9 +556,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @return string|string[]
-     *
-     * @psalm-return array<string>|string
+     * @return string|array<string>
      */
     private function addPropertyIntoHidden(string $classCode, string $fieldName): array|string
     {
@@ -674,6 +644,10 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return $added_import;
     }
 
+    /**
+     * @param array<string,array<string,string>> $allTypes 
+     * @return string 
+     */
     private function addPropertyIntoAccessorsMutators(string $classCode, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
         if (!$fieldNullable) {
@@ -713,6 +687,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return $classCode;
     }
 
+    /**
+     * @param class-string $className
+     * @param array<string,array<string,string>> $allTypes
+     * @return string
+     */
     private function updateClassWithNewProperty(string $className, string $classCode, string $classPath, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
         /** @var string $classCode */
@@ -751,6 +730,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
         };
     }
 
+    /**
+     * @param class-string $className
+     * @param class-string $relatedClass
+     * @param class-string $fullRelatedClass
+     */
     private function handleAskInversedRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
     {
         $short_class = $this->stripModelsNamespace($className);
@@ -775,6 +759,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
         $this->updateClassWithNewRelation($relatedClass, $related_code, $related_path, $inverted_relation_name, $reversed_relation, $className, true);
     }
 
+    /**
+     * @param class-string $className
+     * @param class-string $relatedClass
+     * @return string
+     */
     private function updateClassWithNewRelation(string $className, string $classCode, string $classPath, string $relationName, string $relationType, string $relatedClass, bool $isInversed = false): string
     {
         $added_relation_import = $this->injectImportClass($classCode, \Illuminate\Database\Eloquent\Relations\Relation::class);
@@ -817,6 +806,11 @@ class ModelMakeCommand extends BaseModelMakeCommand
         return $classCode;
     }
 
+    /**
+     * @param array<int,string> $newFields
+     * @param array<int,string> $alreadyExistentFields
+     * @return string|false
+     */
     private function askForPropertyName(array $newFields, array $alreadyExistentFields): string|false
     {
         $field_name = text(
@@ -883,7 +877,6 @@ class ModelMakeCommand extends BaseModelMakeCommand
                     throw new InvalidArgumentException('Missing related class attribute');
                 }
 
-                /** @var string $related_class */
                 $classCode = $this->updateClassWithNewRelation($className, $classCode, $classPath, $field_name, $field_type, $related_class);
             } else {
                 // REQUIRED
@@ -899,9 +892,7 @@ class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param  (int|string)[]  $choices
-     *
-     * @psalm-param list<array-key> $choices
+     * @param  array<int,string>  $choices
      */
     private function askPersistentlyWithCompletion(string $question, array $choices): string
     {

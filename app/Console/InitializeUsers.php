@@ -10,18 +10,12 @@ use Modules\Core\Overrides\Command;
 use function Laravel\Prompts\text;
 use Illuminate\Support\Facades\Hash;
 use function Laravel\Prompts\password;
-use Illuminate\Database\DatabaseManager;
 
 class InitializeUsers extends Command
 {
 	protected $signature = 'auth:initialize-users';
 
 	protected $description = 'Initialize users. <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
-
-	public function __construct(DatabaseManager $db)
-	{
-		parent::__construct($db);
-	}
 
 	public function handle(): void
 	{

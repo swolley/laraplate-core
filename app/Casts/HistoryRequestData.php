@@ -11,7 +11,7 @@ class HistoryRequestData extends DetailRequestData
     public readonly ?int $limit;
 
     /**
-     * @param string|string[] $primaryKey
+     * @param string|array<string> $primaryKey
      */
     public function __construct(HistoryRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {

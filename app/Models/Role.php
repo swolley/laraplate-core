@@ -30,24 +30,24 @@ class Role extends BaseRole
     }
 
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected $fillable = [
+    protected array $fillable = [
         'name',
         'guard_name',
         'description',
     ];
 
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected $hidden = [
+    protected array $hidden = [
         'parent_id',
         'pivot',
     ];
@@ -113,7 +113,7 @@ class Role extends BaseRole
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'guard_name' => ['string', 'max:255'],
             'description' => ['string', 'max:255', 'nullable'],
             // 'locked_at' => ['date', 'nullable'],

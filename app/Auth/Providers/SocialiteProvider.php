@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Models\User;
 use Modules\Core\Models\License;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
 class SocialiteProvider implements AuthenticationProviderInterface
@@ -22,6 +23,20 @@ class SocialiteProvider implements AuthenticationProviderInterface
     {
         try {
             $socialUser = Socialite::driver($request->provider)->user();
+
+            // check if the user is already registered
+            if (
+                User::where('email', $socialUser->getEmail())
+                ->where(fn(Builder $q) => $q->whereNull('social_id')->orWhere('social_id', '!=', $socialUser->getId()))
+                ->exists()
+            ) {
+                return [
+                    'success' => false,
+                    'user' => null,
+                    'error' => 'User already registered with another account type',
+                    'license' => null
+                ];
+            }
 
             /** @var User $user */
             $user = User::updateOrCreate([
@@ -65,7 +80,7 @@ class SocialiteProvider implements AuthenticationProviderInterface
     #[\Override]
     public function isEnabled(): bool
     {
-        return config('services.socialite.enabled', false);
+        return config('auth.providers.socialite.enabled', false);
     }
 
     #[\Override]
@@ -76,7 +91,7 @@ class SocialiteProvider implements AuthenticationProviderInterface
 
     private function checkLicense(User $user): ?string
     {
-        if (!config('core.enable_user_licenses')) {
+        if (!config('auth.enable_user_licenses')) {
             return null;
         }
 

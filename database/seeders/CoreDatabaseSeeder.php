@@ -38,6 +38,15 @@ class CoreDatabaseSeeder extends Seeder
         });
     }
 
+    public static function getDefaultUserRoles(): array
+    {
+        return [
+            'superadmin' => config('permission.roles.superadmin'),
+            'admin' => config('permission.roles.admin'),
+            'guest' => config('permission.roles.guest'),
+        ];
+    }
+
     private function defaultPermissions(): void
     {
         // il comando ha già le transaction
@@ -57,17 +66,15 @@ class CoreDatabaseSeeder extends Seeder
 
         $this->logOperation($role_class);
 
-        $superadmin = config('permission.roles.superadmin');
-        $admin = config('permission.roles.admin');
-        $guest = config('permission.roles.guest');
+        $roles = self::getDefaultUserRoles();
 
         $roles_data = [
             [
-                'name' => $superadmin,
+                'name' => $roles['superadmin'],
                 'locked_at' => now(),
             ],
             [
-                'name' => $admin,
+                'name' => $roles['admin'],
                 'locked_at' => now(),
                 'permissions' => fn() => $permission_class::where(function ($query) use ($user_table, $role_table) {
                     $query->whereIn('table_name', [$user_table, $role_table])
@@ -75,7 +82,7 @@ class CoreDatabaseSeeder extends Seeder
                 })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get()
             ],
             [
-                'name' => $guest,
+                'name' => $roles['guest'],
                 'locked_at' => now(),
                 'permissions' => fn() => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
                     ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
@@ -83,7 +90,7 @@ class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $this->groups = $role_class::withoutGlobalScopes()->whereIn('name', [$superadmin, $admin, $guest])->get(['id', 'name', 'guard_name'])->keyBy('name');
+        $this->groups = $role_class::withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
         $existing_roles = $this->groups->keys()->all();
         $new_roles = array_filter($roles_data, fn($role) => !in_array($role['name'], $existing_roles));
 
@@ -222,7 +229,7 @@ class CoreDatabaseSeeder extends Seeder
                 'parameters' => [],
                 'schedule' => '@midnight',
                 'description' => 'Resetta assegnazione licenze login a utenti',
-                'is_active' => config('core.enable_user_licenses'),
+                'is_active' => config('auth.enable_user_licenses'),
             ],
             [
                 'name' => 'clearResetTokens',

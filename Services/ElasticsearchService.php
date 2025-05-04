@@ -36,11 +36,7 @@ class ElasticsearchService
      */
     public static function getInstance(): self
     {
-        if (self::$instance === null) {
-            self::$instance = new self();
-        }
-
-        return self::$instance;
+        return self::$instance ??= new self();
     }
 
     /**
@@ -335,7 +331,7 @@ class ElasticsearchService
             ])->asBool();
 
             if (!$exists) {
-                return false;
+                return true;
             }
 
             // Delete the document

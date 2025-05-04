@@ -56,7 +56,7 @@ class GenerateEmbeddingsJob implements ShouldQueue
     public function handle(): void
     {
         $data = $this->model->prepareDataToEmbed();
-        if (!$data || empty($data)) {
+        if (!$data || $data === []) {
             return;
         }
 

@@ -23,10 +23,10 @@ class RouteServiceProvider extends ServiceProvider
     {
         parent::boot();
 
-        RateLimiter::for('embeddings', function (object $job) {
+        RateLimiter::for('embeddings', function () {
             return Limit::perMinute(60); // 60 jobs per minute
         });
-        RateLimiter::for('indexing', fn(object $job) => app()->environment('production') ? [
+        RateLimiter::for('indexing', fn() => app()->environment('production') ? [
             // Single worker limit
             Limit::perMinute(300)  // 300 operations per minute (5 per second)
                 ->by('indexing.worker'),
@@ -65,7 +65,7 @@ class RouteServiceProvider extends ServiceProvider
         $name_prefix = $this->getPrefix();
         Route::middleware('web')
             ->namespace($this->namespace)
-            ->name("$name_prefix.")
+            ->name("{$name_prefix}.")
             ->group([
                 module_path($this->name, '/routes/dev.php'),
             ]);
@@ -74,23 +74,23 @@ class RouteServiceProvider extends ServiceProvider
         Route::middleware(['web'/*, 'verified'*/])
             ->namespace($this->namespace)
             ->prefix($route_prefix)
-            ->name("$name_prefix.")
+            ->name("{$name_prefix}.")
             ->group(module_path($this->name, '/routes/web.php'));
 
         Route::middleware('auth')
-            ->prefix("$route_prefix/auth")
-            ->name("$name_prefix.")
+            ->prefix("{$route_prefix}/auth")
+            ->name("{$name_prefix}.")
             ->namespace($this->namespace)
             ->group(module_path($this->name, '/routes/auth.php'));
 
         Route::middleware('info')
-            ->name("$name_prefix.")
+            ->name("{$name_prefix}.")
             ->prefix($route_prefix)
             ->namespace($this->namespace)
             ->group(module_path($this->name, '/routes/info.php'));
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
-        Route::get("$route_prefix/auth/reset-password", fn() => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
+        Route::get("{$route_prefix}/auth/reset-password", fn() => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
     }
 
     /**
@@ -103,9 +103,9 @@ class RouteServiceProvider extends ServiceProvider
         if (config('core.expose_crud_api')) {
             $name_prefix = $this->getPrefix();
             $route_prefix = 'api';
-            Route::prefix("$route_prefix/v1")
+            Route::prefix("{$route_prefix}/v1")
                 ->middleware([$route_prefix])
-                ->name("$name_prefix.$route_prefix.")
+                ->name("{$name_prefix}.{$route_prefix}.")
                 ->namespace($this->namespace)
                 ->group([
                     module_path($this->name, '/routes/crud.php'),

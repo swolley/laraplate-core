@@ -14,6 +14,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Mtrajano\LaravelSwagger\GenerateSwaggerDoc as BaseGenerateSwaggerDoc;
 use Modules\Core\Helpers\HasBenchmark;
+use Symfony\Component\Console\Command\Command;
 
 class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 {
@@ -56,7 +57,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $this->moduleHandle($module_name);
         }
 
-        return static::SUCCESS;
+        return Command::SUCCESS;
     }
 
     /**
@@ -68,7 +69,7 @@ class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     {
         $filter = $this->option('filter') ?: null;
 
-        /** @var null|string $file */
+        /** @var string|null $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
         $config = config('laravel-swagger');
 

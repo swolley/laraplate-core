@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Str;
 use Nwidart\Modules\Module;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\File;
@@ -19,7 +20,7 @@ if (!function_exists('modules')) {
      * @param  bool  $onlyActive  return only active modules
      * @param  string|null  $onlyModule  filter for specified module
      * @param  bool|null  $prioritySort  sort modules by priority
-     * @return string[]
+     * @return array<int,string>
      */
     function modules(bool $showMainApp = false, bool $fullpath = false, bool $onlyActive = true, ?string $onlyModule = null, ?bool $prioritySort = false): array
     {
@@ -58,9 +59,9 @@ if (!function_exists('normalize_path')) {
     /**
      * get list of available translations.
      *
-     * @param  string  $p  return path with correct directory separator
+     * @param string $p return path with correct directory separator
      */
-    function normalize_path($p): string
+    function normalize_path(string $p): string
     {
         return str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $p);
     }
@@ -151,7 +152,7 @@ if (!function_exists('migrations')) {
      * @param  bool  $onlyPending  return only pending migrations
      * @param  bool  $onlyActive  filter for only active modules
      * @param  string|null  $onlyModule  filter for specified module
-     * @return false|int|string[] number if count requested, string[] if list requested, false if error occured
+     * @return false|int|array<string> number if count requested, string[] if list requested, false if error occured
      */
     function migrations(bool $count = false, bool $onlyPending = false, bool $onlyActive = true, ?string $onlyModule = null): array|int|false
     {
@@ -204,7 +205,7 @@ if (!function_exists('models')) {
             $models_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Models' : $modules_models_folder);
             $model_files = File::allFiles($models_path);
 
-            if (empty($model_files)) {
+            if ($model_files === []) {
                 continue;
             }
 
@@ -242,7 +243,7 @@ if (!function_exists('controllers')) {
      *
      * @param bool $onlyActive filter for only active modules
      * @param string|null $onlyModule filter for specified module
-     * @return string[]
+     * @return array<int,string>
      *
      * @psalm-return list{0?: string,...}
      */
@@ -284,13 +285,13 @@ if (!function_exists('routes')) {
      *
      * @param bool $onlyActive filter for only active modules
      * @param string|null $onlyModule filter for specified module
-     * @return Route[]
+     * @return array<int,Route>
      *
      * @psalm-return list{0?: string,...}
      */
     function routes(bool $onlyActive = true, ?string $onlyModule = null): array
     {
-        /** @var Route[] $routes */
+        /** @var array<int,Route> $routes */
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = app('router')->getRoutes()->getRoutes();
@@ -329,7 +330,7 @@ if (!function_exists('api_versions')) {
     /**
      * Return Api Versions.
      *
-     * @return string[]
+     * @return array<int,string>
      *
      * @psalm-return list<string>
      */

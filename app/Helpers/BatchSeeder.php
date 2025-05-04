@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Overrides\Seeder;
 use Illuminate\Support\Facades\Log;
 use function Laravel\Prompts\progress;
-use Modules\Core\Helpers\HasApprovals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 

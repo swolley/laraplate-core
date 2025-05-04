@@ -8,17 +8,17 @@ use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Grids\Components\Field;
 
-/** @phpstan-type FormatterCallable null|callable(mixed, Model): void */
+/** @phpstan-type FormatterCallable callable(mixed, Model):void|null */
 trait HasFormatters
 {
     /** 
-     * @var null|callable
+     * @var callable|null
      * @phpstan-var FormatterCallable
      */
     private $getFormatter;
 
     /** 
-     * @var null|callable 
+     * @var callable|null 
      * @phpstan-var FormatterCallable
      */
     private $setFormatter;

@@ -53,9 +53,9 @@ class ACL extends Model
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'permission_id' => ['required', 'exists:permissions,id'],
-            'filters' => [new QueryBuilder],
+            'filters' => [new QueryBuilder()],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'description' => ['string', 'max:255', 'nullable'],

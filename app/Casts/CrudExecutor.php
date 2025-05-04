@@ -60,7 +60,7 @@ class CrudExecutor
     /**
      * get all available values.
      *
-     * @return string[]
+     * @return array<string>
      */
     public static function values(): array
     {

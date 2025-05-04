@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
-use Modules\Core\Cache\CacheManager;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\FilterOperator;
 use Illuminate\Database\Eloquent\Model;
@@ -52,7 +52,7 @@ class Grid extends Entity
 
     private array $prepareFieldsCallbacks = [];
 
-    const LAYOUTS_TABLE = 'grid_layouts';
+    public const LAYOUTS_TABLE = 'grid_layouts';
 
     public function __construct(Model|string $model)
     {
@@ -585,7 +585,7 @@ class Grid extends Entity
     private function processReadActions(ResponseBuilder $responseBuilder, GridRequest $request): ResponseBuilder
     {
         if (class_uses_trait($this->getModel(), HasCache::class)) {
-            return CacheManager::tryByRequest($this->getModel(), $request, fn($cbRequest) => $this->callbackToReadAction($responseBuilder, $cbRequest));
+            return Cache::tryByRequest($this->getModel(), $request, fn($cbRequest) => $this->callbackToReadAction($responseBuilder, $cbRequest));
         }
 
         return $this->callbackToReadAction($responseBuilder, $request);
@@ -695,9 +695,9 @@ class Grid extends Entity
      */
     private function checkGridLayoutsTableExists(): bool
     {
-        $exists = Schema::hasTable(Grid::LAYOUTS_TABLE);
+        $exists = Schema::hasTable(self::LAYOUTS_TABLE);
         if (!$exists) {
-            Log::warning('No ' . Grid::LAYOUTS_TABLE . ' table found');
+            Log::warning('No ' . self::LAYOUTS_TABLE . ' table found');
         }
 
         return $exists;
@@ -713,7 +713,7 @@ class Grid extends Entity
             return new Collection();
         }
 
-        return DB::table(Grid::LAYOUTS_TABLE)->where(function ($query) {
+        return DB::table(self::LAYOUTS_TABLE)->where(function ($query) {
             $user = Auth::user();
             if ($user) {
                 $query->where('user_id', $user->id);
@@ -741,9 +741,9 @@ class Grid extends Entity
             throw new Exception('User must be logged in to update a grid layout');
         }
 
-        $id = DB::table(Grid::LAYOUTS_TABLE)->insertGetId($this->requestData->layout);
+        $id = DB::table(self::LAYOUTS_TABLE)->insertGetId($this->requestData->layout);
 
-        return DB::table(Grid::LAYOUTS_TABLE)->find($id);
+        return DB::table(self::LAYOUTS_TABLE)->find($id);
     }
 
     /**
@@ -764,7 +764,7 @@ class Grid extends Entity
             throw new Exception('User must be logged in to update a grid layout');
         }
 
-        return DB::table(Grid::LAYOUTS_TABLE)->where('id', $this->requestData->layout['id'])->where(function ($query) use ($user) {
+        return DB::table(self::LAYOUTS_TABLE)->where('id', $this->requestData->layout['id'])->where(function ($query) use ($user) {
             $query->where('user_id', $user->id);
             if ($user->isSuperAdmin()) {
                 $query->orWhere('is_public', true);
@@ -788,7 +788,7 @@ class Grid extends Entity
     {
         $updated = $this->getLayoutWriteBuilder()->update($this->requestData->layout);
         if ($updated) {
-            return DB::table(Grid::LAYOUTS_TABLE)->find($this->requestData->layout['id']);
+            return DB::table(self::LAYOUTS_TABLE)->find($this->requestData->layout['id']);
         }
 
         throw new Exception('unable to update layout');
@@ -806,7 +806,7 @@ class Grid extends Entity
      */
     private function deleteUserLayout()
     {
-        $old = DB::table(Grid::LAYOUTS_TABLE)->find($this->requestData->layout['id']);
+        $old = DB::table(self::LAYOUTS_TABLE)->find($this->requestData->layout['id']);
         $deleted = $this->getLayoutWriteBuilder()->delete();
         if ($deleted) {
             return $old;

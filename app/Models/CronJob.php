@@ -26,7 +26,7 @@ class CronJob extends Model
     }
 
     /**
-     * @var string[]
+     * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
@@ -78,10 +78,10 @@ class CronJob extends Model
     public function getRules()
     {
         $rules = $this->getRulesTrait();
-        $rules[static::DEFAULT_RULE] = array_merge($rules[static::DEFAULT_RULE], [
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'command' => ['required', 'string', 'max:255'],
             'parameters' => ['required', 'json'],
-            'schedule' => ['required', new CronExpressionRule],
+            'schedule' => ['required', new CronExpressionRule()],
             'description' => ['string', 'max:255', 'nullable'],
             'is_active' => ['boolean', 'required'],
         ]);

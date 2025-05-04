@@ -41,7 +41,7 @@ trait HasCommandModelResolution
                 $this->error('Multiple models found: ' . implode(', ', $model));
                 return false;
             }
-            /** @var class-string $modelq */
+            /** @var class-string<Model> $model */
             $model = head($model);
             if (!class_exists($model)) {
                 $this->error('Model not found');

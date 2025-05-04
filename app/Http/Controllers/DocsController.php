@@ -9,29 +9,25 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use UnexpectedValueException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Nwidart\Modules\Facades\Module;
-use Symfony\Component\Routing\Annotation\Route;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 class DocsController extends OpenApiJsonController
 {
-    public function __construct(
-        protected \Illuminate\Cache\Repository $cache,
-    ) {}
-
-	/**
-	 * @route-comment
-	 * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
+     */
     public function mergeDocs(Request $request, string $version = 'v1')
     {
-        return $this->cache->tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn() => response()->json($this->getJson($version)));
+        return Cache::tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn() => response()->json($this->getJson($version)));
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: '/', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: '/', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
+     */
     public function welcome(): View
     {
         $all_modules = modules(true, false, false);
@@ -46,14 +42,14 @@ class DocsController extends OpenApiJsonController
             }
 
             foreach ($all_models as $i => $model) {
-                if (Str::startsWith($model, $module) || Str::startsWith($model, "Modules\\$module")) {
+                if (Str::startsWith($model, $module) || Str::startsWith($model, "Modules\\{$module}")) {
                     $grouped[$module]['models'][] = $model;
                     unset($all_models[$i]);
                 }
             }
 
             foreach ($all_controllers as $i => $controller) {
-                if (Str::startsWith($controller, $module) || Str::startsWith($controller, "Modules\\$module")) {
+                if (Str::startsWith($controller, $module) || Str::startsWith($controller, "Modules\\{$module}")) {
                     $grouped[$module]['controllers'][] = $controller;
                     unset($all_controllers[$i]);
                 }
@@ -86,10 +82,10 @@ class DocsController extends OpenApiJsonController
         ]);
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
+     */
     public function phpinfo(): View
     {
         return view('core::phpinfo');

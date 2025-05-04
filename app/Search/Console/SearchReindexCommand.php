@@ -36,7 +36,7 @@ class SearchReindexCommand extends Command
 
             // Se il modello usa il trait HasCache, invalida la cache
             if (in_array(HasCache::class, class_uses_recursive($model))) {
-                (new $model)->invalidateCache();
+                (new $model())->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model);
             }
 

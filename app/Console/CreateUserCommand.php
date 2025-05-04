@@ -16,9 +16,9 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Hash;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\password;
-use Illuminate\Database\DatabaseManager;
 use function Laravel\Prompts\multiselect;
 use Modules\Core\Helpers\HasCommandUtils;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class CreateUserCommand extends Command
 {
@@ -33,11 +33,6 @@ class CreateUserCommand extends Command
      * The console command description.
      */
     protected $description = 'Create new user <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
-
-    public function __construct(DatabaseManager $db)
-    {
-        parent::__construct($db);
-    }
 
     /**
      * Execute the console command.
@@ -99,9 +94,7 @@ class CreateUserCommand extends Command
                         $roles = multiselect('Roles', $all_roles, required: false);
                     } while ($roles === [] || confirm('You didn\'t choose any role, do you want to continue?', false));
 
-                    $permissions = (confirm('Do you want to specify custom user permissions', false, hint: "user already inherits choosen Roles permissions"))
-                        ? multiselect('Permissions', $all_permissions, required: false)
-                        : [];
+                    $permissions = confirm('Do you want to specify custom user permissions', false, hint: "user already inherits choosen Roles permissions") ? multiselect('Permissions', $all_permissions, required: false) : [];
 
                     $user->save();
                     $user->roles()->sync($roles);
@@ -126,11 +119,11 @@ class CreateUserCommand extends Command
 
             table(['User', 'Email', 'Password', 'Roles', 'Permissions'], $created_users);
 
-            return static::SUCCESS;
+            return BaseCommand::SUCCESS;
         } catch (Throwable $ex) {
             $this->error($ex->getMessage());
 
-            return static::FAILURE;
+            return BaseCommand::FAILURE;
         }
     }
 }

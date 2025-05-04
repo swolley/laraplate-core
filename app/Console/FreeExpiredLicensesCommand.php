@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class FreeExpiredLicensesCommand extends Command
 {
@@ -17,6 +18,6 @@ class FreeExpiredLicensesCommand extends Command
         $this->info('Freeing expired licenses...');
         user_class();
         $this->output->error('User class is not Modules\Core\Models\User');
-        return static::SUCCESS;
+        return BaseCommand::SUCCESS;
     }
 }

@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
 /*
     |--------------------------------------------------------------------------
     | API Routes
@@ -20,4 +17,4 @@ use Illuminate\Support\Facades\Route;
 //     Route::get('core', fn (Request $request) => $request->user())->name('core');
 // });
 
-require(__DIR__ . '/crud.php');
+require __DIR__ . '/crud.php';
