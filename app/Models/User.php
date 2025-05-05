@@ -38,7 +38,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser
