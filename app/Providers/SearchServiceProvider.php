@@ -34,16 +34,14 @@ final class SearchServiceProvider extends ServiceProvider
         // });
 
         // Register Typesense client
-        $this->app->singleton('typesense', function ($app) {
+        $this->app->singleton('typesense', function (array $app): \Typesense\Client {
             $config = $app['config']['scout.typesense.client-settings'];
 
             return new TypesenseClient($config);
         });
 
         // Register the search engine interface for backward compatibility
-        $this->app->singleton(SearchEngineInterface::class, function ($app) {
-            return $app->make(EngineManager::class)->engine();
-        });
+        $this->app->singleton(SearchEngineInterface::class, fn($app) => $app->make(EngineManager::class)->engine());
 
         // Create an alias for easier access
         $this->app->alias(SearchEngineInterface::class, 'search');

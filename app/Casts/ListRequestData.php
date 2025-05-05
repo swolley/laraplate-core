@@ -12,11 +12,11 @@ use Modules\Core\Http\Requests\ListRequest;
 class ListRequestData extends SelectRequestData
 {
     public protected(set) int $pagination;
-    public protected(set) int|null $page;
-    public protected(set) int|null $skip;
-    public protected(set) int|null $take;
-    public protected(set) int|null $from;
-    public protected(set) int|null $to;
+    public protected(set) int|null $page = null;
+    public protected(set) int|null $skip = null;
+    public protected(set) int|null $take = null;
+    public protected(set) int|null $from = null;
+    public protected(set) int|null $to = null;
     public protected(set) int|null $limit;
     public protected(set) bool $count;
     public protected(set) array $sort;
@@ -48,7 +48,7 @@ class ListRequestData extends SelectRequestData
 
         if (isset($validated['group_by'])) {
             $this->addGroupsToColumns($validated['group_by']);
-            $validated['group_by'] = array_map(fn(string $group) => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
+            $validated['group_by'] = array_map(fn(string $group): ?string => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
             $this->group_by = $validated['group_by'];
         }
     }
@@ -65,7 +65,7 @@ class ListRequestData extends SelectRequestData
             $this->from = (int) ($validated['from'] ?? 1);
             $this->skip = $this->from - 1;
             $this->to = isset($validated['to']) ? (int) $validated['to'] : null;
-            if ($this->to) {
+            if ($this->to !== null && $this->to !== 0) {
                 $this->take = $this->pagination = $this->to - $this->from;
             }
         } elseif (isset($validated['limit'])) {
@@ -158,7 +158,7 @@ class ListRequestData extends SelectRequestData
     private function addGroupsToColumns(array $groups): void
     {
         if ($this->columns !== []) {
-            $all_columns_name = array_map(fn(Column $column) => $column->name, $this->columns);
+            $all_columns_name = array_map(fn(Column $column): string => $column->name, $this->columns);
 
             foreach ($groups as $group) {
                 if (!in_array($group, $all_columns_name, true)) {

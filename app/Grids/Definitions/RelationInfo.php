@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-final class RelationInfo
+final readonly class RelationInfo
 {
     /**
      * @param  string  $type  relation type (method name)
@@ -14,7 +14,7 @@ final class RelationInfo
      * @param  string  $foreignKey  db foreign key column
      * @param  string  $ownerKey  db local key (usually primary key)
      */
-    public function __construct(protected string $type, protected string $name, protected string $model, protected string $table, protected string $foreignKey, protected string $ownerKey) {}
+    public function __construct(private string $type, private string $name, private string $model, private string $table, private string $foreignKey, private string $ownerKey) {}
 
     /**
      * gets relation type.

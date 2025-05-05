@@ -206,7 +206,7 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn ($relation) => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
@@ -293,8 +293,8 @@ final class CrudHelper
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
-        usort($columns, fn (Column $a, Column $b) => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn (Column $column) => $column->name, $columns);
+        usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
+        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {

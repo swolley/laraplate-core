@@ -44,7 +44,7 @@ final class IndexInSearchJob implements ShouldQueue
      * @param  Model  $model  The model to index
      */
     public function __construct(
-        protected Model $model,
+        private Model $model,
     ) {
         // Validate that the model implements Searchable
         if (! in_array(Searchable::class, class_uses_recursive($model::class), true)) {

@@ -117,7 +117,7 @@ final class ModuleDocGenerator extends Generator
 
             $regex = str_replace('\*', '.*', preg_quote((string) $pattern, '/'));
 
-            if (preg_match('/^' . $regex . '$/', $route_name)) {
+            if (preg_match('/^' . $regex . '$/', (string) $route_name)) {
                 return true;
             }
         }

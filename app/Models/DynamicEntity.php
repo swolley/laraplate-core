@@ -45,14 +45,14 @@ final class DynamicEntity extends Model
     {
         $model = self::tryResolveModel($tableName, $connection);
 
-        if ($model) {
+        if ($model !== null && $model !== '' && $model !== '0') {
             return new $model($attributes);
         }
 
         if (config('crud.dynamic_entities', false)) {
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 
-            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request) {
+            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request): \Modules\Core\Models\DynamicEntity {
                 $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
 
@@ -80,7 +80,7 @@ final class DynamicEntity extends Model
 
         $found ??= self::findModel($models, Str::singular($requestEntity));
 
-        if (! $found) {
+        if ($found === null || $found === '' || $found === '0') {
             return null;
         }
 
@@ -121,7 +121,7 @@ final class DynamicEntity extends Model
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, fn ($v) => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     /**
@@ -161,7 +161,7 @@ final class DynamicEntity extends Model
     {
         $this->setTable($tableName);
 
-        if ($connection) {
+        if ($connection !== null && $connection !== '' && $connection !== '0') {
             $this->setConnection($connection);
         }
     }

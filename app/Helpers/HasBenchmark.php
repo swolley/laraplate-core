@@ -33,7 +33,7 @@ trait HasBenchmark
         $this->benchmarkStartTime = microtime(true);
         $this->benchmarkStartMemory = memory_get_usage();
 
-        if ($table) {
+        if ($table !== null && $table !== '' && $table !== '0') {
             $this->startRowCount = $db->table($table)->count();
         }
         $db->enableQueryLog();

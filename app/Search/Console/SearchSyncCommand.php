@@ -71,7 +71,7 @@ final class SearchSyncCommand extends Command
                 $chunk++;
                 $progress = new Progress(
                     'Syncing documents chunk ' . $chunk . ' of ' . $total_chunks,
-                    $records->map(fn ($record) => 'Record ' . $record->id)->toArray(),
+                    $records->map(fn ($record): string => 'Record ' . $record->id)->toArray(),
                 );
 
                 foreach ($records as $record) {
@@ -85,7 +85,7 @@ final class SearchSyncCommand extends Command
 
             // Se il modello usa il trait HasCache, invalida la cache
             if (in_array(HasCache::class, class_uses_recursive($model_class), true)) {
-                (new $model_class())->invalidateCache();
+                new $model_class()->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model_class);
             }
 

@@ -11,11 +11,11 @@ use Illuminate\Support\Facades\Auth;
 use Monolog\Processor\ProcessorInterface;
 use Monolog\Processor\PsrLogMessageProcessor;
 
-final class GelfAdditionalInfoProcessor implements ProcessorInterface
+final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
 {
-    private readonly PsrLogMessageProcessor $psrLogMessageProcessor;
+    private PsrLogMessageProcessor $psrLogMessageProcessor;
 
-    public function __construct(private readonly ?string $channel = null)
+    public function __construct(private ?string $channel = null)
     {
         $this->psrLogMessageProcessor = new PsrLogMessageProcessor(removeUsedContextFields: true);
     }

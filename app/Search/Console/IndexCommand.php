@@ -24,14 +24,14 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     {
         $model = $this->getModelClass();
 
-        if (! $model) {
+        if ($model === '' || $model === '0' || $model === false) {
             $this->error('Model not found');
 
             return Command::FAILURE;
         }
 
         $this->addArgument('name');
-        $this->input->setArgument('name', (new $model())->indexableAs());
+        $this->input->setArgument('name', new $model()->indexableAs());
         $this->addOption('key');
 
         return parent::handle($manager);
@@ -41,7 +41,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     protected function createIndex(Engine $engine, $name, $options): void
     {
         $model = $this->argument('model');
-        $options = (new $model())->getSearchMapping();
+        $options = new $model()->getSearchMapping();
         parent::createIndex($engine, $name, $options);
     }
 }

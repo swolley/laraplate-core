@@ -231,8 +231,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $this->availableClasses = $this->possibleModels();
 
         $prompted = collect($this->getDefinition()->getArguments())
-            ->filter(fn ($argument) => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
-            ->filter(fn ($argument) => $argument->getName() !== 'command')
+            ->filter(fn ($argument): bool => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
+            ->filter(fn ($argument): bool => $argument->getName() !== 'command')
             ->each(function ($argument) use ($input): void {
                 $question = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst($argument->getDescription()) . '?';
                 $arg_name = $argument->getName();
@@ -278,7 +278,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 default: $this->isNewClass ? ['migration'] : [],
             ),
         )
-            ->map(fn ($option) => match ($option) {
+            ->map(fn ($option): int|string => match ($option) {
                 'resource controller' => 'resource',
                 'form requests' => 'requests',
                 default => $option,
@@ -452,13 +452,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $exploded = explode('\\', $relatedName);
         $targetEntityShort = end($exploded);
 
-        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn ($type) => $type !== 'relation');
+        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn ($type): bool => $type !== 'relation');
 
         $rows = new Collection();
 
         foreach (array_keys($filtered_relation_types) as $key) {
-            $message = '';
-
             $message = match (Str::replace('relation\\', '', $key)) {
                 'ManyToOne' => "Each <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.",
                 'OneToMany' => "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.",
@@ -751,12 +749,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         }
         $reversed_relation = $this->getReversedRelationType($relationType);
 
-        if (! $reversed_relation) {
+        if ($reversed_relation === null || $reversed_relation === '' || $reversed_relation === '0') {
             return;
         }
         $proposed_name = $this->proposeInversedName($short_class, $reversed_relation);
 
-        if (! $proposed_name) {
+        if ($proposed_name === null || $proposed_name === '' || $proposed_name === '0') {
             return;
         }
         $inverted_relation_name = text("What is the name of the reversed relation? [{$proposed_name}]", default: $proposed_name);
@@ -820,7 +818,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $field_name = text(
             ($newFields === [] ? '' : 'Add another property? ') . 'New property name',
             hint: 'press <return> to stop adding fields',
-            validate: function (string $field_name) use ($newFields, $alreadyExistentFields) {
+            validate: function (string $field_name) use ($newFields, $alreadyExistentFields): ?string {
                 $field_name = Str::snake(mb_trim($field_name));
 
                 if (in_array($field_name, $newFields, true) || in_array($field_name, $alreadyExistentFields, true)) {
@@ -877,7 +875,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             }
 
             if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {
-                if (! $related_class) {
+                if ($related_class === '' || $related_class === '0' || $related_class === [] || $related_class === null) {
                     throw new InvalidArgumentException('Missing related class attribute');
                 }
 
@@ -902,7 +900,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     {
         return suggest(
             $question,
-            fn ($value) => array_filter($choices, fn ($name) => Str::contains($name, $value, ignoreCase: true)),
+            fn ($value): array => array_filter($choices, fn ($name) => Str::contains($name, $value, ignoreCase: true)),
             required: true,
         );
     }

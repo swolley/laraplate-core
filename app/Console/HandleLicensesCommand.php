@@ -27,14 +27,14 @@ final class HandleLicensesCommand extends Command
     public function handle()
     {
         try {
-            return $this->db->transaction(function () {
+            return $this->db->transaction(function (): int {
                 $number = 0;
                 $valid_to = null;
 
                 $licenses_groups = License::query()->groupBy('valid_to')
                     ->select($this->db->raw('valid_to'), $this->db->raw('count(*) as count'))
                     ->get();
-                $licenses_count = (int) $licenses_groups->reduce(fn (int $total, object $current) => $total + $current->count, 0);
+                $licenses_count = (int) $licenses_groups->reduce(fn (int $total, object $current): int|float => $total + $current->count, 0);
 
                 if ($licenses_groups->isEmpty()) {
                     $this->output->info('No licenses found');
@@ -42,7 +42,7 @@ final class HandleLicensesCommand extends Command
                     $this->output->info('Current licenses status');
                     table(
                         ['Status', 'Expiration', 'Licenses Qt.'],
-                        $licenses_groups->map(fn ($data) => [
+                        $licenses_groups->map(fn ($data): array => [
                             $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
@@ -67,7 +67,7 @@ final class HandleLicensesCommand extends Command
                         return BaseCommand::SUCCESS;
                     }
 
-                    $validations = (new License())->getOperationRules('create');
+                    $validations = new License()->getOperationRules('create');
 
                     $valid_to = text(
                         "Specify an expiring date, otherwise it'll be " . ($action === 'close' ? 'today' : 'perpetual'),
@@ -192,7 +192,7 @@ final class HandleLicensesCommand extends Command
             return null;
         }
 
-        $validator = Validator::make([$attribute => $value], array_filter($validations, fn ($k) => $k === $attribute, ARRAY_FILTER_USE_KEY))->stopOnFirstFailure(true);
+        $validator = Validator::make([$attribute => $value], array_filter($validations, fn ($k): bool => $k === $attribute, ARRAY_FILTER_USE_KEY))->stopOnFirstFailure(true);
 
         if (! $validator->passes()) {
             return $validator->messages()->first();

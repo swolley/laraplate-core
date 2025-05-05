@@ -83,8 +83,8 @@ class CrudController extends Controller
                 $total_records = $query->count();
 
                 $data = match (true) {
-                    isset($filters->page) => $this->listByPagination($query, $filters, $responseBuilder, $total_records),
-                    isset($filters->from) => $this->listByFromTo($query, $filters, $responseBuilder, $total_records),
+                    $filters->page !== null => $this->listByPagination($query, $filters, $responseBuilder, $total_records),
+                    $filters->from !== null => $this->listByFromTo($query, $filters, $responseBuilder, $total_records),
                     default => $this->listByOthers($query, $filters, $responseBuilder, $total_records),
                 };
 
@@ -499,7 +499,7 @@ class CrudController extends Controller
     /**
      * @return string|array<int,string>
      */
-    private function getModelKeyValue(CrudRequestData $filters): string|array
+    private function getModelKeyValue(\Modules\Core\Casts\ModifyRequestData $filters): string|array
     {
         /** @var string|array<int,string> $key */
         $key = $filters->model->getKeyName();
@@ -592,7 +592,7 @@ class CrudController extends Controller
             ],
         ];
 
-        if ($embeddings) {
+        if ($embeddings !== null && $embeddings !== []) {
             $params['body']['query']['bool']['should'][] = [
                 'script_score' => [
                     'query' => ['match_all' => new stdClass()],
@@ -616,7 +616,7 @@ class CrudController extends Controller
             $params['index'] = $filters->mainEntity;
         }
 
-        if ($filters->take) {
+        if ($filters->take !== null && $filters->take !== 0) {
             $params['size'] = $filters->take;
         }
 

@@ -14,7 +14,7 @@ class OptimisticLockAddCommand extends LockedAddCommand
     public $description = 'Add a migration to add optimistic locking columns to a model <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function generateMigrationPath(Model $instance)
+    public function generateMigrationPath(Model $instance): string
     {
         return "_{$this->operation}_optimistic_columns_to_{$instance->getTable()}.php";
     }

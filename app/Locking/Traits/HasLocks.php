@@ -60,14 +60,14 @@ trait HasLocks
         return 'is_locked';
     }
 
-    public function getLocketAtColumn()
+    public function getLocketAtColumn(): string
     {
-        return (new Locked())->lockedAtColumn();
+        return new Locked()->lockedAtColumn();
     }
 
-    public function getLockedByColumn()
+    public function getLockedByColumn(): string
     {
-        return (new Locked())->lockedByColumn();
+        return new Locked()->lockedByColumn();
     }
 
     public function lock(?User $user = null): self
@@ -89,12 +89,12 @@ trait HasLocks
 
     public function isLocked(): bool
     {
-        return $this->{(new Locked())->lockedAtColumn()} !== null;
+        return $this->{new Locked()->lockedAtColumn()} !== null;
     }
 
     public function isLockedBy(User $user): bool
     {
-        return $this->isLocked() && $this->{(new Locked())->lockedByColumn()} === $user->id;
+        return $this->isLocked() && $this->{new Locked()->lockedByColumn()} === $user->id;
     }
 
     public function isNotLocked(): bool
@@ -104,7 +104,7 @@ trait HasLocks
 
     public function isNotLockedBy(User $user): bool
     {
-        return $this->isNotLocked() && $this->{(new Locked())->lockedByColumn()} !== $user->id;
+        return $this->isNotLocked() && $this->{new Locked()->lockedByColumn()} !== $user->id;
     }
 
     public function unlock(): self
@@ -174,45 +174,45 @@ trait HasLocks
         return $this;
     }
 
-    public function wasUnlocked()
+    public function wasUnlocked(): bool
     {
-        return $this->getOriginal((new Locked())->lockedAtColumn()) === null;
+        return $this->getOriginal(new Locked()->lockedAtColumn()) === null;
     }
 
-    public function wasUnlockedBy(User $user)
+    public function wasUnlockedBy(User $user): bool
     {
-        return $this->wasUnlocked() && $user->id === $this->getOriginal((new Locked())->lockedByColumn());
+        return $this->wasUnlocked() && $user->id === $this->getOriginal(new Locked()->lockedByColumn());
     }
 
-    public function wasLocked()
+    public function wasLocked(): bool
     {
-        return $this->getOriginal((new Locked())->lockedAtColumn()) !== null;
+        return $this->getOriginal(new Locked()->lockedAtColumn()) !== null;
     }
 
-    public function wasLockedBy(User $user)
+    public function wasLockedBy(User $user): bool
     {
-        return $this->wasLocked() && $user->id === $this->getOriginal((new Locked())->lockedByColumn());
+        return $this->wasLocked() && $user->id === $this->getOriginal(new Locked()->lockedByColumn());
     }
 
     public function scopeLocked($query): void
     {
-        $query->where((new Locked())->lockedAtColumn(), '!=', null);
+        $query->where(new Locked()->lockedAtColumn(), '!=', null);
     }
 
     public function scopeLockedBy($query, User $user): void
     {
         $this->scopeLocked($query);
-        $query->where((new Locked())->lockedByColumn(), $user->id);
+        $query->where(new Locked()->lockedByColumn(), $user->id);
     }
 
     public function scopeUnlocked($query): void
     {
-        $query->where((new Locked())->lockedAtColumn(), null);
+        $query->where(new Locked()->lockedAtColumn(), null);
     }
 
     public function scopeUnlockedBy($query, User $user): void
     {
         $this->scopeUnlocked($query);
-        $query->where((new Locked())->lockedByColumn(), '!=', $user->id);
+        $query->where(new Locked()->lockedByColumn(), '!=', $user->id);
     }
 }

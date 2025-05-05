@@ -32,7 +32,7 @@ trait HasCrudOperations
     {
         $query->skip($filters->from - 1);
 
-        if (isset($filters->to)) {
+        if ($filters->to !== null) {
             $query->take($filters->to - $filters->from + 1);
         }
 

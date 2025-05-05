@@ -48,11 +48,11 @@ final class CoreServiceProvider extends ServiceProvider
 
     protected string $nameLower = 'core';
 
-    protected $subscribe = [
+    private array $subscribe = [
         LockedModelSubscriber::class,
     ];
 
-    protected $listen = [
+    private array $listen = [
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
@@ -96,7 +96,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
-        $this->app->singleton(Locked::class, fn () => new Locked());
+        $this->app->singleton(Locked::class, fn (): \Modules\Core\Locking\Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -110,7 +110,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if user is super admin
-        Gate::before(fn (?User $user) => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn (?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -154,7 +154,7 @@ final class CoreServiceProvider extends ServiceProvider
         return [];
     }
 
-    protected function registerModels(): void
+    private function registerModels(): void
     {
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
         Model::shouldBeStrict();
@@ -163,7 +163,7 @@ final class CoreServiceProvider extends ServiceProvider
     /**
      * Register commands in the format of Command::class.
      */
-    protected function registerCommands(): void
+    private function registerCommands(): void
     {
         $module_commands_subpath = config('modules.paths.generator.command.path');
         $commands = $this->inspectFolderCommands($module_commands_subpath);
@@ -184,7 +184,7 @@ final class CoreServiceProvider extends ServiceProvider
     /**
      * Register command Schedules.
      */
-    protected function registerCommandSchedules(): void
+    private function registerCommandSchedules(): void
     {
         $this->app->booted(function (): void {
             $schedule = $this->app->make(Schedule::class);
@@ -210,7 +210,7 @@ final class CoreServiceProvider extends ServiceProvider
         });
     }
 
-    protected function registerMiddlewares(): void
+    private function registerMiddlewares(): void
     {
         $router = app('router');
         $router->middleware(LocalizationMiddleware::class);
@@ -221,44 +221,30 @@ final class CoreServiceProvider extends ServiceProvider
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
     }
 
-    protected function registerCache(): void
+    private function registerCache(): void
     {
         // Override the binding for the Repository
-        $this->app->bind(BaseRepository::class, function ($app) {
-            return new Repository($app->make(Store::class));
-        });
-        $this->app->bind(BaseContract::class, function ($app) {
-            return new Repository($app->make(Store::class));
-        });
+        $this->app->bind(BaseRepository::class, fn($app): \Modules\Core\Cache\Repository => new Repository($app->make(Store::class)));
+        $this->app->bind(BaseContract::class, fn($app): \Modules\Core\Cache\Repository => new Repository($app->make(Store::class)));
 
-        Cache::macro('tryByRequest', function (...$args) {
-            return app(Repository::class)->tryByRequest(...$args);
-        });
+        Cache::macro('tryByRequest', fn(...$args) => app(Repository::class)->tryByRequest(...$args));
 
-        Cache::macro('clearByEntity', function (...$args) {
-            return app(Repository::class)->clearByEntity(...$args);
-        });
+        Cache::macro('clearByEntity', fn(...$args) => app(Repository::class)->clearByEntity(...$args));
 
-        Cache::macro('clearByRequest', function (...$args) {
-            return app(Repository::class)->clearByRequest(...$args);
-        });
+        Cache::macro('clearByRequest', fn(...$args) => app(Repository::class)->clearByRequest(...$args));
 
-        Cache::macro('clearByUser', function (...$args) {
-            return app(Repository::class)->clearByUser(...$args);
-        });
+        Cache::macro('clearByUser', fn(...$args) => app(Repository::class)->clearByUser(...$args));
 
-        Cache::macro('clearByGroup', function (...$args) {
-            return app(Repository::class)->clearByGroup(...$args);
-        });
+        Cache::macro('clearByGroup', fn(...$args) => app(Repository::class)->clearByGroup(...$args));
     }
 
-    private function inspectFolderCommands(string $commandsSubpath)
+    private function inspectFolderCommands(string $commandsSubpath): array
     {
         $modules_namespace = config('modules.namespace');
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn ($file) => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }

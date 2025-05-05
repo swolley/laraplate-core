@@ -29,7 +29,7 @@ final class TranslationsCheckCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         $this->output->writeln(['', 'Sorting translations', '']);
         $languages = translations(true);
@@ -57,7 +57,7 @@ final class TranslationsCheckCommand extends Command
         $mapped = [];
 
         foreach (array_keys($translations) as $key) {
-            $fullpath = $subgroup ? "{$subgroup}.{$key}" : $key;
+            $fullpath = $subgroup !== null && $subgroup !== '' && $subgroup !== '0' ? "{$subgroup}.{$key}" : $key;
 
             if (gettype($translations[$key]) === 'string') {
                 $mapped[] = $fullpath;

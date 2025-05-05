@@ -34,7 +34,7 @@ final class CheckIndexCommand extends Command
             if ($model) {
                 $modeles = [$model];
             } else {
-                $modeles = array_filter(models(), fn ($model) => in_array(Searchable::class, class_uses_recursive($model), true));
+                $modeles = array_filter(models(), fn ($model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
             }
 
             $wrong_or_missing_indexes = [];
@@ -61,7 +61,7 @@ final class CheckIndexCommand extends Command
 
                     // Se il modello usa il trait HasCache, invalida la cache
                     if (in_array(HasCache::class, class_uses_recursive($model), true)) {
-                        (new $model())->invalidateCache();
+                        new $model()->invalidateCache();
                         $this->info('Cache has been invalidated for model ' . $model);
                     }
                 }

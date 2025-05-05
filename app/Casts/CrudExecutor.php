@@ -8,19 +8,19 @@ use ReflectionClass;
 
 final class CrudExecutor
 {
-    public const SELECT = 'get';
+    public const string SELECT = 'get';
 
-    public const COUNT = 'count';
+    public const string COUNT = 'count';
 
-    public const INSERT = 'create';
+    public const string INSERT = 'create';
 
-    public const UPDATE = 'save';
+    public const string UPDATE = 'save';
 
-    public const DELETE = 'delete';
+    public const string DELETE = 'delete';
 
-    public const FORCE_DELETE = 'force_delete';
+    public const string FORCE_DELETE = 'force_delete';
 
-    public const RESTORE = 'restore';
+    public const string RESTORE = 'restore';
 
     /**
      * gets value if exists.

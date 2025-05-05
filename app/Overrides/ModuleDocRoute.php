@@ -29,11 +29,11 @@ final class ModuleDocRoute extends Route
         return $this->reflectedRoute->action['as'] ?? null;
     }
 
-    public function group()
+    public function group(): string
     {
         $name = $this->name();
 
-        if (! $name) {
+        if ($name === null || $name === '' || $name === '0') {
             return '';
         }
         $exploded = explode('.', $name);

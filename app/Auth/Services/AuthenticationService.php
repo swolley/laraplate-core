@@ -7,13 +7,13 @@ namespace Modules\Core\Auth\Services;
 use Illuminate\Http\Request;
 use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
 
-final class AuthenticationService
+final readonly class AuthenticationService
 {
     /**
      * @param  array<int,AuthenticationProviderInterface>  $providers
      */
     public function __construct(
-        private readonly array $providers,
+        private array $providers,
     ) {}
 
     public function authenticate(Request $request): array
@@ -39,8 +39,8 @@ final class AuthenticationService
     public function getAvailableProviders(): array
     {
         return array_map(
-            fn (AuthenticationProviderInterface $provider) => $provider->getProviderName(),
-            array_filter($this->providers, fn ($p) => $p->isEnabled()),
+            fn (AuthenticationProviderInterface $provider): string => $provider->getProviderName(),
+            array_filter($this->providers, fn ($p): bool => $p->isEnabled()),
         );
     }
 }

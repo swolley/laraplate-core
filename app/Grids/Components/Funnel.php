@@ -47,7 +47,7 @@ final class Funnel extends ListEntity
         // if (is_array($this->getLabelField())) array_push($columns, ...array_map(fn ($field) => $field->getName(), $this->getLabelField()));
         // else $columns[] = $this->getLabelField()->getName();
         // $columns = array_unique($columns);
-        $columns = $this->getAllFields()->map(fn ($field) => $field->getName())->toArray();
+        $columns = $this->getAllFields()->map(fn ($field): string => $field->getName())->toArray();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $funnels_data['sort'] ?? $this->getDefaultSorts($columns, $model));
@@ -100,7 +100,7 @@ final class Funnel extends ListEntity
             // columns filters
             $this->prepareFunnelFilterProperties($columns_filters, $grouped_filters);
             // other funnels filters
-            $this->prepareFunnelFilterProperties(array_filter($this->requestData->funnelsFilters, fn ($f) => $f !== $current_funnel, ARRAY_FILTER_USE_KEY), $grouped_filters);
+            $this->prepareFunnelFilterProperties(array_filter($this->requestData->funnelsFilters, fn ($f): bool => $f !== $current_funnel, ARRAY_FILTER_USE_KEY), $grouped_filters);
 
             foreach ($grouped_filters as $path => $entity_filters) {
                 if (count(explode('.', $path)) === 1) {

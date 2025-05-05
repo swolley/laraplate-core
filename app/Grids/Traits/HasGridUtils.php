@@ -32,7 +32,7 @@ trait HasGridUtils
         $allMethods = new ReflectionClass($class)->getMethods(ReflectionMethod::IS_PUBLIC);
         $methods = array_filter(
             $allMethods,
-            fn ($method) => $method->isUserDefined()
+            fn ($method): bool => $method->isUserDefined()
                 && $method->hasReturnType() && (
                     $method->getReturnType()->__toString() === Relation::class
                     || is_subclass_of($method->getReturnType()->__toString(), Relation::class)
@@ -92,7 +92,7 @@ trait HasGridUtils
             return false;
         }
 
-        $relationships = array_filter($model::getRelationships(), function ($r) {
+        $relationships = array_filter($model::getRelationships(), function ($r): bool {
             $model = $r->getModel();
 
             if (static::class instanceof $model) {

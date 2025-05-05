@@ -18,7 +18,7 @@ final class FreeAllLicensesCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         try {
             $user_class = user_class();

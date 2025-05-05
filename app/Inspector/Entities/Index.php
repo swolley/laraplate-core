@@ -6,16 +6,16 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-final class Index
+final readonly class Index
 {
     /**
      * @param  Collection<string>  $columns
      * @param  Collection<string>  $attributes
      */
     public function __construct(
-        public readonly string $name,
-        public readonly Collection $columns,
-        public readonly Collection $attributes,
+        public string $name,
+        public Collection $columns,
+        public Collection $attributes,
     ) {}
 
     public function isComposite(): bool

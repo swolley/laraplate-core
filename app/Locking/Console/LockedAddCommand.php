@@ -19,16 +19,9 @@ class LockedAddCommand extends Command
 
     protected $operation = 'add';
 
-    /**
-     * @var Filesystem
-     */
-    protected $files;
-
-    public function __construct(Filesystem $filesystem)
+    public function __construct(protected \Illuminate\Filesystem\Filesystem $files)
     {
         parent::__construct();
-
-        $this->files = $filesystem;
     }
 
     public function handle(): int
@@ -71,7 +64,7 @@ class LockedAddCommand extends Command
         return BaseCommand::SUCCESS;
     }
 
-    public function generateMigrationPath(Model $instance)
+    public function generateMigrationPath(Model $instance): string
     {
         return "_{$this->operation}_locked_columns_to_{$instance->getTable()}.php";
     }

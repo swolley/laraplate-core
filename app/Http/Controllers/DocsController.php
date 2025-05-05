@@ -114,7 +114,7 @@ final class DocsController extends OpenApiJsonController
 
             /** @var array{paths: mixed,...} $json */
             $json = json_decode(file_get_contents($file), true);
-            $json['paths'] = array_filter($json['paths'], function ($k) use ($version) {
+            $json['paths'] = array_filter($json['paths'], function ($k) use ($version): bool {
                 if (Str::contains($k, $version)) {
                     return true;
                 }
@@ -125,7 +125,7 @@ final class DocsController extends OpenApiJsonController
             if (Str::startsWith($short_name, 'App')) {
                 $main_json = $json;
             } elseif (in_array(str_replace([$assets, '-swagger.json'], '', $file), $modules, true)) {
-                $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn (string $k) => Str::contains($k, $version) || ! Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
+                $additionalPaths = array_merge($additionalPaths, array_filter($json['paths'], fn (string $k): bool => Str::contains($k, $version) || ! Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY));
             }
         }
 

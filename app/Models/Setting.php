@@ -48,7 +48,7 @@ final class Setting extends Model
         'group_name' => 'base',
     ];
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
@@ -105,7 +105,7 @@ final class Setting extends Model
     protected function requiresApprovalWhen($modifications): bool
     {
         return array_intersect(
-            array_filter($this->getFillable(), fn ($field) => $field !== 'description'),
+            array_filter($this->getFillable(), fn ($field): bool => $field !== 'description'),
             array_keys($modifications),
         ) !== [];
     }

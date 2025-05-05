@@ -37,25 +37,13 @@ final class DeleteFromSearchJob implements ShouldQueue
     public array $backoff;
 
     /**
-     * Search index name.
-     */
-    protected string $index;
-
-    /**
-     * Document ID to delete.
-     */
-    protected string|int $document_id;
-
-    /**
      * Create a new job instance.
      *
      * @param  string  $index  Search index name
      * @param  string|int  $document_id  Document ID to delete
      */
-    public function __construct(string $index, string|int $document_id)
+    public function __construct(private string $index, private string|int $document_id)
     {
-        $this->index = $index;
-        $this->document_id = $document_id;
         $this->onQueue(config('scout.queue_name', 'indexing'));
 
         // Set job configurations from config

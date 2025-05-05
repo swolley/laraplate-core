@@ -46,7 +46,7 @@ final class Permission extends ModelsPermission
         'pivot',
     ];
 
-    protected $append = [
+    private array $append = [
         'action',
     ];
 
@@ -54,7 +54,7 @@ final class Permission extends ModelsPermission
         'guard_name' => 'web',
     ];
 
-    public function __construct($attributes = [])
+    public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
 
@@ -64,7 +64,7 @@ final class Permission extends ModelsPermission
         ]);
     }
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
@@ -81,12 +81,12 @@ final class Permission extends ModelsPermission
         return $rules;
     }
 
-    protected static function newFactory(): PermissionFactory
+    private static function newFactory(): PermissionFactory
     {
         return PermissionFactory::new();
     }
 
-    protected function getActionAttribute(): ?ActionEnum
+    private function getActionAttribute(): ?ActionEnum
     {
         if ($this->name === null) {
             return null;

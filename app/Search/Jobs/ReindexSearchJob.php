@@ -37,32 +37,14 @@ final class ReindexSearchJob implements ShouldQueue
     public array $backoff;
 
     /**
-     * Model class to reindex.
-     */
-    protected string $model_class;
-
-    /**
-     * Whether to use the bulk indexing.
-     */
-    protected bool $use_bulk;
-
-    /**
-     * Batch size for bulk indexing.
-     */
-    protected int $batch_size;
-
-    /**
      * Constructor.
      *
      * @param  string  $model_class  Class name of models to reindex
      * @param  bool  $use_bulk  Whether to use bulk indexing
      * @param  int  $batch_size  Number of records to process in each batch (for bulk)
      */
-    public function __construct(string $model_class, bool $use_bulk = true, int $batch_size = 500)
+    public function __construct(private string $model_class, private bool $use_bulk = true, private int $batch_size = 500)
     {
-        $this->model_class = $model_class;
-        $this->use_bulk = $use_bulk;
-        $this->batch_size = $batch_size;
         $this->onQueue(config('scout.queue_name', 'indexing'));
 
         // Set job configurations from config
@@ -136,7 +118,7 @@ final class ReindexSearchJob implements ShouldQueue
         ]);
     }
 
-    private function bulkReindex($model_instance, string $index_name): void
+    private function bulkReindex(object $model_instance, string $index_name): void
     {
         $model_instance::query()->searchable();
         Log::info('Bulk reindex job completed successfully', [
@@ -145,7 +127,7 @@ final class ReindexSearchJob implements ShouldQueue
         ]);
     }
 
-    private function individualReindex($model_instance): void
+    private function individualReindex(object $model_instance): void
     {
         $count = 0;
         $model_instance::chunk($this->batch_size, function ($models) use (&$count): void {

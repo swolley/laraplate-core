@@ -13,7 +13,7 @@ final class LockedModelSubscriber
     /**
      * Register the listeners for the subscriber.
      */
-    public function subscribe(Dispatcher $events): array
+    public function subscribe(): array
     {
         return [
             'eloquent.saving: *' => 'saving',
@@ -25,13 +25,13 @@ final class LockedModelSubscriber
 
     public function saving(string $event, $entity): bool
     {
-        if ((new Locked())->allowsModificationsOnLockedObjects()) {
+        if (new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
         }
 
         $model = $this->getModelFromPassedParams($entity);
 
-        if ((new Locked())->doesNotUseHasLocks($model)) {
+        if (new Locked()->doesNotUseHasLocks($model)) {
             return true;
         }
 
@@ -52,7 +52,7 @@ final class LockedModelSubscriber
 
     public function deleting(string $event, $entity): bool
     {
-        if ((new Locked())->allowsModificationsOnLockedObjects()) {
+        if (new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
         }
         $model = $this->getModelFromPassedParams($entity);
@@ -90,7 +90,7 @@ final class LockedModelSubscriber
         throw new LockedModelException('This model is locked');
     }
 
-    public function notificationSending(NotificationSending $event)
+    public function notificationSending(NotificationSending $event): bool
     {
         $locked = new Locked();
 

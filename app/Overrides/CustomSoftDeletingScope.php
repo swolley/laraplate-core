@@ -28,7 +28,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     #[Override]
     protected function addWithoutTrashed(Builder $builder): void
     {
-        $builder->macro('withoutTrashed', function (Builder $builder) {
+        $builder->macro('withoutTrashed', function (Builder $builder): \Illuminate\Database\Eloquent\Builder {
             $model = $builder->getModel();
 
             $builder->withoutGlobalScope($this)->whereNull(
@@ -47,7 +47,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     #[Override]
     protected function addOnlyTrashed(Builder $builder): void
     {
-        $builder->macro('onlyTrashed', function (Builder $builder) {
+        $builder->macro('onlyTrashed', function (Builder $builder): \Illuminate\Database\Eloquent\Builder {
             $model = $builder->getModel();
 
             $builder->withoutGlobalScope($this)->whereNotNull(

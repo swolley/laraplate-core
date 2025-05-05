@@ -29,10 +29,10 @@ final class GridsController extends Controller
             $grids = [];
             $permissions = $request->user()->getAllPermissions();
 
-            if ($entity) {
+            if ($entity !== null && $entity !== '' && $entity !== '0') {
                 $entity_instance = DynamicEntity::tryResolveModel($entity);
 
-                if (! $entity_instance) {
+                if ($entity_instance === null || $entity_instance === '' || $entity_instance === '0') {
                     throw new UnexpectedValueException("Unable to find entity '{$entity}'");
                 }
                 $entity = $entity_instance;
@@ -44,7 +44,7 @@ final class GridsController extends Controller
                 $table = $instance->getTable();
 
                 if (
-                    (! $entity || $instance::class === $entity::class)
+                    ($entity === null || $entity === '' || $entity === '0' || $instance::class === $entity::class)
                     && Grid::useGridUtils($instance)
                     && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
                 ) {
@@ -54,7 +54,7 @@ final class GridsController extends Controller
                 }
             }
 
-            if ($entity) {
+            if ($entity !== null && $entity !== '' && $entity !== '0') {
                 if ($grids === []) {
                     throw new UnexpectedValueException("'{$entity}' is not a Grid");
                 }

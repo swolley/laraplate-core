@@ -19,7 +19,7 @@ final class ImportCommand extends \Laravel\Scout\Console\ImportCommand
     #[Override]
     public function handle(Dispatcher $events)
     {
-        if (! $this->getModelClass()) {
+        if (in_array($this->getModelClass(), ['', '0'], true) || $this->getModelClass() === false) {
             return Command::FAILURE;
         }
 

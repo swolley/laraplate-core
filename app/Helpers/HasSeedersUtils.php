@@ -18,9 +18,7 @@ trait HasSeedersUtils
         $model = new $class();
 
         // Extract the relations from the attributes array
-        $callables = array_filter($attributes, function ($value, $key) use ($class, $model) {
-            return (is_callable($value) || method_exists($class, $key)) && ! in_array($key, [...$model->getFillable(), ...$model->getHidden(), ...$model->getGuarded()], true);
-        }, ARRAY_FILTER_USE_BOTH);
+        $callables = array_filter($attributes, fn($value, $key): bool => (is_callable($value) || method_exists($class, $key)) && ! in_array($key, [...$model->getFillable(), ...$model->getHidden(), ...$model->getGuarded()], true), ARRAY_FILTER_USE_BOTH);
 
         // Remove the relations from the attributes array
         $model_attributes = array_diff_key($attributes, $callables);
@@ -115,7 +113,7 @@ trait HasSeedersUtils
     protected function logOperation(string $model): void
     {
         $already_exists = $model::query()->exists();
-        $table = (new $model())->getTable();
+        $table = new $model()->getTable();
         $this->command->line('  ' . ($already_exists ? 'Updating' : 'Creating') . ' default <fg=cyan;options=bold>' . $table . '</>');
     }
 }

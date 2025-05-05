@@ -103,7 +103,7 @@ final class Role extends BaseRole
         return false;
     }
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [

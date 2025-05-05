@@ -22,16 +22,16 @@ final class SettingController extends Controller
      */
     public function getTranslations(Request $request, ?string $lang = null): HttpFoundationResponse
     {
-        if ($lang) {
+        if ($lang !== null && $lang !== '' && $lang !== '0') {
             $lang = mb_substr($lang, 0, 2);
         }
 
-        $translations = Cache::tags([config('app.name')])->remember(RequestFacade::route()->getName() . $lang, config('cache.duration'), function () use ($lang) {
+        $translations = Cache::tags([config('app.name')])->remember(RequestFacade::route()->getName() . $lang, config('cache.duration'), function () use ($lang): array {
             $languages = translations(true, true);
             $translations = [];
 
             $default_locale = App::getLocale();
-            usort($languages, function ($a, $b) use ($default_locale) {
+            usort($languages, function ($a, $b) use ($default_locale): int {
                 if (Str::endsWith($a, DIRECTORY_SEPARATOR . $default_locale)) {
                     return -1;
                 }
@@ -57,7 +57,7 @@ final class SettingController extends Controller
                 foreach ($files as $file) {
                     $contents = include $file;
 
-                    if ($lang) {
+                    if ($lang !== null && $lang !== '' && $lang !== '0') {
                         $translations[basename($file, '.php')] = $contents;
                     } else {
                         $translations[$short_name][basename($file, '.php')] = $contents;

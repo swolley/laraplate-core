@@ -44,7 +44,7 @@ final class Option extends ListEntity
         $columns = $this->getAllQueryFields();
         $this->getAllFields()->diff($columns);
         $this->getAllFields()->diff($columns);
-        $columns = $columns->map(fn ($field) => $field->getName())->toArray();
+        $columns = $columns->map(fn ($field): string => $field->getName())->toArray();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $option_data['sort'] ?? $this->getDefaultSorts($columns, $model));

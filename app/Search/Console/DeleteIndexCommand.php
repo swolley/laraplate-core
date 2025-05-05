@@ -23,12 +23,12 @@ final class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
     {
         $model = $this->getModelClass();
 
-        if (! $model) {
+        if ($model === '' || $model === '0' || $model === false) {
             return Command::FAILURE;
         }
 
         $this->addArgument('name');
-        $this->input->setArgument('name', (new $model())->indexableAs());
+        $this->input->setArgument('name', new $model()->indexableAs());
 
         return parent::handle($manager);
     }

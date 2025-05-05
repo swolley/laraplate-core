@@ -49,7 +49,7 @@ final class License extends Model
         return $this->hasOne(User::class);
     }
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [

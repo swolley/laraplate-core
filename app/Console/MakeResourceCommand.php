@@ -46,13 +46,13 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
         if ($this->option('model')) {
             $class_name ??= $this->argument('name');
 
-            if ($is_module && $module_name && class_exists('Nwidart\Modules\Facades\Module')) {
+            if ($is_module && $module_name && class_exists(\Nwidart\Modules\Facades\Module::class)) {
                 $this->callSilently('make:model', ['name' => "{$class_name}", 'module' => $module_name]);
             } else {
                 $this->callSilently('make:model', ['name' => "{$class_name}"]);
             }
 
-            if (! $model) {
+            if ($model === '' || $model === '0' || $model === false) {
                 $this->input->setArgument('name', $modelNamespace . '\\' . $class_name);
                 $this->input->setOption('model', false);
 
@@ -60,7 +60,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             }
         }
 
-        if (! $model) {
+        if ($model === '' || $model === '0' || $model === false) {
             $this->error('Model not found');
 
             return self::FAILURE;
@@ -72,7 +72,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
                 ->pluralStudly()
                 ->snake();
 
-            if ($is_module && $module_name && class_exists('Nwidart\Modules\Facades\Module')) {
+            if ($is_module && $module_name && class_exists(\Nwidart\Modules\Facades\Module::class)) {
                 $this->call('module:make-migration', ['name' => "create_{$table}_table", 'module' => $module_name, '--create' => $table]);
             } else {
                 $this->call('make:migration', ['name' => "create_{$table}_table", '--create' => $table]);
@@ -80,7 +80,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
         }
 
         if ($this->option('factory')) {
-            if ($is_module && $module_name && class_exists('Nwidart\Modules\Facades\Module')) {
+            if ($is_module && $module_name && class_exists(\Nwidart\Modules\Facades\Module::class)) {
                 $this->call('module:make-factory', ['name' => $model, 'module' => $module_name]);
             } else {
                 $this->call('make:factory', ['name' => $model]);
@@ -273,7 +273,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
 
         if ($this->option('simple')) {
             $this->copyStubToApp('ResourceManagePage', $manageResourcePagePath, [
-                'baseResourcePage' => 'Filament\\Resources\\Pages\\ManageRecords' . ($needsAlias ? ' as BaseManageRecords' : ''),
+                'baseResourcePage' => \Filament\Resources\Pages\ManageRecords::class . ($needsAlias ? ' as BaseManageRecords' : ''),
                 'baseResourcePageClass' => $needsAlias ? 'BaseManageRecords' : 'ManageRecords',
                 'namespace' => "{$namespace}\\{$resourceClass}\\Pages",
                 'resource' => "{$namespace}\\{$resourceClass}",
@@ -282,7 +282,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             ]);
         } else {
             $this->copyStubToApp('ResourceListPage', $listResourcePagePath, [
-                'baseResourcePage' => 'Filament\\Resources\\Pages\\ListRecords' . ($needsAlias ? ' as BaseListRecords' : ''),
+                'baseResourcePage' => \Filament\Resources\Pages\ListRecords::class . ($needsAlias ? ' as BaseListRecords' : ''),
                 'baseResourcePageClass' => $needsAlias ? 'BaseListRecords' : 'ListRecords',
                 'namespace' => "{$namespace}\\{$resourceClass}\\Pages",
                 'resource' => "{$namespace}\\{$resourceClass}",
@@ -291,7 +291,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             ]);
 
             $this->copyStubToApp('ResourcePage', $createResourcePagePath, [
-                'baseResourcePage' => 'Filament\\Resources\\Pages\\CreateRecord' . ($needsAlias ? ' as BaseCreateRecord' : ''),
+                'baseResourcePage' => \Filament\Resources\Pages\CreateRecord::class . ($needsAlias ? ' as BaseCreateRecord' : ''),
                 'baseResourcePageClass' => $needsAlias ? 'BaseCreateRecord' : 'CreateRecord',
                 'namespace' => "{$namespace}\\{$resourceClass}\\Pages",
                 'resource' => "{$namespace}\\{$resourceClass}",
@@ -303,7 +303,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
 
             if ($this->option('view')) {
                 $this->copyStubToApp('ResourceViewPage', $viewResourcePagePath, [
-                    'baseResourcePage' => 'Filament\\Resources\\Pages\\ViewRecord' . ($needsAlias ? ' as BaseViewRecord' : ''),
+                    'baseResourcePage' => \Filament\Resources\Pages\ViewRecord::class . ($needsAlias ? ' as BaseViewRecord' : ''),
                     'baseResourcePageClass' => $needsAlias ? 'BaseViewRecord' : 'ViewRecord',
                     'namespace' => "{$namespace}\\{$resourceClass}\\Pages",
                     'resource' => "{$namespace}\\{$resourceClass}",
@@ -324,7 +324,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             $editPageActions = implode(PHP_EOL, $editPageActions);
 
             $this->copyStubToApp('ResourceEditPage', $editResourcePagePath, [
-                'baseResourcePage' => 'Filament\\Resources\\Pages\\EditRecord' . ($needsAlias ? ' as BaseEditRecord' : ''),
+                'baseResourcePage' => \Filament\Resources\Pages\EditRecord::class . ($needsAlias ? ' as BaseEditRecord' : ''),
                 'baseResourcePageClass' => $needsAlias ? 'BaseEditRecord' : 'EditRecord',
                 'actions' => $this->indentString($editPageActions, 3),
                 'namespace' => "{$namespace}\\{$resourceClass}\\Pages",

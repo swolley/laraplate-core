@@ -8,16 +8,16 @@ use Illuminate\Http\Request;
 use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 
-final class CrudRequestData
+final readonly class CrudRequestData
 {
-    public readonly ?string $connection;
+    public ?string $connection;
 
     /**
      * @phpstan-ignore property.uninitializedReadonly
      */
-    public readonly Model $model;
+    public Model $model;
 
-    public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey)
+    public function __construct(public Request $request, public string $mainEntity, array $validated, public string|array $primaryKey)
     {
         $this->connection = $validated['connection'] ?? null;
 

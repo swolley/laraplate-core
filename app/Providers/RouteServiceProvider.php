@@ -14,7 +14,7 @@ use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvi
 
 final class RouteServiceProvider extends ServiceProvider
 {
-    protected string $name = 'Core';
+    private string $name = 'Core';
 
     /**
      * Called before routes are registered.
@@ -48,12 +48,12 @@ final class RouteServiceProvider extends ServiceProvider
         $this->mapWebRoutes();
     }
 
-    protected function getPrefix(): string
+    private function getPrefix(): string
     {
         return Str::slug($this->name);
     }
 
-    protected function getModuleNamespace(): string
+    private function getModuleNamespace(): string
     {
         return str_replace('Providers', 'Http\Controllers', __NAMESPACE__);
     }
@@ -63,7 +63,7 @@ final class RouteServiceProvider extends ServiceProvider
      *
      * These routes all receive session state, CSRF protection, etc.
      */
-    protected function mapWebRoutes(): void
+    private function mapWebRoutes(): void
     {
         $name_prefix = $this->getPrefix();
         Route::middleware('web')
@@ -101,7 +101,7 @@ final class RouteServiceProvider extends ServiceProvider
      *
      * These routes are typically stateless.
      */
-    protected function mapApiRoutes(): void
+    private function mapApiRoutes(): void
     {
         if (config('core.expose_crud_api')) {
             $name_prefix = $this->getPrefix();

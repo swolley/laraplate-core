@@ -6,9 +6,9 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-final class Table
+final readonly class Table
 {
-    public readonly ?Index $primaryKey;
+    public ?Index $primaryKey;
 
     /**
      * @param  Collection<Column>  $columns
@@ -16,12 +16,12 @@ final class Table
      * @param  Collection<ForeignKey>  $foreignKeys
      */
     public function __construct(
-        public readonly string $name,
-        public readonly Collection $columns,
-        public readonly Collection $indexes,
-        public readonly Collection $foreignKeys,
-        public readonly string $schema,
-        public readonly ?string $connection = null,
+        public string $name,
+        public Collection $columns,
+        public Collection $indexes,
+        public Collection $foreignKeys,
+        public string $schema,
+        public ?string $connection = null,
     ) {
         $primaryKey = $indexes->filter(fn ($index) => $index->attributes->contains('primary'));
 

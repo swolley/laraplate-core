@@ -41,7 +41,7 @@ final class UserGridConfig extends Model
         return $this->belongsTo(user_class());
     }
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [

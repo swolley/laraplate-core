@@ -10,8 +10,11 @@ use Modules\Core\Casts\ListRequestData;
 
 final class ListRequest extends SelectRequest
 {
+    /**
+     * @return mixed[]
+     */
     #[Override]
-    public function rules()
+    public function rules(): array
     {
         $rules = parent::rules() + [
             'pagination' => ['integer', 'numeric', 'min:1', 'exclude_if:count,true'],

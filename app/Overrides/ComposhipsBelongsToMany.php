@@ -57,7 +57,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     public function getExistenceCompareKey()
     {
         if (is_array($this->foreignPivotKey)) {
-            return array_map(fn ($key) => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
+            return array_map(fn ($key): string => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
         }
 
         return $this->getQualifiedForeignPivotKeyName();
@@ -189,7 +189,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
         $collection = $collection->merge($this->pivotColumns);
 
         return $collection
-            ->map(fn ($column) => $this->qualifyPivotColumn($column) . ' as pivot_' . $column)
+            ->map(fn ($column): string => $this->qualifyPivotColumn($column) . ' as pivot_' . $column)
             ->unique()
             ->all();
     }

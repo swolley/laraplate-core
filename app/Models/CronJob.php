@@ -45,7 +45,7 @@ final class CronJob extends Model
         'parameters' => '{}',
     ];
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
@@ -60,9 +60,7 @@ final class CronJob extends Model
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(function ($query) {
-                    return $query->whereNull('deleted_at');
-                }),
+                Rule::unique('cron_jobs')->where(fn($query) => $query->whereNull('deleted_at')),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -70,9 +68,7 @@ final class CronJob extends Model
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(function ($query) {
-                    return $query->whereNull('deleted_at');
-                })->ignore($this->id, 'id'),
+                Rule::unique('cron_jobs')->where(fn($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
             ],
         ]);
 

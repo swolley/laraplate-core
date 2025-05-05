@@ -45,7 +45,7 @@ final class ACL extends Model
         $query->where('permission_id', $permission_id);
     }
 
-    public function getRules()
+    public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [

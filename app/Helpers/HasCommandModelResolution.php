@@ -31,12 +31,12 @@ trait HasCommandModelResolution
             return false;
         }
 
-        if ($namespace) {
+        if ($namespace !== null && $namespace !== '' && $namespace !== '0') {
             $model = "{$namespace}\\{$model}";
         }
 
         if (! class_exists($model)) {
-            $model = array_filter($all_models ?? models(false), fn (string $m) => (Str::contains($model, '\\') && $model === $m) || Str::endsWith($m, $model));
+            $model = array_filter($all_models ?? models(false), fn (string $m): bool => (Str::contains($model, '\\') && $model === $m) || Str::endsWith($m, $model));
 
             if (count($model) === 0) {
                 $this->error('Model not found');

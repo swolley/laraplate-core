@@ -32,7 +32,7 @@ final class PermissionChecker
         if (! $permissions instanceof Collection) {
             $user = $request->user();
 
-            if (! $permissions && $user && $user->isSuperAdmin()) {
+            if ($permissions === null && $user && $user->isSuperAdmin()) {
                 return true;
             }
 

@@ -8,17 +8,17 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
-final class Column
+final readonly class Column
 {
-    public readonly DoctrineTypeEnum $type;
+    public DoctrineTypeEnum $type;
 
     /**
      * @param  Collection<string>  $attributes
      */
     public function __construct(
-        public readonly string $name,
-        public readonly Collection $attributes,
-        public readonly mixed $default,
+        public string $name,
+        public Collection $attributes,
+        public mixed $default,
         string $type,
     ) {
         $this->type = DoctrineTypeEnum::fromString($type);

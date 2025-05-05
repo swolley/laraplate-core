@@ -33,10 +33,10 @@ final class PermissionsRefreshCommand extends Command
     private static array $MODELS_BLACKLIST = [
         'App\\Models\\Version',
         'App\\Models\\Modification',
-        'Modules\\Core\\Models\\DynamicEntity',
-        'Modules\\Core\\Models\\License',
-        'Modules\\Core\\Models\\ModelEmbedding',
-        'Illuminate\\Database\\Eloquent\\Relations\\Pivot',
+        \Modules\Core\Models\DynamicEntity::class,
+        \Modules\Core\Models\License::class,
+        \Modules\Core\Models\ModelEmbedding::class,
+        \Illuminate\Database\Eloquent\Relations\Pivot::class,
     ];
 
     /**

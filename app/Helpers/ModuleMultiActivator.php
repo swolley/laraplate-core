@@ -10,9 +10,9 @@ use Illuminate\Container\Container;
 use Nwidart\Modules\Activators\FileActivator;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 
-final class ModuleMultiActivator implements ActivatorInterface
+final readonly class ModuleMultiActivator implements ActivatorInterface
 {
-    private readonly ActivatorInterface $activator;
+    private ActivatorInterface $activator;
 
     public function __construct(Container $app)
     {

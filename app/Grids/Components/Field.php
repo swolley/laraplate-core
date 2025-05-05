@@ -90,7 +90,7 @@ final class Field implements JsonSerializable
      */
     public function getFullAlias(): ?string
     {
-        return $this->path !== '' && $this->path !== '0' ? $this->path . '.' . $this->getAlias() : null;
+        return $this->path !== '' && $this->path !== '0' ? $this->path . '.' . $this->alias : null;
     }
 
     /**
@@ -259,9 +259,9 @@ final class Field implements JsonSerializable
         $filtered_validations = $this->parseValidationsRules();
 
         return [
-            'readable' => $this->isReadable(),
-            'writable' => $this->isWritable(),
-            'fieldType' => $this->getFieldType()->value,
+            'readable' => $this->readable,
+            'writable' => $this->writable,
+            'fieldType' => $this->fieldType->value,
             'required' => in_array('required', $filtered_validations, true),
             'validations' => $filtered_validations,
         ];

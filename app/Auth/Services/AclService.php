@@ -9,9 +9,9 @@ use Modules\Core\Crud\CrudHelper;
 use Modules\Core\Casts\ListRequestData;
 use Illuminate\Database\Eloquent\Builder;
 
-final class AclService
+final readonly class AclService
 {
-    public function __construct(private readonly CrudHelper $crudHelper) {}
+    public function __construct(private CrudHelper $crudHelper) {}
 
     public function applyAclToQuery(Builder $query, int $permission_id): Builder
     {

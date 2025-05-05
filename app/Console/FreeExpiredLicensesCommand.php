@@ -13,7 +13,7 @@ final class FreeExpiredLicensesCommand extends Command
 
     protected $description = 'Free expired licenses. <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
-    public function handle()
+    public function handle(): int
     {
         $this->info('Freeing expired licenses...');
         user_class();

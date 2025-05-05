@@ -32,18 +32,18 @@ if (! function_exists('modules')) {
             $remapped_modules[ucfirst($module)] = $class;
         }
 
-        if ($onlyModule) {
+        if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn (string $k) => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
 
-        if ($prioritySort) {
-            uasort($remapped_modules, fn (Module $a, Module $b) => $b->getPriority() <=> $a->getPriority());
+        if ($prioritySort === true) {
+            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
-        $remapped_modules = $fullpath ? array_map(fn (Module $m) => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
+        $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
 
-        if ($showMainApp && (! $onlyModule || $onlyModule === 'App')) {
+        if ($showMainApp && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) {
             if ($fullpath) {
                 $remapped_modules['App'] = app_path();
             } else {
@@ -118,7 +118,7 @@ if (! function_exists('translations')) {
         $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
         $langs_subpath = config('modules.paths.generator.lang.path');
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l) => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
@@ -296,7 +296,7 @@ if (! function_exists('routes')) {
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = app('router')->getRoutes()->getRoutes();
-        usort($all_routes, fn (Route $a, Route $b) => $a->uri() <=> $b->uri());
+        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
@@ -307,7 +307,7 @@ if (! function_exists('routes')) {
             }
             $exploded = explode('\\', (string) $reference);
 
-            if (($exploded[0] !== 'Modules' && (! $onlyModule || $onlyModule === 'App')) || (in_array($exploded[1], $modules, true) && (! $onlyModule || $exploded[1] === $onlyModule))) {
+            if (($exploded[0] !== 'Modules' && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) || (in_array($exploded[1], $modules, true) && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $exploded[1] === $onlyModule))) {
                 $routes[] = $route;
             }
         }
@@ -442,7 +442,7 @@ if (! function_exists('cast_value')) {
      */
     function cast_value(mixed $value, ?string $type = null): mixed
     {
-        if ($type) {
+        if ($type !== null && $type !== '' && $type !== '0') {
             return match (mb_strtolower($type)) {
                 'int', 'integer' => (int) $value,
                 'float', 'double', 'real' => (float) $value,
@@ -469,19 +469,19 @@ if (! function_exists('cast_value')) {
             return (float) $value;
         }
 
-        if (mb_strtolower($value) === 'true') {
+        if (mb_strtolower((string) $value) === 'true') {
             return true;
         }
 
-        if (mb_strtolower($value) === 'false') {
+        if (mb_strtolower((string) $value) === 'false') {
             return false;
         }
 
         // JSON array or object
-        if ((mb_substr($value, 0, 1) === '[' && mb_substr($value, -1) === ']')
-            || (mb_substr($value, 0, 1) === '{' && mb_substr($value, -1) === '}')
+        if ((mb_substr((string) $value, 0, 1) === '[' && mb_substr((string) $value, -1) === ']')
+            || (mb_substr((string) $value, 0, 1) === '{' && mb_substr((string) $value, -1) === '}')
         ) {
-            $decoded = json_decode($value, true);
+            $decoded = json_decode((string) $value, true);
 
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $decoded;

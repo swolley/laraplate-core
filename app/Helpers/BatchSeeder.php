@@ -55,7 +55,7 @@ abstract class BatchSeeder extends Seeder
     {
         $current_count = $this->command->option('force') ? 0 : $model_class::query()->withoutGlobalScopes()->count();
         $count_to_create = $total_count - $current_count;
-        $entity_name = (new $model_class())->getTable();
+        $entity_name = new $model_class()->getTable();
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');

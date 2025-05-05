@@ -79,11 +79,7 @@ trait Searchable
         $array = [];
 
         // find on web, typesense requires id to be a string
-        if (config('scout.driver') === 'typesense') {
-            $array['id'] = (string) $this->getKey();
-        } else {
-            $array['id'] = $this->getKey();
-        }
+        $array['id'] = config('scout.driver') === 'typesense' ? (string) $this->getKey() : $this->getKey();
 
         // Add common data
         $array['connection'] = $this->getConnectionName() ?: 'default';
@@ -202,7 +198,7 @@ trait Searchable
                 try {
                     $client->collections[$index]->retrieve();
                     $exists = true;
-                } catch (Exception $e) {
+                } catch (Exception) {
                     $exists = false;
                 }
             }
@@ -214,7 +210,7 @@ trait Searchable
             }
 
             return $exists;
-        } catch (Exception $e) {
+        } catch (Exception) {
             return false;
         }
     }
@@ -298,7 +294,7 @@ trait Searchable
             $ids = collect($response['hits'])->pluck('document.id')->toArray();
 
             return static::whereIn($this->getKeyName(), $ids)->get()
-                ->sortBy(fn ($model) => array_search($model->getKey(), $ids, true));
+                ->sortBy(fn ($model): int|string|false => array_search($model->getKey(), $ids, true));
         }
 
         return collect();
@@ -559,7 +555,7 @@ trait Searchable
             ]);
 
             return $response->asArray()['hits']['hits'][0]['_source'][self::INDEXED_AT_FIELD] ?? null;
-        } catch (Exception $e) {
+        } catch (Exception) {
             return null;
         }
     }
@@ -580,7 +576,7 @@ trait Searchable
             ]);
 
             return $response['hits'][0]['document'][self::INDEXED_AT_FIELD] ?? null;
-        } catch (Exception $e) {
+        } catch (Exception) {
             return null;
         }
     }
@@ -599,9 +595,7 @@ trait Searchable
                     $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(function ($val) {
-                        return is_string($val) ? "\"{$val}\"" : $val;
-                    }, $value));
+                    $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
                     $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {

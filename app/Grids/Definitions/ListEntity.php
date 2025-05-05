@@ -48,10 +48,10 @@ abstract class ListEntity extends Entity
     final public static function create(Field|string|array|null $labelField = null): Closure
     {
         if ($labelField && ! ($labelField instanceof Field)) {
-            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label) => self::createField($label), $labelField);
+            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label): \Modules\Core\Grids\Components\Field => self::createField($label), $labelField);
         }
 
-        return fn (Model $model, Field $valueField) => new static($model, $valueField, $labelField ?? $valueField);
+        return fn (Model $model, Field $valueField): static => new static($model, $valueField, $labelField ?? $valueField);
     }
 
     // public function getName(): string
@@ -84,7 +84,7 @@ abstract class ListEntity extends Entity
      */
     final public function getLabelField(): array|Field|null
     {
-        $fields = $this->getFields()->filter(fn ($field) => in_array($field->getName(), $this->labelFieldsName, true));
+        $fields = $this->getFields()->filter(fn ($field): bool => in_array($field->getName(), $this->labelFieldsName, true));
 
         return $fields->count() === 1 ? $fields->first() : $fields->toArray();
     }
@@ -100,7 +100,7 @@ abstract class ListEntity extends Entity
         $value_field = $this->getValueField();
         $label_field = $this->getLabelField();
 
-        return $this->getFields()->filter(fn ($field, $key) => $key !== $label_field->getName() && $key !== $value_field->getName());
+        return $this->getFields()->filter(fn ($field, $key): bool => $key !== $label_field->getName() && $key !== $value_field->getName());
     }
 
     /**

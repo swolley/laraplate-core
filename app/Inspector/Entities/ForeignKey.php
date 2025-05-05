@@ -6,27 +6,27 @@ namespace Modules\Core\Inspector\Entities;
 
 use Illuminate\Support\Collection;
 
-final class ForeignKey
+final readonly class ForeignKey
 {
     /**
      * @phpstan-ignore property.uninitializedReadonly
      */
-    public readonly ?string $foreignConnection;
+    public ?string $foreignConnection;
 
     /**
      * @param  Collection<string>  $columns
      * @param  Collection<string>  $foreignColumns
      */
     public function __construct(
-        public readonly string $name,
-        public readonly Collection $columns,
-        public readonly ?string $foreignSchema,
-        public readonly string $foreignTable,
-        public readonly Collection $foreignColumns,
-        public readonly string $localSchema,
-        public readonly ?string $localConnection,
-        public readonly ?string $onUpdate = null,
-        public readonly ?string $onDelete = null,
+        public string $name,
+        public Collection $columns,
+        public ?string $foreignSchema,
+        public string $foreignTable,
+        public Collection $foreignColumns,
+        public string $localSchema,
+        public ?string $localConnection,
+        public ?string $onUpdate = null,
+        public ?string $onDelete = null,
     ) {
         if ($localSchema === $foreignSchema) {
             $this->foreignConnection = $localConnection;

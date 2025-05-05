@@ -46,8 +46,8 @@ final class BulkIndexSearchJob implements ShouldQueue
      * @param  bool  $force  If true, forces indexing even if model shouldn't be searchable
      */
     public function __construct(
-        protected Collection $models,
-        protected bool $force = false,
+        private Collection $models,
+        private bool $force = false,
     ) {
         // Validate that collection is not empty
         if ($models->isEmpty()) {
@@ -57,7 +57,7 @@ final class BulkIndexSearchJob implements ShouldQueue
         // Validate that all models are of the same class
         $model_class = $models->first()::class;
 
-        if (! $models->every(fn ($model) => $model instanceof $model_class)) {
+        if (! $models->every(fn ($model): bool => $model instanceof $model_class)) {
             throw new InvalidArgumentException('All models must be of the same class');
         }
 

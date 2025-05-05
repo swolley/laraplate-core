@@ -81,7 +81,7 @@ final class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(AuthenticationService::class, fn ($app) => new AuthenticationService([
+        $this->app->singleton(AuthenticationService::class, fn ($app): \Modules\Core\Auth\Services\AuthenticationService => new AuthenticationService([
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),
         ]));

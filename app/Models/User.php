@@ -118,12 +118,10 @@ class User extends BaseUser implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        switch ($panel->getId()) {
-            case 'admin':
-                return $this->isSuperAdmin();
-            default:
-                return true;
-        }
+        return match ($panel->getId()) {
+            'admin' => $this->isSuperAdmin(),
+            default => true,
+        };
     }
 
     /**

@@ -18,16 +18,15 @@ use Modules\Core\Search\Contracts\SearchEngineInterface;
 abstract class AbstractSearchEngine extends Engine implements SearchEngineInterface
 {
     /**
-     * Configurazione del motore di ricerca.
-     */
-    protected array $config;
-
-    /**
      * Construttore.
      */
-    public function __construct(array $config = [])
+    public function __construct(
+        /**
+         * Configurazione del motore di ricerca.
+         */
+        protected array $config = []
+    )
     {
-        $this->config = $config;
     }
 
     abstract public function supportsVectorSearch(): bool;

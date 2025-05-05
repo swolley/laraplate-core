@@ -15,7 +15,7 @@ use Modules\Core\Casts\ModifyRequestData;
 final class ModifyRequest extends CrudRequest implements IParsableRequest
 {
     #[Override]
-    public function rules()
+    public function rules(): array
     {
         return [];
     }

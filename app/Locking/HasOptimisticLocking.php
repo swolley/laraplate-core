@@ -42,7 +42,7 @@ trait HasOptimisticLocking
      */
     protected static function bootOptimisticLocking(): void
     {
-        static::creating(function (Model $model) {
+        static::creating(function (Model $model): \Illuminate\Database\Eloquent\Model {
             // @phpstan-ignore method.notFound
             if ($model->currentLockVersion() === null) {
                 $model->{static::lockVersionColumn()} = 1;

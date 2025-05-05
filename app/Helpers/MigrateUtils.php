@@ -79,16 +79,10 @@ final class MigrateUtils
 
             if (! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) && ! Schema::hasIndex($table_name, $index_name)) {
                 DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
-                    switch (DB::connection()->getDriverName()) {
-                        case 'pgsql':
-                            DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column})");
-
-                            break;
-                        default:
-                            $table->index([$valid_from_column, $valid_to_column], $index_name);
-
-                            break;
-                    }
+                    match (DB::connection()->getDriverName()) {
+                        'pgsql' => DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column})"),
+                        default => $table->index([$valid_from_column, $valid_to_column], $index_name),
+                    };
                 });
             }
         }
@@ -97,16 +91,10 @@ final class MigrateUtils
 
         if ($hasSoftDelete && $hasValidity && ! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column, 'is_deleted']) && ! Schema::hasIndex($table_name, $index_name)) {
             DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
-                switch (DB::connection()->getDriverName()) {
-                    case 'pgsql':
-                        DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column}, is_deleted)");
-
-                        break;
-                    default:
-                        $table->index([$valid_from_column, $valid_to_column, 'is_deleted'], $index_name);
-
-                        break;
-                }
+                match (DB::connection()->getDriverName()) {
+                    'pgsql' => DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column}, is_deleted)"),
+                    default => $table->index([$valid_from_column, $valid_to_column, 'is_deleted'], $index_name),
+                };
             });
         }
     }
@@ -222,17 +210,13 @@ final class MigrateUtils
         $locked = new Locked();
         $locked_at_column = $locked->lockedAtColumn();
 
-        if ($locked_at_column) {
-            if (! Schema::hasColumn($table->getTable(), $locked_at_column)) {
-                $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
-            }
+        if ($locked_at_column !== '' && $locked_at_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_at_column)) {
+            $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
         }
         $locked_by_column = $locked->lockedByColumn();
 
-        if ($locked_by_column) {
-            if (! Schema::hasColumn($table->getTable(), $locked_by_column)) {
-                $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
-            }
+        if ($locked_by_column !== '' && $locked_by_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_by_column)) {
+            $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
         }
 
         if (! Schema::hasColumn($table->getTable(), 'is_locked')) {
@@ -268,17 +252,13 @@ final class MigrateUtils
         $locked = new Locked();
         $locked_at_column = $locked->lockedAtColumn();
 
-        if ($locked_at_column) {
-            if (Schema::hasColumn($table->getTable(), $locked_at_column)) {
-                $table->dropColumn($locked_at_column);
-            }
+        if ($locked_at_column !== '' && $locked_at_column !== '0' && Schema::hasColumn($table->getTable(), $locked_at_column)) {
+            $table->dropColumn($locked_at_column);
         }
         $locked_by_column = $locked->lockedByColumn();
 
-        if ($locked_by_column) {
-            if (Schema::hasColumn($table->getTable(), $locked_by_column)) {
-                $table->dropColumn($locked_by_column);
-            }
+        if ($locked_by_column !== '' && $locked_by_column !== '0' && Schema::hasColumn($table->getTable(), $locked_by_column)) {
+            $table->dropColumn($locked_by_column);
         }
 
         if (Schema::hasColumn($table->getTable(), 'is_locked')) {
@@ -333,9 +313,6 @@ final class MigrateUtils
 
                         break;
                     case 'oracle':
-                        DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' (' . $column . ' DESC)');
-
-                        break;
                     case 'mysql':
                         DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' (' . $column . ' DESC)');
 

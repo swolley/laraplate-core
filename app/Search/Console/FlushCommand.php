@@ -17,7 +17,7 @@ final class FlushCommand extends \Laravel\Scout\Console\FlushCommand
     #[Override]
     public function handle()
     {
-        if (! $this->getModelClass()) {
+        if (in_array($this->getModelClass(), ['', '0'], true) || $this->getModelClass() === false) {
             return self::FAILURE;
         }
 
