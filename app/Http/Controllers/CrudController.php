@@ -58,7 +58,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
 
-final class CrudController extends Controller
+class CrudController extends Controller
 {
     use HasCrudOperations;
 

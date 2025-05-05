@@ -57,7 +57,7 @@ final class ResponseBuilder
         $this->preview = preview();
     }
 
-    public static function getHttpErrorStatus(int|string $errorCode): int
+    public self function getHttpErrorStatus(int|string $errorCode): int
     {
         $http_statuses = array_flip(self::getHttpStatuses());
 
@@ -72,7 +72,7 @@ final class ResponseBuilder
     /**
      * Set the value of data.
      */
-    public function setData(mixed $data): static
+    public function setData(mixed $data): self
     {
         if ($data instanceof JsonResource) {
             $this->resourceResponse = $data;
@@ -134,9 +134,9 @@ final class ResponseBuilder
     /**
      * Set the value of status.
      */
-    public function setStatus(int $status): static
+    public function setStatus(int $status): self
     {
-        if (! in_array($status, static::getHttpStatuses(), true)) {
+        if (! in_array($status, self::getHttpStatuses(), true)) {
             throw new UnexpectedValueException("{$status} is not a valid status");
         }
         $this->status = $status;
@@ -152,20 +152,20 @@ final class ResponseBuilder
     /**
      * Set the value of error.
      *
-     * @param  null|string|array<int,string>|Throwable  $error
+     * @param  string|array<int,string>|Throwable|null  $error
      */
-    public function setError(string|array|Throwable|null $error): static
+    public function setError(string|array|Throwable|null $error): self
     {
         $this->error = $error;
 
         if (! $this->error) {
             $this->setStatus(Response::HTTP_OK);
         } elseif ($this->error instanceof Throwable) {
-            $this->setStatus(static::getHttpErrorStatus($this->error->getCode()));
+            $this->setStatus(self::getHttpErrorStatus($this->error->getCode()));
         } elseif (is_array($this->error)) {
             $this->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
         } else {
-            $this->setStatus(static::getHttpErrorStatus($this->error));
+            $this->setStatus(self::getHttpErrorStatus($this->error));
         }
 
         return $this;
@@ -179,7 +179,7 @@ final class ResponseBuilder
     /**
      * Set the value of totalRecords.
      */
-    public function setTotalRecords(?int $totalRecords): static
+    public function setTotalRecords(?int $totalRecords): self
     {
         $this->totalRecords = $totalRecords;
 
@@ -194,7 +194,7 @@ final class ResponseBuilder
     /**
      * Set the value of pageRecords.
      */
-    public function setCurrentRecords(?int $currentRecords): static
+    public function setCurrentRecords(?int $currentRecords): self
     {
         $this->currentRecords = $currentRecords;
 
@@ -209,7 +209,7 @@ final class ResponseBuilder
     /**
      * Set the value of currentPage.
      */
-    public function setCurrentPage(?int $currentPage): static
+    public function setCurrentPage(?int $currentPage): self
     {
         $this->currentPage = $currentPage;
 
@@ -224,7 +224,7 @@ final class ResponseBuilder
     /**
      * Set the value of totalPages.
      */
-    public function setTotalPages(?int $totalPages): static
+    public function setTotalPages(?int $totalPages): self
     {
         $this->totalPages = $totalPages;
 
@@ -239,7 +239,7 @@ final class ResponseBuilder
     /**
      * Set the value of pagination.
      */
-    public function setPagination(?int $pagination): static
+    public function setPagination(?int $pagination): self
     {
         $this->pagination = $pagination;
 
@@ -254,7 +254,7 @@ final class ResponseBuilder
     /**
      * Set the value of from.
      */
-    public function setFrom(?int $from): static
+    public function setFrom(?int $from): self
     {
         $this->from = $from;
 
@@ -269,7 +269,7 @@ final class ResponseBuilder
     /**
      * Set the value of to.
      */
-    public function setTo(?int $to): static
+    public function setTo(?int $to): self
     {
         $this->to = $to;
 
@@ -284,9 +284,9 @@ final class ResponseBuilder
     /**
      * Set the value of class.
      *
-     * @param  null|object|class-string  $class
+     * @param  object|class-string|null  $class
      */
-    public function setClass(object|string|null $class): static
+    public function setClass(object|string|null $class): self
     {
         $this->class = is_object($class) ? $class::class : $class;
 
@@ -305,7 +305,7 @@ final class ResponseBuilder
     /**
      * Set the value of table.
      */
-    public function setTable(?string $table): static
+    public function setTable(?string $table): self
     {
         $this->table = $table;
 
@@ -329,7 +329,7 @@ final class ResponseBuilder
         return $this;
     }
 
-    public function setHeader(string $header, ?string $value): static
+    public function setHeader(string $header, ?string $value): self
     {
         if ($value !== null) {
             $this->headers[$header] = $value;
@@ -348,7 +348,7 @@ final class ResponseBuilder
     /**
      * Set the value of cachedAt.
      */
-    public function setCachedAt(?Carbon $cachedAt = null): static
+    public function setCachedAt(?Carbon $cachedAt = null): self
     {
         $this->cachedAt = $cachedAt ?? new Carbon();
 
@@ -416,7 +416,7 @@ final class ResponseBuilder
      *
      * @psalm-return array<array-key>
      */
-    private static function getHttpStatuses(): array
+    private self function getHttpStatuses(): array
     {
         $https_statuses = Response::$statusTexts;
         $https_statuses[419] = 'Session expired';

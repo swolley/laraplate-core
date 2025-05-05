@@ -36,7 +36,7 @@ final class Role extends BaseRole
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected array $fillable = [
+    protected $fillable = [
         'name',
         'guard_name',
         'description',
@@ -48,7 +48,7 @@ final class Role extends BaseRole
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected array $hidden = [
+    protected $hidden = [
         'parent_id',
         'pivot',
     ];

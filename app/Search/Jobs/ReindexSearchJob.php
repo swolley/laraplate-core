@@ -76,18 +76,16 @@ final class ReindexSearchJob implements ShouldQueue
      */
     public function handle(): void
     {
-        // Validate the model class
-        if (! class_exists($this->model_class)) {
-            Log::error("Reindex job failed: Model class {$this->model_class} does not exist");
+        if (! $this->isModelClassValid()) {
+            $this->logModelClassError();
 
             return;
         }
 
-        // Create an instance to check if it's searchable
         $model_instance = new $this->model_class();
 
-        if (! in_array(Searchable::class, class_uses_recursive($this->model_class), true)) {
-            Log::error("Reindex job failed: Model class {$this->model_class} does not use the Searchable trait");
+        if (! $this->isModelSearchable()) {
+            $this->logModelNotSearchableError();
 
             return;
         }
@@ -95,54 +93,89 @@ final class ReindexSearchJob implements ShouldQueue
         $driver = config('scout.driver');
         $index_name = $model_instance->searchableAs();
 
+        $this->logReindexStart($driver, $index_name);
+
+        try {
+            if ($this->use_bulk) {
+                $this->bulkReindex($model_instance, $index_name);
+            } else {
+                $this->individualReindex($model_instance);
+            }
+        } catch (Exception $e) {
+            $this->handleReindexException($e, $driver);
+        }
+    }
+
+    private function isModelClassValid(): bool
+    {
+        return class_exists($this->model_class);
+    }
+
+    private function logModelClassError(): void
+    {
+        Log::error("Reindex job failed: Model class {$this->model_class} does not exist");
+    }
+
+    private function isModelSearchable(): bool
+    {
+        return in_array(Searchable::class, class_uses_recursive($this->model_class), true);
+    }
+
+    private function logModelNotSearchableError(): void
+    {
+        Log::error("Reindex job failed: Model class {$this->model_class} does not use the Searchable trait");
+    }
+
+    private function logReindexStart(string $driver, string $index_name): void
+    {
         Log::info("Starting reindex job for {$this->model_class} with {$driver} driver", [
             'model' => $this->model_class,
             'index' => $index_name,
             'use_bulk' => $this->use_bulk,
             'batch_size' => $this->batch_size,
         ]);
+    }
 
-        try {
-            if ($this->use_bulk) {
-                // Use the Scout searchable method which respects the batch size setting
-                $model_instance::query()->searchable();
-                Log::info('Bulk reindex job completed successfully', [
-                    'model' => $this->model_class,
-                    'index' => $index_name,
-                ]);
-            } else {
-                // Process each model individually
-                $count = 0;
-                $model_instance::chunk($this->batch_size, function ($models) use (&$count): void {
-                    foreach ($models as $model) {
-                        // Instead of dispatching a job, call the searchable method directly
-                        $model->searchable();
-                        $count++;
-                    }
-                });
+    private function bulkReindex($model_instance, string $index_name): void
+    {
+        $model_instance::query()->searchable();
+        Log::info('Bulk reindex job completed successfully', [
+            'model' => $this->model_class,
+            'index' => $index_name,
+        ]);
+    }
 
-                Log::info('Individual reindex job completed successfully', [
-                    'model' => $this->model_class,
-                    'count' => $count,
-                ]);
+    private function individualReindex($model_instance): void
+    {
+        $count = 0;
+        $model_instance::chunk($this->batch_size, function ($models) use (&$count): void {
+            foreach ($models as $model) {
+                $model->searchable();
+                $count++;
             }
-        } catch (Exception $e) {
-            Log::error('Error during reindex job', [
-                'model' => $this->model_class,
-                'driver' => $driver,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+        });
 
-            // If there are attempts left, retry
-            if ($this->tries > $this->attempts()) {
-                $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+        Log::info('Individual reindex job completed successfully', [
+            'model' => $this->model_class,
+            'count' => $count,
+        ]);
+    }
 
-                return;
-            }
+    private function handleReindexException(Exception $e, string $driver): void
+    {
+        Log::error('Error during reindex job', [
+            'model' => $this->model_class,
+            'driver' => $driver,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
 
-            // If we've reached the maximum number of attempts, fail permanently
-            $this->fail($e);
+        if ($this->tries > $this->attempts()) {
+            $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+
+            return;
         }
+
+        $this->fail($e);
     }
 }

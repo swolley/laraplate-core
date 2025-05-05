@@ -93,7 +93,7 @@ final class CoreDatabaseSeeder extends Seeder
         $existing_roles = $this->groups->keys()->all();
         $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
 
-        if (empty($new_roles)) {
+        if ($new_roles === []) {
             $this->command->line('    - nothing to update');
 
             return;
@@ -147,7 +147,7 @@ final class CoreDatabaseSeeder extends Seeder
         $existing_users = $user_class::withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
         $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
 
-        if (empty($new_users)) {
+        if ($new_users === []) {
             $this->command->line('    - nothing to update');
 
             return;
@@ -201,7 +201,7 @@ final class CoreDatabaseSeeder extends Seeder
             fn ($setting) => ! isset($existing_settings[$setting['name']]),
         );
 
-        if (empty($new_settings)) {
+        if ($new_settings === []) {
             $this->command->line('    - nothing to update');
 
             return;
@@ -252,7 +252,7 @@ final class CoreDatabaseSeeder extends Seeder
             fn ($cron) => ! isset($existing_crons[$cron['name']]),
         );
 
-        if (empty($new_crons)) {
+        if ($new_crons === []) {
             $this->command->line('    - nothing to update');
 
             return;

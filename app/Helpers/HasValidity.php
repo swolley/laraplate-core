@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use InvalidArgumentException;
+use InvalidFormatException;
 // use Modules\Core\Casts\ActionEnum;
 // use Illuminate\Support\Facades\Auth;
 // use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -128,7 +129,7 @@ trait HasValidity
     /**
      * Check if the content is valid at a given date.
      *
-     * @throws \InvalidFormatException
+     * @throws InvalidFormatException
      */
     public function isValid(?Carbon $date = null): bool
     {

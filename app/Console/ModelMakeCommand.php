@@ -75,10 +75,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             'dateinterval'*/
             'timestamp' => 'datetime',
         ],
-        'Other Types' => [
-        /*'ascii_string',
-            'decimal',
-            'guid'*/],
+        'Other Types' => [/* 'ascii_string', 'decimal', 'guid' */],
         'Relationships/Associations' => [
             'relation' => 'relation',
             'relation\ManyToOne' => 'belongsTo',
@@ -286,9 +283,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 'form requests' => 'requests',
                 default => $option,
             })
-            ->each(fn ($option)
-            /** @var string $option */
-            => $input->setOption($option, true));
+            ->each(function ($option) use ($input): void {
+                /** @var string $option */
+                $input->setOption($option, true);
+            });
     }
 
     #[Override]
@@ -456,7 +454,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn ($type) => $type !== 'relation');
 
-        /** @var Collection<int, list{array<array-key, string>|string, string}> */
         $rows = new Collection();
 
         foreach (array_keys($filtered_relation_types) as $key) {
@@ -572,9 +569,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         if ($pos !== false) {
             $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
 
-            /** @var int $pos */
-            $pos = Str::position($classCode, '];', $pos);
-            $classCode = Str::substrReplace($classCode, sprintf("%s\t'%s',\n\t", $needs_newline ? "\n" : '', $fieldName), $pos, 0);
+            $classCode = Str::substrReplace(
+                $classCode,
+                sprintf("%s\t'%s',\n\t", $needs_newline ? "\n" : '', $fieldName),
+                Str::position($classCode, '];', $pos),
+                0,
+            );
         }
 
         return $classCode;
@@ -588,11 +588,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         if ($pos !== false) {
             $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
 
-            /** @var int $pos */
-            $pos = Str::position($classCode, '];', $pos);
-
-            /** @var string $pos */
-            return Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s',\n\t", $needs_newline ? "\n" : '', $fieldName, $fieldType), $pos, 0);
+            return Str::substrReplace(
+                $classCode,
+                sprintf("%s\t'%s' => '%s',\n\t", $needs_newline ? "\n" : '', $fieldName, $fieldType),
+                Str::position($classCode, '];', $pos),
+                0,
+            );
         }
 
         return $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s',\n\t];", $search, $fieldName, $fieldType));
@@ -618,11 +619,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $pos = Str::position($classCode, "'always' => [", $pos);
             $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
 
-            /** @var int $pos */
-            $pos = Str::position($classCode, '];', $pos);
-
-            /** @var string $classCode */
-            return Str::substrReplace($classCode, sprintf("%s\t'%s' => '%s%s',\n\t", $needs_newline ? "\n" : '', $fieldName, Str::startsWith($fieldType, 'date') ? 'date' : $fieldType, $fieldNullable ? '' : '|required'), $pos, 0);
+            return Str::substrReplace(
+                $classCode,
+                sprintf("%s\t'%s' => '%s%s',\n\t", $needs_newline ? "\n" : '', $fieldName, Str::startsWith($fieldType, 'date') ? 'date' : $fieldType, $fieldNullable ? '' : '|required'),
+                Str::position($classCode, '];', $pos),
+                0,
+            );
         }
 
         return $this->injectCodeAtTheEnd($classCode, sprintf("\n%s\n\t\t'%s' => '%s%s',\n\t];", $search, $fieldName, $fieldType, $fieldNullable ? '' : '|required'));

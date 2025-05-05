@@ -13,8 +13,8 @@ use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Jobs\BulkIndexSearchJob;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Modules\Core\Search\Contracts\SearchAnalyticsInterface;
 use Modules\Core\Search\Contracts\SearchEngineInterface;
+use Modules\Core\Search\Contracts\SearchAnalyticsInterface;
 
 /**
  * Implementazione del motore di ricerca per Elasticsearch
@@ -164,7 +164,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         // Query di ricerca testuale
-        if (!empty($query)) {
+        if ($query !== '' && $query !== null) {
             $params['body']['query']['bool']['should'][] = [
                 'multi_match' => [
                     'query' => $query,
@@ -176,9 +176,9 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         // Filtri
-        if (isset($options['filters']) && !empty($options['filters'])) {
+        if (isset($options['filters']) && $options['filters'] !== []) {
             $filters = $this->buildSearchFilters($options['filters']);
-            if (!empty($filters)) {
+            if ($filters !== []) {
                 $params['body']['query']['bool']['must'] = array_merge(
                     $params['body']['query']['bool']['must'],
                     $filters
@@ -240,9 +240,9 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         // Filtri
-        if (isset($options['filters']) && !empty($options['filters'])) {
+        if (isset($options['filters']) && $options['filters'] !== []) {
             $filters = $this->buildSearchFilters($options['filters']);
-            if (!empty($filters)) {
+            if ($filters !== []) {
                 $params['body']['query']['bool']['must'] = array_merge(
                     $params['body']['query']['bool']['must'],
                     $filters
@@ -377,7 +377,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         $indexName = $model->searchableAs();
 
         // Aggiungi prefisso se configurato
-        if (!empty($this->config['index_prefix'])) {
+        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
             $indexName = $this->config['index_prefix'] . $indexName;
         }
 
@@ -411,10 +411,10 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         ];
 
         // Aggiungi filtri se presenti
-        if (!empty($filters)) {
+        if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
-            if (!empty($esFilters)) {
+            if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
                     $esFilters
@@ -453,10 +453,10 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         ];
 
         // Aggiungi filtri se presenti
-        if (!empty($filters)) {
+        if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
-            if (!empty($esFilters)) {
+            if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
                     $esFilters
@@ -495,10 +495,10 @@ d
         ];
 
         // Aggiungi filtri se presenti
-        if (!empty($filters)) {
+        if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
-            if (!empty($esFilters)) {
+            if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
                     $esFilters
@@ -539,10 +539,10 @@ d
         ];
 
         // Aggiungi filtri se presenti
-        if (!empty($filters)) {
+        if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
-            if (!empty($esFilters)) {
+            if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
                     $esFilters
@@ -584,10 +584,10 @@ d
         ];
 
         // Aggiungi filtri se presenti
-        if (!empty($filters)) {
+        if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
-            if (!empty($esFilters)) {
+            if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
                     $esFilters

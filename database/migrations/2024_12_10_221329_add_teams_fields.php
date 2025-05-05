@@ -24,11 +24,11 @@ return new class extends Migration
             return;
         }
 
-        if (empty($tableNames)) {
+        if ($tableNames === '' || $tableNames === null) {
             throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
-        if (empty($columnNames['team_foreign_key'] ?? null)) {
+        if (($columnNames['team_foreign_key'] ?? null) === null) {
             throw new Exception('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 

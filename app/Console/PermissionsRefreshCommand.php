@@ -96,7 +96,7 @@ final class PermissionsRefreshCommand extends Command
 
             /** @var array<int,string> $found_permissions */
             $found_permissions = $permission_class::query()->where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
-            $new_model_suffix = empty($found_permissions) ? " for new model {$model}" : '';
+            $new_model_suffix = $found_permissions !== [] ? " for new model {$model}" : '';
 
             foreach ($common_permissions as $permission) {
                 $permission_name = $connection . '.' . $table . '.' . $permission->value;
@@ -188,7 +188,7 @@ final class PermissionsRefreshCommand extends Command
         $query = $permission_class::query()->whereNotIn('name', $all_permissions);
         $to_be_deleted = $query->pluck('name')->toArray();
 
-        if (! empty($to_be_deleted) && $query->delete()) {
+        if ($to_be_deleted !== [] && $query->delete()) {
             $changes = true;
 
             if (! $quiet_mode) {

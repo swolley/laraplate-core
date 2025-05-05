@@ -11,7 +11,7 @@ use Modules\Core\Casts\SelectRequestData;
 abstract class SelectRequest extends CrudRequest
 {
     #[Override]
-    final public function rules()
+    public function rules()
     {
         return parent::rules() + [
             'columns.*' => [new QueryColumn()],
@@ -20,7 +20,7 @@ abstract class SelectRequest extends CrudRequest
     }
 
     #[Override]
-    final public function parsed(): SelectRequestData
+    public function parsed(): SelectRequestData
     {
         /** @phpstan-ignore method.notFound */
         return new SelectRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);

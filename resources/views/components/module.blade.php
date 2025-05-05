@@ -5,7 +5,7 @@
 	</div>
 
 	<div class="ml-12">
-		@if (empty($data['models']))
+		@if ($data['models'] === [])
 		<div class="mt-2 text-sm">
 			<span class="text-gray-700">No Model found</span>
 		</div>
@@ -26,7 +26,7 @@
 	</div>
 
 	<div class="ml-12">
-		@if (empty($data['controllers']))
+		@if ($data['controllers'] === [])
 		<div class="mt-2 text-sm">
 			<span class="text-gray-700">No Controller found</span>
 		</div>

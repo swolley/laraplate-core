@@ -7,7 +7,7 @@ namespace Modules\Core\Locking\Console;
 use Override;
 use Illuminate\Database\Eloquent\Model;
 
-final class OptimisticLockAddCommand extends LockedAddCommand
+class OptimisticLockAddCommand extends LockedAddCommand
 {
     public $signature = 'lock:optimistic-add {model} {--namespace=}';
 

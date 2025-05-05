@@ -11,7 +11,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
-final class LockedAddCommand extends Command
+class LockedAddCommand extends Command
 {
     public $signature = 'lock:locked-add {model} {--namespace=}';
 

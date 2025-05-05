@@ -40,7 +40,7 @@ final class GridsController extends Controller
 
             foreach (models() as $model) {
                 /** @var Model $instance */
-                $instance = new $model;
+                $instance = new $model();
                 $table = $instance->getTable();
 
                 if (

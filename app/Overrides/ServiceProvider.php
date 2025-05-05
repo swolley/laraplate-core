@@ -10,7 +10,7 @@ use RecursiveDirectoryIterator;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 
-final class ServiceProvider extends BaseServiceProvider
+class ServiceProvider extends BaseServiceProvider
 {
     protected string $name;
 

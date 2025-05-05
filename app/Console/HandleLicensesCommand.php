@@ -67,7 +67,7 @@ final class HandleLicensesCommand extends Command
                         return BaseCommand::SUCCESS;
                     }
 
-                    $validations = (new License)->getOperationRules('create');
+                    $validations = (new License())->getOperationRules('create');
 
                     $valid_to = text(
                         "Specify an expiring date, otherwise it'll be " . ($action === 'close' ? 'today' : 'perpetual'),

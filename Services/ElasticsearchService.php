@@ -64,14 +64,14 @@ final class ElasticsearchService
 
             if ($exists) {
                 // Update mappings and settings of existing index
-                if (! empty($mappings)) {
+                if ($mappings !== []) {
                     $this->client->indices()->putMapping([
                         'index' => $index,
                         'body' => $mappings,
                     ]);
                 }
 
-                if (! empty($settings)) {
+                if ($settings !== []) {
                     $this->client->indices()->putSettings([
                         'index' => $index,
                         'body' => ['settings' => $settings],
@@ -84,11 +84,11 @@ final class ElasticsearchService
             // Create a new index
             $params = ['index' => $index, 'body' => []];
 
-            if (! empty($settings)) {
+            if ($settings !== []) {
                 $params['body']['settings'] = $settings;
             }
 
-            if (! empty($mappings)) {
+            if ($mappings !== []) {
                 $params['body']['mappings'] = $mappings;
             }
 
@@ -148,7 +148,7 @@ final class ElasticsearchService
      */
     public function bulkIndex(string $index, array $documents): array
     {
-        if (empty($documents)) {
+        if ($documents === []) {
             return ['indexed' => 0, 'failed' => 0, 'errors' => []];
         }
 

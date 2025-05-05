@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use TypeError;
+use InvalidArgumentException;
+use Modules\Core\Models\User;
 use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
+use Illuminate\Contracts\Container\BindingResolutionException;
 
 /**
  * @phpstan-type HasApprovalsType HasApprovals
@@ -60,8 +64,16 @@ trait HasApprovals
         return $preview;
     }
 
+    /**
+     * @param  array<string, mixed>  $modifications
+     *
+     * @throws BindingResolutionException
+     * @throws InvalidArgumentException
+     * @throws TypeError
+     */
     protected function requiresApprovalWhen($modifications): bool
     {
+        /** @var null|User $user */
         $user = auth()?->user();
 
         /** @phpstan-ignore method.notFound */
@@ -69,6 +81,6 @@ trait HasApprovals
             return false;
         }
 
-        return ! empty($modifications);
+        return $modifications !== [];
     }
 }

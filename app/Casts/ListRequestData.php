@@ -48,7 +48,7 @@ class ListRequestData extends SelectRequestData
 
         if (isset($validated['group_by'])) {
             $this->addGroupsToColumns($validated['group_by']);
-            $validated['group_by'] = array_map(fn(string $group) => preg_replace("/^$mainEntity\./", '', $group), $validated['group_by']);
+            $validated['group_by'] = array_map(fn(string $group) => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
             $this->group_by = $validated['group_by'];
         }
     }
@@ -64,7 +64,8 @@ class ListRequestData extends SelectRequestData
         } elseif (isset($validated['from']) || isset($validated['to'])) {
             $this->from = (int) ($validated['from'] ?? 1);
             $this->skip = $this->from - 1;
-            if ($this->to = isset($validated['to']) ? (int) $validated['to'] : null) {
+            $this->to = isset($validated['to']) ? (int) $validated['to'] : null;
+            if ($this->to) {
                 $this->take = $this->pagination = $this->to - $this->from;
             }
         } elseif (isset($validated['limit'])) {

@@ -14,6 +14,7 @@ final class CronExpression implements CastsAttributes
     /**
      * Cast the given value.
      *
+     * @param  CoreCronExpression|string  $value
      * @param  array<string, mixed>  $attributes
      */
     #[Override]
@@ -23,13 +24,13 @@ final class CronExpression implements CastsAttributes
             return null;
         }
 
-        /** @var CoreCronExpression|string $value */
         return is_string($value) ? new CoreCronExpression($value) : $value;
     }
 
     /**
      * Prepare the given value for storage.
      *
+     * @param  CoreCronExpression|string  $value
      * @param  array<string, mixed>  $attributes
      */
     #[Override]
@@ -39,7 +40,6 @@ final class CronExpression implements CastsAttributes
             return null;
         }
 
-        /** @var CoreCronExpression|string $value */
         return is_string($value) ? $value : $value->getExpression();
     }
 }

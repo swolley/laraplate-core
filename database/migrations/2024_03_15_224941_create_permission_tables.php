@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
 use Illuminate\Database\Schema\Blueprint;
@@ -20,11 +21,11 @@ return new class() extends Migration
         $pivotRole = $columnNames['role_pivot_key'] ?? 'role_id';
         $pivotPermission = $columnNames['permission_pivot_key'] ?? 'permission_id';
 
-        if (empty($tableNames)) {
+        if ($tableNames === '' || $tableNames === null) {
             throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
-        if ($teams && empty($columnNames['team_foreign_key'] ?? null)) {
+        if ($teams && ($columnNames['team_foreign_key'] ?? null) === null) {
             throw new Exception('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
@@ -191,7 +192,7 @@ return new class() extends Migration
     {
         $tableNames = config('permission.table_names');
 
-        if (empty($tableNames)) {
+        if ($tableNames === '' || $tableNames === null) {
             throw new Exception('Error: config/permission.php not found and defaults could not be merged. Please publish the package configuration before proceeding, or drop the tables manually.');
         }
 

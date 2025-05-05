@@ -38,7 +38,7 @@ final class CrudHelper
         $columns = $this->groupColumns($main_entity, $request_data->columns);
 
         foreach ($columns as $type => $cols) {
-            if ($type === 'main' && ! empty($cols)) {
+            if ($type === 'main' && $cols !== []) {
                 $this->sortColumns($query, $cols);
 
                 /** @var array<int,string> $only_standard_columns */
@@ -52,7 +52,7 @@ final class CrudHelper
                 // TODO: qui mancano ancora le colonne utili a fare le relation se la foreign key si trova sulla main table
                 $this->addForeignKeysToSelectedColumns($query, $only_standard_columns, $main_model, $main_entity);
                 $query->select($only_standard_columns);
-            } elseif ($type === 'relations' && ! empty($cols)) {
+            } elseif ($type === 'relations' && $cols === []) {
                 foreach ($cols as $relation => $relation_cols) {
                     $this->sortColumns($query, $relation_cols);
                     $only_relation_columns = [];
@@ -217,7 +217,7 @@ final class CrudHelper
         /** @var array<int,string> $exploded */
         $exploded = explode('.', $property);
 
-        if (! empty($exploded) && $exploded[0] === $model->getTable()) {
+        if ($exploded !== [] && $exploded[0] === $model->getTable()) {
             array_shift($exploded);
         }
         $field = array_pop($exploded);
@@ -375,7 +375,7 @@ final class CrudHelper
      */
     private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
     {
-        if (! empty($relations_columns[$relation])) {
+        if ($relations_columns[$relation] !== []) {
             $this->addForeignKeysToSelectedColumns($query, $relations_columns[$relation]);
             $this->applyColumnsToSelect($query, $relations_columns[$relation]);
         }
@@ -386,7 +386,7 @@ final class CrudHelper
             $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns[$relation]);
         }
 
-        if (! empty($relations_sorts[$relation])) {
+        if ($relations_sorts[$relation] !== []) {
             foreach ($relations_sorts[$relation] as $sort) {
                 $query->orderBy($sort->property, $sort->direction->value);
             }

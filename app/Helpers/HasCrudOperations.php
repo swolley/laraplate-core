@@ -62,7 +62,7 @@ trait HasCrudOperations
 
     protected function applyFilters(Builder $query, array $filters): void
     {
-        // FIXME: non ricorso più cosa doveva essere
+        // FIXME: non ricordo più cosa doveva essere
         $queryKey = $this->getQueryKey($query, $filters);
 
         if (isset($this->preparedQueries[$queryKey])) {
@@ -89,6 +89,9 @@ trait HasCrudOperations
         }
     }
 
+    /**
+     * @param  array<int,array{field:string,direction?:'asc'|'desc'}>  $sorts
+     */
     protected function applySorting(Builder $query, array $sorts): void
     {
         foreach ($sorts as $sort) {
@@ -117,7 +120,7 @@ trait HasCrudOperations
         $fillables = $model->getFillable();
         $discarder_values = [];
 
-        if (! empty($fillables)) {
+        if ($fillables !== []) {
             foreach (array_keys($values) as $property) {
                 if (in_array($property, $fillables, true)) {
                     continue;

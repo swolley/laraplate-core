@@ -8,7 +8,7 @@ use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Console\Command as BaseCommand;
 
-final class Command extends BaseCommand
+class Command extends BaseCommand
 {
     use HasBenchmark;
 

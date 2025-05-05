@@ -22,7 +22,7 @@ final class Version extends OvertrueVersion
      *
      * @psalm-suppress NonInvariantPropertyType
      */
-    protected array $hidden = [
+    protected $hidden = [
         'user_id',
         'connection_ref',
         'table_ref',

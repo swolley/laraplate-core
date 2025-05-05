@@ -1167,7 +1167,7 @@
                                                 @include('core::components.barcode-icon')
                                                 <div>Models</div>
                                             </div>
-                                            @if (empty($data['models']))
+                                            @if ($data['models'] === [])
                                                 <div class="text-sm text-gray-600">
                                                     <span>No Model found</span>
                                                 </div>
@@ -1186,7 +1186,7 @@
                                                 @include('core::components.route-icon')
                                                 <div>Controllers</div>
                                             </div>
-                                            @if (empty($data['controllers']))
+                                            @if ($data['controllers'] === [])
                                                 <div class="text-sm text-gray-600">
                                                     <span>No Controller found</span>
                                                 </div>
@@ -1205,7 +1205,7 @@
                                                 @include('core::components.route-icon')
                                                 <div>Routes</div>
                                             </div>
-                                            @if (empty($data['controllers']))
+                                            @if ($data['routes'] === [])
                                                 <div class="text-sm text-gray-600">
                                                     <span>No Route found</span>
                                                 </div>
@@ -1220,7 +1220,7 @@
                                         </div> --}}
                                     </div>
 
-                                    @if ($data['authors'] && !empty($data['authors']))
+                                    @if ($data['authors'] && $data['authors'] !== [])
                                         <p class="mt-4 text-sm/relaxed">
                                             @foreach ($data['authors'] as $author)
                                                 <span class="author">

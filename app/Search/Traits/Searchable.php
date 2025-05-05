@@ -116,7 +116,7 @@ trait Searchable
         foreach ($this->embed as $attribute) {
             $value = $this->{$attribute};
 
-            if ($value && gettype($value) === 'string' && ($value !== '' && $value !== '0')) {
+            if ($this->isValidEmbedValue($value)) {
                 $data .= ' ' . $value;
             }
         }
@@ -383,23 +383,7 @@ trait Searchable
         $mapping = [];
 
         foreach ($fields as $fieldName => $fieldData) {
-            $type = $this->mapGenericToElasticsearchType($fieldData['type']);
-
-            $mapping[$fieldName] = ['type' => $type];
-
-            // Handle special field types with additional properties
-            if ($fieldData['type'] === 'date' && isset($fieldData['format'])) {
-                $mapping[$fieldName]['format'] = $fieldData['format'];
-            } elseif ($fieldData['type'] === 'vector') {
-                $mapping[$fieldName] = [
-                    'type' => 'dense_vector',
-                    'dims' => $fieldData['dimensions'],
-                    'index' => true,
-                    'similarity' => $fieldData['similarity'],
-                ];
-            } elseif ($fieldData['type'] === 'text' && isset($fieldData['analyzer'])) {
-                $mapping[$fieldName]['analyzer'] = $fieldData['analyzer'];
-            }
+            $mapping[$fieldName] = $this->getElasticsearchFieldMapping($fieldData);
         }
 
         return $mapping;
@@ -628,5 +612,37 @@ trait Searchable
         }
 
         return implode(' && ', $filterStrings);
+    }
+
+    /**
+     * Check if a value is valid for embedding.
+     */
+    private function isValidEmbedValue(mixed $value): bool
+    {
+        return $value
+            && is_string($value)
+            && $value !== ''
+            && $value !== '0';
+    }
+
+    private function getElasticsearchFieldMapping(array $fieldData): array
+    {
+        $type = $this->mapGenericToElasticsearchType($fieldData['type']);
+        $mapping = ['type' => $type];
+
+        if ($fieldData['type'] === 'date' && isset($fieldData['format'])) {
+            $mapping['format'] = $fieldData['format'];
+        } elseif ($fieldData['type'] === 'vector') {
+            $mapping = [
+                'type' => 'dense_vector',
+                'dims' => $fieldData['dimensions'],
+                'index' => true,
+                'similarity' => $fieldData['similarity'],
+            ];
+        } elseif ($fieldData['type'] === 'text' && isset($fieldData['analyzer'])) {
+            $mapping['analyzer'] = $fieldData['analyzer'];
+        }
+
+        return $mapping;
     }
 }

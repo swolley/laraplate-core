@@ -56,7 +56,9 @@ final class SocialiteProvider implements AuthenticationProviderInterface
             ]);
 
             // Verifica licenza
-            if ($error = $this->checkLicense($user)) {
+            $error = $this->checkLicense($user);
+
+            if ($error) {
                 return [
                     'success' => false,
                     'user' => null,

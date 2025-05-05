@@ -32,7 +32,7 @@ final class Repository extends BaseRepository
      * @param  Closure(TCacheValue): mixed  $callback
      * @return TCacheValue
      */
-    final public function tryByRequest(Model|string|array|null $entity, Request $request, \Closure $callback, ?int $duration = null): mixed
+    public function tryByRequest(Model|string|array|null $entity, Request $request, \Closure $callback, ?int $duration = null): mixed
     {
         $tags = [config('app.name')];
 
@@ -51,7 +51,9 @@ final class Repository extends BaseRepository
             }
         }
 
-        if ($user = self::getKeyPartsFromUser($request->user())) {
+        $user = self::getKeyPartsFromUser($request->user());
+
+        if ($user) {
             array_push($tags, ...$user);
         }
         $key = self::getKeyFromRequest($request);
@@ -75,7 +77,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache by specified entity.
      */
-    final public function clearByEntity(Model|string|array $entity): void
+    public function clearByEntity(Model|string|array $entity): void
     {
         $models = Arr::wrap($entity);
 
@@ -93,7 +95,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache by request extracted info.
      */
-    final public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
+    public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
         $key = self::getKeyFromRequest($request);
 
@@ -117,7 +119,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache elements by user and only by entity if specified.
      */
-    final public function clearByUser(User $user, Model|string|array|null $entity = null): void
+    public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
         $user_key = 'U' . $user->id;
 
@@ -141,7 +143,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache elements by user group and only by entity if specified.
      */
-    final public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
+    public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
         $role_key = 'R' . $role->id;
 
@@ -228,7 +230,9 @@ final class Repository extends BaseRepository
 
     private function getDuration(): int|array
     {
-        if ($threshold = $this->getThreshold()) {
+        $threshold = $this->getThreshold();
+
+        if ($threshold) {
             return [$threshold, config('cache.duration')];
         }
 

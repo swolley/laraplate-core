@@ -29,7 +29,9 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
     {
         $model = $this->getModelClass('name', $this->option('model-namespace'), ! $this->option('model'));
 
-        if ($match = Str::match('/(?:App|Modules)\\\\(?:\\w+\\\\)*Models/', $model ?: '')) {
+        $match = Str::match('/(?:App|Modules)\\\\(?:\\w+\\\\)*Models/', $model ?: '');
+
+        if ($match) {
             $modelNamespace = $match;
             unset($match);
         } else {

@@ -68,43 +68,70 @@ final class IndexInSearchJob implements ShouldQueue
         $index_name = $this->model->searchableAs();
         $document_id = $this->model->getKey();
 
-        Log::debug("Indexing document {$document_id} in {$index_name} using {$driver} driver");
+        $this->logIndexingStart($document_id, $index_name, $driver);
 
-        // If the model implements shouldBeSearchable method and should not be searchable, delete the document
-        if (method_exists($this->model, 'shouldBeSearchable') && ! $this->model->shouldBeSearchable()) {
-            $this->model->unsearchable();
+        if ($this->shouldDeleteDocument()) {
+            $this->deleteDocument();
 
             return;
         }
 
         try {
-            // Use the Scout searchable method to index the model
-            // This automatically uses the correct driver
-            $this->model->searchableUsing()->update($this->model);
-
-            // Update indexing timestamp if the model supports that functionality
-            if (method_exists($this->model, 'updateSearchIndexTimestamp')) {
-                $this->model->updateSearchIndexTimestamp();
-            }
-
-            Log::debug("Document {$document_id} successfully indexed in {$index_name}");
+            $this->updateDocument();
+            $this->updateIndexTimestampIfNeeded();
+            $this->logIndexingSuccess($document_id, $index_name);
         } catch (Exception $e) {
-            Log::error("Error indexing document {$document_id} in {$index_name}", [
-                'driver' => $driver,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            // If there are attempts left, retry
-            if ($this->tries > $this->attempts()) {
-                $this->release($this->backoff[$this->attempts() - 1] ?? 60);
-
-                return;
-            }
-
-            // If we've reached the maximum number of attempts, fail permanently
-            $this->fail($e);
+            $this->handleIndexingException($e, $document_id, $index_name, $driver);
         }
+    }
+
+    private function logIndexingStart(string $document_id, string $index_name, string $driver): void
+    {
+        Log::debug("Indexing document {$document_id} in {$index_name} using {$driver} driver");
+    }
+
+    private function shouldDeleteDocument(): bool
+    {
+        return method_exists($this->model, 'shouldBeSearchable') && ! $this->model->shouldBeSearchable();
+    }
+
+    private function deleteDocument(): void
+    {
+        $this->model->unsearchable();
+    }
+
+    private function updateDocument(): void
+    {
+        $this->model->searchableUsing()->update($this->model);
+    }
+
+    private function updateIndexTimestampIfNeeded(): void
+    {
+        if (method_exists($this->model, 'updateSearchIndexTimestamp')) {
+            $this->model->updateSearchIndexTimestamp();
+        }
+    }
+
+    private function logIndexingSuccess(string $document_id, string $index_name): void
+    {
+        Log::debug("Document {$document_id} successfully indexed in {$index_name}");
+    }
+
+    private function handleIndexingException(Exception $e, string $document_id, string $index_name, string $driver): void
+    {
+        Log::error("Error indexing document {$document_id} in {$index_name}", [
+            'driver' => $driver,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        if ($this->tries > $this->attempts()) {
+            $this->release($this->backoff[$this->attempts() - 1] ?? 60);
+
+            return;
+        }
+
+        $this->fail($e);
     }
 
     /**

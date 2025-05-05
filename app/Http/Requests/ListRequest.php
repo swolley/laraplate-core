@@ -22,7 +22,7 @@ final class ListRequest extends SelectRequest
             'count' => ['boolean'],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
-            'filters' => [new QueryBuilder],
+            'filters' => [new QueryBuilder()],
             'group_by.*' => ['string'],
         ];
         $rules['relations.*'][] = 'exclude_if:count,true';

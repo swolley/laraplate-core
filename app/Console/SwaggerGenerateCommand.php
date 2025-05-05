@@ -70,7 +70,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $module_path = Module::getModulePath($moduleName);
             $module_json = json_decode(file_get_contents($module_path . DIRECTORY_SEPARATOR . 'module.json'), true);
             $config['title'] .= ' ' . $module_json['name'] . ' module';
-            $config['description'] = $module_json['description'] . (empty($module_json['keywords']) ? '' : ' (' . implode(', ', $module_json['keywords']) . ')');
+            $config['description'] = $module_json['description'] . ($module_json['keywords'] === [] ? '' : ' (' . implode(', ', $module_json['keywords']) . ')');
             $composer_json = json_decode(file_get_contents($module_path . 'composer.json'));
 
             if (isset($composer_json->version)) {

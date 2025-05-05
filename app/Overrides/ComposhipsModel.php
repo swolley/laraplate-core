@@ -10,7 +10,7 @@ use Awobaz\Compoships\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Model as BaseModel;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
-final class ComposhipsModel extends Model
+class ComposhipsModel extends Model
 {
     #[Override]
     public function belongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null, $parentKey = null, $relatedKey = null, $relation = null)

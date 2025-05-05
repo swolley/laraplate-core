@@ -32,7 +32,7 @@ final class Setting extends Model
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
-    protected array $fillable = [
+    protected $fillable = [
         'name',
         'value',
         'encrypted',
@@ -42,7 +42,7 @@ final class Setting extends Model
         'description',
     ];
 
-    protected array $attributes = [
+    protected $attributes = [
         'encrypted' => false,
         'type' => 'string',
         'group_name' => 'base',

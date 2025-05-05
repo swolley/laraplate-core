@@ -15,7 +15,7 @@ trait HasSeedersUtils
     protected function create(string $class, array $attributes): Model
     {
         /** @var Model $model */
-        $model = new $class;
+        $model = new $class();
 
         // Extract the relations from the attributes array
         $callables = array_filter($attributes, function ($value, $key) use ($class, $model) {
@@ -115,7 +115,7 @@ trait HasSeedersUtils
     protected function logOperation(string $model): void
     {
         $already_exists = $model::query()->exists();
-        $table = (new $model)->getTable();
+        $table = (new $model())->getTable();
         $this->command->line('  ' . ($already_exists ? 'Updating' : 'Creating') . ' default <fg=cyan;options=bold>' . $table . '</>');
     }
 }

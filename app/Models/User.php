@@ -28,8 +28,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Lab404\Impersonate\Exceptions\InvalidUserProvider;
+use Lab404\Impersonate\Exceptions\MissingUserProvider;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Contracts\Container\BindingResolutionException;
 
 #[ObservedBy([UserObserver::class])]
 /**
@@ -37,7 +41,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  *
  * @mixin IdeHelperUser
  */
-final class User extends BaseUser implements FilamentUser
+class User extends BaseUser implements FilamentUser
 {
     use ApprovesChanges,
         HasFactory,
@@ -123,12 +127,22 @@ final class User extends BaseUser implements FilamentUser
         }
     }
 
+    /**
+     * returns the impersonator user.
+     *
+     * @throws BindingResolutionException
+     * @throws MissingUserProvider
+     * @throws InvalidUserProvider
+     * @throws ModelNotFoundException
+     */
     public function getImpersonator(): self
     {
         return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
     }
 
     /**
+     * returns the saved custom grid configs for the user.
+     *
      * @return HasMany<UserGridConfig>
      */
     public function grid_configs(): HasMany
@@ -137,6 +151,8 @@ final class User extends BaseUser implements FilamentUser
     }
 
     /**
+     * returns the license currently related to the user.
+     *
      * @return BelongsTo<License>
      */
     public function license(): BelongsTo

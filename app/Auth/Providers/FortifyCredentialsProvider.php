@@ -31,7 +31,6 @@ final class FortifyCredentialsProvider implements AuthenticationProviderInterfac
         $email = $request->get('email');
         $password = $request->get('password');
 
-        /** @var null|User $user */
         $query = User::query()->has('roles');
 
         if ($username) {
@@ -62,7 +61,9 @@ final class FortifyCredentialsProvider implements AuthenticationProviderInterfac
         }
 
         // Verifica licenza
-        if ($error = $this->checkLicense($user)) {
+        $error = $this->checkLicense($user);
+
+        if ($error) {
             return [
                 'success' => false,
                 'user' => null,

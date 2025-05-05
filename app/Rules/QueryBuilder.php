@@ -21,33 +21,42 @@ final class QueryBuilder implements ValidationRule
     {
         if (! is_array($value)) {
             $fail("{$attribute} doesn't have a correct format");
+
+            return;
         }
 
         if (! Arr::isList($value)) {
-            if (! array_key_exists('property', $value) && ! array_key_exists('filters', $value)) {
-                $fail("{$attribute} doesn't have a correct format");
-            }
-
-            if (array_key_exists('property', $value)) {
-                if (! array_key_exists('operator', $value)) {
-                    $fail("{$attribute} \"operator\" is required");
-                }
-
-                if (! array_key_exists('value', $value)) {
-                    $fail("{$attribute} \"value\" is required");
-                }
-            }
-
-            if (array_key_exists('filters', $value)) {
-                if (! Arr::isList($value['filters'])) {
-                    $fail("{$attribute} filters doesn't have a correct format");
-                }
-                $this->validate("{$attribute}.filters", $value['filters'], $fail);
-            }
+            $this->validateAssociative($attribute, $value, $fail);
         } else {
             foreach ($value as $idx => $filter) {
                 $this->validate("{$attribute}.{$idx}", $filter, $fail);
             }
+        }
+    }
+
+    private function validateAssociative(string $attribute, array $value, Closure $fail): void
+    {
+        if (! array_key_exists('property', $value) && ! array_key_exists('filters', $value)) {
+            $fail("{$attribute} doesn't have a correct format");
+
+            return;
+        }
+
+        if (array_key_exists('property', $value)) {
+            if (! array_key_exists('operator', $value)) {
+                $fail("{$attribute} \"operator\" is required");
+            }
+
+            if (! array_key_exists('value', $value)) {
+                $fail("{$attribute} \"value\" is required");
+            }
+        }
+
+        if (array_key_exists('filters', $value)) {
+            if (! Arr::isList($value['filters'])) {
+                $fail("{$attribute} filters doesn't have a correct format");
+            }
+            $this->validate("{$attribute}.filters", $value['filters'], $fail);
         }
     }
 }

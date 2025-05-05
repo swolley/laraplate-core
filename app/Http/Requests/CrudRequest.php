@@ -18,7 +18,7 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
 
     protected Model $model;
 
-    final public function rules()
+    public function rules()
     {
         return [
             'connection' => ['string', 'sometimes'],
@@ -31,7 +31,7 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
     }
 
     #[Override]
-    final public function parsed(): CrudRequestData
+    public function parsed(): CrudRequestData
     {
         /** @phpstan-ignore method.notFound */
         return new CrudRequestData($this, $this->route('entity'), $this->validated(), $this->primaryKey ?? 'id');
