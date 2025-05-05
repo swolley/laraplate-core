@@ -73,7 +73,7 @@ trait HasCrudOperations
 
         $query->where(function ($q) use ($filters): void {
             foreach ($filters as $field => $filter) {
-                if (empty($filter['value'])) {
+                if (!isset($filter['value']) || $filter['value'] === '') {
                     continue;
                 }
 

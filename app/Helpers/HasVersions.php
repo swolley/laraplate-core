@@ -29,7 +29,7 @@ trait HasVersions
     protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
     /**
-     * @param  null|string|DateTimeInterface  $time
+     * @param  string|DateTimeInterface|null  $time
      *
      * @throws \Carbon\Exceptions\InvalidFormatException
      */

@@ -73,7 +73,7 @@ trait HasApprovals
      */
     protected function requiresApprovalWhen($modifications): bool
     {
-        /** @var null|User $user */
+        /** @var User|null $user */
         $user = auth()?->user();
 
         /** @phpstan-ignore method.notFound */

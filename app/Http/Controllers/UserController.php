@@ -51,7 +51,7 @@ final class UserController extends Controller
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
-        /** @var null|User $user */
+        /** @var User|null $user */
         $user = $this->auth->user();
 
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti

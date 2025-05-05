@@ -72,7 +72,6 @@ final class IndexInSearchJob implements ShouldQueue
 
         if ($this->shouldDeleteDocument()) {
             $this->deleteDocument();
-
             return;
         }
 

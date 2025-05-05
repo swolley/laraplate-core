@@ -62,7 +62,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     {
         $filter = $this->option('filter') ?: null;
 
-        /** @var null|string $file */
+        /** @var string|null $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
         $config = config('laravel-swagger');
 
@@ -82,7 +82,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $doc['tags'] = [$moduleName];
 
         // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
-        if (array_filter($doc['paths'], fn ($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
+        if (array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
             $doc['tags'][] = 'Api';
         }
 

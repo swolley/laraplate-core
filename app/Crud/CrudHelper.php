@@ -206,11 +206,11 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn($relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
-     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:null|string}
+     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:string|null}
      */
     private function splitProperty(Builder|Model $model, string $property): array
     {
@@ -281,7 +281,7 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
@@ -293,8 +293,8 @@ final class CrudHelper
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
-        usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
+        usort($columns, fn(Column $a, Column $b): int => $a->name <=> $b->name);
+        $all_columns_name = array_map(fn(Column $column): string => $column->name, $columns);
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {

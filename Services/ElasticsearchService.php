@@ -95,7 +95,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->create($params);
 
             return $response->asBool();
-        } catch (ClientResponseException|ServerResponseException $e) {
+        } catch (ClientResponseException | ServerResponseException $e) {
             Log::error('Elasticsearch create index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -126,7 +126,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->delete(['index' => $index]);
 
             return $response->asBool();
-        } catch (ClientResponseException|ServerResponseException $e) {
+        } catch (ClientResponseException | ServerResponseException $e) {
             Log::error('Elasticsearch delete index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -191,7 +191,7 @@ final class ElasticsearchService
                 'failed' => $failed,
                 'errors' => $errors,
             ];
-        } catch (ClientResponseException|ServerResponseException $e) {
+        } catch (ClientResponseException | ServerResponseException $e) {
             Log::error('Elasticsearch bulk index error', [
                 'index' => $index,
                 'documents_count' => count($documents),
@@ -223,7 +223,7 @@ final class ElasticsearchService
             $response = $this->client->search($params);
 
             return $response->asArray();
-        } catch (ClientResponseException|ServerResponseException $e) {
+        } catch (ClientResponseException | ServerResponseException $e) {
             Log::error('Elasticsearch search error', [
                 'index' => $index,
                 'query' => $query,
@@ -242,7 +242,7 @@ final class ElasticsearchService
      *
      * @throws ElasticsearchException
      *
-     * @return null|array Document data or null if not found
+     * @return array|null Document data or null if not found
      */
     public function getDocument(string $index, string $id): ?array
     {
@@ -351,12 +351,12 @@ final class ElasticsearchService
         $builder->setHosts($config['hosts']);
 
         // Set authentication if configured
-        if (! empty($config['username']) && ! empty($config['password'])) {
+        if (isset($config['username']) && isset($config['password'])) {
             $builder->setBasicAuthentication($config['username'], $config['password']);
         }
 
         // Set retry configuration
-        if (! empty($config['retries'])) {
+        if ($config['retries'] !== null && $config['retries'] !== 0) {
             $builder->setRetries($config['retries']);
         }
 
@@ -367,7 +367,7 @@ final class ElasticsearchService
         ]);
 
         // Set cloud ID if available
-        if (! empty($config['cloud_id'])) {
+        if (isset($config['cloud_id']) && $config['cloud_id'] !== '') {
             $builder->setElasticCloudId($config['cloud_id']);
         }
 

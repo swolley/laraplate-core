@@ -18,8 +18,8 @@ if (! function_exists('modules')) {
      * @param  bool  $showMainApp  add main app into modules list
      * @param  bool  $fullpath  return only module name or full path on file system
      * @param  bool  $onlyActive  return only active modules
-     * @param  null|string  $onlyModule  filter for specified module
-     * @param  null|bool  $prioritySort  sort modules by priority
+     * @param  string|null  $onlyModule  filter for specified module
+     * @param  bool|null  $prioritySort  sort modules by priority
      * @return array<int,string>
      */
     function modules(bool $showMainApp = false, bool $fullpath = false, bool $onlyActive = true, ?string $onlyModule = null, ?bool $prioritySort = false): array
@@ -34,14 +34,14 @@ if (! function_exists('modules')) {
 
         if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn(string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, fn(Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
-        $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
+        $remapped_modules = $fullpath ? array_map(fn(Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
 
         if ($showMainApp && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) {
             if ($fullpath) {
@@ -118,7 +118,7 @@ if (! function_exists('translations')) {
         $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
         $langs_subpath = config('modules.paths.generator.lang.path');
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath ? $app_languages : array_map(fn(string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
@@ -152,7 +152,7 @@ if (! function_exists('migrations')) {
      * @param  bool  $count  return only count or full list
      * @param  bool  $onlyPending  return only pending migrations
      * @param  bool  $onlyActive  filter for only active modules
-     * @param  null|string  $onlyModule  filter for specified module
+     * @param  string|null  $onlyModule  filter for specified module
      * @return false|int|array<string> number if count requested, string[] if list requested, false if error occured
      */
     function migrations(bool $count = false, bool $onlyPending = false, bool $onlyActive = true, ?string $onlyModule = null): array|int|false
@@ -192,7 +192,7 @@ if (! function_exists('models')) {
      * list all Models.
      *
      * @param  bool  $onlyActive  filter for only active modules
-     * @param  null|string  $onlyModule  filter for specified module
+     * @param  string|null  $onlyModule  filter for specified module
      * @return list<class-string<Model>>
      */
     function models(bool $onlyActive = true, ?string $onlyModule = null): array
@@ -243,7 +243,7 @@ if (! function_exists('controllers')) {
      * list all Controllers.
      *
      * @param  bool  $onlyActive  filter for only active modules
-     * @param  null|string  $onlyModule  filter for specified module
+     * @param  string|null  $onlyModule  filter for specified module
      * @return array<int,string>
      *
      * @psalm-return list{0?: string,...}
@@ -285,7 +285,7 @@ if (! function_exists('routes')) {
      * list all Controllers.
      *
      * @param  bool  $onlyActive  filter for only active modules
-     * @param  null|string  $onlyModule  filter for specified module
+     * @param  string|null  $onlyModule  filter for specified module
      * @return array<int,Route>
      *
      * @psalm-return list{0?: string,...}
@@ -296,7 +296,7 @@ if (! function_exists('routes')) {
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = app('router')->getRoutes()->getRoutes();
-        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
+        usort($all_routes, fn(Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
@@ -359,7 +359,7 @@ if (! function_exists('preview')) {
     /**
      * Getter/Setter for session preview flag.
      *
-     * @param  null|bool  $enablePreview  enable preview flag
+     * @param  bool|null  $enablePreview  enable preview flag
      */
     function preview(?bool $enablePreview = null): bool
     {
@@ -438,7 +438,7 @@ if (! function_exists('cast_value')) {
      * Cast a value to a specific type.
      *
      * @param  mixed  $value  The value to cast
-     * @param  null|string  $type  The type to cast to
+     * @param  string|null  $type  The type to cast to
      */
     function cast_value(mixed $value, ?string $type = null): mixed
     {

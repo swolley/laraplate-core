@@ -71,7 +71,7 @@ final class DynamicEntity extends Model
      * @throws Exception
      * @throws InvalidArgumentException
      *
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
     {
@@ -121,7 +121,7 @@ final class DynamicEntity extends Model
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, fn($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     /**
@@ -136,11 +136,11 @@ final class DynamicEntity extends Model
     /**
      * @throws Exception
      *
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      */
     private static function findModel(array $models, string $modelName): ?string
     {
-        $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
+        $found = array_filter($models, fn($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
         if (count($found) > 1) {
             throw new \Exception("Too many models found for '{$modelName}'");

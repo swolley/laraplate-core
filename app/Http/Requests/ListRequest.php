@@ -11,7 +11,7 @@ use Modules\Core\Casts\ListRequestData;
 final class ListRequest extends SelectRequest
 {
     /**
-     * @return mixed[]
+     * @return array<string, mixed>
      */
     #[Override]
     public function rules(): array

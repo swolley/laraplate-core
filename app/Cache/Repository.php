@@ -202,7 +202,7 @@ final class Repository extends BaseRepository
     /**
      * compose key parts by user and groups.
      *
-     * @return null|array<int,string>
+     * @return array<int,string>|null
      */
     private function getKeyPartsFromUser(User $user): ?array
     {
@@ -218,7 +218,7 @@ final class Repository extends BaseRepository
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-        $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
+        $groups = $user->{$group_method}->map(fn(Model $r): string => 'R' . (int) $r->id)->toArray();
         sort($groups);
         array_push($tags, ...$groups);
 
