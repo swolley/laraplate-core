@@ -467,7 +467,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         $response = $client->search($query);
         return $response['aggregations']['by_term']['buckets'] ?? [];
     }
-d
+
     public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
     {
         $client = $this->createClient();

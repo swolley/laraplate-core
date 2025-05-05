@@ -57,7 +57,7 @@ final class ResponseBuilder
         $this->preview = preview();
     }
 
-    public self function getHttpErrorStatus(int|string $errorCode): int
+    public function getHttpErrorStatus(int|string $errorCode): int
     {
         $http_statuses = array_flip(self::getHttpStatuses());
 
