@@ -219,12 +219,14 @@ class User extends BaseUser implements FilamentUser
         return UserFactory::new();
     }
 
-    protected static function scopeSuperAdmin(Builder $query): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected static function superAdmin(Builder $query): Builder
     {
         return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
-    protected static function scopeAdmin(Builder $query): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected static function admin(Builder $query): Builder
     {
         return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
     }

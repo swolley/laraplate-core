@@ -21,6 +21,7 @@ use Modules\Core\Search\Contracts\SearchAnalyticsInterface;
  */
 class ElasticsearchEngine extends Engine implements SearchEngineInterface, SearchAnalyticsInterface
 {
+    public $config;
     public function supportsVectorSearch(): bool
     {
         return true;
@@ -48,7 +49,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
 
     public function bulkIndex(iterable $models): void
     {
-        if (!count($models)) {
+        if (count($models) === 0) {
             return;
         }
 
@@ -66,7 +67,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $client->indices()->exists(['index' => $indexName])->asBool();
     }
 
-    public function createIndex(Model $model): void
+    public function createIndex(Model $model, array $options = []): void
     {
         // $this->ensureSearchable($model);
 
@@ -79,7 +80,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             $mapping = [];
             if (method_exists($model, 'getSearchMapping')) {
                 $mapping = $model->getSearchMapping();
-            } else if (method_exists($model, 'toSearchableIndex')) {
+            } elseif (method_exists($model, 'toSearchableIndex')) {
                 $mapping = $model->toSearchableIndex();
             }
 
@@ -341,12 +342,12 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         // Filtri
-        if ($id) {
+        if ($id !== null && $id !== 0) {
             $query->where('id', $id);
-        } elseif ($from) {
+        } elseif ($from !== null && $from !== '' && $from !== '0') {
             $query->where('updated_at', '>', Carbon::parse($from));
         } else {
-            $lastIndexed = (new $modelClass())->getLastIndexedTimestamp();
+            $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
             if ($lastIndexed) {
                 $query->where('updated_at', '>', $lastIndexed);
             }
@@ -360,7 +361,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         }
 
         // Sincronizziamo ogni record
-        $query->chunk(100, function ($records) {
+        $query->chunk(100, function ($records): void {
             foreach ($records as $record) {
                 $this->indexDocument($record);
             }
@@ -378,7 +379,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
 
         // Aggiungi prefisso se configurato
         if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
-            $indexName = $this->config['index_prefix'] . $indexName;
+            return $this->config['index_prefix'] . $indexName;
         }
 
         return $indexName;

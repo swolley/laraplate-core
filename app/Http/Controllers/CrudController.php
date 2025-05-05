@@ -75,7 +75,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -118,7 +118,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -188,7 +188,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -227,7 +227,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder) {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
                 $tree_relation_type = [];
 
                 if ($filters->parents && $filters->children) {

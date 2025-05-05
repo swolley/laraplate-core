@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Models\Setting;
 use Modules\Core\Http\Requests\ListRequest;
 
-class ListRequestData extends SelectRequestData
+readonly class ListRequestData extends SelectRequestData
 {
     public protected(set) int $pagination;
     public protected(set) int|null $page = null;

@@ -21,7 +21,7 @@ final class GridsController extends Controller
      * @route-comment
      * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
      */
-    public function getGridsConfigs(Request $request, ?string $entity = null)
+    public function getGridsConfigs(Request $request, ?string $entity = null): \Illuminate\Http\JsonResponse
     {
         $response_builder = new ResponseBuilder($request);
 

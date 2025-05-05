@@ -218,12 +218,9 @@ final class Repository extends BaseRepository
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-
-        if ($group_method !== '0') {
-            $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
-            sort($groups);
-            array_push($tags, ...$groups);
-        }
+        $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
+        sort($groups);
+        array_push($tags, ...$groups);
 
         return array_map('strval', $tags);
     }

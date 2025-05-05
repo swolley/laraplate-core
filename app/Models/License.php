@@ -29,12 +29,14 @@ final class License extends Model
      */
     protected $fillable = [];
 
-    public function scopeFree(Builder $query): void
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    public function free(Builder $query): void
     {
         $query->doesntHave('user');
     }
 
-    public function scopeOccupied(Builder $query): void
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    public function occupied(Builder $query): void
     {
         $query->has('user');
     }

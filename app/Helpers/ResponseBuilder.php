@@ -108,7 +108,7 @@ final class ResponseBuilder
 
     public function isOk(): bool
     {
-        return ! $this->error && $this->getStatus() < 400;
+        return ! $this->error && $this->status < 400;
     }
 
     public function isError(): bool
@@ -416,7 +416,7 @@ final class ResponseBuilder
      *
      * @psalm-return array<array-key>
      */
-    private self function getHttpStatuses(): array
+    private function getHttpStatuses(): array
     {
         $https_statuses = Response::$statusTexts;
         $https_statuses[419] = 'Session expired';
@@ -477,7 +477,7 @@ final class ResponseBuilder
                 $payload['meta']['from'] = $this->from;
 
                 if ($this->to !== null) {
-                    $count = $this->data()->count();
+                    $count = $this->resourceResponse->resource->count();
                     $payload['meta']['to'] = $count < $this->to - $this->from + 1 ? $this->from + $count - 1 : $this->to;
                 }
             }

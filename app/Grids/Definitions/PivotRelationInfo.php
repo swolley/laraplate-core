@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-final class PivotRelationInfo extends RelationInfo
+final readonly class PivotRelationInfo extends RelationInfo
 {
     /**
      * @param  string  $pivotTable  pivot table name for many-to-many relations
      * @param  string  $pivotOwnerKey  pivot owner key
      * @param  string  $pivotForeignKey  pivot foreign key
      */
-    final public function __construct(string $type, string $name, string $model, string $table, string $foreignKey, string $ownerKey, private readonly string $pivotTable, private readonly string $pivotOwnerKey, private readonly string $pivotForeignKey)
+    final public function __construct(string $type, string $name, string $model, string $table, string $foreignKey, string $ownerKey, private string $pivotTable, private string $pivotOwnerKey, private string $pivotForeignKey)
     {
         parent::__construct($type, $name, $model, $table, $foreignKey, $ownerKey);
     }

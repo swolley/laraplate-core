@@ -40,7 +40,8 @@ final class ACL extends Model
         return $this->belongsTo(Permission::class);
     }
 
-    public function scopeForPermission($query, $permission_id): void
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    public function forPermission($query, $permission_id): void
     {
         $query->where('permission_id', $permission_id);
     }
