@@ -25,9 +25,7 @@ final class LockedModelSubscriber
     }
 
     /**
-     * @param string $event
      * @param mixed $entity
-     * @return bool
      * @phpstan-ignore-next-line
      */
     public function saving(string $event, $entity): bool
@@ -58,9 +56,7 @@ final class LockedModelSubscriber
     }
 
     /**
-     * @param string $event
      * @param mixed $entity
-     * @return bool
      * @phpstan-ignore-next-line
      */
     public function deleting(string $event, $entity): bool
@@ -84,9 +80,7 @@ final class LockedModelSubscriber
     }
 
     /**
-     * @param string $event
      * @param mixed $entity
-     * @return bool
      * @phpstan-ignore-next-line
      */
     public function replicating(string $event, $entity): bool
@@ -99,21 +93,17 @@ final class LockedModelSubscriber
         $model = $this->getModelFromPassedParams($entity);
 
         /** @var Model $model */
-        if (!$model || $locked->doesNotUseHasLocks($model)) {
+        if (!$model instanceof \Illuminate\Database\Eloquent\Model || $locked->doesNotUseHasLocks($model)) {
             return true;
         }
 
-        if (!$model || $model->isUnlocked()) {
+        if ($model->isUnlocked()) {
             return true;
         }
 
         throw new LockedModelException('This model is locked');
     }
 
-    /**
-     * @param NotificationSending $event
-     * @return bool
-     */
     public function notificationSending(NotificationSending $event): bool
     {
         $locked = new Locked();
@@ -136,7 +126,6 @@ final class LockedModelSubscriber
 
     /**
      * @param mixed $params
-     * @return Model|null
      */
     private function getModelFromPassedParams($params): Model|null
     {

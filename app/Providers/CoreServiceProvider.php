@@ -8,6 +8,7 @@ use Override;
 use Exception;
 use TypeError;
 use ReflectionException;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Locking\Locked;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Cache\Repository;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
@@ -73,11 +75,6 @@ final class CoreServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
         $this->registerAuths();
         $this->registerMiddlewares();
-        $this->registerModels();
-
-        if ($this->app->isProduction() && config('core.force_https')) {
-            URL::forceScheme('https');
-        }
 
         Password::defaults(fn() => Password::min(8)
             ->letters()
@@ -85,6 +82,11 @@ final class CoreServiceProvider extends ServiceProvider
             ->numbers()
             ->symbols()
             ->uncompromised());
+
+        $this->configureCommands();
+        $this->configureModels();
+        $this->configureDates();
+        $this->configureUrls();
     }
 
     /**
@@ -109,6 +111,7 @@ final class CoreServiceProvider extends ServiceProvider
             $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
         }
     }
+
 
     public function registerAuths(): void
     {
@@ -157,10 +160,39 @@ final class CoreServiceProvider extends ServiceProvider
         return [];
     }
 
-    private function registerModels(): void
+    /**
+     * Configure the commands.
+     */
+    private function configureCommands(): void
+    {
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    /**
+     * Configure the models.
+     */
+    private function configureModels(): void
     {
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
         Model::shouldBeStrict();
+    }
+
+    /**
+     * Configure the dates.
+     */
+    private function configureDates(): void
+    {
+        Date::use(CarbonImmutable::class);
+    }
+
+    /**
+     * Configure the urls.
+     */
+    private function configureUrls(): void
+    {
+        if ($this->app->isProduction() && config('core.force_https')) {
+            URL::forceScheme('https');
+        }
     }
 
     /**
@@ -180,8 +212,6 @@ final class CoreServiceProvider extends ServiceProvider
         array_push($commands, ...$search_commands);
 
         $this->commands($commands);
-
-        DB::prohibitDestructiveCommands($this->app->isProduction());
     }
 
     /**
@@ -214,8 +244,7 @@ final class CoreServiceProvider extends ServiceProvider
     }
 
     /**
-     * @return void 
-     * @throws BindingResolutionException 
+     * @throws BindingResolutionException
      */
     private function registerMiddlewares(): void
     {
@@ -229,24 +258,21 @@ final class CoreServiceProvider extends ServiceProvider
     }
 
     /**
-     * @return void 
-     * @throws InvalidArgumentException 
-     * @throws TypeError 
-     * @throws ReflectionException 
+     * @throws InvalidArgumentException
+     * @throws TypeError
+     * @throws ReflectionException
      */
     private function registerCache(): void
     {
         // Override the binding for the Repository con il metodo corretto
         /** @phpstan-ignore-next-line */
-        $this->app->extend('cache.store', function ($service, $app) {
-            return new Repository(
-                $app['cache']->getStore(),
-                $app['config']['cache.stores.' . $app['config']['cache.default']]
-            );
-        });
+        $this->app->extend('cache.store', fn($service, array $app): \Modules\Core\Cache\Repository => new Repository(
+            $app['cache']->getStore(),
+            $app['config']['cache.stores.' . $app['config']['cache.default']]
+        ));
 
         // Ensure event dispatcher has been imported
-        $this->app->resolving('cache.store', function (Repository $repository, $app) {
+        $this->app->resolving('cache.store', function (Repository $repository, array $app): \Modules\Core\Cache\Repository {
             $repository->setEventDispatcher($app['events']);
             return $repository;
         });
@@ -264,10 +290,6 @@ final class CoreServiceProvider extends ServiceProvider
         Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
-    /**
-     * @param string $commandsSubpath 
-     * @return array 
-     */
     private function inspectFolderCommands(string $commandsSubpath): array
     {
         $modules_namespace = config('modules.namespace');
@@ -279,9 +301,6 @@ final class CoreServiceProvider extends ServiceProvider
         );
     }
 
-    /**
-     * @return array 
-     */
     private function getPublishableViewPaths(): array
     {
         $paths = [];

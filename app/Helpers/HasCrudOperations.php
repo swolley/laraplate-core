@@ -73,10 +73,12 @@ trait HasCrudOperations
 
         $query->where(function ($q) use ($filters): void {
             foreach ($filters as $field => $filter) {
-                if (!isset($filter['value']) || $filter['value'] === '') {
+                if (!isset($filter['value'])) {
                     continue;
                 }
-
+                if ($filter['value'] === '') {
+                    continue;
+                }
                 $this->applyFilter($q, $field, $filter);
             }
         });

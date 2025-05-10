@@ -27,8 +27,6 @@ final class TreeRequest extends DetailRequest
 
     /**
      * Return data specific to tree request
-     * 
-     * @return TreeRequestData
      */
     #[Override]
     public function parsed(): TreeRequestData
