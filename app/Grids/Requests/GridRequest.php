@@ -16,7 +16,7 @@ use Modules\Core\Http\Requests\ModifyRequest;
 
 final class GridRequest extends FormRequest implements IParsableRequest
 {
-    private GridAction $action;
+    public private(set) GridAction $action;
 
     private ListRequest|ModifyRequest $realMainRequest;
 
@@ -86,15 +86,16 @@ final class GridRequest extends FormRequest implements IParsableRequest
     public function validated($key = null, $default = null)
     {
         $validated = $this->realMainRequest->validated($key, $default);
-
-        if ($this->funnels) {
-            for ($i = 0; count($this->funnels); $i++) {
+        $funnels = $this->input('funnels');
+        if ($funnels) {
+            for ($i = 0; count($funnels); $i++) {
                 $validated['funnels'][$i] = $this->realFunnelRequests[$i]->validated();
             }
         }
 
-        if ($this->options) {
-            for ($i = 0; count($this->options); $i++) {
+        $options = $this->input('options');
+        if ($options) {
+            for ($i = 0; count($options); $i++) {
                 $validated['options'][$i] = $this->realOptionRequests[$i]->validated();
             }
         }
@@ -131,9 +132,9 @@ final class GridRequest extends FormRequest implements IParsableRequest
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ListRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
-
-                if (property_exists($this, 'funnels') && $this->funnels !== null) {
-                    foreach ($this->funnels as $funnel) {
+                $funnels = $this->input('funnels');
+                if (property_exists($this, 'funnels') && $funnels !== null) {
+                    foreach ($funnels as $funnel) {
                         /** @phpstan-ignore staticMethod.notFound */
                         $sub_request = ListRequest::createFrom($this);
                         $sub_request->setContainer($this->container);
@@ -142,8 +143,10 @@ final class GridRequest extends FormRequest implements IParsableRequest
                     }
                 }
 
-                if (property_exists($this, 'options') && $this->options !== null) {
-                    foreach ($this->options as $option) {
+
+                $options = $this->input('options');
+                if (property_exists($this, 'options') && $options !== null) {
+                    foreach ($options as $option) {
                         /** @phpstan-ignore staticMethod.notFound */
                         $sub_request = ListRequest::createFrom($this);
                         $sub_request->setContainer($this->container);
@@ -153,11 +156,11 @@ final class GridRequest extends FormRequest implements IParsableRequest
                 }
 
                 break;
-                // case GridAction::LAYOUT:
-                // case GridAction::COUNT:
+            // case GridAction::LAYOUT:
+            // case GridAction::COUNT:
             case GridAction::INSERT:
             case GridAction::UPDATE:
-                /** @phpstan-ignore staticMethod.notFound */
+            /** @phpstan-ignore staticMethod.notFound */
                 // $this->realMainRequest = ModifyRequest::createFrom($this);
             case GridAction::CHECK:
             case GridAction::FORCE_DELETE:

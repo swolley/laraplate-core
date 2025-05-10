@@ -7,6 +7,7 @@ namespace Modules\Core\Database\Seeders;
 use Illuminate\Support\Str;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Overrides\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -75,7 +76,7 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['admin'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where(function ($query) use ($user_table, $role_table): void {
+                'permissions' => fn() => $permission_class::where(function ($query) use ($user_table, $role_table): void {
                     $query->whereIn('table_name', [$user_table, $role_table])
                         ->orWhere('name', 'like', '%.' . ActionEnum::SELECT->value);
                 })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get(),
@@ -83,7 +84,7 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['guest'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
+                'permissions' => fn() => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
                     ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
                     ->get(),
             ],
@@ -91,7 +92,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $this->groups = $role_class::withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
         $existing_roles = $this->groups->keys()->all();
-        $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
+        $new_roles = array_filter($roles_data, fn($role) => ! in_array($role['name'], $existing_roles, true));
 
         if ($new_roles === []) {
             $this->command->line('    - nothing to update');
@@ -99,7 +100,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        $this->db->transaction(function () use ($role_class, $new_roles): void {
+        DB::transaction(function () use ($role_class, $new_roles): void {
             foreach ($new_roles as &$role) {
                 $this->create($role_class, $role);
                 $this->command->line("    - {$role['name']} <fg=green>created</>");
@@ -145,7 +146,7 @@ final class CoreDatabaseSeeder extends Seeder
         ];
 
         $existing_users = $user_class::withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
-        $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
+        $new_users = array_filter($users_data, fn($user) => ! isset($existing_users[$user['username']]));
 
         if ($new_users === []) {
             $this->command->line('    - nothing to update');
@@ -153,7 +154,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        $this->db->transaction(function () use ($user_class, $new_users): void {
+        DB::transaction(function () use ($user_class, $new_users): void {
             foreach ($new_users as &$user) {
                 $this->create($user_class, $user);
                 $this->command->line("    - {$user['username']} <fg=green>created</>");
@@ -198,7 +199,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $new_settings = array_filter(
             $default_settings,
-            fn ($setting) => ! isset($existing_settings[$setting['name']]),
+            fn($setting) => ! isset($existing_settings[$setting['name']]),
         );
 
         if ($new_settings === []) {
@@ -207,7 +208,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        $this->db->transaction(function () use ($new_settings): void {
+        DB::transaction(function () use ($new_settings): void {
             foreach ($new_settings as &$setting) {
                 if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
                     $this->create(Setting::class, $setting);
@@ -249,7 +250,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $new_crons = array_filter(
             $default_crons,
-            fn ($cron) => ! isset($existing_crons[$cron['name']]),
+            fn($cron) => ! isset($existing_crons[$cron['name']]),
         );
 
         if ($new_crons === []) {
@@ -258,7 +259,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        $this->db->transaction(function () use ($new_crons): void {
+        DB::transaction(function () use ($new_crons): void {
             foreach ($new_crons as &$cron) {
                 if (! CronJob::query()->withoutGlobalScopes()->where('name', $cron['name'])->exists()) {
                     $this->create(CronJob::class, $cron);

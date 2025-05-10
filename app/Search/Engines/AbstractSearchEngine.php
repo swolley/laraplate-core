@@ -25,9 +25,7 @@ abstract class AbstractSearchEngine extends Engine implements SearchEngineInterf
          * Configurazione del motore di ricerca.
          */
         protected array $config = []
-    )
-    {
-    }
+    ) {}
 
     abstract public function supportsVectorSearch(): bool;
 

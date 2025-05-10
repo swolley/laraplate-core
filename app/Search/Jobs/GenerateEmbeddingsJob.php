@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
-use Log;
 use Exception;
 use Throwable;
 use LLPhant\OllamaConfig;
 use LLPhant\OpenAIConfig;
 use Illuminate\Bus\Queueable;
 use LLPhant\Embeddings\Document;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -62,12 +62,13 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         $data = $this->model->prepareDataToEmbed();
 
-        if (! $data || $data === []) {
+        if ($data === null || $data === '') {
             return;
         }
 
         try {
-            $document = new Document($data);
+            $document = new Document();
+            $document->content = $data;
             $splitDocuments = DocumentSplitter::splitDocument($document, 800);
             $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
 

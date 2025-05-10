@@ -9,8 +9,9 @@ use Laravel\Scout\EngineManager;
 use Modules\Core\Helpers\HasBenchmark;
 use Symfony\Component\Console\Command\Command;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
 
-final class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
+final class DeleteIndexCommand extends BaseDeleteIndexCommand
 {
     use HasBenchmark, SearchableCommandUtils;
 
@@ -24,12 +25,14 @@ final class DeleteIndexCommand extends \Laravel\Scout\Console\DeleteIndexCommand
         $model = $this->getModelClass();
 
         if ($model === '' || $model === '0' || $model === false) {
-            return Command::FAILURE;
+            return Command::INVALID;
         }
 
         $this->addArgument('name');
         $this->input->setArgument('name', new $model()->indexableAs());
 
-        return parent::handle($manager);
+        parent::handle($manager);
+
+        return Command::SUCCESS;
     }
 }

@@ -7,7 +7,7 @@ namespace Modules\Core\Http\Requests;
 use Override;
 use Modules\Core\Casts\DetailRequestData;
 
-final class DetailRequest extends SelectRequest
+class DetailRequest extends SelectRequest
 {
     #[Override]
     public function parsed(): DetailRequestData

@@ -25,10 +25,14 @@ final class TreeRequest extends DetailRequest
         ];
     }
 
+    /**
+     * Return data specific to tree request
+     * 
+     * @return TreeRequestData
+     */
     #[Override]
     public function parsed(): TreeRequestData
     {
-        /** @phpstan-ignore method.notFound */
         return new TreeRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
     }
 }

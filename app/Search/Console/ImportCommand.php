@@ -9,8 +9,9 @@ use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Contracts\Events\Dispatcher;
 use Symfony\Component\Console\Command\Command;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Laravel\Scout\Console\ImportCommand as BaseImportCommand;
 
-final class ImportCommand extends \Laravel\Scout\Console\ImportCommand
+final class ImportCommand extends BaseImportCommand
 {
     use HasBenchmark, SearchableCommandUtils;
 
@@ -20,9 +21,11 @@ final class ImportCommand extends \Laravel\Scout\Console\ImportCommand
     public function handle(Dispatcher $events)
     {
         if (in_array($this->getModelClass(), ['', '0'], true) || $this->getModelClass() === false) {
-            return Command::FAILURE;
+            return Command::INVALID;
         }
 
-        return parent::handle($events);
+        parent::handle($events);
+
+        return Command::SUCCESS;
     }
 }

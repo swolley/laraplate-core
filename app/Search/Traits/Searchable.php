@@ -79,6 +79,7 @@ trait Searchable
         $array = [];
 
         // find on web, typesense requires id to be a string
+        // TODO: quando sono pronte le classi che estendono scout fare il tostring nella classe di typesense
         $array['id'] = config('scout.driver') === 'typesense' ? (string) $this->getKey() : $this->getKey();
 
         // Add common data
@@ -294,7 +295,7 @@ trait Searchable
             $ids = collect($response['hits'])->pluck('document.id')->toArray();
 
             return static::whereIn($this->getKeyName(), $ids)->get()
-                ->sortBy(fn ($model): int|string|false => array_search($model->getKey(), $ids, true));
+                ->sortBy(fn($model): int|string|false => array_search($model->getKey(), $ids, true));
         }
 
         return collect();

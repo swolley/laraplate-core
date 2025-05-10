@@ -89,13 +89,13 @@ final class GridsController extends Controller
     public function grid(GridRequest $request, string $entity): Response
     {
         try {
-            // $filters = $request->parsed();
+            $filters = $request->parsed();
             $model = DynamicEntity::resolve($entity, $filters['connection'] ?? null, request: $request);
-            PermissionChecker::ensurePermissions($request, $model->getTable(), $request->action, $model->getConnectionName());
+            PermissionChecker::ensurePermissions($request, $model->getTable(), $filters->action->value, $model->getConnectionName());
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException|UnauthorizedException $ex) {
+        } catch (UnexpectedValueException | UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();

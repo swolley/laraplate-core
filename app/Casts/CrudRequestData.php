@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
 
-final readonly class CrudRequestData
+class CrudRequestData
 {
     public ?string $connection;
 

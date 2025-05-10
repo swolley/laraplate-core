@@ -44,7 +44,7 @@ class LockedAddCommand extends Command
         if (! class_exists($className)) {
             $this->error("Model {$className} does not exist");
 
-            return BaseCommand::FAILURE;
+            return BaseCommand::INVALID;
         }
 
         $instance = new $className();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking;
 
-use Illuminate\Events\Dispatcher;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Events\NotificationSending;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 
@@ -12,6 +12,7 @@ final class LockedModelSubscriber
 {
     /**
      * Register the listeners for the subscriber.
+     * @return array<string,string>
      */
     public function subscribe(): array
     {
@@ -23,6 +24,12 @@ final class LockedModelSubscriber
         ];
     }
 
+    /**
+     * @param string $event
+     * @param mixed $entity
+     * @return bool
+     * @phpstan-ignore-next-line
+     */
     public function saving(string $event, $entity): bool
     {
         if (new Locked()->allowsModificationsOnLockedObjects()) {
@@ -50,6 +57,12 @@ final class LockedModelSubscriber
         return true;
     }
 
+    /**
+     * @param string $event
+     * @param mixed $entity
+     * @return bool
+     * @phpstan-ignore-next-line
+     */
     public function deleting(string $event, $entity): bool
     {
         if (new Locked()->allowsModificationsOnLockedObjects()) {
@@ -70,6 +83,12 @@ final class LockedModelSubscriber
         throw new LockedModelException('This model is locked');
     }
 
+    /**
+     * @param string $event
+     * @param mixed $entity
+     * @return bool
+     * @phpstan-ignore-next-line
+     */
     public function replicating(string $event, $entity): bool
     {
         $locked = new Locked();
@@ -79,17 +98,22 @@ final class LockedModelSubscriber
         }
         $model = $this->getModelFromPassedParams($entity);
 
-        if ($locked->doesNotUseHasLocks($model)) {
+        /** @var Model $model */
+        if (!$model || $locked->doesNotUseHasLocks($model)) {
             return true;
         }
 
-        if ($model->isUnlocked()) {
+        if (!$model || $model->isUnlocked()) {
             return true;
         }
 
         throw new LockedModelException('This model is locked');
     }
 
+    /**
+     * @param NotificationSending $event
+     * @return bool
+     */
     public function notificationSending(NotificationSending $event): bool
     {
         $locked = new Locked();
@@ -110,7 +134,11 @@ final class LockedModelSubscriber
         throw new LockedModelException('This model is locked');
     }
 
-    private function getModelFromPassedParams($params)
+    /**
+     * @param mixed $params
+     * @return Model|null
+     */
+    private function getModelFromPassedParams($params): Model|null
     {
         if (is_array($params) && $params !== []) {
             return $params[0];

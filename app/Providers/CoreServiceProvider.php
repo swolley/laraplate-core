@@ -6,7 +6,10 @@ namespace Modules\Core\Providers;
 
 use Override;
 use Exception;
+use TypeError;
+use ReflectionException;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +17,6 @@ use Modules\Core\Cache\Repository;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Contracts\Cache\Store;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\SoftDeletes;
@@ -34,6 +36,7 @@ use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Illuminate\Contracts\Cache\Repository as BaseContract;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 
@@ -76,7 +79,7 @@ final class CoreServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        Password::defaults(fn () => Password::min(8)
+        Password::defaults(fn() => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -96,7 +99,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
-        $this->app->singleton(Locked::class, fn (): \Modules\Core\Locking\Locked => new Locked());
+        $this->app->singleton(Locked::class, fn(): \Modules\Core\Locking\Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -110,7 +113,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if user is super admin
-        Gate::before(fn (?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn(?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -210,6 +213,10 @@ final class CoreServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * @return void 
+     * @throws BindingResolutionException 
+     */
     private function registerMiddlewares(): void
     {
         $router = app('router');
@@ -221,34 +228,60 @@ final class CoreServiceProvider extends ServiceProvider
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
     }
 
+    /**
+     * @return void 
+     * @throws InvalidArgumentException 
+     * @throws TypeError 
+     * @throws ReflectionException 
+     */
     private function registerCache(): void
     {
-        // Override the binding for the Repository
-        $this->app->bind(BaseRepository::class, fn($app): \Modules\Core\Cache\Repository => new Repository($app->make(Store::class)));
-        $this->app->bind(BaseContract::class, fn($app): \Modules\Core\Cache\Repository => new Repository($app->make(Store::class)));
+        // Override the binding for the Repository con il metodo corretto
+        /** @phpstan-ignore-next-line */
+        $this->app->extend('cache.store', function ($service, $app) {
+            return new Repository(
+                $app['cache']->getStore(),
+                $app['config']['cache.stores.' . $app['config']['cache.default']]
+            );
+        });
 
-        Cache::macro('tryByRequest', fn(...$args) => app(Repository::class)->tryByRequest(...$args));
+        // Ensure event dispatcher has been imported
+        $this->app->resolving('cache.store', function (Repository $repository, $app) {
+            $repository->setEventDispatcher($app['events']);
+            return $repository;
+        });
 
-        Cache::macro('clearByEntity', fn(...$args) => app(Repository::class)->clearByEntity(...$args));
+        // Bind interfaces to the correct service
+        $this->app->bind(BaseRepository::class, fn($app) => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn($app) => $app['cache.store']);
+        $this->app->bind(Repository::class, fn($app) => $app['cache.store']);
 
-        Cache::macro('clearByRequest', fn(...$args) => app(Repository::class)->clearByRequest(...$args));
-
-        Cache::macro('clearByUser', fn(...$args) => app(Repository::class)->clearByUser(...$args));
-
-        Cache::macro('clearByGroup', fn(...$args) => app(Repository::class)->clearByGroup(...$args));
+        // Register macros
+        Cache::macro('tryByRequest', fn(...$args) => app('cache.store')->tryByRequest(...$args));
+        Cache::macro('clearByEntity', fn(...$args) => app('cache.store')->clearByEntity(...$args));
+        Cache::macro('clearByRequest', fn(...$args) => app('cache.store')->clearByRequest(...$args));
+        Cache::macro('clearByUser', fn(...$args) => app('cache.store')->clearByUser(...$args));
+        Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
+    /**
+     * @param string $commandsSubpath 
+     * @return array 
+     */
     private function inspectFolderCommands(string $commandsSubpath): array
     {
         $modules_namespace = config('modules.namespace');
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }
 
+    /**
+     * @return array 
+     */
     private function getPublishableViewPaths(): array
     {
         $paths = [];

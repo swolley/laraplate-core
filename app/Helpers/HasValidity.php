@@ -153,7 +153,7 @@ trait HasValidity
      */
     public function isExpired(): bool
     {
-        return $this->valid_to !== null && $this->valid_to < now();
+        return $this->{static::$valid_to_column} !== null && $this->{static::$valid_to_column} < now();
     }
 
     /**
@@ -161,7 +161,7 @@ trait HasValidity
      */
     public function isDraft(): bool
     {
-        return $this->valid_from === null;
+        return $this->{static::$valid_from_column} === null;
     }
 
     /**
@@ -169,7 +169,7 @@ trait HasValidity
      */
     public function isScheduled(): bool
     {
-        return $this->valid_from !== null && $this->valid_from > now();
+        return $this->{static::$valid_from_column} !== null && $this->{static::$valid_from_column} > now();
     }
 
     /**
@@ -186,8 +186,8 @@ trait HasValidity
             $valid_to = $max;
         }
 
-        $this->valid_from = $valid_from;
-        $this->valid_to = $valid_to;
+        $this->{static::$valid_from_column} = $valid_from;
+        $this->{static::$valid_to_column} = $valid_to;
     }
 
     /**
@@ -195,8 +195,8 @@ trait HasValidity
      */
     public function unpublish(): void
     {
-        $this->valid_from = null;
-        $this->valid_to = null;
+        $this->{static::$valid_from_column} = null;
+        $this->{static::$valid_to_column} = null;
     }
 
     /**

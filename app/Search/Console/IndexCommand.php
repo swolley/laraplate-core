@@ -27,7 +27,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         if ($model === '' || $model === '0' || $model === false) {
             $this->error('Model not found');
 
-            return Command::FAILURE;
+            return Command::INVALID;
         }
 
         $this->addArgument('name');

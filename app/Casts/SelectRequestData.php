@@ -7,7 +7,7 @@ namespace Modules\Core\Casts;
 use Illuminate\Support\Str;
 use Modules\Core\Http\Requests\SelectRequest;
 
-final class SelectRequestData extends CrudRequestData
+class SelectRequestData extends CrudRequestData
 {
     /**
      * @var array<int, Column>

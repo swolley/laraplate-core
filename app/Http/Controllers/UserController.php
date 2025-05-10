@@ -24,10 +24,9 @@ final class UserController extends Controller
     public function __construct(
         Repository $cache,
         AuthManager $auth,
-        DatabaseManager $db,
         private readonly Socialite $socialite,
     ) {
-        parent::__construct($cache, $auth, $db);
+        parent::__construct($cache, $auth);
     }
 
     /**

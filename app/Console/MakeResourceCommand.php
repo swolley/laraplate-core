@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\select;
-
 use Override;
+
 use Filament\Panel;
 use ReflectionClass;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Filament\Clusters\Cluster;
 use Filament\Facades\Filament;
+use function Laravel\Prompts\select;
 use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\Console\Command\Command;
@@ -44,7 +44,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
         $class_name = Str::after($model ?: '', $modelNamespace . '\\');
 
         if ($this->option('model')) {
-            $class_name ??= $this->argument('name');
+            $class_name = $class_name ?: $this->argument('name');
 
             if ($is_module && $module_name && class_exists(\Nwidart\Modules\Facades\Module::class)) {
                 $this->callSilently('make:model', ['name' => "{$class_name}", 'module' => $module_name]);
@@ -63,7 +63,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
         if ($model === '' || $model === '0' || $model === false) {
             $this->error('Model not found');
 
-            return self::FAILURE;
+            return self::INVALID;
         }
 
         if ($this->option('migration')) {
@@ -105,7 +105,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             $panel = count($panels) > 1 ? $panels[select(
                 label: 'Which panel would you like to create this in?',
                 options: array_map(
-                    fn (Panel $panel): string => $panel->getId(),
+                    fn(Panel $panel): string => $panel->getId(),
                     $panels,
                 ),
                 default: Filament::getDefaultPanel()->getId(),

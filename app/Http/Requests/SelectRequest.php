@@ -38,12 +38,14 @@ abstract class SelectRequest extends CrudRequest
 
         $to_merge = [];
 
-        if (property_exists($this, 'columns') && $this->columns !== null && is_string($this->columns)) {
-            $to_merge['columns'] = static::decode($this->columns);
+        $columns = $this->input('columns');
+        if ($columns && is_string($columns)) {
+            $to_merge['columns'] = static::decode($columns);
         }
 
-        if (property_exists($this, 'relations') && $this->relations !== null && is_string($this->relations)) {
-            $to_merge['relations'] = static::decode($this->relations);
+        $relations = $this->input('relations');
+        if ($relations && is_string($relations)) {
+            $to_merge['relations'] = static::decode($relations);
         }
 
         /** @phpstan-ignore method.notFound */

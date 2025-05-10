@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-final readonly class RelationInfo
+readonly class RelationInfo
 {
     /**
      * @param  string  $type  relation type (method name)

@@ -9,7 +9,7 @@ use Illuminate\Database\DatabaseManager;
 use Modules\Core\Helpers\HasSeedersUtils;
 use Illuminate\Database\Seeder as BaseSeeder;
 
-final class Seeder extends BaseSeeder
+class Seeder extends BaseSeeder
 {
     use HasBenchmark, HasSeedersUtils;
 

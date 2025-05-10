@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 
-final class ResponseBuilder
+class ResponseBuilder
 {
     private int $status = Response::HTTP_OK;
 
