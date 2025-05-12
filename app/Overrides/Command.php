@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Modules\Core\Helpers\HasBenchmark;
-use Illuminate\Database\DatabaseManager;
 use Illuminate\Console\Command as BaseCommand;
+use Illuminate\Database\DatabaseManager;
+use Modules\Core\Helpers\HasBenchmark;
 
 class Command extends BaseCommand
 {

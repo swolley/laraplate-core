@@ -6,11 +6,11 @@ namespace Modules\Core\Locking\Console;
 
 use function Laravel\Prompts\confirm;
 
-use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Locking\Traits\HasLocks;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\HasOptimisticLocking;
+use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Overrides\Command;
 
 final class ModelLockingRefreshCommand extends Command
 {

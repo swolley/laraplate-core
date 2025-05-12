@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\table;
-use function Laravel\Prompts\search;
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\password;
 use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\password;
+use function Laravel\Prompts\search;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
 
-use Throwable;
-use Illuminate\Support\Str;
-use Modules\Core\Models\Role;
-use Modules\Core\Models\Permission;
-use Modules\Core\Overrides\Command;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasCommandUtils;
+use Modules\Core\Models\Permission;
+use Modules\Core\Models\Role;
+use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Command\Command as BaseCommand;
+use Throwable;
 
 final class CreateUserCommand extends Command
 {

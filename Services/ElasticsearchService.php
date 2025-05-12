@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Elastic\Elasticsearch\Client;
-use Illuminate\Support\Facades\Log;
 use Elastic\Elasticsearch\ClientBuilder;
-use Modules\Core\Search\Exceptions\ElasticsearchException;
 use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
+use Illuminate\Support\Facades\Log;
+use Modules\Core\Search\Exceptions\ElasticsearchException;
 
 final class ElasticsearchService
 {
@@ -95,7 +95,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->create($params);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch create index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -126,7 +126,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->delete(['index' => $index]);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch delete index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -191,7 +191,7 @@ final class ElasticsearchService
                 'failed' => $failed,
                 'errors' => $errors,
             ];
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch bulk index error', [
                 'index' => $index,
                 'documents_count' => count($documents),
@@ -223,7 +223,7 @@ final class ElasticsearchService
             $response = $this->client->search($params);
 
             return $response->asArray();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch search error', [
                 'index' => $index,
                 'query' => $query,
@@ -242,7 +242,7 @@ final class ElasticsearchService
      *
      * @throws ElasticsearchException
      *
-     * @return array|null Document data or null if not found
+     * @return null|array Document data or null if not found
      */
     public function getDocument(string $index, string $id): ?array
     {

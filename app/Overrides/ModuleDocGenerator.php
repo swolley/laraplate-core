@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Override;
-use Illuminate\Support\Str;
 use Illuminate\Routing\Route;
+use Illuminate\Support\Str;
 use Mtrajano\LaravelSwagger\Generator;
+use Override;
 
 final class ModuleDocGenerator extends Generator
 {

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Contracts;
 
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Modules\Core\Models\License;
-use Illuminate\Foundation\Auth\User;
 
-interface AuthenticationProviderInterface
+interface IAuthenticationProvider
 {
     /**
      * Verifica se questo provider può gestire la richiesta.

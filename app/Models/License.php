@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Modules\Core\Helpers\HasValidity;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Modules\Core\Database\Factories\LicenseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Core\Database\Factories\LicenseFactory;
+use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasValidity;
 
 /**
  * @mixin IdeHelperLicense

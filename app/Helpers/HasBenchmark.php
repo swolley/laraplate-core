@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Throwable;
-use InvalidArgumentException;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use InvalidArgumentException;
+use Throwable;
 
 trait HasBenchmark
 {

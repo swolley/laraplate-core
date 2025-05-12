@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Logging\GelfLoggerFactory;
+use Hedii\LaravelGelfLogger\Processors\RenameIdFieldProcessor;
 // use Monolog\Formatter\GelfMessageFormatter;
 use Modules\Core\Logging\GelfAdditionalInfoProcessor;
-use Hedii\LaravelGelfLogger\Processors\RenameIdFieldProcessor;
+use Modules\Core\Logging\GelfLoggerFactory;
 
 return [
     'channels' => [

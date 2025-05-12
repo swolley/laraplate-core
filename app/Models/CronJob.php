@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
-use Illuminate\Validation\Rule;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
+use Modules\Core\Casts\CronExpression as CronExpressionCast;
+use Modules\Core\Database\Factories\CronJobFactory;
+use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Database\Factories\CronJobFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
+use Override;
 
 /**
  * @mixin IdeHelperCronJob
@@ -60,7 +60,7 @@ final class CronJob extends Model
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(fn($query) => $query->whereNull('deleted_at')),
+                Rule::unique('cron_jobs')->where(fn ($query) => $query->whereNull('deleted_at')),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -68,7 +68,7 @@ final class CronJob extends Model
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(fn($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
+                Rule::unique('cron_jobs')->where(fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
             ],
         ]);
 

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Casts\ListRequestData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Grids\Resources\ResponseBuilder;
 
 trait HasCrudOperations
@@ -73,9 +73,10 @@ trait HasCrudOperations
 
         $query->where(function ($q) use ($filters): void {
             foreach ($filters as $field => $filter) {
-                if (!isset($filter['value'])) {
+                if (! isset($filter['value'])) {
                     continue;
                 }
+
                 if ($filter['value'] === '') {
                     continue;
                 }

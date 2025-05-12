@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Override;
 use ArrayAccess;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use UnexpectedValueException;
 use Illuminate\Contracts\View\View;
-use Nwidart\Modules\Facades\Module;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Nwidart\Modules\Facades\Module;
+use Override;
+use UnexpectedValueException;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 final class DocsController extends OpenApiJsonController

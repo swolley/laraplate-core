@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use Override;
-use Modules\Core\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\Core\Models\Role;
+use Override;
 
 final class RoleFactory extends Factory
 {

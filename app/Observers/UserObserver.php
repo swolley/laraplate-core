@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Observers;
 
 use Hash;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\App;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
 
 final class UserObserver
 {

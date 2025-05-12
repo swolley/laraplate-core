@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Modules\Core\Casts\ActionEnum;
-use Modules\Core\Overrides\Command;
 use Approval\Traits\RequiresApproval;
-use Modules\Core\Helpers\HasValidity;
-use Spatie\Permission\Models\Permission;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Overrides\Command;
+use Spatie\Permission\Models\Permission;
 
 final class PermissionsRefreshCommand extends Command
 {

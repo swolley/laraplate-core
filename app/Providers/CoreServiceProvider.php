@@ -4,46 +4,47 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Override;
-use Exception;
-use TypeError;
-use ReflectionException;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
-use InvalidArgumentException;
-use Modules\Core\Locking\Locked;
-use Modules\Core\Models\CronJob;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Cache\Repository;
-use Illuminate\Support\Facades\URL;
+use Exception;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Cache\Repository as BaseRepository;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Cache\Repository as BaseContract;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
-use Modules\Core\Helpers\SoftDeletes;
-use Illuminate\Auth\Events\Registered;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
-use Nwidart\Modules\Traits\PathNamespace;
-use Illuminate\Console\Scheduling\Schedule;
-use Modules\Core\Overrides\ServiceProvider;
-use Modules\Core\Locking\LockedModelSubscriber;
-use Spatie\Permission\Middleware\RoleMiddleware;
-use Illuminate\Cache\Repository as BaseRepository;
-use Modules\Core\Http\Middleware\PreviewMiddleware;
-use Spatie\Permission\Middleware\PermissionMiddleware;
+use InvalidArgumentException;
+use Modules\Core\Cache\Repository;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
-use Illuminate\Contracts\Cache\Repository as BaseContract;
+use Modules\Core\Http\Middleware\PreviewMiddleware;
+use Modules\Core\Locking\Locked;
+use Modules\Core\Locking\LockedModelSubscriber;
+use Modules\Core\Models\CronJob;
+use Modules\Core\Overrides\ServiceProvider;
+use Nwidart\Modules\Traits\PathNamespace;
+use Override;
+use ReflectionException;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
-use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use TypeError;
 
 /**
- * @property \Illuminate\Foundation\Application $app
+ * @property Application $app
  */
 final class CoreServiceProvider extends ServiceProvider
 {
@@ -76,7 +77,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(fn() => Password::min(8)
+        Password::defaults(fn () => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -101,7 +102,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
-        $this->app->singleton(Locked::class, fn(): \Modules\Core\Locking\Locked => new Locked());
+        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -112,11 +113,10 @@ final class CoreServiceProvider extends ServiceProvider
         }
     }
 
-
     public function registerAuths(): void
     {
         // bypass all other checks if user is super admin
-        Gate::before(fn(?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn (?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -266,28 +266,29 @@ final class CoreServiceProvider extends ServiceProvider
     {
         // Override the binding for the Repository con il metodo corretto
         /** @phpstan-ignore-next-line */
-        $this->app->extend('cache.store', fn($service, array $app): \Modules\Core\Cache\Repository => new Repository(
-            $app['cache']->getStore(),
-            $app['config']['cache.stores.' . $app['config']['cache.default']]
+        $this->app->extend('cache.store', fn ($service, Application $app): Repository => new Repository(
+            $app->get('cache')->getStore(),
+            $app->get('config')->get('cache.stores.' . $app->get('config')->get('cache.default')),
         ));
 
         // Ensure event dispatcher has been imported
-        $this->app->resolving('cache.store', function (Repository $repository, array $app): \Modules\Core\Cache\Repository {
-            $repository->setEventDispatcher($app['events']);
+        $this->app->resolving('cache.store', function (Repository $repository, Application $app): Repository {
+            $repository->setEventDispatcher($app->get('events'));
+
             return $repository;
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn($app) => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn($app) => $app['cache.store']);
-        $this->app->bind(Repository::class, fn($app) => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(Repository::class, fn ($app) => $app['cache.store']);
 
         // Register macros
-        Cache::macro('tryByRequest', fn(...$args) => app('cache.store')->tryByRequest(...$args));
-        Cache::macro('clearByEntity', fn(...$args) => app('cache.store')->clearByEntity(...$args));
-        Cache::macro('clearByRequest', fn(...$args) => app('cache.store')->clearByRequest(...$args));
-        Cache::macro('clearByUser', fn(...$args) => app('cache.store')->clearByUser(...$args));
-        Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
+        Cache::macro('tryByRequest', fn (...$args) => app('cache.store')->tryByRequest(...$args));
+        Cache::macro('clearByEntity', fn (...$args) => app('cache.store')->clearByEntity(...$args));
+        Cache::macro('clearByRequest', fn (...$args) => app('cache.store')->clearByRequest(...$args));
+        Cache::macro('clearByUser', fn (...$args) => app('cache.store')->clearByUser(...$args));
+        Cache::macro('clearByGroup', fn (...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array
@@ -296,7 +297,7 @@ final class CoreServiceProvider extends ServiceProvider
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }

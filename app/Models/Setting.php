@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
-use Modules\Core\Cache\HasCache;
 use Illuminate\Validation\Rules\Enum;
+use Modules\Core\Cache\HasCache;
+use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Factories\SettingFactory;
+use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
-use Modules\Core\Helpers\HasApprovals;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Casts\SettingTypeEnum;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Database\Factories\SettingFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Override;
 
 /**
  * @mixin IdeHelperSetting

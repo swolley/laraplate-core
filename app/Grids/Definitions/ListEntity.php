@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Grids\Definitions;
 
 use Closure;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Grids\Components\Field;
-use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Grids\Requests\GridRequest;
+use Illuminate\Support\Collection;
 use Modules\Core\Grids\Casts\GridRequestData;
+use Modules\Core\Grids\Components\Field;
+use Modules\Core\Grids\Requests\GridRequest;
+use Modules\Core\Helpers\ResponseBuilder;
 
 /**
  * enanched entity class with common funcionalities for value/label lists.
@@ -48,7 +48,7 @@ abstract class ListEntity extends Entity
     final public static function create(Field|string|array|null $labelField = null): Closure
     {
         if ($labelField && ! ($labelField instanceof Field)) {
-            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label): \Modules\Core\Grids\Components\Field => self::createField($label), $labelField);
+            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label): Field => self::createField($label), $labelField);
         }
 
         return fn (Model $model, Field $valueField): static => new static($model, $valueField, $labelField ?? $valueField);

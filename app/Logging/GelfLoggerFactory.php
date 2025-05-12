@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Logging;
 
-use Override;
 use Exception;
 use Gelf\Publisher;
-use Monolog\Logger;
-use Monolog\Handler\GelfHandler;
-use Monolog\Formatter\GelfMessageFormatter;
 use Gelf\Transport\IgnoreErrorTransportWrapper;
 use Hedii\LaravelGelfLogger\GelfLoggerFactory as BaseGelfLoggerGelfLoggerFactory;
+use Monolog\Formatter\GelfMessageFormatter;
+use Monolog\Handler\GelfHandler;
+use Monolog\Logger;
+use Override;
 
 final class GelfLoggerFactory extends BaseGelfLoggerGelfLoggerFactory
 {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Override;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Override;
 
 final class EventServiceProvider extends ServiceProvider
 {

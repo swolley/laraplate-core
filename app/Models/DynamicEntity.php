@@ -4,26 +4,26 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use InvalidArgumentException;
-use UnexpectedValueException;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Collection;
-use Modules\Core\Inspector\Inspect;
-use Illuminate\Support\Facades\Cache;
-use Modules\Core\Helpers\HasVersions;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Inspector\Entities\Index;
-use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Inspector\Entities\Column;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Inspector\Entities\ForeignKey;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use InvalidArgumentException;
+use Modules\Core\Grids\Traits\HasGridUtils;
+use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Inspector\Entities\Column;
+use Modules\Core\Inspector\Entities\ForeignKey;
+use Modules\Core\Inspector\Entities\Index;
+use Modules\Core\Inspector\Inspect;
+use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
+use UnexpectedValueException;
 
 /**
  * @mixin IdeHelperDynamicEntity
@@ -52,7 +52,7 @@ final class DynamicEntity extends Model
         if (config('crud.dynamic_entities', false)) {
             $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 
-            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request): \Modules\Core\Models\DynamicEntity {
+            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request): DynamicEntity {
                 $model = new self($attributes);
                 $model->inspect($tableName, $connection, $request);
 
@@ -71,7 +71,7 @@ final class DynamicEntity extends Model
      * @throws Exception
      * @throws InvalidArgumentException
      *
-     * @return class-string<Model>|null
+     * @return null|class-string<Model>
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
     {
@@ -121,7 +121,7 @@ final class DynamicEntity extends Model
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, fn($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     /**
@@ -136,11 +136,11 @@ final class DynamicEntity extends Model
     /**
      * @throws Exception
      *
-     * @return class-string<Model>|null
+     * @return null|class-string<Model>
      */
     private static function findModel(array $models, string $modelName): ?string
     {
-        $found = array_filter($models, fn($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
+        $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
         if (count($found) > 1) {
             throw new \Exception("Too many models found for '{$modelName}'");

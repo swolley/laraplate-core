@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Override;
-use Illuminate\Support\Str;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+use Override;
 
 final class RouteServiceProvider extends ServiceProvider
 {

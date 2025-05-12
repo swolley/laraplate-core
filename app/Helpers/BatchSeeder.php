@@ -7,11 +7,11 @@ namespace Modules\Core\Helpers;
 use function Laravel\Prompts\progress;
 
 use Exception;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Overrides\Seeder;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Modules\Core\Overrides\Seeder;
 
 abstract class BatchSeeder extends Seeder
 {

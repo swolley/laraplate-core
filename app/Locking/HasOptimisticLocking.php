@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 
 trait HasOptimisticLocking
@@ -42,7 +42,7 @@ trait HasOptimisticLocking
      */
     protected static function bootOptimisticLocking(): void
     {
-        static::creating(function (Model $model): \Illuminate\Database\Eloquent\Model {
+        static::creating(function (Model $model): Model {
             // @phpstan-ignore method.notFound
             if ($model->currentLockVersion() === null) {
                 $model->{static::lockVersionColumn()} = 1;

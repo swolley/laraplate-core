@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use ReflectionClass;
 use Illuminate\Routing\Route as LaravelRoute;
 use Mtrajano\LaravelSwagger\DataObjects\Route;
+use ReflectionClass;
 
 final class ModuleDocRoute extends Route
 {

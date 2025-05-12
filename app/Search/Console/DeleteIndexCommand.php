@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use Override;
+use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Helpers\HasBenchmark;
-use Symfony\Component\Console\Command\Command;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
-use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
+use Override;
+use Symfony\Component\Console\Command\Command;
 
 final class DeleteIndexCommand extends BaseDeleteIndexCommand
 {

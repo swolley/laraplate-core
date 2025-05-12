@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Logging;
 
-use Override;
-use Monolog\LogRecord;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
+use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 use Monolog\Processor\PsrLogMessageProcessor;
+use Override;
 
 final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
 {

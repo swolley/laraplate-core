@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Fortify;
 
-use Illuminate\Support\Arr;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
+use Modules\Core\Helpers\HasValidations;
 
 final class UpdateUserProfileInformation implements UpdatesUserProfileInformation
 {

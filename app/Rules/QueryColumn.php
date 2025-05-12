@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Rules;
 
 use Closure;
-use Override;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Override;
 
 final class QueryColumn implements ValidationRule
 {

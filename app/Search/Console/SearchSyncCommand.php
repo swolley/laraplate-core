@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Console;
 
 use Exception;
-use Laravel\Prompts\Progress;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Modules\Core\Cache\HasCache;
 use Illuminate\Support\Facades\Log;
+use Laravel\Prompts\Progress;
+use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Traits\Searchable;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class SearchSyncCommand extends Command
 {

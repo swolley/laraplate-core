@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Override;
-use InvalidArgumentException;
 use Awobaz\Compoships\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Model as BaseModel;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Model as BaseModel;
+use InvalidArgumentException;
+use Override;
 
 class ComposhipsModel extends Model
 {

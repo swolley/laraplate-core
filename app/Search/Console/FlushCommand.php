@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use Override;
 use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
 
 final class FlushCommand extends \Laravel\Scout\Console\FlushCommand
 {

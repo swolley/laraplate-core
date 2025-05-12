@@ -9,18 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Interface che definisce le operazioni supportate dai motori di ricerca.
  */
-interface SearchEngineInterface
+interface ISearchEngine
 {
-    // /**
-    //  * Determina se il modello è searchable
-    //  */
-    // public function isSearchable(Model $model): bool;
-
-    // /**
-    //  * Verifica se il modello è searchable
-    //  */
-    // public function ensureIsSearchable(Model $model): void;
-
     /**
      * Verifica se il motore supporta la ricerca vettoriale.
      */

@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Jobs;
 
-use Log;
-use Exception;
-use Throwable;
-use Illuminate\Bus\Queueable;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Queue\SerializesModels;
 use Elastic\Elasticsearch\ClientBuilder;
-use Illuminate\Queue\InteractsWithQueue;
+use Exception;
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
+use Log;
+use Throwable;
 
 final class FinalizeReindexJob implements ShouldQueue
 {

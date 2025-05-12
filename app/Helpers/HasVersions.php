@@ -6,11 +6,11 @@ namespace Modules\Core\Helpers;
 
 use DateTimeInterface;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
 // use Illuminate\Database\Eloquent\Relations\Pivot;
@@ -29,7 +29,7 @@ trait HasVersions
     protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
     /**
-     * @param  string|DateTimeInterface|null  $time
+     * @param  null|string|DateTimeInterface  $time
      *
      * @throws \Carbon\Exceptions\InvalidFormatException
      */

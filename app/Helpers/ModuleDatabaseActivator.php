@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Override;
-use Exception;
 use BadMethodCallException;
-use Illuminate\Support\Str;
-use Nwidart\Modules\Module;
-use Modules\Core\Models\Setting;
+use Exception;
 use Illuminate\Container\Container;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
+use Modules\Core\Models\Setting;
 use Nwidart\Modules\Contracts\ActivatorInterface;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Nwidart\Modules\Module;
+use Override;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
@@ -157,7 +157,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             $this->getQuery()->update(['value' => $this->modulesStatuses]);
             $this->flushCache();
         } elseif (! $active && in_array($name, $this->modulesStatuses, true)) {
-            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn($m): bool => $m !== $name)]);
+            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn ($m): bool => $m !== $name)]);
             $this->flushCache();
         }
     }
@@ -198,7 +198,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             return $this->readSettings();
         }
 
-        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn(): array => $this->readSettings());
+        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn (): array => $this->readSettings());
     }
 
     private function config(string $key, mixed $default = null): mixed

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Override;
-use Illuminate\Support\Str;
 use Illuminate\Filesystem\Filesystem;
-use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
+use Illuminate\Support\Str;
+use Modules\Core\Helpers\HasBenchmark;
+use Override;
 
 final class VendorPublishCommand extends BaseVendorPublishCommand
 {

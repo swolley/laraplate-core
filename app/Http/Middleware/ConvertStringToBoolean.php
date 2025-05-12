@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Middleware;
 
-use Override;
 use Illuminate\Foundation\Http\Middleware\TransformsRequest;
+use Override;
 
 final class ConvertStringToBoolean extends TransformsRequest
 {

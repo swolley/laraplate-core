@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
-use Modules\Core\Rules\QueryColumn;
 use Modules\Core\Casts\SelectRequestData;
+use Modules\Core\Rules\QueryColumn;
+use Override;
 
 abstract class SelectRequest extends CrudRequest
 {
@@ -39,11 +39,13 @@ abstract class SelectRequest extends CrudRequest
         $to_merge = [];
 
         $columns = $this->input('columns');
+
         if ($columns && is_string($columns)) {
             $to_merge['columns'] = static::decode($columns);
         }
 
         $relations = $this->input('relations');
+
         if ($relations && is_string($relations)) {
             $to_merge['relations'] = static::decode($relations);
         }

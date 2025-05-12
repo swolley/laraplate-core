@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Override;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection as BaseCollection;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Override;
 
 final class ComposhipsBelongsToMany extends BelongsToMany
 {

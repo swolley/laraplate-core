@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Override;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Override;
 
 final class CustomSoftDeletingScope extends SoftDeletingScope
 {
@@ -28,7 +28,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     #[Override]
     protected function addWithoutTrashed(Builder $builder): void
     {
-        $builder->macro('withoutTrashed', function (Builder $builder): \Illuminate\Database\Eloquent\Builder {
+        $builder->macro('withoutTrashed', function (Builder $builder): Builder {
             $model = $builder->getModel();
 
             $builder->withoutGlobalScope($this)->whereNull(
@@ -47,7 +47,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     #[Override]
     protected function addOnlyTrashed(Builder $builder): void
     {
-        $builder->macro('onlyTrashed', function (Builder $builder): \Illuminate\Database\Eloquent\Builder {
+        $builder->macro('onlyTrashed', function (Builder $builder): Builder {
             $model = $builder->getModel();
 
             $builder->withoutGlobalScope($this)->whereNotNull(

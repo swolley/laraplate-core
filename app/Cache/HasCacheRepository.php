@@ -1,24 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Cache;
 
-use Illuminate\Support\Arr;
-use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Modules\Core\Helpers\ResponseBuilder;
+use Spatie\Permission\Models\Role;
 
-trait CacheRepositoryTrait
+trait HasCacheRepository
 {
     /**
      * Try to extract from cache or by specified callback using request info.
      *
      * @template TCacheValue
      *
-     * @param   Model|string|array<string|object>|null
-     * @param   Closure(TCacheValue): mixed  $callback
-     * @return  TCacheValue
+     * @param   null|Model|string|array<string|object>
+     * @param  Closure(TCacheValue): mixed  $callback
+     * @return TCacheValue
      */
     public function tryByRequest(Model|string|array|null $entity, Request $request, \Closure $callback, ?int $duration = null): mixed
     {
@@ -64,6 +66,7 @@ trait CacheRepositoryTrait
 
     /**
      * clear cache by specified entity.
+     *
      * @param   Model|string|array<string|object>
      */
     public function clearByEntity(Model|string|array $entity): void
@@ -83,7 +86,8 @@ trait CacheRepositoryTrait
 
     /**
      * clear cache by request extracted info.
-     * @param   Model|string|array<string|object>|null
+     *
+     * @param   null|Model|string|array<string|object>
      */
     public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
@@ -108,7 +112,8 @@ trait CacheRepositoryTrait
 
     /**
      * clear cache elements by user and only by entity if specified.
-     * @param   Model|string|array<string|object>|null
+     *
+     * @param   null|Model|string|array<string|object>
      */
     public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
@@ -133,7 +138,8 @@ trait CacheRepositoryTrait
 
     /**
      * clear cache elements by user group and only by entity if specified.
-     * @param   Model|string|array<string|object>|null
+     *
+     * @param   null|Model|string|array<string|object>
      */
     public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
@@ -153,6 +159,22 @@ trait CacheRepositoryTrait
             }
         } else {
             $this->tags([config('app.name'), $role_key])->flush();
+        }
+    }
+
+    /**
+     * recursively sorts array by keys.
+     *
+     * @param null|array<int,string>|string
+     */
+    private static function recursiveKSort(array|string|null &$array): void
+    {
+        if (is_array($array)) {
+            ksort($array);
+
+            foreach ($array as &$value) {
+                self::recursiveKSort($value);
+            }
         }
     }
 
@@ -178,24 +200,9 @@ trait CacheRepositoryTrait
     }
 
     /**
-     * recursively sorts array by keys.
-     * @param array<int,string>|string|null
-     */
-    private static function recursiveKSort(array|string|null &$array): void
-    {
-        if (is_array($array)) {
-            ksort($array);
-
-            foreach ($array as &$value) {
-                self::recursiveKSort($value);
-            }
-        }
-    }
-
-    /**
      * compose key parts by user and groups.
      *
-     * @return array<int,string>|null
+     * @return null|array<int,string>
      */
     private function getKeyPartsFromUser(User $user): ?array
     {
@@ -211,7 +218,7 @@ trait CacheRepositoryTrait
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-        $groups = $user->{$group_method}->map(fn(Model $r): string => 'R' . (int) $r->id)->toArray();
+        $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
         sort($groups);
         array_push($tags, ...$groups);
 

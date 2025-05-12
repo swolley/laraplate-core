@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Providers;
 
-use Override;
 use Exception;
-use Illuminate\Http\Request;
-use Modules\Core\Models\User;
-use Modules\Core\Models\License;
-use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
+use Illuminate\Http\Request;
+use Laravel\Socialite\Facades\Socialite;
+use Modules\Core\Auth\Contracts\IAuthenticationProvider;
+use Modules\Core\Models\License;
+use Modules\Core\Models\User;
+use Override;
 
-final class SocialiteProvider implements AuthenticationProviderInterface
+final class SocialiteProvider implements IAuthenticationProvider
 {
     #[Override]
     public function canHandle(Request $request): bool

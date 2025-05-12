@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\SearchRequestData;
+use Override;
 
 final class SearchRequest extends ListRequest
 {

@@ -4,29 +4,29 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\table;
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\suggest;
 use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\suggest;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
 
+use Doctrine\DBAL\Types\Type;
+use Illuminate\Console\Concerns\CreatesMatchingTest;
+use Illuminate\Console\Concerns\PromptsForMissingInput;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Models\DynamicEntity;
 use Override;
 use ReflectionClass;
 use ReflectionMethod;
-use Illuminate\Support\Str;
-use Doctrine\DBAL\Types\Type;
-use InvalidArgumentException;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
-use Modules\Core\Helpers\HasBenchmark;
-use Modules\Core\Models\DynamicEntity;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
 use Symfony\Component\Console\Input\InputInterface;
-use Illuminate\Console\Concerns\CreatesMatchingTest;
 use Symfony\Component\Console\Output\OutputInterface;
-use Illuminate\Console\Concerns\PromptsForMissingInput;
-use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
 
 /**
  * @psalm-suppress PropertyNotSetInConstructor
@@ -210,11 +210,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
         $path_suffix = Str::after($name, 'Models\\');
 
-        return (
-            Str::startsWith($name, config('modules.namespace'))
+        return (Str::startsWith($name, config('modules.namespace'))
             ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
-            : $this->laravel['path']
-        ) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
+            : $this->laravel['path']) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
     }
 
     #[Override]

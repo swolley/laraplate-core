@@ -4,24 +4,28 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Engines;
 
-use Illuminate\Support\Carbon;
 use Elastic\ScoutDriverPlus\Engine;
+use Exception;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Search\Jobs\IndexInSearchJob;
-use Modules\Core\Search\Jobs\ReindexSearchJob;
+use InvalidArgumentException;
+use Modules\Core\Search\Contracts\ISearchAnalytics;
+use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\BulkIndexSearchJob;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Modules\Core\Search\Contracts\SearchEngineInterface;
-use Modules\Core\Search\Contracts\SearchAnalyticsInterface;
+use Modules\Core\Search\Jobs\IndexInSearchJob;
+use Modules\Core\Search\Jobs\ReindexSearchJob;
+use stdClass;
 
 /**
- * Implementazione del motore di ricerca per Elasticsearch
+ * Implementazione del motore di ricerca per Elasticsearch.
  */
-class ElasticsearchEngine extends Engine implements SearchEngineInterface, SearchAnalyticsInterface
+class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEngine
 {
     public $config;
+
     public function supportsVectorSearch(): bool
     {
         return true;
@@ -43,7 +47,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         // Prima generiamo l'embedding, poi indichiamo
         Bus::chain([
             new GenerateEmbeddingsJob($model),
-            new IndexInSearchJob($model)
+            new IndexInSearchJob($model),
         ])->dispatch();
     }
 
@@ -59,14 +63,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
     }
 
-    protected function checkIndexExists(Model $model): bool
-    {
-        $client = $this->createClient();
-        $indexName = $this->getIndexName($model);
-
-        return $client->indices()->exists(['index' => $indexName])->asBool();
-    }
-
     public function createIndex(Model $model, array $options = []): void
     {
         // $this->ensureSearchable($model);
@@ -78,6 +74,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         try {
             // Otteniamo il mapping dal modello
             $mapping = [];
+
             if (method_exists($model, 'getSearchMapping')) {
                 $mapping = $model->getSearchMapping();
             } elseif (method_exists($model, 'toSearchableIndex')) {
@@ -88,17 +85,18 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'index' => $indexName,
                 'body' => [
                     'mappings' => [
-                        'properties' => $mapping
-                    ]
-                ]
+                        'properties' => $mapping,
+                    ],
+                ],
             ];
 
             $indexExists = $client->indices()->exists(['index' => $indexName]);
 
             // Se l'indice non esiste, lo creiamo
-            if (!$indexExists) {
+            if (! $indexExists) {
                 $client->indices()->create($indexConfig);
                 Log::info("Indice Elasticsearch '{$indexName}' creato");
+
                 return;
             }
 
@@ -110,19 +108,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             $client->reindex([
                 'body' => [
                     'source' => ['index' => $indexName],
-                    'dest' => ['index' => $tempIndex]
-                ]
+                    'dest' => ['index' => $tempIndex],
+                ],
             ]);
 
             // Eliminiamo il vecchio indice e assegnamo l'alias
             $client->indices()->delete(['index' => $indexName]);
             $client->indices()->putAlias([
                 'index' => $tempIndex,
-                'name' => $indexName
+                'name' => $indexName,
             ]);
 
             Log::info("Indice Elasticsearch '{$indexName}' aggiornato");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Pulizia in caso di errori
             if ($client->indices()->exists(['index' => $tempIndex])) {
                 $client->indices()->delete(['index' => $tempIndex]);
@@ -130,7 +128,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
 
             Log::error("Creazione indice Elasticsearch '{$indexName}' fallita", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             throw $e;
@@ -148,10 +146,10 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                     'bool' => [
                         'must' => [],
                         'should' => [],
-                        'minimum_should_match' => 1
-                    ]
-                ]
-            ]
+                        'minimum_should_match' => 1,
+                    ],
+                ],
+            ],
         ];
 
         // Configurazione dimensione risultati
@@ -171,18 +169,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                     'query' => $query,
                     'fields' => $options['fields'] ?? ['*'],
                     'type' => 'best_fields',
-                    'fuzziness' => 'AUTO'
-                ]
+                    'fuzziness' => 'AUTO',
+                ],
             ];
         }
 
         // Filtri
         if (isset($options['filters']) && $options['filters'] !== []) {
             $filters = $this->buildSearchFilters($options['filters']);
+
             if ($filters !== []) {
                 $params['body']['query']['bool']['must'] = array_merge(
                     $params['body']['query']['bool']['must'],
-                    $filters
+                    $filters,
                 );
             }
         }
@@ -216,18 +215,18 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                         'should' => [
                             [
                                 'script_score' => [
-                                    'query' => ['match_all' => new \stdClass()],
+                                    'query' => ['match_all' => new stdClass()],
                                     'script' => [
                                         'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                                        'params' => ['query_vector' => $vector]
-                                    ]
-                                ]
-                            ]
+                                        'params' => ['query_vector' => $vector],
+                                    ],
+                                ],
+                            ],
                         ],
-                        'minimum_should_match' => 1
-                    ]
-                ]
-            ]
+                        'minimum_should_match' => 1,
+                    ],
+                ],
+            ],
         ];
 
         // Configurazione dimensione risultati
@@ -243,10 +242,11 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         // Filtri
         if (isset($options['filters']) && $options['filters'] !== []) {
             $filters = $this->buildSearchFilters($options['filters']);
+
             if ($filters !== []) {
                 $params['body']['query']['bool']['must'] = array_merge(
                     $params['body']['query']['bool']['must'],
-                    $filters
+                    $filters,
                 );
             }
         }
@@ -275,29 +275,36 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 switch ($value['type']) {
                     case 'term':
                         $esFilters[] = ['term' => [$field => $value['value']]];
+
                         break;
                     case 'terms':
                         $esFilters[] = ['terms' => [$field => $value['value']]];
+
                         break;
                     case 'range':
                         $esFilters[] = ['range' => [$field => $value['value']]];
+
                         break;
                     case 'match':
                         $esFilters[] = ['match' => [$field => $value['value']]];
+
                         break;
                     case 'wildcard':
                         $esFilters[] = ['wildcard' => [$field => $value['value']]];
+
                         break;
                     case 'exists':
                         $esFilters[] = ['exists' => ['field' => $field]];
+
                         break;
                     case 'geo_distance':
                         $esFilters[] = [
                             'geo_distance' => [
                                 'distance' => $value['distance'],
-                                $field => $value['point']
-                            ]
+                                $field => $value['point'],
+                            ],
                         ];
+
                         break;
                 }
             } elseif (is_array($value) && count($value) === 2 && isset($value[0]) && isset($value[1])) {
@@ -306,9 +313,9 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                     'range' => [
                         $field => [
                             'gte' => $value[0],
-                            'lte' => $value[1]
-                        ]
-                    ]
+                            'lte' => $value[1],
+                        ],
+                    ],
                 ];
             } else {
                 // Filtro semplice per valore esatto
@@ -326,12 +333,12 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
 
     public function syncModel(string $modelClass, ?int $id = null, ?string $from = null): int
     {
-        if (!class_exists($modelClass)) {
-            throw new \InvalidArgumentException("Class {$modelClass} does not exist");
+        if (! class_exists($modelClass)) {
+            throw new InvalidArgumentException("Class {$modelClass} does not exist");
         }
 
-        if (!$this->usesSearchableTrait(new $modelClass())) {
-            throw new \InvalidArgumentException("Model {$modelClass} does not implement the Searchable trait");
+        if (! $this->usesSearchableTrait(new $modelClass())) {
+            throw new InvalidArgumentException("Model {$modelClass} does not implement the Searchable trait");
         }
 
         $query = $modelClass::query();
@@ -348,6 +355,7 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             $query->where('updated_at', '>', Carbon::parse($from));
         } else {
             $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
+
             if ($lastIndexed) {
                 $query->where('updated_at', '>', $lastIndexed);
             }
@@ -370,21 +378,6 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
         return $count;
     }
 
-    /**
-     * Ottieni il nome dell'indice per il modello
-     */
-    protected function getIndexName(Model $model): string
-    {
-        $indexName = $model->searchableAs();
-
-        // Aggiungi prefisso se configurato
-        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
-            return $this->config['index_prefix'] . $indexName;
-        }
-
-        return $indexName;
-    }
-
     public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
     {
         $client = $this->createClient();
@@ -396,19 +389,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'query' => [
                     'bool' => [
                         'must' => [
-                            ['match' => ['entity' => $model->getTable()]]
-                        ]
-                    ]
+                            ['match' => ['entity' => $model->getTable()]],
+                        ],
+                    ],
                 ],
                 'aggs' => [
                     'over_time' => [
                         'date_histogram' => [
                             'field' => $filters['date_field'] ?? 'valid_from',
-                            'calendar_interval' => $interval
-                        ]
-                    ]
-                ]
-            ]
+                            'calendar_interval' => $interval,
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Aggiungi filtri se presenti
@@ -418,12 +411,13 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
-                    $esFilters
+                    $esFilters,
                 );
             }
         }
 
         $response = $client->search($query);
+
         return $response['aggregations']['over_time']['buckets'] ?? [];
     }
 
@@ -438,19 +432,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'query' => [
                     'bool' => [
                         'must' => [
-                            ['match' => ['entity' => $model->getTable()]]
-                        ]
-                    ]
+                            ['match' => ['entity' => $model->getTable()]],
+                        ],
+                    ],
                 ],
                 'aggs' => [
                     'by_term' => [
                         'terms' => [
                             'field' => $field,
-                            'size' => $size
-                        ]
-                    ]
-                ]
-            ]
+                            'size' => $size,
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Aggiungi filtri se presenti
@@ -460,12 +454,13 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
-                    $esFilters
+                    $esFilters,
                 );
             }
         }
 
         $response = $client->search($query);
+
         return $response['aggregations']['by_term']['buckets'] ?? [];
     }
 
@@ -480,19 +475,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'query' => [
                     'bool' => [
                         'must' => [
-                            ['match' => ['entity' => $model->getTable()]]
-                        ]
-                    ]
+                            ['match' => ['entity' => $model->getTable()]],
+                        ],
+                    ],
                 ],
                 'aggs' => [
                     'geo_clusters' => [
                         'geohash_grid' => [
                             'field' => $geoField,
-                            'precision' => 5
-                        ]
-                    ]
-                ]
-            ]
+                            'precision' => 5,
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Aggiungi filtri se presenti
@@ -502,18 +497,16 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
-                    $esFilters
+                    $esFilters,
                 );
             }
         }
 
         $response = $client->search($query);
+
         return $response['aggregations']['geo_clusters']['buckets'] ?? [];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
     {
         $client = $this->createClient();
@@ -525,18 +518,18 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'query' => [
                     'bool' => [
                         'must' => [
-                            ['match' => ['entity' => $model->getTable()]]
-                        ]
-                    ]
+                            ['match' => ['entity' => $model->getTable()]],
+                        ],
+                    ],
                 ],
                 'aggs' => [
                     'field_stats' => [
                         'stats' => [
-                            'field' => $field
-                        ]
-                    ]
-                ]
-            ]
+                            'field' => $field,
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Aggiungi filtri se presenti
@@ -546,18 +539,16 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
-                    $esFilters
+                    $esFilters,
                 );
             }
         }
 
         $response = $client->search($query);
+
         return $response['aggregations']['field_stats'] ?? [];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
     {
         $client = $this->createClient();
@@ -569,19 +560,19 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
                 'query' => [
                     'bool' => [
                         'must' => [
-                            ['match' => ['entity' => $model->getTable()]]
-                        ]
-                    ]
+                            ['match' => ['entity' => $model->getTable()]],
+                        ],
+                    ],
                 ],
                 'aggs' => [
                     'histogram' => [
                         'histogram' => [
                             'field' => $field,
-                            'interval' => $interval
-                        ]
-                    ]
-                ]
-            ]
+                            'interval' => $interval,
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Aggiungi filtri se presenti
@@ -591,12 +582,36 @@ class ElasticsearchEngine extends Engine implements SearchEngineInterface, Searc
             if ($esFilters !== []) {
                 $query['body']['query']['bool']['must'] = array_merge(
                     $query['body']['query']['bool']['must'],
-                    $esFilters
+                    $esFilters,
                 );
             }
         }
 
         $response = $client->search($query);
+
         return $response['aggregations']['histogram']['buckets'] ?? [];
+    }
+
+    protected function checkIndexExists(Model $model): bool
+    {
+        $client = $this->createClient();
+        $indexName = $this->getIndexName($model);
+
+        return $client->indices()->exists(['index' => $indexName])->asBool();
+    }
+
+    /**
+     * Ottieni il nome dell'indice per il modello.
+     */
+    protected function getIndexName(Model $model): string
+    {
+        $indexName = $model->searchableAs();
+
+        // Aggiungi prefisso se configurato
+        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
+            return $this->config['index_prefix'] . $indexName;
+        }
+
+        return $indexName;
     }
 }

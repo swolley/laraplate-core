@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Modules\Core\Overrides\Command;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Overrides\Command;
 
 final class ClearExpiredModels extends Command
 {

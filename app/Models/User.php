@@ -4,40 +4,41 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
-use Filament\Panel;
-use Illuminate\Validation\Rule;
 use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
-use Modules\Core\Helpers\HasVersions;
-use Modules\Core\Helpers\SoftDeletes;
-use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Notifications\Notifiable;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Observers\UserObserver;
-use Illuminate\Validation\Rules\Password;
-use Modules\Core\Locking\Traits\HasLocks;
-use Lab404\Impersonate\Models\Impersonate;
 use Filament\Models\Contracts\FilamentUser;
-use Modules\Core\Models\Pivot\ModelHasRole;
-use Laravel\Fortify\TwoFactorAuthenticatable;
-use Illuminate\Foundation\Auth\User as BaseUser;
-use Modules\Core\Database\Factories\UserFactory;
+use Filament\Panel;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Lab404\Impersonate\Services\ImpersonateManager;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as BaseUser;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Lab404\Impersonate\Exceptions\InvalidUserProvider;
 use Lab404\Impersonate\Exceptions\MissingUserProvider;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use Lab404\Impersonate\Models\Impersonate;
+use Lab404\Impersonate\Services\ImpersonateManager;
+use Laravel\Fortify\TwoFactorAuthenticatable;
+use Modules\Core\Database\Factories\UserFactory;
+use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Pivot\ModelHasRole;
+use Modules\Core\Observers\UserObserver;
+use Override;
+use Spatie\Permission\Traits\HasRoles;
 
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser

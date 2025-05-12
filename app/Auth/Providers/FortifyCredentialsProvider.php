@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Providers;
 
-use Override;
-use Illuminate\Http\Request;
-use Modules\Core\Models\User;
-use Modules\Core\Models\License;
 use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
+use Modules\Core\Auth\Contracts\IAuthenticationProvider;
+use Modules\Core\Models\License;
+use Modules\Core\Models\User;
+use Override;
 
-final class FortifyCredentialsProvider implements AuthenticationProviderInterface
+final class FortifyCredentialsProvider implements IAuthenticationProvider
 {
     #[Override]
     public function canHandle(Request $request): bool

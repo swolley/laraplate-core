@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Cache;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * @phpstan-type HasCacheType HasCache

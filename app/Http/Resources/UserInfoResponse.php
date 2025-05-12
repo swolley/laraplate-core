@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Resources;
 
-use Override;
-use Modules\Core\Models\Permission;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Models\Permission;
+use Override;
 
 final class UserInfoResponse extends JsonResource
 {

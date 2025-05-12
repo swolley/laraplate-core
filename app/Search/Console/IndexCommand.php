@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use Override;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Engines\Engine;
 use Modules\Core\Helpers\HasBenchmark;
-use Symfony\Component\Console\Command\Command;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
+use Symfony\Component\Console\Command\Command;
 
 final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
 {

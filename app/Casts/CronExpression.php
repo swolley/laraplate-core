@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-use Override;
-use Illuminate\Database\Eloquent\Model;
 use Cron\CronExpression as CoreCronExpression;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+use Override;
 
 final class CronExpression implements CastsAttributes
 {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
 use Modules\Core\Casts\TreeRequestData;
+use Override;
 
 final class TreeRequest extends DetailRequest
 {
@@ -26,7 +26,7 @@ final class TreeRequest extends DetailRequest
     }
 
     /**
-     * Return data specific to tree request
+     * Return data specific to tree request.
      */
     #[Override]
     public function parsed(): TreeRequestData

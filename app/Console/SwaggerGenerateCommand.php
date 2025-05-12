@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Override;
-use Illuminate\Support\Str;
-use Nwidart\Modules\Facades\Module;
-use Modules\Core\Helpers\HasBenchmark;
-use Mtrajano\LaravelSwagger\FormatterManager;
-use Modules\Core\Overrides\ModuleDocGenerator;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputOption;
-use Mtrajano\LaravelSwagger\LaravelSwaggerException;
 use Illuminate\Contracts\Container\BindingResolutionException;
-use Symfony\Component\Console\Exception\InvalidArgumentException;
+use Illuminate\Support\Str;
+use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Overrides\ModuleDocGenerator;
+use Mtrajano\LaravelSwagger\FormatterManager;
 use Mtrajano\LaravelSwagger\GenerateSwaggerDoc as BaseGenerateSwaggerDoc;
+use Mtrajano\LaravelSwagger\LaravelSwaggerException;
+use Nwidart\Modules\Facades\Module;
+use Override;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\InvalidArgumentException;
+use Symfony\Component\Console\Input\InputOption;
 
 final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 {
@@ -62,7 +62,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     {
         $filter = $this->option('filter') ?: null;
 
-        /** @var string|null $file */
+        /** @var null|string $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
         $config = config('laravel-swagger');
 
@@ -82,7 +82,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $doc['tags'] = [$moduleName];
 
         // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
-        if (array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
+        if (array_filter($doc['paths'], fn ($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
             $doc['tags'][] = 'Api';
         }
 

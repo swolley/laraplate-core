@@ -4,30 +4,30 @@ declare(strict_types=1);
 
 namespace Modules\Core\Inspector\Types;
 
-use Doctrine\DBAL\Types\BlobType;
-use Doctrine\DBAL\Types\DateType;
-use Doctrine\DBAL\Types\GuidType;
-use Doctrine\DBAL\Types\JsonType;
-use Doctrine\DBAL\Types\TextType;
-use Doctrine\DBAL\Types\TimeType;
-use Doctrine\DBAL\Types\FloatType;
+use Doctrine\DBAL\Types\AsciiStringType;
 use Doctrine\DBAL\Types\BigIntType;
 use Doctrine\DBAL\Types\BinaryType;
-use Doctrine\DBAL\Types\StringType;
+use Doctrine\DBAL\Types\BlobType;
 use Doctrine\DBAL\Types\BooleanType;
-use Doctrine\DBAL\Types\DecimalType;
-use Doctrine\DBAL\Types\IntegerType;
-use Doctrine\DBAL\Types\DateTimeType;
-use Doctrine\DBAL\Types\SmallIntType;
-use Doctrine\DBAL\Types\DateTimeTzType;
-use Doctrine\DBAL\Types\AsciiStringType;
-use Doctrine\DBAL\Types\SimpleArrayType;
-use Doctrine\DBAL\Types\DateIntervalType;
 use Doctrine\DBAL\Types\DateImmutableType;
-use Doctrine\DBAL\Types\TimeImmutableType;
-use Doctrine\DBAL\Types\Type as DoctrineType;
+use Doctrine\DBAL\Types\DateIntervalType;
 use Doctrine\DBAL\Types\DateTimeImmutableType;
+use Doctrine\DBAL\Types\DateTimeType;
 use Doctrine\DBAL\Types\DateTimeTzImmutableType;
+use Doctrine\DBAL\Types\DateTimeTzType;
+use Doctrine\DBAL\Types\DateType;
+use Doctrine\DBAL\Types\DecimalType;
+use Doctrine\DBAL\Types\FloatType;
+use Doctrine\DBAL\Types\GuidType;
+use Doctrine\DBAL\Types\IntegerType;
+use Doctrine\DBAL\Types\JsonType;
+use Doctrine\DBAL\Types\SimpleArrayType;
+use Doctrine\DBAL\Types\SmallIntType;
+use Doctrine\DBAL\Types\StringType;
+use Doctrine\DBAL\Types\TextType;
+use Doctrine\DBAL\Types\TimeImmutableType;
+use Doctrine\DBAL\Types\TimeType;
+use Doctrine\DBAL\Types\Type as DoctrineType;
 
 enum DoctrineTypeEnum: string
 {

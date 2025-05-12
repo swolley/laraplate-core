@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use Override;
-use Modules\Core\Helpers\HasBenchmark;
 use Illuminate\Contracts\Events\Dispatcher;
-use Symfony\Component\Console\Command\Command;
-use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Laravel\Scout\Console\ImportCommand as BaseImportCommand;
+use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
+use Symfony\Component\Console\Command\Command;
 
 final class ImportCommand extends BaseImportCommand
 {

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
-use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\IParsableRequest;
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Models\DynamicEntity;
+use Override;
 
 abstract class CrudRequest extends FormRequest implements IParsableRequest
 {

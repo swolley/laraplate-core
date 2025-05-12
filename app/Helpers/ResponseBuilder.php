@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Exception;
-use Throwable;
-use Illuminate\Support\Arr;
-use Illuminate\Http\Request;
-use UnexpectedValueException;
-use Illuminate\Support\Carbon;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
+use UnexpectedValueException;
 
 class ResponseBuilder
 {
@@ -152,7 +152,7 @@ class ResponseBuilder
     /**
      * Set the value of error.
      *
-     * @param  string|array<int,string>|Throwable|null  $error
+     * @param  null|string|array<int,string>|Throwable  $error
      */
     public function setError(string|array|Throwable|null $error): self
     {
@@ -284,7 +284,7 @@ class ResponseBuilder
     /**
      * Set the value of class.
      *
-     * @param  object|class-string|null  $class
+     * @param  null|object|class-string  $class
      */
     public function setClass(object|string|null $class): self
     {

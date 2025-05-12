@@ -6,8 +6,8 @@ namespace Modules\Core\Models;
 
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Database\Factories\PermissionFactory;
+use Modules\Core\Helpers\HasValidations;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
 /**
@@ -46,12 +46,12 @@ final class Permission extends ModelsPermission
         'pivot',
     ];
 
-    private array $append = [
-        'action',
-    ];
-
     protected $attributes = [
         'guard_name' => 'web',
+    ];
+
+    private array $append = [
+        'action',
     ];
 
     public function __construct(array $attributes = [])

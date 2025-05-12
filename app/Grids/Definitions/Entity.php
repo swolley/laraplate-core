@@ -8,24 +8,24 @@ use function PHPUnit\Framework\assertInstanceOf;
 
 use Closure;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use UnexpectedValueException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Casts\WhereClause;
-use Modules\Core\Inspector\Inspect;
+use Illuminate\Support\Str;
 use Modules\Core\Casts\FilterOperator;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Grids\Components\Field;
-use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Grids\Requests\GridRequest;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Casts\WhereClause;
 use Modules\Core\Grids\Casts\GridRequestData;
+use Modules\Core\Grids\Components\Field;
+use Modules\Core\Grids\Components\Grid;
+use Modules\Core\Grids\Requests\GridRequest;
+use Modules\Core\Grids\Traits\HasGridUtils;
+use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Inspector\Inspect;
+use Modules\Core\Locking\Traits\HasLocks;
+use UnexpectedValueException;
 
 /**
  * Main entity class with common properties.

@@ -8,7 +8,7 @@ namespace Modules\Core\Search\Contracts;
  * Interface that defines extended methods for searchable models
  * Extends the base functionality of Laravel Scout.
  */
-interface SearchableInterface
+interface ISearchable
 {
     /**
      * Get the search mapping schema for the search engine.

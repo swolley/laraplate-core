@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Components;
 
-use Override;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Grids\Definitions\ListEntity;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Log;
+use Modules\Core\Grids\Definitions\ListEntity;
+use Override;
 
 final class Funnel extends ListEntity
 {

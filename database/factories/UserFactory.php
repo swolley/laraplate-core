@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use Override;
-use Illuminate\Support\Str;
-use Modules\Core\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+use Modules\Core\Models\User;
+use Override;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\Modules\Core\Models\User>

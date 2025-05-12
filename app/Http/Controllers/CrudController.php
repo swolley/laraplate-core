@@ -4,59 +4,59 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Closure;
-use stdClass;
-use Throwable;
-use LogicException;
-use BadMethodCallException;
-use Doctrine\DBAL\Exception;
-use Illuminate\Http\Request;
-use UnexpectedValueException;
-use Illuminate\Support\Carbon;
-use Modules\Core\Casts\Filter;
-use Modules\Core\Crud\CrudHelper;
-use Modules\Core\Casts\WhereClause;
-use Illuminate\Foundation\Auth\User;
-use Modules\Core\Casts\FiltersGroup;
 use Approval\Traits\RequiresApproval;
-use Illuminate\Support\Facades\Cache;
-use Modules\Core\Models\Modification;
-use Modules\Core\Casts\FilterOperator;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
-use Modules\Core\Casts\CrudRequestData;
-use Modules\Core\Casts\ListRequestData;
-use Modules\Core\Casts\TreeRequestData;
+use BadMethodCallException;
+use Closure;
+use Doctrine\DBAL\Exception;
 use Elastic\Elasticsearch\ClientBuilder;
-use Modules\Core\Casts\IParsableRequest;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\UnauthorizedException;
+use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
+use LogicException;
+use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\HistoryRequestData;
+use Modules\Core\Casts\IParsableRequest;
+use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\SelectRequestData;
-use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Casts\HistoryRequestData;
-use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Casts\TreeRequestData;
+use Modules\Core\Casts\WhereClause;
+use Modules\Core\Crud\CrudHelper;
 use Modules\Core\Helpers\HasCrudOperations;
 use Modules\Core\Helpers\PermissionChecker;
-use Modules\Core\Http\Requests\ListRequest;
-use Modules\Core\Http\Requests\TreeRequest;
-use Illuminate\Database\Eloquent\Collection;
-use Overtrue\LaravelVersionable\Versionable;
+use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\DetailRequest;
+use Modules\Core\Http\Requests\HistoryRequest;
+use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
 use Modules\Core\Http\Requests\SearchRequest;
-use Modules\Core\Http\Requests\HistoryRequest;
-use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Validation\UnauthorizedException;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Modules\Core\Locking\Exceptions\LockedModelException;
-use Modules\Core\Locking\Exceptions\CannotUnlockException;
+use Modules\Core\Http\Requests\TreeRequest;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use Modules\Core\Locking\Exceptions\CannotUnlockException;
+use Modules\Core\Locking\Exceptions\LockedModelException;
+use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Modification;
+use Modules\Core\Search\Traits\Searchable;
+use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
-use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
+use stdClass;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
+use UnexpectedValueException;
 
 class CrudController extends Controller
 {
@@ -75,7 +75,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -118,7 +118,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -188,7 +188,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
@@ -227,7 +227,7 @@ class CrudController extends Controller
             }
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): \Modules\Core\Helpers\ResponseBuilder {
+            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
                 $tree_relation_type = [];
 
                 if ($filters->parents && $filters->children) {
@@ -499,7 +499,7 @@ class CrudController extends Controller
     /**
      * @return string|array<int,string>
      */
-    private function getModelKeyValue(\Modules\Core\Casts\ModifyRequestData $filters): string|array
+    private function getModelKeyValue(ModifyRequestData $filters): string|array
     {
         /** @var string|array<int,string> $key */
         $key = $filters->model->getKeyName();

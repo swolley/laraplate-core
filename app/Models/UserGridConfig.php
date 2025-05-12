@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
-use Modules\Core\Cache\HasCache;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Cache\HasCache;
+use Modules\Core\Helpers\HasValidations;
+use Override;
 
 /**
  * @mixin IdeHelperUserGridConfig

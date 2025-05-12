@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Interface che definisce le operazioni di analytics supportate dai motori di ricerca.
  */
-interface SearchAnalyticsInterface
+interface ISearchAnalytics
 {
     /**
      * Ottiene metriche basate sul tempo (es. distribuzione temporale).

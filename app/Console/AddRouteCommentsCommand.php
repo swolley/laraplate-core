@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use ReflectionClass;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\Route;
+use ReflectionClass;
 
 final class AddRouteCommentsCommand extends Command
 {

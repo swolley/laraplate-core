@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
+use Illuminate\Auth\AuthManager;
+use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Auth\AuthManager;
-use Illuminate\Foundation\Auth\User;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Validation\UnauthorizedException;
+use Laravel\Socialite\Contracts\User as SocialUser;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Helpers\ResponseBuilder;
-use Illuminate\Contracts\Cache\Repository;
-use Modules\Core\Listeners\AfterLoginListener;
-use Illuminate\Validation\UnauthorizedException;
-use Modules\Core\Http\Resources\UserInfoResponse;
-use Laravel\Socialite\Contracts\User as SocialUser;
 use Modules\Core\Http\Requests\ImpersonationRequest;
+use Modules\Core\Http\Resources\UserInfoResponse;
+use Modules\Core\Listeners\AfterLoginListener;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class UserController extends Controller
@@ -50,7 +49,7 @@ final class UserController extends Controller
      */
     public function userInfo(Request $request): HttpFoundationResponse
     {
-        /** @var User|null $user */
+        /** @var null|User $user */
         $user = $this->auth->user();
 
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti

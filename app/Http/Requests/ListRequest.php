@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
-use Modules\Core\Rules\QueryBuilder;
 use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Rules\QueryBuilder;
+use Override;
 
 class ListRequest extends SelectRequest
 {
@@ -41,16 +41,19 @@ class ListRequest extends SelectRequest
         $to_merge = [];
 
         $sort = $this->input('sort');
+
         if ($sort) {
             $to_merge['sort'] = is_string($sort) && is_json($sort) ? json_decode($sort, true) : (is_string($sort) ? preg_split("/,\s?/", $sort) : $sort);
         }
 
         $filters = $this->input('filters');
+
         if ($filters) {
             $to_merge['filters'] = is_string($filters) && is_json($filters) ? json_decode($filters, true) : $filters;
         }
 
         $group_by = $this->input('group_by');
+
         if ($group_by) {
             $to_merge['group_by'] = is_string($group_by) && is_json($group_by) ? json_decode($group_by, true) : $group_by;
         }

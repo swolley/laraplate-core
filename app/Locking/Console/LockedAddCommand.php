@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Console;
 
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\App;
-use Modules\Core\Overrides\Command;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
+use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class LockedAddCommand extends Command
@@ -19,7 +19,7 @@ class LockedAddCommand extends Command
 
     protected $operation = 'add';
 
-    public function __construct(protected \Illuminate\Filesystem\Filesystem $files)
+    public function __construct(protected Filesystem $files)
     {
         parent::__construct();
     }

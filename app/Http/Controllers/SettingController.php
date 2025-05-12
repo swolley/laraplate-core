@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Modules\Core\Models\Setting;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
-use Modules\Core\Helpers\ResponseBuilder;
 use Illuminate\Support\Facades\Request as RequestFacade;
+use Illuminate\Support\Str;
+use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Models\Setting;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class SettingController extends Controller

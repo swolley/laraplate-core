@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Modules\Core\Crud;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Modules\Core\Casts\Sort;
 use InvalidArgumentException;
 use Modules\Core\Casts\Column;
-use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\ColumnType;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Casts\SelectRequestData;
+use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\Inspect;
-use Illuminate\Support\Facades\Auth;
-use Modules\Core\Casts\FiltersGroup;
-use Modules\Core\Casts\FilterOperator;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Casts\ListRequestData;
-use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Casts\SelectRequestData;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 final class CrudHelper
 {
@@ -100,12 +100,12 @@ final class CrudHelper
             // forse devo fare un filter ricorsivo nell'oggetto FiltersGroup e tirare fuori solo i campi relativi alla singoal relation o sottorelation conservando la struttura originale?
 
             // foreach ($request_data->filters->filters as $filter) {
-            //     if (!preg_match("/^\w+\.\w+$/", $filter->property)) {
+            //     if (preg_match("/^\w+\.\w+$/", $filter->property)) {
             //         $index = str_replace($main_entity . '.', '', $filter->property);
             //         $splitted = self::splitColumnNameOnLastDot($index);
             //         $cloned_filter = new Filter($splitted[1], $filter->value, $filter->operator);
             //         $relation_name = preg_replace('/\.' . $splitted[1] . '$/', '', $filter->property);
-            //         if (!array_key_exists($index, $relations_filters[$relation_name])) {
+            //         if (! array_key_exists($index, $relations_filters[$relation_name])) {
             //             $relations_filters[$relation_name] = [$cloned_filter];
             //         } else {
             //             $relations_filters[$relation_name][] = $cloned_filter;
@@ -206,11 +206,11 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn($relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
-     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:string|null}
+     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:null|string}
      */
     private function splitProperty(Builder|Model $model, string $property): array
     {
@@ -281,7 +281,7 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
@@ -293,8 +293,8 @@ final class CrudHelper
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
-        usort($columns, fn(Column $a, Column $b): int => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn(Column $column): string => $column->name, $columns);
+        usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
+        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {

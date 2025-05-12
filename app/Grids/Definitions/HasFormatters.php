@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Definitions;
 
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Modules\Core\Grids\Components\Field;
 
 /** @phpstan-type FormatterCallable callable(mixed, Model):void|null */

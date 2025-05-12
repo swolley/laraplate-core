@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
-use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
-use Overtrue\LaravelVersionable\VersionStrategy;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
+use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
+use Overtrue\LaravelVersionable\VersionStrategy;
 
 /**
  * @mixin IdeHelperVersion

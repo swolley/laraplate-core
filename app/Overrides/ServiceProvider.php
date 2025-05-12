@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Override;
-use RecursiveIteratorIterator;
-use RecursiveDirectoryIterator;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
+use Override;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 class ServiceProvider extends BaseServiceProvider
 {
@@ -56,7 +56,7 @@ class ServiceProvider extends BaseServiceProvider
             if (! array_key_exists($key, $array1)) {
                 $array1[$key] = $value;
             } elseif (is_array($value)) {
-                // if (!isset($array1[$key])) {
+                // if (! isset($array1[$key])) {
                 // 	$array1[$key] = [];
                 // }
                 $array1[$key] = self::mergeArrays($array1[$key], $value);

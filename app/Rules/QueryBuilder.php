@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Rules;
 
 use Closure;
-use Override;
-use Illuminate\Support\Arr;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Arr;
+use Override;
 
 final class QueryBuilder implements ValidationRule
 {

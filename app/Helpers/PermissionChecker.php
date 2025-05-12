@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use InvalidArgumentException;
 use Illuminate\Auth\SessionGuard;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\UnauthorizedException;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use InvalidArgumentException;
 
 final class PermissionChecker
 {

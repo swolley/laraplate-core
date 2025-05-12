@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use Override;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\Permission;
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Override;
 
 final class PermissionFactory extends Factory
 {

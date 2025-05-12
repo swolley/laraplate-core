@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Inspector\Entities;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
 final readonly class Column

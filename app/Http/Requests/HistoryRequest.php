@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
 use Modules\Core\Casts\HistoryRequestData;
+use Override;
 
 final class HistoryRequest extends DetailRequest
 {

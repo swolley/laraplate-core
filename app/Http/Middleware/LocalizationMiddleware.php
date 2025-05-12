@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Middleware;
 
 use Closure;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 final class LocalizationMiddleware

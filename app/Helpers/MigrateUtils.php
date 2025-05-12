@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use InvalidArgumentException;
-use Modules\Core\Locking\Locked;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
+use Modules\Core\Locking\Locked;
 
 final class MigrateUtils
 {

@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Override;
+use function Laravel\Prompts\select;
 
+use Filament\Clusters\Cluster;
+use Filament\Commands\MakeResourceCommand as FilamentMakeResourceCommand;
+use Filament\Facades\Filament;
 use Filament\Panel;
-use ReflectionClass;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Filament\Clusters\Cluster;
-use Filament\Facades\Filament;
-use function Laravel\Prompts\select;
 use Modules\Core\Helpers\HasBenchmark;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Symfony\Component\Console\Command\Command;
 use Modules\Core\Helpers\HasCommandModelResolution;
-use Filament\Commands\MakeResourceCommand as FilamentMakeResourceCommand;
+use Override;
+use ReflectionClass;
+use Symfony\Component\Console\Command\Command;
 
 final class MakeResourceCommand extends FilamentMakeResourceCommand
 {
@@ -105,7 +105,7 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
             $panel = count($panels) > 1 ? $panels[select(
                 label: 'Which panel would you like to create this in?',
                 options: array_map(
-                    fn(Panel $panel): string => $panel->getId(),
+                    fn (Panel $panel): string => $panel->getId(),
                     $panels,
                 ),
                 default: Filament::getDefaultPanel()->getId(),
@@ -140,12 +140,11 @@ final class MakeResourceCommand extends FilamentMakeResourceCommand
         $editResourcePageClass = "Edit{$modelClass}";
         $viewResourcePageClass = "View{$modelClass}";
 
-        $baseResourcePath
-            = (string) str($resourceClass)
-                ->prepend('/' . $resourceNamespace . '/')
-                ->prepend($path)
-                ->replace('\\', '/')
-                ->replace('//', '/');
+        $baseResourcePath = (string) str($resourceClass)
+            ->prepend('/' . $resourceNamespace . '/')
+            ->prepend($path)
+            ->replace('\\', '/')
+            ->replace('//', '/');
 
         $resourcePath = "{$baseResourcePath}.php";
         $resourcePagesDirectory = "{$baseResourcePath}/Pages";

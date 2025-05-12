@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\text;
 use function Laravel\Prompts\password;
+use function Laravel\Prompts\text;
 
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\Hash;
 
 final class InitializeUsers extends Command
 {

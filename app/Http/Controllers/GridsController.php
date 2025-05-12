@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Illuminate\Http\Request;
-use UnexpectedValueException;
-use Modules\Core\Models\DynamicEntity;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Helpers\PermissionChecker;
-use Modules\Core\Grids\Requests\GridRequest;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Http\Request;
 use Illuminate\Validation\UnauthorizedException;
+use Modules\Core\Grids\Components\Grid;
+use Modules\Core\Grids\Requests\GridRequest;
+use Modules\Core\Helpers\PermissionChecker;
+use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Models\DynamicEntity;
+use Symfony\Component\HttpFoundation\Response;
+use UnexpectedValueException;
 
 final class GridsController extends Controller
 {
@@ -95,7 +95,7 @@ final class GridsController extends Controller
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException | UnauthorizedException $ex) {
+        } catch (UnexpectedValueException|UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();

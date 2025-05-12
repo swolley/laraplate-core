@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Rules;
 
 use Closure;
-use Override;
-use InvalidArgumentException;
 use Illuminate\Contracts\Validation\ValidationRule;
+use InvalidArgumentException;
+use Override;
 
 final class CronExpression implements ValidationRule
 {

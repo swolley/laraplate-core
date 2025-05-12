@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Override;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Database\Events\MigrationsEnded;
+use Override;
 
 final class CommandListenerProvider extends ServiceProvider
 {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Facades;
 
-use Override;
 use Illuminate\Support\Facades\Facade;
+use Override;
 
 /**
  * @see \Sfolador\Locked\Locked

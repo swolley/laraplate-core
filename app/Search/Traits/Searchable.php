@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Traits;
 
-use stdClass;
+use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
 use Exception;
-use Laravel\Scout\EngineManager;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Scout\EngineManager;
 use Modules\Core\Models\ModelEmbedding;
+use Modules\Core\Search\Engines\AbstractSearchEngine;
+use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Services\ElasticsearchService;
-use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Modules\Core\Search\Engines\AbstractSearchEngine;
-use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
+use stdClass;
 
 /**
  * Extended searchable trait that supports multiple engines
  * Provides enhanced functionality for Elasticsearch and Typesense.
  *
- * Note: Models using this trait should implement SearchableInterface
+ * Note: Models using this trait should implement ISearchable
  */
 trait Searchable
 {
@@ -295,7 +295,7 @@ trait Searchable
             $ids = collect($response['hits'])->pluck('document.id')->toArray();
 
             return static::whereIn($this->getKeyName(), $ids)->get()
-                ->sortBy(fn($model): int|string|false => array_search($model->getKey(), $ids, true));
+                ->sortBy(fn ($model): int|string|false => array_search($model->getKey(), $ids, true));
         }
 
         return collect();
@@ -596,7 +596,7 @@ trait Searchable
                     $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
                     $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Override;
-use Nwidart\Modules\Module;
 use Illuminate\Container\Container;
 use Nwidart\Modules\Activators\FileActivator;
 use Nwidart\Modules\Contracts\ActivatorInterface;
+use Nwidart\Modules\Module;
+use Override;
 
 final readonly class ModuleMultiActivator implements ActivatorInterface
 {

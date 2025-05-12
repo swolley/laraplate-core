@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Override;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use Laravel\Fortify\Fortify;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
+use Laravel\Fortify\Fortify;
 use Modules\Core\Actions\Fortify\CreateNewUser;
-use Modules\Core\Auth\Providers\SocialiteProvider;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserPassword;
-use Modules\Core\Auth\Services\AuthenticationService;
-use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
+use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
+use Modules\Core\Auth\Providers\SocialiteProvider;
+use Modules\Core\Auth\Services\AuthenticationService;
+use Override;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
@@ -81,7 +81,7 @@ final class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(AuthenticationService::class, fn ($app): \Modules\Core\Auth\Services\AuthenticationService => new AuthenticationService([
+        $this->app->singleton(AuthenticationService::class, fn ($app): AuthenticationService => new AuthenticationService([
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),
         ]));

@@ -4,49 +4,49 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Components;
 
-use Closure;
-use Throwable;
-use RuntimeException;
 use BadMethodCallException;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use InvalidArgumentException;
-use UnexpectedValueException;
-use Modules\Core\Cache\HasCache;
-use PHPUnit\Framework\Exception;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
-use Modules\Core\Casts\FilterOperator;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
-use Modules\Core\Grids\Casts\GridAction;
-use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Grids\Definitions\Entity;
-use Modules\Core\Grids\Hooks\HasReadHooks;
-use Illuminate\Support\Facades\Concurrency;
-use Modules\Core\Grids\Hooks\HasWriteHooks;
-use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Grids\Requests\GridRequest;
+use Closure;
 use Doctrine\DBAL\Exception as DBALException;
-use Modules\Core\Grids\Casts\GridRequestData;
-use Modules\Core\Grids\Resources\ResponseBuilder;
-use PHPUnit\Framework\ExpectationFailedException;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Modules\Core\Cache\HasCache;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Grids\Casts\GridAction;
+use Modules\Core\Grids\Casts\GridRequestData;
+use Modules\Core\Grids\Definitions\Entity;
 use Modules\Core\Grids\Exceptions\ConcurrencyException;
+use Modules\Core\Grids\Hooks\HasReadHooks;
+use Modules\Core\Grids\Hooks\HasWriteHooks;
+use Modules\Core\Grids\Requests\GridRequest;
+use Modules\Core\Grids\Resources\ResponseBuilder;
+use Modules\Core\Grids\Traits\HasGridUtils;
+use PHPUnit\Framework\Exception;
+use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
-use Illuminate\Contracts\Container\BindingResolutionException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
+use Throwable;
+use UnexpectedValueException;
 
 final class Grid extends Entity
 {
@@ -564,17 +564,17 @@ final class Grid extends Entity
 
         // data
         if (in_array($action, [GridAction::SELECT, GridAction::DATA], true)) {
-            $processes[] = fn (): \Modules\Core\Grids\Resources\ResponseBuilder => $this->processData($responseBuilder);
+            $processes[] = fn (): ResponseBuilder => $this->processData($responseBuilder);
         }
 
         // options
         if ($action === GridAction::SELECT || $action === GridAction::OPTIONS) {
-            $processes[] = fn (): \Modules\Core\Grids\Resources\ResponseBuilder => $this->processOptions($responseBuilder);
+            $processes[] = fn (): ResponseBuilder => $this->processOptions($responseBuilder);
         }
 
         // funnels
         if ($action === GridAction::SELECT || $action === GridAction::FUNNELS) {
-            $processes[] = fn (): \Modules\Core\Grids\Resources\ResponseBuilder => $this->processFunnels($responseBuilder);
+            $processes[] = fn (): ResponseBuilder => $this->processFunnels($responseBuilder);
         }
 
         Concurrency::driver(App::runningInConsole() ? 'fork' : 'process')->run($processes);
@@ -593,7 +593,7 @@ final class Grid extends Entity
     private function processReadActions(ResponseBuilder $responseBuilder, GridRequest $request): ResponseBuilder
     {
         if (class_uses_trait($this->getModel(), HasCache::class)) {
-            return Cache::tryByRequest($this->getModel(), $request, fn ($cbRequest): \Modules\Core\Grids\Resources\ResponseBuilder => $this->callbackToReadAction($responseBuilder, $cbRequest));
+            return Cache::tryByRequest($this->getModel(), $request, fn ($cbRequest): ResponseBuilder => $this->callbackToReadAction($responseBuilder, $cbRequest));
         }
 
         return $this->callbackToReadAction($responseBuilder, $request);

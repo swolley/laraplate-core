@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\table;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
 
-use Throwable;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
-use Illuminate\Support\Facades\Log;
 use Modules\Core\Overrides\Command;
-use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Console\Command\Command as BaseCommand;
+use Throwable;
 
 final class HandleLicensesCommand extends Command
 {

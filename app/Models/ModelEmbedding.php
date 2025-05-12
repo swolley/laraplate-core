@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Override;
 
 // use Modules\Core\Database\Factories\ModelEmbeddingFactory;
 

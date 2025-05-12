@@ -7,11 +7,11 @@ namespace Modules\Core\Search\Console;
 use function Laravel\Prompts\confirm;
 
 use Exception;
-use Modules\Core\Cache\HasCache;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
-use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 

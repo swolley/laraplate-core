@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Throwable;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Command\Command as BaseCommand;
+use Throwable;
 
 final class FreeAllLicensesCommand extends Command
 {

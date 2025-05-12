@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Console;
 
-use Override;
 use Illuminate\Database\Eloquent\Model;
+use Override;
 
 class OptimisticLockAddCommand extends LockedAddCommand
 {

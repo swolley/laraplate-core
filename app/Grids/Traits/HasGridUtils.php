@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Modules\Core\Grids\Traits;
 
 use Exception;
-use Throwable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Modules\Core\Grids\Components\Grid;
+use Modules\Core\Grids\Definitions\PivotRelationInfo;
+use Modules\Core\Grids\Definitions\RelationInfo;
+use Modules\Core\Locking\Traits\HasLocks;
 use ReflectionClass;
 use ReflectionMethod;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Grids\Definitions\RelationInfo;
-use Illuminate\Database\Eloquent\Relations\Relation;
-use Modules\Core\Grids\Definitions\PivotRelationInfo;
+use Throwable;
 
 trait HasGridUtils
 {

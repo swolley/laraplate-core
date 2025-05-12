@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Lab404\Impersonate\Impersonate;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Lab404\Impersonate\Impersonate;
 
 final class ImpersonationRequest extends FormRequest
 {
@@ -15,7 +15,7 @@ final class ImpersonationRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        /** @var User|null $user */
+        /** @var null|User $user */
         $user = auth()->user();
 
         return $user && class_uses_trait($user, Impersonate::class) && $user->canImpersonate();

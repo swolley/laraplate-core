@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Models\DynamicEntity;
-use Illuminate\Database\Eloquent\Model;
 
 class CrudRequestData
 {

@@ -8,10 +8,10 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Inspector\Entities\Index;
-use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
+use Modules\Core\Inspector\Entities\Index;
+use Modules\Core\Inspector\Entities\Table;
 
 final class Inspect
 {
@@ -145,7 +145,7 @@ final class Inspect
      */
     private static function parseColumns(array $columns): Collection
     {
-        return collect($columns)->map(fn ($column): \Modules\Core\Inspector\Entities\Column => new Column(
+        return collect($columns)->map(fn ($column): Column => new Column(
             $column['name'],
             self::getAttributesForColumn($column),
             $column['default'],
@@ -168,7 +168,7 @@ final class Inspect
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(fn ($index): \Modules\Core\Inspector\Entities\Index => new Index(
+        return collect($indexes)->map(fn ($index): Index => new Index(
             $index['name'],
             collect($index['columns']),
             self::getAttributesForIndex($index),
@@ -180,7 +180,7 @@ final class Inspect
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
-        return collect($keys)->map(fn ($foreignKey): \Modules\Core\Inspector\Entities\ForeignKey => new ForeignKey(
+        return collect($keys)->map(fn ($foreignKey): ForeignKey => new ForeignKey(
             $foreignKey['name'],
             collect($foreignKey['columns']),
             $foreignKey['foreign_schema'],

@@ -6,8 +6,8 @@ namespace Modules\Core\Casts;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Modules\Core\Models\Setting;
 use Modules\Core\Http\Requests\ListRequest;
+use Modules\Core\Models\Setting;
 
 class ListRequestData extends SelectRequestData
 {
@@ -32,7 +32,7 @@ class ListRequestData extends SelectRequestData
 
         $this->extractPagination($validated);
 
-        if (!isset($this->limit)) {
+        if (! isset($this->limit)) {
             $this->limit = (int) ($validated['limit'] ?? $this->pagination);
         }
 
@@ -107,7 +107,7 @@ class ListRequestData extends SelectRequestData
         if ($filter['value'] === 'null' || $filter['value'] === null) {
             $filter['value'] = null;
         } elseif (in_array($filter['operator'], [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
-            $filter['value'] = !Str::startsWith($filter['value'], '%') && !Str::endsWith($filter['value'], '%') ? '%' . $filter['value'] . '%' : $filter['value'];
+            $filter['value'] = ! Str::startsWith($filter['value'], '%') && ! Str::endsWith($filter['value'], '%') ? '%' . $filter['value'] . '%' : $filter['value'];
         } elseif ($filter['operator'] === FilterOperator::IN && is_string($filter['value'])) {
             $filter['value'] = is_json($filter['value']) ? json_decode($filter['value'], true) : explode(',', $filter['value']);
         }
@@ -130,7 +130,7 @@ class ListRequestData extends SelectRequestData
             $filters = new Filter($filters['property'], $filters['value'], $filters['operator']);
         }
 
-        if ($level === 0 && !($filters instanceof FiltersGroup) && Arr::isList($filters)) {
+        if ($level === 0 && ! ($filters instanceof FiltersGroup) && Arr::isList($filters)) {
             $filters = new FiltersGroup($filters);
         }
     }
@@ -161,7 +161,7 @@ class ListRequestData extends SelectRequestData
             $all_columns_name = array_map(fn(Column $column): string => $column->name, $this->columns);
 
             foreach ($groups as $group) {
-                if (!in_array($group, $all_columns_name, true)) {
+                if (! in_array($group, $all_columns_name, true)) {
                     $this->columns[] = new Column($group);
                 }
             }

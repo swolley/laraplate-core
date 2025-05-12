@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Override;
 use Modules\Core\Casts\DetailRequestData;
+use Override;
 
 class DetailRequest extends SelectRequest
 {

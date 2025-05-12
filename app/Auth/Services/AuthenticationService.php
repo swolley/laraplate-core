@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Auth\Services;
 
 use Illuminate\Http\Request;
-use Modules\Core\Auth\Contracts\AuthenticationProviderInterface;
+use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 
 final readonly class AuthenticationService
 {
     /**
-     * @param  array<int,AuthenticationProviderInterface>  $providers
+     * @param  array<int,IAuthenticationProvider>  $providers
      */
     public function __construct(
         private array $providers,
@@ -39,7 +39,7 @@ final readonly class AuthenticationService
     public function getAvailableProviders(): array
     {
         return array_map(
-            fn (AuthenticationProviderInterface $provider): string => $provider->getProviderName(),
+            fn (IAuthenticationProvider $provider): string => $provider->getProviderName(),
             array_filter($this->providers, fn ($p): bool => $p->isEnabled()),
         );
     }

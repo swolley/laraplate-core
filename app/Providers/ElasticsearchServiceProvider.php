@@ -21,7 +21,7 @@ final class ElasticsearchServiceProvider extends ServiceProvider
         );
 
         // Load Elasticsearch client configuration (if not already loaded by the package)
-        // if (!$this->app['config']->has('elastic.connections')) {
+        // if (! $this->app['config']->has('elastic.connections')) {
         $this->mergeConfigFrom(
             __DIR__ . '/../config/elastic.client.php',
             'elastic',
@@ -29,7 +29,7 @@ final class ElasticsearchServiceProvider extends ServiceProvider
         // }
 
         // Register the service as singleton
-        $this->app->singleton('elasticsearch', fn(): \Modules\Core\Services\ElasticsearchService => ElasticsearchService::getInstance());
+        $this->app->singleton('elasticsearch', fn (): ElasticsearchService => ElasticsearchService::getInstance());
 
         // Create an alias for easier access to the service
         $this->app->alias('elasticsearch', ElasticsearchService::class);

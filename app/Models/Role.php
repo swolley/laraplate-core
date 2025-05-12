@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Override;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Modules\Core\Cache\HasCache;
-use Illuminate\Support\Collection;
+use Modules\Core\Database\Factories\RoleFactory;
+use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
-use Spatie\Permission\Models\Role as BaseRole;
-use Modules\Core\Database\Factories\RoleFactory;
+use Override;
 use Spatie\Permission\Exceptions\GuardDoesNotMatch;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 /**

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Fortify;
 
-use Override;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Override;
 
 final class CreateNewUser implements CreatesNewUsers
 {

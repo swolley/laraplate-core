@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use InvalidFormatException;
+use Illuminate\Database\Eloquent\Builder;
 // use Modules\Core\Casts\ActionEnum;
 // use Illuminate\Support\Facades\Auth;
 // use Illuminate\Database\Eloquent\Model;
-use InvalidArgumentException;
 use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Builder;
+use InvalidArgumentException;
+use InvalidFormatException;
 
 // use Illuminate\Validation\UnauthorizedException;
 
@@ -32,10 +32,10 @@ trait HasValidity
 
     public function initializeHasValidity(): void
     {
-        // if (!isset($this->casts[static::$valid_from_column])) {
+        // if (! isset($this->casts[static::$valid_from_column])) {
         //     $this->casts[static::$valid_from_column] = 'date';
         // }
-        // if (!isset($this->casts[static::$valid_to_column])) {
+        // if (! isset($this->casts[static::$valid_to_column])) {
         //     $this->casts[static::$valid_to_column] = 'date';
         // }
         if (! in_array(static::$valid_from_column, $this->fillable, true)) {

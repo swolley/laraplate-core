@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Modules\Core\Grids\Components;
 
 use Closure;
-use Override;
-use JsonSerializable;
-use UnexpectedValueException;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Grids\Definitions\HasPath;
-use Modules\Core\Grids\Traits\HasGridUtils;
+use JsonSerializable;
 use Modules\Core\Grids\Definitions\FieldType;
 use Modules\Core\Grids\Definitions\HasFormatters;
+use Modules\Core\Grids\Definitions\HasPath;
 use Modules\Core\Grids\Definitions\HasValidations;
+use Modules\Core\Grids\Traits\HasGridUtils;
+use Override;
+use UnexpectedValueException;
 
 final class Field implements JsonSerializable
 {
