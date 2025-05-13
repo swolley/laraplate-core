@@ -87,7 +87,7 @@ trait HasCacheRepository
     /**
      * clear cache by request extracted info.
      *
-     * @param   null|Model|string|array<string|object>
+     * @param  null|Model|string|array<string|object>
      */
     public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
@@ -113,7 +113,7 @@ trait HasCacheRepository
     /**
      * clear cache elements by user and only by entity if specified.
      *
-     * @param   null|Model|string|array<string|object>
+     * @param  null|Model|string|array<string|object>
      */
     public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
@@ -139,7 +139,7 @@ trait HasCacheRepository
     /**
      * clear cache elements by user group and only by entity if specified.
      *
-     * @param   null|Model|string|array<string|object>
+     * @param  null|Model|string|array<string|object>
      */
     public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
@@ -165,7 +165,7 @@ trait HasCacheRepository
     /**
      * recursively sorts array by keys.
      *
-     * @param null|array<int,string>|string
+     * @param  null|array<int,string>|string  $array
      */
     private static function recursiveKSort(array|string|null &$array): void
     {

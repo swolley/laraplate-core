@@ -38,10 +38,10 @@ final class FortifyServiceProvider extends ServiceProvider
                     return redirect()->route('core.auth.userInfo');
                 }
 
-                // If we are in a Filament context, redirect to Filament login
-                if (str_contains($request->path(), 'admin')) {
-                    return redirect()->route('filament.auth.login');
-                }
+                // // If we are in a Filament context, redirect to Filament login
+                // if (str_contains($request->path(), 'admin')) {
+                //     return redirect()->route('filament.auth.login');
+                // }
 
                 return redirect()->intended(Fortify::redirects('logout', '/'));
             }
@@ -55,10 +55,10 @@ final class FortifyServiceProvider extends ServiceProvider
                     return redirect()->route('core.auth.userInfo');
                 }
 
-                // If we are in a Filament context, redirect to Filament dashboard
-                if (str_contains($request->path(), 'admin')) {
-                    return redirect()->route('filament.pages.dashboard');
-                }
+                // // If we are in a Filament context, redirect to Filament dashboard
+                // if (str_contains($request->path(), 'admin')) {
+                //     return redirect()->route('filament.pages.dashboard');
+                // }
 
                 return redirect()->intended(Fortify::redirects('login'));
             }
@@ -72,10 +72,10 @@ final class FortifyServiceProvider extends ServiceProvider
                     return redirect()->route('core.auth.userInfo');
                 }
 
-                // If we are in a Filament context, redirect to Filament dashboard
-                if (str_contains($request->path(), 'admin')) {
-                    return redirect()->route('filament.pages.dashboard');
-                }
+                // // If we are in a Filament context, redirect to Filament dashboard
+                // if (str_contains($request->path(), 'admin')) {
+                //     return redirect()->route('filament.pages.dashboard');
+                // }
 
                 return redirect()->intended(Fortify::redirects('register'));
             }

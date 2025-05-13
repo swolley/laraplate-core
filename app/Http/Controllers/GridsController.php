@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
+use Exception;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\UnauthorizedException;
+use InvalidArgumentException;
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\DynamicEntity;
+use PHPUnit\Framework\Exception as FrameworkException;
+use PHPUnit\Framework\ExpectationFailedException;
+use PHPUnit\Framework\UnknownClassOrInterfaceException;
+use Spatie\Permission\Contracts\Permission;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
@@ -30,27 +38,17 @@ final class GridsController extends Controller
             $permissions = $request->user()->getAllPermissions();
 
             if ($entity !== null && $entity !== '' && $entity !== '0') {
-                $entity_instance = DynamicEntity::tryResolveModel($entity);
-
-                if ($entity_instance === null || $entity_instance === '' || $entity_instance === '0') {
-                    throw new UnexpectedValueException("Unable to find entity '{$entity}'");
-                }
-                $entity = $entity_instance;
+                $entity = $this->getModel($entity);
             }
 
             foreach (models() as $model) {
                 /** @var Model $instance */
                 $instance = new $model();
                 $table = $instance->getTable();
+                $grid = $this->getModelGridConfigs($entity, $instance, $table, $request, $permissions);
 
-                if (
-                    ($entity === null || $entity === '' || $entity === '0' || $instance::class === $entity::class)
-                    && Grid::useGridUtils($instance)
-                    && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
-                ) {
-                    /** @var Grid $grid */
-                    $grid = $instance->getGrid();
-                    $grids[$table] = $grid->getConfigs();
+                if ($grid !== null) {
+                    $grids[$table] = $grid;
                 }
             }
 
@@ -100,5 +98,45 @@ final class GridsController extends Controller
                 ->setData($ex)
                 ->json();
         }
+    }
+
+    private function getModel(string $entity): string
+    {
+        $entity_instance = DynamicEntity::tryResolveModel($entity);
+
+        if ($entity_instance === null || $entity_instance === '' || $entity_instance === '0') {
+            throw new UnexpectedValueException("Unable to find entity '{$entity}'");
+        }
+
+        return $entity_instance;
+    }
+
+    /**
+     * @param  Collection<Permission>  $permissions
+     *
+     * @throws InvalidArgumentException
+     * @throws BindingResolutionException
+     * @throws UnauthorizedException
+     * @throws Exception
+     * @throws FrameworkException
+     * @throws ExpectationFailedException
+     * @throws UnknownClassOrInterfaceException
+     * @throws Exception
+     * @throws UnexpectedValueException
+     */
+    private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request, Collection $permissions): ?array
+    {
+        if (
+            ($entity === null || $entity === '' || $entity === '0' || $instance::class === $entity::class)
+            && Grid::useGridUtils($instance)
+            && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName(), permissions: $permissions)
+        ) {
+            /** @var Grid $grid */
+            $grid = $instance->getGrid();
+
+            return $grid->getConfigs();
+        }
+
+        return null;
     }
 }

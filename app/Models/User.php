@@ -6,8 +6,6 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -41,7 +39,7 @@ use Spatie\Permission\Traits\HasRoles;
  *
  * @mixin IdeHelperUser
  */
-class User extends BaseUser implements FilamentUser
+class User extends BaseUser
 {
     use ApprovesChanges,
         HasFactory,
@@ -115,14 +113,6 @@ class User extends BaseUser implements FilamentUser
         }
 
         return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
-    }
-
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return match ($panel->getId()) {
-            'admin' => $this->isSuperAdmin(),
-            default => true,
-        };
     }
 
     /**
