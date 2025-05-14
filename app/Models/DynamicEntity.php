@@ -71,7 +71,7 @@ final class DynamicEntity extends Model
      * @throws Exception
      * @throws InvalidArgumentException
      *
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
     {
@@ -136,7 +136,7 @@ final class DynamicEntity extends Model
     /**
      * @throws Exception
      *
-     * @return null|class-string<Model>
+     * @return class-string<Model>|null
      */
     private static function findModel(array $models, string $modelName): ?string
     {

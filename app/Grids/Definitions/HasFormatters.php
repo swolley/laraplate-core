@@ -12,14 +12,14 @@ use Modules\Core\Grids\Components\Field;
 trait HasFormatters
 {
     /**
-     * @var null|callable
+     * @var callable|null
      *
      * @phpstan-var FormatterCallable
      */
     private $getFormatter;
 
     /**
-     * @var null|callable
+     * @var callable|null
      *
      * @phpstan-var FormatterCallable
      */
@@ -87,7 +87,7 @@ trait HasFormatters
     /**
      * alias for write formatter getter that returns static for pipes.
      *
-     * @param  null|callable  $callback  read formatter callback
+     * @param  callable|null  $callback  read formatter callback
      */
     public function getFormatter(?callable $callback): static
     {
@@ -99,7 +99,7 @@ trait HasFormatters
     /**
      * alias for write formatter getter that returns static for pipes.
      *
-     * @param  null|callable  $callback  write formatter callback
+     * @param  callable|null  $callback  write formatter callback
      */
     public function setFormatter(?callable $callback): static
     {

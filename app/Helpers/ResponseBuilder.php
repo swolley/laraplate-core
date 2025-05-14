@@ -52,7 +52,7 @@ class ResponseBuilder
 
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
-    public function __construct(private Request $request)
+    public function __construct(private ?Request $request)
     {
         $this->preview = preview();
     }
@@ -152,7 +152,7 @@ class ResponseBuilder
     /**
      * Set the value of error.
      *
-     * @param  null|string|array<int,string>|Throwable  $error
+     * @param  string|array<int,string>|Throwable|null  $error
      */
     public function setError(string|array|Throwable|null $error): self
     {
@@ -284,7 +284,7 @@ class ResponseBuilder
     /**
      * Set the value of class.
      *
-     * @param  null|object|class-string  $class
+     * @param  object|class-string|null  $class
      */
     public function setClass(object|string|null $class): self
     {

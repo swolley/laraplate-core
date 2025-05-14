@@ -18,7 +18,7 @@ trait HasCacheRepository
      *
      * @template TCacheValue
      *
-     * @param   null|Model|string|array<string|object>
+     * @param   Model|string|array<string|object>|null
      * @param  Closure(TCacheValue): mixed  $callback
      * @return TCacheValue
      */
@@ -87,7 +87,7 @@ trait HasCacheRepository
     /**
      * clear cache by request extracted info.
      *
-     * @param  null|Model|string|array<string|object>
+     * @param  Model|string|array<string|object>|null
      */
     public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
@@ -113,7 +113,7 @@ trait HasCacheRepository
     /**
      * clear cache elements by user and only by entity if specified.
      *
-     * @param  null|Model|string|array<string|object>
+     * @param  Model|string|array<string|object>|null
      */
     public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
@@ -139,7 +139,7 @@ trait HasCacheRepository
     /**
      * clear cache elements by user group and only by entity if specified.
      *
-     * @param  null|Model|string|array<string|object>
+     * @param  Model|string|array<string|object>|null
      */
     public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
@@ -165,7 +165,7 @@ trait HasCacheRepository
     /**
      * recursively sorts array by keys.
      *
-     * @param  null|array<int,string>|string  $array
+     * @param  array<int,string>|string|null  $array
      */
     private static function recursiveKSort(array|string|null &$array): void
     {
@@ -202,7 +202,7 @@ trait HasCacheRepository
     /**
      * compose key parts by user and groups.
      *
-     * @return null|array<int,string>
+     * @return array<int,string>|null
      */
     private function getKeyPartsFromUser(User $user): ?array
     {

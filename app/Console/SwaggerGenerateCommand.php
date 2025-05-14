@@ -62,7 +62,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     {
         $filter = $this->option('filter') ?: null;
 
-        /** @var null|string $file */
+        /** @var string|null $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
         $config = config('laravel-swagger');
 

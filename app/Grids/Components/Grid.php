@@ -770,7 +770,7 @@ final class Grid extends Entity
             throw new BadMethodCallException("App doesn't support grid layouts");
         }
 
-        /** @var null|User $user */
+        /** @var User|null $user */
         $user = Auth::user();
 
         if (! $user) {

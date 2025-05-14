@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
@@ -41,9 +42,9 @@ final class ACL extends Model
     }
 
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    public function forPermission($query, $permission_id): void
+    public function scopeForPermission(Builder $query, $permission_id): Builder
     {
-        $query->where('permission_id', $permission_id);
+        return $query->where('permission_id', $permission_id);
     }
 
     public function getRules(): array

@@ -242,7 +242,7 @@ final class ElasticsearchService
      *
      * @throws ElasticsearchException
      *
-     * @return null|array Document data or null if not found
+     * @return array|null Document data or null if not found
      */
     public function getDocument(string $index, string $id): ?array
     {

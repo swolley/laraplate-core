@@ -41,7 +41,7 @@ abstract class ListEntity extends Entity
     /**
      * list entity generator.
      *
-     * @param  null|Field|string|string[]|Field[]  $labelField
+     * @param  Field|string|string[]|Field[]|null  $labelField
      * @return Closure construct callback
      * @return Closure(Model, Field): static
      */
@@ -80,7 +80,7 @@ abstract class ListEntity extends Entity
     /**
      * gets field used for label data.
      *
-     * @return null|Field|array<string, mixed>
+     * @return Field|array<string, mixed>|null
      */
     final public function getLabelField(): array|Field|null
     {

@@ -210,7 +210,7 @@ final class CrudHelper
     }
 
     /**
-     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:null|string}
+     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:string|null}
      */
     private function splitProperty(Builder|Model $model, string $property): array
     {

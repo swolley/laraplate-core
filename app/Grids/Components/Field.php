@@ -36,7 +36,7 @@ final class Field implements JsonSerializable
      * @param  Model  $model  field entity related model
      * @param  string  $path  field path (prefix of the full name)
      * @param  string  $name  field name (column)
-     * @param  null|string  $alias  field alias (name will be used if nothing assigned)
+     * @param  string|null  $alias  field alias (name will be used if nothing assigned)
      */
     public function __construct(string $path, string $name, ?string $alias = null, private FieldType $fieldType = FieldType::COLUMN, ?Model $model = null)
     {

@@ -219,7 +219,7 @@ trait HasGridUtils
     }
 
     /**
-     * @return array{createdAt:null|string,updatedAt:null|string,deletedAt:null|string,lockedAt:null|string}
+     * @return array{createdAt:string|null,updatedAt:string|null,deletedAt:string|null,lockedAt:string|null}
      */
     public static function getTimestampColumns(Model $model, bool $fullnames = false): array
     {

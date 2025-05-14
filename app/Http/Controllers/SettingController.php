@@ -181,6 +181,7 @@ final class SettingController extends Controller
             if ($tag === '.') {
                 continue;
             }
+
             if ($tag === '..') {
                 continue;
             }

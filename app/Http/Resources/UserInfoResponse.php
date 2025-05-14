@@ -26,7 +26,7 @@ final class UserInfoResponse extends JsonResource
                     $permissions[$permission->guard][] = $permission->name;
                 }
             }
-            $roles = $this->resource->roles->map(fn ($role) => $role->name);
+            $roles = $this->resource->roles->map(fn($role) => $role->name);
 
             return [
                 'id' => $this->resource->id,
