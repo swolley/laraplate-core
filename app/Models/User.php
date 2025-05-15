@@ -36,7 +36,6 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser
@@ -47,13 +46,13 @@ class User extends BaseUser
         HasRoles,
         HasValidations,
         HasVersions,
-        Impersonate,
+        // Impersonate,
         Notifiable,
         SoftDeletes,
         TwoFactorAuthenticatable {
-            getRules as protected getRulesTrait;
-            roles as protected rolesTrait;
-        }
+        getRules as protected getRulesTrait;
+        roles as protected rolesTrait;
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -113,6 +112,11 @@ class User extends BaseUser
         }
 
         return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
+    }
+
+    public function canBeImpersonated(): bool
+    {
+        return !$this->isSuperAdmin();
     }
 
     /**
@@ -213,13 +217,13 @@ class User extends BaseUser
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
     protected static function superAdmin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
     protected static function admin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.admin')));
     }
 
     /**

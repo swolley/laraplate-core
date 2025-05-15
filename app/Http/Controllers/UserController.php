@@ -21,11 +21,9 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 final class UserController extends Controller
 {
     public function __construct(
-        Repository $cache,
-        AuthManager $auth,
         private readonly Socialite $socialite,
     ) {
-        parent::__construct($cache, $auth);
+        parent::__construct();
     }
 
     /**
@@ -50,7 +48,7 @@ final class UserController extends Controller
     public function userInfo(Request $request): HttpFoundationResponse
     {
         /** @var User|null $user */
-        $user = $this->auth->user();
+        $user = auth()->user();
 
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
@@ -79,7 +77,7 @@ final class UserController extends Controller
         $user_to_impersonate = user_class()::findOrFail($user_to_impersonate_id);
 
         /** @var User $current_user */
-        $current_user = $this->auth->user();
+        $current_user = auth()->user();
         $current_user->impersonate($user_to_impersonate);
 
         return new ResponseBuilder($request)
@@ -94,7 +92,7 @@ final class UserController extends Controller
     public function leaveImpersonate(Request $request): HttpFoundationResponse
     {
         /** @var User $current_user */
-        $current_user = $this->auth->user();
+        $current_user = auth()->user();
         $current_user->leaveImpersonation();
 
         return new ResponseBuilder($request)
@@ -124,7 +122,7 @@ final class UserController extends Controller
             'social_token_secret' => $social_user->tokenSecret ?? null,
         ]);
 
-        $this->auth->login($user);
+        auth()->login($user);
 
         return redirect('/dashboard');
     }
@@ -135,7 +133,7 @@ final class UserController extends Controller
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {
-        return $this->auth->user()
+        return auth()->user()
             ? response()->json(['message' => 'Session maintained successfully.'])
             : response()->json(['error' => 'Unauthorized'], 401);
     }
