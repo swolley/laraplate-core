@@ -12,7 +12,7 @@ use Modules\Core\Grids\Resources\ResponseBuilder;
 
 trait HasCrudOperations
 {
-    private array $preparedQueries = [];
+    // private array $preparedQueries = [];
 
     protected function listByPagination(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
     {
@@ -60,37 +60,36 @@ trait HasCrudOperations
         return $data;
     }
 
-    protected function applyFilters(Builder $query, array $filters): void
-    {
-        // FIXME: non ricordo più cosa doveva essere
-        $queryKey = $this->getQueryKey($query, $filters);
+    // protected function applyFilters(Builder $query, array $filters): void
+    // {
+    //     $queryKey = $this->getQueryKey($query, $filters);
 
-        if (isset($this->preparedQueries[$queryKey])) {
-            $query->mergeBindings($this->preparedQueries[$queryKey]);
+    //     if (isset($this->preparedQueries[$queryKey])) {
+    //         $query->mergeBindings($this->preparedQueries[$queryKey]);
 
-            return;
-        }
+    //         return;
+    //     }
 
-        $query->where(function ($q) use ($filters): void {
-            foreach ($filters as $field => $filter) {
-                if (! isset($filter['value'])) {
-                    continue;
-                }
+    //     $query->where(function ($q) use ($filters): void {
+    //         foreach ($filters as $field => $filter) {
+    //             if (! isset($filter['value'])) {
+    //                 continue;
+    //             }
 
-                if ($filter['value'] === '') {
-                    continue;
-                }
-                $this->applyFilter($q, $field, $filter);
-            }
-        });
+    //             if ($filter['value'] === '') {
+    //                 continue;
+    //             }
+    //             $this->applyFilter($q, $field, $filter);
+    //         }
+    //     });
 
-        $this->preparedQueries[$queryKey] = $query->getBindings();
+    //     $this->preparedQueries[$queryKey] = $query->getBindings();
 
-        // Limita la dimensione della cache per evitare memory leaks
-        if (count($this->preparedQueries) > 100) {
-            array_shift($this->preparedQueries);
-        }
-    }
+    //     // Limita la dimensione della cache per evitare memory leaks
+    //     if (count($this->preparedQueries) > 100) {
+    //         array_shift($this->preparedQueries);
+    //     }
+    // }
 
     /**
      * @param  array<int,array{field:string,direction?:'asc'|'desc'}>  $sorts

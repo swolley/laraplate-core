@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Modules\Core\Filament\Resources\ACLResource\Pages;
 use Modules\Core\Models\ACL;
 
 class ACLResource extends Resource

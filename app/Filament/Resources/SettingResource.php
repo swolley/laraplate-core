@@ -114,7 +114,7 @@ class SettingResource extends Resource
                         'datetime' => 'DateTime',
                     ]),
                 Tables\Filters\SelectFilter::make('group')
-                    ->options(fn() => Setting::distinct()->pluck('group', 'group')->toArray()),
+                    ->options(fn () => Setting::distinct()->pluck('group', 'group')->toArray()),
                 Tables\Filters\SelectFilter::make('is_public')
                     ->options([
                         '1' => 'Public',

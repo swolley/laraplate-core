@@ -5,14 +5,25 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 use ReflectionClass;
 
 trait HasSeedersUtils
 {
     /**
-     * @param  class-string  $class
+     * Create a model from attributes.
+     *
+     * @template TModel of Model
+     *
+     * @param  class-string<TModel>  $class
+     * @param  array<string,mixed>  $attributes
+     * @param  array<string,mixed>  $pivotValues
+     * @return TModel
      */
-    protected function create(string $class, array $attributes): Model
+    protected function create(string $class, array $attributes, array $pivotValues = []): Model
     {
         /** @var Model $model */
         $model = new $class();
@@ -42,11 +53,25 @@ trait HasSeedersUtils
                 $value = is_callable($value) ? $value($model) : $value;
                 $return_type = $reflected_class->getMethod($method)->getReturnType()?->getName();
 
-                if ($return_type && is_subclass_of($return_type, \Illuminate\Database\Eloquent\Relations\Relation::class)) {
-                    if ($return_type === \Illuminate\Database\Eloquent\Relations\BelongsToMany::class) {
-                        $model->{$method}()->sync($value->pluck('id'));
+                if ($return_type && is_subclass_of($return_type, Relation::class)) {
+                    $relation = $model->{$method}();
+
+                    if ($return_type === BelongsToMany::class) {
+                        /**
+                         * @var BelongsToMany<Model> $relation
+                         * @var Collection<int,Model> $value
+                         */
+                        if (isset($pivotValues[$method])) {
+                            $relation->syncWithPivotValues($value->pluck('id'), $pivotValues[$method], false);
+                        } else {
+                            $relation->syncWithoutDetaching($value->pluck('id'));
+                        }
                     } else {
-                        $model->{$method}()->associate($value);
+                        /**
+                         * @var BelongsTo<Model> $relation
+                         * @var Model|int $value
+                         */
+                        $relation->associate($value);
                     }
                 } else {
                     $model->{$method}($value);
@@ -58,14 +83,18 @@ trait HasSeedersUtils
     }
 
     /**
-     * @param  class-string  $class
-     * @param  array<int,array>  $items  Array di array di attributi
-     * @return array<int,Model>
+     * Create many models from factories.
+     *
+     * @template TModel of Model
+     *
+     * @param  class-string<TModel>  $class
+     * @param  array<int,array<string,mixed>>  $items  Array di array di attributi
+     * @return Collection<int,TModel>
      */
-    protected function createMany(string $class, array $items): array
+    protected function createMany(string $class, array $items): Collection
     {
         if ($items === []) {
-            return [];
+            return collect();
         }
 
         $timestamp = now();
@@ -104,7 +133,7 @@ trait HasSeedersUtils
             }
         }
 
-        return $models;
+        return collect($models);
     }
 
     /**

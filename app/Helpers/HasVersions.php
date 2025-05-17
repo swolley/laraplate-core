@@ -59,6 +59,17 @@ trait HasVersions
         return config('versionable.version_model')::createForModel($refreshedModel, $attributes, $refreshedModel->updated_at);
     }
 
+    public function getVersionUserId()
+    {
+        $user_key = $this->getUserForeignKeyName();
+
+        if (isset($this['attributes'][$user_key])) {
+            return $this->getAttribute($this->getUserForeignKeyName());
+        }
+
+        return auth()->id();
+    }
+
     protected static function bootHasVersions(): void
     {
         static::deleted(function (Model $model): void {

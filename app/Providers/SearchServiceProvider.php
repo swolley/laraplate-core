@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use Elastic\ScoutDriverPlus\Engine;
+use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Search\Contracts\ISearchEngine;
@@ -20,7 +20,7 @@ use Typesense\Client as TypesenseClient;
 final class SearchServiceProvider extends ServiceProvider
 {
     public array $bindings = [
-        Engine::class => ElasticsearchEngine::class,
+        BaseElasticsearchEngine::class => ElasticsearchEngine::class,
     ];
 
     /**

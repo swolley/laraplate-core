@@ -117,7 +117,7 @@ trait HasCacheRepository
      */
     public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
-        $user_key = 'U' . $user->id;
+        $user_key = "U{$user->id}";
 
         if ($entity) {
             $models = Arr::wrap($entity);
@@ -143,7 +143,7 @@ trait HasCacheRepository
      */
     public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
-        $role_key = 'R' . $role->id;
+        $role_key = "R{$role->id}";
 
         if ($entity) {
             $models = Arr::wrap($entity);
@@ -206,7 +206,7 @@ trait HasCacheRepository
      */
     private function getKeyPartsFromUser(User $user): ?array
     {
-        $tags = ['U' . $user->id];
+        $tags = ["U{$user->id}"];
         $group_method = null;
 
         if (method_exists($user, 'groups')) {
@@ -218,7 +218,7 @@ trait HasCacheRepository
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-        $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . (int) $r->id)->toArray();
+        $groups = $user->{$group_method}->map(fn (Model $r): string => "R{$r->id}")->toArray();
         sort($groups);
         array_push($tags, ...$groups);
 

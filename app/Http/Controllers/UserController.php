@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Illuminate\Auth\AuthManager;
-use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\UnauthorizedException;
 use Laravel\Socialite\Contracts\User as SocialUser;
 use Laravel\Socialite\Facades\Socialite;
@@ -48,7 +47,7 @@ final class UserController extends Controller
     public function userInfo(Request $request): HttpFoundationResponse
     {
         /** @var User|null $user */
-        $user = auth()->user();
+        $user = Auth::user();
 
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
@@ -77,7 +76,7 @@ final class UserController extends Controller
         $user_to_impersonate = user_class()::findOrFail($user_to_impersonate_id);
 
         /** @var User $current_user */
-        $current_user = auth()->user();
+        $current_user = Auth::user();
         $current_user->impersonate($user_to_impersonate);
 
         return new ResponseBuilder($request)
@@ -92,7 +91,7 @@ final class UserController extends Controller
     public function leaveImpersonate(Request $request): HttpFoundationResponse
     {
         /** @var User $current_user */
-        $current_user = auth()->user();
+        $current_user = Auth::user();
         $current_user->leaveImpersonation();
 
         return new ResponseBuilder($request)
@@ -122,7 +121,7 @@ final class UserController extends Controller
             'social_token_secret' => $social_user->tokenSecret ?? null,
         ]);
 
-        auth()->login($user);
+        Auth::login($user);
 
         return redirect('/dashboard');
     }
@@ -133,7 +132,7 @@ final class UserController extends Controller
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {
-        return auth()->user()
+        return Auth::user()
             ? response()->json(['message' => 'Session maintained successfully.'])
             : response()->json(['error' => 'Unauthorized'], 401);
     }

@@ -68,7 +68,7 @@
             "scalar_types": true
         },
         "phpdoc_types_order": {
-            "null_adjustment": "always_first",
+            "null_adjustment": "always_last",
             "sort_algorithm": "none"
         },
         "php_unit_method_casing": {
@@ -186,13 +186,17 @@
             "less_and_greater": false
         },
         "ordered_imports": {
-            "sort_algorithm": "length",
+            "sort_algorithm": "alpha",
             "imports_order": ["const", "function", "class"]
         },
         "no_superfluous_phpdoc_tags": {
             "allow_mixed": false,
             "allow_unused_params": false,
             "remove_inheritdoc": true
+        },
+        "function_declaration": {
+            "closure_function_spacing": "one",
+            "closure_fn_spacing": "one"
         }
     }
 }

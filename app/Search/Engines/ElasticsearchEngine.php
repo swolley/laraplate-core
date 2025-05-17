@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchAnalytics;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\BulkIndexSearchJob;
@@ -63,7 +64,7 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
         BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
     }
 
-    public function createIndex(Model $model, array $options = []): void
+    public function createIndex(Model $model, array $options = [])
     {
         // $this->ensureSearchable($model);
 
@@ -135,76 +136,77 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
         }
     }
 
-    public function search(string $query, array $options = []): array
-    {
-        $client = $this->createClient();
+    // public function search(string $query, array $options = []): array
+    // {
+    //     $client = $this->createClient();
 
-        $params = [
-            'index' => $options['index'] ?? null,
-            'body' => [
-                'query' => [
-                    'bool' => [
-                        'must' => [],
-                        'should' => [],
-                        'minimum_should_match' => 1,
-                    ],
-                ],
-            ],
-        ];
+    //     $params = [
+    //         'index' => $options['index'] ?? null,
+    //         'body' => [
+    //             'query' => [
+    //                 'bool' => [
+    //                     'must' => [],
+    //                     'should' => [],
+    //                     'minimum_should_match' => 1,
+    //                 ],
+    //             ],
+    //         ],
+    //     ];
 
-        // Configurazione dimensione risultati
-        if (isset($options['size'])) {
-            $params['size'] = $options['size'];
-        }
+    //     // Configurazione dimensione risultati
+    //     if (isset($options['size'])) {
+    //         $params['size'] = $options['size'];
+    //     }
 
-        // Configurazione paginazione
-        if (isset($options['from'])) {
-            $params['from'] = $options['from'];
-        }
+    //     // Configurazione paginazione
+    //     if (isset($options['from'])) {
+    //         $params['from'] = $options['from'];
+    //     }
 
-        // Query di ricerca testuale
-        if ($query !== '' && $query !== null) {
-            $params['body']['query']['bool']['should'][] = [
-                'multi_match' => [
-                    'query' => $query,
-                    'fields' => $options['fields'] ?? ['*'],
-                    'type' => 'best_fields',
-                    'fuzziness' => 'AUTO',
-                ],
-            ];
-        }
+    //     // Query di ricerca testuale
+    //     if ($query !== '' && $query !== null) {
+    //         $params['body']['query']['bool']['should'][] = [
+    //             'multi_match' => [
+    //                 'query' => $query,
+    //                 'fields' => $options['fields'] ?? ['*'],
+    //                 'type' => 'best_fields',
+    //                 'fuzziness' => 'AUTO',
+    //             ],
+    //         ];
+    //     }
 
-        // Filtri
-        if (isset($options['filters']) && $options['filters'] !== []) {
-            $filters = $this->buildSearchFilters($options['filters']);
+    //     // Filtri
+    //     if (isset($options['filters']) && $options['filters'] !== []) {
+    //         $filters = $this->buildSearchFilters($options['filters']);
 
-            if ($filters !== []) {
-                $params['body']['query']['bool']['must'] = array_merge(
-                    $params['body']['query']['bool']['must'],
-                    $filters,
-                );
-            }
-        }
+    //         if ($filters !== []) {
+    //             $params['body']['query']['bool']['must'] = array_merge(
+    //                 $params['body']['query']['bool']['must'],
+    //                 $filters,
+    //             );
+    //         }
+    //     }
 
-        // Ordinamento
-        if (isset($options['sort'])) {
-            $params['body']['sort'] = $options['sort'];
-        }
+    //     // Ordinamento
+    //     if (isset($options['sort'])) {
+    //         $params['body']['sort'] = $options['sort'];
+    //     }
 
-        // Solo campi specifici
-        if (isset($options['_source'])) {
-            $params['body']['_source'] = $options['_source'];
-        }
+    //     // Solo campi specifici
+    //     if (isset($options['_source'])) {
+    //         $params['body']['_source'] = $options['_source'];
+    //     }
 
-        // Esecuzione query
-        $results = $client->search($params);
+    //     // Esecuzione query
+    //     $results = $client->search($params);
 
-        return $results->asArray();
-    }
+    //     return $results->asArray();
+    // }
 
     public function vectorSearch(array $vector, array $options = []): array
     {
-        $client = $this->createClient();
+        $builder = new Builder()
+        $searchParameters = $this->searchParametersFactory->makeFromBuilder($builder);
 
         $params = [
             'index' => $options['index'] ?? null,

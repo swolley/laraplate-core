@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+return [
     /**
      * The session key used to store the original user id.
      */
@@ -37,5 +38,4 @@ return [
      * Use 'back' to redirect to the previous page
      */
     'leave_redirect_to' => '/',
-
 ];

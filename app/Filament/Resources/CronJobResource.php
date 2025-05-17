@@ -108,7 +108,7 @@ class CronJobResource extends Resource
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\Action::make('run')
                     ->icon('heroicon-o-play')
-                    ->action(fn(CronJob $record) => $record->run())
+                    ->action(fn (CronJob $record) => $record->run())
                     ->requiresConfirmation(),
             ])
             ->bulkActions([
