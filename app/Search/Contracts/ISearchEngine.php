@@ -5,77 +5,54 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 /**
- * Interface che definisce le operazioni supportate dai motori di ricerca.
+ * Interface that defines methods for search engines
+ * Extends ISearchable to include engine-specific functionality.
  */
-interface ISearchEngine
+interface ISearchEngine extends ISearchable, ISearchAnalytics
 {
     /**
-     * Verifica se il motore supporta la ricerca vettoriale.
+     * Check if the engine supports vector search.
      */
     public function supportsVectorSearch(): bool;
 
     /**
-     * Verifica se un indice esiste e la sua struttura è corretta.
-     */
-    public function checkIndex(Model $model, bool $createIfMissing = false): bool;
-
-    /**
-     * Crea o aggiorna un indice per il modello specificato.
-     */
-    public function createIndex(Model $model): void;
-
-    /**
-     * Indicizza un singolo documento.
-     */
-    public function indexDocument(Model $model): void;
-
-    /**
-     * Indicizza un documento con supporto per embedding vettoriali.
-     */
-    public function indexDocumentWithEmbedding(Model $model): void;
-
-    /**
-     * Rimuove un documento dall'indice.
-     */
-    public function deleteDocument(Model $model): void;
-
-    /**
-     * Indicizza un gruppo di documenti in modalità bulk.
-     */
-    public function bulkIndex(iterable $models): void;
-
-    /**
-     * Esegue una ricerca full-text.
+     * Delete a document from the index.
      *
-     * @param  string  $query  Query di ricerca
-     * @param  array  $options  Opzioni di ricerca (filtri, campi, ordinamento, ecc.)
-     * @return array Risultati della ricerca
+     * @param  Model|Collection<int,Model>  $model
      */
-    public function search(string $query, array $options = []): array;
+    public function delete(Model|Collection $model): void;
 
     /**
-     * Esegue una ricerca vettoriale basata su embedding.
+     * Index a single document.
      *
-     * @param  array  $vector  Array di valori dell'embedding
-     * @param  array  $options  Opzioni di ricerca (filtri, ordinamento, ecc.)
-     * @return array Risultati della ricerca
+     * @param  Model|Collection<int,Model>  $model
      */
-    public function vectorSearch(array $vector, array $options = []): array;
+    public function index(Model|Collection $model): void;
 
     /**
-     * Reindicizza tutti i documenti di un modello.
+     * Index a document with vector search support.
+     *
+     * @param  Model|Collection<int,Model>  $model
      */
-    public function reindexModel(string $modelClass): void;
+    public function indexWithEmbedding(Model|Collection $model): void;
+
+    // /**
+    //  * Index a group of documents in bulk mode.
+    //  */
+    // public function bulkIndex(iterable $models): void;
 
     /**
-     * Sincronizza i documenti modificati dopo l'ultima indicizzazione.
+     * Sync documents modified after the last indexing.
+     *
+     * @param  class-string<Model>  $modelClass
      */
-    public function syncModel(string $modelClass, ?int $id = null, ?string $from = null): int;
+    public function sync(string $modelClass, ?int $id = null, ?string $from = null): int;
 
     /**
-     * Trasforma i filtri in un formato adatto al motore di ricerca.
+     * Transform filters to a format suitable for the search engine.
      */
     public function buildSearchFilters(array $filters): array|string;
 }

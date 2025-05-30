@@ -70,7 +70,7 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
     {
         foreach ($this->modules as $data) {
             foreach ($data['migrations'] as $migration) {
-                $only_description = preg_replace("/(?:.*)\d{4}_\d{2}_\d{2}_\d{6}/", '', (string) $migration);
+                $only_description = preg_replace('/.*\d{4}_\d{2}_\d{2}_\d{6}/', '', (string) $migration);
 
                 if (Str::endsWith($file, $only_description)) {
                     return $migration;

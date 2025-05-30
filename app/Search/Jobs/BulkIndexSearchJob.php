@@ -6,7 +6,6 @@ namespace Modules\Core\Search\Jobs;
 
 use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,12 +14,13 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
 use Throwable;
+use Typesense\Override;
 
 /**
  * Job for bulk indexing documents in search engines
  * Supports both Elasticsearch and Typesense via Laravel Scout.
  */
-final class BulkIndexSearchJob implements ShouldQueue
+final class BulkIndexSearchJob extends CommonSearchJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -45,6 +45,7 @@ final class BulkIndexSearchJob implements ShouldQueue
      * @param  Collection  $models  Collection of models to index
      * @param  bool  $force  If true, forces indexing even if model shouldn't be searchable
      */
+    #[Override]
     public function __construct(
         private Collection $models,
         private bool $force = false,
@@ -66,12 +67,7 @@ final class BulkIndexSearchJob implements ShouldQueue
             throw new InvalidArgumentException("Model {$model_class} does not use the Searchable trait");
         }
 
-        $this->onQueue(config('scout.queue_name', 'indexing'));
-
-        // Set job configurations from config
-        $this->tries = config('scout.queue_tries', 3);
-        $this->timeout = config('scout.queue_timeout', 120);
-        $this->backoff = config('scout.queue_backoff', [30, 60, 180]);
+        parent::__construct();
     }
 
     /**

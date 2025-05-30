@@ -9,6 +9,7 @@ use Approval\Traits\ApprovesChanges;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -215,13 +216,13 @@ class User extends BaseUser
         return UserFactory::new();
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
         return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected static function admin(Builder $query): Builder
     {
         return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));

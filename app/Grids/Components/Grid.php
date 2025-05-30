@@ -913,11 +913,11 @@ final class Grid extends Entity
         // count is calculated before pagination but after filters
         $count = $query->count();
 
-        if (($pagination = $this->requestData->pagination) !== 0) {
-            $query->skip((int) $pagination['from'] - 1);
+        if ($this->requestData->pagination !== 0) {
+            $query->skip((int) $this->requestData->from - 1);
 
-            if (isset($pagination['to'])) {
-                $query->take((int) $pagination['to'] - (int) $pagination['from'] + 1);
+            if (isset($this->requestData->to)) {
+                $query->take((int) $this->requestData->to - (int) $this->requestData->from + 1);
             }
         }
 

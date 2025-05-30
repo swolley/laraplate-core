@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Override;
 
-// use Modules\Core\Database\Factories\ModelEmbeddingFactory;
-
 /**
  * @mixin IdeHelperModelEmbedding
  */

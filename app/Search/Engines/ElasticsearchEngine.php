@@ -4,48 +4,57 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Engines;
 
-use Elastic\ScoutDriverPlus\Engine;
-use Exception;
+use Elastic\Elasticsearch\Client;
+use Elastic\Elasticsearch\Exception\ClientResponseException;
+use Elastic\Elasticsearch\Exception\ServerResponseException;
+use Elastic\Elasticsearch\Response\Elasticsearch;
+use Elastic\ScoutDriverPlus\Engine as BaseEngine;
+use Http\Promise\Promise;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
-use Laravel\Scout\Builder;
-use Modules\Core\Search\Contracts\ISearchAnalytics;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\BulkIndexSearchJob;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\ElasticsearchService;
+use Override;
 use stdClass;
 
 /**
- * Implementazione del motore di ricerca per Elasticsearch.
+ * Implementation of the search engine for Elasticsearch.
  */
-class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEngine
+class ElasticsearchEngine extends BaseEngine implements ISearchEngine
 {
-    public $config;
+    public array $config;
 
     public function supportsVectorSearch(): bool
     {
         return true;
     }
 
-    // /**
-    //  * {@inheritdoc}
-    //  */
-    // public function indexDocument(Model $model): void
-    // {
-    //     $this->ensureSearchable($model);
-    //     IndexInSearchJob::dispatch($model);
-    // }
-
-    public function indexDocumentWithEmbedding(Model $model): void
+    public function index(Model|Collection $model): void
     {
-        // $this->ensureSearchable($model);
+        if ($model instanceof Collection) {
+            if ($model->isEmpty()) {
+                return;
+            }
+            $this->ensureSearchable($model->first());
+        } else {
+            $this->ensureSearchable($model);
+        }
 
-        // Prima generiamo l'embedding, poi indichiamo
+        IndexInSearchJob::dispatch($model);
+    }
+
+    public function indexWithEmbedding(Model|Collection $model): void
+    {
+        $this->ensureSearchable($model);
+
         Bus::chain([
             new GenerateEmbeddingsJob($model),
             new IndexInSearchJob($model),
@@ -59,157 +68,22 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
         }
 
         $firstModel = $models[0] ?? $models->first();
-        // $this->ensureSearchable($firstModel);
+        $this->ensureSearchable($firstModel);
 
         BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
     }
 
-    public function createIndex(Model $model, array $options = [])
-    {
-        // $this->ensureSearchable($model);
-
-        $client = $this->createClient();
-        $indexName = $this->getIndexName($model);
-        $tempIndex = $indexName . '_temp_' . time();
-
-        try {
-            // Otteniamo il mapping dal modello
-            $mapping = [];
-
-            if (method_exists($model, 'getSearchMapping')) {
-                $mapping = $model->getSearchMapping();
-            } elseif (method_exists($model, 'toSearchableIndex')) {
-                $mapping = $model->toSearchableIndex();
-            }
-
-            $indexConfig = [
-                'index' => $indexName,
-                'body' => [
-                    'mappings' => [
-                        'properties' => $mapping,
-                    ],
-                ],
-            ];
-
-            $indexExists = $client->indices()->exists(['index' => $indexName]);
-
-            // Se l'indice non esiste, lo creiamo
-            if (! $indexExists) {
-                $client->indices()->create($indexConfig);
-                Log::info("Indice Elasticsearch '{$indexName}' creato");
-
-                return;
-            }
-
-            // Altrimenti, creiamo un indice temporaneo e reindicizziamo
-            $indexConfig['index'] = $tempIndex;
-            $client->indices()->create($indexConfig);
-
-            // Reindicizziamo i documenti
-            $client->reindex([
-                'body' => [
-                    'source' => ['index' => $indexName],
-                    'dest' => ['index' => $tempIndex],
-                ],
-            ]);
-
-            // Eliminiamo il vecchio indice e assegnamo l'alias
-            $client->indices()->delete(['index' => $indexName]);
-            $client->indices()->putAlias([
-                'index' => $tempIndex,
-                'name' => $indexName,
-            ]);
-
-            Log::info("Indice Elasticsearch '{$indexName}' aggiornato");
-        } catch (Exception $e) {
-            // Pulizia in caso di errori
-            if ($client->indices()->exists(['index' => $tempIndex])) {
-                $client->indices()->delete(['index' => $tempIndex]);
-            }
-
-            Log::error("Creazione indice Elasticsearch '{$indexName}' fallita", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    // public function search(string $query, array $options = []): array
-    // {
-    //     $client = $this->createClient();
-
-    //     $params = [
-    //         'index' => $options['index'] ?? null,
-    //         'body' => [
-    //             'query' => [
-    //                 'bool' => [
-    //                     'must' => [],
-    //                     'should' => [],
-    //                     'minimum_should_match' => 1,
-    //                 ],
-    //             ],
-    //         ],
-    //     ];
-
-    //     // Configurazione dimensione risultati
-    //     if (isset($options['size'])) {
-    //         $params['size'] = $options['size'];
-    //     }
-
-    //     // Configurazione paginazione
-    //     if (isset($options['from'])) {
-    //         $params['from'] = $options['from'];
-    //     }
-
-    //     // Query di ricerca testuale
-    //     if ($query !== '' && $query !== null) {
-    //         $params['body']['query']['bool']['should'][] = [
-    //             'multi_match' => [
-    //                 'query' => $query,
-    //                 'fields' => $options['fields'] ?? ['*'],
-    //                 'type' => 'best_fields',
-    //                 'fuzziness' => 'AUTO',
-    //             ],
-    //         ];
-    //     }
-
-    //     // Filtri
-    //     if (isset($options['filters']) && $options['filters'] !== []) {
-    //         $filters = $this->buildSearchFilters($options['filters']);
-
-    //         if ($filters !== []) {
-    //             $params['body']['query']['bool']['must'] = array_merge(
-    //                 $params['body']['query']['bool']['must'],
-    //                 $filters,
-    //             );
-    //         }
-    //     }
-
-    //     // Ordinamento
-    //     if (isset($options['sort'])) {
-    //         $params['body']['sort'] = $options['sort'];
-    //     }
-
-    //     // Solo campi specifici
-    //     if (isset($options['_source'])) {
-    //         $params['body']['_source'] = $options['_source'];
-    //     }
-
-    //     // Esecuzione query
-    //     $results = $client->search($params);
-
-    //     return $results->asArray();
-    // }
-
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function vectorSearch(array $vector, array $options = []): array
     {
-        $builder = new Builder()
-        $searchParameters = $this->searchParametersFactory->makeFromBuilder($builder);
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $options['index'] ?? null;
 
         $params = [
-            'index' => $options['index'] ?? null,
+            'index' => $index,
             'body' => [
                 'query' => [
                     'bool' => [
@@ -231,17 +105,17 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Configurazione dimensione risultati
+        // Configure result size
         if (isset($options['size'])) {
             $params['size'] = $options['size'];
         }
 
-        // Configurazione paginazione
+        // Configure pagination
         if (isset($options['from'])) {
             $params['from'] = $options['from'];
         }
 
-        // Filtri
+        // Filters
         if (isset($options['filters']) && $options['filters'] !== []) {
             $filters = $this->buildSearchFilters($options['filters']);
 
@@ -253,27 +127,27 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             }
         }
 
-        // Ordinamento
+        // Sorting
         $params['body']['sort'] = $options['sort'] ?? ['_score' => ['order' => 'desc']];
 
-        // Solo campi specifici
+        // Specific fields only
         if (isset($options['_source'])) {
             $params['body']['_source'] = $options['_source'];
         }
 
-        // Esecuzione query
+        // Execute query
         $results = $client->search($params);
 
         return $results->asArray();
     }
 
-    public function buildSearchFilters(array $filters): array|string
+    public function buildSearchFilters(array $filters): array
     {
         $esFilters = [];
 
         foreach ($filters as $field => $value) {
             if (is_array($value) && isset($value['type'])) {
-                // Filtri avanzati con tipo esplicito
+                // Advanced filters with explicit type
                 switch ($value['type']) {
                     case 'term':
                         $esFilters[] = ['term' => [$field => $value['value']]];
@@ -310,7 +184,7 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
                         break;
                 }
             } elseif (is_array($value) && count($value) === 2 && isset($value[0]) && isset($value[1])) {
-                // Assumiamo che sia un range
+                // Assume it's a range
                 $esFilters[] = [
                     'range' => [
                         $field => [
@@ -320,7 +194,7 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
                     ],
                 ];
             } else {
-                // Filtro semplice per valore esatto
+                // Simple exact match filter
                 $esFilters[] = ['term' => [$field => $value]];
             }
         }
@@ -328,12 +202,12 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
         return $esFilters;
     }
 
-    public function reindexModel(string $modelClass): void
+    public function reindex(string $modelClass): void
     {
         ReindexSearchJob::dispatch($modelClass);
     }
 
-    public function syncModel(string $modelClass, ?int $id = null, ?string $from = null): int
+    public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
         if (! class_exists($modelClass)) {
             throw new InvalidArgumentException("Class {$modelClass} does not exist");
@@ -345,12 +219,12 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
 
         $query = $modelClass::query();
 
-        // Supporto per soft delete
+        // Support for soft delete
         if (method_exists($modelClass, 'withTrashed')) {
             $query->withTrashed();
         }
 
-        // Filtri
+        // Filters
         if ($id !== null && $id !== 0) {
             $query->where('id', $id);
         } elseif ($from !== null && $from !== '' && $from !== '0') {
@@ -365,12 +239,12 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
 
         $count = $query->count();
 
-        // Se non ci sono record, non facciamo niente
+        // If no records, do nothing
         if ($count === 0) {
             return 0;
         }
 
-        // Sincronizziamo ogni record
+        // Sync each record
         $query->chunk(100, function ($records): void {
             foreach ($records as $record) {
                 $this->indexDocument($record);
@@ -380,12 +254,17 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
         return $count;
     }
 
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
     {
-        $client = $this->createClient();
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $this->getIndexName($model);
 
         $query = [
-            'index' => $this->getIndexName($model),
+            'index' => $index,
             'body' => [
                 'size' => 0,
                 'query' => [
@@ -406,29 +285,23 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Aggiungi filtri se presenti
-        if ($filters !== [] && $filters !== null) {
-            $esFilters = $this->buildSearchFilters($filters);
-
-            if ($esFilters !== []) {
-                $query['body']['query']['bool']['must'] = array_merge(
-                    $query['body']['query']['bool']['must'],
-                    $esFilters,
-                );
-            }
-        }
-
-        $response = $client->search($query);
+        // Add filters if present
+        $response = $this->setFilters($filters, $query, $client);
 
         return $response['aggregations']['over_time']['buckets'] ?? [];
     }
 
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
     {
-        $client = $this->createClient();
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $this->getIndexName($model);
 
         $query = [
-            'index' => $this->getIndexName($model),
+            'index' => $index,
             'body' => [
                 'size' => 0,
                 'query' => [
@@ -449,29 +322,23 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Aggiungi filtri se presenti
-        if ($filters !== [] && $filters !== null) {
-            $esFilters = $this->buildSearchFilters($filters);
-
-            if ($esFilters !== []) {
-                $query['body']['query']['bool']['must'] = array_merge(
-                    $query['body']['query']['bool']['must'],
-                    $esFilters,
-                );
-            }
-        }
-
-        $response = $client->search($query);
+        // Add filters if present
+        $response = $this->setFilters($filters, $query, $client);
 
         return $response['aggregations']['by_term']['buckets'] ?? [];
     }
 
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
     {
-        $client = $this->createClient();
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $this->getIndexName($model);
 
         $query = [
-            'index' => $this->getIndexName($model),
+            'index' => $index,
             'body' => [
                 'size' => 0,
                 'query' => [
@@ -492,29 +359,23 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Aggiungi filtri se presenti
-        if ($filters !== [] && $filters !== null) {
-            $esFilters = $this->buildSearchFilters($filters);
-
-            if ($esFilters !== []) {
-                $query['body']['query']['bool']['must'] = array_merge(
-                    $query['body']['query']['bool']['must'],
-                    $esFilters,
-                );
-            }
-        }
-
-        $response = $client->search($query);
+        // Add filters if present
+        $response = $this->setFilters($filters, $query, $client);
 
         return $response['aggregations']['geo_clusters']['buckets'] ?? [];
     }
 
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
     {
-        $client = $this->createClient();
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $this->getIndexName($model);
 
         $query = [
-            'index' => $this->getIndexName($model),
+            'index' => $index,
             'body' => [
                 'size' => 0,
                 'query' => [
@@ -534,29 +395,23 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Aggiungi filtri se presenti
-        if ($filters !== [] && $filters !== null) {
-            $esFilters = $this->buildSearchFilters($filters);
-
-            if ($esFilters !== []) {
-                $query['body']['query']['bool']['must'] = array_merge(
-                    $query['body']['query']['bool']['must'],
-                    $esFilters,
-                );
-            }
-        }
-
-        $response = $client->search($query);
+        // Add filters if present
+        $response = $this->setFilters($filters, $query, $client);
 
         return $response['aggregations']['field_stats'] ?? [];
     }
 
+    /**
+     * @throws ServerResponseException
+     * @throws ClientResponseException
+     */
     public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
     {
-        $client = $this->createClient();
+        $client = ElasticsearchService::getInstance()->getClient();
+        $index = $this->getIndexName($model);
 
         $query = [
-            'index' => $this->getIndexName($model),
+            'index' => $index,
             'body' => [
                 'size' => 0,
                 'query' => [
@@ -577,7 +432,94 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             ],
         ];
 
-        // Aggiungi filtri se presenti
+        // Add filters if present
+        $response = $this->setFilters($filters, $query, $client);
+
+        return $response['aggregations']['histogram']['buckets'] ?? [];
+    }
+
+    public function deleteDocument(Model $model): void
+    {
+        $this->delete(collect([$model]));
+    }
+
+    public function checkIndex(Model $model): bool
+    {
+        return $this->checkIndexExists($model);
+    }
+
+    public function getSearchMapping(Model $model): array
+    {
+        return $model->getSearchMapping() ?? [];
+    }
+
+    public function prepareDataToEmbed(Model $model): array
+    {
+        return $model->toSearchableArray();
+    }
+
+    public function getLastIndexedTimestamp(Model $model): ?string
+    {
+        return $model->getLastIndexedTimestamp();
+    }
+
+    protected function checkIndexExists(Model $model): bool
+    {
+        $client = ElasticsearchService::getInstance()->getClient();
+        $indexName = $this->getIndexName($model);
+
+        return $client->indices()->exists(['index' => $indexName])->asBool();
+    }
+
+    /**
+     * Get the index name for the model.
+     */
+    protected function getIndexName(Model $model): string
+    {
+        $indexName = $model->searchableAs();
+
+        // Add prefix if configured
+        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
+            return $this->config['index_prefix'] . $indexName;
+        }
+
+        return $indexName;
+    }
+
+    /**
+     * Ensure the model is searchable and index exists.
+     */
+    protected function ensureSearchable(Model $model): void
+    {
+        if (! $this->usesSearchableTrait($model)) {
+            throw new InvalidArgumentException('Model ' . get_class($model) . ' does not implement the Searchable trait');
+        }
+
+        if (! $this->checkIndexExists($model)) {
+            $this->createIndex($model);
+        }
+    }
+
+    /**
+     * Check if model uses the Searchable trait.
+     */
+    protected function usesSearchableTrait(Model $model): bool
+    {
+        return in_array(Searchable::class, class_uses_recursive($model), true);
+    }
+
+    /**
+     * @param array|null $filters
+     * @param array $query
+     * @param Client $client
+     *
+     * @return Elasticsearch|Promise
+     *
+     * @throws ClientResponseException
+     * @throws ServerResponseException
+     */
+    public function setFilters(?array $filters, array $query, Client $client): Promise|Elasticsearch
+    {
         if ($filters !== [] && $filters !== null) {
             $esFilters = $this->buildSearchFilters($filters);
 
@@ -589,31 +531,12 @@ class ElasticsearchEngine extends Engine implements ISearchAnalytics, ISearchEng
             }
         }
 
-        $response = $client->search($query);
-
-        return $response['aggregations']['histogram']['buckets'] ?? [];
+        return $client->search($query);
     }
 
-    protected function checkIndexExists(Model $model): bool
+    #[Override]
+    public function ensureIndex(Model $model): bool
     {
-        $client = $this->createClient();
-        $indexName = $this->getIndexName($model);
-
-        return $client->indices()->exists(['index' => $indexName])->asBool();
-    }
-
-    /**
-     * Ottieni il nome dell'indice per il modello.
-     */
-    protected function getIndexName(Model $model): string
-    {
-        $indexName = $model->searchableAs();
-
-        // Aggiungi prefisso se configurato
-        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
-            return $this->config['index_prefix'] . $indexName;
-        }
-
-        return $indexName;
+        // TODO: Implement ensureIndex() method.
     }
 }

@@ -13,6 +13,7 @@ use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use JsonException;
 use LLPhant\Embeddings\Document;
 use LLPhant\Embeddings\DocumentSplitter\DocumentSplitter;
 use LLPhant\Embeddings\EmbeddingFormatter\EmbeddingFormatter;
@@ -20,15 +21,17 @@ use LLPhant\Embeddings\EmbeddingGenerator\Ollama\OllamaEmbeddingGenerator;
 use LLPhant\Embeddings\EmbeddingGenerator\OpenAI\OpenAI3SmallEmbeddingGenerator;
 use LLPhant\OllamaConfig;
 use LLPhant\OpenAIConfig;
+use Psr\Http\Client\ClientExceptionInterface;
 use Throwable;
 
 final class GenerateEmbeddingsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public int $tries = 3;
 
-    public $backoff = [30, 60, 120];
+    /** @var array|int[]  */
+    public array $backoff = [30, 60, 120];
 
     /**
      * Job timeout in seconds
@@ -37,12 +40,12 @@ final class GenerateEmbeddingsJob implements ShouldQueue
      * - Multiple calls for long documents
      * - Buffer for network latency and retries.
      */
-    public $timeout = 300;
+    public int $timeout = 300;
 
     /**
      * Maximum time to wait in queue before execution.
      */
-    public $maxExceptionsThenWait = 300;
+    public int $maxExceptionsThenWait = 300;
 
     public function __construct(
         private readonly object $model,
@@ -54,10 +57,14 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         return [
             new ThrottlesExceptions(10, 5), // Max 10 exceptions in 5 minutes
-            new RateLimited('embeddings'), // Rate limit for the embeddings queue
+            new RateLimited('embeddings'), // Rate limit for the embedding queue
         ];
     }
 
+    /**
+     * @throws ClientExceptionInterface
+     * @throws JsonException
+     */
     public function handle(): void
     {
         $data = $this->model->prepareDataToEmbed();
@@ -115,7 +122,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw $e; // Rethrow per far fallire il job chain
+            throw $e; // Rethrow to make the join chain fails
         }
     }
 

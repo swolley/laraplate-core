@@ -92,7 +92,7 @@ final class CronJob extends Model
     }
 
     #[Override]
-    protected function casts()
+    protected function casts(): array
     {
         return [
             'name' => 'string',

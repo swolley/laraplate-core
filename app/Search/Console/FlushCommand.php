@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use Laravel\Scout\Console\FlushCommand as BaseFlushCommand;
 use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 
-final class FlushCommand extends \Laravel\Scout\Console\FlushCommand
+final class FlushCommand extends BaseFlushCommand
 {
     use HasBenchmark, SearchableCommandUtils;
 
@@ -21,6 +22,8 @@ final class FlushCommand extends \Laravel\Scout\Console\FlushCommand
             return self::INVALID;
         }
 
-        return parent::handle();
+        parent::handle();
+
+        return self::SUCCESS;
     }
 }

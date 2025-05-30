@@ -307,7 +307,7 @@ final class Field implements JsonSerializable
         $validations = $this->model->getRules()[$this->getName()] ?? [];
 
         if (is_string($validations)) {
-            preg_match("/regex:\/(?:.*)\//", $validations, $regex, PREG_UNMATCHED_AS_NULL);
+            preg_match('/regex:\/.*\//', $validations, $regex, PREG_UNMATCHED_AS_NULL);
 
             if ($regex !== [] && $regex[0] !== null) {
                 $validations = mb_trim(str_replace($regex[0], '', $validations), '|');

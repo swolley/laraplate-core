@@ -16,7 +16,7 @@ use Override;
  */
 final class UserGridConfig extends Model
 {
-    use HasCache, HasFactory, HasValidations {
+    use HasCache, HasValidations {
         getRules as protected getRulesTrait;
     }
 
@@ -56,7 +56,7 @@ final class UserGridConfig extends Model
     }
 
     #[Override]
-    protected function casts()
+    protected function casts(): array
     {
         return [
             'user_id' => 'integer',

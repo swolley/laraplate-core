@@ -6,18 +6,18 @@ namespace Modules\Core\Search\Jobs;
 
 use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Searchable;
+use Typesense\Override;
 
 /**
  * Job for reindexing all models of a specified class
  * Supports both Elasticsearch and Typesense.
  */
-final class ReindexSearchJob implements ShouldQueue
+final class ReindexSearchJob extends CommonSearchJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -43,14 +43,10 @@ final class ReindexSearchJob implements ShouldQueue
      * @param  bool  $use_bulk  Whether to use bulk indexing
      * @param  int  $batch_size  Number of records to process in each batch (for bulk)
      */
+    #[Override]
     public function __construct(private string $model_class, private bool $use_bulk = true, private int $batch_size = 500)
     {
-        $this->onQueue(config('scout.queue_name', 'indexing'));
-
-        // Set job configurations from config
-        $this->tries = config('scout.queue_tries', 3);
-        $this->timeout = config('scout.queue_timeout', 600); // Longer timeout for reindexing
-        $this->backoff = config('scout.queue_backoff', [60, 180, 360]);
+        parent::__construct();
     }
 
     /**

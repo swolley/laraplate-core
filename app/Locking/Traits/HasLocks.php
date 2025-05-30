@@ -24,7 +24,7 @@ trait HasLocks
         });
 
         static::saving(function (Model $model): void {
-            // Rimuovi is_locked dai dati da salvare
+            // Remove is_locked from saving data
             unset($model->attributes[$model->getIsLockedColumn()]);
             unset($model->original[$model->getIsLockedColumn()]);
         });

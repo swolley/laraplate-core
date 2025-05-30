@@ -49,9 +49,9 @@ abstract class BatchSeeder extends Seeder
      *
      * @param  class-string<Model>  $model_class  The model class to create the data for
      * @param  int  $total_count  The total number of data to create
-     * @param  bool  $force_approve  Whether to force approval of the created data
+     * @param  int|null  $batch_size  The size of the batch to create
      */
-    protected function createInBatches(string $model_class, int $total_count, bool $force_approve = true): void
+    protected function createInBatches(string $model_class, int $total_count, ?int $batch_size = null): void
     {
         $current_count = $this->command->option('force') ? 0 : $model_class::query()->withoutGlobalScopes()->count();
         $count_to_create = $total_count - $current_count;
@@ -63,7 +63,7 @@ abstract class BatchSeeder extends Seeder
             return;
         }
 
-        $batches = ceil($count_to_create / self::BATCH_SIZE);
+        $batches = ceil($count_to_create / ($batch_size ?? self::BATCH_SIZE));
         $created = 0;
 
         $progress = progress("Creating {$entity_name}", $count_to_create);
@@ -85,14 +85,7 @@ abstract class BatchSeeder extends Seeder
                     /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
                     /** @phpstan-ignore staticMethod.notFound */
                     $factory = $model_class::factory();
-                    $created_models = $factory->count($batch_size)->create();
-
-                    if ($force_approve && class_uses_trait($model_class, HasApprovals::class)) {
-                        /** @var Model $model */
-                        foreach ($created_models as $model) {
-                            $model->approve();
-                        }
-                    }
+                    $factory->count($batch_size)->create();
 
                     DB::commit();
                     $success = true;
@@ -113,7 +106,7 @@ abstract class BatchSeeder extends Seeder
                         throw $e;
                     }
 
-                    $progress->hint("<fg=yellow>Retry {$retry_count} for {$entity_name} batch {" . ($batch + 1) . '}</>');
+                    $progress->hint("<fg=yellow>Retry {$retry_count} for {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                     $progress->render();
                     sleep(self::RETRY_DELAY);
                 }

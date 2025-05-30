@@ -7,11 +7,15 @@ namespace Modules\Core\Overrides;
 use Illuminate\Routing\Route as LaravelRoute;
 use Mtrajano\LaravelSwagger\DataObjects\Route;
 use ReflectionClass;
+use ReflectionException;
 
 final class ModuleDocRoute extends Route
 {
     private readonly LaravelRoute $reflectedRoute;
 
+    /**
+     * @throws ReflectionException
+     */
     public function __construct(LaravelRoute $route)
     {
         parent::__construct($route);

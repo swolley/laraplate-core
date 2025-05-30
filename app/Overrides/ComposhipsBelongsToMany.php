@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +12,9 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection as BaseCollection;
 use Override;
 
+/**
+ * @property string|array<string> $parentKey
+ */
 final class ComposhipsBelongsToMany extends BelongsToMany
 {
     #[Override]
@@ -26,7 +30,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     }
 
     #[Override]
-    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*']): Builder
     {
         if ($parentQuery->getQuery()->from === $query->getQuery()->from) {
             return $this->getRelationExistenceQueryForSelfJoin($query, $parentQuery, $columns);
@@ -54,7 +58,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     }
 
     #[Override]
-    public function getExistenceCompareKey()
+    public function getExistenceCompareKey(): array|string|Expression
     {
         if (is_array($this->foreignPivotKey)) {
             return array_map(fn ($key): string => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
@@ -94,7 +98,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     }
 
     #[Override]
-    public function qualifyPivotColumn($column)
+    public function qualifyPivotColumn($column): array|string|Expression
     {
         if (is_array($column)) {
             return array_map(fn ($c) => parent::qualifyPivotColumn($c), $column);
@@ -155,7 +159,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     }
 
     #[Override]
-    protected function addWhereConstraints()
+    protected function addWhereConstraints(): self
     {
         if (is_array($this->parentKey)) {
             foreach ($this->parentKey as $parentKey) {

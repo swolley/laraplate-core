@@ -752,8 +752,8 @@ abstract class Entity
             $responseBuilder->setCurrentPage((int) ($this->requestData->request->get('page') ?? 1));
             $responseBuilder->setPagination((int) $this->requestData->request->get('pagination'));
         } elseif ($this->requestData->request->has('from')) {
-            $responseBuilder->setFrom($this->requestData->pagination['from']);
-            $responseBuilder->setTo($this->requestData->pagination['to']);
+            $responseBuilder->setFrom($this->requestData->from);
+            $responseBuilder->setTo($this->requestData->to);
         }
     }
 
@@ -783,7 +783,7 @@ abstract class Entity
             $grid_utils = HasGridUtils::class;
 
             if (! class_exists($extended_class_name)) {
-                eval("class {$extended_class_name} extends {$class} { use {$grid_utils}; }");
+                eval(sprintf('class %s extends %s { use %s; }', $extended_class_name, $class, $grid_utils));
             }
             $model = new $extended_class_name;
         }

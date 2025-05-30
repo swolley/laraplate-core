@@ -43,7 +43,12 @@ return [
     |
     */
 
-    'queue' => env('SCOUT_QUEUE', true),
+    'queue' => env('SCOUT_QUEUE', true) ? [
+        'queue' => env('SCOUT_QUEUE_NAME', 'indexing'),
+        'tries' => env('SCOUT_QUEUE_TRIES', 3),
+        'timeout' => env('SCOUT_QUEUE_TIMEOUT', 120),
+        'backoff' => env('SCOUT_QUEUE_BACKOFF', [30, 60, 120]),
+    ] : false,
 
     /*
     |--------------------------------------------------------------------------
@@ -217,8 +222,4 @@ return [
         'dimensions' => env('VECTOR_DIMENSIONS', 1536), // OpenAI default
         'provider' => env('EMBEDDING_PROVIDER', 'openai'),
     ],
-    'queue_name' => env('SCOUT_QUEUE', 'indexing'),
-    'queue_timeout' => env('scout.queue_timeout', 300), // 5 minutes
-    'queue_tries' => env('scout.queue_tries', 3),
-    'queue_backoff' => [30, 60, 120], // waiting time between retries in seconds
 ];

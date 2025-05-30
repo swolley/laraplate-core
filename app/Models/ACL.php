@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
@@ -24,6 +25,8 @@ final class ACL extends Model
         getRules as protected getRulesTrait;
     }
 
+    protected $table = 'acl';
+
     protected $fillable = [
         'permission_id',
         'filters',      // Stored as JSON
@@ -41,12 +44,6 @@ final class ACL extends Model
         return $this->belongsTo(Permission::class);
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    public function scopeForPermission(Builder $query, $permission_id): Builder
-    {
-        return $query->where('permission_id', $permission_id);
-    }
-
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
@@ -59,6 +56,12 @@ final class ACL extends Model
         ]);
 
         return $rules;
+    }
+
+    #[Scope]
+    protected function forPermission(Builder $query, $permission_id): Builder
+    {
+        return $query->where('permission_id', $permission_id);
     }
 
     #[Override]

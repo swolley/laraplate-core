@@ -85,13 +85,7 @@ final class ModelLockingRefreshCommand extends Command
      */
     private function checkIfBlacklisted(string $model): bool
     {
-        foreach ($this->models_blacklist as $blacklisted) {
-            if ($model === $blacklisted || is_subclass_of($model, $blacklisted)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->models_blacklist, fn ($blacklisted) => $model === $blacklisted || is_subclass_of($model, $blacklisted));
     }
 
     /**
@@ -99,23 +93,22 @@ final class ModelLockingRefreshCommand extends Command
      */
     private function optimisticLockingCheck(Model $instance, string $model, string $table): void
     {
-        $optimistick_locking_class = HasOptimisticLocking::class;
         $optimistic_locking_column = method_exists($instance, 'lockVersionColumn') ? $instance->lockVersionColumn() : null;
-        $has_optimistic_locking = class_uses_trait($instance, $optimistick_locking_class);
+        $has_optimistic_locking = class_uses_trait($instance, HasOptimisticLocking::class);
 
         $has_optimistic_locking_column = $optimistic_locking_column !== null && Schema::hasColumn($table, $optimistic_locking_column);
 
-        if ($has_optimistic_locking_column && ! $has_optimistic_locking) {
-            $this->doRemoveOptimistickLokingOnModel($model, $optimistic_locking_column);
-        } elseif ($has_optimistic_locking && ! $has_optimistic_locking_column) {
-            $this->doAddOptimistickLokingOnModel($model, $optimistic_locking_column);
+        if ($optimistic_locking_column && $has_optimistic_locking_column && ! $has_optimistic_locking) {
+            $this->doRemoveOptimisticLockingOnModel($model, $optimistic_locking_column);
+        } elseif ($optimistic_locking_column && $has_optimistic_locking && ! $has_optimistic_locking_column) {
+            $this->doAddOptimisticLockingOnModel($model, $optimistic_locking_column);
         }
     }
 
     /**
      * @param  class-string<Model>  $model
      */
-    private function doAddOptimistickLokingOnModel(string $model, string $optimistic_locking_column): void
+    private function doAddOptimisticLockingOnModel(string $model, string $optimistic_locking_column): void
     {
         if ($this->askConfirmForOperation(
             "Model {$model} uses optimistic locking but column {$optimistic_locking_column} is missing. Would you like to create it into the schema?",
@@ -129,7 +122,7 @@ final class ModelLockingRefreshCommand extends Command
     /**
      * @param  class-string<Model>  $model
      */
-    private function doRemoveOptimistickLokingOnModel(string $model, string $optimistic_locking_column): void
+    private function doRemoveOptimisticLockingOnModel(string $model, string $optimistic_locking_column): void
     {
         if ($this->askConfirmForOperation(
             "Model {$model} doesn't use optimistic locking but column {$optimistic_locking_column} found. Would you like to remove it from the schema?",
@@ -153,9 +146,9 @@ final class ModelLockingRefreshCommand extends Command
         $has_locked_at_column = $lock_at_column !== null && Schema::hasColumn($table, $lock_at_column);
         $has_locked_by_column = $lock_by_column !== null && Schema::hasColumn($table, $lock_by_column);
 
-        if (($has_locked_at_column || $has_locked_by_column) && ! $has_locking) {
+        if ($lock_at_column && ($has_locked_at_column || $has_locked_by_column) && ! $has_locking) {
             $this->doRemoveLockableOnModel($model, $lock_at_column);
-        } elseif ($has_locking && (! $has_locked_at_column || ! $has_locked_by_column)) {
+        } elseif ($lock_at_column && $has_locking && (! $has_locked_at_column || ! $has_locked_by_column)) {
             $this->doAddLockableOnModel($model, $lock_at_column);
         }
     }

@@ -49,7 +49,7 @@ trait HasValidity
 
     public function scopeValidityOrdered(Builder $query): void
     {
-        $query->orderBy(static::$valid_from_column, 'desc')/* ->orderBy(static::$valid_to_column, 'desc') */;
+        $query->orderBy($this->qualifyColumn(static::$valid_from_column), 'desc')/* ->orderBy(static::$valid_to_column, 'desc') */;
     }
 
     /**

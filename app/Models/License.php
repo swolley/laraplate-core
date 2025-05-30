@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,13 +30,13 @@ final class License extends Model
      */
     protected $fillable = [];
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     public function free(Builder $query): void
     {
         $query->doesntHave('user');
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     public function occupied(Builder $query): void
     {
         $query->has('user');

@@ -6,18 +6,18 @@ namespace Modules\Core\Search\Jobs;
 
 use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Services\ElasticsearchService;
+use Typesense\Override;
 
 /**
  * Job for deleting a document from a search index
  * Supports both Elasticsearch and Typesense.
  */
-final class DeleteFromSearchJob implements ShouldQueue
+final class DeleteFromSearchJob extends CommonSearchJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -42,14 +42,10 @@ final class DeleteFromSearchJob implements ShouldQueue
      * @param  string  $index  Search index name
      * @param  string|int  $document_id  Document ID to delete
      */
+    #[Override]
     public function __construct(private string $index, private string|int $document_id)
     {
-        $this->onQueue(config('scout.queue_name', 'indexing'));
-
-        // Set job configurations from config
-        $this->tries = config('scout.queue_tries', 3);
-        $this->timeout = config('scout.queue_timeout', 60);
-        $this->backoff = config('scout.queue_backoff', [30, 60, 120]);
+        parent::__construct();
     }
 
     /**

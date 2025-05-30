@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Auth\Events\Registered;
@@ -66,6 +67,8 @@ final class CoreServiceProvider extends ServiceProvider
 
     /**
      * Boot the application events.
+     *
+     * @throws BindingResolutionException
      */
     public function boot(): void
     {
@@ -92,6 +95,8 @@ final class CoreServiceProvider extends ServiceProvider
 
     /**
      * Register the service provider.
+     *
+     * @throws ReflectionException
      */
     #[Override]
     public function register(): void
@@ -106,17 +111,16 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
-        // $app->alias('App\\Models\\User', user_class());
 
         if ($this->app->isLocal()) {
-            $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
+            $this->app->register(IdeHelperServiceProvider::class);
         }
     }
 
     public function registerAuths(): void
     {
         // bypass all other checks if user is super admin
-        Gate::before(fn (?User $user): ?true => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -124,14 +128,15 @@ final class CoreServiceProvider extends ServiceProvider
      */
     public function registerTranslations(): void
     {
-        $langPath = resource_path('lang/modules/' . $this->nameLower);
+        $langPath = $this->getResourcePath('lang');
 
         if (is_dir($langPath)) {
             $this->loadTranslationsFrom($langPath, $this->nameLower);
             $this->loadJsonTranslationsFrom($langPath);
         } else {
-            $this->loadTranslationsFrom(module_path($this->name, 'lang'), $this->nameLower);
-            $this->loadJsonTranslationsFrom(module_path($this->name, 'lang'));
+            $lang_path = module_path($this->name, 'lang');
+            $this->loadTranslationsFrom($lang_path, $this->nameLower);
+            $this->loadJsonTranslationsFrom($lang_path);
         }
     }
 
@@ -140,7 +145,7 @@ final class CoreServiceProvider extends ServiceProvider
      */
     public function registerViews(): void
     {
-        $viewPath = resource_path('views/modules/' . $this->nameLower);
+        $viewPath = $this->getResourcePath('views');
         $sourcePath = module_path($this->name, 'resources/views');
 
         $this->publishes([$sourcePath => $viewPath], ['views', $this->nameLower . '-module-views']);
@@ -158,6 +163,11 @@ final class CoreServiceProvider extends ServiceProvider
     public function provides(): array
     {
         return [];
+    }
+
+    private function getResourcePath(string $prefix): string
+    {
+        return resource_path("{$prefix}/modules/" . $this->nameLower);
     }
 
     /**

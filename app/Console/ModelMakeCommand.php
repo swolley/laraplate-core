@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Support\Carbon;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\suggest;
@@ -24,6 +26,7 @@ use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Models\DynamicEntity;
 use Override;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionMethod;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -42,7 +45,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     /**
      * @var array
      */
-    private $availableClasses = [];
+    private array $availableClasses = [];
 
     /**
      * @var array<string,array<string,string>>
@@ -85,6 +88,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         ],
     ];
 
+    /**
+     * @throws ReflectionException
+     * @throws FileNotFoundException
+     */
     #[Override]
     public function handle(): void
     {
@@ -122,7 +129,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                     foreach ($class->getFillable() as $fillable) {
                         /** @var string $class_code */
-                        $class_code = $this->addPropertyIntoFillables($class_code, $fillable);
+                        $class_code = $this->addPropertyIntoFillable($class_code, $fillable);
                     }
                     $casts = $class->casts();
 
@@ -144,7 +151,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                     foreach ($class->getAppends() as $append) {
                         $type = $casts[$append] ?? 'text';
-                        $nullable = isset($found_rules[$append]) ? (gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)) : true;
+                        $nullable = !isset($found_rules[$append]) || ((gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)));
                         $method_subfix = Str::studly($append) . 'Attribute';
 
                         if (method_exists($class, 'get' . $method_subfix)) {
@@ -181,13 +188,13 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     #[Override]
-    protected function possibleModels()
+    protected function possibleModels(): array
     {
         return models(false);
     }
 
     #[Override]
-    protected function qualifyClass($name)
+    protected function qualifyClass($name): array|string
     {
         $name = mb_ltrim($name, '\\/');
 
@@ -205,7 +212,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     #[Override]
-    protected function getPath($name)
+    protected function getPath($name): string
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
         $path_suffix = Str::after($name, 'Models\\');
@@ -343,11 +350,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             #region [ATTRIBUTES]
             public \$connection = 'default';
             public \$table = '{$table_name}';
-            
+
             protected \$fillable = [
             ];
 
-            protected function casts() 
+            protected function casts()
             {
                 return [
                 ];
@@ -365,7 +372,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 'always' => [],
             ];
             #endregion
-        
+
             // public function __construct() {
             //     parent::__construct();
             // }
@@ -375,7 +382,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
             #region [ACCESSORS_MUTATORS]
             #endregion
-            
+
             #region [RELATIONS]
             #endregion
         EOL;
@@ -392,6 +399,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     /**
      * @param  class-string<Model>  $className
+     *
+     * @throws ReflectionException
+     *
      * @return array<int,mixed>
      */
     private function getClassFields(string $className): array
@@ -404,7 +414,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $prop = $ref->getProperty('fillable');
 
             /** @psalm-suppress UnusedMethodCall */
-            $prop->setAccessible(true);
             array_push($already_existent_fields, ...$prop->getDefaultValue());
         }
 
@@ -412,7 +421,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $method = $ref->getMethod('casts');
 
             /** @psalm-suppress UnusedMethodCall */
-            $method->setAccessible(true);
             $already_existent_fields = array_merge($already_existent_fields, array_keys($method->invoke($temp_instance)));
         }
 
@@ -420,7 +428,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $prop = $ref->getProperty('hidden');
 
             /** @psalm-suppress UnusedMethodCall */
-            $prop->setAccessible(true);
             $already_existent_fields = array_merge($already_existent_fields, $prop->getDefaultValue());
         }
 
@@ -428,7 +435,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $prop = $ref->getProperty('attributes');
 
             /** @psalm-suppress UnusedMethodCall */
-            $prop->setAccessible(true);
             $already_existent_fields = array_merge($already_existent_fields, array_keys($prop->getDefaultValue()));
         }
 
@@ -436,7 +442,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $prop = $ref->getProperty('appends');
 
             /** @psalm-suppress UnusedMethodCall */
-            $prop->setAccessible(true);
             $already_existent_fields = array_merge($already_existent_fields, $prop->getDefaultValue());
         }
 
@@ -538,7 +543,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     /**
      * @return string|array<string>
      */
-    private function addPropertyIntoFillables(string $classCode, string $fieldName): array|string
+    private function addPropertyIntoFillable(string $classCode, string $fieldName): array|string
     {
         $search = 'protected $fillable = [';
         $pos = Str::position($classCode, $search);
@@ -660,20 +665,20 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $method_name = Str::studly($fieldName);
 
             if ($field_real_type === 'datetime') {
-                $imported_carbon_class = $this->injectImportClass($classCode, \Illuminate\Support\Carbon::class);
+                $imported_carbon_class = $this->injectImportClass($classCode, Carbon::class);
 
                 if (! $imported_carbon_class) {
-                    $field_real_type = \Illuminate\Support\Carbon::class;
+                    $field_real_type = Carbon::class;
                 }
             }
 
             $snippet = <<<EOL
-                
+
                 public function set{$method_name}Attribute({$field_real_type} \${$fieldName})
                 {
                     \$this->{$fieldName} = \${$fieldName};
                 }
-                
+
             EOL;
 
             if ($pos !== false) {
@@ -697,7 +702,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     private function updateClassWithNewProperty(string $className, string $classCode, string $classPath, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
         /** @var string $classCode */
-        $classCode = $this->addPropertyIntoFillables($classCode, $fieldName);
+        $classCode = $this->addPropertyIntoFillable($classCode, $fieldName);
         $classCode = $this->addPropertyIntoCasts($classCode, $fieldName, $fieldType);
         $classCode = $this->addPropertyIntoValidations($classCode, $fieldName, $fieldType, $fieldNullable);
         $classCode = $this->addPropertyIntoAccessorsMutators($classCode, $fieldName, $fieldType, $fieldNullable, $allTypes);
@@ -721,13 +726,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         };
     }
 
-    private function proposeInversedName(string $class, string $relation): ?string
+    private function proposeInverseName(string $class, string $relation): ?string
     {
         return match ($relation) {
-            'ManyToOne' => Str::snake(Str::plural($class)),
-            'OneToMany' => Str::snake(Str::singular($class)),
-            'OneToOne' => Str::snake(Str::plural($class)),
-            'ManyToMany' => Str::snake(Str::singular($class)),
+            'ManyToOne', 'OneToOne' => Str::snake(Str::plural($class)),
+            'OneToMany', 'ManyToMany' => Str::snake(Str::singular($class)),
             default => null,
         };
     }
@@ -737,7 +740,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
      * @param  class-string  $relatedClass
      * @param  class-string  $fullRelatedClass
      */
-    private function handleAskInversedRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
+    private function handleAskInverseRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
     {
         $short_class = $this->stripModelsNamespace($className);
         $create_reverse_relation = $this->confirm("Do you want to create a method into class {$relatedClass} to access {$short_class}?", true);
@@ -750,7 +753,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         if ($reversed_relation === null || $reversed_relation === '' || $reversed_relation === '0') {
             return;
         }
-        $proposed_name = $this->proposeInversedName($short_class, $reversed_relation);
+        $proposed_name = $this->proposeInverseName($short_class, $reversed_relation);
 
         if ($proposed_name === null || $proposed_name === '' || $proposed_name === '0') {
             return;
@@ -781,7 +784,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 {
                     return \$this->{$relation_method}({$class_model_import}::class);
                 }
-            
+
         EOL;
 
         $search = '#region [RELATIONS]';
@@ -801,7 +804,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         // reverse relation
         if (! $isInversed) {
-            $this->handleAskInversedRelation($className, $relatedClass, $full_related_class, $relationType);
+            $this->handleAskInverseRelation($className, $relatedClass, $full_related_class, $relationType);
         }
 
         return $classCode;
@@ -815,7 +818,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     {
         $field_name = text(
             ($newFields === [] ? '' : 'Add another property? ') . 'New property name',
-            hint: 'press <return> to stop adding fields',
             validate: function (string $field_name) use ($newFields, $alreadyExistentFields): ?string {
                 $field_name = Str::snake(mb_trim($field_name));
 
@@ -825,6 +827,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                 return null;
             },
+            hint: 'press <return> to stop adding fields',
         );
 
         return $field_name !== '' && $field_name !== '0' ? Str::snake(mb_trim($field_name)) : false;

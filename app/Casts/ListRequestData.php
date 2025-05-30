@@ -82,7 +82,7 @@ class ListRequestData extends SelectRequestData
 
     private function getDefaultPagination(): int
     {
-        return Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
+        return (int) Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
     }
 
     public function calculateTotalPages(int $totalRecords): int

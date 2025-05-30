@@ -6,7 +6,6 @@ namespace Modules\Core\Search\Jobs;
 
 use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -14,12 +13,13 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
+use Typesense\Override;
 
 /**
  * Job for indexing a model in search engines
  * Supports both Elasticsearch and Typesense via Laravel Scout.
  */
-final class IndexInSearchJob implements ShouldQueue
+final class IndexInSearchJob extends CommonSearchJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -43,6 +43,7 @@ final class IndexInSearchJob implements ShouldQueue
      *
      * @param  Model  $model  The model to index
      */
+    #[Override]
     public function __construct(
         private Model $model,
     ) {
@@ -51,12 +52,7 @@ final class IndexInSearchJob implements ShouldQueue
             throw new InvalidArgumentException('Model ' . $model::class . ' does not implement the Searchable trait');
         }
 
-        $this->onQueue(config('scout.queue_name', 'indexing'));
-
-        // Set job configurations from config
-        $this->tries = config('scout.queue_tries', 3);
-        $this->timeout = config('scout.queue_timeout', 60);
-        $this->backoff = config('scout.queue_backoff', [2, 10, 30]);
+        parent::__construct();
     }
 
     /**

@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
-use Exception;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
-use Laravel\Scout\EngineManager;
 use Modules\Core\Models\ModelEmbedding;
-use Modules\Core\Search\Engines\AbstractSearchEngine;
+use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
-use Modules\Core\Services\ElasticsearchService;
-use stdClass;
 
 /**
  * Extended searchable trait that supports multiple engines
@@ -39,11 +36,9 @@ trait Searchable
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
-            if ($engine instanceof AbstractSearchEngine && $engine->supportsVectorSearch()) {
+            if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
-                    // start with embeddings
                     new GenerateEmbeddingsJob($this),
-                    // then proceed with indexing
                     new IndexInSearchJob($this),
                 ])->dispatch();
 
@@ -51,7 +46,6 @@ trait Searchable
             }
         }
 
-        // proceed with indexing
         $this->baseSearchable();
     }
 
@@ -60,12 +54,11 @@ trait Searchable
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
-            if ($engine instanceof AbstractSearchEngine && $engine->supportsVectorSearch()) {
+            if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 new GenerateEmbeddingsJob($this)->dispatchSync();
             }
         }
 
-        // then proceed with indexing
         $this->baseSearchableSync();
     }
 
@@ -74,21 +67,16 @@ trait Searchable
      */
     public function toSearchableArray(): array
     {
-        // Start with basic searchable array from Scout
-        // $array = $this->toArray();
-        $array = [];
+        $array = parent::toSearchableArray();
+        $engine = $this->searchableUsing();
 
-        // find on web, typesense requires id to be a string
-        // TODO: quando sono pronte le classi che estendono scout fare il tostring nella classe di typesense
-        $array['id'] = config('scout.driver') === 'typesense' ? (string) $this->getKey() : $this->getKey();
-
-        // Add common data
+        $array['id'] = $this->getKey();
         $array['connection'] = $this->getConnectionName() ?: 'default';
         $array['entity'] = $this->getTable();
         $array[self::INDEXED_AT_FIELD] = now()->utc()->toZuluString();
 
         // Add embeddings if available
-        if (method_exists($this, 'embeddings')) {
+        if (config('scout.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
 
             if ($embeddings !== []) {
@@ -121,19 +109,6 @@ trait Searchable
         return $data;
     }
 
-    // /**
-    //  * Generate embeddings for the model
-    //  *
-    //  * @param bool $force If true, force generation even if embeddings already exist
-    //  * @return void
-    //  */
-    // public function generateEmbeddings(bool $force = false): void
-    // {
-    //     if (config('scout.vector_search.enabled')) {
-    //         GenerateEmbeddingsJob::dispatch($this, $force);
-    //     }
-    // }
-
     /**
      * Relationship with model embeddings.
      */
@@ -150,19 +125,13 @@ trait Searchable
      */
     public function getSearchMapping(): array
     {
-        $driver = config('scout.driver');
-        $fields = $this->getSearchFields();
+        $engine = $this->searchableUsing();
 
-        if ($driver === 'elastic') {
-            return $this->convertToElasticsearchMapping($fields);
+        if ($engine instanceof ISearchEngine) {
+            return $engine->getSearchMapping($this);
         }
 
-        if ($driver === 'typesense') {
-            return $this->convertToTypesenseSchema($fields);
-        }
-
-        // Default to Elasticsearch format as fallback
-        return $this->convertToElasticsearchMapping($fields);
+        return [];
     }
 
     /**
@@ -170,50 +139,39 @@ trait Searchable
      */
     public function reindex(): void
     {
-        // Use Scout's method
-        $this->searchableUsing()->flush($this);
-        $this->newQuery()->get()->searchable();
+        $engine = $this->searchableUsing();
+
+        if ($engine instanceof ISearchEngine) {
+            $engine->reindex(get_class($this));
+        }
     }
 
     /**
      * Check if index exists and create if needed.
      */
-    public function checkIndex(bool $createIfMissing = false): bool
+    public function checkIndex(): bool
     {
-        try {
-            $index = $this->searchableAs();
-            $exists = false;
+        $engine = $this->searchableUsing();
 
-            // Determine current driver and check index
-            $driver = config('scout.driver');
-            $client = app(EngineManager::class)->engine();
-
-            if ($driver === 'elastic') {
-                // For Elasticsearch
-                $client = ElasticsearchService::getInstance()->getClient();
-                $exists = $client->indices()->exists(['index' => $index])->asBool();
-            } elseif ($driver === 'typesense') {
-                // For Typesense
-                $client = app('typesense');
-
-                try {
-                    $client->collections[$index]->retrieve();
-                    $exists = true;
-                } catch (Exception) {
-                    $exists = false;
-                }
-            }
-
-            if (! $exists && $createIfMissing) {
-                $this->createIndex();
-
-                return true;
-            }
-
-            return $exists;
-        } catch (Exception) {
-            return false;
+        if ($engine instanceof ISearchEngine) {
+            return $engine->checkIndex($this);
         }
+
+        return false;
+    }
+
+    /**
+     * Check if index exists and create if needed.
+     */
+    public function ensureIndex(): bool
+    {
+        $engine = $this->searchableUsing();
+
+        if ($engine instanceof ISearchEngine) {
+            return $engine->ensureIndex($this);
+        }
+
+        return false;
     }
 
     /**
@@ -221,12 +179,10 @@ trait Searchable
      */
     public function createIndex(): void
     {
-        $driver = config('scout.driver');
+        $engine = $this->searchableUsing();
 
-        if ($driver === 'elastic') {
-            $this->createElasticsearchIndex();
-        } elseif ($driver === 'typesense') {
-            $this->createTypesenseCollection();
+        if ($engine instanceof ISearchEngine) {
+            $engine->createIndex($this);
         }
     }
 
@@ -235,14 +191,10 @@ trait Searchable
      */
     public function getLastIndexedTimestamp(): ?string
     {
-        $driver = config('scout.driver');
+        $engine = $this->searchableUsing();
 
-        if ($driver === 'elastic') {
-            return $this->getElasticsearchLastIndexedTimestamp();
-        }
-
-        if ($driver === 'typesense') {
-            return $this->getTypesenseLastIndexedTimestamp();
+        if ($engine instanceof ISearchEngine) {
+            return $engine->getLastIndexedTimestamp($this);
         }
 
         return null;
@@ -254,359 +206,17 @@ trait Searchable
      * @param  array  $vector  Embedding vector
      * @param  array  $options  Search options
      */
-    public function vectorSearch(array $vector, array $options = []): \Illuminate\Database\Eloquent\Collection
+    public function vectorSearch(array $vector, array $options = []): Collection
     {
-        $driver = config('scout.driver');
-        $size = $options['size'] ?? 10;
+        $engine = $this->searchableUsing();
 
-        if ($driver === 'elastic') {
-            return static::search()
-                ->rawQuery([
-                    'script_score' => [
-                        'query' => $options['filter'] ?? ['match_all' => new stdClass()],
-                        'script' => [
-                            'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                            'params' => ['query_vector' => $vector],
-                        ],
-                    ],
-                ])
-                ->take($size)
-                ->get();
-        }
-
-        if ($driver === 'typesense') {
-            // For Typesense, we use the vector search capability
-            $client = app('typesense');
-            $collection = $this->searchableAs();
-
-            $searchParams = [
-                'q' => '*',
-                'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
-                'per_page' => $size,
-            ];
-
-            if (isset($options['filter'])) {
-                $searchParams['filter_by'] = $this->buildTypesenseFilter($options['filter']);
-            }
-
-            $response = $client->collections[$collection]->documents->search($searchParams);
-
-            // Convert to Eloquent collection
-            $ids = collect($response['hits'])->pluck('document.id')->toArray();
-
-            return static::whereIn($this->getKeyName(), $ids)->get()
-                ->sortBy(fn ($model): int|string|false => array_search($model->getKey(), $ids, true));
+        if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
+            return $engine->vectorSearch($vector, array_merge($options, [
+                'index' => $this->searchableAs(),
+            ]));
         }
 
         return collect();
-    }
-
-    /**
-     * Get generic search field definitions
-     * This provides an engine-agnostic representation of search fields.
-     *
-     * @return array Array of field definitions with common properties
-     */
-    protected function getSearchFields(): array
-    {
-        $fields = [];
-
-        // Process fillable fields
-        foreach ($this->getFillable() as $field) {
-            $castType = $this->getCasts()[$field] ?? null;
-
-            $fieldData = [
-                'name' => $field,
-                'type' => $this->getGenericFieldType($castType),
-                'sortable' => true,
-                'filterable' => true,
-                'searchable' => true,
-            ];
-
-            // Add special handling based on field name or type
-            if (in_array($fieldData['type'], ['text', 'string'], true)) {
-                $fieldData['analyzer'] = 'standard';
-            }
-
-            $fields[$field] = $fieldData;
-        }
-
-        // Add indexed_at timestamp field
-        $fields[self::INDEXED_AT_FIELD] = [
-            'name' => self::INDEXED_AT_FIELD,
-            'type' => 'date',
-            'format' => 'yyyy-MM-dd\TH:mm:ss\Z',
-            'sortable' => true,
-            'filterable' => true,
-            'searchable' => false,
-        ];
-
-        // Add embedding field if model supports it
-        if (method_exists($this, 'embeddings')) {
-            $fields['embedding'] = [
-                'name' => 'embedding',
-                'type' => 'vector',
-                'dimensions' => 1536, // OpenAI embedding dimensions
-                'similarity' => 'cosine',
-                'sortable' => false,
-                'filterable' => false,
-                'searchable' => true,
-            ];
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Map model cast types to generic field types.
-     */
-    protected function getGenericFieldType(?string $castType): string
-    {
-        return match ($castType) {
-            'integer', 'int' => 'integer',
-            'float', 'double', 'decimal' => 'float',
-            'boolean', 'bool' => 'boolean',
-            'datetime', 'date', 'timestamp' => 'date',
-            'array', 'json', 'object', 'collection' => 'object',
-            default => 'text',
-        };
-    }
-
-    /**
-     * Convert generic field definitions to Elasticsearch mapping format.
-     */
-    protected function convertToElasticsearchMapping(array $fields): array
-    {
-        $mapping = [];
-
-        foreach ($fields as $fieldName => $fieldData) {
-            $mapping[$fieldName] = $this->getElasticsearchFieldMapping($fieldData);
-        }
-
-        return $mapping;
-    }
-
-    /**
-     * Convert generic field definitions to Typesense schema format.
-     */
-    protected function convertToTypesenseSchema(array $fields): array
-    {
-        $typesenseFields = [];
-        $defaultSortingField = 'id';
-
-        foreach ($fields as $fieldName => $fieldData) {
-            $fieldType = $this->mapGenericToTypesenseType($fieldData['type']);
-
-            $field = [
-                'name' => $fieldName,
-                'type' => $fieldType,
-            ];
-
-            // Add faceting for filterable string fields
-            if ($fieldData['filterable'] && in_array($fieldType, ['string', 'string[]'], true)) {
-                $field['facet'] = true;
-            }
-
-            // Special handling for vector fields
-            if ($fieldData['type'] === 'vector') {
-                $field = [
-                    'name' => $fieldName,
-                    'type' => 'float[]',
-                    'embed' => [
-                        'from' => ['*'],
-                        'model_config' => [
-                            'model_name' => 'openai',
-                        ],
-                    ],
-                ];
-            }
-
-            // For ID field or primary key
-            if ($fieldName === 'id' || $fieldName === $this->getKeyName()) {
-                $defaultSortingField = $fieldName;
-            }
-
-            $typesenseFields[] = $field;
-        }
-
-        return [
-            'fields' => $typesenseFields,
-            'default_sorting_field' => $defaultSortingField,
-        ];
-    }
-
-    /**
-     * Map generic field types to Elasticsearch types.
-     */
-    protected function mapGenericToElasticsearchType(string $genericType): string
-    {
-        return match ($genericType) {
-            'integer' => 'long',
-            'float' => 'double',
-            'boolean' => 'boolean',
-            'date' => 'date',
-            'object' => 'object',
-            'vector' => 'dense_vector', // Will need additional properties
-            'text', 'string' => 'text',
-            default => 'text',
-        };
-    }
-
-    /**
-     * Map generic field types to Typesense types.
-     */
-    protected function mapGenericToTypesenseType(string $genericType): string
-    {
-        return match ($genericType) {
-            'integer' => 'int32',
-            'float' => 'float',
-            'boolean' => 'bool',
-            'date' => 'string', // Typesense treats dates as strings
-            'object' => 'object',
-            'vector' => 'float[]', // Will need special handling
-            'text', 'string' => 'string',
-            default => 'string',
-        };
-    }
-
-    /**
-     * Create Elasticsearch index.
-     */
-    protected function createElasticsearchIndex(): void
-    {
-        try {
-            $client = ElasticsearchService::getInstance()->getClient();
-            $index = $this->searchableAs();
-
-            // Check if index exists
-            $exists = $client->indices()->exists(['index' => $index])->asBool();
-
-            if (! $exists) {
-                // Create index with appropriate mapping
-                $client->indices()->create([
-                    'index' => $index,
-                    'body' => [
-                        'mappings' => [
-                            'properties' => $this->getSearchMapping(),
-                        ],
-                    ],
-                ]);
-            }
-        } catch (Exception $e) {
-            // Log error
-            \Illuminate\Support\Facades\Log::error('Error creating Elasticsearch index', [
-                'model' => static::class,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Create Typesense collection.
-     */
-    protected function createTypesenseCollection(): void
-    {
-        try {
-            $client = app('typesense');
-            $collection = $this->searchableAs();
-
-            // Check if collection exists
-            try {
-                $client->collections[$collection]->retrieve();
-
-                return; // Collection already exists
-            } catch (Exception $e) {
-                // Collection doesn't exist, create it
-                $schema = $this->convertToTypesenseSchema($this->getSearchFields());
-                $schema['name'] = $collection;
-
-                $client->collections->create($schema);
-            }
-        } catch (Exception $e) {
-            // Log error
-            \Illuminate\Support\Facades\Log::error('Error creating Typesense collection', [
-                'model' => static::class,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Get last indexed timestamp from Elasticsearch.
-     */
-    protected function getElasticsearchLastIndexedTimestamp(): ?string
-    {
-        try {
-            $client = ElasticsearchService::getInstance()->getClient();
-            $index = $this->searchableAs();
-
-            $response = $client->search([
-                'index' => $index,
-                'body' => [
-                    'size' => 1,
-                    'sort' => [self::INDEXED_AT_FIELD => 'desc'],
-                    'query' => [
-                        'match_all' => (object) [],
-                    ],
-                ],
-            ]);
-
-            return $response->asArray()['hits']['hits'][0]['_source'][self::INDEXED_AT_FIELD] ?? null;
-        } catch (Exception) {
-            return null;
-        }
-    }
-
-    /**
-     * Get last indexed timestamp from Typesense.
-     */
-    protected function getTypesenseLastIndexedTimestamp(): ?string
-    {
-        try {
-            $client = app('typesense');
-            $collection = $this->searchableAs();
-
-            $response = $client->collections[$collection]->documents->search([
-                'q' => '*',
-                'sort_by' => self::INDEXED_AT_FIELD . ':desc',
-                'per_page' => 1,
-            ]);
-
-            return $response['hits'][0]['document'][self::INDEXED_AT_FIELD] ?? null;
-        } catch (Exception) {
-            return null;
-        }
-    }
-
-    /**
-     * Build Typesense filter from array.
-     */
-    protected function buildTypesenseFilter(array $filters): string
-    {
-        $filterStrings = [];
-
-        foreach ($filters as $field => $value) {
-            if (is_array($value)) {
-                if (count($value) === 2 && is_numeric($value[0]) && is_numeric($value[1])) {
-                    // Range filter
-                    $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
-                } else {
-                    // IN filter
-                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
-                    $filterStrings[] = "{$field}:[{$values}]";
-                }
-            } else {
-                // Exact match
-                $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
-                $filterStrings[] = "{$field}:={$formattedValue}";
-            }
-        }
-
-        return implode(' && ', $filterStrings);
     }
 
     /**
@@ -618,26 +228,5 @@ trait Searchable
             && is_string($value)
             && $value !== ''
             && $value !== '0';
-    }
-
-    private function getElasticsearchFieldMapping(array $fieldData): array
-    {
-        $type = $this->mapGenericToElasticsearchType($fieldData['type']);
-        $mapping = ['type' => $type];
-
-        if ($fieldData['type'] === 'date' && isset($fieldData['format'])) {
-            $mapping['format'] = $fieldData['format'];
-        } elseif ($fieldData['type'] === 'vector') {
-            $mapping = [
-                'type' => 'dense_vector',
-                'dims' => $fieldData['dimensions'],
-                'index' => true,
-                'similarity' => $fieldData['similarity'],
-            ];
-        } elseif ($fieldData['type'] === 'text' && isset($fieldData['analyzer'])) {
-            $mapping['analyzer'] = $fieldData['analyzer'];
-        }
-
-        return $mapping;
     }
 }

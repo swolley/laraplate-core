@@ -45,7 +45,12 @@ class ServiceProvider extends BaseServiceProvider
 
             $original = $config->get($key, []);
             $current = require $path;
-            $merged = self::mergeArrays($original, $current);
+
+            if (gettype($current) === 'array' && gettype($original) === 'array') {
+                $merged = self::mergeArrays($original, $current);
+            } else {
+                $merged = $current;
+            }
             $config->set($key, $merged);
         }
     }

@@ -6,6 +6,7 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Mtrajano\LaravelSwagger\Generator;
 use Override;
 
@@ -39,19 +40,7 @@ final class ModuleDocGenerator extends Generator
 
             $parameter_values = [];
 
-            foreach ($route->wheres as $key => $value) {
-                if (! is_string($value) && ! is_array($value)) {
-                    continue;
-                }
-
-                $values = is_string($value) && Str::contains($value, '|')
-                    ? explode('|', $value)
-                    : (array) $value;
-
-                if ($values !== []) {
-                    $parameter_values[$key] = $values;
-                }
-            }
+            $this->iterateWheres($route->wheres, $parameter_values);
 
             if ($parameter_values === []) {
                 $module_routes[] = new ModuleDocRoute($route);
@@ -59,23 +48,17 @@ final class ModuleDocGenerator extends Generator
                 continue;
             }
 
-            foreach ($this->generateCombinations($parameter_values) as $combination) {
-                $new_route = clone $route;
-                $new_uri = $new_route->uri;
-
-                foreach ($combination as $param => $value) {
-                    $new_uri = str_replace('{' . $param . '}', $value, $new_uri);
-                    unset($new_route->wheres[$param]);
-                }
-
-                $new_route->uri = $new_uri;
-                $module_routes[] = new ModuleDocRoute($new_route);
-            }
+            $this->iterateCombinations($route, $parameter_values, $module_routes);
         }
 
         return $module_routes;
     }
 
+    /**
+     * Generates the path for the route.
+     *
+     * @throws InvalidArgumentException
+     */
     #[Override]
     protected function generatePath(): void
     {
@@ -91,6 +74,51 @@ final class ModuleDocGenerator extends Generator
             $path_method['responses']['200']['content'] = [
                 'text/html' => [],
             ];
+        }
+    }
+
+    /**
+     * Iterates through the wheres array and adds the parameter values to the parameter_values array.
+     *
+     * @param  array<string, string|array>  $wheres
+     * @param  array<string, array<int, string>>  &$parameter_values
+     */
+    private function iterateWheres(array $wheres, array &$parameter_values): void
+    {
+        foreach ($wheres as $key => $value) {
+            if (! is_string($value) && ! is_array($value)) {
+                continue;
+            }
+
+            $values = is_string($value) && Str::contains($value, '|')
+                ? explode('|', $value)
+                : (array) $value;
+
+            if ($values !== []) {
+                $parameter_values[$key] = $values;
+            }
+        }
+    }
+
+    /**
+     * Iterates through the combinations and adds the new routes to the module_routes array.
+     *
+     * @param  array<string, array<int, string>>  $parameter_values
+     * @param  array<int, ModuleDocRoute>  $module_routes
+     */
+    private function iterateCombinations(Route $route, array $parameter_values, array &$module_routes): void
+    {
+        foreach ($this->generateCombinations($parameter_values) as $combination) {
+            $new_route = clone $route;
+            $new_uri = $new_route->uri;
+
+            foreach ($combination as $param => $value) {
+                $new_uri = str_replace('{' . $param . '}', $value, $new_uri);
+                unset($new_route->wheres[$param]);
+            }
+
+            $new_route->uri = $new_uri;
+            $module_routes[] = new ModuleDocRoute($new_route);
         }
     }
 

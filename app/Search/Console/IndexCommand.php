@@ -34,7 +34,9 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         $this->input->setArgument('name', new $model()->indexableAs());
         $this->addOption('key');
 
-        return parent::handle($manager);
+        parent::handle($manager);
+
+        return Command::SUCCESS;
     }
 
     #[Override]
