@@ -30,7 +30,9 @@ final class GenerateEmbeddingsJob implements ShouldQueue
 
     public int $tries = 3;
 
-    /** @var array|int[]  */
+    /**
+     * @var array|int[]
+     */
     public array $backoff = [30, 60, 120];
 
     /**
@@ -43,7 +45,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     public int $timeout = 300;
 
     /**
-     * Maximum time to wait in queue before execution.
+     * Maximum time to wait in the queue before execution.
      */
     public int $maxExceptionsThenWait = 300;
 

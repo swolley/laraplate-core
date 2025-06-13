@@ -7,59 +7,59 @@ namespace Modules\Core\Search\Contracts;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Interface che definisce le operazioni di analytics supportate dai motori di ricerca.
+ * Interface defining the analytics operations supported by search engines.
  */
 interface ISearchAnalytics
 {
     /**
-     * Ottiene metriche basate sul tempo (es. distribuzione temporale).
+     * It gets time-based metrics (e.g., time distribution).
      *
-     * @param  Model  $model  Modello da analizzare
-     * @param  array  $filters  Filtri da applicare
-     * @param  string  $interval  Intervallo temporale (es. '1d', '1M')
-     * @return array Risultati dell'aggregazione
+     * @param  Model  $model  Model to analyze
+     * @param  array  $filters  Filters to apply
+     * @param  string  $interval  Time interval (e.g., '1d', '1M')
+     * @return array Aggregation results
      */
     public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array;
 
     /**
-     * Ottiene metriche basate su termini (es. frequenza di valori in un campo).
+     * It gets metrics based on terms (e.g., frequency of values in a field).
      *
-     * @param  Model  $model  Modello da analizzare
-     * @param  string  $field  Campo da aggregare
-     * @param  array  $filters  Filtri da applicare
-     * @param  int  $size  Numero massimo di bucket da restituire
-     * @return array Risultati dell'aggregazione
+     * @param  Model  $model  Model to analyze
+     * @param  string  $field  Field to aggregate
+     * @param  array  $filters  Filters to apply
+     * @param  int  $size  Maximum number of buckets to return
+     * @return array Aggregation results
      */
     public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array;
 
     /**
-     * Ottiene metriche basate su dati geografici.
+     * It gets metrics based on geographic data.
      *
-     * @param  Model  $model  Modello da analizzare
-     * @param  string  $geoField  Campo geografico da utilizzare
-     * @param  array  $filters  Filtri da applicare
-     * @return array Risultati dell'aggregazione
+     * @param  Model  $model  Model to analyze
+     * @param  string  $geoField  Geographic area to use
+     * @param  array  $filters  Filters to apply
+     * @return array Aggregation results
      */
     public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array;
 
     /**
-     * Ottiene statistiche su un campo numerico.
+     * It gets statistics on a numeric field.
      *
-     * @param  Model  $model  Modello da analizzare
-     * @param  string  $field  Campo da aggregare
-     * @param  array  $filters  Filtri da applicare
-     * @return array Risultati dell'aggregazione (min, max, avg, sum, ecc.)
+     * @param  Model  $model  Model to analyze
+     * @param  string  $field  Field to aggregate
+     * @param  array  $filters  Filters to apply
+     * @return array Aggregation results (min, max, avg, sum, etc.)
      */
     public function getNumericFieldStats(Model $model, string $field, array $filters = []): array;
 
     /**
-     * Calcola la distribuzione di valori in intervalli (istogramma).
+     * Calculate the distribution of values in intervals (histogram).
      *
-     * @param  Model  $model  Modello da analizzare
-     * @param  string  $field  Campo da aggregare
-     * @param  array  $filters  Filtri da applicare
-     * @param  mixed  $interval  Intervallo per i bucket
-     * @return array Risultati dell'aggregazione
+     * @param  Model  $model  Model to analyze
+     * @param  string  $field  Field to aggregate
+     * @param  array  $filters  Filters to apply
+     * @param  mixed  $interval  Bucket range
+     * @return array Aggregation results
      */
-    public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array;
+    public function getHistogram(Model $model, string $field, array $filters = [], int $interval = 50): array;
 }

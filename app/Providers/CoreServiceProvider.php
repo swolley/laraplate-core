@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
-use InvalidArgumentException;
+use Laravel\Scout\EngineManager;
 use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -36,13 +36,16 @@ use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Overrides\ServiceProvider;
+use Modules\Core\Search\Engines\ElasticsearchEngine;
+use Modules\Core\Search\Engines\TypesenseEngine;
 use Nwidart\Modules\Traits\PathNamespace;
 use Override;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use ReflectionException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
-use TypeError;
 
 /**
  * @property Application $app
@@ -96,6 +99,9 @@ final class CoreServiceProvider extends ServiceProvider
     /**
      * Register the service provider.
      *
+     * @throws BindingResolutionException
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
      * @throws ReflectionException
      */
     #[Override]
@@ -107,19 +113,13 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
-        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
-        $this->app->alias(Locked::class, 'locked');
-
-        $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
-
-        if ($this->app->isLocal()) {
-            $this->app->register(IdeHelperServiceProvider::class);
-        }
+        // Registration of custom search engines
+        $this->registerSearchEngines();
     }
 
     public function registerAuths(): void
     {
-        // bypass all other checks if user is super admin
+        // bypass all other checks if the user is super admin
         Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
@@ -163,6 +163,39 @@ final class CoreServiceProvider extends ServiceProvider
     public function provides(): array
     {
         return [];
+    }
+
+    /**
+     * Registers the custom search engines.
+     * @throws BindingResolutionException
+     */
+    protected function registerSearchEngines(): void
+    {
+        // Extend Laravel Scout with custom engines
+        $this->app->make(EngineManager::class)->extend('elasticsearch', function () {
+            $config = config('search.engines.elasticsearch');
+            $engine = new ElasticsearchEngine();
+            $engine->config = $config;
+
+            return $engine;
+        });
+
+        $this->app->make(EngineManager::class)->extend('typesense', function () {
+            $config = config('search.engines.typesense');
+            $engine = new TypesenseEngine();
+            $engine->config = $config;
+
+            return $engine;
+        });
+
+        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
+        $this->app->alias(Locked::class, 'locked');
+
+        $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
+
+        if ($this->app->isLocal()) {
+            $this->app->register(IdeHelperServiceProvider::class);
+        }
     }
 
     private function getResourcePath(string $prefix): string
@@ -226,6 +259,7 @@ final class CoreServiceProvider extends ServiceProvider
 
     /**
      * Register command Schedules.
+     * @throws BindingResolutionException
      */
     private function registerCommandSchedules(): void
     {
@@ -253,9 +287,6 @@ final class CoreServiceProvider extends ServiceProvider
         });
     }
 
-    /**
-     * @throws BindingResolutionException
-     */
     private function registerMiddlewares(): void
     {
         $router = app('router');
@@ -268,13 +299,13 @@ final class CoreServiceProvider extends ServiceProvider
     }
 
     /**
-     * @throws InvalidArgumentException
-     * @throws TypeError
      * @throws ReflectionException
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
      */
     private function registerCache(): void
     {
-        // Override the binding for the Repository con il metodo corretto
+        // Override the binding for the Repository with the correct method
         /** @phpstan-ignore-next-line */
         $this->app->extend('cache.store', fn ($service, Application $app): Repository => new Repository(
             $app->get('cache')->getStore(),

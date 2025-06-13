@@ -7,6 +7,7 @@ namespace Modules\Core\Services;
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Exception\ClientResponseException;
+use Elastic\Elasticsearch\Exception\MissingParameterException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Search\Exceptions\ElasticsearchException;
@@ -16,7 +17,11 @@ final class ElasticsearchService
     /**
      * Elasticsearch client instance.
      */
-    private Client $client;
+    public Client $client {
+        get {
+            return $this->client;
+        }
+    }
 
     /**
      * Singleton instance of the service.
@@ -40,21 +45,13 @@ final class ElasticsearchService
     }
 
     /**
-     * Get the Elasticsearch client.
-     */
-    public function getClient(): Client
-    {
-        return $this->client;
-    }
-
-    /**
      * Create or update index.
      *
      * @param  string  $index  Index name
      * @param  array  $settings  Index settings
      * @param  array  $mappings  Index mappings
      *
-     * @throws ElasticsearchException
+     * @throws ElasticsearchException|MissingParameterException
      */
     public function createIndex(string $index, array $settings = [], array $mappings = []): bool
     {
@@ -110,7 +107,7 @@ final class ElasticsearchService
      *
      * @param  string  $index  Index name
      *
-     * @throws ElasticsearchException
+     * @throws ElasticsearchException|MissingParameterException
      */
     public function deleteIndex(string $index): bool
     {

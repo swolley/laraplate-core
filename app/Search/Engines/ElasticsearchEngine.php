@@ -4,143 +4,87 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Engines;
 
-use Elastic\Elasticsearch\Client;
-use Elastic\Elasticsearch\Exception\ClientResponseException;
-use Elastic\Elasticsearch\Exception\ServerResponseException;
-use Elastic\Elasticsearch\Response\Elasticsearch;
-use Elastic\ScoutDriverPlus\Engine as BaseEngine;
-use Http\Promise\Promise;
+use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
+use Exception;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use JsonException;
+use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\BulkIndexSearchJob;
-use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
-use Modules\Core\Services\ElasticsearchService;
 use Override;
 use stdClass;
 
 /**
  * Implementation of the search engine for Elasticsearch.
  */
-class ElasticsearchEngine extends BaseEngine implements ISearchEngine
+final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISearchEngine
 {
-    public array $config;
+    //    public array $config;
 
+    #[Override]
     public function supportsVectorSearch(): bool
     {
         return true;
     }
 
-    public function index(Model|Collection $model): void
+    /**
+     * @param  Model&Searchable  $name
+     *
+     * @throws Exception
+     * @throws \Http\Client\Exception
+     */
+    #[Override]
+    public function createIndex($name, array $options = []): void
     {
-        if ($model instanceof Collection) {
-            if ($model->isEmpty()) {
-                return;
-            }
-            $this->ensureSearchable($model->first());
-        } else {
-            $this->ensureSearchable($model);
-        }
-
-        IndexInSearchJob::dispatch($model);
-    }
-
-    public function indexWithEmbedding(Model|Collection $model): void
-    {
-        $this->ensureSearchable($model);
-
-        Bus::chain([
-            new GenerateEmbeddingsJob($model),
-            new IndexInSearchJob($model),
-        ])->dispatch();
-    }
-
-    public function bulkIndex(iterable $models): void
-    {
-        if (count($models) === 0) {
+        if ($this->checkIndex(new $name())) {
             return;
         }
 
-        $firstModel = $models[0] ?? $models->first();
-        $this->ensureSearchable($firstModel);
+        $collection = $name->searchableAs();
 
-        BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
-    }
+        try {
+            // Get mapping from the model
+            $schema = [];
 
-    /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
-     */
-    public function vectorSearch(array $vector, array $options = []): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $options['index'] ?? null;
-
-        $params = [
-            'index' => $index,
-            'body' => [
-                'query' => [
-                    'bool' => [
-                        'must' => [],
-                        'should' => [
-                            [
-                                'script_score' => [
-                                    'query' => ['match_all' => new stdClass()],
-                                    'script' => [
-                                        'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                                        'params' => ['query_vector' => $vector],
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'minimum_should_match' => 1,
-                    ],
-                ],
-            ],
-        ];
-
-        // Configure result size
-        if (isset($options['size'])) {
-            $params['size'] = $options['size'];
-        }
-
-        // Configure pagination
-        if (isset($options['from'])) {
-            $params['from'] = $options['from'];
-        }
-
-        // Filters
-        if (isset($options['filters']) && $options['filters'] !== []) {
-            $filters = $this->buildSearchFilters($options['filters']);
-
-            if ($filters !== []) {
-                $params['body']['query']['bool']['must'] = array_merge(
-                    $params['body']['query']['bool']['must'],
-                    $filters,
-                );
+            if (method_exists($name, 'getSearchMapping')) {
+                $schema = $name->getSearchMapping();
+            } elseif (method_exists($name, 'toSearchableIndex')) {
+                $schema = $name->toSearchableIndex();
             }
+
+            // Add collection name to schema
+            $schema['name'] = $collection;
+
+            parent::createIndex($collection, $schema);
+            Log::info("Elasticsearch collection '{$collection}' created");
+        } catch (Exception $e) {
+            Log::error("Error creating Elasticsearch collection '{$collection}'", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
-
-        // Sorting
-        $params['body']['sort'] = $options['sort'] ?? ['_score' => ['order' => 'desc']];
-
-        // Specific fields only
-        if (isset($options['_source'])) {
-            $params['body']['_source'] = $options['_source'];
-        }
-
-        // Execute query
-        $results = $client->search($params);
-
-        return $results->asArray();
     }
 
+    #[Override]
+    public function search(Builder $builder)
+    {
+        // Check if it's a vector search.
+        if ($this->isVectorSearch($builder)) {
+            return $this->performVectorSearch($builder);
+        }
+
+        // Otherwise, use the traditional search.
+        return parent::search($builder);
+    }
+
+    #[Override]
     public function buildSearchFilters(array $filters): array
     {
         $esFilters = [];
@@ -202,11 +146,19 @@ class ElasticsearchEngine extends BaseEngine implements ISearchEngine
         return $esFilters;
     }
 
+    #[Override]
     public function reindex(string $modelClass): void
     {
         ReindexSearchJob::dispatch($modelClass);
     }
 
+    #[Override]
+    /**
+     * @param  class-string<Model>  $modelClass
+     *
+     * @throws \Http\Client\Exception
+     * @throws JsonException
+     */
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
         if (! class_exists($modelClass)) {
@@ -245,258 +197,429 @@ class ElasticsearchEngine extends BaseEngine implements ISearchEngine
         }
 
         // Sync each record
-        $query->chunk(100, function ($records): void {
-            foreach ($records as $record) {
-                $this->indexDocument($record);
-            }
+        $query->chunk(100, function (Collection $records): void {
+            $this->update($records);
         });
 
         return $count;
     }
 
+    //    /**
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function vectorSearch(array $vector, array $options = []): array
+    //    {
+    //        $client = ElasticsearchService::getInstance()->client;
+    //        $index = $options['index'] ?? null;
+    //
+    //        $params = [
+    //            'index' => $index,
+    //            'body' => [
+    //                'query' => [
+    //                    'bool' => [
+    //                        'must' => [],
+    //                        'should' => [
+    //                            [
+    //                                'script_score' => [
+    //                                    'query' => ['match_all' => new stdClass()],
+    //                                    'script' => [
+    //                                        'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+    //                                        'params' => ['query_vector' => $vector],
+    //                                    ],
+    //                                ],
+    //                            ],
+    //                        ],
+    //                        'minimum_should_match' => 1,
+    //                    ],
+    //                ],
+    //            ],
+    //        ];
+    //
+    //        // Configure result size
+    //        if (isset($options['size'])) {
+    //            $params['size'] = $options['size'];
+    //        }
+    //
+    //        // Configure pagination
+    //        if (isset($options['from'])) {
+    //            $params['from'] = $options['from'];
+    //        }
+    //
+    //        // Filters
+    //        if (isset($options['filters']) && $options['filters'] !== []) {
+    //            $filters = $this->buildSearchFilters($options['filters']);
+    //
+    //            if ($filters !== []) {
+    //                $params['body']['query']['bool']['must'] = array_merge(
+    //                    $params['body']['query']['bool']['must'],
+    //                    $filters,
+    //                );
+    //            }
+    //        }
+    //
+    //        // Sorting
+    //        $params['body']['sort'] = $options['sort'] ?? ['_score' => ['order' => 'desc']];
+    //
+    //        // Specific fields only
+    //        if (isset($options['_source'])) {
+    //            $params['body']['_source'] = $options['_source'];
+    //        }
+    //
+    //        // Execute query
+    //        $results = $client->search($params);
+    //
+    //        return $results->asArray();
+    //    }
+
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
+    //    {
+    //        //        $client = ElasticsearchService::getInstance()->getClient();
+    //        //        $index = $model->searchableAs();
+    //
+    //        $response = $model::searchQuery()
+    //            ->bool()
+    //            ->must('match', ['entity' => $model->getTable()])
+    //            ->aggregation('over_time', [
+    //                'date_histogram' => [
+    //                    'field' => $filters['date_field'] ?? 'valid_from',
+    //                    'calendar_interval' => $interval,
+    //                ],
+    //            ])
+    //            ->size(0)
+    //            ->execute();
+    //
+    //        //        $query = [
+    //        //            'index' => $index,
+    //        //            'body' => [
+    //        //                'size' => 0,
+    //        //                'query' => [
+    //        //                    'bool' => [
+    //        //                        'must' => [
+    //        //                            ['match' => ['entity' => $model->getTable()]],
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //                'aggs' => [
+    //        //                    'over_time' => [
+    //        //                        'date_histogram' => [
+    //        //                            'field' => $filters['date_field'] ?? 'valid_from',
+    //        //                            'calendar_interval' => $interval,
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //            ],
+    //        //        ];
+    //
+    //        // Add filters if present
+    //        //        $response = $this->setFilters($filters, $query, $client);
+    //
+    //        return $response['aggregations']['over_time']['buckets'] ?? [];
+    //    }
+
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
+    //    {
+    //        //        $client = ElasticsearchService::getInstance()->getClient();
+    //        //        $index = $this->getIndexName($model);
+    //
+    //        $response = $model::searchQuery()
+    //            ->bool()
+    //            ->must('match', ['entity' => $model->getTable()])
+    //            ->aggregation('by_term', [
+    //                'terms' => [
+    //                    'field' => $field,
+    //                    'size' => $size,
+    //                ],
+    //            ])
+    //            ->size(0)
+    //            ->execute();
+    //
+    //        //        $query = [
+    //        //            'index' => $index,
+    //        //            'body' => [
+    //        //                'size' => 0,
+    //        //                'query' => [
+    //        //                    'bool' => [
+    //        //                        'must' => [
+    //        //                            ['match' => ['entity' => $model->getTable()]],
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //                'aggs' => [
+    //        //                    'by_term' => [
+    //        //                        'terms' => [
+    //        //                            'field' => $field,
+    //        //                            'size' => $size,
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //            ],
+    //        //        ];
+    //
+    //        // Add filters if present
+    //        //        $response = $this->setFilters($filters, $query, $client);
+    //
+    //        return $response['aggregations']['by_term']['buckets'] ?? [];
+    //    }
+
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
+    //    {
+    //        //        $client = ElasticsearchService::getInstance()->getClient();
+    //        //        $index = $this->getIndexName($model);
+    //
+    //        $response = $model::searchQuery()
+    //            ->bool()
+    //            ->must('match', ['entity' => $model->getTable()])
+    //            ->aggregation('geo_clusters', [
+    //                'geohash_grid' => [
+    //                    'field' => $geoField,
+    //                    'precision' => 5,
+    //                ],
+    //            ])
+    //            ->size(0)
+    //            ->execute();
+    //
+    //        //        $query = [
+    //        //            'index' => $index,
+    //        //            'body' => [
+    //        //                'size' => 0,
+    //        //                'query' => [
+    //        //                    'bool' => [
+    //        //                        'must' => [
+    //        //                            ['match' => ['entity' => $model->getTable()]],
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //                'aggs' => [
+    //        //                    'geo_clusters' => [
+    //        //                        'geohash_grid' => [
+    //        //                            'field' => $geoField,
+    //        //                            'precision' => 5,
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //            ],
+    //        //        ];
+    //        //
+    //        //        // Add filters if present
+    //        //        $response = $this->setFilters($filters, $query, $client);
+    //
+    //        return $response['aggregations']['geo_clusters']['buckets'] ?? [];
+    //    }
+
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
+    //    {
+    //        //        $client = ElasticsearchService::getInstance()->getClient();
+    //        //        $index = $this->getIndexName($model);
+    //
+    //        $response = $model::searchQuery()
+    //            ->bool()
+    //            ->must('match', ['entity' => $model->getTable()])
+    //            ->aggregation('field_stats', [
+    //                'stats' => [
+    //                    'field' => $field,
+    //                ],
+    //            ])
+    //            ->size(0)
+    //            ->execute();
+    //
+    //        //        $query = [
+    //        //            'index' => $index,
+    //        //            'body' => [
+    //        //                'size' => 0,
+    //        //                'query' => [
+    //        //                    'bool' => [
+    //        //                        'must' => [
+    //        //                            ['match' => ['entity' => $model->getTable()]],
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //                'aggs' => [
+    //        //                    'field_stats' => [
+    //        //                        'stats' => [
+    //        //                            'field' => $field,
+    //        //                        ],
+    //        //                    ],
+    //        //                ],
+    //        //            ],
+    //        //        ];
+    //        //
+    //        //        // Add filters if present
+    //        //        $response = $this->setFilters($filters, $query, $client);
+    //
+    //        return $response['aggregations']['field_stats'] ?? [];
+    //    }
+
+    //    /**
+    //     * @throws ServerResponseException
+    //     * @throws ClientResponseException
+    //     */
+    //    public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
+    //    {
+    //        $client = $ElasticsearchService::getInstance()->client;
+    //        $index = $this->getIndexName($model);
+    //
+    //        $query = [
+    //            'index' => $index,
+    //            'body' => [
+    //                'size' => 0,
+    //                'query' => [
+    //                    'bool' => [
+    //                        'must' => [
+    //                            ['match' => ['entity' => $model->getTable()]],
+    //                        ],
+    //                    ],
+    //                ],
+    //                'aggs' => [
+    //                    'histogram' => [
+    //                        'histogram' => [
+    //                            'field' => $field,
+    //                            'interval' => $interval,
+    //                        ],
+    //                    ],
+    //                ],
+    //            ],
+    //        ];
+    //
+    //        // Add filters if present
+    //        $response = $this->setFilters($filters, $query, $client);
+    //
+    //        return $response['aggregations']['histogram']['buckets'] ?? [];
+    //    }
+
+    #[Override]
     /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
+     * @param  Model&Searchable  $model
      */
-    public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $this->getIndexName($model);
-
-        $query = [
-            'index' => $index,
-            'body' => [
-                'size' => 0,
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            ['match' => ['entity' => $model->getTable()]],
-                        ],
-                    ],
-                ],
-                'aggs' => [
-                    'over_time' => [
-                        'date_histogram' => [
-                            'field' => $filters['date_field'] ?? 'valid_from',
-                            'calendar_interval' => $interval,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        // Add filters if present
-        $response = $this->setFilters($filters, $query, $client);
-
-        return $response['aggregations']['over_time']['buckets'] ?? [];
-    }
-
-    /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
-     */
-    public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $this->getIndexName($model);
-
-        $query = [
-            'index' => $index,
-            'body' => [
-                'size' => 0,
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            ['match' => ['entity' => $model->getTable()]],
-                        ],
-                    ],
-                ],
-                'aggs' => [
-                    'by_term' => [
-                        'terms' => [
-                            'field' => $field,
-                            'size' => $size,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        // Add filters if present
-        $response = $this->setFilters($filters, $query, $client);
-
-        return $response['aggregations']['by_term']['buckets'] ?? [];
-    }
-
-    /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
-     */
-    public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $this->getIndexName($model);
-
-        $query = [
-            'index' => $index,
-            'body' => [
-                'size' => 0,
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            ['match' => ['entity' => $model->getTable()]],
-                        ],
-                    ],
-                ],
-                'aggs' => [
-                    'geo_clusters' => [
-                        'geohash_grid' => [
-                            'field' => $geoField,
-                            'precision' => 5,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        // Add filters if present
-        $response = $this->setFilters($filters, $query, $client);
-
-        return $response['aggregations']['geo_clusters']['buckets'] ?? [];
-    }
-
-    /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
-     */
-    public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $this->getIndexName($model);
-
-        $query = [
-            'index' => $index,
-            'body' => [
-                'size' => 0,
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            ['match' => ['entity' => $model->getTable()]],
-                        ],
-                    ],
-                ],
-                'aggs' => [
-                    'field_stats' => [
-                        'stats' => [
-                            'field' => $field,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        // Add filters if present
-        $response = $this->setFilters($filters, $query, $client);
-
-        return $response['aggregations']['field_stats'] ?? [];
-    }
-
-    /**
-     * @throws ServerResponseException
-     * @throws ClientResponseException
-     */
-    public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $index = $this->getIndexName($model);
-
-        $query = [
-            'index' => $index,
-            'body' => [
-                'size' => 0,
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            ['match' => ['entity' => $model->getTable()]],
-                        ],
-                    ],
-                ],
-                'aggs' => [
-                    'histogram' => [
-                        'histogram' => [
-                            'field' => $field,
-                            'interval' => $interval,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        // Add filters if present
-        $response = $this->setFilters($filters, $query, $client);
-
-        return $response['aggregations']['histogram']['buckets'] ?? [];
-    }
-
-    public function deleteDocument(Model $model): void
-    {
-        $this->delete(collect([$model]));
-    }
-
-    public function checkIndex(Model $model): bool
-    {
-        return $this->checkIndexExists($model);
-    }
-
     public function getSearchMapping(Model $model): array
     {
-        return $model->getSearchMapping() ?? [];
-    }
-
-    public function prepareDataToEmbed(Model $model): array
-    {
-        return $model->toSearchableArray();
-    }
-
-    public function getLastIndexedTimestamp(Model $model): ?string
-    {
-        return $model->getLastIndexedTimestamp();
-    }
-
-    protected function checkIndexExists(Model $model): bool
-    {
-        $client = ElasticsearchService::getInstance()->getClient();
-        $indexName = $this->getIndexName($model);
-
-        return $client->indices()->exists(['index' => $indexName])->asBool();
-    }
-
-    /**
-     * Get the index name for the model.
-     */
-    protected function getIndexName(Model $model): string
-    {
-        $indexName = $model->searchableAs();
-
-        // Add prefix if configured
-        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
-            return $this->config['index_prefix'] . $indexName;
+        if (method_exists($model, 'getSearchMapping')) {
+            return $model->getSearchMapping();
         }
 
-        return $indexName;
+        // Default mapping for Elasticsearch
+        $mapping = [
+            'mappings' => [
+                'properties' => [
+                    'id' => ['type' => 'keyword'],
+                    'entity' => ['type' => 'keyword'],
+                    'connection' => ['type' => 'keyword'],
+                    self::INDEXED_AT_FIELD => ['type' => 'date'],
+                ],
+            ],
+        ];
+
+        // Add a vector field if needed
+        if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
+            $mapping['mappings']['properties']['embedding'] = [
+                'type' => 'dense_vector',
+                'dims' => config('scout.vector_search.dimensions', 1536),
+                'index' => true,
+                'similarity' => 'cosine',
+            ];
+        }
+
+        return $mapping;
     }
 
-    /**
-     * Ensure the model is searchable and index exists.
-     */
-    protected function ensureSearchable(Model $model): void
+    #[Override]
+    public function prepareDataToEmbed(Model $model): ?string
+    {
+        if (! method_exists($model, 'prepareDataToEmbed')) {
+            return null;
+        }
+
+        return $model->prepareDataToEmbed();
+    }
+
+    #[Override]
+    public function ensureSearchable(Model $model): void
     {
         if (! $this->usesSearchableTrait($model)) {
             throw new InvalidArgumentException('Model ' . get_class($model) . ' does not implement the Searchable trait');
         }
+    }
 
-        if (! $this->checkIndexExists($model)) {
+    #[Override]
+    /**
+     * @throws \Http\Client\Exception
+     * @throws Exception
+     */
+    public function ensureIndex(Model $model): bool
+    {
+        $this->ensureSearchable($model);
+
+        if (! $this->checkIndex($model)) {
+            /** @var Model|Searchable $model */
             $this->createIndex($model);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @throws \Http\Client\Exception
+     */
+    #[Override]
+    public function getLastIndexedTimestamp(Model $model): ?string
+    {
+        $this->ensureIndex($model);
+
+        try {
+            /** @var Model&Searchable $model */
+            return $model::search('*')
+                ->where('entity', $model->getTable())
+                ->orderBy(self::INDEXED_AT_FIELD, 'desc')
+                ->take(1)
+                ->get()
+                ->first()
+                ?->{self::INDEXED_AT_FIELD};
+        } catch (Exception $e) {
+            Log::error('Error getting last indexed timestamp from Elasticsearch', [
+                'index' => $model->searchableAs(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    #[Override]
+    /**
+     * @param  Model&Searchable  $model
+     */
+    public function checkIndex(Model $model): bool
+    {
+        try {
+            return $this->indexManager->exists($model->searchableAs());
+        } catch (Exception) {
+            return false;
         }
     }
 
@@ -508,35 +631,126 @@ class ElasticsearchEngine extends BaseEngine implements ISearchEngine
         return in_array(Searchable::class, class_uses_recursive($model), true);
     }
 
-    /**
-     * @param array|null $filters
-     * @param array $query
-     * @param Client $client
-     *
-     * @return Elasticsearch|Promise
-     *
-     * @throws ClientResponseException
-     * @throws ServerResponseException
-     */
-    public function setFilters(?array $filters, array $query, Client $client): Promise|Elasticsearch
+    private function isVectorSearch(Builder $builder): bool
     {
-        if ($filters !== [] && $filters !== null) {
-            $esFilters = $this->buildSearchFilters($filters);
+        // Check if the builder contains parameters for vector search.
+        return isset($builder->wheres['vector'])
+            || isset($builder->wheres['embedding'])
+            || method_exists($builder->model, 'getVectorField');
+    }
 
-            if ($esFilters !== []) {
-                $query['body']['query']['bool']['must'] = array_merge(
-                    $query['body']['query']['bool']['must'],
-                    $esFilters,
-                );
-            }
+    private function performVectorSearch(Builder $builder): mixed
+    {
+        /** @var Model&Searchable $model */
+        $model = $builder->model;
+
+        // Extract the vector from the builder
+        $vector = $this->extractVectorFromBuilder($builder);
+
+        // Build the vector search query
+        //        $query = [
+        //            'script_score' => [
+        //                'query' => ['match_all' => new stdClass()],
+        //                'script' => [
+        //                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+        //                    'params' => ['query_vector' => $vector],
+        //                ],
+        //            ],
+        //        ];
+
+        // Add filters if any are present
+        //        if (! empty($builder->wheres)) {
+        //            $filters = $this->buildFiltersFromBuilder($builder);
+        //
+        //            if ($filters) {
+        //                $query = [
+        //                    'bool' => [
+        //                        'must' => $filters,
+        //                        'should' => [$query],
+        //                        'minimum_should_match' => 1,
+        //                    ],
+        //                ];
+        //            }
+        //        }
+
+        // Execute the search query
+        return $builder
+            ->query(function ($query) use ($vector) {
+                return [
+                    'bool' => [
+                        'must' => $query,
+                        'should' => [
+                            'script_score' => [
+                                'query' => ['match_all' => new stdClass()],
+                                'script' => [
+                                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                                    'params' => ['query_vector' => $vector],
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            })
+            ->take($builder->limit ?: 10)
+            ->get();
+    }
+
+    private function extractVectorFromBuilder(Builder $builder): array
+    {
+        // Find the vector in the builder parameters.
+        if (isset($builder->wheres['vector'])) {
+            return $builder->wheres['vector'];
         }
 
-        return $client->search($query);
+        if (isset($builder->wheres['embedding'])) {
+            return $builder->wheres['embedding'];
+        }
+
+        return [];
     }
 
-    #[Override]
-    public function ensureIndex(Model $model): bool
-    {
-        // TODO: Implement ensureIndex() method.
-    }
+    //    /**
+    //     * @throws ClientResponseException
+    //     * @throws ServerResponseException
+    //     */
+    //    public function setFilters(?array $filters, array $query, Client $client): Promise|Elasticsearch
+    //    {
+    //        if ($filters !== [] && $filters !== null) {
+    //            $esFilters = $this->buildSearchFilters($filters);
+    //
+    //            if ($esFilters !== []) {
+    //                $query['body']['query']['bool']['must'] = array_merge(
+    //                    $query['body']['query']['bool']['must'],
+    //                    $esFilters,
+    //                );
+    //            }
+    //        }
+    //
+    //        return $client->search($query);
+    //    }
+
+    //    #[Override]
+    //    public function ensureIndexExists(Model $model): bool
+    //    {
+    //        // Integrazione con Scout per verificare l'esistenza dell'indice
+    //        if (method_exists(parent::class, 'indexExists')) {
+    //            if (!parent::indexExists($model->searchableAs())) {
+    //                // Utilizzare il metodo nativo di Scout se disponibile
+    //                if (method_exists(parent::class, 'createIndex')) {
+    //                    parent::createIndex($model->searchableAs(), $this->getSearchMapping($model));
+    //                } else {
+    //                    $this->createIndex($model);
+    //                }
+    //                return true;
+    //            }
+    //            return false;
+    //        }
+    //
+    //        // Fallback al comportamento esistente
+    //        if (!$this->checkIndex($model)) {
+    //            $this->createIndex($model);
+    //            return true;
+    //        }
+    //        return false;
+    //    }
 }

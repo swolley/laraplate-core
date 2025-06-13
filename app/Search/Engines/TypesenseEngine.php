@@ -5,70 +5,49 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Engines;
 
 use Exception;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use JsonException;
+use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\BulkIndexSearchJob;
-use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
 use Override;
+use Typesense\Exceptions\TypesenseClientError;
 
 /**
  * Implementation of the search engine for Typesense.
  */
-class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
+final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 {
-    public array $config;
+    //    public array $config;
 
     public function supportsVectorSearch(): bool
     {
         return true;
     }
 
-    public function index(Model|Collection $model): void
+    /**
+     * @param  Model&Searchable  $name
+     *
+     * @throws Exception
+     * @throws \Http\Client\Exception
+     */
+    #[Override]
+    public function createIndex($name, array $options = []): void
     {
-        $this->ensureSearchable($model);
-        IndexInSearchJob::dispatch($model);
-    }
-
-    public function indexDocumentWithEmbedding(Model|Collection $model): void
-    {
-        $this->ensureSearchable($model);
-
-        Bus::chain([
-            new GenerateEmbeddingsJob($model),
-            new IndexInSearchJob($model),
-        ])->dispatch();
-    }
-
-    public function bulkIndex(iterable $models): void
-    {
-        if (count($models) === 0) {
+        if ($this->checkIndex(new $name())) {
             return;
         }
 
-        $firstModel = $models[0] ?? $models->first();
-        $this->ensureSearchable($firstModel);
-
-        BulkIndexSearchJob::dispatch(collect($models), $firstModel->searchableAs());
-    }
-
-    public function createIndex($name, array $options = []): void
-    {
-        $this->ensureSearchable($name);
-
-        $client = app('typesense');
-        $collection = $this->getIndexName($name);
+        $collection = $name->searchableAs();
 
         try {
-            // Get mapping from model
+            // Get mapping from the model
             $schema = [];
 
             if (method_exists($name, 'getSearchMapping')) {
@@ -80,15 +59,8 @@ class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             // Add collection name to schema
             $schema['name'] = $collection;
 
-            // Check if collection exists
-            try {
-                $client->collections[$collection]->retrieve();
-                Log::info("Typesense collection '{$collection}' already exists");
-            } catch (Exception) {
-                // Collection doesn't exist, create it
-                $client->collections->create($schema);
-                Log::info("Typesense collection '{$collection}' created");
-            }
+            $this->typesense->collections->create($schema);
+            Log::info("Typesense collection '{$collection}' created");
         } catch (Exception $e) {
             Log::error("Error creating Typesense collection '{$collection}'", [
                 'error' => $e->getMessage(),
@@ -99,23 +71,19 @@ class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         }
     }
 
-    public function vectorSearch(array $vector, array $options = [])
+    #[Override]
+    public function search(Builder $builder)
     {
-        $collection = $options['index'] ?? null;
-
-        $searchParams = [
-            'q' => '*',
-            'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
-            'per_page' => $options['size'] ?? 10,
-        ];
-
-        if (isset($options['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($options['filter']);
+        // Check if it's a vector search.
+        if ($this->isVectorSearch($builder)) {
+            return $this->performVectorSearch($builder);
         }
 
-        return $this->typesense->collections[$collection]->documents->search($searchParams);
+        // Otherwise, use the traditional search.
+        return parent::search($builder);
     }
 
+    #[Override]
     public function buildSearchFilters(array $filters): string
     {
         $filterStrings = [];
@@ -147,15 +115,16 @@ class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     #[Override]
+    /**
+     * @param  class-string<Model>  $modelClass
+     *
+     * @throws \Http\Client\Exception
+     * @throws TypesenseClientError
+     * @throws JsonException
+     */
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
-        if (! class_exists($modelClass)) {
-            throw new InvalidArgumentException("Class {$modelClass} does not exist");
-        }
-
-        if (! $this->usesSearchableTrait(new $modelClass())) {
-            throw new InvalidArgumentException("Model {$modelClass} does not implement the Searchable trait");
-        }
+        $this->ensureIndex(new $modelClass());
 
         $query = $modelClass::query();
 
@@ -185,188 +154,221 @@ class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         }
 
         // Sync each record
-        $query->chunk(100, function ($records): void {
-            foreach ($records as $record) {
-                $this->indexDocument($record);
-            }
+        $query->chunk(100, function (Collection $records): void {
+            $this->update($records);
         });
 
         return $count;
     }
 
-    public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
-    {
-        $collection = $this->getIndexName($model);
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     */
+    //    public function getTimeBasedMetrics(Model $model, array $filters = [], string $interval = '1M'): array
+    //    {
+    //        $collection = $model->searchableAs();
+    //
+    //        $searchParams = [
+    //            'q' => '*',
+    //            'group_by' => $filters['date_field'] ?? 'valid_from',
+    //            'group_limit' => 100,
+    //        ];
+    //
+    //        if (isset($filters['filter'])) {
+    //            $searchParams['filter_by'] = $this->buildFilter($filters['filter']);
+    //        }
+    //
+    //        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+    //
+    //        return $response['grouped_hits'] ?? [];
+    //    }
 
-        $searchParams = [
-            'q' => '*',
-            'group_by' => $filters['date_field'] ?? 'valid_from',
-            'group_limit' => 100,
-        ];
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     */
+    //    public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
+    //    {
+    //        $collection = $model->searchableAs();
+    //
+    //        $searchParams = [
+    //            'q' => '*',
+    //            'group_by' => $field,
+    //            'group_limit' => $size,
+    //        ];
+    //
+    //        if (isset($filters['filter'])) {
+    //            $searchParams['filter_by'] = $this->buildFilter($filters['filter']);
+    //        }
+    //
+    //        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+    //
+    //        return $response['grouped_hits'] ?? [];
+    //    }
 
-        if (isset($filters['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($filters['filter']);
-        }
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     */
+    //    public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
+    //    {
+    //        return $this->getGroupedData($model, $geoField, $filters, 100);
+    //    }
 
-        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     */
+    //    public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
+    //    {
+    //        $collection = $model->searchableAs();
+    //
+    //        $searchParams = [
+    //            'q' => '*',
+    //            'group_by' => $field,
+    //            'group_limit' => 1,
+    //        ];
+    //
+    //        if (isset($filters['filter'])) {
+    //            $searchParams['filter_by'] = $this->buildFilter($filters['filter']);
+    //        }
+    //
+    //        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+    //
+    //        return $response['grouped_hits'][0] ?? [];
+    //    }
 
-        return $response['grouped_hits'] ?? [];
-    }
-
-    public function getTermBasedMetrics(Model $model, string $field, array $filters = [], int $size = 10): array
-    {
-        $collection = $this->getIndexName($model);
-
-        $searchParams = [
-            'q' => '*',
-            'group_by' => $field,
-            'group_limit' => $size,
-        ];
-
-        if (isset($filters['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($filters['filter']);
-        }
-
-        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
-
-        return $response['grouped_hits'] ?? [];
-    }
-
-    public function getGeoBasedMetrics(Model $model, string $geoField = 'geocode', array $filters = []): array
-    {
-        $collection = $this->getIndexName($model);
-
-        $searchParams = [
-            'q' => '*',
-            'group_by' => $geoField,
-            'group_limit' => 100,
-        ];
-
-        if (isset($filters['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($filters['filter']);
-        }
-
-        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
-
-        return $response['grouped_hits'] ?? [];
-    }
-
-    public function getNumericFieldStats(Model $model, string $field, array $filters = []): array
-    {
-        $collection = $this->getIndexName($model);
-
-        $searchParams = [
-            'q' => '*',
-            'group_by' => $field,
-            'group_limit' => 1,
-        ];
-
-        if (isset($filters['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($filters['filter']);
-        }
-
-        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
-
-        return $response['grouped_hits'][0] ?? [];
-    }
-
-    public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
-    {
-        $collection = $this->getIndexName($model);
-
-        $searchParams = [
-            'q' => '*',
-            'group_by' => $field,
-            'group_limit' => 100,
-        ];
-
-        if (isset($filters['filter'])) {
-            $searchParams['filter_by'] = $this->buildTypesenseFilter($filters['filter']);
-        }
-
-        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
-
-        return $response['grouped_hits'] ?? [];
-    }
-
-    // #[Override]
-    // public function index(Model|Collection $model): void
-    // {
-    //     $collection = $this->getIndexName($model);
-    //     $this->typesense->collections[$collection]->update($model->toSearchableArray());
-    // }
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     */
+    //    public function getHistogram(Model $model, string $field, array $filters = [], $interval = 50): array
+    //    {
+    //        return $this->getGroupedData($model, $field, $filters, 100);
+    //    }
 
     #[Override]
-    public function indexWithEmbedding(Model|Collection $model): void
-    {
-        $collection = $this->getIndexName($model);
-        $this->typesense->collections[$collection]->update($model->toSearchableArray());
-    }
-
-    #[Override]
+    /**
+     * @param  Model&Searchable  $model
+     */
     public function getSearchMapping(Model $model): array
     {
-        // TODO: Implement getSearchMapping() method.
-    }
-
-    #[Override]
-    public function prepareDataToEmbed(): ?string
-    {
-        // TODO: Implement prepareDataToEmbed() method.
-    }
-
-    #[Override]
-    public function ensureIndex(Model $model): bool
-    {
-        // TODO: Implement ensureIndex() method.
-    }
-
-    #[Override]
-    public function getLastIndexedTimestamp(Model $model): ?string
-    {
-        // TODO: Implement getLastIndexedTimestamp() method.
-    }
-
-    #[Override]
-    public function checkIndex(Model $model): bool
-    {
-        $collection = $this->getIndexName($model);
-
-        try {
-            $this->typesense->collections[$collection]->retrieve();
-
-            return true;
-        } catch (Exception) {
-            return false;
-        }
-    }
-
-    /**
-     * Get the index name for the model.
-     */
-    protected function getIndexName(Model $model): string
-    {
-        $indexName = $model->searchableAs();
-
-        // Add prefix if configured
-        if ($this->config['index_prefix'] !== '' && $this->config['index_prefix'] !== null) {
-            return $this->config['index_prefix'] . $indexName;
+        if (method_exists($model, 'getSearchMapping')) {
+            return $model->getSearchMapping();
         }
 
-        return $indexName;
+        // Default mapping for Typesense
+        $mapping = [
+            'name' => $model->searchableAs(),
+            'fields' => [
+                ['name' => 'id', 'type' => 'string', 'index' => true],
+                ['name' => 'entity', 'type' => 'string', 'facet' => true],
+                ['name' => 'connection', 'type' => 'string', 'facet' => true],
+                ['name' => self::INDEXED_AT_FIELD, 'type' => 'string', 'sort' => true],
+            ],
+        ];
+
+        // Add a vector field if needed
+        if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
+            $mapping['fields'][] = [
+                'name' => 'embedding',
+                'type' => 'float[]',
+                'embed' => true,
+            ];
+        }
+
+        return $mapping;
     }
 
-    /**
-     * Ensure the model is searchable and index exists.
-     */
-    protected function ensureSearchable(Model $model): void
+    #[Override]
+    public function prepareDataToEmbed(Model $model): ?string
+    {
+        if (! method_exists($model, 'prepareDataToEmbed')) {
+            return null;
+        }
+
+        return $model->prepareDataToEmbed();
+    }
+
+    public function ensureSearchable(Model $model): void
     {
         if (! $this->usesSearchableTrait($model)) {
             throw new InvalidArgumentException('Model ' . get_class($model) . ' does not implement the Searchable trait');
         }
+    }
 
-        if (! $this->checkIndexExists($model)) {
+    /**
+     * @throws \Http\Client\Exception
+     * @throws Exception
+     */
+    #[Override]
+    public function ensureIndex(Model $model): bool
+    {
+        $this->ensureSearchable($model);
+
+        if (! $this->checkIndex($model)) {
+            /** @var Model|Searchable $model */
             $this->createIndex($model);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @throws \Http\Client\Exception
+     */
+    #[Override]
+    public function getLastIndexedTimestamp(Model $model): ?string
+    {
+        $this->ensureIndex($model);
+
+        try {
+            /** @var Model&Searchable $model */
+            return $model::search('*')
+                ->where('entity', $model->getTable())
+                ->orderBy(self::INDEXED_AT_FIELD, 'desc')
+                ->take(1)
+                ->get()
+                ->first()
+                ?->{self::INDEXED_AT_FIELD};
+        } catch (Exception $e) {
+            Log::error('Error getting last indexed timestamp from Typesense', [
+                'index' => $model->searchableAs(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  Model&Searchable  $model
+     *
+     * @throws \Http\Client\Exception
+     */
+    public function checkIndex(Model $model): bool
+    {
+        $this->ensureSearchable($model);
+
+        try {
+            $this->typesense->collections[$model->searchableAs()]->retrieve();
+
+            return true;
+        } catch (Exception) {
+            return false;
         }
     }
 
@@ -377,4 +379,111 @@ class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     {
         return in_array(Searchable::class, class_uses_recursive($model), true);
     }
+
+    private function isVectorSearch(Builder $builder): bool
+    {
+        // Check if the builder contains parameters for vector search.
+        return isset($builder->wheres['vector'])
+            || isset($builder->wheres['embedding'])
+            || method_exists($builder->model, 'getVectorField');
+    }
+
+    /**
+     * @throws \Http\Client\Exception
+     * @throws TypesenseClientError
+     */
+    private function performVectorSearch(Builder $builder): mixed
+    {
+        /** @var Model&Searchable $model */
+        $model = $builder->model;
+        $collection = $model->searchableAs();
+
+        // Extract the vector from the builder
+        $vector = $this->extractVectorFromBuilder($builder);
+
+        $searchParams = [
+            'q' => $builder->query ?: '*',
+            'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
+            'per_page' => $builder->limit ?: 10,
+        ];
+
+        // Add filters if any are present
+        if (! empty($builder->wheres)) {
+            $filters = $this->buildFiltersFromBuilder($builder);
+
+            if ($filters) {
+                $searchParams['filter_by'] = $filters;
+            }
+        }
+
+        return $this->typesense->collections[$collection]->documents->search($searchParams);
+    }
+
+    private function extractVectorFromBuilder(Builder $builder): array
+    {
+        // Find the vector in the builder parameters.
+        if (isset($builder->wheres['vector'])) {
+            return $builder->wheres['vector'];
+        }
+
+        if (isset($builder->wheres['embedding'])) {
+            return $builder->wheres['embedding'];
+        }
+
+        return [];
+    }
+
+    private function buildFilter(string $fieldName, mixed $value): string
+    {
+        if (is_array($value)) {
+            $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+
+            return "{$fieldName}:[{$values}]";
+        }
+        $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
+
+        return "{$fieldName}:={$formattedValue}";
+    }
+
+    private function buildFiltersFromBuilder(Builder $builder): string
+    {
+        $filters = [];
+
+        foreach ($builder->wheres as $field => $value) {
+            if ($field === 'vector' || $field === 'embedding') {
+                continue; // Skip vector fields
+            }
+
+            $filters[] = $this->buildFilter($field, $value);
+        }
+
+        return implode(' && ', $filters);
+    }
+
+    //    /**
+    //     * @param  Model&Searchable  $model
+    //     *
+    //     * @throws TypesenseClientError
+    //     * @throws \Http\Client\Exception
+    //     *
+    //     * @return array|mixed
+    //     */
+    //    private function getGroupedData(Model $model, string $field, array $filters, int $limit): mixed
+    //    {
+    //        $collection = $model->searchableAs();
+    //
+    //        $searchParams = [
+    //            'q' => '*',
+    //            'group_by' => $field,
+    //            'group_limit' => $limit,
+    //        ];
+    //
+    //        if (isset($filters['filter'])) {
+    //            $searchParams['filter_by'] = $this->buildFilter($filters['filter']);
+    //        }
+    //
+    //        $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+    //
+    //        return $response['grouped_hits'] ?? [];
+    //    }
 }

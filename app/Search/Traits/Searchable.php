@@ -6,60 +6,69 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Scout\Scout;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
-use Modules\Core\Search\Jobs\IndexInSearchJob;
 
 /**
  * Extended searchable trait that supports multiple engines
  * Provides enhanced functionality for Elasticsearch and Typesense.
- *
- * Note: Models using this trait should implement ISearchable
  */
 trait Searchable
 {
     use ScoutSearchable {
-        searchable as protected baseSearchable;
-        searchableSync as protected baseSearchableSync;
+        queueMakeSearchable as protected baseQueueMakeSearchable;
+        syncMakeSearchable as protected baseSyncMakeSearchableSync;
     }
 
     /**
      * Field name for indexing timestamp.
      */
-    public const INDEXED_AT_FIELD = 'indexed_at';
+    public static string $indexedAtField = 'indexed_at';
 
-    public function searchable(): void
+    /**
+     * Reindex all records of this model.
+     */
+    public static function reindex(?int $chunk = null): void
+    {
+        static::makeAllSearchable($chunk);
+    }
+
+    public function queueMakeSearchable($models): void
     {
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
-                    new GenerateEmbeddingsJob($this),
-                    new IndexInSearchJob($this),
-                ])->dispatch();
+                    new GenerateEmbeddingsJob($models),
+                    new Scout::$makeSearchableJob($models),
+                ])->dispatch()
+                    ->onQueue($models->first()->syncWithSearchUsingQueue())
+                    ->onConnection($models->first()->syncWithSearchUsing());
 
                 return;
             }
         }
 
-        $this->baseSearchable();
+        $this->baseQueueMakeSearchable($models);
     }
 
-    public function searchableSync(): void
+    public function syncMakeSearchable($models): void
     {
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-                new GenerateEmbeddingsJob($this)->dispatchSync();
+                dispatch(new GenerateEmbeddingsJob($models)
+                    ->onQueue($models->first()->syncWithSearchUsingQueue())
+                    ->onConnection($models->first()->syncWithSearchUsing()));
             }
         }
 
-        $this->baseSearchableSync();
+        $this->baseSyncMakeSearchableSync($models);
     }
 
     /**
@@ -67,13 +76,14 @@ trait Searchable
      */
     public function toSearchableArray(): array
     {
-        $array = parent::toSearchableArray();
         $engine = $this->searchableUsing();
 
-        $array['id'] = $this->getKey();
-        $array['connection'] = $this->getConnectionName() ?: 'default';
-        $array['entity'] = $this->getTable();
-        $array[self::INDEXED_AT_FIELD] = now()->utc()->toZuluString();
+        $array = [
+            'id' => $this->getKey(),
+            'connection' => $this->getConnectionName() ?: 'default',
+            'entity' => $this->getTable(),
+            self::$indexedAtField => now()->utc()->toIso8601ZuluString(),
+        ];
 
         // Add embeddings if available
         if (config('scout.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
@@ -120,8 +130,6 @@ trait Searchable
     /**
      * Get field mapping for search engine
      * Convert generic field definitions to the format required by the current search engine.
-     *
-     * @return array Mapping in format appropriate for current search engine
      */
     public function getSearchMapping(): array
     {
@@ -135,35 +143,9 @@ trait Searchable
     }
 
     /**
-     * Reindex all records of this model.
+     * Check if the index exists and create if needed.
      */
-    public function reindex(): void
-    {
-        $engine = $this->searchableUsing();
-
-        if ($engine instanceof ISearchEngine) {
-            $engine->reindex(get_class($this));
-        }
-    }
-
-    /**
-     * Check if index exists and create if needed.
-     */
-    public function checkIndex(): bool
-    {
-        $engine = $this->searchableUsing();
-
-        if ($engine instanceof ISearchEngine) {
-            return $engine->checkIndex($this);
-        }
-
-        return false;
-    }
-
-    /**
-     * Check if index exists and create if needed.
-     */
-    public function ensureIndex(): bool
+    public function ensureIndexExists(): bool
     {
         $engine = $this->searchableUsing();
 
@@ -171,11 +153,20 @@ trait Searchable
             return $engine->ensureIndex($this);
         }
 
+        if (method_exists($engine, 'createIndex')) {
+            // Use Scout's native method if available.
+            if (! method_exists($engine, 'indexExists') || ! $engine->indexExists($this)) {
+                $engine->createIndex($this);
+
+                return true;
+            }
+        }
+
         return false;
     }
 
     /**
-     * Create or update search index.
+     * Create or update the index.
      */
     public function createIndex(): void
     {
@@ -183,6 +174,9 @@ trait Searchable
 
         if ($engine instanceof ISearchEngine) {
             $engine->createIndex($this);
+        } elseif (method_exists($engine, 'createIndex')) {
+            // Use Scout's native method.
+            $engine->createIndex($this->searchableAs());
         }
     }
 
@@ -198,25 +192,6 @@ trait Searchable
         }
 
         return null;
-    }
-
-    /**
-     * Perform vector search based on embedding.
-     *
-     * @param  array  $vector  Embedding vector
-     * @param  array  $options  Search options
-     */
-    public function vectorSearch(array $vector, array $options = []): Collection
-    {
-        $engine = $this->searchableUsing();
-
-        if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-            return $engine->vectorSearch($vector, array_merge($options, [
-                'index' => $this->searchableAs(),
-            ]));
-        }
-
-        return collect();
     }
 
     /**
