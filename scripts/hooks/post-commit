@@ -4,6 +4,6 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Run version script with --nointeractive
-"$SCRIPT_DIR/../version.sh" --nointeractive
+"$SCRIPT_DIR/../../scripts/version.sh" --nointeractive
 
 exit 0
