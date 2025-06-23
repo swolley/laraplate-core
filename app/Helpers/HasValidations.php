@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\UnauthorizedException;
+use Modules\Cms\Helpers\HasDynamicContents;
 use Modules\Core\Casts\CrudExecutor;
 
 /**
@@ -84,7 +85,11 @@ trait HasValidations
         $rules = $this->getOperationRules($operation);
 
         if ($rules !== []) {
-            Validator::make($this->getAttributes(), $rules)->validate();
+            $attributes = $this->getAttributes();
+            if (class_uses_trait($this, HasDynamicContents::class)) {
+                $attributes = array_merge($attributes, $this->getComponentsAttribute());
+            }
+            Validator::make($attributes, $rules)->validate();
         }
     }
 
