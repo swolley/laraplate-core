@@ -12,6 +12,7 @@
 -   [Installation](#installation)
 -   [Configuration](#configuration)
 -   [Features](#features)
+-   [Scripts](#scripts)
 -   [Contributing](#contributing)
 -   [License](#license)
 
@@ -52,6 +53,8 @@ VERIFY_NEW_USER=true							#enables email verification for new users
 ENABLE_USER_REGISTRATION=true					#enables user registration
 ENABLE_SOCIAL_LOGIN=true						#enables social login
 ENABLE_USER_LICENSE=false						#enables user licenses
+ENABLE_USER_2FA=false							#enables two-factor authentication
+AUTH_MODEL=Modules\Core\Models\User				#authentication model
 
 #locking
 LOCKIN_LOCK_VERSION_COLUMN=lock_version			#column name for the lock version
@@ -78,6 +81,12 @@ GRAYLOG_PORT=12201								#graylog port
 #permission
 PERMISSION_MODEL=Modules\Core\Models\Permission	#permission model
 ROLE_MODEL=Modules\Core\Models\Role				#role model
+SUPERADMIN_ROLE=superadmin						#superadmin role name
+ADMIN_ROLE=admin								#admin role name
+GUEST_ROLE=guest								#guest role name
+SUPERADMIN_USER=superadmin						#superadmin user name
+ADMIN_USER=admin								#admin user name
+GUEST_USER=anonymous							#guest user name
 
 #queues
 HORIZON_DOMAIN=									#horizon domain
@@ -95,6 +104,59 @@ OLLAMA_MODEL="llama3.2:3b"						#ollama model
 SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
 VECTOR_SEARCH_ENABLED=true                      #create embeddings with ai functionalities before indexing in search engine
 EMBEDDING_PROVIDER=openai                       #actually supported embedding generator provider (openai, ollama)
+SEARCH_ENGINE=elasticsearch						#default search engine
+VECTOR_DIMENSION=768							#vector dimension for embeddings
+VECTOR_SIMILARITY=cosine						#vector similarity metric (cosine, dot_product, euclidean)
+VECTOR_DIMENSIONS=1536							#vector dimensions for OpenAI default
+SCOUT_PREFIX=									#scout index prefix
+SCOUT_QUEUE=true								#enable scout queue
+SCOUT_QUEUE_NAME=indexing						#scout queue name
+SCOUT_QUEUE_TRIES=3								#scout queue retry attempts
+SCOUT_QUEUE_TIMEOUT=120							#scout queue timeout
+SCOUT_QUEUE_BACKOFF=30,60,120					#scout queue backoff times
+SCOUT_IDENTIFY=false							#identify user in search engine
+
+#elasticsearch
+ELASTICSEARCH_INDEX_PREFIX=						#elasticsearch index prefix
+ELASTICSEARCH_QUEUE_CONNECTION=sync				#elasticsearch queue connection
+ELASTICSEARCH_QUEUE=indexing					#elasticsearch queue name
+ELASTICSEARCH_QUEUE_TIMEOUT=300					#elasticsearch queue timeout
+ELASTICSEARCH_QUEUE_TRIES=3						#elasticsearch queue retry attempts
+ELASTIC_CONNECTION=default						#elasticsearch connection name
+ELASTIC_HOST=localhost:9200						#elasticsearch host
+ELASTIC_RETRIES=3								#elasticsearch retry attempts
+ELASTIC_TIMEOUT=60								#elasticsearch timeout
+ELASTIC_CONNECT_TIMEOUT=10						#elasticsearch connection timeout
+ELASTIC_SSL_VERIFICATION=true					#elasticsearch SSL verification
+ELASTIC_USERNAME=								#elasticsearch username
+ELASTIC_PASSWORD=								#elasticsearch password
+ELASTIC_LOG_ENABLED=false						#elasticsearch logging enabled
+ELASTIC_LOG_LEVEL=error							#elasticsearch log level
+ELASTIC_RETRY_ON_CONFLICT=3						#elasticsearch retry on conflict
+ELASTIC_BULK_SIZE=500							#elasticsearch bulk size
+ELASTIC_SCOUT_DRIVER_REFRESH_DOCUMENTS=false	#elasticsearch scout driver refresh documents
+
+#typesense
+TYPESENSE_API_KEY=xyz							#typesense api key
+TYPESENSE_HOST=localhost						#typesense host
+TYPESENSE_PORT=8108								#typesense port
+TYPESENSE_PATH=									#typesense path
+TYPESENSE_PROTOCOL=http							#typesense protocol
+TYPESENSE_CONNECTION_TIMEOUT_SECONDS=2			#typesense connection timeout
+TYPESENSE_HEALTHCHECK_INTERVAL_SECONDS=30		#typesense healthcheck interval
+TYPESENSE_NUM_RETRIES=3							#typesense number of retries
+TYPESENSE_RETRY_INTERVAL_SECONDS=1				#typesense retry interval
+TYPESENSE_INDEX_PREFIX=							#typesense index prefix
+TYPESENSE_HOSTS=http://localhost:8108			#typesense hosts (comma separated)
+
+#cache
+CACHE_DURATION_SHORT=10							#short cache duration in seconds
+CACHE_DURATION_MEDIUM=300						#medium cache duration in seconds
+CACHE_DURATION_LONG=3600						#long cache duration in seconds
+
+#app
+APP_LOGO=										#application logo
+SOFT_DELETES_EXPIRATION_DAYS=					#soft deletes expiration days
 
 #social login
 FACEBOOK_CLIENT_ID=								#facebook client id
@@ -212,8 +274,8 @@ If you need to override the Core Module or dependencies configs you can publish 
 
 ### Requirements
 
--   PHP >= 8.3
--   Laravel 11
+-   PHP >= 8.4
+-   Laravel 12.0+
 -   **PHP Extensions:**
 
     -   `ext-curl`: Provides support for URL requests.
@@ -222,6 +284,7 @@ If you need to override the Core Module or dependencies configs you can publish 
     -   `ext-pcntl`: Provides process control functions.
     -   `ext-posix`: Offers access to POSIX functions.
     -   `ext-intl`: Provides internationalization services.
+    -   `ext-sockets`: Provides low-level networking interface.
 
 ### Installed Packages
 
@@ -232,7 +295,9 @@ The Core Module utilizes several packages to enhance its functionality. Below is
     -   [doctrine/dbal](https://github.com/doctrine/dbal): A database abstraction layer for PHP.
     -   [laravel/fortify](https://github.com/laravel/fortify): Provides authentication features for Laravel applications.
     -   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): Adds versioning capabilities to Eloquent models.
-    -   [spatie/laravel-permission](https://github.com/spatie/laravel-permission): Manages user roles and permissions.
+    -   [spatie/laravel-permission](https://github.com/spatie/spatie-laravel-permission): Manages user roles and permissions.
+    -   [staudenmeir/laravel-adjacency-list](https://github.com/staudenmeir/laravel-adjacency-list): Provides adjacency list pattern for hierarchical data.
+    -   [awobaz/compoships](https://github.com/topclaudy/compoships): Enables composite primary keys in Laravel Eloquent.
 
 -   **Logging and Monitoring:**
 
@@ -243,6 +308,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [lab404/laravel-impersonate](https://github.com/404labfr/laravel-impersonate): Allows user impersonation for testing and support.
     -   [stephenlake/laravel-approval](https://github.com/stephenlake/laravel-approval): Implements an approval workflow for models.
+    -   [laravel/socialite](https://github.com/laravel/socialite): Provides OAuth authentication for Laravel applications.
 
 -   **API and Documentation:**
 
@@ -253,11 +319,25 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [elasticsearch/elasticsearch](https://github.com/elasticsearch/elasticsearch): Integrates Elasticsearch for advanced search capabilities.
     -   [theodo-group/llphant](https://github.com/theodo-group/llphant): Provides a library for handling Elasticsearch indexing.
+    -   [babenkoivan/elastic-scout-driver](https://github.com/babenkoivan/elastic-scout-driver): Laravel Scout driver for Elasticsearch.
+    -   [babenkoivan/elastic-scout-driver-plus](https://github.com/babenkoivan/elastic-scout-driver-plus): Enhanced Laravel Scout driver for Elasticsearch.
+    -   [typesense/typesense-php](https://github.com/typesense/typesense-php): PHP client for Typesense search engine.
+    -   [laravel/scout](https://github.com/laravel/scout): Laravel Scout provides a simple, driver-based solution for adding full-text search to your Eloquent models.
+
+-   **Spatial Data:**
+
+    -   [matanyadaev/laravel-eloquent-spatial](https://github.com/matanyadaev/laravel-eloquent-spatial): Provides spatial data support for Laravel Eloquent models.
 
 -   **Development and Testing:**
 
     -   [pestphp/pest](https://github.com/pestphp/pest): A testing framework for PHP.
     -   [pestphp/pest-plugin-laravel](https://github.com/pestphp/pest-plugin-laravel): Adds Laravel-specific testing features to Pest.
+    -   [pestphp/pest-plugin-stressless](https://github.com/pestphp/pest-plugin-stressless): Stress testing plugin for Pest.
+    -   [pestphp/pest-plugin-type-coverage](https://github.com/pestphp/pest-plugin-type-coverage): Type coverage plugin for Pest.
+    -   [laravel/pint](https://github.com/laravel/pint): Laravel's code style fixer.
+    -   [nunomaduro/phpinsights](https://github.com/nunomaduro/phpinsights): PHP quality checker.
+    -   [peckphp/peck](https://github.com/peckphp/peck): PHP typo checker.
+    -   [rector/rector](https://github.com/rectorphp/rector): Automated PHP code refactoring tool.
 
 ### Additional Functionalities
 
@@ -285,6 +365,59 @@ The Core Module includes built-in features such as:
 -   User licenses
 -   Locking system for models
 -   Graylog logging
+-   Social login integration with multiple providers
+-   Spatial data support for geographical applications
+-   Composite primary keys support
+-   Adjacency list pattern for hierarchical data structures
+-   Vector search capabilities with AI-powered embeddings
+-   Typesense search engine integration
+
+## Scripts
+
+The Core Module provides several useful scripts for development and maintenance:
+
+### Code Quality and Testing
+
+```bash
+# Run all tests and quality checks
+composer test
+
+# Run specific test suites
+composer test:unit          # Run unit tests with coverage
+composer test:type-coverage # Check type coverage (target: 100%)
+composer test:typos         # Check for typos in code
+composer test:lint          # Check code style
+composer test:types         # Run PHPStan analysis
+composer test:refactor      # Run Rector refactoring
+```
+
+### Code Quality Tools
+
+```bash
+# Code style and IDE helpers
+composer lint               # Fix code style and generate IDE helpers
+
+# Static analysis
+composer check              # Run PHPStan analysis
+composer fix                # Run PHPStan analysis with auto-fix
+composer refactor           # Run Rector refactoring
+```
+
+### Version Management
+
+```bash
+# Version bumping
+composer version:major      # Bump major version
+composer version:minor      # Bump minor version
+composer version:patch      # Bump patch version
+```
+
+### Development Setup
+
+```bash
+# Setup Git hooks
+composer setup:hooks
+```
 
 ### Other References
 
