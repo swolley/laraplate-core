@@ -218,7 +218,7 @@ trait HasCacheRepository
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-        $groups = $user->{$group_method}->map(fn (Model $r): string => "R{$r->id}")->toArray();
+        $groups = $user->{$group_method}->map(fn(Model $r): string => "R{$r->id}")->toArray();
         sort($groups);
         array_push($tags, ...$groups);
 

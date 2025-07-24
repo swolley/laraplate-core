@@ -1,9 +1,20 @@
 {
     "name": "Core",
-    "alias": "core",
-    "description": "",
-    "keywords": [],
-    "priority": 999,
+    "alias": "core", 
+    "description": "Core Module for Base Functionality",
+    "keywords": [
+        "core",
+        "base",
+        "foundation",
+        "essential",
+        "framework",
+        "infrastructure",
+        "utilities",
+        "helpers",
+        "services",
+        "providers"
+    ],
+    "priority": 0,
     "providers": [
         "Modules\\Core\\Providers\\CoreServiceProvider"
     ],

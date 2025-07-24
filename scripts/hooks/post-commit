@@ -20,7 +20,7 @@ fi
 # Run version script if found
 if [ -n "$VERSION_SCRIPT" ] && [ -f "$VERSION_SCRIPT" ]; then
     echo "Running version script: $VERSION_SCRIPT"
-    "$VERSION_SCRIPT" --nointeractive
+    $VERSION_SCRIPT --nointeractive
 else
     echo "Warning: version.sh script not found"
 fi

@@ -6,6 +6,8 @@ namespace Modules\Core\Providers;
 
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Carbon\CarbonImmutable;
+use Elastic\Elasticsearch\Client as ElasticsearchClient;
+use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
@@ -46,6 +48,7 @@ use ReflectionException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Typesense\Client as TypesenseClient;
 
 /**
  * @property Application $app
@@ -83,7 +86,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(fn () => Password::min(8)
+        Password::defaults(fn() => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -113,6 +116,9 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
 
+        // Register search clients
+        $this->registerSearchClients();
+
         // Registration of custom search engines
         $this->registerSearchEngines();
     }
@@ -120,7 +126,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if the user is super admin
-        Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn(?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -166,29 +172,102 @@ final class CoreServiceProvider extends ServiceProvider
     }
 
     /**
+     * Registers the search clients in the container.
+     */
+    protected function registerSearchClients(): void
+    {
+        // Register Elasticsearch client
+        $this->app->singleton(ElasticsearchClient::class, function ($app) {
+            $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
+
+            $builder = ClientBuilder::create();
+            $builder->setHosts($config['hosts']);
+
+            // Set authentication if configured
+            if (isset($config['username']) && isset($config['password'])) {
+                $builder->setBasicAuthentication($config['username'], $config['password']);
+            }
+
+            // Set retry configuration
+            if ($config['retries'] !== null && $config['retries'] !== 0) {
+                $builder->setRetries($config['retries']);
+            }
+
+            // Set timeout options
+            $builder->setHttpClientOptions([
+                'timeout' => $config['timeout'] ?? 60,
+                'connect_timeout' => $config['connect_timeout'] ?? 10,
+            ]);
+
+            // Set cloud ID if available
+            if (isset($config['cloud_id']) && $config['cloud_id'] !== '') {
+                $builder->setElasticCloudId($config['cloud_id']);
+            }
+
+            // Set SSL configuration
+            if (isset($config['ssl_verification'])) {
+                $builder->setSSLVerification($config['ssl_verification']);
+            }
+
+            return $builder->build();
+        });
+
+        // Register Typesense client
+        $this->app->singleton(TypesenseClient::class, function ($app) {
+            $config = config('scout.typesense.client-settings', [
+                'api_key' => env('TYPESENSE_API_KEY'),
+                'nodes' => [
+                    [
+                        'host' => env('TYPESENSE_HOST', 'localhost'),
+                        'port' => env('TYPESENSE_PORT', '8108'),
+                        'protocol' => env('TYPESENSE_PROTOCOL', 'http'),
+                    ],
+                ],
+                'connection_timeout_seconds' => 2,
+            ]);
+
+            return new TypesenseClient($config);
+        });
+    }
+
+    /**
      * Registers the custom search engines.
      * @throws BindingResolutionException
      */
     protected function registerSearchEngines(): void
     {
         // Extend Laravel Scout with custom engines
-        $this->app->make(EngineManager::class)->extend('elasticsearch', function () {
+        $this->app->make(EngineManager::class)->extend('elasticsearch', function ($app) {
             $config = config('search.engines.elasticsearch');
-            $engine = new ElasticsearchEngine();
-            $engine->config = $config;
+
+            // Get the Elasticsearch client from the container
+            $client = $app->make(ElasticsearchClient::class);
+
+            // Create the engine with proper dependency injection
+            $engine = $app->make(ElasticsearchEngine::class, [
+                'client' => $client,
+                'config' => $config,
+            ]);
 
             return $engine;
         });
 
-        $this->app->make(EngineManager::class)->extend('typesense', function () {
+        $this->app->make(EngineManager::class)->extend('typesense', function ($app) {
             $config = config('search.engines.typesense');
-            $engine = new TypesenseEngine();
-            $engine->config = $config;
+
+            // Get the Typesense client from the container
+            $client = $app->make(TypesenseClient::class);
+
+            // Create the engine with proper dependency injection
+            $engine = $app->make(TypesenseEngine::class, [
+                'client' => $client,
+                'config' => $config,
+            ]);
 
             return $engine;
         });
 
-        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
+        $this->app->singleton(Locked::class, fn(): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -307,7 +386,7 @@ final class CoreServiceProvider extends ServiceProvider
     {
         // Override the binding for the Repository with the correct method
         /** @phpstan-ignore-next-line */
-        $this->app->extend('cache.store', fn ($service, Application $app): Repository => new Repository(
+        $this->app->extend('cache.store', fn($service, Application $app): Repository => new Repository(
             $app->get('cache')->getStore(),
             $app->get('config')->get('cache.stores.' . $app->get('config')->get('cache.default')),
         ));
@@ -320,16 +399,16 @@ final class CoreServiceProvider extends ServiceProvider
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(Repository::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, fn($app) => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn($app) => $app['cache.store']);
+        $this->app->bind(Repository::class, fn($app) => $app['cache.store']);
 
         // Register macros
-        Cache::macro('tryByRequest', fn (...$args) => app('cache.store')->tryByRequest(...$args));
-        Cache::macro('clearByEntity', fn (...$args) => app('cache.store')->clearByEntity(...$args));
-        Cache::macro('clearByRequest', fn (...$args) => app('cache.store')->clearByRequest(...$args));
-        Cache::macro('clearByUser', fn (...$args) => app('cache.store')->clearByUser(...$args));
-        Cache::macro('clearByGroup', fn (...$args) => app('cache.store')->clearByGroup(...$args));
+        Cache::macro('tryByRequest', fn(...$args) => app('cache.store')->tryByRequest(...$args));
+        Cache::macro('clearByEntity', fn(...$args) => app('cache.store')->clearByEntity(...$args));
+        Cache::macro('clearByRequest', fn(...$args) => app('cache.store')->clearByRequest(...$args));
+        Cache::macro('clearByUser', fn(...$args) => app('cache.store')->clearByUser(...$args));
+        Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array
@@ -338,7 +417,7 @@ final class CoreServiceProvider extends ServiceProvider
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }

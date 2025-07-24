@@ -76,7 +76,7 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['admin'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where(function ($query) use ($user_table, $role_table): void {
+                'permissions' => fn() => $permission_class::where(function ($query) use ($user_table, $role_table): void {
                     $query->whereIn('table_name', [$user_table, $role_table])
                         ->orWhere('name', 'like', '%.' . ActionEnum::SELECT->value);
                 })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get(),
@@ -84,7 +84,7 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['guest'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
+                'permissions' => fn() => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
                     ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
                     ->get(),
             ],
@@ -92,7 +92,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $this->groups = $role_class::withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
         $existing_roles = $this->groups->keys()->all();
-        $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
+        $new_roles = array_filter($roles_data, fn($role) => ! in_array($role['name'], $existing_roles, true));
 
         if ($new_roles === []) {
             $this->command->line('    - nothing to update');
@@ -146,7 +146,7 @@ final class CoreDatabaseSeeder extends Seeder
         ];
 
         $existing_users = $user_class::withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
-        $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
+        $new_users = array_filter($users_data, fn($user) => ! isset($existing_users[$user['username']]));
 
         if ($new_users === []) {
             $this->command->line('    - nothing to update');
@@ -199,7 +199,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $new_settings = array_filter(
             $default_settings,
-            fn ($setting) => ! isset($existing_settings[$setting['name']]),
+            fn($setting) => ! isset($existing_settings[$setting['name']]),
         );
 
         if ($new_settings === []) {
@@ -250,7 +250,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $new_crons = array_filter(
             $default_crons,
-            fn ($cron) => ! isset($existing_crons[$cron['name']]),
+            fn($cron) => ! isset($existing_crons[$cron['name']]),
         );
 
         if ($new_crons === []) {

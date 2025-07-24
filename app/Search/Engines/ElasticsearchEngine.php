@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
-use JsonException;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\ReindexSearchJob;

@@ -18,6 +18,12 @@ class ServiceProvider extends BaseServiceProvider
 
     protected function registerConfig(): void
     {
+        // Check if modules config is available
+        if (!config()->has('modules.paths.generator.config.path')) {
+            // If modules config is not available, skip config registration
+            return;
+        }
+
         $relativeConfigPath = config('modules.paths.generator.config.path');
         $configPath = module_path($this->name, $relativeConfigPath);
 

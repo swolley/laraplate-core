@@ -11,21 +11,19 @@ use Illuminate\Cache\Repository as BaseRepository;
 use Override;
 
 /**
- * @template TTtl of Closure|DateInterval|DateTimeInterface|int|null
+ * @template TDuration of Closure|DateInterval|DateTimeInterface|int|null
  */
 final class Repository extends BaseRepository
 {
     use HasCacheRepository;
 
     #[Override]
-    /**
-     * @param  TTtl|list<TTtl,TTtl>  $ttl
-     */
     public function remember($key, $ttl, Closure $callback): mixed
     {
         $ttl ??= $this->getDuration();
-        $method = is_array($ttl) ? 'flexible' : 'remember';
-
-        return parent::$method($key, $ttl, $callback);
+        if (is_array($ttl)) {
+            return parent::flexible($key, $ttl, $callback);
+        }
+        return parent::remember($key, $ttl, $callback);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -23,6 +24,9 @@ use Overtrue\LaravelVersionable\VersionStrategy;
 trait HasVersions
 {
     use Versionable;
+
+    protected ?User $_creator;
+    protected ?User $_modifier;
 
     protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
@@ -87,18 +91,49 @@ trait HasVersions
         }
     }
 
-    protected function getCreatedBy(): ?User
-    {
-        $first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
+    // public function getCreatorAttribute(): ?User
+    // {
+    //     if (! isset($this->creator)) {
+    //         $this->creator = $this->created_by;
+    //     }
 
-        return $first_version ? $this->getuser($first_version) : null;
+    //     return $this->creator;
+    // }
+
+    /**
+     * alias for created_by
+     */
+    protected function creator(): Attribute
+    {
+        return $this->createdBy();
     }
 
-    protected function getModifiedBy(): ?User
+    protected function createdBy(): Attribute
     {
-        $last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
+        return Attribute::make(
+            get: function () {
+                if (! isset($this->_creator)) {
+                    $first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
+                    $this->_creator = $first_version ? $this->getuser($first_version) : null;
+                }
 
-        return $last_version ? $this->getuser($last_version) : null;
+                return $this->_creator;
+            },
+        );
+    }
+
+    protected function modifiedBy(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (! isset($this->_modifier)) {
+                    $last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
+                    $this->_modifier = $last_version ? $this->getuser($last_version) : null;
+                }
+
+                return $this->_modifier;
+            },
+        );
     }
 
     private function getUser(int $userId): ?User
