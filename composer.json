@@ -109,5 +109,12 @@
         "psr-4": {
             "Modules\\Core\\Tests\\": "tests/"
         }
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "pestphp/pest-plugin": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
     }
 }

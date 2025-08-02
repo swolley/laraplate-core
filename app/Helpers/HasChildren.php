@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\app\Helpers;
+namespace Modules\Core\Helpers;
 
 use Parental\HasChildren as ParentalHasChildren;
 

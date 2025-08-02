@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
+use Modules\Cms\Database\Factories\DynamicContentFactory;
 use Modules\Core\Overrides\Seeder;
 
 abstract class BatchSeeder extends Seeder
@@ -137,6 +138,20 @@ abstract class BatchSeeder extends Seeder
         return $created;
     }
 
+    /**
+     * Execute a batch of data creation.
+     *
+     * @param  class-string<Model>  $modelClass  The model class to create the data for
+     * @param  string  $entity_name  The name of the entity to create the data for
+     * @param  int  $batch  The batch number
+     * @param  int  $batchSize  The size of the batch to create
+     * @param  int  $currentCount  The current number of records in the database
+     * @param  int  $countToCreate  The total number of records to create
+     * @param  int  $created  The number of records created so far
+     * @param  int  $remaining  The number of records remaining to create
+     * @param  Progress  $progress  The progress bar
+     * @param  bool  $asyncMode  Whether to run the batch asynchronously
+     */
     private function executeBatch(string &$modelClass, string &$entity_name, int &$batch, int &$batchSize, int &$currentCount, int &$countToCreate, int &$created, int &$remaining, Progress $progress, bool $asyncMode = false): void
     {
         $retry_count = 0;
@@ -162,10 +177,13 @@ abstract class BatchSeeder extends Seeder
                     $connection->reconnect();
                 }
 
-                /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
                 /** @phpstan-ignore staticMethod.notFound */
                 $factory = $modelClass::factory();
-                $factory->count($batchSize)->create();
+                /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
+                $new_models = $factory->count($batchSize)->create();
+                if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
+                    $factory->createRelations($new_models);
+                }
 
                 $success = true;
                 $created += $batchSize;

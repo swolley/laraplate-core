@@ -33,6 +33,7 @@ trait HasVersions
     protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
     /**
+     * @param  array $replacements
      * @param  string|DateTimeInterface|null  $time
      *
      * @throws \Carbon\Exceptions\InvalidFormatException
@@ -40,16 +41,26 @@ trait HasVersions
     public function createVersion(array $replacements = [], $time = null): ?Version
     {
         if ($this->shouldBeVersioning() || $replacements !== []) {
-            return tap(config('versionable.version_model')::createForModel($this, $replacements, $time), function (): void {
-                $this->removeOldVersions((int) $this->getKeepVersionsCount());
-            });
+            return tap(
+                config('versionable.version_model')::createForModel($this, $replacements, $time),
+                function (): void {
+                    $this->removeOldVersions((int) $this->getKeepVersionsCount());
+                },
+            );
         }
 
         return null;
     }
 
+    /**
+     * @param Model&HasVersions $model
+     */
     public function createInitialVersion(Model $model): Version
     {
+        // if ($model->has('versions')) {
+        //     return $model->firstVersion()->first();
+        // }
+
         /** @var Versionable|Model $refreshedModel */
         $refreshedModel = static::query()->withoutGlobalScopes()->findOrFail($model->getKey());
 
@@ -60,7 +71,11 @@ trait HasVersions
          */
         $attributes = $refreshedModel->getVersionableAttributes(VersionStrategy::SNAPSHOT);
 
-        return config('versionable.version_model')::createForModel($refreshedModel, $attributes, $refreshedModel->updated_at);
+        return config('versionable.version_model')::createForModel(
+            $refreshedModel,
+            $attributes,
+            $refreshedModel->updated_at,
+        );
     }
 
     public function getVersionUserId()
@@ -71,14 +86,15 @@ trait HasVersions
             return $this->getAttribute($this->getUserForeignKeyName());
         }
 
-        return auth()->id();
+        // return auth()->id();
+        return null;
     }
 
     protected static function bootHasVersions(): void
     {
         static::deleted(function (Model $model): void {
             /** @var Versionable|Version $model */
-            if (method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting()) {
+            if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
                 $model->createVersion(['deleted_at' => $model->deleted_at]);
             }
         });
@@ -112,9 +128,9 @@ trait HasVersions
     {
         return Attribute::make(
             get: function () {
-                if (! isset($this->_creator)) {
+                if (!isset($this->_creator)) {
                     $first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
-                    $this->_creator = $first_version ? $this->getuser($first_version) : null;
+                    $this->_creator = $first_version ? $this->getUser($first_version) : null;
                 }
 
                 return $this->_creator;
@@ -126,9 +142,9 @@ trait HasVersions
     {
         return Attribute::make(
             get: function () {
-                if (! isset($this->_modifier)) {
+                if (!isset($this->_modifier)) {
                     $last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
-                    $this->_modifier = $last_version ? $this->getuser($last_version) : null;
+                    $this->_modifier = $last_version ? $this->getUser($last_version) : null;
                 }
 
                 return $this->_modifier;
