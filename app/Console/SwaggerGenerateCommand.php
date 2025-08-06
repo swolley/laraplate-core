@@ -16,6 +16,7 @@ use Override;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Yaml\Yaml;
 
 final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 {
@@ -82,7 +83,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $doc['tags'] = [$moduleName];
 
         // $doc['tags'] = array_reduce($doc['paths'], fn($total, $current) => array_merge($total, $current['tags']), []);
-        if (array_filter($doc['paths'], fn ($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
+        if (array_filter($doc['paths'], fn($k) => Str::contains($k, '/api/'), ARRAY_FILTER_USE_KEY) !== []) {
             $doc['tags'][] = 'Api';
         }
 
@@ -96,9 +97,21 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             if (! file_exists($folder)) {
                 mkdir($folder, recursive: true);
             }
+            if (file_exists($file)) {
+                $old_doc = file_get_contents($file);
+                if ($this->option('format') === 'json') {
+                    $old_doc = json_decode($old_doc, true);
+                } else if ($this->option('format') === 'yaml') {
+                    $old_doc = Yaml::parse($old_doc, Yaml::PARSE_OBJECT_FOR_MAP);
+                } else {
+                    $old_doc = null;
+                }
+            } else {
+                $old_doc = null;
+            }
             file_put_contents($file, $formattedDoc);
 
-            $this->verboseGeneration($doc);
+            $this->verboseGeneration($doc, $old_doc);
         } else {
             $this->line($formattedDoc);
         }
@@ -112,13 +125,28 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         ];
     }
 
-    private function verboseGeneration(array $doc): void
+    private function verboseGeneration(array $doc, ?array $old_doc): void
     {
         $this->info($doc['info']['title']);
 
         foreach ($doc['paths'] as $path => $methods) {
-            $methods = array_map('strtoupper', array_keys($methods));
-            $this->line(implode('|', $methods) . (count($methods) > 1 ? "\t" : "\t\t") . $path);
+            $keys = array_keys($methods);
+            $imploded_methods = implode('|', array_map('strtoupper', $keys));
+            $post_methods_padding = 40 - strlen($imploded_methods);
+            $post_route_padding = 60 - strlen($path);
+            if (isset($old_doc['paths'][$path]) && $old_doc['paths'][$path] == $doc['paths'][$path]) {
+                $color = 'gray';
+                $message = 'unchanged';
+            } else if (isset($old_doc['paths'][$path])) {
+                $color = 'yellow';
+                $message = 'updated';
+            } else {
+                $color = 'green';
+                $message = 'new';
+            }
+            $this->line($imploded_methods . str_repeat(" ", $post_methods_padding) . $path . str_repeat(" ", $post_route_padding) . "<fg={$color}>{$message}</fg={$color}>");
         }
+
+        $this->line('');
     }
 }

@@ -32,6 +32,7 @@ use Laravel\Scout\EngineManager;
 use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
+use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
 use Modules\Core\Locking\Locked;
@@ -375,6 +376,7 @@ final class CoreServiceProvider extends ServiceProvider
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
+        $router->aliasMiddleware('crud_api', EnsureCrudApiAreEnabled::class);
     }
 
     /**
