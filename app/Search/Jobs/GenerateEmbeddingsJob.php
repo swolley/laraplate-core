@@ -35,6 +35,8 @@ use LLPhant\Embeddings\EmbeddingGenerator\VoyageAI\VoyageLaw2EmbeddingGenerator;
 use LLPhant\OllamaConfig;
 use LLPhant\OpenAIConfig;
 use LLPhant\VoyageAIConfig;
+use Modules\Core\Search\Ai\SentenceTransformersConfig;
+use Modules\Core\Search\Ai\SentenceTransformersEmbeddingGenerator;
 use Psr\Http\Client\ClientExceptionInterface;
 use RuntimeException;
 use Throwable;
@@ -120,27 +122,30 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         switch (config('search.vector_search.provider')) {
             case 'openai':
-                $config = new OpenAIConfig();
-                $config->apiKey = config('ai.openai_api_key');
+                $config = new OpenAIConfig(config('ai.openai_api_key'));
 
                 return match (config('ai.openai_model')) {
                     'text-embedding-3-large' => new OpenAI3LargeEmbeddingGenerator($config),
                     'text-embedding-ada-002' => new OpenAIADA002EmbeddingGenerator($config),
                     default => new OpenAI3SmallEmbeddingGenerator($config),
                 };
+
             case 'ollama':
                 $config = new OllamaConfig();
+                if (config('ai.ollama_api_url')) {
+                    $config->url = config('ai.ollama_api_url');
+                }
+
                 $config->model = match (config('ai.ollama_model')) {
                     'nomic-embed-large' => 'nomic-embed-large',
                     default => 'nomic-embed-text',
                 };
 
-                $config->url = config('ai.ollama_api_url', 'http://localhost:11434/api/embeddings');
 
                 return new OllamaEmbeddingGenerator($config);
+
             case 'voyageai':
-                $config = new VoyageAIConfig();
-                $config->apiKey = config('ai.voyageai_api_key');
+                $config = new VoyageAIConfig(config('ai.voyageai_api_key'));
 
                 return match (config('ai.voyageai_model')) {
                     'voyage-3' => new Voyage3EmbeddingGenerator($config),
@@ -151,11 +156,17 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                     'voyage-law-2' => new VoyageLaw2EmbeddingGenerator($config),
                     default => new Voyage3LiteEmbeddingGenerator($config),
                 };
+
             case 'mistral':
-                $config = new OpenAIConfig();
-                $config->apiKey = config('ai.mistral_api_key');
+                $config = new OpenAIConfig(config('ai.mistral_api_key'));
 
                 return new MistralEmbeddingGenerator($config);
+
+            case 'sentence-transformers':
+                $config = new SentenceTransformersConfig(config('ai.sentence_transformers_api_key'), config('ai.sentence_transformers_url'));
+
+                return new SentenceTransformersEmbeddingGenerator($config);
+
             default:
                 return null;
         }

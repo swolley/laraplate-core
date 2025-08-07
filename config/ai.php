@@ -15,4 +15,7 @@ return [
 
     'mistral_api_key' => env('MISTRAL_API_KEY'),
     // 'mistral_model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
+
+    'sentence_transformers_url' => env('SENTENCE_TRANSFORMERS_URL'),
+    'sentence_transformers_api_key' => env('SENTENCE_TRANSFORMERS_API_KEY'),
 ];
