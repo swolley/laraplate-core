@@ -21,6 +21,7 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\Inspect;
+use ReflectionMethod;
 
 final class CrudHelper
 {
@@ -206,7 +207,7 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn($relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
@@ -242,22 +243,57 @@ final class CrudHelper
      */
     private function applyFilter(Builder $query, Filter $filter, string &$method, array &$relation_columns): void
     {
-        if (mb_substr_count($filter->property, '.') > 1) {
+        $path_length = mb_substr_count($filter->property, '.');
+        if ($path_length >= 1) {
             // relations
             $splitted = $this->splitProperty($query->getModel(), $filter->property);
-            $query->{$method . 'Has'}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns): void {
-                if ($splitted['field'] === 'deleted_at') {
-                    $permission = "{$splitted['connection']}.{$splitted['table']}.delete";
-                    $user = Auth::user();
+            $query_model = $query->getModel();
 
-                    if ($user && $user->can($permission)) {
-                        $q->withTrashed();
-                    }
+            if (method_exists($query_model, $splitted['field'])) {
+                $reflected_method = new ReflectionMethod($query_model, $splitted['field']);
+
+                //if last item in property path is a relation it should become a whereHas
+                // TODO: this is valid only for the first sublevel
+                if (is_a($reflected_method->getReturnType()->__toString(), Relation::class, true)) {
+                    $returned_relation_entity = $query_model->{$splitted['field']}()->getModel();
+                    $splitted['relation'] = $splitted['field'];
+                    $splitted['table'] = $returned_relation_entity->getTable();
+                    $splitted['field'] = $returned_relation_entity->getKeyName();
+                    $splitted['connection'] = $returned_relation_entity->getConnection()->getName();
+
+                    $query->has(
+                        $splitted['relation'],
+                        $filter->operator->value,
+                        $filter->value,
+                        Str::startsWith($method, 'or') ? 'or' : 'and',
+                        fn(Builder $q) => $q->withoutGlobalScope('global_ordered')
+                    );
+
+                    return;
                 }
-                $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
-                $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
-            });
-        } elseif ($filter->value === null) {
+            }
+
+            if ($path_length > 1) {
+                $query->{$method . 'Has'}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns): void {
+                    $q->withoutGlobalScope('global_ordered');
+
+                    if ($splitted['field'] === 'deleted_at') {
+                        $permission = "{$splitted['connection']}.{$splitted['table']}.delete";
+                        $user = Auth::user();
+
+                        if ($user && $user->can($permission)) {
+                            $q->withTrashed();
+                        }
+                    }
+                    $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
+                    $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
+                });
+
+                return;
+            }
+        }
+
+        if ($filter->value === null) {
             // is or is not null
             $method .= $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
             $query->{$method}($filter->property);
@@ -281,7 +317,7 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
@@ -293,8 +329,8 @@ final class CrudHelper
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
-        usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
+        usort($columns, fn(Column $a, Column $b): int => $a->name <=> $b->name);
+        $all_columns_name = array_map(fn(Column $column): string => $column->name, $columns);
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {
@@ -375,7 +411,11 @@ final class CrudHelper
      */
     private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
     {
-        if ($relations_columns[$relation] !== []) {
+        // if (! array_key_exists($relation, $relations_columns)) {
+        //     throw new InvalidArgumentException('Relation not found: ' . $relation);
+        // }
+
+        if (array_key_exists($relation, $relations_columns) && $relations_columns[$relation] !== []) {
             $this->addForeignKeysToSelectedColumns($query, $relations_columns[$relation]);
             $this->applyColumnsToSelect($query, $relations_columns[$relation]);
         }
@@ -386,7 +426,7 @@ final class CrudHelper
             $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns[$relation]);
         }
 
-        if ($relations_sorts[$relation] !== []) {
+        if (array_key_exists($relation, $relations_sorts) && $relations_sorts[$relation] !== []) {
             foreach ($relations_sorts[$relation] as $sort) {
                 $query->orderBy($sort->property, $sort->direction->value);
             }

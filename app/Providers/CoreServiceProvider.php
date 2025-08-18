@@ -296,8 +296,10 @@ final class CoreServiceProvider extends ServiceProvider
      */
     private function configureModels(): void
     {
+        // TODO: should be strict prevents also eager loading. App is not yet ready for this
+        // Model::shouldBeStrict();
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
-        Model::shouldBeStrict();
+        Model::preventAccessingMissingAttributes(! $this->app->isProduction());
     }
 
     /**

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
 use Modules\Cms\Database\Factories\DynamicContentFactory;
+use Modules\Cms\Helpers\HasSlug;
 use Modules\Core\Overrides\Seeder;
 
 abstract class BatchSeeder extends Seeder

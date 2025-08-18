@@ -18,7 +18,9 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\UnauthorizedException;
 use LogicException;
@@ -65,14 +67,14 @@ class CrudController extends Controller
 
     // region READ OPERATIONS
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/select/{entity}', name: 'core.crud.list', methods: [GET, POST, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api, crud_api])
+     * Route(path: 'app/crud/select/{entity}', name: 'core.crud.list', methods: [GET, POST, HEAD], middleware: [web])
+     */
     public function list(ListRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ListRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ListRequestData $filters): ResponseBuilder {
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
@@ -80,7 +82,6 @@ class CrudController extends Controller
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
-
                 $total_records = $query->count();
 
                 $data = match (true) {
@@ -89,7 +90,7 @@ class CrudController extends Controller
                     default => $this->listByOthers($query, $filters, $responseBuilder, $total_records),
                 };
 
-                if (isset($filters->group_by)) {
+                if (isset($filters->group_by) && $filters->group_by !== []) {
                     $data = $this->applyGroupBy($data, $filters->group_by);
                 }
 
@@ -108,14 +109,14 @@ class CrudController extends Controller
      * @throws Throwable
      * @throws UnexpectedValueException
      */
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/detail/{entity}', name: 'core.api.detail', methods: [GET, HEAD], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/detail/{entity}', name: 'core.crud.detail', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/detail/{entity}', name: 'core.api.detail', methods: [GET, HEAD], middleware: [api, crud_api])
+     * Route(path: 'app/crud/detail/{entity}', name: 'core.crud.detail', methods: [GET, HEAD], middleware: [web])
+     */
     public function detail(DetailRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, DetailRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, DetailRequestData $filters): ResponseBuilder {
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
@@ -132,14 +133,14 @@ class CrudController extends Controller
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api, crud_api])
+     * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
+     */
     public function search(SearchRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, SearchRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, SearchRequestData $filters): ResponseBuilder {
             $is_searchable_class = class_uses_trait($filters->model, Searchable::class);
 
             if (! isset($filters->model) || $is_searchable_class) {
@@ -166,22 +167,21 @@ class CrudController extends Controller
                     ->setTotalPages($filters->calculateTotalPages($totalRecords));
 
                 return $responseBuilder
-                    ->setData($data)
-                    ->getResponse();
+                    ->setData($data);
             }
 
-            return $responseBuilder->setError('Full-search operation can be done only on Searchable entities')->getResponse();
+            return $responseBuilder->setError('Full-search operation can be done only on Searchable entities');
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/history/{entity}', name: 'core.api.history', methods: [GET, HEAD], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/history/{entity}', name: 'core.crud.history', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/history/{entity}', name: 'core.api.history', methods: [GET, HEAD], middleware: [api, crud_api])
+     * Route(path: 'app/crud/history/{entity}', name: 'core.crud.history', methods: [GET, HEAD], middleware: [web])
+     */
     public function history(HistoryRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, HistoryRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, HistoryRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
             if (! $this->hasHistory($model)) {
@@ -213,14 +213,14 @@ class CrudController extends Controller
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/tree/{entity}', name: 'core.api.tree', methods: [GET, HEAD], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/tree/{entity}', name: 'core.crud.tree', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/tree/{entity}', name: 'core.api.tree', methods: [GET, HEAD], middleware: [api, crud_api])
+     * Route(path: 'app/crud/tree/{entity}', name: 'core.crud.tree', methods: [GET, HEAD], middleware: [web])
+     */
     public function tree(TreeRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, TreeRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, TreeRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
             if (! $this->useRecursiveRelationships($model)) {
@@ -251,14 +251,14 @@ class CrudController extends Controller
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api, crud_api])
+     * Route(path: 'app/crud/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
+     */
     public function insert(Request $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values, $request): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values, $request): ResponseBuilder {
             $model = $values->model;
             PermissionChecker::ensurePermissions($values->request, $model->getTable(), 'insert', $model->getConnectionName());
             // $values = method_exists($model, 'getRules') ? $request->validate($model->getRules()) : $filters;
@@ -277,19 +277,18 @@ class CrudController extends Controller
             return $responseBuilder
                 ->setData($created)
                 ->setStatus(Response::HTTP_CREATED)
-                ->setError($discarded_values === [] ? null : $discarded_values)
-                ->getResponse();
+                ->setError($discarded_values === [] ? null : $discarded_values);
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/update/{entity}', name: 'core.api.replace', methods: [PATCH, PUT], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/update/{entity}', name: 'core.api.replace', methods: [PATCH, PUT], middleware: [api, crud_api])
+     * Route(path: 'app/crud/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
+     */
     public function update(ModifyRequest $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values): ResponseBuilder {
             $model = $values->model;
             PermissionChecker::ensurePermissions($values->request, $model->getTable(), 'update', $model->getConnectionName());
 
@@ -311,7 +310,7 @@ class CrudController extends Controller
                 throw new ModelNotFoundException('No model Found');
             }
             $updated_records = new Collection();
-            $this->db->transaction(function () use ($found_records, $updated_records, $values): void {
+            DB::transaction(function () use ($found_records, $updated_records, $values): void {
                 foreach ($found_records as $found_record) {
                     /** @psalm-suppress InvalidArgument */
                     if ($found_record->update($values->changes)) {
@@ -325,20 +324,19 @@ class CrudController extends Controller
             }
 
             return $responseBuilder
-                ->setData($updated_records)
-                ->getResponse();
+                ->setData($updated_records);
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'api/v1/delete/{entity}', name: 'core.api.delete', methods: [DELETE, POST], middleware: [api, crud_api])
-	 * Route(path: 'app/crud/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'api/v1/delete/{entity}', name: 'core.api.delete', methods: [DELETE, POST], middleware: [api, crud_api])
+     * Route(path: 'app/crud/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
+     */
     public function delete(ModifyRequest $request): Response
     {
         // delete deve bypassare le preview
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters): ResponseBuilder {
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
             $key_value = $this->getModelKeyValue($filters);
@@ -348,7 +346,7 @@ class CrudController extends Controller
                 throw new ModelNotFoundException('No model Found');
             }
             $deleted_records = new Collection();
-            $this->db->transaction(function () use ($found_records, $deleted_records): void {
+            DB::transaction(function () use ($found_records, $deleted_records): void {
                 foreach ($found_records as $found_record) {
                     if ($found_record->forceDelete()) {
                         $deleted_records->add($found_record);
@@ -357,8 +355,7 @@ class CrudController extends Controller
             });
 
             return $responseBuilder
-                ->setData($deleted_records)
-                ->getResponse();
+                ->setData($deleted_records);
         });
     }
 
@@ -373,7 +370,7 @@ class CrudController extends Controller
     public function doActivateOperation(ModifyRequest $request, string $operation): Response
     {
         // activate deve bypassare le preview
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): ResponseBuilder {
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'restore', $model->getConnectionName());
             $key = $filters->primaryKey;
@@ -391,80 +388,78 @@ class CrudController extends Controller
             $found_record->fresh();
 
             return $responseBuilder
-                ->setData($found_record)
-                ->getResponse();
+                ->setData($found_record);
         });
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/activate/{entity}', name: 'core.crud.activate', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/activate/{entity}', name: 'core.crud.activate', methods: [PATCH], middleware: [web])
+     */
     public function activate(ModifyRequest $request): Response
     {
         return $this->doActivateOperation($request, 'activate');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/inactivate/{entity}', name: 'core.crud.inactivate', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/inactivate/{entity}', name: 'core.crud.inactivate', methods: [PATCH], middleware: [web])
+     */
     public function inactivate(ModifyRequest $request): Response
     {
         return $this->doActivateOperation($request, 'inactivate');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/approve/{entity}', name: 'core.crud.approve', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/approve/{entity}', name: 'core.crud.approve', methods: [PATCH], middleware: [web])
+     */
     public function approve(ModifyRequest $request): Response
     {
         return $this->doApproveOperation($request, 'approve');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/disapprove/{entity}', name: 'core.crud.disapprove', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/disapprove/{entity}', name: 'core.crud.disapprove', methods: [PATCH], middleware: [web])
+     */
     public function disapprove(ModifyRequest $request): Response
     {
         return $this->doApproveOperation($request, 'disapprove');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/lock/{entity}', name: 'core.crud.lock', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/lock/{entity}', name: 'core.crud.lock', methods: [PATCH], middleware: [web])
+     */
     public function lock(ModifyRequest $request): Response
     {
         return $this->doLockOperation($request, 'lock');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/unlock/{entity}', name: 'core.crud.unlock', methods: [PATCH], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/unlock/{entity}', name: 'core.crud.unlock', methods: [PATCH], middleware: [web])
+     */
     public function unlock(ModifyRequest $request): Response
     {
         return $this->doLockOperation($request, 'unlock');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/cache-clear/{entity}', name: 'core.crud.cache-clear', methods: [DELETE], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/cache-clear/{entity}', name: 'core.crud.cache-clear', methods: [DELETE], middleware: [web])
+     */
     public function clearModelCache(Request $request): Response
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, CrudRequestData $filters): Response {
+        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, CrudRequestData $filters): ResponseBuilder {
             $model = $filters->model;
             $table = $model->getTable();
             Cache::clearByEntity($model);
 
             return $responseBuilder
                 ->setData("{$table} cached cleared")
-                ->setStatus(Response::HTTP_OK)
-                ->getResponse();
+                ->setStatus(Response::HTTP_OK);
         });
     }
 
@@ -531,42 +526,37 @@ class CrudController extends Controller
         $filters = $this->isParsableRequest($request) ? $request->parsed() : $request->validated();
 
         try {
-            return $operation($response_builder, $filters)->getResponse();
+            $operation($response_builder, $filters);
         } catch (QueryException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR)
-                ->getResponse();
+                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (LockedModelException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_LOCKED)
-                ->getResponse();
+                ->setStatus(Response::HTTP_LOCKED);
         } catch (UnexpectedValueException | BadMethodCallException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_BAD_REQUEST)
-                ->getResponse();
+                ->setStatus(Response::HTTP_BAD_REQUEST);
         } catch (LogicException | AlreadyLockedException | CannotUnlockException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_NOT_MODIFIED)
-                ->getResponse();
+                ->setStatus(Response::HTTP_NOT_MODIFIED);
         } catch (ModelNotFoundException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_NO_CONTENT)
-                ->getResponse();
+                ->setStatus(Response::HTTP_NO_CONTENT);
         } catch (UnauthorizedException $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_UNAUTHORIZED)
-                ->getResponse();
+                ->setStatus(Response::HTTP_UNAUTHORIZED);
         } catch (Throwable $ex) {
-            return $response_builder
+            $response_builder
                 ->setData($ex)
-                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR)
-                ->getResponse();
+                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
+        } finally {
+            return $response_builder->getResponse();
         }
     }
 
@@ -692,7 +682,7 @@ class CrudController extends Controller
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             /** @var User $user */
-            $user = $this->auth->user();
+            $user = Auth::user();
 
             if ($filters['modification']) {
                 $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $filters->primaryKey])->findOrFail($filters['modification']);
@@ -757,7 +747,7 @@ class CrudController extends Controller
                 throw new AlreadyLockedException($operation === 'lock' ? 'Record already locked' : 'Record isn\'t locked');
             }
             $locked_records = new Collection();
-            $this->db->transaction(function () use ($found_records, $locked_records): void {
+            DB::transaction(function () use ($found_records, $locked_records): void {
                 foreach ($found_records as $found_record) {
                     /** @psalm-suppress InvalidArgument */
                     if (! $found_record->isLocked() && $found_record->lock()) {

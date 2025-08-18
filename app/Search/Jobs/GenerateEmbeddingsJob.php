@@ -9,6 +9,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -67,7 +68,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     public int $maxExceptionsThenWait = 300;
 
     public function __construct(
-        private readonly object $model,
+        private readonly Model $model,
     ) {
         $this->onQueue('embeddings');
     }
@@ -122,9 +123,9 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         switch (config('search.vector_search.provider')) {
             case 'openai':
-                $config = new OpenAIConfig(config('ai.openai_api_key'));
+                $config = new OpenAIConfig(config('ai.providers.openai.api_key'));
 
-                return match (config('ai.openai_model')) {
+                return match (config('ai.providers.openai.openai_model')) {
                     'text-embedding-3-large' => new OpenAI3LargeEmbeddingGenerator($config),
                     'text-embedding-ada-002' => new OpenAIADA002EmbeddingGenerator($config),
                     default => new OpenAI3SmallEmbeddingGenerator($config),
@@ -132,11 +133,11 @@ final class GenerateEmbeddingsJob implements ShouldQueue
 
             case 'ollama':
                 $config = new OllamaConfig();
-                if (config('ai.ollama_api_url')) {
-                    $config->url = config('ai.ollama_api_url');
+                if (config('ai.providers.ollama.api_url')) {
+                    $config->url = config('ai.providers.ollama.api_url');
                 }
 
-                $config->model = match (config('ai.ollama_model')) {
+                $config->model = match (config('ai.providers.ollama.model')) {
                     'nomic-embed-large' => 'nomic-embed-large',
                     default => 'nomic-embed-text',
                 };
@@ -145,9 +146,9 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 return new OllamaEmbeddingGenerator($config);
 
             case 'voyageai':
-                $config = new VoyageAIConfig(config('ai.voyageai_api_key'));
+                $config = new VoyageAIConfig(config('ai.providers.voyageai.api_key'));
 
-                return match (config('ai.voyageai_model')) {
+                return match (config('ai.providers.voyageai.model')) {
                     'voyage-3' => new Voyage3EmbeddingGenerator($config),
                     'voyage-3-large' => new Voyage3LargeEmbeddingGenerator($config),
                     'voyage-code-2' => new VoyageCode2EmbeddingGenerator($config),
@@ -158,12 +159,12 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 };
 
             case 'mistral':
-                $config = new OpenAIConfig(config('ai.mistral_api_key'));
+                $config = new OpenAIConfig(config('ai.providers.mistral.api_key'));
 
                 return new MistralEmbeddingGenerator($config);
 
             case 'sentence-transformers':
-                $config = new SentenceTransformersConfig(config('ai.sentence_transformers_api_key'), config('ai.sentence_transformers_url'));
+                $config = new SentenceTransformersConfig(config('ai.providers.sentence_transformers.api_key'), config('ai.providers.sentence_transformers.url'));
 
                 return new SentenceTransformersEmbeddingGenerator($config);
 

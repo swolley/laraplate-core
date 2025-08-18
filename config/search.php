@@ -23,7 +23,7 @@ return [
     |
     */
     'vector_search' => [
-        'provider' => env('VECTOR_SEARCH_PROVIDER'),
+        'provider' => env('VECTOR_SEARCH_PROVIDER', config('ai.default')),
         'enabled' => env('VECTOR_SEARCH_ENABLED', true),
         'dimension' => env('VECTOR_DIMENSION', 768), // Default per OpenAI text-embedding-3-small
         'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean

@@ -12,5 +12,8 @@ final class SentenceTransformersConfig
 
     public bool $normalizeEmbeddings = true;
 
-    public function __construct(private ?string $apiKey = null, private string $url = 'http://localhost:8000') {}
+    public function __construct(
+        public ?string $apiKey = null,
+        public string $url = 'http://localhost:8000'
+    ) {}
 }

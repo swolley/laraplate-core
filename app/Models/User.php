@@ -17,11 +17,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Lab404\Impersonate\Exceptions\InvalidUserProvider;
 use Lab404\Impersonate\Exceptions\MissingUserProvider;
-use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
@@ -51,9 +51,10 @@ class User extends BaseUser
         Notifiable,
         SoftDeletes,
         TwoFactorAuthenticatable {
-            getRules as protected getRulesTrait;
-            roles as protected rolesTrait;
-        }
+        getRules as protected getRulesTrait;
+        roles as protected rolesTrait;
+        HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -161,6 +162,15 @@ class User extends BaseUser
         return $this->rolesTrait()->using(ModelHasRole::class);
     }
 
+    public function getPermissionsViaRoles(): Collection
+    {
+        if ($this->isSuperAdmin()) {
+            return Permission::get()->sort()->values();
+        }
+
+        return $this->getPermissionsViaRolesTrait();
+    }
+
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
@@ -218,13 +228,13 @@ class User extends BaseUser
     #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
     #[Scope]
     protected static function admin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
+        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.admin')));
     }
 
     /**

@@ -38,6 +38,7 @@ class ListRequestData extends SelectRequestData
 
         $this->count = isset($validated['count']) ? (int) $validated['count'] : false;
         $this->sort = $this->conformSorts($validated['sort'] ?? []);
+        $this->relations = $this->conformRelations($validated['relations'] ?? []);
 
         if (isset($validated['filters'])) {
             $this->conformFiltersToQueryBuilderFormat($validated['filters']);
@@ -88,6 +89,11 @@ class ListRequestData extends SelectRequestData
     public function calculateTotalPages(int $totalRecords): int
     {
         return (int) ceil($totalRecords / $this->pagination);
+    }
+
+    protected function conformRelations(array $relations): array
+    {
+        return array_map(fn(string $relation): string => preg_replace(["/^{$this->mainEntity}\./", "/^{$this->model->getTable()}\./"], '', $relation), $relations);
     }
 
     protected function conformFilterOperators(array &$filter): void
