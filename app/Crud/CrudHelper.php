@@ -274,20 +274,25 @@ final class CrudHelper
             }
 
             if ($path_length > 1) {
-                $query->{$method . 'Has'}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns): void {
-                    $q->withoutGlobalScope('global_ordered');
+                $has_method = $method . 'Has';
 
-                    if ($splitted['field'] === 'deleted_at') {
-                        $permission = "{$splitted['connection']}.{$splitted['table']}.delete";
-                        $user = Auth::user();
+                // Ensure the method name is valid
+                if (method_exists($query, $has_method)) {
+                    $query->{$has_method}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns): void {
+                        $q->withoutGlobalScope('global_ordered');
 
-                        if ($user && $user->can($permission)) {
-                            $q->withTrashed();
+                        if ($splitted['field'] === 'deleted_at') {
+                            $permission = "{$splitted['connection']}.{$splitted['table']}.delete";
+                            $user = Auth::user();
+
+                            if ($user && $user->can($permission)) {
+                                $q->withTrashed();
+                            }
                         }
-                    }
-                    $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
-                    $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
-                });
+                        $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
+                        $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
+                    });
+                }
 
                 return;
             }
@@ -303,7 +308,9 @@ final class CrudHelper
             $query->{$method}($filter->property, $filter->value);
         } else {
             // all the others
-            $query->{$method}($filter->property, $filter->operator->value, $filter->value);
+            if (!empty($method) && method_exists($query, $method)) {
+                $query->{$method}($filter->property, $filter->operator->value, $filter->value);
+            }
         }
     }
 
@@ -317,7 +324,9 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                if (!empty($method) && method_exists($query, $method)) {
+                    $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                }
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
