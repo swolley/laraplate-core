@@ -31,12 +31,6 @@ class SettingResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('key')
-                    ->required()
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true)
-                    ->regex('/^[a-z0-9_]+$/')
-                    ->helperText('Only lowercase letters, numbers and underscores are allowed'),
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255),
@@ -56,7 +50,7 @@ class SettingResource extends Resource
                 Forms\Components\TextInput::make('value')
                     ->required()
                     ->maxLength(65535),
-                Forms\Components\TextInput::make('group')
+                Forms\Components\TextInput::make('group_name')
                     ->required()
                     ->maxLength(255)
                     ->default('general'),
@@ -77,21 +71,24 @@ class SettingResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('key')
-                    ->searchable(),
+                Tables\Columns\TextColumn::make('group_name')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('type')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('value')
                     ->searchable()
                     ->limit(50),
-                Tables\Columns\TextColumn::make('group')
-                    ->searchable(),
                 Tables\Columns\IconColumn::make('is_public')
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_encrypted')
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -113,8 +110,8 @@ class SettingResource extends Resource
                         'date' => 'Date',
                         'datetime' => 'DateTime',
                     ]),
-                Tables\Filters\SelectFilter::make('group')
-                    ->options(fn () => Setting::distinct()->pluck('group', 'group')->toArray()),
+                Tables\Filters\SelectFilter::make('group_name')
+                    ->options(fn() => Setting::distinct()->pluck('group_name', 'group_name')->toArray()),
                 Tables\Filters\SelectFilter::make('is_public')
                     ->options([
                         '1' => 'Public',

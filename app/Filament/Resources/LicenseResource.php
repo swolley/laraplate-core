@@ -78,19 +78,19 @@ class LicenseResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                Tables\Columns\TextColumn::make('id')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('domain')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('email')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('company')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('expires_at')
-                    ->date()
-                    ->sortable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->boolean(),
+                    ->boolean()
+                    ->state(fn($record) => $record->isValid()),
+                Tables\Columns\TextColumn::make('valid_from')
+                    ->dateTime()
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('valid_to')
+                    ->dateTime()
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -101,22 +101,17 @@ class LicenseResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('is_active')
-                    ->options([
-                        '1' => 'Active',
-                        '0' => 'Inactive',
-                    ]),
                 Tables\Filters\Filter::make('expired')
-                    ->query(fn ($query) => $query->where('expires_at', '<', now())),
+                    ->query(fn($query) => $query->where('valid_to', '<', now())),
                 Tables\Filters\Filter::make('expiring_soon')
-                    ->query(fn ($query) => $query->whereBetween('expires_at', [now(), now()->addDays(30)])),
+                    ->query(fn($query) => $query->whereBetween('valid_to', [now(), now()->addDays(30)])),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\Action::make('validate')
                     ->icon('heroicon-o-check-circle')
-                    ->action(fn (License $record) => $record->validate())
+                    ->action(fn(License $record) => $record->validate())
                     ->requiresConfirmation(),
             ])
             ->bulkActions([

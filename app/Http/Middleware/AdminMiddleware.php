@@ -18,14 +18,16 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! Auth::guard('admin')->check()) {
+        // Use default guard instead of 'admin' guard to be compatible with Filament
+        if (! Auth::check()) {
             return redirect()->route('filament.admin.auth.login');
         }
 
-        $user = Auth::guard('admin')->user();
+        $user = Auth::user();
 
-        if (! $user || ! $user->hasRole('superadmin')) {
-            Auth::guard('admin')->logout();
+        // Check if user has admin role (adjust role name as needed)
+        if (! $user || ! $user->hasRole(['superadmin', 'admin'])) {
+            Auth::logout();
 
             return redirect()->route('filament.admin.auth.login');
         }

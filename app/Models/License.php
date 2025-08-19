@@ -30,6 +30,10 @@ final class License extends Model
      */
     protected $fillable = [];
 
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
     #[Scope]
     public function free(Builder $query): void
     {

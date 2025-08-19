@@ -25,7 +25,7 @@ final class ACL extends Model
         getRules as protected getRulesTrait;
     }
 
-    protected $table = 'acl';
+    protected $table = 'acls';
 
     protected $fillable = [
         'permission_id',

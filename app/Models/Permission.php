@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
@@ -94,5 +95,10 @@ final class Permission extends ModelsPermission
         $splitted = explode('.', $this->name);
 
         return ActionEnum::tryFrom(array_pop($splitted));
+    }
+
+    public function acls(): HasMany
+    {
+        return $this->hasMany(ACL::class);
     }
 }

@@ -51,9 +51,16 @@ class PermissionResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('guard_name')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('connection_name')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('table_name')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('description')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
@@ -67,11 +74,15 @@ class PermissionResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('guard_name')
-                    ->options([
-                        'web' => 'Web',
-                        'api' => 'API',
-                        'admin' => 'Admin',
-                    ]),
+                    ->options(Permission::distinct('guard_name')->pluck('guard_name'))
+                    ->multiple()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('connection_name')
+                    ->options(Permission::distinct('connection_name')->pluck('connection_name'))
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('table_name')
+                    ->options(Permission::distinct('table_name')->pluck('table_name'))
+                    ->preload(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

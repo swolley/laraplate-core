@@ -72,21 +72,25 @@ class CronJobResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('command')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('schedule')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('without_overlapping')
-                    ->boolean(),
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('last_run_at')
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('next_run_at')
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -108,7 +112,7 @@ class CronJobResource extends Resource
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\Action::make('run')
                     ->icon('heroicon-o-play')
-                    ->action(fn (CronJob $record) => $record->run())
+                    ->action(fn(CronJob $record) => $record->run())
                     ->requiresConfirmation(),
             ])
             ->bulkActions([

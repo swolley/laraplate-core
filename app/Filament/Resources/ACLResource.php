@@ -16,6 +16,10 @@ class ACLResource extends Resource
 {
     protected static ?string $model = ACL::class;
 
+    protected static ?string $label = 'ACLs';
+
+    protected static ?string $navigationLabel = 'ACLs';
+
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
 
     protected static ?string $navigationGroup = 'Core';
@@ -54,9 +58,11 @@ class ACLResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('permission.name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('description')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
