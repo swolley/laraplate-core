@@ -19,7 +19,7 @@ class ServiceProvider extends BaseServiceProvider
     protected function registerConfig(): void
     {
         // Check if modules config is available
-        if (!config()->has('modules.paths.generator.config.path')) {
+        if (! config()->has('modules.paths.generator.config.path')) {
             // If modules config is not available, skip config registration
             return;
         }
@@ -52,7 +52,7 @@ class ServiceProvider extends BaseServiceProvider
             $original = $config->get($key, []);
             $current = require $path;
 
-            if (gettype($current) === 'array' && gettype($original) === 'array') {
+            if (is_array($current) && is_array($original)) {
                 $merged = self::mergeArrays($original, $current);
             } else {
                 $merged = $current;

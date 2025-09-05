@@ -73,6 +73,48 @@ final class GenerateEmbeddingsJob implements ShouldQueue
         $this->onQueue('embeddings');
     }
 
+    /**
+     * @throws BindingResolutionException
+     * @throws ClientExceptionInterface
+     * @throws JsonException
+     * @throws Exception
+     * @throws GuzzleException
+     * @throws RuntimeException
+     *
+     * @return Document[]
+     */
+    public static function embedDocument(string $data): array
+    {
+        $document = new Document();
+        $document->content = $data;
+        $splitDocuments = DocumentSplitter::splitDocument($document);
+        $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
+
+        $generator = self::getGenerator();
+
+        if ($generator === null) {
+            return [];
+        }
+
+        return $generator->embedDocuments($formattedDocuments);
+    }
+
+    /**
+     * @throws BindingResolutionException
+     *
+     * @return float[]
+     */
+    public static function embedText(string $text): array
+    {
+        $generator = self::getGenerator();
+
+        if ($generator === null) {
+            return [];
+        }
+
+        return $generator->embedText($text);
+    }
+
     public function middleware(): array
     {
         return [
@@ -133,6 +175,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
 
             case 'ollama':
                 $config = new OllamaConfig();
+
                 if (config('ai.providers.ollama.api_url')) {
                     $config->url = config('ai.providers.ollama.api_url');
                 }
@@ -142,9 +185,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                     default => 'nomic-embed-text',
                 };
 
-
                 return new OllamaEmbeddingGenerator($config);
-
             case 'voyageai':
                 $config = new VoyageAIConfig(config('ai.providers.voyageai.api_key'));
 
@@ -162,59 +203,12 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 $config = new OpenAIConfig(config('ai.providers.mistral.api_key'));
 
                 return new MistralEmbeddingGenerator($config);
-
             case 'sentence-transformers':
                 $config = new SentenceTransformersConfig(config('ai.providers.sentence_transformers.api_key'), config('ai.providers.sentence_transformers.url'));
 
                 return new SentenceTransformersEmbeddingGenerator($config);
-
             default:
                 return null;
         }
-    }
-
-    /**
-     * 
-     * @param string $data 
-     * 
-     * @return Document[] 
-     * 
-     * @throws BindingResolutionException 
-     * @throws ClientExceptionInterface 
-     * @throws JsonException 
-     * @throws Exception 
-     * @throws GuzzleException 
-     * @throws RuntimeException 
-     */
-    public static function embedDocument(string $data): array
-    {
-        $document = new Document();
-        $document->content = $data;
-        $splitDocuments = DocumentSplitter::splitDocument($document);
-        $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
-
-        $generator = self::getGenerator();
-        if ($generator === null) {
-            return [];
-        }
-
-        return $generator->embedDocuments($formattedDocuments);
-    }
-
-    /**
-     * 
-     * @param string $text 
-     * 
-     * @return float[] 
-     * 
-     * @throws BindingResolutionException 
-     */
-    public static function embedText(string $text): array
-    {
-        $generator = self::getGenerator();
-        if ($generator === null) {
-            return [];
-        }
-        return $generator->embedText($text);
     }
 }

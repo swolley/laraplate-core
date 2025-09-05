@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Middleware;
 
 use Closure;
+use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,7 +27,8 @@ class AdminMiddleware
         $user = Auth::user();
 
         // Check if user has admin role (adjust role name as needed)
-        if (! $user || ! $user->hasRole(['superadmin', 'admin'])) {
+        // if (! $user || ! $user->hasRole(['superadmin', 'admin'])) {
+        if (! $user || ! $user->isSuperAdmin() || ! $user->canAccessPanel(Filament::getPanel())) {
             Auth::logout();
 
             return redirect()->route('filament.admin.auth.login');

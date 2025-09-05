@@ -86,6 +86,7 @@ trait HasValidations
 
         if ($rules !== []) {
             $attributes = $this->getAttributes();
+
             if (class_uses_trait($this, HasDynamicContents::class)) {
                 $attributes = array_merge($attributes, $this->getComponentsAttribute());
             }

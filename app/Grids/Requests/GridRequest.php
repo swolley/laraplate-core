@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Requests;
 
-use Override;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Grids\Casts\GridAction;
-use Illuminate\Foundation\Http\FormRequest;
-use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Grids\Casts\GridRequestData;
+use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
+use Override;
 
 final class GridRequest extends FormRequest implements IParsableRequest
 {
@@ -87,6 +87,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
     {
         $validated = $this->realMainRequest->validated($key, $default);
         $funnels = $this->input('funnels');
+
         if ($funnels) {
             for ($i = 0; count($funnels); $i++) {
                 $validated['funnels'][$i] = $this->realFunnelRequests[$i]->validated();
@@ -94,6 +95,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
         }
 
         $options = $this->input('options');
+
         if ($options) {
             for ($i = 0; count($options); $i++) {
                 $validated['options'][$i] = $this->realOptionRequests[$i]->validated();
@@ -133,6 +135,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
                 $this->realMainRequest = ListRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
                 $funnels = $this->input('funnels');
+
                 if (property_exists($this, 'funnels') && $funnels !== null) {
                     foreach ($funnels as $funnel) {
                         /** @phpstan-ignore staticMethod.notFound */
@@ -143,8 +146,8 @@ final class GridRequest extends FormRequest implements IParsableRequest
                     }
                 }
 
-
                 $options = $this->input('options');
+
                 if (property_exists($this, 'options') && $options !== null) {
                     foreach ($options as $option) {
                         /** @phpstan-ignore staticMethod.notFound */
@@ -156,11 +159,11 @@ final class GridRequest extends FormRequest implements IParsableRequest
                 }
 
                 break;
-            // case GridAction::LAYOUT:
-            // case GridAction::COUNT:
+                // case GridAction::LAYOUT:
+                // case GridAction::COUNT:
             case GridAction::INSERT:
             case GridAction::UPDATE:
-            /** @phpstan-ignore staticMethod.notFound */
+                /** @phpstan-ignore staticMethod.notFound */
                 // $this->realMainRequest = ModifyRequest::createFrom($this);
             case GridAction::CHECK:
             case GridAction::FORCE_DELETE:

@@ -6,6 +6,9 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -39,7 +42,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property BelongsToMany $roles
  * @mixin IdeHelperUser
  */
-class User extends BaseUser
+class User extends BaseUser implements FilamentUser, MustVerifyEmail
 {
     use ApprovesChanges,
         HasFactory,
@@ -90,6 +93,11 @@ class User extends BaseUser
         'created_at',
         'email_verified_at',
     ];
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->isSuperAdmin() || $this->can('*', ['guard' => $panel->getAuthGuard()]);
+    }
 
     public function isGuest(): bool
     {

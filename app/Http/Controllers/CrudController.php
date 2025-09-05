@@ -146,6 +146,7 @@ class CrudController extends Controller
             if (! isset($filters->model) || $is_searchable_class) {
                 $embeddedDocument = null;
                 $search_text = Str::of($filters->qs)->trim()->toString();
+
                 // no needs to wait for embeddings if is a short query string, try to do a match search instead
                 if (property_exists($filters->model, 'embed') && $filters->model->embed !== null && $filters->model->embed !== [] && Str::wordCount($search_text) > 10) {
                     $embeddedDocument = GenerateEmbeddingsJob::embedText($search_text);
@@ -374,7 +375,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'restore', $model->getConnectionName());
             $key = $filters->primaryKey;
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             if ($operation === 'activate' && ! $found_record->restore()) {
@@ -535,11 +536,11 @@ class CrudController extends Controller
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_LOCKED);
-        } catch (UnexpectedValueException | BadMethodCallException $ex) {
+        } catch (UnexpectedValueException|BadMethodCallException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_BAD_REQUEST);
-        } catch (LogicException | AlreadyLockedException | CannotUnlockException $ex) {
+        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_NOT_MODIFIED);
@@ -678,7 +679,7 @@ class CrudController extends Controller
 
             /** @var string|array $key */
             $key = $model->getKeyName();
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             /** @var User $user */

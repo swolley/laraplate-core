@@ -26,6 +26,7 @@ trait HasVersions
     use Versionable;
 
     protected ?User $_creator;
+
     protected ?User $_modifier;
 
     protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
@@ -33,7 +34,6 @@ trait HasVersions
     protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
     /**
-     * @param  array $replacements
      * @param  string|DateTimeInterface|null  $time
      *
      * @throws \Carbon\Exceptions\InvalidFormatException
@@ -53,7 +53,7 @@ trait HasVersions
     }
 
     /**
-     * @param Model&HasVersions $model
+     * @param  Model&HasVersions  $model
      */
     public function createInitialVersion(Model $model): Version
     {
@@ -94,7 +94,7 @@ trait HasVersions
     {
         static::deleted(function (Model $model): void {
             /** @var Versionable|Version $model */
-            if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
+            if (method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting()) {
                 $model->createVersion(['deleted_at' => $model->deleted_at]);
             }
         });
@@ -117,7 +117,7 @@ trait HasVersions
     // }
 
     /**
-     * alias for created_by
+     * alias for created_by.
      */
     protected function creator(): Attribute
     {
@@ -128,7 +128,7 @@ trait HasVersions
     {
         return Attribute::make(
             get: function () {
-                if (!isset($this->_creator)) {
+                if (! isset($this->_creator)) {
                     $first_version = $this->firstVersion?->{$this->getUserForeignKeyName()};
                     $this->_creator = $first_version ? $this->getUser($first_version) : null;
                 }
@@ -142,7 +142,7 @@ trait HasVersions
     {
         return Attribute::make(
             get: function () {
-                if (!isset($this->_modifier)) {
+                if (! isset($this->_modifier)) {
                     $last_version = $this->lastVersion?->{$this->getUserForeignKeyName()};
                     $this->_modifier = $last_version ? $this->getUser($last_version) : null;
                 }

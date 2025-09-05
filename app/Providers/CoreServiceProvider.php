@@ -11,9 +11,12 @@ use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Cache\CacheManager;
+use Illuminate\Cache\MemoizedStore;
 use Illuminate\Cache\Repository as BaseRepository;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Cache\Repository as BaseContract;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
@@ -233,6 +236,7 @@ final class CoreServiceProvider extends ServiceProvider
 
     /**
      * Registers the custom search engines.
+     *
      * @throws BindingResolutionException
      */
     protected function registerSearchEngines(): void
@@ -245,12 +249,10 @@ final class CoreServiceProvider extends ServiceProvider
             $client = $app->make(ElasticsearchClient::class);
 
             // Create the engine with proper dependency injection
-            $engine = $app->make(ElasticsearchEngine::class, [
+            return $app->make(ElasticsearchEngine::class, [
                 'client' => $client,
                 'config' => $config,
             ]);
-
-            return $engine;
         });
 
         $this->app->make(EngineManager::class)->extend('typesense', function ($app) {
@@ -260,12 +262,11 @@ final class CoreServiceProvider extends ServiceProvider
             $client = $app->make(TypesenseClient::class);
 
             // Create the engine with proper dependency injection
-            $engine = $app->make(TypesenseEngine::class, [
+            return $app->make(TypesenseEngine::class, [
                 'client' => $client,
                 'config' => $config,
+                'maxTotalResults' => config('scout.typesense.max_total_results', 1000),
             ]);
-
-            return $engine;
         });
 
         $this->app->singleton(Locked::class, fn(): Locked => new Locked());
@@ -341,6 +342,7 @@ final class CoreServiceProvider extends ServiceProvider
 
     /**
      * Register command Schedules.
+     *
      * @throws BindingResolutionException
      */
     private function registerCommandSchedules(): void
@@ -388,18 +390,53 @@ final class CoreServiceProvider extends ServiceProvider
      */
     private function registerCache(): void
     {
-        // Override the binding for the Repository with the correct method
-        /** @phpstan-ignore-next-line */
-        $this->app->extend('cache.store', fn($service, Application $app): Repository => new Repository(
-            $app->get('cache')->getStore(),
-            $app->get('config')->get('cache.stores.' . $app->get('config')->get('cache.default')),
-        ));
+        // Override the CacheManager to return our custom Repository
+        $this->app->extend('cache', function ($cacheManager, Application $app) {
+            // Create a custom CacheManager that returns our Repository
+            return new class($app) extends CacheManager {
+                public function repository(Store $store, array $config = []): Repository
+                {
+                    return new Repository($store, $config);
+                }
+            };
+        });
 
-        // Ensure event dispatcher has been imported
-        $this->app->resolving('cache.store', function (Repository $repository, Application $app): Repository {
+        // Override the cache.store binding to ensure it uses our Repository
+        $this->app->extend('cache.store', function ($service, Application $app): Repository {
+            // Get the underlying store
+            /** @var \Illuminate\Contracts\Cache\Store $store */
+            $store = $app->get('cache')->driver()->getStore();
+
+            // Get the cache configuration
+            $config = $app->get('config')->get('cache.stores.' . $app->get('config')->get('cache.default'));
+
+            // Create our custom Repository
+            $repository = new Repository($store, $config);
+
+            // Set the event dispatcher
             $repository->setEventDispatcher($app->get('events'));
 
             return $repository;
+        });
+
+        // Override the cache.memo binding to use our Repository
+        $this->app->extend('cache.memo', function ($service, Application $app): Repository {
+            $driver = $app->get('config')->get('cache.default');
+
+            if (!$app->bound($bindingKey = "cache.__memoized:{$driver}")) {
+                $store = $app->get('cache')->driver($driver)->getStore();
+                $config = $app->get('config')->get('cache.stores.' . $driver);
+
+                $repository = new Repository(
+                    new MemoizedStore($driver, $store),
+                    $config
+                );
+                $repository->setEventDispatcher($app->get('events'));
+
+                $app->scoped($bindingKey, fn() => $repository);
+            }
+
+            return $app->make($bindingKey);
         });
 
         // Bind interfaces to the correct service

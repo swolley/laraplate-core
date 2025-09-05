@@ -19,7 +19,6 @@ use Modules\Core\Models\DynamicEntity;
 use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
-use Spatie\Permission\Contracts\Permission;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
@@ -45,7 +44,7 @@ final class GridsController extends Controller
                 /** @var Model $instance */
                 $instance = new $model();
                 $table = $instance->getTable();
-                $grid = $this->getModelGridConfigs($entity, $instance, $table, $request/*, $permissions*/);
+                $grid = $this->getModelGridConfigs($entity, $instance, $table, $request/* , $permissions */);
 
                 if ($grid !== null) {
                     $grids[$table] = $grid;
@@ -93,7 +92,7 @@ final class GridsController extends Controller
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException | UnauthorizedException $ex) {
+        } catch (UnexpectedValueException|UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();
@@ -112,8 +111,6 @@ final class GridsController extends Controller
     }
 
     /**
-     * @param  Collection<Permission>  $permissions
-     *
      * @throws InvalidArgumentException
      * @throws BindingResolutionException
      * @throws UnauthorizedException
@@ -124,12 +121,12 @@ final class GridsController extends Controller
      * @throws Exception
      * @throws UnexpectedValueException
      */
-    private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request/*, Collection $permissions*/): ?array
+    private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request/* , Collection $permissions */): ?array
     {
         if (
             ($entity === null || $entity === '' || $entity === '0' || $instance::class === $entity::class)
             && Grid::useGridUtils($instance)
-            && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName()/*, permissions: $permissions*/)
+            && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName()/* , permissions: $permissions */)
         ) {
             /** @var Grid $grid */
             $grid = $instance->getGrid();

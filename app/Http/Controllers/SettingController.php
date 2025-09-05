@@ -17,10 +17,10 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class SettingController extends Controller
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
+     */
     public function getTranslations(TranslationsRequest $request, ?string $lang = null): HttpFoundationResponse
     {
         if ($lang !== null && $lang !== '' && $lang !== '0') {
@@ -61,10 +61,10 @@ final class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
+     */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
         $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
@@ -84,10 +84,10 @@ final class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
+     */
     public function siteInfo(Request $request): HttpFoundationResponse
     {
         return new ResponseBuilder($request)

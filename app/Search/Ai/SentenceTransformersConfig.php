@@ -14,6 +14,6 @@ final class SentenceTransformersConfig
 
     public function __construct(
         public ?string $apiKey = null,
-        public string $url = 'http://localhost:8000'
+        public string $url = 'http://localhost:8000',
     ) {}
 }

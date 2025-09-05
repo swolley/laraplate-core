@@ -207,7 +207,7 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn($relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
@@ -244,6 +244,7 @@ final class CrudHelper
     private function applyFilter(Builder $query, Filter $filter, string &$method, array &$relation_columns): void
     {
         $path_length = mb_substr_count($filter->property, '.');
+
         if ($path_length >= 1) {
             // relations
             $splitted = $this->splitProperty($query->getModel(), $filter->property);
@@ -252,7 +253,7 @@ final class CrudHelper
             if (method_exists($query_model, $splitted['field'])) {
                 $reflected_method = new ReflectionMethod($query_model, $splitted['field']);
 
-                //if last item in property path is a relation it should become a whereHas
+                // if last item in property path is a relation it should become a whereHas
                 // TODO: this is valid only for the first sublevel
                 if (is_a($reflected_method->getReturnType()->__toString(), Relation::class, true)) {
                     $returned_relation_entity = $query_model->{$splitted['field']}()->getModel();
@@ -266,7 +267,7 @@ final class CrudHelper
                         $filter->operator->value,
                         $filter->value,
                         Str::startsWith($method, 'or') ? 'or' : 'and',
-                        fn(Builder $q) => $q->withoutGlobalScope('global_ordered')
+                        fn (Builder $q) => $q->withoutGlobalScope('global_ordered'),
                     );
 
                     return;
@@ -308,7 +309,7 @@ final class CrudHelper
             $query->{$method}($filter->property, $filter->value);
         } else {
             // all the others
-            if (!empty($method) && method_exists($query, $method)) {
+            if (! empty($method) && method_exists($query, $method)) {
                 $query->{$method}($filter->property, $filter->operator->value, $filter->value);
             }
         }
@@ -324,8 +325,8 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                if (!empty($method) && method_exists($query, $method)) {
-                    $query->{$method}(fn(Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                if (! empty($method) && method_exists($query, $method)) {
+                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
@@ -338,8 +339,8 @@ final class CrudHelper
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
-        usort($columns, fn(Column $a, Column $b): int => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn(Column $column): string => $column->name, $columns);
+        usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
+        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {

@@ -29,7 +29,7 @@ final class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('embeddings', function () {
             return Limit::perMinute(60); // 60 jobs per minute
         });
-        RateLimiter::for('indexing', fn() => app()->environment('production') ? [
+        RateLimiter::for('indexing', fn () => app()->environment('production') ? [
             // Single worker limit
             Limit::perMinute(300)  // 300 operations per minute (5 per second)
                 ->by('indexing.worker'),
@@ -93,7 +93,7 @@ final class RouteServiceProvider extends ServiceProvider
             ->group(module_path($this->name, '/routes/info.php'));
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
-        Route::get("{$route_prefix}/auth/reset-password", fn() => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
+        Route::get("{$route_prefix}/auth/reset-password", fn () => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Modules\Core\Search\Ai;
 
 use Exception;
 use GuzzleHttp\Client;
+use JsonException;
 use LLPhant\Embeddings\Document;
 use LLPhant\Embeddings\DocumentUtils;
 use LLPhant\Embeddings\EmbeddingGenerator\EmbeddingGeneratorInterface;
@@ -84,11 +85,12 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
     /**
      * @param  Document[]  $documents
-     * @return Document[]
      *
      * @throws ClientExceptionInterface
-     * @throws \JsonException
+     * @throws JsonException
      * @throws Exception
+     *
+     * @return Document[]
      */
     public function embedDocuments(array $documents): array
     {

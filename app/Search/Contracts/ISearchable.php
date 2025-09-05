@@ -28,15 +28,11 @@ interface ISearchable
 
     /**
      * Get the search mapping schema for the search engine.
-     *
-     * @param  Model  $model
      */
     public function getSearchMapping(Model $model): array;
 
     /**
      * Prepare data for embedding (if supported).
-     *
-     * @param  Model  $model
      */
     public function prepareDataToEmbed(Model $model): ?string;
 
@@ -51,22 +47,16 @@ interface ISearchable
 
     /**
      * Check if the index exists.
-     *
-     * @param  Model  $model
      */
     public function checkIndex(Model $model): bool;
 
     /**
      * Check if the index exists.
-     *
-     * @param  Model  $model
      */
     public function ensureIndex(Model $model): bool;
 
     /**
      * Get the timestamp of the last indexing.
-     *
-     * @param  Model  $model
      */
     public function getLastIndexedTimestamp(Model $model): ?string;
 }

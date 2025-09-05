@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Scout\Scout;
@@ -21,12 +22,25 @@ trait Searchable
     use ScoutSearchable {
         queueMakeSearchable as protected baseQueueMakeSearchable;
         syncMakeSearchable as protected baseSyncMakeSearchableSync;
+        searchableConnection as protected baseSearchableConnection;
     }
 
     /**
      * Field name for indexing timestamp.
      */
     public static string $indexedAtField = 'indexed_at';
+
+    private ?string $cacheConnection = null;
+
+    public function setCacheConnection(string $connection): void
+    {
+        $this->cacheConnection = $connection;
+    }
+
+    public function searchableConnection(): ?string
+    {
+        return $this->cacheConnection;
+    }
 
     /**
      * Reindex all records of this model.
@@ -41,9 +55,13 @@ trait Searchable
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
+            if (!is_iterable($models)) {
+                $models = collect([$models]);
+            }
+
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
-                    new GenerateEmbeddingsJob($models),
+                    ...$models->map(fn(Model $model) => new GenerateEmbeddingsJob($model))->toArray(),
                     new Scout::$makeSearchableJob($models),
                 ])->dispatch()
                     ->onQueue($models->first()->syncWithSearchUsingQueue())
@@ -61,10 +79,16 @@ trait Searchable
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
+            if (!is_iterable($models)) {
+                $models = collect([$models]);
+            }
+
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-                dispatch(new GenerateEmbeddingsJob($models)
-                    ->onQueue($models->first()->syncWithSearchUsingQueue())
-                    ->onConnection($models->first()->syncWithSearchUsing()));
+                foreach ($models as $model) {
+                    dispatch(new GenerateEmbeddingsJob($model)
+                        ->onQueue($model->syncWithSearchUsingQueue())
+                        ->onConnection($model->syncWithSearchUsing()));
+                }
             }
         }
 

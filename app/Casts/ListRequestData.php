@@ -12,19 +12,29 @@ use Modules\Core\Models\Setting;
 class ListRequestData extends SelectRequestData
 {
     public protected(set) int $pagination;
-    public protected(set) int|null $page = null;
-    public protected(set) int|null $skip = null;
-    public protected(set) int|null $take = null;
-    public protected(set) int|null $from = null;
-    public protected(set) int|null $to = null;
-    public protected(set) int|null $limit;
+
+    public protected(set) ?int $page = null;
+
+    public protected(set) ?int $skip = null;
+
+    public protected(set) ?int $take = null;
+
+    public protected(set) ?int $from = null;
+
+    public protected(set) ?int $to = null;
+
+    public protected(set) ?int $limit;
+
     public protected(set) bool $count;
+
     public protected(set) array $sort;
-    public protected(set) FiltersGroup|null $filters;
+
+    public protected(set) ?FiltersGroup $filters;
+
     public array $group_by = [];
 
     /**
-     * @param string|array<string> $primaryKey
+     * @param  string|array<string>  $primaryKey
      */
     public function __construct(ListRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {
@@ -49,12 +59,17 @@ class ListRequestData extends SelectRequestData
 
         if (isset($validated['group_by'])) {
             $this->addGroupsToColumns($validated['group_by']);
-            $validated['group_by'] = array_map(fn(string $group): ?string => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
+            $validated['group_by'] = array_map(fn (string $group): ?string => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
             $this->group_by = $validated['group_by'];
         }
     }
 
-    protected function extractPagination(array $validated)
+    public function calculateTotalPages(int $totalRecords): int
+    {
+        return (int) ceil($totalRecords / $this->pagination);
+    }
+
+    protected function extractPagination(array $validated): void
     {
         if (isset($validated['pagination']) || isset($validated['page'])) {
             $this->take = $this->pagination = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
@@ -66,6 +81,7 @@ class ListRequestData extends SelectRequestData
             $this->from = (int) ($validated['from'] ?? 1);
             $this->skip = $this->from - 1;
             $this->to = isset($validated['to']) ? (int) $validated['to'] : null;
+
             if ($this->to !== null && $this->to !== 0) {
                 $this->take = $this->pagination = $this->to - $this->from;
             }
@@ -81,19 +97,9 @@ class ListRequestData extends SelectRequestData
         }
     }
 
-    private function getDefaultPagination(): int
-    {
-        return (int) Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
-    }
-
-    public function calculateTotalPages(int $totalRecords): int
-    {
-        return (int) ceil($totalRecords / $this->pagination);
-    }
-
     protected function conformRelations(array $relations): array
     {
-        return array_map(fn(string $relation): string => preg_replace(["/^{$this->mainEntity}\./", "/^{$this->model->getTable()}\./"], '', $relation), $relations);
+        return array_map(fn (string $relation): string => preg_replace(["/^{$this->mainEntity}\./", "/^{$this->model->getTable()}\./"], '', $relation), $relations);
     }
 
     protected function conformFilterOperators(array &$filter): void
@@ -106,7 +112,7 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     * @param array{property:string,value:mixed,operator:FilterOperator} $filter
+     * @param  array{property:string,value:mixed,operator:FilterOperator}  $filter
      */
     protected function conformFilterValue(array &$filter): void
     {
@@ -141,8 +147,13 @@ class ListRequestData extends SelectRequestData
         }
     }
 
+    private function getDefaultPagination(): int
+    {
+        return (int) Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
+    }
+
     /**
-     * @param array<int, string|array{property:string,direction:SortDirection}> $sorts
+     * @param  array<int, string|array{property:string,direction:SortDirection}>  $sorts
      * @return array<int, Sort>
      */
     private function conformSorts(array $sorts): array
@@ -155,6 +166,7 @@ class ListRequestData extends SelectRequestData
             }
         }
         unset($value);
+
         return $sorts;
     }
 
@@ -164,7 +176,7 @@ class ListRequestData extends SelectRequestData
     private function addGroupsToColumns(array $groups): void
     {
         if ($this->columns !== []) {
-            $all_columns_name = array_map(fn(Column $column): string => $column->name, $this->columns);
+            $all_columns_name = array_map(fn (Column $column): string => $column->name, $this->columns);
 
             foreach ($groups as $group) {
                 if (! in_array($group, $all_columns_name, true)) {

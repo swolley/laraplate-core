@@ -82,6 +82,11 @@ final class Permission extends ModelsPermission
         return $rules;
     }
 
+    public function acls(): HasMany
+    {
+        return $this->hasMany(ACL::class);
+    }
+
     private static function newFactory(): PermissionFactory
     {
         return PermissionFactory::new();
@@ -95,10 +100,5 @@ final class Permission extends ModelsPermission
         $splitted = explode('.', $this->name);
 
         return ActionEnum::tryFrom(array_pop($splitted));
-    }
-
-    public function acls(): HasMany
-    {
-        return $this->hasMany(ACL::class);
     }
 }

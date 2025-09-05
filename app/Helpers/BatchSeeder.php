@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Exception;
-
+use ErrorException;
 use function Laravel\Prompts\progress;
+use Illuminate\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
 use Modules\Cms\Database\Factories\DynamicContentFactory;
-use Modules\Cms\Helpers\HasSlug;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\Search\Traits\Searchable;
+use Throwable;
 
 abstract class BatchSeeder extends Seeder
 {
-    private const BATCHSIZE = 10;
-
     private const MAX_RETRIES = 3;
+
+    private const BATCHSIZE = 100;
 
     private const RETRY_DELAY = 1; // seconds
 
@@ -40,25 +42,13 @@ abstract class BatchSeeder extends Seeder
             $this->execute();
             $this->command->newLine();
             $this->command->info('All data seeded successfully!');
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->command->error('Error during seeding: ' . $e->getMessage());
             Log::error('Seeding error: ' . $e->getMessage(), [
                 'exception' => $e,
                 'trace' => $e->getTraceAsString(),
             ]);
         }
-    }
-
-    private function countCurrentRecords(string $modelClass): int
-    {
-        return $modelClass::query()->withoutGlobalScopes()->count();
-    }
-
-    private function countToCreate(int $totalCount, int $currentCount): int
-    {
-        $currentCount = $this->command->option('force') ? 0 : $currentCount;
-
-        return $totalCount - $currentCount;
     }
 
     /**
@@ -85,6 +75,7 @@ abstract class BatchSeeder extends Seeder
 
         $created = 0;
         $batch = 0;
+
         while ($created < $count_to_create) {
             $remaining = $count_to_create - $created;
             $batchSize = min(self::BATCHSIZE, $remaining);
@@ -110,33 +101,75 @@ abstract class BatchSeeder extends Seeder
             return 0;
         }
 
-
         $progress = progress("Creating {$entity_name}", $count_to_create);
         $progress->start();
 
         $created = 0;
         $batch = 0;
         $concurrencies = [];
-        while ($created < $count_to_create) {
+
+        $driver = Concurrency::driver('fork');
+
+        /** @var Throwable|null $force_kill_all_batches */
+        $force_kill_all_batches = null;
+
+        $propagate_exception = function (Throwable $e) use (&$force_kill_all_batches, &$progress, &$entity_name, &$batch): void {
+            $force_kill_all_batches = $e;
+            $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+            $progress->render();
+            exit(1);
+        };
+
+        while ($force_kill_all_batches === null && $created < $count_to_create) {
             $remaining = max(0, $count_to_create - $created - count($concurrencies) * $batchSize);
             $batchSize = min(self::BATCHSIZE, $remaining);
 
-            $concurrencies[] = fn() => $this->executeBatch($modelClass, $entity_name, $batch, $batchSize, $current_count, $count_to_create, $created, $remaining, $progress, true);
+            $concurrencies[] = fn() => $this->executeBatch($modelClass, $entity_name, $batch, $batchSize, $current_count, $count_to_create, $created, $remaining, $progress, true, $propagate_exception);
             $batch++;
 
-            if (count($concurrencies) >= $maxParallelCount) {
-                Concurrency::driver('fork')->run($concurrencies);
+            if ($maxParallelCount <= count($concurrencies)) {
+                $driver->run($concurrencies);
                 $concurrencies = [];
             }
         }
 
+        if ($force_kill_all_batches !== null) {
+            throw $force_kill_all_batches;
+        }
+
         if ($concurrencies !== []) {
-            Concurrency::run($concurrencies);
+            $driver->run($concurrencies);
         }
 
         $progress->finish();
 
         return $created;
+    }
+
+    private function countCurrentRecords(string $modelClass): int
+    {
+        return $modelClass::count();
+    }
+
+    private function countToCreate(int $totalCount, int $currentCount): int
+    {
+        $currentCount = $this->command->option('force') ? 0 : $currentCount;
+
+        return $totalCount - $currentCount;
+    }
+
+    private function isSearchable(string $modelClass): bool
+    {
+        return class_uses_trait($modelClass, Searchable::class);
+    }
+
+    private function getCacheConnectionName(string $modelClass): string
+    {
+        if (! $this->isSearchable($modelClass)) {
+            return config('cache.default');
+        }
+
+        return new $modelClass()->searchableConnection() ?? config('cache.default');
     }
 
     /**
@@ -153,7 +186,7 @@ abstract class BatchSeeder extends Seeder
      * @param  Progress  $progress  The progress bar
      * @param  bool  $asyncMode  Whether to run the batch asynchronously
      */
-    private function executeBatch(string &$modelClass, string &$entity_name, int &$batch, int &$batchSize, int &$currentCount, int &$countToCreate, int &$created, int &$remaining, Progress $progress, bool $asyncMode = false): void
+    private function executeBatch(string &$modelClass, string &$entity_name, int &$batch, int &$batchSize, int &$currentCount, int &$countToCreate, int &$created, int &$remaining, Progress $progress, bool $asyncMode = false, ?callable $force_kill_batches = null): void
     {
         $retry_count = 0;
         $success = false;
@@ -162,26 +195,31 @@ abstract class BatchSeeder extends Seeder
             return;
         }
 
+        $connections = [
+            'database' => new $modelClass()->getConnectionName() ?? config('database.default'),
+            'cache' => $this->getCacheConnectionName($modelClass),
+
+        ];
+
         while (! $success && $retry_count < self::MAX_RETRIES) {
             try {
                 if ($asyncMode) {
-                    // Disable prepared statements for this connection
-                    config(['database.connections.pgsql.prepared_statements' => false]);
+                    // Setup fresh connections for async operations
+                    $connections = $this->setupAsyncConnections($modelClass, $connections['database'], $connections['cache']);
+                }
 
-                    // Purge and reconnect to apply the new configuration
-                    DB::purge();
-                    DB::reconnect();
-
-                    // Force a new connection for this process
-                    $connection = DB::connection();
-                    $connection->disconnect();
-                    $connection->reconnect();
+                $model_instance = new $modelClass();
+                $model_instance->setConnection($connections['database']);
+                if ($this->isSearchable($modelClass)) {
+                    $model_instance->setCacheConnection($connections['cache']);
                 }
 
                 /** @phpstan-ignore staticMethod.notFound */
-                $factory = $modelClass::factory();
+                $factory = $model_instance->factory();
+
                 /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
                 $new_models = $factory->count($batchSize)->create();
+
                 if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
                     $factory->createRelations($new_models);
                 }
@@ -191,17 +229,27 @@ abstract class BatchSeeder extends Seeder
 
                 $progress->hint('');
                 $progress->advance($batchSize);
-            } catch (QueryException $e) {
+            } catch (QueryException | ErrorException $e) {
                 $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
-                throw $e;
+                if ($force_kill_batches) {
+                    $force_kill_batches($e);
+                    return;
+                } else {
+                    throw $e;
+                }
             } catch (ValidationException $e) {
                 $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
-                throw $e;
-            } catch (Exception $e) {
+                if ($force_kill_batches) {
+                    $force_kill_batches($e);
+                    return;
+                } else {
+                    throw $e;
+                }
+            } catch (Throwable $e) {
                 $retry_count++;
 
                 if ($retry_count >= self::MAX_RETRIES) {
@@ -210,16 +258,17 @@ abstract class BatchSeeder extends Seeder
 
                     $this->command->error($e->getTraceAsString());
 
-                    throw $e;
+                    if ($force_kill_batches) {
+                        $force_kill_batches($e);
+                        return;
+                    } else {
+                        throw $e;
+                    }
                 }
 
                 if ($asyncMode) {
-                    // Force a new connection on retry
-                    DB::purge();
-                    DB::reconnect();
-                    $connection = DB::connection();
-                    $connection->disconnect();
-                    $connection->reconnect();
+                    // Reset connections on retry
+                    $this->resetAsyncConnections($connections['database'], $connections['cache']);
                 }
 
                 $created_before = $created;
@@ -229,11 +278,109 @@ abstract class BatchSeeder extends Seeder
                 $progress->render();
 
                 $remaining = $countToCreate - $created;
-                /** @var int $batchSize */
                 $batchSize = min(self::BATCHSIZE, $remaining);
 
                 sleep(self::RETRY_DELAY);
             }
         }
+    }
+
+    /**
+     * Setup fresh connections for async operations
+     * @return list{database:string,cache:string}
+     */
+    private function setupAsyncConnections(string $modelClass, string $db_connection_name, string $cache_connection_name): array
+    {
+        return [
+            'database' => $this->setupAsyncDatabaseConnection($db_connection_name),
+            'cache' => $this->setupAsyncCacheConnection($cache_connection_name)
+        ];
+    }
+
+    /**
+     * Setup a fresh database connection for async operations
+     */
+    private function setupAsyncDatabaseConnection(string $connection_name): string
+    {
+        // Disable prepared statements for better async performance
+        config(["database.connections.$connection_name.prepared_statements" => false]);
+
+        // Create a new connection with unique name
+        $tmp_connection_name = 'async_db_' . uniqid();
+        config([
+            "database.connections.{$tmp_connection_name}" => config("database.connections.$connection_name")
+        ]);
+
+        // Set the new connection as default
+        DB::purge();
+        DB::setDefaultConnection($tmp_connection_name);
+        DB::reconnect();
+
+        return $tmp_connection_name;
+    }
+
+    /**
+     * Setup a fresh Redis connection for async operations
+     */
+    private function setupAsyncCacheConnection(string $cache_connection_name): string
+    {
+        // Create a unique Redis connection for this process
+        $tmp_cache_connection_name = 'async_cache_' . uniqid();
+        $cache_config = config('cache.stores.' . $cache_connection_name);
+
+        // Copy the default Redis configuration
+        config([
+            "cache.stores.{$tmp_cache_connection_name}" => $cache_config
+        ]);
+
+        // Clear and reconnect Redis
+        Cache::purge();
+        // /** @var Repository $store */
+        // $store = Cache::store($tmp_cache_connection_name);
+        // $connection = $store->getStore()->getConnection();
+        // $connection->disconnect();
+        // $connection->connect();
+
+        return $tmp_cache_connection_name;
+    }
+
+    /**
+     * Reset all connections for async operations
+     */
+    private function resetAsyncConnections(string $db_connection_name, string $cache_connection_name): void
+    {
+        // Reset database connection
+        $this->resetAsyncDatabaseConnection($db_connection_name);
+
+        // Reset Redis connection
+        $this->resetAsyncCacheConnection($cache_connection_name);
+    }
+
+    /**
+     * Reset the database connection for async operations
+     */
+    private function resetAsyncDatabaseConnection(string $connection_name): void
+    {
+        // Close current connection
+        $current_connection = DB::connection($connection_name);
+        $current_connection->disconnect();
+
+        // Reconnect with fresh connection
+        DB::reconnect($connection_name);
+    }
+
+    /**
+     * Reset the Redis connection for async operations
+     */
+    private function resetAsyncCacheConnection(string $connection_name): void
+    {
+        // Close current cache connection
+        /** @var Repository $store */
+        $store = Cache::store($connection_name);
+        $cache_connection = $store->getConnection();
+        $cache_connection->disconnect();
+
+        // Reconnect cache
+        $cache_connection->connect();
     }
 }

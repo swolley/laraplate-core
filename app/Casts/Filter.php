@@ -9,6 +9,6 @@ final readonly class Filter
     public function __construct(
         public string $property,
         public mixed $value,
-        public FilterOperator $operator = FilterOperator::EQUALS
+        public FilterOperator $operator = FilterOperator::EQUALS,
     ) {}
 }

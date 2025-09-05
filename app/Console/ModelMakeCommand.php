@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Support\Carbon;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\suggest;
@@ -15,8 +13,10 @@ use function Laravel\Prompts\text;
 use Doctrine\DBAL\Types\Type;
 use Illuminate\Console\Concerns\CreatesMatchingTest;
 use Illuminate\Console\Concerns\PromptsForMissingInput;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -42,9 +42,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private bool $isNewClass = false;
 
-    /**
-     * @var array
-     */
     private array $availableClasses = [];
 
     /**
@@ -151,7 +148,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                     foreach ($class->getAppends() as $append) {
                         $type = $casts[$append] ?? 'text';
-                        $nullable = !isset($found_rules[$append]) || ((gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)));
+                        $nullable = ! isset($found_rules[$append]) || ((gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)));
                         $method_subfix = Str::studly($append) . 'Attribute';
 
                         if (method_exists($class, 'get' . $method_subfix)) {

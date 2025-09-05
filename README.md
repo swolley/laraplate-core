@@ -440,3 +440,79 @@ If you want to contribute to this project, follow these steps:
 ## License
 
 Core Module is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## TODO and FIXME
+
+This section tracks all pending tasks and issues that need to be addressed in the Core Module.
+
+### High Priority
+
+- [ ] **Database Compatibility Testing** - `Modules/Core/app/Models/DynamicEntity.php:104`
+  - Test DynamicEntity with Oracle and SQL Server databases
+  - Current implementation may not be fully compatible
+
+- [ ] **Authentication Events Fix** - `Modules/Core/app/Helpers/HasValidations.php:97`
+  - FIXME: No events before retrieved, current implementation queries and then checks permissions
+  - Need to implement proper event handling for user authorization
+
+- [ ] **Development Middleware Cleanup** - `bootstrap/app.php:51`
+  - TODO: Remove temporary middleware removals at end of development
+  - Currently removes ValidateCsrfToken, EnsureEmailIsVerified, and AuthenticateSession
+
+### Medium Priority
+
+- [ ] **Database Index Optimization** - `Modules/Core/database/migrations/2019_05_31_042934_create_versions_table.php:26`
+  - TODO: Consider adding index on versionable_type and versionable_id columns
+  - Evaluate performance impact and implement if beneficial
+
+- [ ] **Strict Mode Configuration** - `Modules/Core/app/Providers/CoreServiceProvider.php:298`
+  - TODO: Strict mode prevents eager loading, application not yet ready
+  - Need to review and implement proper eager loading strategies
+
+- [ ] **CRUD Helper Relations** - `Modules/Core/app/Crud/CrudHelper.php:52`
+  - TODO: Missing columns for relations when foreign key is on main table
+  - Need to implement proper relation handling
+
+- [ ] **Filter Grouping** - `Modules/Core/app/Crud/CrudHelper.php:99`
+  - TODO: Need to implement filter disassembly and grouping for single relations
+  - Current implementation may not handle complex filter scenarios properly
+
+- [ ] **Sublevel Validation** - `Modules/Core/app/Crud/CrudHelper.php:255`
+  - TODO: Current validation only works for first sublevel
+  - Need to extend to support multiple sublevels
+
+### Low Priority
+
+- [ ] **Preview Record Management** - `Modules/Core/app/Http/Controllers/CrudController.php:304`
+  - TODO: How to handle record preview? What to do with pending changes?
+  - Need to implement proper preview functionality
+
+- [ ] **Grid Request Data Completion** - `Modules/Core/app/Grids/Casts/GridRequestData.php:138`
+  - TODO: Need to complete implementation
+  - Current implementation is incomplete
+
+- [ ] **Grid Request Entity Handling** - `Modules/Core/app/Grids/Requests/GridRequest.php:48`
+  - TODO: Need entity or start from grid entity and check requested columns
+  - Clarify entity handling strategy
+
+- [ ] **Grid Components Review** - Multiple files
+  - TODO: Review and improve Option component (`Modules/Core/app/Grids/Components/Option.php:37`)
+  - TODO: Review and improve Funnel component (`Modules/Core/app/Grids/Components/Funnel.php:43`)
+  - TODO: Test Grid component implementation (`Modules/Core/app/Grids/Components/Grid.php:134`)
+
+- [ ] **Versioning Implementation** - `Modules/Core/app/Helpers/HasVersions.php:161,166`
+  - TODO: May need override for multiple primary keys
+  - TODO: Complete implementation for versioning functionality
+
+- [ ] **Entity Definition Testing** - `Modules/Core/app/Grids/Definitions/Entity.php:323,779`
+  - TODO: May induce false paths if same sub-name exists in different sub-relations
+  - TODO: Verify implementation, currently only sketched
+
+### Notes
+
+- Most TODO items are related to edge cases and advanced features
+- Several items require testing with different database systems
+- Some components need completion of implementation details
+- Priority should be given to high-priority items that affect core functionality
+
+

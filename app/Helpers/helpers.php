@@ -21,7 +21,6 @@ if (! function_exists('modules')) {
      * @param  string|null  $onlyModule  filter for specified module
      * @param  bool|null  $prioritySort  sort modules by priority
      * @param  callable|null  $filter  filter for specified modules
-     * 
      * @return array<int,string>
      */
     function modules(bool $showMainApp = false, bool $fullpath = false, bool $onlyActive = true, ?string $onlyModule = null, ?bool $prioritySort = false, ?callable $filter = null): array
@@ -40,14 +39,14 @@ if (! function_exists('modules')) {
 
         if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn(string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, fn(Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
-        $remapped_modules = $fullpath ? array_map(fn(Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
+        $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
 
         if ($showMainApp && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) {
             if ($fullpath) {
@@ -124,7 +123,7 @@ if (! function_exists('translations')) {
         $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
         $langs_subpath = config('modules.paths.generator.lang.path');
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn(string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
@@ -200,7 +199,6 @@ if (! function_exists('models')) {
      * @param  bool  $onlyActive  filter for only active modules
      * @param  string|null  $onlyModule  filter for specified module
      * @param  callable|null  $filter  filter for specified models
-     * 
      * @return list<class-string<Model>>
      */
     function models(bool $onlyActive = true, ?string $onlyModule = null, ?callable $filter = null): array
@@ -309,7 +307,7 @@ if (! function_exists('routes')) {
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = app('router')->getRoutes()->getRoutes();
-        usort($all_routes, fn(Route $a, Route $b): int => $a->uri() <=> $b->uri());
+        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];

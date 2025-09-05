@@ -157,7 +157,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             $this->getQuery()->update(['value' => $this->modulesStatuses]);
             $this->flushCache();
         } elseif (! $active && in_array($name, $this->modulesStatuses, true)) {
-            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn($m): bool => $m !== $name)]);
+            $this->getQuery()->update(['value' => array_filter($this->modulesStatuses, fn ($m): bool => $m !== $name)]);
             $this->flushCache();
         }
     }
@@ -198,7 +198,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             return $this->readSettings();
         }
 
-        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn(): array => $this->readSettings());
+        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn (): array => $this->readSettings());
     }
 
     private function config(string $key, mixed $default = null): mixed

@@ -21,14 +21,14 @@ final class PermissionChecker
      * @throws InvalidArgumentException
      * @throws BindingResolutionException
      */
-    public static function checkPermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null /*, ?Collection $permissions = null*/): bool
+    public static function checkPermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null /* , ?Collection $permissions = null */): bool
     {
         /** @var SessionGuard $guard */
         $guard = Auth::guard();
         $guard_name = $guard->name;
 
         $connection ??= 'default';
-        $permission_name = "$connection.$entity.$operation";
+        $permission_name = "{$connection}.{$entity}.{$operation}";
 
         // if ($permissions instanceof Collection) {
         //     return $permissions->filter(
@@ -41,14 +41,14 @@ final class PermissionChecker
         $user = $request->user();
 
         if (! $user) {
-            $user = Cache::rememberForever('anonymous_user', fn() => user_class()::whereName('anonymous')->first());
+            $user = Cache::rememberForever('anonymous_user', fn () => user_class()::whereName('anonymous')->first());
 
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
 
             Auth::login($user);
-            $request->setUserResolver(fn() => $user);
+            $request->setUserResolver(fn () => $user);
         }
 
         return $user->isSuperAdmin() || $user->hasPermissionTo($permission_name, $guard_name);
@@ -62,9 +62,9 @@ final class PermissionChecker
      * @throws BindingResolutionException
      * @throws UnauthorizedException
      */
-    public static function ensurePermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null /*, ?Collection $permissions = null*/): true
+    public static function ensurePermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null /* , ?Collection $permissions = null */): true
     {
-        if (! self::checkPermissions($request, $entity, $operation, $connection/*, $permissions*/)) {
+        if (! self::checkPermissions($request, $entity, $operation, $connection/* , $permissions */)) {
             throw new UnauthorizedException('User not allowed to access this resource');
         }
 

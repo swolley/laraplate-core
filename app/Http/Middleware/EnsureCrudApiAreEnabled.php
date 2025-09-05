@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Middleware;
 
-use App;
 use Closure;
 use Illuminate\Http\Request;
 
