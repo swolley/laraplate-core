@@ -13,7 +13,7 @@ use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
-// use Filament\Actions\ViewAction;
+use Filament\Actions\ViewAction;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
@@ -34,6 +34,7 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
+use Modules\Cms\Models\Preset;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
@@ -333,7 +334,7 @@ abstract class BaseTable
     ) {
         /** @var Collection<Action> $default_actions */
         $default_actions = collect([
-            // ViewAction::make()->hiddenLabel(),
+            ViewAction::make()->hiddenLabel(),
         ]);
         /** @var Collection<BulkAction> $default_bulk_actions */
         $default_bulk_actions = collect([]);
@@ -460,15 +461,19 @@ abstract class BaseTable
                         ->label('Preset')
                         ->multiple()
                         ->options(function () use ($entity_type) {
-                            return \Modules\Cms\Models\Preset::where('is_active', true)
+                            return \Modules\Cms\Models\Preset::query()
+                                ->join('entities', 'presets.entity_id', '=', 'entities.id')
+                                ->where('presets.is_active', true)
                                 ->whereHas('entity', fn(Builder $query) => $query->where([
-                                    'is_active' => true,
-                                    'type' => $entity_type,
+                                    'entities.is_active' => true,
+                                    'entities.type' => $entity_type,
                                 ]))
-                                ->sortBy('entity.name')
-                                ->sortBy('name')
-                                ->get()
-                                ->pluck('name', 'id', 'entity.name');
+                                ->orderBy('entities.name')
+                                ->orderBy('presets.name')
+                                ->get(['presets.id', 'presets.name', 'presets.entity_id', 'entities.name'])
+                                ->mapWithKeys(function (Preset $preset) {
+                                    return [$preset->id => $preset->entity->name . ' - ' . $preset->name];
+                                });
                         })
                         ->query(function (Builder $query, array $data): Builder {
                             return $query->when(
@@ -507,7 +512,7 @@ abstract class BaseTable
                                 'week' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfWeek()),
                                 'month' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfMonth()),
                                 'year' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfYear()),
-                                default => $query,
+                                default => $query->withoutGlobalScope('deleted'),
                             };
                         });
                     }),
