@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Approval\Traits\RequiresApproval;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Models\DynamicEntity;
+use Modules\Core\Models\License;
+use Modules\Core\Models\ModelEmbedding;
+use Modules\Core\Models\Modification;
+use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
 use Spatie\Permission\Models\Permission;
 
@@ -18,7 +24,7 @@ final class PermissionsRefreshCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:refresh';
+    protected $signature = 'permission:refresh { --p|pretend : prevent changes }';
 
     /**
      * The console command description.
@@ -31,12 +37,12 @@ final class PermissionsRefreshCommand extends Command
      * @var array<int,string>
      */
     private static array $MODELS_BLACKLIST = [
-        'App\\Models\\Version',
-        'App\\Models\\Modification',
-        \Modules\Core\Models\DynamicEntity::class,
-        \Modules\Core\Models\License::class,
-        \Modules\Core\Models\ModelEmbedding::class,
-        \Illuminate\Database\Eloquent\Relations\Pivot::class,
+        Version::class,
+        Modification::class,
+        DynamicEntity::class,
+        License::class,
+        ModelEmbedding::class,
+        Pivot::class,
     ];
 
     /**
@@ -45,6 +51,7 @@ final class PermissionsRefreshCommand extends Command
     public function handle(): void
     {
         $quiet_mode = $this->option('quiet');
+        $pretend_mode = $this->option('pretend');
 
         $all_models = models();
         $user_class = user_class();
@@ -57,18 +64,24 @@ final class PermissionsRefreshCommand extends Command
             ActionEnum::UPDATE,
             ActionEnum::DELETE,
             ActionEnum::FORCE_DELETE,
-            // ActionEnum::RESTORE,
+            ActionEnum::RESTORE,
             ActionEnum::APPROVE,
             // ActionEnum::DISAPPROVE,
             ActionEnum::PUBLISH,
             // ActionEnum::UNPUBLISH,
         ];
+
         $changes = false;
         $all_permissions = [];
 
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
         $parental_class = \Parental\HasChildren::class;
+
+        if ($pretend_mode) {
+            $this->info('Running in pretend mode, no changes will be made');
+            $this->newLine();
+        }
 
         $this->db->beginTransaction();
 
@@ -103,7 +116,7 @@ final class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
-                if ($permission === ActionEnum::DELETE && ! class_uses_trait($model, SoftDeletes::class)) {
+                if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && ! class_uses_trait($model, SoftDeletes::class)) {
                     if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
@@ -199,10 +212,15 @@ final class PermissionsRefreshCommand extends Command
         }
 
         if (! $changes && ! $quiet_mode) {
+            $this->newLine();
             $this->info('No changes needed');
         }
 
-        $this->db->commit();
+        if (! $pretend_mode) {
+            $this->db->commit();
+        } else {
+            $this->db->rollBack();
+        }
     }
 
     private function checkIfBlacklisted(string $model): bool

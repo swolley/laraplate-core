@@ -15,6 +15,7 @@ return [
             'via' => GelfLoggerFactory::class,
             'host' => env('GELF_URL'),
             'port' => env('GELF_PORT', 12201),
+            // 'password' => env('GELF_PASSWORD'),
             // 'formatter' => GelfMessageFormatter::class,
             'processors' => [
                 [

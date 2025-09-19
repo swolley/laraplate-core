@@ -7,6 +7,7 @@ namespace Modules\Core\Helpers;
 use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Support\Facades\App;
 use InvalidArgumentException;
 use Modules\Core\Models\User;
 use TypeError;
@@ -73,6 +74,11 @@ trait HasApprovals
      */
     protected function requiresApprovalWhen($modifications): bool
     {
+        // TODO: need to verify if console operations must be approved or not
+        if (App::runningInConsole()) {
+            return false;
+        }
+
         /** @var User|null $user */
         $user = auth()?->user();
 

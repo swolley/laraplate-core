@@ -43,8 +43,8 @@ trait HasLocks
             $this->hidden[] = $this->getIsLockedColumn();
         }
 
-        if (! in_array($this->getLocketAtColumn(), $this->hidden, true)) {
-            $this->hidden[] = $this->getLocketAtColumn();
+        if (! in_array($this->getLockedAtColumn(), $this->hidden, true)) {
+            $this->hidden[] = $this->getLockedAtColumn();
         }
 
         if (! in_array($this->getLockedByColumn(), $this->hidden, true)) {
@@ -60,7 +60,7 @@ trait HasLocks
         return 'is_locked';
     }
 
-    public function getLocketAtColumn(): string
+    public function getLockedAtColumn(): string
     {
         return new Locked()->lockedAtColumn();
     }
@@ -72,7 +72,7 @@ trait HasLocks
 
     public function lock(?User $user = null): self
     {
-        $this->{$this->getLocketAtColumn()} = now();
+        $this->{$this->getLockedAtColumn()} = now();
 
         if ($user instanceof User) {
             $this->{$this->getLockedByColumn()} = $user->id;

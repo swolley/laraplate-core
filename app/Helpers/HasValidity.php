@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 // use Modules\Core\Casts\ActionEnum;
 // use Illuminate\Support\Facades\Auth;
 // use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 use InvalidFormatException;
@@ -69,7 +70,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopeExpired(Builder $query): Builder
+    #[Scope]
+    public function expired(Builder $query): Builder
     {
         return $query->withoutGlobalScope('valid')->whereNotNull($this->qualifyColumn(static::$valid_to_column))->where($this->qualifyColumn(static::$valid_to_column), '<', now());
     }
@@ -79,7 +81,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopeExpiredAt(Builder $query, Carbon $date): Builder
+    #[Scope]
+    public function expiredAt(Builder $query, Carbon $date): Builder
     {
         return $query->expired()->validAt($date);
     }
@@ -89,7 +92,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopeValidAt(Builder $query, Carbon $date): Builder
+    #[Scope]
+    public function validAt(Builder $query, Carbon $date): Builder
     {
         return static::withoutGlobalScope('valid')->withValidityFilter($query, $date);
     }
@@ -99,7 +103,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopePublished(Builder $query): Builder
+    #[Scope]
+    public function published(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($query): void {
             $query->where($this->qualifyColumn(static::$valid_to_column), '>=', now())->orWhereNull($this->qualifyColumn(static::$valid_to_column));
@@ -111,7 +116,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopeDraft(Builder $query): Builder
+    #[Scope]
+    public function draft(Builder $query): Builder
     {
         return $query->whereNull($this->qualifyColumn(static::$valid_from_column));
     }
@@ -121,7 +127,8 @@ trait HasValidity
      *
      * @throws InvalidArgumentException
      */
-    public function scopeScheduled(Builder $query): Builder
+    #[Scope]
+    public function scheduled(Builder $query): Builder
     {
         return $query->whereNotNull($this->qualifyColumn(static::$valid_from_column))->where($this->qualifyColumn(static::$valid_from_column), '>', now());
     }

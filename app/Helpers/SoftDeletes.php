@@ -6,6 +6,7 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\UnauthorizedException;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 
@@ -61,7 +62,7 @@ trait SoftDeletes
     protected static function bootSoftDeletes(): void
     {
         // Rimuoviamo lo scope predefinito che usa deleted_at
-        static::withoutGlobalScope(new \Illuminate\Database\Eloquent\SoftDeletingScope());
+        static::withoutGlobalScope(new SoftDeletingScope());
 
         // Aggiungiamo il nostro scope personalizzato che usa is_deleted
         static::addGlobalScope(new CustomSoftDeletingScope());

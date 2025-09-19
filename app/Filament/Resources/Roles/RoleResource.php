@@ -6,22 +6,15 @@ namespace Modules\Core\Filament\Resources\Roles;
 
 use BackedEnum;
 use Coolsam\Modules\Resource;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-// use Filament\Resources\Resource;
 use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\Roles\Pages\CreateRole;
 use Modules\Core\Filament\Resources\Roles\Pages\EditRole;
 use Modules\Core\Filament\Resources\Roles\Pages\ListRoles;
+use Modules\Core\Filament\Resources\Roles\Schemas\RoleForm;
+use Modules\Core\Filament\Resources\Roles\Tables\RolesTable;
 use Modules\Core\Models\Role;
 use UnitEnum;
 
@@ -42,66 +35,12 @@ class RoleResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true),
-                TextInput::make('guard_name')
-                    ->required()
-                    ->maxLength(255)
-                    ->default('web'),
-                TextInput::make('description')
-                    ->maxLength(255),
-                Select::make('permissions')
-                    ->multiple()
-                    ->relationship('permissions', 'name')
-                    ->preload(),
-            ]);
+        return RoleForm::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('name')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('guard_name')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
-                TextColumn::make('description')
-                    ->searchable()
-                    ->toggleable(),
-                TextColumn::make('permissions.name')
-                    ->badge()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                SelectFilter::make('permissions')
-                    ->relationship('permissions', 'name')
-                    ->multiple()
-                    ->preload(),
-            ])
-            ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
+        return RolesTable::configure($table);
     }
 
     public static function getRelations(): array

@@ -31,9 +31,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
         $builder->macro('withoutTrashed', function (Builder $builder): Builder {
             $model = $builder->getModel();
 
-            $builder->withoutGlobalScope($this)->whereNull(
-                $model->getQualifiedIsDeletedColumn(),
-            );
+            $builder->withoutGlobalScope($this)->where($model->getQualifiedIsDeletedColumn(), false);
 
             return $builder;
         });
@@ -50,9 +48,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
         $builder->macro('onlyTrashed', function (Builder $builder): Builder {
             $model = $builder->getModel();
 
-            $builder->withoutGlobalScope($this)->whereNotNull(
-                $model->getQualifiedIsDeletedColumn(),
-            );
+            $builder->withoutGlobalScope($this)->where($model->getQualifiedIsDeletedColumn(), true);
 
             return $builder;
         });

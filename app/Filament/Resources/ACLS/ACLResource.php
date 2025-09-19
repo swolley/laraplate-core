@@ -6,20 +6,15 @@ namespace Modules\Core\Filament\Resources\ACLS;
 
 use BackedEnum;
 use Coolsam\Modules\Resource;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\ACLS\Pages\CreateACL;
 use Modules\Core\Filament\Resources\ACLS\Pages\EditACL;
 use Modules\Core\Filament\Resources\ACLS\Pages\ListACLs;
 use Modules\Core\Filament\Resources\ACLS\Schemas\ACLForm;
+use Modules\Core\Filament\Resources\ACLS\Tables\ACLsTable;
 use Modules\Core\Models\ACL;
 use UnitEnum;
 
@@ -49,38 +44,7 @@ class ACLResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('permission.name')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('description')
-                    ->searchable()
-                    ->toggleable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                SelectFilter::make('permission')
-                    ->relationship('permission', 'name')
-                    ->searchable()
-                    ->preload(),
-            ])
-            ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
+        return ACLsTable::configure($table);
     }
 
     public static function getRelations(): array

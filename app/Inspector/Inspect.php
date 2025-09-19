@@ -15,12 +15,17 @@ use Modules\Core\Inspector\Entities\Table;
 
 final class Inspect
 {
+    public static function keyName(string $name, ?string $schema = null): string
+    {
+        return ($schema ?? 'default') . '_' . $name;
+    }
+
     /**
      * Retrieve a particular table for a given database connection.
      */
     public static function table(string $name, ?string $schema = null): ?Table
     {
-        $key_name = ($schema ?? 'default') . '_' . $name;
+        $key_name = self::keyName($name, $schema);
         $inspected_data = Cache::tags(['inspector', $schema ?? 'default'])->get($key_name);
 
         if ($inspected_data) {
@@ -30,7 +35,7 @@ final class Inspect
         /** @phpstan-ignore staticMethod.notFound */
         $connection = Schema::connection($schema);
         $tables = $connection->getTables();
-        $table = Arr::first($tables, fn ($table): bool => $table['name'] === $name);
+        $table = Arr::first($tables, fn($table): bool => $table['name'] === $name);
 
         if (! $table) {
             return null;
@@ -105,7 +110,7 @@ final class Inspect
     {
         $columns = self::columns($table, $schema);
 
-        return Arr::first($columns, fn ($column): bool => $column['name'] === $name);
+        return Arr::first($columns, fn($column): bool => $column['name'] === $name);
     }
 
     /**
@@ -116,7 +121,7 @@ final class Inspect
     {
         $indexes = self::indexes($table, $schema);
 
-        return Arr::first($indexes, fn ($index): bool => $index['name'] === $name);
+        return Arr::first($indexes, fn($index): bool => $index['name'] === $name);
     }
 
     /**
@@ -127,7 +132,7 @@ final class Inspect
     {
         $foreigns = self::foreignKeys($table, $schema);
 
-        return Arr::first($foreigns, fn ($foreign): bool => $foreign['name'] === $name);
+        return Arr::first($foreigns, fn($foreign): bool => $foreign['name'] === $name);
     }
 
     private static function getAttributesForColumn(array $column): Collection
@@ -145,7 +150,7 @@ final class Inspect
      */
     private static function parseColumns(array $columns): Collection
     {
-        return collect($columns)->map(fn ($column): Column => new Column(
+        return collect($columns)->map(fn($column): Column => new Column(
             $column['name'],
             self::getAttributesForColumn($column),
             $column['default'],
@@ -168,7 +173,7 @@ final class Inspect
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(fn ($index): Index => new Index(
+        return collect($indexes)->map(fn($index): Index => new Index(
             $index['name'],
             collect($index['columns']),
             self::getAttributesForIndex($index),
@@ -180,7 +185,7 @@ final class Inspect
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
-        return collect($keys)->map(fn ($foreignKey): ForeignKey => new ForeignKey(
+        return collect($keys)->map(fn($foreignKey): ForeignKey => new ForeignKey(
             $foreignKey['name'],
             collect($foreignKey['columns']),
             $foreignKey['foreign_schema'],
