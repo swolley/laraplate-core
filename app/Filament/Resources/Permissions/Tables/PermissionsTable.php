@@ -2,21 +2,16 @@
 
 namespace Modules\Core\Filament\Resources\Permissions\Tables;
 
-use \Override;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
+use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Permission;
 
-class PermissionsTable extends BaseTable
+class PermissionsTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return Permission::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {

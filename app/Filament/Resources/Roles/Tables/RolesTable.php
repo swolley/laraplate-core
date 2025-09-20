@@ -2,21 +2,15 @@
 
 namespace Modules\Core\Filament\Resources\Roles\Tables;
 
-use \Override;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
-use Modules\Core\Models\Role;
+use Modules\Core\Filament\Utils\HasTable;
 
-class RolesTable extends BaseTable
+class RolesTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return Role::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {
@@ -33,7 +27,8 @@ class RolesTable extends BaseTable
                         ->toggleable(),
                     TextColumn::make('description')
                         ->searchable()
-                        ->toggleable(),
+                        ->toggleable()
+                        ->toggleable(isToggledHiddenByDefault: false),
                     TextColumn::make('permissions.name')
                         ->badge()
                         ->toggleable(isToggledHiddenByDefault: true),

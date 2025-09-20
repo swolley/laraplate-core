@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Users\Pages;
 
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Users\UserResource;
+use Modules\Core\Filament\Utils\HasRecords;
 
 class ListUsers extends ListRecords
 {
-    protected static string $resource = UserResource::class;
+    use HasRecords;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            CreateAction::make(),
-        ];
-    }
+    protected static string $resource = UserResource::class;
 }

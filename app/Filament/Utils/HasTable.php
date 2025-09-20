@@ -14,7 +14,6 @@ use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
@@ -28,6 +27,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException as GlobalInvalidArgumentException;
@@ -43,41 +43,8 @@ use Modules\Core\Models\User;
 use PHPUnit\Event\InvalidArgumentException;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
-abstract class BaseTable
+trait HasTable
 {
-    /**
-     * @return class-string<Model>
-     */
-    abstract protected function getModel(): string;
-
-    public function getTabs(): array
-    {
-        $model = $this->getModel();
-        if ($model === null) {
-            return [];
-        }
-
-        if (!class_uses_trait($model, HasDynamicContents::class)) {
-            return [];
-        }
-
-        $entities = $model::fetchAvailableEntities(EntityType::tryFrom(new $model()->getTable()));
-        if ($entities->count() < 2) {
-            return [];
-        }
-
-        $tabs = [];
-        foreach ($entities as $entity) {
-            $tabs[$entity->name] = Tab::make($entity->name)
-                ->badge($model::query()->where('entity_id', $entity->id)->count())
-                ->modifyQueryUsing(fn(Builder $query) => $query->where('entity_id', $entity->id));
-        }
-
-        return array_merge([
-            'all' => Tab::make('All')->badge($model::query()->count()),
-        ], $tabs);
-    }
-
     /**
      * 
      * @param ?callable(Collection<string,Column> $columns):void $columns 
@@ -241,13 +208,20 @@ abstract class BaseTable
                     ->alignCenter()
                     ->trueIcon('heroicon-o-lock-closed')
                     ->tooltip(
-                        fn(Model $record) => $record->isLocked()
-                            ? sprintf(
-                                'Locked at %s by User #%s',
-                                $record->{$record->getLockedAtColumn()}->format('Y-m-d H:i:s'),
-                                $record->{$record->getLockedByColumn()}
-                            )
-                            : null
+                        function (Model $record) {
+                            if (!$record->isLocked()) {
+                                return null;
+                            }
+
+                            $locked_at = $record->{$record->getLockedAtColumn()};
+                            if ($locked_at instanceof Carbon) {
+                                $locked_at = $locked_at->format('Y-m-d H:i:s');
+                            }
+
+                            $locked_by = $record->{$record->getLockedByColumn()};
+
+                            return sprintf('Locked at %s by User #%s', $locked_at, $locked_by);
+                        }
                     )
                     ->falseIcon(false)
             );
@@ -356,7 +330,7 @@ abstract class BaseTable
                 Action::make('unpublish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedStop)
-                    ->color(fn(Model $record) => $record->isDraft() ? 'gray' : 'danger')
+                    ->color(fn(Model $record) => $record->isDraft() ? 'gray' : 'warning')
                     ->disabled(fn(Model $record) => $record->isDraft())
                     ->action(function (Model $record) {
                         $valid_to_column = $record::validToKey();

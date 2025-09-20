@@ -53,6 +53,14 @@ final class Role extends BaseRole
         'pivot',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'datetime',
+        ];
+    }
+
     #[Override]
     public function users(): BelongsToMany
     {

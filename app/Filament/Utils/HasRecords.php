@@ -1,0 +1,24 @@
+<?php
+
+namespace Modules\Core\Filament\Utils;
+
+use Filament\Actions\CreateAction;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
+
+trait HasRecords
+{
+    protected function getHeaderActions(): array
+    {
+        $model = self::getResource()::getModel();
+        $model_instance = new $model();
+        $model_table = $model_instance->getTable();
+        $model_connection = $model_instance->getConnectionName() ?? 'default';
+        $permissions_prefix = "$model_connection.$model_table";
+
+        $can_create = Auth::user()->can("{$permissions_prefix}.create");
+        return $can_create ? [
+            CreateAction::make()->icon(Heroicon::OutlinedPlus),
+        ] : [];
+    }
+}

@@ -2,7 +2,6 @@
 
 namespace Modules\Core\Filament\Resources\CronJobs\Tables;
 
-use \Override;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -10,16 +9,12 @@ use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
+use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\CronJob;
 
-final class CronJobsTable extends BaseTable
+final class CronJobsTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return CronJob::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {

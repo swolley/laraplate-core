@@ -2,20 +2,14 @@
 
 namespace Modules\Core\Filament\Resources\ACLS\Tables;
 
-use \Override;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
-use Modules\Core\Models\ACL;
+use Modules\Core\Filament\Utils\HasTable;
 
-final class ACLsTable extends BaseTable
+final class ACLsTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return ACL::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {
@@ -28,6 +22,10 @@ final class ACLsTable extends BaseTable
                         ->sortable(),
                     TextColumn::make('description')
                         ->searchable()
+                        ->toggleable(),
+                    TextColumn::make('filters')
+                        ->toggleable(),
+                    TextColumn::make('sort')
                         ->toggleable(),
                 ]);
             },

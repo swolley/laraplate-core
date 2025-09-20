@@ -2,20 +2,14 @@
 
 namespace Modules\Core\Filament\Resources\Modifications\Tables;
 
-use \Override;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
-use Modules\Core\Models\Modification;
+use Modules\Core\Filament\Utils\HasTable;
 
-class ModificationsTable extends BaseTable
+class ModificationsTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return Modification::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {
@@ -25,37 +19,19 @@ class ModificationsTable extends BaseTable
                 $default_columns->unshift(...[
                     TextColumn::make('modifiable_id')
                         ->numeric()
-                        ->sortable(),
+                        ->sortable()
+                        ->searchable(),
                     TextColumn::make('modifiable_type')
                         ->searchable(),
-                    // TextColumn::make('modifier_id')
-                    //     ->numeric()
-                    //     ->sortable(),
-                    // TextColumn::make('modifier_type')
-                    //     ->searchable(),
-                    // TextColumn::make('approvers_required')
-                    //     ->numeric()
-                    //     ->sortable(),
-                    // TextColumn::make('disapprovers_required')
-                    //     ->numeric()
-                    //     ->sortable(),
-                    // TextColumn::make('md5')
-                    //     ->searchable(),
-                    TextColumn::make()
+                    TextColumn::make('modifier.name')
+                        ->searchable()
+                        ->sortable(),
+                    TextColumn::make('modifications.original')
                         ->label('Original')
                         ->limit(50),
-                    TextColumn::make('modifications.original')
-                        ->limit(50),
                     TextColumn::make('modifications.modified')
+                        ->label('Modified')
                         ->limit(50),
-                    TextColumn::make('created_at')
-                        ->dateTime()
-                        ->sortable()
-                        ->toggleable(isToggledHiddenByDefault: true),
-                    TextColumn::make('updated_at')
-                        ->dateTime()
-                        ->sortable()
-                        ->toggleable(isToggledHiddenByDefault: true),
                 ]);
             },
         );

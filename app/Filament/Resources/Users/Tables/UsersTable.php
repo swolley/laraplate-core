@@ -2,7 +2,6 @@
 
 namespace Modules\Core\Filament\Resources\Users\Tables;
 
-use \Override;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Notifications\Notification;
@@ -11,16 +10,12 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
+use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\User;
 
-class UsersTable extends BaseTable
+class UsersTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return User::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {

@@ -21,7 +21,7 @@ class ModificationResource extends Resource
 {
     protected static ?string $model = Modification::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHandThumbUp;
 
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 

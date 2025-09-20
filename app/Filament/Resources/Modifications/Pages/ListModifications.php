@@ -2,18 +2,13 @@
 
 namespace Modules\Core\Filament\Resources\Modifications\Pages;
 
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
+use Modules\Core\Filament\Utils\HasRecords;
 
 class ListModifications extends ListRecords
 {
-    protected static string $resource = ModificationResource::class;
+    use HasRecords;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            CreateAction::make(),
-        ];
-    }
+    protected static string $resource = ModificationResource::class;
 }

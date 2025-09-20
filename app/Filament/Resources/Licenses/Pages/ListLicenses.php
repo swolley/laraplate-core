@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Licenses\Pages;
 
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
+use Modules\Core\Filament\Utils\HasRecords;
 
 class ListLicenses extends ListRecords
 {
-    protected static string $resource = LicenseResource::class;
+    use HasRecords;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            CreateAction::make(),
-        ];
-    }
+    protected static string $resource = LicenseResource::class;
 }

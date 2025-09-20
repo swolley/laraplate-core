@@ -2,22 +2,17 @@
 
 namespace Modules\Core\Filament\Resources\Settings\Tables;
 
-use \Override;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
+use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
 
-class SettingsTable extends BaseTable
+class SettingsTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return Setting::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {
@@ -44,7 +39,6 @@ class SettingsTable extends BaseTable
                         ->searchable()
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('value')
-                        ->searchable()
                         ->alignCenter(),
                 ]);
             },

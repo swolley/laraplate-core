@@ -2,21 +2,15 @@
 
 namespace Modules\Core\Filament\Resources\Licenses\Tables;
 
-use \Override;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Modules\Core\Filament\Utils\BaseTable;
-use Modules\Core\Models\License;
+use Modules\Core\Filament\Utils\HasTable;
 
-class LicensesTable extends BaseTable
+class LicensesTable
 {
-    #[Override]
-    protected function getModel(): string
-    {
-        return License::class;
-    }
+    use HasTable;
 
     public static function configure(Table $table): Table
     {
