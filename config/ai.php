@@ -27,7 +27,7 @@ return [
             'model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
         ],
 
-        'sentence-transformers' => [
+        'sentence_transformers' => [
             'url' => env('SENTENCE_TRANSFORMERS_URL'),
             'api_key' => env('SENTENCE_TRANSFORMERS_API_KEY'),
         ],

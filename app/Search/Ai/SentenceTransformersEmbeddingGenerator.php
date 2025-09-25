@@ -27,8 +27,14 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
         $this->truncate = $config->truncate;
         $this->normalizeEmbeddings = $config->normalizeEmbeddings;
 
+        // Ensure URL has protocol
+        $url = $config->url;
+        if (!preg_match('/^https?:\/\//', $url)) {
+            $url = 'http://' . $url;
+        }
+
         $options = [
-            'base_uri' => $config->url,
+            'base_uri' => $url,
             'timeout' => $config->timeout,
             'connect_timeout' => $config->timeout,
             'read_timeout' => $config->timeout,
@@ -130,8 +136,17 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             }
 
             // Assign embeddings to documents in this batch
-            for ($i = 0; $i < count($batch); $i++) {
-                $batch[$i]->embedding = $searchResults['embeddings'][$i];
+            $embeddings = $searchResults['embeddings'];
+            $batchSize = count($batch);
+            $embeddingsCount = count($embeddings);
+
+            // Check if embeddings count matches batch size
+            if ($embeddingsCount !== $batchSize) {
+                throw new Exception("Embeddings count mismatch: expected {$batchSize}, got {$embeddingsCount}. Response: " . json_encode($searchResults));
+            }
+
+            for ($i = 0; $i < $batchSize; $i++) {
+                $batch[$i]->embedding = $embeddings[$i];
                 $processedDocuments[] = $batch[$i];
             }
         }

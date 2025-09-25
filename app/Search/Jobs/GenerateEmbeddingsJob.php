@@ -16,6 +16,7 @@ use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use JsonException;
 use LLPhant\Embeddings\Document;
 use LLPhant\Embeddings\DocumentSplitter\DocumentSplitter;
@@ -86,7 +87,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     public static function embedDocument(string $data): array
     {
         $document = new Document();
-        $document->content = $data;
+        $document->content = Str::of($data)->replaceMatches("/\n|\t/", ' ')->replaceMatches("/\s+/", ' ')->trim()->toString();
         $splitDocuments = DocumentSplitter::splitDocument($document);
         $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
 

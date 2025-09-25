@@ -53,11 +53,16 @@ trait Searchable
     public function queueMakeSearchable($models): void
     {
         if (config('scout.vector_search.enabled')) {
-            $engine = $this->searchableUsing();
-
             if (!is_iterable($models)) {
                 $models = collect([$models]);
             }
+
+            if (!config('scout.queue')) {
+                $this->syncMakeSearchable($models);
+                return;
+            }
+
+            $engine = $this->searchableUsing();
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
@@ -85,9 +90,14 @@ trait Searchable
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 foreach ($models as $model) {
-                    dispatch(new GenerateEmbeddingsJob($model)
-                        ->onQueue($model->syncWithSearchUsingQueue())
-                        ->onConnection($model->syncWithSearchUsing()));
+                    // If Scout queue is disabled, run embeddings job synchronously
+                    if (!config('scout.queue')) {
+                        (new GenerateEmbeddingsJob($model))->handle();
+                    } else {
+                        dispatch(new GenerateEmbeddingsJob($model)
+                            ->onQueue($model->syncWithSearchUsingQueue())
+                            ->onConnection($model->syncWithSearchUsing()));
+                    }
                 }
             }
         }
@@ -157,12 +167,7 @@ trait Searchable
      */
     public function getSearchMapping(): array
     {
-        $engine = $this->searchableUsing();
-
-        if ($engine instanceof ISearchEngine) {
-            return $engine->getSearchMapping($this);
-        }
-
+        // TODO: how to define mapping for generic models and if I don't know the mapping rules?
         return [];
     }
 

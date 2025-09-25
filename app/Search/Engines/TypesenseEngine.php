@@ -7,6 +7,7 @@ namespace Modules\Core\Search\Engines;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -48,13 +49,13 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         try {
             // Get mapping from the model
-            $schema = [];
+            // $schema = [];
 
-            if (method_exists($name, 'getSearchMapping')) {
-                $schema = $name->getSearchMapping();
-            } elseif (method_exists($name, 'toSearchableIndex')) {
-                $schema = $name->toSearchableIndex();
-            }
+            // if (method_exists($name, 'getSearchMapping')) {
+            $schema = $this->getSearchMapping($name);
+            // } elseif (method_exists($name, 'toSearchableIndex')) {
+            // $schema = $name->toSearchableIndex();
+            // }
 
             // Add collection name to schema
             $schema['name'] = $collection;
@@ -95,7 +96,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
                     $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+                    $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
                     $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {
@@ -264,29 +265,41 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      */
     public function getSearchMapping(Model $model): array
     {
-        if (method_exists($model, 'getSearchMapping')) {
-            return $model->getSearchMapping();
-        }
 
         // Default mapping for Typesense
         $mapping = [
             'name' => $model->searchableAs(),
             'fields' => [
-                ['name' => 'id', 'type' => 'string', 'index' => true],
-                ['name' => 'entity', 'type' => 'string', 'facet' => true],
-                ['name' => 'connection', 'type' => 'string', 'facet' => true],
-                ['name' => self::INDEXED_AT_FIELD, 'type' => 'string', 'sort' => true],
+                'id ' => ['name' => 'id', 'type' => 'string', 'index' => true],
+                'entity' => ['name' => 'entity', 'type' => 'string', 'facet' => true],
+                'connection' => ['name' => 'connection', 'type' => 'string', 'facet' => true],
+                self::INDEXED_AT_FIELD => ['name' => self::INDEXED_AT_FIELD, 'type' => 'string', 'sort' => true],
             ],
         ];
 
         // Add a vector field if needed
         if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
-            $mapping['fields'][] = [
+            $mapping['fields']['embedding'] = [
                 'name' => 'embedding',
                 'type' => 'float[]',
                 'embed' => true,
             ];
         }
+
+        if (method_exists($model, 'getSearchMapping')) {
+            $model_additional_mapping = $model->getSearchMapping();
+            $fields = isset($model_additional_mapping['fields']) ? $model_additional_mapping['fields'] : (Arr::isList($model_additional_mapping) ? $model_additional_mapping : []);
+
+            foreach ($fields as $field) {
+                if (array_key_exists($field['name'], $mapping['fields'])) {
+                    $mapping['fields'][$field['name']] = $field;
+                } else {
+                    $mapping['fields'][$field['name']] = $field;
+                }
+            }
+        }
+
+        $mapping['fields'] = array_values($mapping['fields']);
 
         return $mapping;
     }
@@ -436,7 +449,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     private function buildFilter(string $fieldName, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+            $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
 
             return "{$fieldName}:[{$values}]";
         }
