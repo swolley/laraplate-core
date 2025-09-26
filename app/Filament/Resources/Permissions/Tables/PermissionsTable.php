@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Permissions\Tables;
 
 use Filament\Tables\Columns\TextColumn;
@@ -17,7 +19,7 @@ class PermissionsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns) {
+            columns: function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -34,7 +36,7 @@ class PermissionsTable
                         ->searchable(),
                 ]);
             },
-            filters: function (Collection $default_filters) {
+            filters: function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('guard_name')
                         ->options(Permission::distinct('guard_name')->pluck('guard_name'))

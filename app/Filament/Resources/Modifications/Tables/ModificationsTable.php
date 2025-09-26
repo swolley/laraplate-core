@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Modifications\Tables;
 
 use Filament\Tables\Columns\TextColumn;
@@ -15,7 +17,7 @@ class ModificationsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns) {
+            columns: function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('modifiable_id')
                         ->numeric()

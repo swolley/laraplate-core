@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\ACLS\Schemas;
 
 use Filament\Forms\Components\KeyValue;

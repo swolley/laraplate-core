@@ -19,4 +19,6 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
      * Check if the engine supports vector search.
      */
     public function supportsVectorSearch(): bool;
+
+    public function createIndex($name, array $options = []): void;
 }

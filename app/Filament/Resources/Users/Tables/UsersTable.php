@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Users\Tables;
 
 use Filament\Actions\Action;
@@ -41,24 +43,24 @@ class UsersTable
 
                 return $default_columns;
             },
-            actions: function (Collection $default_actions) {
+            actions: function (Collection $default_actions): void {
                 $default_actions->unshift(
                     Action::make('resend_verification_email')
                         ->label('Resend Verification Email')
                         ->icon('heroicon-o-envelope')
-                        ->authorize(fn(User $record) => !$record->hasVerifiedEmail())
-                        ->action(function (User $record) {
+                        ->authorize(fn (User $record) => ! $record->hasVerifiedEmail())
+                        ->action(function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);
                             $record->notify($notification);
                             Notification::make()
-                                ->title("Verification email has been resent.")
+                                ->title('Verification email has been resent.')
                                 ->send();
                         })
-                        ->requiresConfirmation()
+                        ->requiresConfirmation(),
                 );
             },
-            filters: function (Collection $default_filters) {
+            filters: function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('roles')
                         ->relationship('roles', 'name')

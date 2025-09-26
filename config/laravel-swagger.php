@@ -54,6 +54,9 @@ return [
         'swagger.*',
         'password.reset',
         'horizon.*',
+        'livewire.*',
+        'filament.*',
+        'telescope.*',
     ],
 
     /*

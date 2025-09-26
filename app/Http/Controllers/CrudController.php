@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -69,7 +70,7 @@ class CrudController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api, crud_api])
+     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: ['GET', 'POST', 'HEAD'], middleware: ['api', 'crud_api'])
      * Route(path: 'app/crud/select/{entity}', name: 'core.crud.list', methods: [GET, POST, HEAD], middleware: [web])
      */
     public function list(ListRequest $request): Response
@@ -375,7 +376,7 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'restore', $model->getConnectionName());
             $key = $filters->primaryKey;
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             if ($operation === 'activate' && ! $found_record->restore()) {
@@ -536,11 +537,11 @@ class CrudController extends Controller
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_LOCKED);
-        } catch (UnexpectedValueException|BadMethodCallException $ex) {
+        } catch (UnexpectedValueException | BadMethodCallException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_BAD_REQUEST);
-        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
+        } catch (LogicException | AlreadyLockedException | CannotUnlockException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_NOT_MODIFIED);
@@ -679,7 +680,7 @@ class CrudController extends Controller
 
             /** @var string|array $key */
             $key = $model->getKeyName();
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             /** @var User $user */

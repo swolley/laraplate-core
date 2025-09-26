@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Roles\Tables;
 
 use Filament\Tables\Columns\TextColumn;
@@ -16,7 +18,7 @@ class RolesTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns) {
+            columns: function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -34,7 +36,7 @@ class RolesTable
                         ->toggleable(isToggledHiddenByDefault: true),
                 ]);
             },
-            filters: function (Collection $default_filters) {
+            filters: function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('permissions')
                         ->relationship('permissions', 'name')

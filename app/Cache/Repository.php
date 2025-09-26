@@ -19,6 +19,7 @@ final class Repository extends BaseRepository
     use HasCacheRepository;
 
     private int $maxRetries = 3;
+
     private int $retryDelay = 100; // milliseconds
 
     #[Override]

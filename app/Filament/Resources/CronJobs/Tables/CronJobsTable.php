@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\CronJobs\Tables;
 
 use Filament\Actions\Action;
@@ -20,11 +22,11 @@ final class CronJobsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns) {
+            columns: function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     ToggleColumn::make('is_active')
-                        ->toggleable()
-                        ->sortable()
+                        // ->toggleable()
+                        // ->sortable()
                         ->grow(false)
                         ->alignCenter(),
                     TextColumn::make('name')
@@ -46,7 +48,7 @@ final class CronJobsTable
                             return sprintf(
                                 'Last run: %s<br>Next run: %s',
                                 $record->last_run_at?->format('Y-m-d H:i:s'),
-                                $record->next_run_at?->format('Y-m-d H:i:s')
+                                $record->next_run_at?->format('Y-m-d H:i:s'),
                             );
                         })
                         ->toggleable(isToggledHiddenByDefault: true)
@@ -54,13 +56,13 @@ final class CronJobsTable
                         ->html(),
                 ]);
             },
-            actions: function (Collection $default_actions) {
+            actions: function (Collection $default_actions): void {
                 $default_actions->unshift(Action::make('run')
                     ->icon('heroicon-o-play')
-                    ->action(fn(CronJob $record) => $record->run())
+                    ->action(fn (CronJob $record) => $record->run())
                     ->requiresConfirmation());
             },
-            filters: function (Collection $default_filters) {
+            filters: function (Collection $default_filters): void {
                 $default_filters->unshift(
                     TernaryFilter::make('is_active')
                         ->label('Active')

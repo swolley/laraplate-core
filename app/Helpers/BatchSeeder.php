@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use ErrorException;
 use function Laravel\Prompts\progress;
+
+use ErrorException;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -117,6 +118,7 @@ abstract class BatchSeeder extends Seeder
             $force_kill_all_batches = $e;
             $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
             $progress->render();
+
             exit(1);
         };
 
@@ -124,7 +126,7 @@ abstract class BatchSeeder extends Seeder
             $remaining = max(0, $count_to_create - $created - count($concurrencies) * $batchSize);
             $batchSize = min(self::BATCHSIZE, $remaining);
 
-            $concurrencies[] = fn() => $this->executeBatch($modelClass, $entity_name, $batch, $batchSize, $current_count, $count_to_create, $created, $remaining, $progress, true, $propagate_exception);
+            $concurrencies[] = fn () => $this->executeBatch($modelClass, $entity_name, $batch, $batchSize, $current_count, $count_to_create, $created, $remaining, $progress, true, $propagate_exception);
             $batch++;
 
             if ($maxParallelCount <= count($concurrencies)) {
@@ -198,7 +200,6 @@ abstract class BatchSeeder extends Seeder
         $connections = [
             'database' => new $modelClass()->getConnectionName() ?? config('database.default'),
             'cache' => $this->getCacheConnectionName($modelClass),
-
         ];
 
         while (! $success && $retry_count < self::MAX_RETRIES) {
@@ -210,6 +211,7 @@ abstract class BatchSeeder extends Seeder
 
                 $model_instance = new $modelClass();
                 $model_instance->setConnection($connections['database']);
+
                 if ($this->isSearchable($modelClass)) {
                     $model_instance->setCacheConnection($connections['cache']);
                 }
@@ -229,26 +231,28 @@ abstract class BatchSeeder extends Seeder
 
                 $progress->hint('');
                 $progress->advance($batchSize);
-            } catch (QueryException | ErrorException $e) {
+            } catch (QueryException|ErrorException $e) {
                 $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
                 if ($force_kill_batches) {
                     $force_kill_batches($e);
+
                     return;
-                } else {
-                    throw $e;
                 }
+
+                throw $e;
             } catch (ValidationException $e) {
                 $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
                 if ($force_kill_batches) {
                     $force_kill_batches($e);
+
                     return;
-                } else {
-                    throw $e;
                 }
+
+                throw $e;
             } catch (Throwable $e) {
                 $retry_count++;
 
@@ -260,10 +264,11 @@ abstract class BatchSeeder extends Seeder
 
                     if ($force_kill_batches) {
                         $force_kill_batches($e);
+
                         return;
-                    } else {
-                        throw $e;
                     }
+
+                    throw $e;
                 }
 
                 if ($asyncMode) {
@@ -286,29 +291,30 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Setup fresh connections for async operations
+     * Setup fresh connections for async operations.
+     *
      * @return list{database:string,cache:string}
      */
     private function setupAsyncConnections(string $modelClass, string $db_connection_name, string $cache_connection_name): array
     {
         return [
             'database' => $this->setupAsyncDatabaseConnection($db_connection_name),
-            'cache' => $this->setupAsyncCacheConnection($cache_connection_name)
+            'cache' => $this->setupAsyncCacheConnection($cache_connection_name),
         ];
     }
 
     /**
-     * Setup a fresh database connection for async operations
+     * Setup a fresh database connection for async operations.
      */
     private function setupAsyncDatabaseConnection(string $connection_name): string
     {
         // Disable prepared statements for better async performance
-        config(["database.connections.$connection_name.prepared_statements" => false]);
+        config(["database.connections.{$connection_name}.prepared_statements" => false]);
 
         // Create a new connection with unique name
         $tmp_connection_name = 'async_db_' . uniqid();
         config([
-            "database.connections.{$tmp_connection_name}" => config("database.connections.$connection_name")
+            "database.connections.{$tmp_connection_name}" => config("database.connections.{$connection_name}"),
         ]);
 
         // Set the new connection as default
@@ -320,7 +326,7 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Setup a fresh Redis connection for async operations
+     * Setup a fresh Redis connection for async operations.
      */
     private function setupAsyncCacheConnection(string $cache_connection_name): string
     {
@@ -330,7 +336,7 @@ abstract class BatchSeeder extends Seeder
 
         // Copy the default Redis configuration
         config([
-            "cache.stores.{$tmp_cache_connection_name}" => $cache_config
+            "cache.stores.{$tmp_cache_connection_name}" => $cache_config,
         ]);
 
         // Clear and reconnect Redis
@@ -345,7 +351,7 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Reset all connections for async operations
+     * Reset all connections for async operations.
      */
     private function resetAsyncConnections(string $db_connection_name, string $cache_connection_name): void
     {
@@ -357,7 +363,7 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Reset the database connection for async operations
+     * Reset the database connection for async operations.
      */
     private function resetAsyncDatabaseConnection(string $connection_name): void
     {
@@ -370,7 +376,7 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Reset the Redis connection for async operations
+     * Reset the Redis connection for async operations.
      */
     private function resetAsyncCacheConnection(string $connection_name): void
     {

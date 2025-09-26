@@ -1,11 +1,21 @@
 #!/bin/bash
 
-# Directory of the script
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-MODULE_DIR="$(dirname "$SCRIPT_DIR")"
-GIT_FILE="$MODULE_DIR/.git"
 ICON_CHECKMARK="\033[32m✓\033[0m"
 ICON_CROSS="\033[31m✗\033[0m"
+
+# Directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+APP_DIR="$(dirname "$SCRIPT_DIR")"
+GIT_DIR="$APP_DIR/.git"
+if [ ! -f "$GIT_DIR" ]; then
+    # echo ".git directory not found checking parent directory"
+    GIT_DIR="$(dirname "$APP_DIR")/.git"
+    
+    if [ ! -f "$GIT_DIR" || ! -f "$GIT_DIR/../.gitmodules" ]; then
+        echo -e "$ICON_CROSS $APP_DIR is neither a git repository nor a git submodule, aborting"
+        exit 1
+    fi
+fi
 
 # Function to convert relative path to absolute path
 # Arguments:
@@ -24,36 +34,25 @@ get_absolute_path() {
     fi
 }
 
-# Check if this is a git submodule
-if [ -f "$GIT_FILE" ]; then
-    echo "Found submodule in $MODULE_DIR"
-    # Read the gitdir from the .git file
-    GIT_DIR=$(cat "$GIT_FILE" | cut -d' ' -f2)
-    # Convert relative path to absolute if needed
-    if [[ "$GIT_DIR" == gitdir:* ]]; then
-        GIT_DIR="${GIT_DIR#gitdir:}"
-    fi
-    if [[ "$GIT_DIR" != /* ]]; then
-        GIT_DIR="$MODULE_DIR/$GIT_DIR"
-    fi
-else
-    echo "Installing git hooks in $MODULE_DIR"
-    # Regular git repository
-    GIT_DIR="$MODULE_DIR/.git"
-fi
+echo "Installing git hooks in $APP_DIR"
 
 HOOKS_DIR=$(get_absolute_path "$GIT_DIR/hooks")
+if [ ! -d "$HOOKS_DIR" ]; then
+    mkdir -p "$HOOKS_DIR"
+fi
+
 
 # Make all hook scripts executable
 chmod +x "$SCRIPT_DIR"/*.sh
+chmod +x "$SCRIPT_DIR"/hooks/*
 
 # Check if hooks directory exists and contains files
 if [ ! -d "$SCRIPT_DIR/hooks" ] || [ -z "$(ls -A "$SCRIPT_DIR/hooks")" ]; then
-    echo "    No hooks found"
+    echo -e "   $ICON_CROSS No hooks found"
 else
     # Create symlinks for each hook
     for hook in "$SCRIPT_DIR"/hooks/*; do
-        hook_name=$(basename "$hook" .sh)
+        hook_name=$(basename "$hook")
         if [ "$hook_name" != "install" ]; then
             if [ -L "$HOOKS_DIR/$hook_name" ] && [ "$(readlink "$HOOKS_DIR/$hook_name")" = "$hook" ]; then
                 echo -e "    $ICON_CHECKMARK Hook already set: $hook_name"

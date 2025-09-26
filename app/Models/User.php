@@ -54,10 +54,10 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         Notifiable,
         SoftDeletes,
         TwoFactorAuthenticatable {
-        getRules as protected getRulesTrait;
-        roles as protected rolesTrait;
-        HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
-    }
+            getRules as protected getRulesTrait;
+            roles as protected rolesTrait;
+            HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
+        }
 
     /**
      * The attributes that are mass assignable.
@@ -236,13 +236,13 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.superadmin')));
+        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
     #[Scope]
     protected static function admin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn($query) => $query->where('name', config('permission.roles.admin')));
+        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
     }
 
     /**

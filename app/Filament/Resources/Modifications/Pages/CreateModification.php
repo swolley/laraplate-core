@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Modifications\Pages;
 
 use Filament\Resources\Pages\CreateRecord;

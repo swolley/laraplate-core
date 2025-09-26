@@ -90,7 +90,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(fn() => Password::min(8)
+        Password::defaults(fn () => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -130,7 +130,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if the user is super admin
-        Gate::before(fn(?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -269,7 +269,7 @@ final class CoreServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->singleton(Locked::class, fn(): Locked => new Locked());
+        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -393,7 +393,8 @@ final class CoreServiceProvider extends ServiceProvider
         // Override the CacheManager to return our custom Repository
         $this->app->extend('cache', function ($cacheManager, Application $app) {
             // Create a custom CacheManager that returns our Repository
-            return new class($app) extends CacheManager {
+            return new class($app) extends CacheManager
+            {
                 public function repository(Store $store, array $config = []): Repository
                 {
                     return new Repository($store, $config);
@@ -404,7 +405,7 @@ final class CoreServiceProvider extends ServiceProvider
         // Override the cache.store binding to ensure it uses our Repository
         $this->app->extend('cache.store', function ($service, Application $app): Repository {
             // Get the underlying store
-            /** @var \Illuminate\Contracts\Cache\Store $store */
+            /** @var Store $store */
             $store = $app->get('cache')->driver()->getStore();
 
             // Get the cache configuration
@@ -423,33 +424,33 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->extend('cache.memo', function ($service, Application $app): Repository {
             $driver = $app->get('config')->get('cache.default');
 
-            if (!$app->bound($bindingKey = "cache.__memoized:{$driver}")) {
+            if (! $app->bound($bindingKey = "cache.__memoized:{$driver}")) {
                 $store = $app->get('cache')->driver($driver)->getStore();
                 $config = $app->get('config')->get('cache.stores.' . $driver);
 
                 $repository = new Repository(
                     new MemoizedStore($driver, $store),
-                    $config
+                    $config,
                 );
                 $repository->setEventDispatcher($app->get('events'));
 
-                $app->scoped($bindingKey, fn() => $repository);
+                $app->scoped($bindingKey, fn () => $repository);
             }
 
             return $app->make($bindingKey);
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn($app) => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn($app) => $app['cache.store']);
-        $this->app->bind(Repository::class, fn($app) => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(Repository::class, fn ($app) => $app['cache.store']);
 
         // Register macros
-        Cache::macro('tryByRequest', fn(...$args) => app('cache.store')->tryByRequest(...$args));
-        Cache::macro('clearByEntity', fn(...$args) => app('cache.store')->clearByEntity(...$args));
-        Cache::macro('clearByRequest', fn(...$args) => app('cache.store')->clearByRequest(...$args));
-        Cache::macro('clearByUser', fn(...$args) => app('cache.store')->clearByUser(...$args));
-        Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
+        Cache::macro('tryByRequest', fn (...$args) => app('cache.store')->tryByRequest(...$args));
+        Cache::macro('clearByEntity', fn (...$args) => app('cache.store')->clearByEntity(...$args));
+        Cache::macro('clearByRequest', fn (...$args) => app('cache.store')->clearByRequest(...$args));
+        Cache::macro('clearByUser', fn (...$args) => app('cache.store')->clearByUser(...$args));
+        Cache::macro('clearByGroup', fn (...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array
@@ -458,7 +459,7 @@ final class CoreServiceProvider extends ServiceProvider
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }

@@ -29,7 +29,8 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
         // Ensure URL has protocol
         $url = $config->url;
-        if (!preg_match('/^https?:\/\//', $url)) {
+
+        if (! preg_match('/^https?:\/\//', $url)) {
             $url = 'http://' . $url;
         }
 

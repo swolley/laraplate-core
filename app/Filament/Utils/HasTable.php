@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Utils;
 
 use Filament\Actions\Action;
@@ -40,21 +42,21 @@ use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\User;
+use Modules\Core\Search\Traits\Searchable;
 use PHPUnit\Event\InvalidArgumentException;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
 trait HasTable
 {
     /**
-     * 
-     * @param ?callable(Collection<string,Column> $columns):void $columns 
-     * @param ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void $actions 
-     * @param ?callable(Collection<string,Filter> $default_filters):void $filters 
-     * 
-     * @throws LogicException 
-     * @throws BindingResolutionException 
-     * @throws InvalidArgumentException 
-     * @throws GlobalInvalidArgumentException 
+     * @param  ?callable(Collection<string,Column> $columns):void  $columns
+     * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
+     * @param  ?callable(Collection<string,Filter> $default_filters):void  $filters
+     *
+     * @throws LogicException
+     * @throws BindingResolutionException
+     * @throws InvalidArgumentException
+     * @throws GlobalInvalidArgumentException
      */
     protected static function configureTable(Table $table, ?callable $columns = null, ?callable $actions = null, array $fixedActions = [], ?callable $filters = null): Table
     {
@@ -65,14 +67,15 @@ trait HasTable
         $model_instance = new $model();
         $model_table = $model_instance->getTable();
         $model_connection = $model_instance->getConnectionName() ?? 'default';
-        $permissions_prefix = "$model_connection.$model_table";
+        $permissions_prefix = "{$model_connection}.{$model_table}";
 
         $traits = class_uses_recursive($model);
-        $has_soft_deletes = in_array(SoftDeletes::class, $traits) || in_array(BaseSoftDeletes::class, $traits);
-        $has_validity = in_array(HasValidity::class, $traits);
-        $has_locks = in_array(HasLocks::class, $traits);
-        $has_sorts = in_array(SortableTrait::class, $traits) || in_array(BaseSortableTrait::class, $traits);
-        $has_dynamic_contents = in_array(HasDynamicContents::class, $traits);
+        $has_soft_deletes = in_array(SoftDeletes::class, $traits, true) || in_array(BaseSoftDeletes::class, $traits, true);
+        $has_validity = in_array(HasValidity::class, $traits, true);
+        $has_locks = in_array(HasLocks::class, $traits, true);
+        $has_sorts = in_array(SortableTrait::class, $traits, true) || in_array(BaseSortableTrait::class, $traits, true);
+        $has_dynamic_contents = in_array(HasDynamicContents::class, $traits, true);
+        $has_searchable = in_array(Searchable::class, $traits, true);
 
         if ($has_soft_deletes) {
             $table->recordClasses(function ($record) {
@@ -91,18 +94,19 @@ trait HasTable
             $has_sorts,
             $has_dynamic_contents,
             $columns,
-            $model_instance
+            $model_instance,
         );
 
         self::configureActions(
             $table,
             $has_soft_deletes,
             $has_validity,
+            $has_searchable,
             $actions,
             $fixedActions,
             $permissions_prefix,
             $user,
-            $model_instance
+            $model_instance,
         );
 
         self::configureFilters(
@@ -114,7 +118,7 @@ trait HasTable
             $filters,
             $model_instance,
             $permissions_prefix,
-            $user
+            $user,
         );
 
         if ($has_sorts) {
@@ -150,8 +154,8 @@ trait HasTable
         bool $hasSorts,
         bool $hasDynamicContents,
         ?callable $columns,
-        Model $model_instance
-    ) {
+        Model $model_instance,
+    ): void {
         /** @var Collection<Column> $default_columns */
         $default_columns = collect([]);
 
@@ -192,12 +196,12 @@ trait HasTable
                             </div>
                         </div>',
                             $record->{$record->validFromKey()}?->format('Y-m-d H:i:s'),
-                            $record->{$record->validToKey()}?->format('Y-m-d H:i:s')
+                            $record->{$record->validToKey()}?->format('Y-m-d H:i:s'),
                         );
                     })
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
-                    ->html()
+                    ->html(),
             );
         }
 
@@ -209,11 +213,12 @@ trait HasTable
                     ->trueIcon('heroicon-o-lock-closed')
                     ->tooltip(
                         function (Model $record) {
-                            if (!$record->isLocked()) {
+                            if (! $record->isLocked()) {
                                 return null;
                             }
 
                             $locked_at = $record->{$record->getLockedAtColumn()};
+
                             if ($locked_at instanceof Carbon) {
                                 $locked_at = $locked_at->format('Y-m-d H:i:s');
                             }
@@ -221,9 +226,9 @@ trait HasTable
                             $locked_by = $record->{$record->getLockedByColumn()};
 
                             return sprintf('Locked at %s by User #%s', $locked_at, $locked_by);
-                        }
+                        },
                     )
-                    ->falseIcon(false)
+                    ->falseIcon(false),
             );
         }
 
@@ -235,7 +240,7 @@ trait HasTable
                     ->sortable()
                     ->grow(false)
                     ->alignRight()
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->toggleable(isToggledHiddenByDefault: true),
             );
         }
 
@@ -243,8 +248,8 @@ trait HasTable
             $default_columns->add(
                 TextColumn::make('timestamps')
                     ->formatStateUsing(function (Model $record) use ($hasSoftDeletes) {
-                        $string =
-                            '<div class="space-y-1">
+                        $string
+                            = '<div class="space-y-1">
                             <div class="flex justify-between">
                                 <span>Created:</span>
                                 <span>%s</span>
@@ -255,11 +260,12 @@ trait HasTable
                             </div>';
                         $values = [
                             $record->{$record->getCreatedAtColumn() ?? 'created_at'}->format('Y-m-d H:i:s'),
-                            $record->{$record->getUpdatedAtColumn() ?? 'updated_at'}->format('Y-m-d H:i:s')
+                            $record->{$record->getUpdatedAtColumn() ?? 'updated_at'}->format('Y-m-d H:i:s'),
                         ];
+
                         if ($hasSoftDeletes) {
-                            $string .=
-                                '<div class="flex justify-between">
+                            $string
+                                .= '<div class="flex justify-between">
                                 <span>Deleted:</span>
                                 <span>%s</span>
                             </div>';
@@ -271,7 +277,7 @@ trait HasTable
                     })
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->grow(false)
-                    ->html()
+                    ->html(),
             );
         }
 
@@ -281,15 +287,16 @@ trait HasTable
 
         $default_columns->keyBy(fn(Column $column) => $column->getName());
         $primary_key = $model_instance->getKeyName();
-        if (!$default_columns->offsetExists($primary_key)) {
+
+        if (! $default_columns->offsetExists($primary_key)) {
             $default_columns->unshift(
                 TextColumn::make('id')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->toggleable(isToggledHiddenByDefault: true),
             );
         }
-        $default_columns->each(function (Column $column) {
+        $default_columns->each(function (Column $column): void {
             if ($column->isSearchable()) {
                 $column->searchable(isIndividual: true);
             }
@@ -301,15 +308,17 @@ trait HasTable
         Table $table,
         bool $hasSoftDeletes,
         bool $hasValidity,
+        bool $hasSearchable,
         ?callable $actions,
         array $fixedActions,
         string $permissionsPrefix,
-        User $user
-    ) {
+        User $user,
+    ): void {
         /** @var Collection<Action> $default_actions */
         $default_actions = collect([
             ViewAction::make()->hiddenLabel(),
         ]);
+
         /** @var Collection<BulkAction> $default_bulk_actions */
         $default_bulk_actions = collect([]);
 
@@ -318,7 +327,7 @@ trait HasTable
                 Action::make('publish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedPlay)
-                    ->action(function (Model $record) {
+                    ->action(function (Model $record): void {
                         $valid_from_column = $record::validFromKey();
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_from_column => now(), $valid_to_column => null]);
@@ -332,59 +341,78 @@ trait HasTable
                     ->icon(Heroicon::OutlinedStop)
                     ->color(fn(Model $record) => $record->isDraft() ? 'gray' : 'warning')
                     ->disabled(fn(Model $record) => $record->isDraft())
-                    ->action(function (Model $record) {
+                    ->action(function (Model $record): void {
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_to_column => now()]);
                         $record->refresh();
                     })
-                    ->requiresConfirmation()
+                    ->requiresConfirmation(),
             );
         }
 
-        if ($user->can("$permissionsPrefix.update")) {
+        if ($hasSearchable) {
+            $default_actions->add(
+                Action::make('reindex')
+                    ->hiddenLabel()
+                    ->icon(Heroicon::ArrowPath)
+                    ->action(function (Model $record): void {
+                        $record->reindex();
+                    }),
+            );
+            $default_bulk_actions->add(
+                BulkAction::make('reindex')
+                    ->icon(Heroicon::ArrowPath)
+                    ->action(function (Collection $records): void {
+                        $records->each(fn(Model $record) => $record->reindex());
+                    }),
+            );
+        }
+
+        if ($user->can("{$permissionsPrefix}.update")) {
             $default_actions->add(
                 EditAction::make()
-                    ->hiddenLabel()
+                    ->hiddenLabel(),
             );
         }
 
         if ($hasSoftDeletes) {
-            if ($user->can("$permissionsPrefix.restore")) {
+            if ($user->can("{$permissionsPrefix}.restore")) {
                 $default_actions->add(
                     RestoreAction::make()
-                        ->hiddenLabel()
+                        ->hiddenLabel(),
                 );
                 $default_bulk_actions->add(
                     RestoreBulkAction::make()
-                        ->deselectRecordsAfterCompletion()
+                        ->deselectRecordsAfterCompletion(),
                 );
             }
-            if ($user->can("$permissionsPrefix.delete")) {
+
+            if ($user->can("{$permissionsPrefix}.delete")) {
                 $default_actions->add(
                     DeleteAction::make()
                         ->icon(Heroicon::OutlinedEyeSlash)
-                        ->hiddenLabel()
+                        ->hiddenLabel(),
                 );
                 $default_bulk_actions->add(
                     DeleteBulkAction::make()
                         ->icon(Heroicon::OutlinedEyeSlash)
-                        ->deselectRecordsAfterCompletion()
+                        ->deselectRecordsAfterCompletion(),
                 );
             }
         }
 
-        if ($user->can("$permissionsPrefix.forceDelete")) {
+        if ($user->can("{$permissionsPrefix}.forceDelete")) {
             $default_actions->add(
                 ForceDeleteAction::make()
                     ->visible(true)
                     ->requiresConfirmation()
-                    ->hiddenLabel()
+                    ->hiddenLabel(),
             );
             $default_bulk_actions->add(
                 ForceDeleteBulkAction::make()
                     ->visible(true)
                     ->requiresConfirmation()
-                    ->deselectRecordsAfterCompletion()
+                    ->deselectRecordsAfterCompletion(),
             );
         }
 
@@ -395,13 +423,15 @@ trait HasTable
         $fixed_actions_list = [];
         $grouped_actions_list = [];
         $default_actions->keyBy(fn(Action $action) => $action->getName());
+
         foreach ($default_actions as $name => $action) {
-            if ($fixedActions !== [] && in_array($name, $fixedActions)) {
+            if ($fixedActions !== [] && in_array($name, $fixedActions, true)) {
                 $fixed_actions_list[] = $action;
             } else {
                 $grouped_actions_list[] = $action;
             }
         }
+
         if ($grouped_actions_list !== []) {
             $fixed_actions_list[] = ActionGroup::make($grouped_actions_list);
         }
@@ -423,19 +453,20 @@ trait HasTable
         ?callable $filters,
         Model $model_instance,
         string $permissionsPrefix,
-        User $user
-    ) {
+        User $user,
+    ): void {
         $default_filters = collect([]);
 
         if ($hasDynamicContents) {
             $entity_type = EntityType::tryFrom($model_instance->getTable());
+
             if ($entity_type) {
                 $default_filters->add(
                     SelectFilter::make('preset')
                         ->label('Preset')
                         ->multiple()
                         ->options(function () use ($entity_type) {
-                            return \Modules\Cms\Models\Preset::query()
+                            return Preset::query()
                                 ->join('entities', 'presets.entity_id', '=', 'entities.id')
                                 ->where('presets.is_active', true)
                                 ->whereHas('entity', fn(Builder $query) => $query->where([
@@ -452,7 +483,7 @@ trait HasTable
                         ->query(function (Builder $query, array $data): Builder {
                             return $query->when(
                                 $data['values'],
-                                fn(Builder $query, $values): Builder => $query->whereIn('preset_id', $values)
+                                fn(Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
                             );
                         }),
                 );
@@ -460,7 +491,7 @@ trait HasTable
         }
 
         // FILTERS
-        if ($hasSoftDeletes && $user->can("$permissionsPrefix.restore")) {
+        if ($hasSoftDeletes && $user->can("{$permissionsPrefix}.restore")) {
             $deleted_at_column = $model_instance->getDeletedAtColumn();
             $default_filters->push(
                 // TrashedFilter::make(),
@@ -492,6 +523,7 @@ trait HasTable
                     }),
             );
         }
+
         if ($hasLocks) {
             $locked_at_column = $model_instance->getLockedAtColumn();
             $default_filters->push(
@@ -527,6 +559,7 @@ trait HasTable
                     }),
             );
         }
+
         if ($hasValidity) {
             $default_filters->add(
                 SelectFilter::make('is_valid')
@@ -608,6 +641,6 @@ trait HasTable
             $filters($default_filters);
         }
 
-        $table->filters($default_filters->all()/*, layout: FiltersLayout::Modal*/);
+        $table->filters($default_filters->all()/* , layout: FiltersLayout::Modal */);
     }
 }

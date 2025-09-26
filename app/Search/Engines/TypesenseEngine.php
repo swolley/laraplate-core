@@ -96,7 +96,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
                     $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
                     $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {
@@ -265,7 +265,6 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      */
     public function getSearchMapping(Model $model): array
     {
-
         // Default mapping for Typesense
         $mapping = [
             'name' => $model->searchableAs(),
@@ -288,7 +287,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         if (method_exists($model, 'getSearchMapping')) {
             $model_additional_mapping = $model->getSearchMapping();
-            $fields = isset($model_additional_mapping['fields']) ? $model_additional_mapping['fields'] : (Arr::isList($model_additional_mapping) ? $model_additional_mapping : []);
+            $fields = $model_additional_mapping['fields'] ?? (Arr::isList($model_additional_mapping) ? $model_additional_mapping : []);
 
             foreach ($fields as $field) {
                 if (array_key_exists($field['name'], $mapping['fields'])) {
@@ -449,7 +448,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     private function buildFilter(string $fieldName, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+            $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
 
             return "{$fieldName}:[{$values}]";
         }

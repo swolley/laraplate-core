@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Scout\Scout;
+use Modules\Core\Inspector\Entities\Column;
+use Modules\Core\Inspector\Inspect;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
@@ -32,6 +34,14 @@ trait Searchable
 
     private ?string $cacheConnection = null;
 
+    /**
+     * Reindex all records of this model.
+     */
+    public static function reindex(?int $chunk = null): void
+    {
+        static::makeAllSearchable($chunk);
+    }
+
     public function setCacheConnection(string $connection): void
     {
         $this->cacheConnection = $connection;
@@ -42,23 +52,16 @@ trait Searchable
         return $this->cacheConnection;
     }
 
-    /**
-     * Reindex all records of this model.
-     */
-    public static function reindex(?int $chunk = null): void
-    {
-        static::makeAllSearchable($chunk);
-    }
-
     public function queueMakeSearchable($models): void
     {
         if (config('scout.vector_search.enabled')) {
-            if (!is_iterable($models)) {
+            if (! is_iterable($models)) {
                 $models = collect([$models]);
             }
 
-            if (!config('scout.queue')) {
+            if (! config('scout.queue')) {
                 $this->syncMakeSearchable($models);
+
                 return;
             }
 
@@ -84,14 +87,14 @@ trait Searchable
         if (config('scout.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
-            if (!is_iterable($models)) {
+            if (! is_iterable($models)) {
                 $models = collect([$models]);
             }
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 foreach ($models as $model) {
                     // If Scout queue is disabled, run embeddings job synchronously
-                    if (!config('scout.queue')) {
+                    if (! config('scout.queue')) {
                         (new GenerateEmbeddingsJob($model))->handle();
                     } else {
                         dispatch(new GenerateEmbeddingsJob($model)
@@ -167,8 +170,14 @@ trait Searchable
      */
     public function getSearchMapping(): array
     {
-        // TODO: how to define mapping for generic models and if I don't know the mapping rules?
-        return [];
+        $table = Inspect::table($this->getTable());
+
+        return $table->columns->map(function (Column $column) {
+            return [
+                'name' => $column->name,
+                'type' => $column->type->value,
+            ];
+        })->toArray();
     }
 
     /**
@@ -184,7 +193,7 @@ trait Searchable
 
         if (method_exists($engine, 'createIndex')) {
             // Use Scout's native method if available.
-            if (! method_exists($engine, 'indexExists') || ! $engine->indexExists($this)) {
+            if (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this)) {
                 $engine->createIndex($this);
 
                 return true;

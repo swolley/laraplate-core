@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Filament\Resources\Permissions\Schemas;
 
 use Filament\Forms\Components\TextInput;
