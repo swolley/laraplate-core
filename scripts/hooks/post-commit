@@ -3,6 +3,13 @@
 # Directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Check if this commit is a version bump commit
+commit_message=$(git log -1 --pretty=%B)
+if [[ "$commit_message" =~ ^(chore: bump version|chore: update changelog) ]]; then
+    echo "Skipping version script - this is a version bump commit"
+    exit 0
+fi
+
 # Try to find the version script in different possible locations
 VERSION_SCRIPT=""
 
