@@ -6,6 +6,7 @@ namespace Modules\Core\Search\Schema;
 
 use InvalidArgumentException;
 use Modules\Core\Search\Contracts\ISchemaTranslator;
+use Modules\Core\Search\Schema\Translators\DatabaseTranslator;
 use Modules\Core\Search\Schema\Translators\ElasticsearchTranslator;
 use Modules\Core\Search\Schema\Translators\TypesenseTranslator;
 
@@ -44,5 +45,6 @@ class SchemaManager
     {
         $this->registerTranslator(new ElasticsearchTranslator());
         $this->registerTranslator(new TypesenseTranslator());
+        $this->registerTranslator(new DatabaseTranslator());
     }
 }

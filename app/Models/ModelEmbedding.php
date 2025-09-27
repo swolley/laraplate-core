@@ -13,6 +13,15 @@ use Override;
  */
 final class ModelEmbedding extends Model
 {
+    protected $connection {
+        get {
+            return config('search.embedding_model_connection');
+        }
+        set {
+            $this->connection = $value;
+        }
+    }
+
     /**
      * The attributes that are mass assignable.
      */

@@ -12,8 +12,6 @@ use Illuminate\Database\Eloquent\Model;
  */
 interface ISearchable
 {
-    public const string INDEXED_AT_FIELD = '_indexed_at';
-
     /**
      * Sync documents modified after the last indexing.
      *

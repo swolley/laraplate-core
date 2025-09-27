@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Scout\Scout;
-use Modules\Core\Inspector\Entities\Column;
-use Modules\Core\Inspector\Inspect;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
+use Modules\Core\Search\Schema\FieldDefinition;
+use Modules\Core\Search\Schema\FieldType;
+use Modules\Core\Search\Schema\SchemaDefinition;
+use Modules\Core\Search\Schema\SchemaManager;
 
 /**
  * Extended searchable trait that supports multiple engines
@@ -170,14 +173,36 @@ trait Searchable
      */
     public function getSearchMapping(): array
     {
-        $table = Inspect::table($this->getTable());
+        $schema = new SchemaDefinition($this->getTable());
+        // $table = Inspect::table($this->getTable());
 
-        return $table->columns->map(function (Column $column) {
-            return [
-                'name' => $column->name,
-                'type' => $column->type->value,
-            ];
-        })->toArray();
+        // $table->columns->each(function (Column $column) use ($schema) {
+        //     $schema->addField(new FieldDefinition($column->name, FieldType::fromDoctrine($column->type)));
+        // });
+
+        $document = $this->toSearchableArray();
+        foreach ($document as $key => $value) {
+            if ($key === 'embedding') {
+                $schema->addField(new FieldDefinition($key, FieldType::VECTOR));
+            } else {
+                $schema->addField(new FieldDefinition($key, FieldType::fromValue($value)));
+            }
+        }
+
+        // Get the current engine and translate
+        $engine = $this->searchableUsing();
+        if ($engine instanceof \Elastic\ScoutDriver\Engine)
+            $engineName = 'elasticsearch';
+        else if ($engine instanceof \Laravel\Scout\Engines\TypesenseEngine) {
+            $engineName = 'typesense';
+        } else if ($engine instanceof \Laravel\Scout\Engines\DatabaseEngine) {
+            $engineName = 'database';
+        } else {
+            throw new Exception('Unsupported engine ' . $engine::class);
+        }
+
+        $schemaManager = app(SchemaManager::class);
+        return $schemaManager->translateForEngine($schema, $engineName);
     }
 
     /**

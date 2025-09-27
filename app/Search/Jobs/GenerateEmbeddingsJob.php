@@ -140,7 +140,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
             $embeddedDocuments = self::embedDocument($data);
 
             foreach ($embeddedDocuments as $embeddedDocument) {
-                $this->model->embeddings()->create(['embedding' => $embeddedDocument]);
+                $this->model->embeddings()->create(['embedding' => $embeddedDocument->embedding]);
             }
         } catch (Exception $e) {
             Log::error('Embedding generation failed for model: ' . $this->model::class, [

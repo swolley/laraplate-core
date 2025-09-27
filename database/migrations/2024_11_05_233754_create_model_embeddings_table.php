@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
+use Modules\Core\Models\ModelEmbedding;
 
 return new class extends Migration
 {
@@ -14,15 +16,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('model_embeddings', function (Blueprint $table): void {
+        $connection = new ModelEmbedding()->getConnection();
+        $driver = $connection->getDriverName();
+
+        Schema::connection($connection)->create('model_embeddings', function (Blueprint $table) use ($driver): void {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
-            $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
+            if ($driver === 'pgsql') {
+                $table->vector('embedding', 1536)->nullable(false)->comment('The generated embedding of the model'); // 1536 dimensions for OpenAI
+            } else {
+                $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
+            }
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
             );
         });
+
+        if ($driver === 'pgsql') {
+            DB::connection($connection)->statement('CREATE INDEX idx_model_embeddings_embedding ON model_embeddings USING ivfflat (embedding vector_cosine_ops);');
+        }
     }
 
     /**
@@ -30,6 +43,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        $connection = new ModelEmbedding()->getConnection();
+
+        Schema::connection($connection)->dropIfExists('model_embeddings');
         Schema::dropIfExists('model_embeddings');
     }
 };

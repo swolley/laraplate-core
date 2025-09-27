@@ -14,6 +14,7 @@ use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
 use Override;
 use stdClass;
@@ -23,6 +24,8 @@ use stdClass;
  */
 final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISearchEngine
 {
+    use CommonEngineFunctions;
+
     //    public array $config;
 
     #[Override]
@@ -545,74 +548,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         return $mapping;
     }
 
-    #[Override]
-    public function prepareDataToEmbed(Model $model): ?string
-    {
-        if (! method_exists($model, 'prepareDataToEmbed')) {
-            return null;
-        }
-
-        return $model->prepareDataToEmbed();
-    }
-
-    #[Override]
-    public function ensureSearchable(Model $model): void
-    {
-        if (! $this->usesSearchableTrait($model)) {
-            throw new InvalidArgumentException('Model ' . get_class($model) . ' does not implement the Searchable trait');
-        }
-    }
-
-    #[Override]
-    /**
-     * @throws \Http\Client\Exception
-     * @throws Exception
-     */
-    public function ensureIndex(Model $model): bool
-    {
-        $this->ensureSearchable($model);
-
-        if (! $this->checkIndex($model)) {
-            /** @var Model|Searchable $model */
-            $this->createIndex($model);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @throws \Http\Client\Exception
-     */
-    #[Override]
-    public function getLastIndexedTimestamp(Model $model): ?string
-    {
-        $this->ensureIndex($model);
-
-        try {
-            /** @var Model&Searchable $model */
-            return $model::search('*')
-                ->where('entity', $model->getTable())
-                ->orderBy(self::INDEXED_AT_FIELD, 'desc')
-                ->take(1)
-                ->get()
-                ->first()
-                ?->{self::INDEXED_AT_FIELD};
-        } catch (Exception $e) {
-            Log::error('Error getting last indexed timestamp from Elasticsearch', [
-                'index' => $model->searchableAs(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-    }
-
-    #[Override]
     /**
      * @param  Model&Searchable  $model
      */
+    #[Override]
     public function checkIndex(Model $model): bool
     {
         try {
@@ -620,22 +559,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         } catch (Exception) {
             return false;
         }
-    }
-
-    /**
-     * Check if model uses the Searchable trait.
-     */
-    protected function usesSearchableTrait(Model $model): bool
-    {
-        return in_array(Searchable::class, class_uses_recursive($model), true);
-    }
-
-    private function isVectorSearch(Builder $builder): bool
-    {
-        // Check if the builder contains parameters for vector search.
-        return isset($builder->wheres['vector'])
-            || isset($builder->wheres['embedding'])
-            || method_exists($builder->model, 'getVectorField');
     }
 
     private function performVectorSearch(Builder $builder): mixed
@@ -692,20 +615,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             })
             ->take($builder->limit ?: 10)
             ->get();
-    }
-
-    private function extractVectorFromBuilder(Builder $builder): array
-    {
-        // Find the vector in the builder parameters.
-        if (isset($builder->wheres['vector'])) {
-            return $builder->wheres['vector'];
-        }
-
-        if (isset($builder->wheres['embedding'])) {
-            return $builder->wheres['embedding'];
-        }
-
-        return [];
     }
 
     //    /**
