@@ -82,7 +82,7 @@
             "@test:types",
             "@test:refactor"
         ],
-        "version": "v1.20.0",
+        "version": "./scripts/version.sh --nointeractive",
         "version:silent": "./scripts/version.sh --silent --nointeractive",
         "version:major": "./scripts/version.sh major",
         "version:minor": "./scripts/version.sh minor",
