@@ -10,11 +10,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Scout\Scout;
+use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
+use Modules\Core\Search\Schema\IndexType;
 use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\Search\Schema\SchemaManager;
 
@@ -125,6 +128,14 @@ trait Searchable
             self::$indexedAtField => now()->utc()->toIso8601ZuluString(),
         ];
 
+        if (class_uses_trait($this, HasValidity::class)) {
+            $array['valid_from'] = $this->{HasValidity::validFromKey()};
+            $array['valid_to'] = $this->{HasValidity::validToKey()};
+        }
+        if (class_uses_trait($this, SoftDeletes::class)) {
+            $array['is_deleted'] = $this->is_deleted;
+        }
+
         // Add embeddings if available
         if (config('scout.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
@@ -167,25 +178,32 @@ trait Searchable
         return $this->morphMany(ModelEmbedding::class, 'model');
     }
 
+    private function getSchemaDefinition(): SchemaDefinition
+    {
+        return new SchemaDefinition($this->getTable());
+    }
+
     /**
      * Get field mapping for search engine
      * Convert generic field definitions to the format required by the current search engine.
      */
-    public function getSearchMapping(): array
+    public function getSearchMapping(?SchemaDefinition $schema = null): array
     {
-        $schema = new SchemaDefinition($this->getTable());
-        // $table = Inspect::table($this->getTable());
+        if (! $schema) {
+            $schema = $this->getSchemaDefinition();
+            // $table = Inspect::table($this->getTable());
 
-        // $table->columns->each(function (Column $column) use ($schema) {
-        //     $schema->addField(new FieldDefinition($column->name, FieldType::fromDoctrine($column->type)));
-        // });
+            // $table->columns->each(function (Column $column) use ($schema) {
+            //     $schema->addField(new FieldDefinition($column->name, FieldType::fromDoctrine($column->type)));
+            // });
 
-        $document = $this->toSearchableArray();
-        foreach ($document as $key => $value) {
-            if ($key === 'embedding') {
-                $schema->addField(new FieldDefinition($key, FieldType::VECTOR));
-            } else {
-                $schema->addField(new FieldDefinition($key, FieldType::fromValue($value)));
+            $document = $this->toSearchableArray();
+            foreach ($document as $key => $value) {
+                if ($key === 'embedding') {
+                    $schema->addField(new FieldDefinition($key, FieldType::VECTOR, [IndexType::SEARCHABLE, IndexType::VECTOR]));
+                } else {
+                    $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::SEARCHABLE]));
+                }
             }
         }
 

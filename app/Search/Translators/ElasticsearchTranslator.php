@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Search\Schema\Translators;
+namespace Modules\Core\Search\Translators;
 
 use Modules\Core\Search\Contracts\ISchemaTranslator;
 use Modules\Core\Search\Schema\FieldDefinition;
@@ -52,8 +52,15 @@ class ElasticsearchTranslator implements ISchemaTranslator
                 'type' => 'boolean',
             ],
             FieldType::DATE => [
+                // dates and randge operations
                 'type' => 'date',
                 'format' => $field->options['format'] ?? 'strict_date_optional_time||epoch_millis',
+                // equals operations and sorts
+                "fields" => [
+                    "keyword" => [
+                        "type" => FieldType::KEYWORD
+                    ],
+                ],
             ],
             FieldType::VECTOR => [
                 'type' => 'dense_vector',
@@ -68,7 +75,16 @@ class ElasticsearchTranslator implements ISchemaTranslator
                 'type' => 'object',
                 'properties' => $field->options['properties'] ?? [],
             ],
+            FieldType::GEOCODE => [
+                'type' => 'geo_point',
+                'lat_lon' => true,
+            ],
         };
+
+        if ($field->type === FieldType::ARRAY && isset($field->options['properties'])) {
+            $esField['type'] = 'nested';
+            $esField['properties'] = $field->options['properties'];
+        }
 
         // Add index-specific options
         if ($field->hasIndexType(IndexType::SORTABLE)) {

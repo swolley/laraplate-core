@@ -28,6 +28,7 @@ use Doctrine\DBAL\Types\TextType;
 use Doctrine\DBAL\Types\TimeImmutableType;
 use Doctrine\DBAL\Types\TimeType;
 use Doctrine\DBAL\Types\Type as DoctrineType;
+use MatanYadaev\EloquentSpatial\Doctrine\GeometryType;
 
 enum DoctrineTypeEnum: string
 {
@@ -55,6 +56,7 @@ enum DoctrineTypeEnum: string
     case TIME = 'time';
     case TIME_IMMUTABLE = 'time_immutable';
     case UNKNOWN = 'unknown';
+    case GEOMETRY = 'geometry';
 
     public static function fromDoctrine(DoctrineType|self $type): self
     {
@@ -70,7 +72,7 @@ enum DoctrineTypeEnum: string
         return self::tryFrom($type) ?: self::UNKNOWN;
     }
 
-    private static function fromDoctrineType(DoctrineType $type): self
+    private static function fromDoctrineType(DoctrineType|GeometryType $type): self
     {
         /**
          * This variable exists only so PHPStan
@@ -106,6 +108,7 @@ enum DoctrineTypeEnum: string
             TextType::class => self::TEXT,
             TimeType::class => self::TIME,
             TimeImmutableType::class => self::TIME_IMMUTABLE,
+            GeometryType::class => self::GEOMETRY,
             default => self::UNKNOWN,
         };
     }

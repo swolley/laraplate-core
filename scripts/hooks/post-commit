@@ -14,7 +14,7 @@ fi
 VERSION_SCRIPT=""
 
 # Method 1: Try relative to git hooks directory (for submodules)
-if [ -f "$SCRIPT_DIR/../../scripts/version.sh" ]; then
+if [ -f "$SCRIPT_DIR/../../../../../Modules/Cms/scripts/version.sh" ]; then
     VERSION_SCRIPT="$SCRIPT_DIR/../../scripts/version.sh"
 # Method 2: Try relative to git directory (for standalone repos)
 elif [ -f "$SCRIPT_DIR/../scripts/version.sh" ]; then

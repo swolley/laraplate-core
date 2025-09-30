@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Search\Schema\Translators;
+namespace Modules\Core\Search\Translators;
 
 use Modules\Core\Search\Contracts\ISchemaTranslator;
 use Modules\Core\Search\Schema\FieldDefinition;
@@ -67,8 +67,8 @@ class TypesenseTranslator implements ISchemaTranslator
             FieldType::BOOLEAN => 'bool',
             FieldType::DATE => 'string', // Typesense uses string for dates
             FieldType::VECTOR => 'float[]',
-            FieldType::ARRAY => 'string[]',
-            FieldType::OBJECT => 'object',
+            FieldType::ARRAY => isset($type->options['properties']) ? 'object[]' : 'string[]',
+            FieldType::OBJECT, FieldType::GEOCODE => 'object',
         };
     }
 }

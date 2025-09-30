@@ -6,9 +6,9 @@ namespace Modules\Core\Search\Schema;
 
 use InvalidArgumentException;
 use Modules\Core\Search\Contracts\ISchemaTranslator;
-use Modules\Core\Search\Schema\Translators\DatabaseTranslator;
-use Modules\Core\Search\Schema\Translators\ElasticsearchTranslator;
-use Modules\Core\Search\Schema\Translators\TypesenseTranslator;
+use Modules\Core\Search\Translators\DatabaseTranslator;
+use Modules\Core\Search\Translators\ElasticsearchTranslator;
+use Modules\Core\Search\Translators\TypesenseTranslator;
 
 class SchemaManager
 {

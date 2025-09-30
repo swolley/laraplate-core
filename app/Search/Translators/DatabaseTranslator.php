@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Search\Schema\Translators;
+namespace Modules\Core\Search\Translators;
 
 use Modules\Core\Search\Contracts\ISchemaTranslator;
 use Modules\Core\Search\Schema\FieldDefinition;
