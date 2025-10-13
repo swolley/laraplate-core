@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Pages;
 
 use BackedEnum;
-use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
 use UnitEnum;
 
 class CacheHealth extends Page
 {
-    protected string $view = 'core::filament.pages.cache';
+    // protected string $view = 'core::filament.pages.cache';
 
-    protected static ?string $navigationLabel = 'Cache';
+    protected static ?string $navigationLabel = 'Caches';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
@@ -29,7 +29,9 @@ class CacheHealth extends Page
      */
     public function getWidgets(): array
     {
-        return Filament::getWidgets();
+        return [
+            SearchEngineHealthTableWidget::class,
+        ];
     }
 
     /**

@@ -407,4 +407,22 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     //
     //        return $response['grouped_hits'] ?? [];
     //    }
+
+    #[Override]
+    public function health(): array
+    {
+        $health = $this->typesense->health->retrieve();
+        $metrics = $this->typesense->metrics->retrieve();
+        return [
+            'status' => $health['ok'] ? 'success' : 'danger',
+            'metrics' => $metrics,
+        ];
+    }
+
+    #[Override]
+    public function stats(): array
+    {
+        $collections = $this->typesense->collections->retrieve();
+        return $collections;
+    }
 }

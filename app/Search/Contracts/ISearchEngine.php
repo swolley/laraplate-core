@@ -21,4 +21,10 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
     public function supportsVectorSearch(): bool;
 
     public function createIndex($name, array $options = []): void;
+
+    public function health(): array;
+
+    public function stats(): array;
+
+    public function getName(): string;
 }

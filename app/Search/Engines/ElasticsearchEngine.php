@@ -16,6 +16,7 @@ use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\ElasticsearchService;
 use Override;
 use stdClass;
 
@@ -661,4 +662,23 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     //        }
     //        return false;
     //    }
+
+    #[Override]
+    public function health(): array
+    {
+        $health = ElasticsearchService::getInstance()->client->cluster()->health();
+        //TODO: stats or state('metrics') ???
+        $metrics = ElasticsearchService::getInstance()->client->cluster()->stats();
+        return [
+            'status' => $health->asArray()['status'] ?? 'danger',
+            'metrics' => $metrics->asArray(),
+        ];
+    }
+
+    #[Override]
+    public function stats(): array
+    {
+        $health = ElasticsearchService::getInstance()->client->cluster()->health();
+        return $health->asArray();
+    }
 }

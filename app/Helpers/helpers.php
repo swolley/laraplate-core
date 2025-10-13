@@ -39,14 +39,14 @@ if (! function_exists('modules')) {
 
         if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn(string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, fn(Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
-        $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
+        $remapped_modules = $fullpath ? array_map(fn(Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
 
         if ($showMainApp && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) {
             if ($fullpath) {
@@ -123,7 +123,7 @@ if (! function_exists('translations')) {
         $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
         $langs_subpath = config('modules.paths.generator.lang.path');
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath ? $app_languages : array_map(fn(string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
@@ -307,7 +307,7 @@ if (! function_exists('routes')) {
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = app('router')->getRoutes()->getRoutes();
-        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
+        usort($all_routes, fn(Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
@@ -388,10 +388,13 @@ if (! function_exists('class_uses_trait')) {
      *
      * @param  string|object  $class  The class to check
      * @param  string  $uses  The trait to check for
+     * @param  bool  $recursive  Check if the trait is used in the class or its parents
      */
-    function class_uses_trait(string|object $class, string $uses): bool
+    function class_uses_trait(string|object $class, string $uses, bool $recursive = true): bool
     {
-        return in_array($uses, class_uses_recursive(is_string($class) ? $class : $class::class), true);
+        $class = is_string($class) ? $class : $class::class;
+        $traits = $recursive ? class_uses_recursive($class) : class_uses($class);
+        return in_array($uses, $traits, true);
     }
 }
 

@@ -7,6 +7,7 @@ namespace Modules\Core\Search\Traits;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Typesense\Override;
@@ -21,6 +22,11 @@ trait CommonEngineFunctions
      * @throws \Http\Client\Exception
      */
     abstract public function checkIndex(Model $model): bool;
+
+    public function getName(): string
+    {
+        return Str::of(static::class)->afterLast('\\')->replace('Engine', '')->toString();
+    }
 
     public function isVectorSearch(Builder $builder): bool
     {
