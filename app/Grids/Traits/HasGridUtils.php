@@ -32,7 +32,7 @@ trait HasGridUtils
         $allMethods = new ReflectionClass($class)->getMethods(ReflectionMethod::IS_PUBLIC);
         $methods = array_filter(
             $allMethods,
-            fn ($method): bool => $method->isUserDefined()
+            fn (ReflectionMethod $method): bool => $method->isUserDefined()
                 && $method->hasReturnType() && (
                     $method->getReturnType()->__toString() === Relation::class
                     || is_subclass_of($method->getReturnType()->__toString(), Relation::class)
@@ -110,9 +110,7 @@ trait HasGridUtils
             return false;
         }
 
-        if (count($relationships) > 1) {
-            throw new Exception('Too many relationships found for the same model');
-        }
+        throw_if(count($relationships) > 1, Exception::class, 'Too many relationships found for the same model');
 
         return head($relationships);
     }
@@ -373,15 +371,12 @@ trait HasGridUtils
 
             if ($ref->hasProperty('foreignKey')) {
                 $p = $ref->getProperty('foreignKey');
-                $p->setAccessible(true);
                 $foreign = $p->getValue($methodReturn);
             } elseif ($ref->hasProperty('parentKey')) {
                 $p = $ref->getProperty('parentKey');
-                $p->setAccessible(true);
                 $foreign = $p->getValue($methodReturn);
             } elseif ($ref->hasProperty('secondLocalKey')) {
                 $p = $ref->getProperty('secondLocalKey');
-                $p->setAccessible(true);
                 $foreign = $p->getValue($methodReturn);
             }
 
@@ -397,27 +392,21 @@ trait HasGridUtils
 
             if ($ref->hasProperty('foreignPivotKey')) {
                 $t = $ref->getProperty('table');
-                $t->setAccessible(true);
                 $pivot_table = $t->getValue($methodReturn);
 
                 $p = $ref->getProperty('foreignPivotKey');
-                $p->setAccessible(true);
                 $pivot_foreign = $p->getValue($methodReturn);
 
                 $p = $ref->getProperty('relatedPivotKey');
-                $p->setAccessible(true);
                 $pivot_owner = $p->getValue($methodReturn);
             } elseif ($ref->hasProperty('secondKey')) {
                 $t = $ref->getProperty('throughParent');
-                $t->setAccessible(true);
                 $pivot_table = $t->getValue($methodReturn)->getTable();
 
                 $p = $ref->getProperty('secondKey');
-                $p->setAccessible(true);
                 $pivot_foreign = $p->getValue($methodReturn);
 
                 $p = $ref->getProperty('firstKey');
-                $p->setAccessible(true);
                 $pivot_owner = $p->getValue($methodReturn);
             }
 
@@ -426,15 +415,12 @@ trait HasGridUtils
 
             if ($ref->hasProperty('relatedKey')) {
                 $p = $ref->getProperty('relatedKey');
-                $p->setAccessible(true);
                 $owner = $p->getValue($methodReturn);
             } elseif ($ref->hasProperty('ownerKey')) {
                 $p = $ref->getProperty('ownerKey');
-                $p->setAccessible(true);
                 $owner = $p->getValue($methodReturn);
             } elseif ($ref->hasProperty('localKey')) {
                 $p = $ref->getProperty('localKey');
-                $p->setAccessible(true);
                 $owner = $p->getValue($methodReturn);
             }
 

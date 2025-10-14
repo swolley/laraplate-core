@@ -58,7 +58,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     }
 
     #[Override]
-    public function getExistenceCompareKey(): array|string|Expression
+    public function getExistenceCompareKey(): string|array
     {
         if (is_array($this->foreignPivotKey)) {
             return array_map(fn ($key): string => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
@@ -150,7 +150,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
         $keys = [];
 
         foreach ($models as $model) {
-            $keys[] = is_array($key) ? array_map(fn ($k) => $model->{$k}, $key) : $model->{$key};
+            $keys[] = is_array($key) ? array_map(fn (string $k) => $model->{$k}, $key) : $model->{$key};
         }
         $keys = array_unique($keys, SORT_REGULAR);
         sort($keys);

@@ -22,9 +22,6 @@ final class ModuleDocRoute extends Route
         $class = new ReflectionClass($this);
         $parent = $class->getParentClass();
         $property = $parent->getProperty('route');
-
-        /** @psalm-suppress UnusedMethodCall */
-        $property->setAccessible(true);
         $this->reflectedRoute = $property->getValue($this);
     }
 
@@ -37,7 +34,7 @@ final class ModuleDocRoute extends Route
     {
         $name = $this->name();
 
-        if ($name === null || $name === '' || $name === '0') {
+        if (in_array($name, [null, '', '0'], true)) {
             return '';
         }
         $exploded = explode('.', $name);
