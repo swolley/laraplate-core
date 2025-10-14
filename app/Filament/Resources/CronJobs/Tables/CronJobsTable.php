@@ -44,13 +44,11 @@ final class CronJobsTable
                         ->grow(false)
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('runs')
-                        ->formatStateUsing(function (CronJob $record) {
-                            return sprintf(
-                                'Last run: %s<br>Next run: %s',
-                                $record->last_run_at?->format('Y-m-d H:i:s'),
-                                $record->next_run_at?->format('Y-m-d H:i:s'),
-                            );
-                        })
+                        ->formatStateUsing(fn (CronJob $record): string => sprintf(
+                            'Last run: %s<br>Next run: %s',
+                            $record->last_run_at?->format('Y-m-d H:i:s'),
+                            $record->next_run_at?->format('Y-m-d H:i:s'),
+                        ))
                         ->toggleable(isToggledHiddenByDefault: true)
                         ->grow(false)
                         ->html(),

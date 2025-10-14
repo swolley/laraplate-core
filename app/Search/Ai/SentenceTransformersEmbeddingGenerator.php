@@ -30,7 +30,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
         // Ensure URL has protocol
         $url = $config->url;
 
-        if (! preg_match('/^https?:\/\//', $url)) {
+        if (in_array(preg_match('/^https?:\/\//', $url), [0, false], true)) {
             $url = 'http://' . $url;
         }
 
@@ -41,7 +41,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             'read_timeout' => $config->timeout,
         ];
 
-        if (! empty($config->apiKey)) {
+        if ($config->apiKey !== null && $config->apiKey !== '' && $config->apiKey !== '0') {
             $options['headers'] = ['Authorization' => 'Bearer ' . $config->apiKey];
         }
 
@@ -71,13 +71,9 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
         $searchResults = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-        if (! is_array($searchResults)) {
-            throw new Exception("Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
-        }
+        throw_unless(is_array($searchResults), Exception::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
 
-        if (! isset($searchResults['embeddings'])) {
-            throw new Exception("Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
-        }
+        throw_unless(isset($searchResults['embeddings']), Exception::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
 
         return $searchResults['embeddings'][0];
     }
@@ -101,9 +97,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
      */
     public function embedDocuments(array $documents): array
     {
-        if ($this->batch_size_limit <= 0) {
-            throw new Exception('Batch size limit must be greater than 0.');
-        }
+        throw_if($this->batch_size_limit <= 0, Exception::class, 'Batch size limit must be greater than 0.');
 
         // Process documents in batches
         $batches = array_chunk($documents, $this->batch_size_limit);
@@ -128,13 +122,9 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
             $searchResults = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-            if (! is_array($searchResults)) {
-                throw new Exception("Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
-            }
+            throw_unless(is_array($searchResults), Exception::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
 
-            if (! isset($searchResults['embeddings'])) {
-                throw new Exception("Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
-            }
+            throw_unless(isset($searchResults['embeddings']), Exception::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
 
             // Assign embeddings to documents in this batch
             $embeddings = $searchResults['embeddings'];
@@ -142,9 +132,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             $embeddingsCount = count($embeddings);
 
             // Check if embeddings count matches batch size
-            if ($embeddingsCount !== $batchSize) {
-                throw new Exception("Embeddings count mismatch: expected {$batchSize}, got {$embeddingsCount}. Response: " . json_encode($searchResults));
-            }
+            throw_if($embeddingsCount !== $batchSize, Exception::class, "Embeddings count mismatch: expected {$batchSize}, got {$embeddingsCount}. Response: " . json_encode($searchResults));
 
             for ($i = 0; $i < $batchSize; $i++) {
                 $batch[$i]->embedding = $embeddings[$i];

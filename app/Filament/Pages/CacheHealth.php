@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Pages;
 
 use BackedEnum;
+use Deprecated;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
@@ -35,10 +36,9 @@ final class CacheHealth extends Page
     }
 
     /**
-     * @deprecated Use `getWidgetsSchemaComponents($this->getWidgets())` to transform widgets into schema components instead, which also filters their visibility.
-     *
      * @return array<class-string<Widget> | WidgetConfiguration>
      */
+    #[Deprecated(message: 'Use `getWidgetsSchemaComponents($this->getWidgets())` to transform widgets into schema components instead, which also filters their visibility.')]
     public function getVisibleWidgets(): array
     {
         return $this->filterVisibleWidgets($this->getWidgets());

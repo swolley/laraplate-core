@@ -23,7 +23,7 @@ final class UsersTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns) {
+            columns: function (Collection $default_columns): Collection {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -48,7 +48,7 @@ final class UsersTable
                     Action::make('resend_verification_email')
                         ->label('Resend Verification Email')
                         ->icon('heroicon-o-envelope')
-                        ->authorize(fn(User $record) => ! $record->hasVerifiedEmail())
+                        ->authorize(fn (User $record): bool => ! $record->hasVerifiedEmail())
                         ->action(function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);

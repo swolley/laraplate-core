@@ -15,9 +15,7 @@ final class EnsureIsSuperAdmin
      */
     public function handle(Request $request, Closure $next)
     {
-        if (! Auth::check() || Auth::user()->isSuperAdmin()) {
-            abort(401, 'Unauthorized');
-        }
+        abort_if(! Auth::check() || Auth::user()->isSuperAdmin(), 401, 'Unauthorized');
 
         return $next($request);
     }

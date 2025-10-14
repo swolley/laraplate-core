@@ -225,12 +225,6 @@ final class PermissionsRefreshCommand extends Command
 
     private function checkIfBlacklisted(string $model): bool
     {
-        foreach (self::$MODELS_BLACKLIST as $blacklisted) {
-            if ($model === $blacklisted || is_subclass_of($model, $blacklisted)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::$MODELS_BLACKLIST, fn ($blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
     }
 }

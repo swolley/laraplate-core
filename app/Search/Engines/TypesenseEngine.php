@@ -8,7 +8,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
@@ -97,7 +97,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
                     $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
+                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
                     $filterStrings[] = "{$field}:[{$values}]";
                 }
             } else {
@@ -113,7 +113,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     #[Override]
     public function reindex(string $modelClass): void
     {
-        ReindexSearchJob::dispatch($modelClass);
+        dispatch(new ReindexSearchJob($modelClass));
     }
 
     #[Override]
@@ -139,7 +139,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         if ($id !== null && $id !== 0) {
             $query->where('id', $id);
         } elseif ($from !== null && $from !== '' && $from !== '0') {
-            $query->where('updated_at', '>', Carbon::parse($from));
+            $query->where('updated_at', '>', Date::parse($from));
         } else {
             $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
 
@@ -291,11 +291,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             $fields = $model_additional_mapping['fields'] ?? (Arr::isList($model_additional_mapping) ? $model_additional_mapping : []);
 
             foreach ($fields as $field) {
-                if (array_key_exists($field['name'], $mapping['fields'])) {
-                    $mapping['fields'][$field['name']] = $field;
-                } else {
-                    $mapping['fields'][$field['name']] = $field;
-                }
+                $mapping['fields'][$field['name']] = $field;
             }
         }
 
@@ -321,64 +317,6 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         } catch (Exception) {
             return false;
         }
-    }
-
-    /**
-     * @throws \Http\Client\Exception
-     * @throws TypesenseClientError
-     */
-    private function performVectorSearch(Builder $builder): mixed
-    {
-        /** @var Model&Searchable $model */
-        $model = $builder->model;
-        $collection = $model->searchableAs();
-
-        // Extract the vector from the builder
-        $vector = $this->extractVectorFromBuilder($builder);
-
-        $searchParams = [
-            'q' => $builder->query ?: '*',
-            'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
-            'per_page' => $builder->limit ?: 10,
-        ];
-
-        // Add filters if any are present
-        if (! empty($builder->wheres)) {
-            $filters = $this->buildFiltersFromBuilder($builder);
-
-            if ($filters) {
-                $searchParams['filter_by'] = $filters;
-            }
-        }
-
-        return $this->typesense->collections[$collection]->documents->search($searchParams);
-    }
-
-    private function buildFilter(string $fieldName, mixed $value): string
-    {
-        if (is_array($value)) {
-            $values = implode(',', array_map(fn($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
-
-            return "{$fieldName}:[{$values}]";
-        }
-        $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
-
-        return "{$fieldName}:={$formattedValue}";
-    }
-
-    private function buildFiltersFromBuilder(Builder $builder): string
-    {
-        $filters = [];
-
-        foreach ($builder->wheres as $field => $value) {
-            if ($field === 'vector' || $field === 'embedding') {
-                continue; // Skip vector fields
-            }
-
-            $filters[] = $this->buildFilter($field, $value);
-        }
-
-        return implode(' && ', $filters);
     }
 
     //    /**
@@ -413,6 +351,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     {
         $health = $this->typesense->health->retrieve();
         $metrics = $this->typesense->metrics->retrieve();
+
         return [
             'status' => $health['ok'] ? 'success' : 'danger',
             'metrics' => $metrics,
@@ -422,7 +361,64 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     #[Override]
     public function stats(): array
     {
-        $collections = $this->typesense->collections->retrieve();
-        return $collections;
+        return $this->typesense->collections->retrieve();
+    }
+
+    /**
+     * @throws \Http\Client\Exception
+     * @throws TypesenseClientError
+     */
+    private function performVectorSearch(Builder $builder): mixed
+    {
+        /** @var Model&Searchable $model */
+        $model = $builder->model;
+        $collection = $model->searchableAs();
+
+        // Extract the vector from the builder
+        $vector = $this->extractVectorFromBuilder($builder);
+
+        $searchParams = [
+            'q' => $builder->query ?: '*',
+            'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
+            'per_page' => $builder->limit ?: 10,
+        ];
+
+        // Add filters if any are present
+        if (! empty($builder->wheres)) {
+            $filters = $this->buildFiltersFromBuilder($builder);
+
+            if ($filters !== '') {
+                $searchParams['filter_by'] = $filters;
+            }
+        }
+
+        return $this->typesense->collections[$collection]->documents->search($searchParams);
+    }
+
+    private function buildFilter(string $fieldName, mixed $value): string
+    {
+        if (is_array($value)) {
+            $values = implode(',', array_map(fn ($val): mixed => is_string($val) ? "\"{$val}\"" : $val, $value));
+
+            return "{$fieldName}:[{$values}]";
+        }
+        $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
+
+        return "{$fieldName}:={$formattedValue}";
+    }
+
+    private function buildFiltersFromBuilder(Builder $builder): string
+    {
+        $filters = [];
+
+        foreach ($builder->wheres as $field => $value) {
+            if ($field === 'vector' || $field === 'embedding') {
+                continue; // Skip vector fields
+            }
+
+            $filters[] = $this->buildFilter($field, $value);
+        }
+
+        return implode(' && ', $filters);
     }
 }

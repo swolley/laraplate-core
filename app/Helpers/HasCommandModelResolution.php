@@ -68,7 +68,7 @@ trait HasCommandModelResolution
     /**
      * @param  array<string>  $all_models
      */
-    private function askForUserInput(string $optionName, array $all_models): ?string
+    private function askForUserInput(string $optionName, array $all_models): string
     {
         return select(
             label: "What is the {$optionName}?",

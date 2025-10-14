@@ -136,9 +136,7 @@ class ResponseBuilder
      */
     public function setStatus(int $status): self
     {
-        if (! in_array($status, self::getHttpStatuses(), true)) {
-            throw new UnexpectedValueException("{$status} is not a valid status");
-        }
+        throw_unless(in_array($status, self::getHttpStatuses(), true), UnexpectedValueException::class, "{$status} is not a valid status");
         $this->status = $status;
 
         return $this;

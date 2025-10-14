@@ -8,7 +8,7 @@ use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
@@ -152,7 +152,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     #[Override]
     public function reindex(string $modelClass): void
     {
-        ReindexSearchJob::dispatch($modelClass);
+        dispatch(new ReindexSearchJob($modelClass));
     }
 
     #[Override]
@@ -164,13 +164,9 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
-        if (! class_exists($modelClass)) {
-            throw new InvalidArgumentException("Class {$modelClass} does not exist");
-        }
+        throw_unless(class_exists($modelClass), InvalidArgumentException::class, "Class {$modelClass} does not exist");
 
-        if (! $this->usesSearchableTrait(new $modelClass())) {
-            throw new InvalidArgumentException("Model {$modelClass} does not implement the Searchable trait");
-        }
+        throw_unless($this->usesSearchableTrait(new $modelClass()), InvalidArgumentException::class, "Model {$modelClass} does not implement the Searchable trait");
 
         $query = $modelClass::query();
 
@@ -183,7 +179,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if ($id !== null && $id !== 0) {
             $query->where('id', $id);
         } elseif ($from !== null && $from !== '' && $from !== '0') {
-            $query->where('updated_at', '>', Carbon::parse($from));
+            $query->where('updated_at', '>', Date::parse($from));
         } else {
             $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
 
@@ -562,62 +558,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
     }
 
-    private function performVectorSearch(Builder $builder): mixed
-    {
-        /** @var Model&Searchable $model */
-        $model = $builder->model;
-
-        // Extract the vector from the builder
-        $vector = $this->extractVectorFromBuilder($builder);
-
-        // Build the vector search query
-        //        $query = [
-        //            'script_score' => [
-        //                'query' => ['match_all' => new stdClass()],
-        //                'script' => [
-        //                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-        //                    'params' => ['query_vector' => $vector],
-        //                ],
-        //            ],
-        //        ];
-
-        // Add filters if any are present
-        //        if (! empty($builder->wheres)) {
-        //            $filters = $this->buildFiltersFromBuilder($builder);
-        //
-        //            if ($filters) {
-        //                $query = [
-        //                    'bool' => [
-        //                        'must' => $filters,
-        //                        'should' => [$query],
-        //                        'minimum_should_match' => 1,
-        //                    ],
-        //                ];
-        //            }
-        //        }
-
-        // Execute the search query
-        return $builder
-            ->query(function ($query) use ($vector) {
-                return [
-                    'bool' => [
-                        'must' => $query,
-                        'should' => [
-                            'script_score' => [
-                                'query' => ['match_all' => new stdClass()],
-                                'script' => [
-                                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                                    'params' => ['query_vector' => $vector],
-                                ],
-                            ],
-                        ],
-                    ],
-                ];
-            })
-            ->take($builder->limit ?: 10)
-            ->get();
-    }
-
     //    /**
     //     * @throws ClientResponseException
     //     * @throws ServerResponseException
@@ -667,8 +607,9 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     public function health(): array
     {
         $health = ElasticsearchService::getInstance()->client->cluster()->health();
-        //TODO: stats or state('metrics') ???
+        // TODO: stats or state('metrics') ???
         $metrics = ElasticsearchService::getInstance()->client->cluster()->stats();
+
         return [
             'status' => $health->asArray()['status'] ?? 'danger',
             'metrics' => $metrics->asArray(),
@@ -679,6 +620,58 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     public function stats(): array
     {
         $health = ElasticsearchService::getInstance()->client->cluster()->health();
+
         return $health->asArray();
+    }
+
+    private function performVectorSearch(Builder $builder): mixed
+    {
+        // Extract the vector from the builder
+        $vector = $this->extractVectorFromBuilder($builder);
+
+        // Build the vector search query
+        //        $query = [
+        //            'script_score' => [
+        //                'query' => ['match_all' => new stdClass()],
+        //                'script' => [
+        //                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+        //                    'params' => ['query_vector' => $vector],
+        //                ],
+        //            ],
+        //        ];
+
+        // Add filters if any are present
+        //        if (! empty($builder->wheres)) {
+        //            $filters = $this->buildFiltersFromBuilder($builder);
+        //
+        //            if ($filters) {
+        //                $query = [
+        //                    'bool' => [
+        //                        'must' => $filters,
+        //                        'should' => [$query],
+        //                        'minimum_should_match' => 1,
+        //                    ],
+        //                ];
+        //            }
+        //        }
+
+        // Execute the search query
+        return $builder
+            ->query(fn ($query): array => [
+                'bool' => [
+                    'must' => $query,
+                    'should' => [
+                        'script_score' => [
+                            'query' => ['match_all' => new stdClass()],
+                            'script' => [
+                                'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                                'params' => ['query_vector' => $vector],
+                            ],
+                        ],
+                    ],
+                ],
+            ])
+            ->take($builder->limit ?: 10)
+            ->get();
     }
 }

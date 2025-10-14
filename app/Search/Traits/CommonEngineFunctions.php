@@ -35,7 +35,6 @@ trait CommonEngineFunctions
             || method_exists($builder->model, 'getVectorField');
     }
 
-
     #[Override]
     public function prepareDataToEmbed(Model $model): ?string
     {
@@ -68,9 +67,7 @@ trait CommonEngineFunctions
     #[Override]
     public function ensureSearchable(Model $model): void
     {
-        if (! $this->usesSearchableTrait($model)) {
-            throw new InvalidArgumentException('Model ' . get_class($model) . ' does not implement the Searchable trait');
-        }
+        throw_unless($this->usesSearchableTrait($model), InvalidArgumentException::class, 'Model ' . $model::class . ' does not implement the Searchable trait');
     }
 
     /**
@@ -108,7 +105,6 @@ trait CommonEngineFunctions
         return in_array(Searchable::class, class_uses_recursive($model), true);
     }
 
-
     private function extractVectorFromBuilder(Builder $builder): array
     {
         // Find the vector in the builder parameters.
@@ -116,10 +112,6 @@ trait CommonEngineFunctions
             return $builder->wheres['vector'];
         }
 
-        if (isset($builder->wheres['embedding'])) {
-            return $builder->wheres['embedding'];
-        }
-
-        return [];
+        return $builder->wheres['embedding'] ?? [];
     }
 }

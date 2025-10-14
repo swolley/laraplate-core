@@ -40,7 +40,7 @@ final readonly class AuthenticationService
     {
         return array_map(
             fn (IAuthenticationProvider $provider): string => $provider->getProviderName(),
-            array_filter($this->providers, fn ($p): bool => $p->isEnabled()),
+            array_filter($this->providers, fn (IAuthenticationProvider $p): bool => $p->isEnabled()),
         );
     }
 }

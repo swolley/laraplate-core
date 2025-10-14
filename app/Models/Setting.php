@@ -105,7 +105,7 @@ final class Setting extends Model
     protected function requiresApprovalWhen($modifications): bool
     {
         return array_intersect(
-            array_filter($this->getFillable(), fn ($field): bool => $field !== 'description'),
+            array_filter($this->getFillable(), fn (string $field): bool => $field !== 'description'),
             array_keys($modifications),
         ) !== [];
     }

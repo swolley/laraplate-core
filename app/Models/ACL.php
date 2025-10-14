@@ -6,6 +6,7 @@ namespace Modules\Core\Models;
 
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
@@ -21,7 +22,7 @@ use Override;
  */
 final class ACL extends Model
 {
-    use HasValidations, HasVersions, SoftDeletes {
+    use HasFactory, HasValidations, HasVersions, SoftDeletes {
         getRules as protected getRulesTrait;
     }
 

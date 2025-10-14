@@ -34,18 +34,6 @@ final class License extends Model
         'is_active' => 'boolean',
     ];
 
-    #[Scope]
-    public function free(Builder $query): void
-    {
-        $query->doesntHave('user');
-    }
-
-    #[Scope]
-    public function occupied(Builder $query): void
-    {
-        $query->has('user');
-    }
-
     /**
      * The user that belongs to the license.
      *
@@ -70,5 +58,17 @@ final class License extends Model
     protected static function newFactory(): LicenseFactory
     {
         return LicenseFactory::new();
+    }
+
+    #[Scope]
+    protected function free(Builder $query): void
+    {
+        $query->doesntHave('user');
+    }
+
+    #[Scope]
+    protected function occupied(Builder $query): void
+    {
+        $query->has('user');
     }
 }

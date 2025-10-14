@@ -216,7 +216,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         return (Str::startsWith($name, config('modules.namespace'))
             ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
-            : $this->laravel['path']) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
+            : $this->laravel->make('path')) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
     }
 
     #[Override]
@@ -452,7 +452,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $exploded = explode('\\', $relatedName);
         $targetEntityShort = end($exploded);
 
-        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn ($type): bool => $type !== 'relation');
+        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn (string $type): bool => $type !== 'relation');
 
         $rows = new Collection();
 
@@ -747,12 +747,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         }
         $reversed_relation = $this->getReversedRelationType($relationType);
 
-        if ($reversed_relation === null || $reversed_relation === '' || $reversed_relation === '0') {
+        if (in_array($reversed_relation, [null, '', '0'], true)) {
             return;
         }
         $proposed_name = $this->proposeInverseName($short_class, $reversed_relation);
 
-        if ($proposed_name === null || $proposed_name === '' || $proposed_name === '0') {
+        if (in_array($proposed_name, [null, '', '0'], true)) {
             return;
         }
         $inverted_relation_name = text("What is the name of the reversed relation? [{$proposed_name}]", default: $proposed_name);
@@ -873,9 +873,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             }
 
             if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {
-                if ($related_class === '' || $related_class === '0' || $related_class === [] || $related_class === null) {
-                    throw new InvalidArgumentException('Missing related class attribute');
-                }
+                throw_if(in_array($related_class, ['', '0', [], null], true), InvalidArgumentException::class, 'Missing related class attribute');
 
                 $classCode = $this->updateClassWithNewRelation($className, $classCode, $classPath, $field_name, $field_type, $related_class);
             } else {
@@ -898,7 +896,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     {
         return suggest(
             $question,
-            fn ($value): array => array_filter($choices, fn ($name) => Str::contains($name, $value, ignoreCase: true)),
+            fn ($value): array => array_filter($choices, fn (string $name) => Str::contains($name, $value, ignoreCase: true)),
             required: true,
         );
     }

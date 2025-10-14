@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -39,16 +40,16 @@ if (! function_exists('modules')) {
 
         if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn(string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, fn(Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
-        $remapped_modules = $fullpath ? array_map(fn(Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
+        $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
 
-        if ($showMainApp && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) {
+        if ($showMainApp && (in_array($onlyModule, [null, '', '0', 'App'], true))) {
             if ($fullpath) {
                 $remapped_modules['App'] = app_path();
             } else {
@@ -123,7 +124,7 @@ if (! function_exists('translations')) {
         $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
         $langs_subpath = config('modules.paths.generator.lang.path');
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn(string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
@@ -306,8 +307,8 @@ if (! function_exists('routes')) {
         /** @var array<int,Route> $routes */
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
-        $all_routes = app('router')->getRoutes()->getRoutes();
-        usort($all_routes, fn(Route $a, Route $b): int => $a->uri() <=> $b->uri());
+        $all_routes = app(Router::class)->getRoutes()->getRoutes();
+        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
@@ -318,7 +319,7 @@ if (! function_exists('routes')) {
             }
             $exploded = explode('\\', (string) $reference);
 
-            if (($exploded[0] !== 'Modules' && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $onlyModule === 'App')) || (in_array($exploded[1], $modules, true) && ($onlyModule === null || $onlyModule === '' || $onlyModule === '0' || $exploded[1] === $onlyModule))) {
+            if (($exploded[0] !== 'Modules' && (in_array($onlyModule, [null, '', '0', 'App'], true))) || (in_array($exploded[1], $modules, true) && (in_array($onlyModule, [null, '', '0'], true) || $exploded[1] === $onlyModule))) {
                 $routes[] = $route;
             }
         }
@@ -349,7 +350,7 @@ if (! function_exists('api_versions')) {
      */
     function api_versions(): array
     {
-        $routes = app('router')->getRoutes()->getRoutes();
+        $routes = app(Router::class)->getRoutes()->getRoutes();
         $versions = [];
 
         foreach ($routes as $route) {
@@ -394,6 +395,7 @@ if (! function_exists('class_uses_trait')) {
     {
         $class = is_string($class) ? $class : $class::class;
         $traits = $recursive ? class_uses_recursive($class) : class_uses($class);
+
         return in_array($uses, $traits, true);
     }
 }

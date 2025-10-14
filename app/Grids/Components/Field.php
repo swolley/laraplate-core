@@ -71,9 +71,7 @@ final class Field implements JsonSerializable
      */
     public function setModel(Model $model): void
     {
-        if (! Grid::useGridUtils($model)) {
-            throw new UnexpectedValueException('Model ' . $model::class . ' doesn\'t use ' . HasGridUtils::class);
-        }
+        throw_unless(Grid::useGridUtils($model), UnexpectedValueException::class, 'Model ' . $model::class . ' doesn\'t use ' . HasGridUtils::class);
         $this->model = &$model;
     }
 
@@ -186,13 +184,9 @@ final class Field implements JsonSerializable
             return $this;
         } // throw new \UnexpectedValueException("Cannot set column {$this->name} as readable because is an HIDDEN field in Model " . $this->model::class);
 
-        if (! $isReadable && $this->fieldType !== FieldType::COLUMN) {
-            throw new UnexpectedValueException("Cannot disable read operation for column {$this->name} because is an aggregated field. Remove it from fields if you don't need it");
-        }
+        throw_if(! $isReadable && $this->fieldType !== FieldType::COLUMN, UnexpectedValueException::class, "Cannot disable read operation for column {$this->name} because is an aggregated field. Remove it from fields if you don't need it");
 
-        if ($isReadable && $this->isAppend() && ! $this->hasGetAppend()) {
-            throw new UnexpectedValueException("Cannot set column {$this->name} as readable because it is a calculated field but it doesn't have a getter " . $this->model::class);
-        }
+        throw_if($isReadable && $this->isAppend() && ! $this->hasGetAppend(), UnexpectedValueException::class, "Cannot set column {$this->name} as readable because it is a calculated field but it doesn't have a getter " . $this->model::class);
         $this->readable = $isReadable;
 
         return $this;
@@ -215,13 +209,9 @@ final class Field implements JsonSerializable
             return $this;
         } // throw new \UnexpectedValueException("Cannot set column {$this->name} as writable because is not a FILLABLE field in Model " . $this->model::class);
 
-        if ($isWritable && $this->fieldType !== FieldType::COLUMN) {
-            throw new UnexpectedValueException("Cannot set column {$this->name} as writable because is an aggregated field");
-        }
+        throw_if($isWritable && $this->fieldType !== FieldType::COLUMN, UnexpectedValueException::class, "Cannot set column {$this->name} as writable because is an aggregated field");
 
-        if ($isWritable && $this->isAppend() && ! $this->hasSetAppend()) {
-            throw new UnexpectedValueException("Cannot set column {$this->name} as readable because it is a calculated field but it doesn't have a setter " . $this->model::class);
-        }
+        throw_if($isWritable && $this->isAppend() && ! $this->hasSetAppend(), UnexpectedValueException::class, "Cannot set column {$this->name} as readable because it is a calculated field but it doesn't have a setter " . $this->model::class);
         $this->writable = $isWritable;
 
         return $this;

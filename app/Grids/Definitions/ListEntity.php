@@ -86,7 +86,7 @@ abstract class ListEntity extends Entity
     {
         $fields = $this->getFields()->filter(fn ($field): bool => in_array($field->getName(), $this->labelFieldsName, true));
 
-        return $fields->count() === 1 ? $fields->first() : $fields->toArray();
+        return $fields->count() === 1 ? $fields->first() : $fields->all();
     }
 
     /**

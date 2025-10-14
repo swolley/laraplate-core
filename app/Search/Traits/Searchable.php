@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Traits;
 
+use Elastic\ScoutDriver\Engine;
 use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Scout\Engines\DatabaseEngine;
+use Laravel\Scout\Engines\TypesenseEngine;
 use Laravel\Scout\Scout;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\SoftDeletes;
@@ -75,7 +78,7 @@ trait Searchable
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
-                    ...$models->map(fn(Model $model) => new GenerateEmbeddingsJob($model))->toArray(),
+                    ...$models->map(fn (Model $model): GenerateEmbeddingsJob => new GenerateEmbeddingsJob($model))->toArray(),
                     new Scout::$makeSearchableJob($models),
                 ])->dispatch()
                     ->onQueue($models->first()->syncWithSearchUsingQueue())
@@ -101,7 +104,7 @@ trait Searchable
                 foreach ($models as $model) {
                     // If Scout queue is disabled, run embeddings job synchronously
                     if (! config('scout.queue')) {
-                        (new GenerateEmbeddingsJob($model))->handle();
+                        new GenerateEmbeddingsJob($model)->handle();
                     } else {
                         dispatch(new GenerateEmbeddingsJob($model)
                             ->onQueue($model->syncWithSearchUsingQueue())
@@ -132,6 +135,7 @@ trait Searchable
             $array['valid_from'] = $this->{HasValidity::validFromKey()};
             $array['valid_to'] = $this->{HasValidity::validToKey()};
         }
+
         if (class_uses_trait($this, SoftDeletes::class)) {
             $array['is_deleted'] = $this->is_deleted;
         }
@@ -178,18 +182,13 @@ trait Searchable
         return $this->morphMany(ModelEmbedding::class, 'model');
     }
 
-    private function getSchemaDefinition(): SchemaDefinition
-    {
-        return new SchemaDefinition($this->getTable());
-    }
-
     /**
      * Get field mapping for search engine
      * Convert generic field definitions to the format required by the current search engine.
      */
     public function getSearchMapping(?SchemaDefinition $schema = null): array
     {
-        if (! $schema) {
+        if (! $schema instanceof SchemaDefinition) {
             $schema = $this->getSchemaDefinition();
             // $table = Inspect::table($this->getTable());
 
@@ -198,6 +197,7 @@ trait Searchable
             // });
 
             $document = $this->toSearchableArray();
+
             foreach ($document as $key => $value) {
                 if ($key === 'embedding') {
                     $schema->addField(new FieldDefinition($key, FieldType::VECTOR, [IndexType::SEARCHABLE, IndexType::VECTOR]));
@@ -209,17 +209,19 @@ trait Searchable
 
         // Get the current engine and translate
         $engine = $this->searchableUsing();
-        if ($engine instanceof \Elastic\ScoutDriver\Engine)
+
+        if ($engine instanceof Engine) {
             $engineName = 'elasticsearch';
-        else if ($engine instanceof \Laravel\Scout\Engines\TypesenseEngine) {
+        } elseif ($engine instanceof TypesenseEngine) {
             $engineName = 'typesense';
-        } else if ($engine instanceof \Laravel\Scout\Engines\DatabaseEngine) {
+        } elseif ($engine instanceof DatabaseEngine) {
             $engineName = 'database';
         } else {
             throw new Exception('Unsupported engine ' . $engine::class);
         }
 
         $schemaManager = app(SchemaManager::class);
+
         return $schemaManager->translateForEngine($schema, $engineName);
     }
 
@@ -234,13 +236,11 @@ trait Searchable
             return $engine->ensureIndex($this);
         }
 
-        if (method_exists($engine, 'createIndex')) {
-            // Use Scout's native method if available.
-            if (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this)) {
-                $engine->createIndex($this);
+        // Use Scout's native method if available.
+        if (method_exists($engine, 'createIndex') && (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this))) {
+            $engine->createIndex($this);
 
-                return true;
-            }
+            return true;
         }
 
         return false;
@@ -273,6 +273,11 @@ trait Searchable
         }
 
         return null;
+    }
+
+    private function getSchemaDefinition(): SchemaDefinition
+    {
+        return new SchemaDefinition($this->getTable());
     }
 
     /**

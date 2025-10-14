@@ -25,7 +25,7 @@ trait SortableTrait
     //     // return $column_name;
     // }
 
-    public function scopeOrdered(Builder $query, string $direction = 'asc')
+    protected function scopeOrdered(Builder $query, string $direction = 'asc')
     {
         return $query->orderBy($this->qualifyColumn($this->determineOrderColumnName()), $direction);
     }

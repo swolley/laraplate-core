@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Engines;
 
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\DatabaseEngine as BaseDatabaseEngine;
 use Modules\Core\Models\ModelEmbedding;
@@ -44,7 +45,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
     }
 
     // TODO: to be implemented
-    public function buildSearchFilters(array $filters): array|string
+    public function buildSearchFilters(array $filters): array
     {
         return [];
     }
@@ -82,7 +83,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
             'pgsql' => $this->performPostgreSQLVectorSearch($queryVector, $model, $builder),
             'mysql' => $this->performMySQLVectorSearch($queryVector, $model, $builder),
             'sqlite' => $this->performSQLiteVectorSearch($queryVector, $model, $builder),
-            default => throw new \InvalidArgumentException("Vector search not supported for driver: {$driver}")
+            default => throw new InvalidArgumentException("Vector search not supported for driver: {$driver}"),
         };
     }
 
@@ -93,7 +94,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
         return ModelEmbedding::query()
             ->where('model_type', $model::class)
-            ->selectRaw("*, embedding <=> ?::vector AS distance", [$vectorString])
+            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vectorString])
             ->orderByRaw('embedding <=> ?::vector', [$vectorString])
             ->limit($builder->limit ?? 10)
             ->get()
@@ -115,7 +116,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                     FROM JSON_TABLE(?, '$[*]' COLUMNS (value DOUBLE PATH '$')) a,
                          JSON_TABLE(embedding, '$[*]' COLUMNS (value DOUBLE PATH '$')) b
                 ) AS similarity_score",
-                [$queryVectorJson]
+                [$queryVectorJson],
             )
             ->having('similarity_score', '>', 0.7)
             ->orderBy('similarity_score', 'desc')
@@ -130,19 +131,20 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->get()
-            ->map(function ($embedding) use ($queryVector) {
+            ->map(function ($embedding) use ($queryVector): array {
                 $similarity = $this->calculateCosineSimilarity($queryVector, $embedding->embedding);
+
                 return [
                     'id' => $embedding->id,
                     'similarity_score' => $similarity,
                     'embedding' => $embedding->embedding,
                 ];
             })
-            ->filter(fn($item) => $item['similarity_score'] > 0.7)
+            ->filter(fn ($item): bool => $item['similarity_score'] > 0.7)
             ->sortByDesc('similarity_score')
             ->take($builder->limit ?? 10)
             ->values()
-            ->toArray();
+            ->all();
     }
 
     private function calculateCosineSimilarity(array $a, array $b): float
@@ -154,8 +156,9 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         $dotProduct = 0;
         $normA = 0;
         $normB = 0;
+        $counter = count($a);
 
-        for ($i = 0; $i < count($a); $i++) {
+        for ($i = 0; $i < $counter; $i++) {
             $dotProduct += $a[$i] * $b[$i];
             $normA += $a[$i] * $a[$i];
             $normB += $b[$i] * $b[$i];

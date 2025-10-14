@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Cache\HasCache;
@@ -15,7 +16,7 @@ use Override;
  */
 final class UserGridConfig extends Model
 {
-    use HasCache, HasValidations {
+    use HasCache, HasFactory, HasValidations {
         getRules as protected getRulesTrait;
     }
 

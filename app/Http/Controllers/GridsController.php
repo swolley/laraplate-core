@@ -51,9 +51,7 @@ final class GridsController extends Controller
             }
 
             if ($entity !== null && $entity !== '' && $entity !== '0') {
-                if ($grids === []) {
-                    throw new UnexpectedValueException("'{$entity}' is not a Grid");
-                }
+                throw_if($grids === [], UnexpectedValueException::class, "'{$entity}' is not a Grid");
                 $grids = head($grids);
             }
 
@@ -91,7 +89,7 @@ final class GridsController extends Controller
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException | UnauthorizedException $ex) {
+        } catch (UnexpectedValueException|UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();
@@ -102,9 +100,7 @@ final class GridsController extends Controller
     {
         $entity_instance = DynamicEntity::tryResolveModel($entity);
 
-        if ($entity_instance === null || $entity_instance === '' || $entity_instance === '0') {
-            throw new UnexpectedValueException("Unable to find entity '{$entity}'");
-        }
+        throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, "Unable to find entity '{$entity}'");
 
         return $entity_instance;
     }
@@ -123,7 +119,7 @@ final class GridsController extends Controller
     private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request/* , Collection $permissions */): ?array
     {
         if (
-            ($entity === null || $entity === '' || $entity === '0' || $instance::class === $entity::class)
+            (in_array($entity, [null, '', '0'], true) || $instance::class === $entity::class)
             && Grid::useGridUtils($instance)
             && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName()/* , permissions: $permissions */)
         ) {

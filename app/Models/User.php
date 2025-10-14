@@ -40,6 +40,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -96,7 +97,11 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isSuperAdmin() || $this->can('*', ['guard' => $panel->getAuthGuard()]);
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->can('*', ['guard' => $panel->getAuthGuard()]);
     }
 
     public function isGuest(): bool
@@ -173,7 +178,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function getPermissionsViaRoles(): Collection
     {
         if ($this->isSuperAdmin()) {
-            return Permission::get()->sort()->values();
+            return Permission::query()->get()->sort()->values();
         }
 
         return $this->getPermissionsViaRolesTrait();

@@ -16,19 +16,19 @@ use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 final class DocsController extends OpenApiJsonController
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
+     */
     public function mergeDocs(Request $request, string $version = 'v1')
     {
         return Cache::tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn () => response()->json($this->getJson($version)));
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'welcome', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'welcome', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
+     */
     public function welcome(): View
     {
         $all_modules = modules(true, false, false);
@@ -83,10 +83,10 @@ final class DocsController extends OpenApiJsonController
         ]);
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
+     */
     public function phpinfo(): View
     {
         return view('core::phpinfo');

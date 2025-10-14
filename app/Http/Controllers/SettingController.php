@@ -17,10 +17,10 @@ use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class SettingController extends Controller
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
+     */
     public function getTranslations(TranslationsRequest $request, ?string $lang = null): HttpFoundationResponse
     {
         if ($lang !== null && $lang !== '' && $lang !== '0') {
@@ -61,16 +61,16 @@ final class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
+     */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
-        $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function () {
+        $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function (): array {
             $settings = [];
 
-            foreach (Setting::get() as $s) {
+            foreach (Setting::query()->get() as $s) {
                 $settings[$s->name] = $s->value;
             }
 
@@ -84,10 +84,10 @@ final class SettingController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
+     */
     public function siteInfo(Request $request): HttpFoundationResponse
     {
         return new ResponseBuilder($request)
@@ -108,7 +108,7 @@ final class SettingController extends Controller
         ];
     }
 
-    private function getCurrentPackageVersion(): ?string
+    private function getCurrentPackageVersion(): string
     {
         return $this->getCurrentTag() ?? version();
     }
@@ -162,7 +162,7 @@ final class SettingController extends Controller
         // Prima otteniamo l'hash del commit corrente
         $current_commit = $this->getCurrentCommitHash();
 
-        if ($current_commit === null || $current_commit === '' || $current_commit === '0') {
+        if (in_array($current_commit, [null, '', '0'], true)) {
             return null;
         }
 

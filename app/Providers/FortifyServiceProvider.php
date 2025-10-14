@@ -35,7 +35,7 @@ final class FortifyServiceProvider extends ServiceProvider
             public function toResponse($request)
             {
                 if ($request->wantsJson()) {
-                    return redirect()->route('core.auth.userInfo');
+                    return to_route('core.auth.userInfo');
                 }
 
                 // // If we are in a Filament context, redirect to Filament login
@@ -52,7 +52,7 @@ final class FortifyServiceProvider extends ServiceProvider
             public function toResponse($request)
             {
                 if ($request->wantsJson()) {
-                    return redirect()->route('core.auth.userInfo');
+                    return to_route('core.auth.userInfo');
                 }
 
                 // // If we are in a Filament context, redirect to Filament dashboard
@@ -69,7 +69,7 @@ final class FortifyServiceProvider extends ServiceProvider
             public function toResponse($request)
             {
                 if ($request->wantsJson()) {
-                    return redirect()->route('core.auth.userInfo');
+                    return to_route('core.auth.userInfo');
                 }
 
                 // // If we are in a Filament context, redirect to Filament dashboard

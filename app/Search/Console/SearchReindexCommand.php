@@ -34,7 +34,7 @@ final class SearchReindexCommand extends Command
                 return 1;
             }
 
-            ReindexSearchJob::dispatch($model);
+            dispatch(new ReindexSearchJob($model));
             $this->info('Reindexing has been queued for model ' . $model);
 
             // Se il modello usa il trait HasCache, invalida la cache

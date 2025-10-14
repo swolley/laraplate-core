@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Override;
@@ -47,16 +48,12 @@ class ServiceProvider extends BaseServiceProvider
     protected function mergeConfigFrom($path, $key): void
     {
         if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {
-            $config = $this->app->make('config');
+            $config = $this->app->make(Repository::class);
 
             $original = $config->get($key, []);
             $current = require $path;
 
-            if (is_array($current) && is_array($original)) {
-                $merged = self::mergeArrays($original, $current);
-            } else {
-                $merged = $current;
-            }
+            $merged = is_array($current) && is_array($original) ? self::mergeArrays($original, $current) : $current;
             $config->set($key, $merged);
         }
     }

@@ -24,11 +24,11 @@ final class LicensesTable
                         ->boolean()
                         ->alignCenter()
                         ->grow(false)
-                        ->state(fn($record) => ! $record->isExpired() && ! $record->isDraft())
-                        ->trueColor(fn($record) => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
-                        ->trueIcon(fn($record) => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
+                        ->state(fn ($record): bool => ! $record->isExpired() && ! $record->isDraft())
+                        ->trueColor(fn ($record): string => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
+                        ->trueIcon(fn ($record): string => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
                         ->falseIcon('heroicon-o-x-circle')
-                        ->tooltip(fn($record) => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
+                        ->tooltip(fn ($record): string => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
                     TextColumn::make('id')
                         ->searchable(),
                 ]);

@@ -500,7 +500,7 @@ abstract class Entity
      */
     final public function removeUnusedRelations(): bool
     {
-        $keys = $this->getRelations()->keys()->toArray();
+        $keys = $this->getRelations()->keys()->all();
         $removed = false;
 
         foreach ($keys as $key) {
@@ -670,8 +670,8 @@ abstract class Entity
         }
         $this->fields = new Collection();
         $this->addFields($fields);
-        $fields_keys = $this->getFields()->keys()->toArray();
-        $filtered = $fields->filter(fn ($field, $key): bool => ! in_array($key, $fields_keys, true));
+        $fields_keys = $this->getFields()->keys()->all();
+        $filtered = $fields->reject(fn ($field, $key): bool => in_array($key, $fields_keys, true));
 
         foreach ($this->getRelations() as $relation) {
             $relation->setFields($filtered);
@@ -709,7 +709,7 @@ abstract class Entity
      */
     protected function checkColumnsOrGetDefaults(Model $model, string $value_column, ?array $columns): array
     {
-        if ($columns === null || ($columns == [$value_column] && $columns[0] === $model->getKeyName())) {
+        if ($columns === null || ($columns === [$value_column] && $columns[0] === $model->getKeyName())) {
             $indexes = Inspect::indexes($model->getTable())->toArray();
             $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn (array $idx) => $idx['columns'], $indexes))];
         }
@@ -765,17 +765,13 @@ abstract class Entity
     private function setModel(Model|string $model): void
     {
         if (is_string($model)) {
-            if (! is_subclass_of($model, Model::class)) {
-                throw new UnexpectedValueException('Only Model subclasses are compatible with Grid System');
-            }
+            throw_unless(is_subclass_of($model, Model::class), UnexpectedValueException::class, 'Only Model subclasses are compatible with Grid System');
 
             $model = new $model;
         }
 
         if (! Grid::useGridUtils($model)) {
-            if (! config('core.dynamic_gridutils')) {
-                throw new UnexpectedValueException('Model ' . $model::class . ' doesn\'t use ' . HasGridUtils::class);
-            }
+            throw_unless(config('core.dynamic_gridutils'), UnexpectedValueException::class, 'Model ' . $model::class . ' doesn\'t use ' . HasGridUtils::class);
 
             // TODO: da verificare, solo imbastito
             $class = $model::class;

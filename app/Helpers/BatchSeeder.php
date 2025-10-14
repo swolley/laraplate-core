@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use function Laravel\Prompts\progress;
-
 use ErrorException;
+
+use function Laravel\Prompts\progress;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
 use Modules\Cms\Database\Factories\DynamicContentFactory;
@@ -114,16 +115,16 @@ abstract class BatchSeeder extends Seeder
         /** @var Throwable|null $force_kill_all_batches */
         $force_kill_all_batches = null;
 
-        $propagate_exception = function (Throwable $e) use (&$force_kill_all_batches, &$progress, &$entity_name, &$batch): void {
+        $propagate_exception = function (Throwable $e) use (&$force_kill_all_batches, &$progress, &$entity_name): void {
             $force_kill_all_batches = $e;
-            $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+            $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . (1) . '}: ' . $e->getMessage() . '</>');
             $progress->render();
 
             exit(1);
         };
 
-        while ($force_kill_all_batches === null && $created < $count_to_create) {
-            $remaining = max(0, $count_to_create - $created - count($concurrencies) * $batchSize);
+        while (! $force_kill_all_batches instanceof Throwable && $created < $count_to_create) {
+            $remaining = max(0, $count_to_create - count($concurrencies) * $batchSize);
             $batchSize = min(self::BATCHSIZE, $remaining);
 
             $concurrencies[] = fn () => $this->executeBatch($modelClass, $entity_name, $batch, $batchSize, $current_count, $count_to_create, $created, $remaining, $progress, true, $propagate_exception);
@@ -135,9 +136,7 @@ abstract class BatchSeeder extends Seeder
             }
         }
 
-        if ($force_kill_all_batches !== null) {
-            throw $force_kill_all_batches;
-        }
+        throw_if($force_kill_all_batches instanceof Throwable, $force_kill_all_batches);
 
         if ($concurrencies !== []) {
             $driver->run($concurrencies);
@@ -206,7 +205,7 @@ abstract class BatchSeeder extends Seeder
             try {
                 if ($asyncMode) {
                     // Setup fresh connections for async operations
-                    $connections = $this->setupAsyncConnections($modelClass, $connections['database'], $connections['cache']);
+                    $connections = $this->setupAsyncConnections($connections['database'], $connections['cache']);
                 }
 
                 $model_instance = new $modelClass();
@@ -231,18 +230,7 @@ abstract class BatchSeeder extends Seeder
 
                 $progress->hint('');
                 $progress->advance($batchSize);
-            } catch (QueryException|ErrorException $e) {
-                $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
-                $progress->render();
-
-                if ($force_kill_batches) {
-                    $force_kill_batches($e);
-
-                    return;
-                }
-
-                throw $e;
-            } catch (ValidationException $e) {
+            } catch (QueryException|ErrorException|ValidationException $e) {
                 $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
@@ -285,7 +273,7 @@ abstract class BatchSeeder extends Seeder
                 $remaining = $countToCreate - $created;
                 $batchSize = min(self::BATCHSIZE, $remaining);
 
-                sleep(self::RETRY_DELAY);
+                Sleep::sleep(self::RETRY_DELAY);
             }
         }
     }
@@ -295,7 +283,7 @@ abstract class BatchSeeder extends Seeder
      *
      * @return list{database:string,cache:string}
      */
-    private function setupAsyncConnections(string $modelClass, string $db_connection_name, string $cache_connection_name): array
+    private function setupAsyncConnections(string $db_connection_name, string $cache_connection_name): array
     {
         return [
             'database' => $this->setupAsyncDatabaseConnection($db_connection_name),

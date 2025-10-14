@@ -17,9 +17,9 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\UnauthorizedException;
@@ -97,7 +97,7 @@ class CrudController extends Controller
                 return $responseBuilder
                     ->setClass($model)
                     ->setData($data)
-                    ->setCachedAt(Carbon::now());
+                    ->setCachedAt(Date::now());
             });
         });
     }
@@ -128,7 +128,7 @@ class CrudController extends Controller
                 return $responseBuilder
                     ->setClass($model)
                     ->setData($query->sole())
-                    ->setCachedAt(Carbon::now());
+                    ->setCachedAt(Date::now());
             });
         });
     }
@@ -185,9 +185,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, HistoryRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
-            if (! $this->hasHistory($model)) {
-                throw new BadMethodCallException("'{$filters->mainEntity}' doesn't have history handling");
-            }
+            throw_unless($this->hasHistory($model), BadMethodCallException::class, "'{$filters->mainEntity}' doesn't have history handling");
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
             return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
@@ -209,7 +207,7 @@ class CrudController extends Controller
                 return $responseBuilder
                     ->setClass($model)
                     ->setData($query->sole())
-                    ->setCachedAt(Carbon::now());
+                    ->setCachedAt(Date::now());
             });
         });
     }
@@ -224,9 +222,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, TreeRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
-            if (! $this->useRecursiveRelationships($model)) {
-                throw new UnexpectedValueException("'{$filters->mainEntity}' is not a hierarchical class");
-            }
+            throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, "'{$filters->mainEntity}' is not a hierarchical class");
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
             return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
@@ -247,7 +243,7 @@ class CrudController extends Controller
                 return $responseBuilder
                     ->setClass($model)
                     ->setData($query->sole())
-                    ->setCachedAt(Carbon::now());
+                    ->setCachedAt(Date::now());
             });
         });
     }
@@ -269,9 +265,7 @@ class CrudController extends Controller
 
             $created = $model->create($values->changes);
 
-            if (! $created) {
-                throw new LogicException('Record not created');
-            }
+            throw_unless($created, LogicException::class, 'Record not created');
 
             $created->fresh();
 
@@ -295,9 +289,7 @@ class CrudController extends Controller
 
             // if $filters->request->method() == 'PUT' devo sovrascrivere tutto il record quindi devono esserci tutti i fillable e devo fare le validazioni
             // else valido quello che ho con le regole che ho se le ho
-            if ($model->usesTimestamps() && ! isset($values->{$model::UPDATED_AT})) {
-                throw new BadMethodCallException($model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
-            }
+            throw_if($model->usesTimestamps() && ! isset($values->{Model::UPDATED_AT}), BadMethodCallException::class, Model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
             $key_value = $this->getModelKeyValue($values);
             $found_records = $model->where($key_value)->get();
             // se ci sono proprietà che non sono nei fillable devo restituire errore?
@@ -307,9 +299,7 @@ class CrudController extends Controller
             // 1) impedisco la modifica finché non è approvato/disapprovato tutto
             // 2) posso mettere un flag "force" che disapprova le modifiche in pending e ne crea una nuova?
 
-            if ($found_records->isEmpty() && $values->request->has('id')) {
-                throw new ModelNotFoundException('No model Found');
-            }
+            throw_if($found_records->isEmpty() && $values->request->has('id'), ModelNotFoundException::class, 'No model Found');
             $updated_records = new Collection();
             DB::transaction(function () use ($found_records, $updated_records, $values): void {
                 foreach ($found_records as $found_record) {
@@ -343,9 +333,7 @@ class CrudController extends Controller
             $key_value = $this->getModelKeyValue($filters);
             $found_records = $model->where($key_value)->get();
 
-            if ($found_records->isEmpty() && $filters->request->has('id')) {
-                throw new ModelNotFoundException('No model Found');
-            }
+            throw_if($found_records->isEmpty() && $filters->request->has('id'), ModelNotFoundException::class, 'No model Found');
             $deleted_records = new Collection();
             DB::transaction(function () use ($found_records, $deleted_records): void {
                 foreach ($found_records as $found_record) {
@@ -375,16 +363,12 @@ class CrudController extends Controller
             $model = $filters->model;
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'restore', $model->getConnectionName());
             $key = $filters->primaryKey;
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
-            if ($operation === 'activate' && ! $found_record->restore()) {
-                throw new LogicException('Record not activated');
-            }
+            throw_if($operation === 'activate' && ! $found_record->restore(), LogicException::class, 'Record not activated');
 
-            if (! $found_record->delete()) {
-                throw new LogicException('Record not inactivated');
-            }
+            throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
 
             $found_record->fresh();
 
@@ -536,11 +520,11 @@ class CrudController extends Controller
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_LOCKED);
-        } catch (UnexpectedValueException | BadMethodCallException $ex) {
+        } catch (UnexpectedValueException|BadMethodCallException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_BAD_REQUEST);
-        } catch (LogicException | AlreadyLockedException | CannotUnlockException $ex) {
+        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_NOT_MODIFIED);
@@ -679,7 +663,7 @@ class CrudController extends Controller
 
             /** @var string|array $key */
             $key = $model->getKeyName();
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn($k) => $filters->{$k}, $key);
+            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
             $found_record = $model->withTrashed()->findOrFail($key_value);
 
             /** @var User $user */
@@ -696,9 +680,7 @@ class CrudController extends Controller
             } else {
                 $modifications = $model::query()->findOrFail($filters->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
 
-                if ($modifications->isEmpty()) {
-                    throw new LogicException("No modifications to be {$operation}d");
-                }
+                throw_if($modifications->isEmpty(), LogicException::class, "No modifications to be {$operation}d");
 
                 foreach ($modifications as $modification) {
                     if ($operation === 'approve') {
@@ -730,23 +712,17 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): Response {
             $model = $filters->model;
 
-            if (! class_uses_trait($model, HasLocks::class)) {
-                throw new BadMethodCallException($model::class . ' doesn\'t support locks');
-            }
+            throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . ' doesn\'t support locks');
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'lock', $model->getConnectionName());
             $key_value = $this->getModelKeyValue($filters);
 
             /** @var Model&HasLocks $found_records */
             $found_records = $model->where($key_value)->get();
 
-            if ($found_records->isEmpty() && $filters->request->has('id')) {
-                throw new ModelNotFoundException('No model Found');
-            }
+            throw_if($found_records->isEmpty() && $filters->request->has('id'), ModelNotFoundException::class, 'No model Found');
             $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
 
-            if ($found_records->count() === 1 && $filters->request->has('id') && $can_be_done) {
-                throw new AlreadyLockedException($operation === 'lock' ? 'Record already locked' : 'Record isn\'t locked');
-            }
+            throw_if($found_records->count() === 1 && $filters->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : 'Record isn\'t locked');
             $locked_records = new Collection();
             DB::transaction(function () use ($found_records, $locked_records): void {
                 foreach ($found_records as $found_record) {

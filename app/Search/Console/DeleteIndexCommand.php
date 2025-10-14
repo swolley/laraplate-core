@@ -24,7 +24,7 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
     {
         $model = $this->getModelClass();
 
-        if ($model === '' || $model === '0' || $model === false) {
+        if (in_array($model, ['', '0', false], true)) {
             return Command::INVALID;
         }
 

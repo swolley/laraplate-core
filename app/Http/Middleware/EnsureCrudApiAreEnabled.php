@@ -14,9 +14,7 @@ final class EnsureCrudApiAreEnabled
      */
     public function handle(Request $request, Closure $next)
     {
-        if (! config('core.expose_crud_api')) {
-            abort(403, 'Forbidden');
-        }
+        abort_unless(config('core.expose_crud_api'), 403, 'Forbidden');
 
         return $next($request);
     }

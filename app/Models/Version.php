@@ -7,7 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -17,6 +17,8 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 final class Version extends OvertrueVersion
 {
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+
     /**
      * @var array<int,string>
      *
@@ -51,7 +53,7 @@ final class Version extends OvertrueVersion
         $version->contents = $model->getVersionableAttributes($model->getVersionStrategy(), $replacements);
 
         if ($time) {
-            $version->created_at = Carbon::parse($time);
+            $version->created_at = Date::parse($time);
         }
 
         // custom additional logic

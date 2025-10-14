@@ -112,14 +112,10 @@ trait HasLocks
         $locked = new Locked();
         $lock_by_column = $locked->lockedByColumn();
 
-        if ($locked->cannotBeUnlocked($this)) {
-            throw new CannotUnlockException('This model cannot be unlocked');
-        }
+        throw_if($locked->cannotBeUnlocked($this), CannotUnlockException::class, 'This model cannot be unlocked');
         $locking_user = $this->{$lock_by_column};
 
-        if ($locking_user && $locking_user !== Auth::id()) {
-            throw new CannotUnlockException('This model cannot be unlocked because locked by another user');
-        }
+        throw_if($locking_user && $locking_user !== Auth::id(), CannotUnlockException::class, 'This model cannot be unlocked because locked by another user');
 
         $this->{$locked->lockedAtColumn()} = null;
         $this->{$lock_by_column} = null;
@@ -194,23 +190,23 @@ trait HasLocks
         return $this->wasLocked() && $user->id === $this->getOriginal(new Locked()->lockedByColumn());
     }
 
-    public function scopeLocked($query): void
+    protected function scopeLocked($query): void
     {
         $query->where(new Locked()->lockedAtColumn(), '!=', null);
     }
 
-    public function scopeLockedBy($query, User $user): void
+    protected function scopeLockedBy($query, User $user): void
     {
         $this->scopeLocked($query);
         $query->where(new Locked()->lockedByColumn(), $user->id);
     }
 
-    public function scopeUnlocked($query): void
+    protected function scopeUnlocked($query): void
     {
         $query->where(new Locked()->lockedAtColumn(), null);
     }
 
-    public function scopeUnlockedBy($query, User $user): void
+    protected function scopeUnlockedBy($query, User $user): void
     {
         $this->scopeUnlocked($query);
         $query->where(new Locked()->lockedByColumn(), '!=', $user->id);

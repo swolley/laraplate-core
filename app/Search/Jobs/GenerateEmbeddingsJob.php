@@ -93,7 +93,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
 
         $generator = self::getGenerator();
 
-        if ($generator === null) {
+        if (! $generator instanceof EmbeddingGeneratorInterface) {
             return [];
         }
 
@@ -109,7 +109,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         $generator = self::getGenerator();
 
-        if ($generator === null) {
+        if (! $generator instanceof EmbeddingGeneratorInterface) {
             return [];
         }
 

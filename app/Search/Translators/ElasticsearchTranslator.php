@@ -56,9 +56,9 @@ class ElasticsearchTranslator implements ISchemaTranslator
                 'type' => 'date',
                 'format' => $field->options['format'] ?? 'strict_date_optional_time||epoch_millis',
                 // equals operations and sorts
-                "fields" => [
-                    "keyword" => [
-                        "type" => FieldType::KEYWORD
+                'fields' => [
+                    'keyword' => [
+                        'type' => FieldType::KEYWORD,
                     ],
                 ],
             ],

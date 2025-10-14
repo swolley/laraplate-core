@@ -135,9 +135,9 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $keys = array_keys($methods);
             $imploded_methods = implode('|', array_map('strtoupper', $keys));
             $post_methods_padding = 40 - mb_strlen($imploded_methods);
-            $post_route_padding = 60 - mb_strlen($path);
+            $post_route_padding = 60 - mb_strlen((string) $path);
 
-            if (isset($old_doc['paths'][$path]) && $old_doc['paths'][$path] == $doc['paths'][$path]) {
+            if (isset($old_doc['paths'][$path]) && $old_doc['paths'][$path] === $doc['paths'][$path]) {
                 $color = 'gray';
                 $message = 'unchanged';
             } elseif (isset($old_doc['paths'][$path])) {

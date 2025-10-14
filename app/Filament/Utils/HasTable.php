@@ -78,12 +78,10 @@ trait HasTable
         $has_searchable = in_array(Searchable::class, $traits, true);
 
         if ($has_soft_deletes) {
-            $table->recordClasses(function ($record) {
-                return $record->deleted_at ? [
-                    'line-through' => true,
-                    'text-gray-500' => true,
-                ] : [];
-            });
+            $table->recordClasses(fn ($record): array => $record->deleted_at ? [
+                'line-through' => true,
+                'text-gray-500' => true,
+            ] : []);
         }
 
         self::configureColumns(
@@ -106,7 +104,6 @@ trait HasTable
             $fixedActions,
             $permissions_prefix,
             $user,
-            $model_instance,
         );
 
         self::configureFilters(
@@ -183,9 +180,8 @@ trait HasTable
             $default_columns->add(
                 TextColumn::make('validity')
                     /** @var Model&HasValidity $record */
-                    ->formatStateUsing(function (Model $record) {
-                        return sprintf(
-                            '<div class="space-y-1">
+                    ->formatStateUsing(fn (Model $record): string => sprintf(
+                        '<div class="space-y-1">
                             <div class="flex justify-between">
                                 <span>Valid from:</span>
                                 <span>%s</span>
@@ -195,10 +191,9 @@ trait HasTable
                                 <span>%s</span>
                             </div>
                         </div>',
-                            $record->{$record->validFromKey()}?->format('Y-m-d H:i:s'),
-                            $record->{$record->validToKey()}?->format('Y-m-d H:i:s'),
-                        );
-                    })
+                        $record->{$record->validFromKey()}?->format('Y-m-d H:i:s'),
+                        $record->{$record->validToKey()}?->format('Y-m-d H:i:s'),
+                    ))
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
                     ->html(),
@@ -212,7 +207,7 @@ trait HasTable
                     ->alignCenter()
                     ->trueIcon('heroicon-o-lock-closed')
                     ->tooltip(
-                        function (Model $record) {
+                        function (Model $record): ?string {
                             if (! $record->isLocked()) {
                                 return null;
                             }
@@ -247,7 +242,7 @@ trait HasTable
         if ($model_instance->timestamps) {
             $default_columns->add(
                 TextColumn::make('timestamps')
-                    ->formatStateUsing(function (Model $record) use ($hasSoftDeletes) {
+                    ->formatStateUsing(function (Model $record) use ($hasSoftDeletes): string {
                         $string
                             = '<div class="space-y-1">
                             <div class="flex justify-between">
@@ -285,7 +280,7 @@ trait HasTable
             $columns($default_columns);
         }
 
-        $default_columns->keyBy(fn(Column $column) => $column->getName());
+        $default_columns->keyBy(fn (Column $column): string => $column->getName());
         $primary_key = $model_instance->getKeyName();
 
         if (! $default_columns->offsetExists($primary_key)) {
@@ -333,14 +328,14 @@ trait HasTable
                         $record->update([$valid_from_column => now(), $valid_to_column => null]);
                         $record->refresh();
                     })
-                    ->disabled(fn(Model $record) => $record->isValid())
-                    ->color(fn(Model $record) => $record->isValid() ? 'gray' : 'success')
+                    ->disabled(fn (Model $record) => $record->isValid())
+                    ->color(fn (Model $record): string => $record->isValid() ? 'gray' : 'success')
                     ->requiresConfirmation(),
                 Action::make('unpublish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedStop)
-                    ->color(fn(Model $record) => $record->isDraft() ? 'gray' : 'warning')
-                    ->disabled(fn(Model $record) => $record->isDraft())
+                    ->color(fn (Model $record): string => $record->isDraft() ? 'gray' : 'warning')
+                    ->disabled(fn (Model $record) => $record->isDraft())
                     ->action(function (Model $record): void {
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_to_column => now()]);
@@ -363,7 +358,7 @@ trait HasTable
                 BulkAction::make('reindex')
                     ->icon(Heroicon::ArrowPath)
                     ->action(function (Collection $records): void {
-                        $records->each(fn(Model $record) => $record->reindex());
+                        $records->each(fn (Model $record) => $record->reindex());
                     }),
             );
         }
@@ -422,7 +417,7 @@ trait HasTable
 
         $fixed_actions_list = [];
         $grouped_actions_list = [];
-        $default_actions->keyBy(fn(Action $action) => $action->getName());
+        $default_actions->keyBy(fn (Action $action): ?string => $action->getName());
 
         foreach ($default_actions as $name => $action) {
             if ($fixedActions !== [] && in_array($name, $fixedActions, true)) {
@@ -465,27 +460,21 @@ trait HasTable
                     SelectFilter::make('preset')
                         ->label('Preset')
                         ->multiple()
-                        ->options(function () use ($entity_type) {
-                            return Preset::query()
-                                ->join('entities', 'presets.entity_id', '=', 'entities.id')
-                                ->where('presets.is_active', true)
-                                ->whereHas('entity', fn(Builder $query) => $query->where([
-                                    'entities.is_active' => true,
-                                    'entities.type' => $entity_type,
-                                ]))
-                                ->orderBy('entities.name')
-                                ->orderBy('presets.name')
-                                ->get(['presets.id', 'presets.name', 'presets.entity_id', 'entities.name'])
-                                ->mapWithKeys(function (Preset $preset) {
-                                    return [$preset->id => $preset->entity->name . ' - ' . $preset->name];
-                                });
-                        })
-                        ->query(function (Builder $query, array $data): Builder {
-                            return $query->when(
-                                $data['values'],
-                                fn(Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
-                            );
-                        }),
+                        ->options(fn () => Preset::query()
+                            ->join('entities', 'presets.entity_id', '=', 'entities.id')
+                            ->where('presets.is_active', true)
+                            ->whereHas('entity', fn (Builder $query) => $query->where([
+                                'entities.is_active' => true,
+                                'entities.type' => $entity_type,
+                            ]))
+                            ->orderBy('entities.name')
+                            ->orderBy('presets.name')
+                            ->get(['presets.id', 'presets.name', 'presets.entity_id', 'entities.name'])
+                            ->mapWithKeys(fn (Preset $preset): array => [$preset->id => $preset->entity->name . ' - ' . $preset->name]))
+                        ->query(fn (Builder $query, array $data): Builder => $query->when(
+                            $data['values'],
+                            fn (Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
+                        )),
                 );
             }
         }
@@ -507,20 +496,16 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(function (Builder $query, array $data) use ($deleted_at_column): Builder {
-                        return $query->when($data['value'], function (Builder $query, $value) use ($deleted_at_column): Builder {
-                            return match ($value) {
-                                // 'all' => $query->withTrashed(),
-                                'none' => $query->withoutTrashed(),
-                                'only' => $query->onlyTrashed(),
-                                'today' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfDay()),
-                                'week' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfWeek()),
-                                'month' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfMonth()),
-                                'year' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfYear()),
-                                default => $query->withoutGlobalScope('deleted'),
-                            };
-                        });
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                        // 'all' => $query->withTrashed(),
+                        'none' => $query->withoutTrashed(),
+                        'only' => $query->onlyTrashed(),
+                        'today' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', today()),
+                        'week' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfWeek()),
+                        'month' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfMonth()),
+                        'year' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfYear()),
+                        default => $query->withoutGlobalScope('deleted'),
+                    })),
             );
         }
 
@@ -543,20 +528,16 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(function (Builder $query, array $data) use ($locked_at_column): Builder {
-                        return $query->when($data['value'], function (Builder $query, $value) use ($locked_at_column): Builder {
-                            return match ($value) {
-                                // 'all' => $query->withLocked(),
-                                'none' => $query->withoutLocked(),
-                                'only' => $query->onlyLocked(),
-                                'today' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfDay()),
-                                'week' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
-                                'month' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
-                                'year' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
-                                default => $query,
-                            };
-                        });
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                        // 'all' => $query->withLocked(),
+                        'none' => $query->withoutLocked(),
+                        'only' => $query->onlyLocked(),
+                        'today' => $query->onlyLocked()->whereDate($locked_at_column, '<=', today()),
+                        'week' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
+                        'month' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
+                        'year' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
+                        default => $query,
+                    })),
             );
         }
 
@@ -572,16 +553,14 @@ trait HasTable
                         'expired' => 'Expired',
                         'draft' => 'Draft',
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return match ($data['value']) {
-                            // 'all' => $query,
-                            'valid' => $query->valid(),
-                            'scheduled' => $query->scheduled(),
-                            'expiring' => $query->expiring(),
-                            'expired' => $query->expired(),
-                            'draft' => $query->draft(),
-                            default => $query,
-                        };
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value']) {
+                        // 'all' => $query,
+                        'valid' => $query->valid(),
+                        'scheduled' => $query->scheduled(),
+                        'expiring' => $query->expiring(),
+                        'expired' => $query->expired(),
+                        'draft' => $query->draft(),
+                        default => $query,
                     }),
             );
         }
@@ -600,18 +579,14 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(function (Builder $query, array $data) use ($created_at_column): Builder {
-                        return $query->when($data['value'], function (Builder $query, $value) use ($created_at_column): Builder {
-                            return match ($value) {
-                                // 'all' => $query,
-                                'today' => $query->whereDate($created_at_column, '>=', now()->startOfDay()),
-                                'week' => $query->whereDate($created_at_column, '>=', now()->startOfWeek()),
-                                'month' => $query->whereDate($created_at_column, '>=', now()->startOfMonth()),
-                                'year' => $query->whereDate($created_at_column, '>=', now()->startOfYear()),
-                                default => $query,
-                            };
-                        });
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                        // 'all' => $query,
+                        'today' => $query->whereDate($created_at_column, '>=', today()),
+                        'week' => $query->whereDate($created_at_column, '>=', now()->startOfWeek()),
+                        'month' => $query->whereDate($created_at_column, '>=', now()->startOfMonth()),
+                        'year' => $query->whereDate($created_at_column, '>=', now()->startOfYear()),
+                        default => $query,
+                    })),
                 SelectFilter::make($updated_at_column)
                     ->label('Updated at')
                     ->attribute($updated_at_column)
@@ -622,18 +597,14 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(function (Builder $query, array $data) use ($updated_at_column): Builder {
-                        return $query->when($data['value'], function (Builder $query, $value) use ($updated_at_column): Builder {
-                            return match ($value) {
-                                // 'all' => $query,
-                                'today' => $query->whereDate($updated_at_column, '>=', now()->startOfDay()),
-                                'week' => $query->whereDate($updated_at_column, '>=', now()->startOfWeek()),
-                                'month' => $query->whereDate($updated_at_column, '>=', now()->startOfMonth()),
-                                'year' => $query->whereDate($updated_at_column, '>=', now()->startOfYear()),
-                                default => $query,
-                            };
-                        });
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                        // 'all' => $query,
+                        'today' => $query->whereDate($updated_at_column, '>=', today()),
+                        'week' => $query->whereDate($updated_at_column, '>=', now()->startOfWeek()),
+                        'month' => $query->whereDate($updated_at_column, '>=', now()->startOfMonth()),
+                        'year' => $query->whereDate($updated_at_column, '>=', now()->startOfYear()),
+                        default => $query,
+                    })),
             );
         }
 

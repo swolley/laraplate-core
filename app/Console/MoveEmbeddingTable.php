@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Console;
 
 use function Laravel\Prompts\confirm;
+
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\ModelEmbedding;
-
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 final class MoveEmbeddingTable extends Command
@@ -25,9 +27,8 @@ final class MoveEmbeddingTable extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-
         $configured_connection = new ModelEmbedding()->getConnection();
         // $configured_connection = config('search.embedding_model_connection');
         $already_migrated = DB::connection($configured_connection)->table('model_embeddings')->exists();
@@ -35,16 +36,17 @@ final class MoveEmbeddingTable extends Command
         $other_connection_exists = $default_connection !== $configured_connection && DB::connection($default_connection)->table('model_embeddings')->exists();
 
         if ($already_migrated) {
-            $this->error("The embedding table already exists on the $configured_connection connection.");
+            $this->error("The embedding table already exists on the {$configured_connection} connection.");
+
             return SymfonyCommand::SUCCESS;
         }
 
         if ($other_connection_exists) {
-            if (!confirm('Dropping the current embedding table will lose all the embeddings. Do you want to proceed?', false)) {
+            if (! confirm('Dropping the current embedding table will lose all the embeddings. Do you want to proceed?', false)) {
                 return SymfonyCommand::SUCCESS;
             }
 
-            $this->info("Dropping the embedding table on $default_connection connection...");
+            $this->info("Dropping the embedding table on {$default_connection} connection...");
             Schema::connection($default_connection)->dropIfExists('model_embeddings');
         }
 
@@ -52,7 +54,7 @@ final class MoveEmbeddingTable extends Command
         $migration_class = eval($code);
         $migration_class::up();
 
-        $this->info("Embedding table migrated to $configured_connection connection.");
+        $this->info("Embedding table migrated to {$configured_connection} connection.");
 
         return SymfonyCommand::SUCCESS;
     }

@@ -47,7 +47,7 @@ final class Funnel extends ListEntity
         // if (is_array($this->getLabelField())) array_push($columns, ...array_map(fn ($field) => $field->getName(), $this->getLabelField()));
         // else $columns[] = $this->getLabelField()->getName();
         // $columns = array_unique($columns);
-        $columns = $this->getAllFields()->map(fn ($field): string => $field->getName())->toArray();
+        $columns = $this->getAllFields()->map(fn ($field): string => $field->getName())->all();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $funnels_data['sort'] ?? $this->getDefaultSorts($columns, $model));
@@ -79,7 +79,7 @@ final class Funnel extends ListEntity
     private function prepareFunnelFilterProperties(array $list, array &$grouped_filters): void
     {
         foreach ($list as $field => $filter) {
-            $path = explode('.', $field);
+            $path = explode('.', (string) $field);
             array_shift($path);
             $field = array_pop($path);
             $path = implode('.', $path);
@@ -105,12 +105,12 @@ final class Funnel extends ListEntity
             foreach ($grouped_filters as $path => $entity_filters) {
                 if (count(explode('.', $path)) === 1) {
                     foreach ($entity_filters as $filter) {
-                        static::applyCorrectWhereMethod($q, $filter['property'], $filter['operator'], $filter['value']);
+                        self::applyCorrectWhereMethod($q, $filter['property'], $filter['operator'], $filter['value']);
                     }
                 } else {
                     $q->whereHas($path, function ($q2) use ($entity_filters): void {
                         foreach ($entity_filters as $filter) {
-                            static::applyCorrectWhereMethod($q2, $filter['property'], $filter['operator'], $filter['value']);
+                            self::applyCorrectWhereMethod($q2, $filter['property'], $filter['operator'], $filter['value']);
                         }
                     });
                 }

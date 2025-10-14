@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Override;
@@ -13,6 +14,8 @@ use Override;
  */
 final class ModelEmbedding extends Model
 {
+    use HasFactory;
+
     protected $connection {
         get {
             return config('search.embedding_model_connection');

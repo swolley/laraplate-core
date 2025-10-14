@@ -202,9 +202,9 @@ trait HasCacheRepository
     /**
      * compose key parts by user and groups.
      *
-     * @return array<int,string>|null
+     * @return string[]
      */
-    private function getKeyPartsFromUser(User $user): ?array
+    private function getKeyPartsFromUser(User $user): array
     {
         $tags = ["U{$user->id}"];
         $group_method = null;
@@ -218,9 +218,12 @@ trait HasCacheRepository
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
         }
-        $groups = $user->{$group_method}->map(fn (Model $r): string => "R{$r->id}")->toArray();
-        sort($groups);
-        array_push($tags, ...$groups);
+
+        if ($group_method) {
+            $groups = $user->{$group_method}->map(fn (Model $r): string => "R{$r->id}")->toArray();
+            sort($groups);
+            array_push($tags, ...$groups);
+        }
 
         return array_map('strval', $tags);
     }

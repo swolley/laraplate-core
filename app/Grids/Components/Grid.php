@@ -743,14 +743,10 @@ final class Grid extends Entity
      */
     private function createUserLayout(): mixed
     {
-        if (! $this->checkGridLayoutsTableExists()) {
-            throw new BadMethodCallException("App doesn't support grid layouts");
-        }
+        throw_unless($this->checkGridLayoutsTableExists(), BadMethodCallException::class, "App doesn't support grid layouts");
         $user = Auth::user();
 
-        if (! $user) {
-            throw new Exception('User must be logged in to update a grid layout');
-        }
+        throw_unless($user, Exception::class, 'User must be logged in to update a grid layout');
 
         $id = DB::table(self::LAYOUTS_TABLE)->insertGetId($this->requestData->layout);
 
@@ -766,16 +762,12 @@ final class Grid extends Entity
      */
     private function getLayoutWriteBuilder(): QueryBuilder
     {
-        if (! $this->checkGridLayoutsTableExists()) {
-            throw new BadMethodCallException("App doesn't support grid layouts");
-        }
+        throw_unless($this->checkGridLayoutsTableExists(), BadMethodCallException::class, "App doesn't support grid layouts");
 
         /** @var User|null $user */
         $user = Auth::user();
 
-        if (! $user) {
-            throw new Exception('User must be logged in to update a grid layout');
-        }
+        throw_unless($user, Exception::class, 'User must be logged in to update a grid layout');
 
         return DB::table(self::LAYOUTS_TABLE)->where('id', $this->requestData->layout['id'])->where(function ($query) use ($user): void {
             $query->where('user_id', $user->id);
@@ -859,11 +851,11 @@ final class Grid extends Entity
      */
     private function getData(): array
     {
-        $all_fields = $this->getAllFields()->filter(fn (Field $f): bool => ! $f->isAppend());
+        $all_fields = $this->getAllFields()->reject(fn (Field $f): bool => $f->isAppend());
         $request_columns = $this->requestData->columns;
-        $main_columns = ($request_columns !== [] ? $this->getFields() : $all_fields)->map(fn (Field $f): string => $f->getName())->toArray();
-        $columns_filters = array_filter($this->requestData->filters ?? [], fn ($f): bool => $f['value'] !== '');
-        $funnels_filters = array_filter($this->requestData->funnelsFilters ?? [], fn ($f): bool => $f['value'] !== []);
+        $main_columns = ($request_columns !== [] ? $this->getFields() : $all_fields)->map(fn (Field $f): string => $f->getName())->all();
+        $columns_filters = array_filter($this->requestData->filters ?? [], fn (array $f): bool => $f['value'] !== '');
+        $funnels_filters = array_filter($this->requestData->funnelsFilters ?? [], fn (array $f): bool => $f['value'] !== []);
         $model_filters = [
             ...$this->getEntityFilters(lcfirst($this->getModelName()), $columns_filters),
             ...$this->getEntityFilters(lcfirst($this->getModelName()), $funnels_filters),
@@ -892,7 +884,7 @@ final class Grid extends Entity
 
             $real_relation_name = preg_replace('/^' . lcfirst($this->getModelName()) . "\./", '', $relation);
             $query->with($real_relation_name, function ($q) use ($relation_filters, $relation_info, $all_fields): void {
-                $relation_columns = $relation_info->getFields()->map(fn ($f): string => $f->getName())->toArray();
+                $relation_columns = $relation_info->getFields()->map(fn ($f): string => $f->getName())->all();
                 $q->select(empty($relation_columns) ? ['*'] : array_values($relation_columns));
 
                 if (! in_array($relation_info->info->getOwnerKey(), $q->getQuery()->getQuery()->columns, true)) {
@@ -916,8 +908,8 @@ final class Grid extends Entity
         if ($this->requestData->pagination !== 0) {
             $query->skip((int) $this->requestData->from - 1);
 
-            if (isset($this->requestData->to)) {
-                $query->take((int) $this->requestData->to - (int) $this->requestData->from + 1);
+            if ($this->requestData->to !== null) {
+                $query->take($this->requestData->to - (int) $this->requestData->from + 1);
             }
         }
 
@@ -1018,18 +1010,14 @@ final class Grid extends Entity
 
         foreach ($request_changes as $record) {
             $query->orWhere(function ($q) use ($record, $primary_key_fields, &$fields): void {
-                if (! is_array($record['record'])) {
-                    throw new InvalidArgumentException('Invalid record value');
-                }
+                throw_unless(is_array($record['record']), InvalidArgumentException::class, 'Invalid record value');
 
-                if ($primary_key_fields != array_keys($record['record'])) {
-                    throw new InvalidArgumentException('Invalid primary key fields');
-                }
+                throw_if($primary_key_fields !== array_keys($record['record']), InvalidArgumentException::class, 'Invalid primary key fields');
 
-                static::applyCorrectWhereMethod($q, $record['property'], FilterOperator::NOT_EQUALS, $record['value']);
+                self::applyCorrectWhereMethod($q, $record['property'], FilterOperator::NOT_EQUALS, $record['value']);
 
                 foreach ($record['record'] as $column => $value) {
-                    static::applyCorrectWhereMethod($q, $column, FilterOperator::EQUALS, $value);
+                    self::applyCorrectWhereMethod($q, $column, FilterOperator::EQUALS, $value);
                 }
 
                 if ($fields === []) {
@@ -1078,11 +1066,9 @@ final class Grid extends Entity
         $primary_key = $this->getPrimaryKey();
         $primary_value = is_string($primary_key) ? $this->requestData->request->get($primary_key) : array_map(fn ($key): mixed => $this->requestData->request->get($key), $primary_key);
 
-        if ($this->getModel()->incrementing && $primary_value !== null && $primary_value != []) {
-            throw new UnexpectedValueException('Cannot assign a value to the primary key because is an autoincrement field');
-        }
+        throw_if($this->getModel()->incrementing && $primary_value !== null && $primary_value !== [], UnexpectedValueException::class, 'Cannot assign a value to the primary key because is an autoincrement field');
         $full_primary_key = $this->getFullPrimaryKey();
-        $data = array_filter($this->requestData->request->all(), fn ($k): bool => (is_array($full_primary_key) ? ! in_array($k, $full_primary_key, true) : $k != $full_primary_key) && $k != 'action', ARRAY_FILTER_USE_KEY);
+        $data = array_filter($this->requestData->request->all(), fn ($k): bool => (is_array($full_primary_key) ? ! in_array($k, $full_primary_key, true) : $k !== $full_primary_key) && $k !== 'action', ARRAY_FILTER_USE_KEY);
         // $validator = Validator::make($data, $this->getAllFields()->getRules);
         // $validated = $validator->stopOnFirstFailure(false)->validate();
 

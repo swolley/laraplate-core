@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
@@ -19,6 +20,7 @@ final class Permission extends ModelsPermission
     use HasCache, HasValidations {
         getRules as protected getRulesTrait;
     }
+    use HasFactory;
 
     /**
      * @var array<int,string>
@@ -87,12 +89,7 @@ final class Permission extends ModelsPermission
         return $this->hasMany(ACL::class);
     }
 
-    private static function newFactory(): PermissionFactory
-    {
-        return PermissionFactory::new();
-    }
-
-    private function getActionAttribute(): ?ActionEnum
+    protected function getActionAttribute(): ?ActionEnum
     {
         if ($this->name === null) {
             return null;
@@ -100,5 +97,10 @@ final class Permission extends ModelsPermission
         $splitted = explode('.', $this->name);
 
         return ActionEnum::tryFrom(array_pop($splitted));
+    }
+
+    private static function newFactory(): PermissionFactory
+    {
+        return PermissionFactory::new();
     }
 }

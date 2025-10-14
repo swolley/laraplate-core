@@ -14,7 +14,7 @@ class TranslationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'prefix' => 'nullable|string|regex:/^\w+(.\w+)*$/',
+            'prefix' => ['nullable', 'string', 'regex:/^\w+(.\w+)*$/'],
         ];
     }
 

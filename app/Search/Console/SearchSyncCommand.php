@@ -6,7 +6,7 @@ namespace Modules\Core\Search\Console;
 
 use Exception;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Laravel\Prompts\Progress;
 use Modules\Core\Cache\HasCache;
@@ -49,7 +49,7 @@ final class SearchSyncCommand extends Command
             if ($id) {
                 $model->where('id', $id);
             } elseif ($from) {
-                $model->where('updated_at', '>', Carbon::parse($from));
+                $model->where('updated_at', '>', Date::parse($from));
             } else {
                 $last_indexed = $model->getLastIndexedTimestamp();
                 $model->where('updated_at', '>', $last_indexed);

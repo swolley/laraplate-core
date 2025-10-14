@@ -58,7 +58,7 @@ final class SettingsTable
                             'datetime' => 'DateTime',
                         ]),
                     SelectFilter::make('group_name')
-                        ->options(fn() => Setting::distinct()->pluck('group_name', 'group_name')->toArray()),
+                        ->options(fn () => Setting::query()->distinct()->pluck('group_name', 'group_name')->toArray()),
                     SelectFilter::make('is_public')
                         ->options([
                             '1' => 'Public',

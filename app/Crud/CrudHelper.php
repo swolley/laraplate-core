@@ -207,7 +207,7 @@ final class CrudHelper
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn ($relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_filter($relations, fn (string $relation): bool => ! in_array($relation, $black_list, true));
     }
 
     /**
@@ -307,11 +307,9 @@ final class CrudHelper
             // like not like
             $method .= Str::studly($filter->operator->value);
             $query->{$method}($filter->property, $filter->value);
-        } else {
+        } elseif ($method !== '' && method_exists($query, $method)) {
             // all the others
-            if (! empty($method) && method_exists($query, $method)) {
-                $query->{$method}($filter->property, $filter->operator->value, $filter->value);
-            }
+            $query->{$method}($filter->property, $filter->operator->value, $filter->value);
         }
     }
 
@@ -325,7 +323,7 @@ final class CrudHelper
 
         foreach ($iterable as &$subfilter) {
             if (isset($subfilter->filters)) {
-                if (! empty($method) && method_exists($query, $method)) {
+                if ($method !== '' && method_exists($query, $method)) {
                     $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
             } else {

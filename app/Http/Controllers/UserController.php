@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\UnauthorizedException;
 use Laravel\Socialite\Contracts\User as SocialUser;
@@ -40,10 +42,10 @@ final class UserController extends Controller
         return self::parseUserInfo();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [auth])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [auth])
+     */
     public function userInfo(Request $request): HttpFoundationResponse
     {
         /** @var User|null $user */
@@ -66,10 +68,10 @@ final class UserController extends Controller
         }
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [auth, can:impersonate])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [auth, can:impersonate])
+     */
     public function impersonate(ImpersonationRequest $request): HttpFoundationResponse
     {
         $user_to_impersonate_id = $request->validated()['user'];
@@ -84,10 +86,10 @@ final class UserController extends Controller
             ->json();
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [auth, can:impersonate])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [auth, can:impersonate])
+     */
     public function leaveImpersonate(Request $request): HttpFoundationResponse
     {
         /** @var User $current_user */
@@ -104,12 +106,12 @@ final class UserController extends Controller
         return $this->socialite->driver($service)->redirect();
     }
 
-    public function socialLoginCallback(string $service)
+    public function socialLoginCallback(string $service): Redirector|RedirectResponse
     {
         /** @var SocialUser $social_user */
         $social_user = $this->socialite->driver($service)->user();
 
-        $user = User::updateOrCreate([
+        $user = User::query()->updateOrCreate([
             'social_id' => $social_user->getId(),
         ], [
             'name' => $social_user->getName(),
@@ -126,10 +128,10 @@ final class UserController extends Controller
         return redirect('/dashboard');
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [auth])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [auth])
+     */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {
         return Auth::user()

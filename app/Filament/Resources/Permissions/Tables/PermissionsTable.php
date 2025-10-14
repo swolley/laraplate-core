@@ -39,14 +39,14 @@ final class PermissionsTable
             filters: function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('guard_name')
-                        ->options(Permission::distinct('guard_name')->pluck('guard_name'))
+                        ->options(Permission::query()->distinct('guard_name')->pluck('guard_name'))
                         ->multiple()
                         ->preload(),
                     SelectFilter::make('connection_name')
-                        ->options(Permission::distinct('connection_name')->pluck('connection_name'))
+                        ->options(Permission::query()->distinct('connection_name')->pluck('connection_name'))
                         ->preload(),
                     SelectFilter::make('table_name')
-                        ->options(Permission::distinct('table_name')->pluck('table_name'))
+                        ->options(Permission::query()->distinct('table_name')->pluck('table_name'))
                         ->preload(),
                 ]);
             },

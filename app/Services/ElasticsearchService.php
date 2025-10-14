@@ -92,7 +92,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->create($params);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch create index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -123,7 +123,7 @@ final class ElasticsearchService
             $response = $this->client->indices()->delete(['index' => $index]);
 
             return $response->asBool();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch delete index error', [
                 'index' => $index,
                 'error' => $e->getMessage(),
@@ -188,7 +188,7 @@ final class ElasticsearchService
                 'failed' => $failed,
                 'errors' => $errors,
             ];
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch bulk index error', [
                 'index' => $index,
                 'documents_count' => count($documents),
@@ -220,7 +220,7 @@ final class ElasticsearchService
             $response = $this->client->search($params);
 
             return $response->asArray();
-        } catch (ClientResponseException | ServerResponseException $e) {
+        } catch (ClientResponseException|ServerResponseException $e) {
             Log::error('Elasticsearch search error', [
                 'index' => $index,
                 'query' => $query,

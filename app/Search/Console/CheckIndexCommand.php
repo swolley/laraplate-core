@@ -34,16 +34,16 @@ final class CheckIndexCommand extends Command
             if ($model) {
                 $modeles = [$model];
             } else {
-                $modeles = array_filter(models(), fn($model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
+                $modeles = array_filter(models(), fn (string $model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
             }
 
             $wrong_or_missing_indexes = [];
 
             foreach ($modeles as &$model) {
                 $this->info('Checking model ' . $model);
-                $model = new $model();
+                $model_instance = new $model();
 
-                if (! $model->checkIndex()) {
+                if (! $model_instance->checkIndex()) {
                     $wrong_or_missing_indexes[] = $model;
                     $this->warn('Model ' . $model . ' has a wrong or missing index.');
                 }
@@ -57,7 +57,7 @@ final class CheckIndexCommand extends Command
 
             if (confirm('Do you want to reindex the unmathced models?')) {
                 foreach ($wrong_or_missing_indexes as $model) {
-                    ReindexSearchJob::dispatch($model);
+                    dispatch(new ReindexSearchJob($model));
 
                     // Se il modello usa il trait HasCache, invalida la cache
                     if (in_array(HasCache::class, class_uses_recursive($model), true)) {

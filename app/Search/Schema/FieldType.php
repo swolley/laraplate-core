@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Schema;
 
+use DateTimeInterface;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
 enum FieldType: string
@@ -36,11 +37,12 @@ enum FieldType: string
 
     public static function fromValue(mixed $value): self
     {
-        if (($value instanceof \DateTimeInterface)) {
+        if (($value instanceof DateTimeInterface)) {
             return self::DATE;
         }
 
         $type = gettype($value);
+
         return match ($type) {
             'double' => self::FLOAT,
             'string' => self::TEXT,

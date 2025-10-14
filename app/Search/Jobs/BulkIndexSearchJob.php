@@ -51,21 +51,15 @@ final class BulkIndexSearchJob extends CommonSearchJob
         private bool $force = false,
     ) {
         // Validate that collection is not empty
-        if ($models->isEmpty()) {
-            throw new InvalidArgumentException('Cannot index an empty collection');
-        }
+        throw_if($models->isEmpty(), InvalidArgumentException::class, 'Cannot index an empty collection');
 
         // Validate that all models are of the same class
         $model_class = $models->first()::class;
 
-        if (! $models->every(fn($model): bool => $model instanceof $model_class)) {
-            throw new InvalidArgumentException('All models must be of the same class');
-        }
+        throw_unless($models->every(fn ($model): bool => $model instanceof $model_class), InvalidArgumentException::class, 'All models must be of the same class');
 
         // Validate that the model implements Searchable
-        if (! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true)) {
-            throw new InvalidArgumentException("Model {$model_class} does not use the Searchable trait");
-        }
+        throw_if(! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true), InvalidArgumentException::class, "Model {$model_class} does not use the Searchable trait");
 
         parent::__construct();
     }

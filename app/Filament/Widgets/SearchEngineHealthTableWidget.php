@@ -14,7 +14,7 @@ final class SearchEngineHealthTableWidget extends Widget
 {
     protected string $view = 'core::filament.widgets.search-engine-health';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function getViewData(): array
     {
@@ -35,7 +35,7 @@ final class SearchEngineHealthTableWidget extends Widget
             }
 
             // Get searchable models and their counts
-            $models = models(filter: fn($model) => class_uses_trait($model, Searchable::class) && !class_uses_trait($model, HasChildren::class, false));
+            $models = models(filter: fn ($model): bool => class_uses_trait($model, Searchable::class) && ! class_uses_trait($model, HasChildren::class, false));
             $modelData = [];
 
             foreach ($models as $model) {

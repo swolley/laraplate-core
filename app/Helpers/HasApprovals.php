@@ -28,25 +28,6 @@ trait HasApprovals
         $this->deleteWhenDisapproved = true;
     }
 
-    public function getPreviewAttribute(): ?array
-    {
-        if (! session('preview', false)) {
-            return null;
-        }
-
-        $preview = $this->attributesToArray();
-
-        /** @var Modification $modification */
-        foreach ($this->modifications()->oldest()->select(['modifications'])->cursor() as $modification) {
-            /** @phpstan-ignore property.notFound */
-            foreach ($modification->modifications as $key => $mod) {
-                $preview[$key] = $mod['modified'];
-            }
-        }
-
-        return $preview;
-    }
-
     public function toArray()
     {
         if (! $this->preview) {
@@ -59,6 +40,25 @@ trait HasApprovals
         foreach ($preview['_'] as $key => $value) {
             if ($preview[$key] === $value) {
                 unset($preview['_'][$key]);
+            }
+        }
+
+        return $preview;
+    }
+
+    protected function getPreviewAttribute(): ?array
+    {
+        if (! session('preview', false)) {
+            return null;
+        }
+
+        $preview = $this->attributesToArray();
+
+        /** @var Modification $modification */
+        foreach ($this->modifications()->oldest()->select(['modifications'])->cursor() as $modification) {
+            /** @phpstan-ignore property.notFound */
+            foreach ($modification->modifications as $key => $mod) {
+                $preview[$key] = $mod['modified'];
             }
         }
 

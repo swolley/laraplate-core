@@ -14,7 +14,7 @@ use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
-use Log;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 final class FinalizeReindexJob implements ShouldQueue
@@ -49,9 +49,7 @@ final class FinalizeReindexJob implements ShouldQueue
             $elasticsearch_client = ClientBuilder::create()->build();
 
             // Verifichiamo che l'indice temporaneo esista
-            if (! $elasticsearch_client->indices()->exists(['index' => $this->temp_index])) {
-                throw new Exception("Temporary index {$this->temp_index} does not exist");
-            }
+            throw_unless($elasticsearch_client->indices()->exists(['index' => $this->temp_index]), Exception::class, "Temporary index {$this->temp_index} does not exist");
 
             // Se l'indice originale esiste, lo eliminiamo
             if ($elasticsearch_client->indices()->exists(['index' => $this->index_name])) {

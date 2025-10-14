@@ -47,7 +47,7 @@ final class GridRequestData extends ListRequestData
      */
     private static function replacePrimaryKeyUnderscores(string|array $primaryKeyName): array|string
     {
-        return is_string($primaryKeyName) ? str_replace('.', '_', $primaryKeyName) : array_map(fn ($key) => (string) self::replacePrimaryKeyUnderscores($key), $primaryKeyName);
+        return is_string($primaryKeyName) ? str_replace('.', '_', $primaryKeyName) : array_map(fn (string $key) => (string) self::replacePrimaryKeyUnderscores($key), $primaryKeyName);
     }
 
     private function extractLayout(array $filters, string $tableName): array
@@ -132,9 +132,7 @@ final class GridRequestData extends ListRequestData
         /** @var string[] $replaced */
         $replaced = self::replacePrimaryKeyUnderscores($modelPrimaryKey);
 
-        if (($this->action === GridAction::UPDATE || $this->action === GridAction::DELETE || $this->action === GridAction::FORCE_DELETE) && empty($replaced)) {
-            throw new BadMethodCallException('PrimaryKey is mandatory for update and delete actions');
-        }
+        throw_if((in_array($this->action, [GridAction::UPDATE, GridAction::DELETE, GridAction::FORCE_DELETE], true)) && empty($replaced), BadMethodCallException::class, 'PrimaryKey is mandatory for update and delete actions');
 
         // TODO: da finire di scrivere
         $count = count($replaced);

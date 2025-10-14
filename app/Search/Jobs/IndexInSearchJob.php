@@ -48,9 +48,7 @@ final class IndexInSearchJob extends CommonSearchJob
         private Model $model,
     ) {
         // Validate that the model implements Searchable
-        if (! in_array(Searchable::class, class_uses_recursive($model::class), true)) {
-            throw new InvalidArgumentException('Model ' . $model::class . ' does not implement the Searchable trait');
-        }
+        throw_unless(in_array(Searchable::class, class_uses_recursive($model::class), true), InvalidArgumentException::class, 'Model ' . $model::class . ' does not implement the Searchable trait');
 
         parent::__construct();
     }

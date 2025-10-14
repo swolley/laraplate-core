@@ -51,7 +51,11 @@ final class PermissionChecker
             $request->setUserResolver(fn () => $user);
         }
 
-        return $user->isSuperAdmin() || $user->hasPermissionTo($permission_name, $guard_name);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return (bool) $user->hasPermissionTo($permission_name, $guard_name);
     }
 
     /**
@@ -64,9 +68,7 @@ final class PermissionChecker
      */
     public static function ensurePermissions(Request $request, string $entity, ?string $operation = null, ?string $connection = null /* , ?Collection $permissions = null */): true
     {
-        if (! self::checkPermissions($request, $entity, $operation, $connection/* , $permissions */)) {
-            throw new UnauthorizedException('User not allowed to access this resource');
-        }
+        throw_unless(self::checkPermissions($request, $entity, $operation, $connection/* , $permissions */), UnauthorizedException::class, 'User not allowed to access this resource');
 
         return true;
     }

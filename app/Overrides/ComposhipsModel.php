@@ -6,12 +6,15 @@ namespace Modules\Core\Overrides;
 
 use Awobaz\Compoships\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model as BaseModel;
 use InvalidArgumentException;
 use Override;
 
 class ComposhipsModel extends Model
 {
+    use HasFactory;
+
     #[Override]
     public function belongsToMany($related, $table = null, $foreignPivotKey = null, $relatedPivotKey = null, $parentKey = null, $relatedKey = null, $relation = null)
     {
@@ -74,10 +77,6 @@ class ComposhipsModel extends Model
      */
     protected function validateRelatedModel($related): void
     {
-        if (! is_subclass_of($related, self::class)) {
-            throw new InvalidArgumentException(
-                "The related model '{$related}' must extend " . self::class,
-            );
-        }
+        throw_unless(is_subclass_of($related, self::class), InvalidArgumentException::class, "The related model '{$related}' must extend " . self::class);
     }
 }

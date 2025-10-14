@@ -29,7 +29,7 @@ final class ImpersonationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user' => 'required|number|exists:User,id',
+            'user' => ['required', 'number', 'exists:User,id'],
         ];
     }
 }

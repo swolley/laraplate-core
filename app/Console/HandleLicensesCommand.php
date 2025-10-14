@@ -164,7 +164,7 @@ final class HandleLicensesCommand extends Command
             $number -= $expired;
         }
 
-        if ($number) {
+        if ($number !== 0) {
             License::factory($number)->create([
                 'valid_to' => $validTo ?? today(),
             ]);

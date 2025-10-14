@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Exception;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
@@ -30,7 +31,7 @@ use UnexpectedValueException;
  */
 final class DynamicEntity extends Model
 {
-    use HasGridUtils, HasValidations, HasVersions /* , HasAcl? */, SoftDeletes;
+    use HasFactory, HasGridUtils, HasValidations, HasVersions /* , HasAcl? */, SoftDeletes;
 
     /**
      * @var bool
@@ -82,7 +83,7 @@ final class DynamicEntity extends Model
 
         $found ??= self::findModel($models, Str::singular($requestEntity));
 
-        if ($found === null || $found === '' || $found === '0') {
+        if (in_array($found, [null, '', '0'], true)) {
             return null;
         }
 
@@ -144,9 +145,7 @@ final class DynamicEntity extends Model
     {
         $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
-        if (count($found) > 1) {
-            throw new Exception("Too many models found for '{$modelName}'");
-        }
+        throw_if(count($found) > 1, Exception::class, "Too many models found for '{$modelName}'");
 
         return count($found) === 1 ? head($found) : null;
     }
@@ -154,9 +153,7 @@ final class DynamicEntity extends Model
     private function verifyTableExistence(): void
     {
         /** @phpstan-ignore staticMethod.notFound */
-        if (! Schema::connection($this->connection)->hasTable($this->table)) {
-            throw new UnexpectedValueException("Table '{$this->table}' doesn't exists on '{$this->connection}' connection");
-        }
+        throw_unless(Schema::connection($this->connection)->hasTable($this->table), UnexpectedValueException::class, "Table '{$this->table}' doesn't exists on '{$this->connection}' connection");
     }
 
     private function setTableConnectionInfo(string $tableName, ?string $connection = null): void

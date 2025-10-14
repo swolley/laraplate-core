@@ -55,15 +55,11 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         try {
             $model = self::$MODEL_NAME;
 
-            if (! class_exists($model)) {
-                throw new BadMethodCallException('No Setting model found in the application');
-            }
+            throw_unless(class_exists($model), BadMethodCallException::class, 'No Setting model found in the application');
 
-            if (! Schema::hasTable(new $model()->getTable())) {
-                throw new BadMethodCallException('No settings table found in the database schema');
-            }
+            throw_unless(Schema::hasTable(new $model()->getTable()), BadMethodCallException::class, 'No settings table found in the database schema');
 
-            if (! Setting::where('name', self::$RECORD_NAME)->exists()) {
+            if (! Setting::query()->where('name', self::$RECORD_NAME)->exists()) {
                 self::seedBackendModules();
                 Log::info("Created Setting '{name}' config record", ['name' => self::$RECORD_NAME]);
             }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Pages;
 
 use BackedEnum;
+use Deprecated;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -23,6 +24,12 @@ final class HorizonHealth extends Page
 
     protected string $view = 'core::filament.pages.horizon';
 
+    #[Override]
+    public static function canAccess(): bool
+    {
+        return class_exists(\Laravel\Horizon\HorizonServiceProvider::class);
+    }
+
     // protected static ?int $navigationSort = 1;
 
     /**
@@ -34,18 +41,11 @@ final class HorizonHealth extends Page
     }
 
     /**
-     * @deprecated Use `getWidgetsSchemaComponents($this->getWidgets())` to transform widgets into schema components instead, which also filters their visibility.
-     *
      * @return array<class-string<Widget> | WidgetConfiguration>
      */
+    #[Deprecated(message: 'Use `getWidgetsSchemaComponents($this->getWidgets())` to transform widgets into schema components instead, which also filters their visibility.')]
     public function getVisibleWidgets(): array
     {
         return $this->filterVisibleWidgets($this->getWidgets());
-    }
-
-    #[Override]
-    public static function canAccess(): bool
-    {
-        return class_exists('Laravel\Horizon\HorizonServiceProvider');
     }
 }

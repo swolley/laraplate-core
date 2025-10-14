@@ -22,6 +22,7 @@ return new class extends Migration
         Schema::connection($connection)->create('model_embeddings', function (Blueprint $table) use ($driver): void {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
+
             if ($driver === 'pgsql') {
                 $table->vector('embedding', 1536)->nullable(false)->comment('The generated embedding of the model'); // 1536 dimensions for OpenAI
             } else {

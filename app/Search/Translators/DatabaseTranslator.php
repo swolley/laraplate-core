@@ -22,6 +22,11 @@ class DatabaseTranslator implements ISchemaTranslator
         ];
     }
 
+    public function getEngineName(): string
+    {
+        return 'database';
+    }
+
     private function getColumns(SchemaDefinition $schema): array
     {
         $columns = [];
@@ -38,38 +43,38 @@ class DatabaseTranslator implements ISchemaTranslator
         return match ($field->type) {
             FieldType::TEXT, FieldType::KEYWORD => [
                 'type' => 'text',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::INTEGER => [
                 'type' => 'integer',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::FLOAT => [
                 'type' => 'decimal',
                 'precision' => 10,
                 'scale' => 6,
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::BOOLEAN => [
                 'type' => 'boolean',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
                 'default' => $field->default ?? false,
             ],
             FieldType::DATE => [
                 'type' => 'timestamp',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::VECTOR => [
                 'type' => 'json', // Store as JSON for vector similarity
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::ARRAY => [
                 'type' => 'json',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
             FieldType::OBJECT => [
                 'type' => 'json',
-                'nullable' => !$field->required,
+                'nullable' => ! $field->required,
             ],
         };
     }
@@ -97,10 +102,5 @@ class DatabaseTranslator implements ISchemaTranslator
         }
 
         return $indexes;
-    }
-
-    public function getEngineName(): string
-    {
-        return 'database';
     }
 }

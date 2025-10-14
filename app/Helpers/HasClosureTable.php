@@ -90,36 +90,6 @@ trait HasClosureTable
         return $this->belongsTo(static::class, 'parent_id');
     }
 
-    #[Scope]
-    public function withClosure(Builder $query): Builder
-    {
-        return $query->with(['closure', 'ancestors']);
-    }
-
-    public function scopeTree(Builder $query): Builder
-    {
-        $closureTable = $this->getClosureTable();
-        // $modelTable = $this->getModelTable();
-
-        return $query->withClosure()
-            ->whereDoesntHave('ancestors')
-            ->with([
-                'closure' => fn ($query) => $query->orderBy($this->qualifyTreeColumn('depth', $closureTable)),
-            ]);
-    }
-
-    #[Scope]
-    public function withSiblings(Builder $query): Builder
-    {
-        return $query->with(['siblings', 'siblingsAndSelf']);
-    }
-
-    #[Scope]
-    public function withBloodline(Builder $query): Builder
-    {
-        return $query->with(['ancestors', 'descendants']);
-    }
-
     public function siblings(): HasMany
     {
         return $this->hasMany(static::class, 'parent_id')
@@ -234,7 +204,7 @@ trait HasClosureTable
             ];
         }
 
-        $table_name = (new static())->getTable() . '_closure';
+        $table_name = new static()->getTable() . '_closure';
         DB::table($table_name)->insert($rows);
 
         foreach ($model->children as $child) {
@@ -255,12 +225,42 @@ trait HasClosureTable
         });
 
         static::deleted(function ($model): void {
-            $table_name = (new static())->getTable() . '_closure';
+            $table_name = new static()->getTable() . '_closure';
             DB::table($table_name)
                 ->where('descendant_id', $model->id)
                 ->orWhere('ancestor_id', $model->id)
                 ->delete();
         });
+    }
+
+    #[Scope]
+    protected function withClosure(Builder $query): Builder
+    {
+        return $query->with(['closure', 'ancestors']);
+    }
+
+    protected function scopeTree(Builder $query): Builder
+    {
+        $closureTable = $this->getClosureTable();
+        // $modelTable = $this->getModelTable();
+
+        return $query->withClosure()
+            ->whereDoesntHave('ancestors')
+            ->with([
+                'closure' => fn ($query) => $query->orderBy($this->qualifyTreeColumn('depth', $closureTable)),
+            ]);
+    }
+
+    #[Scope]
+    protected function withSiblings(Builder $query): Builder
+    {
+        return $query->with(['siblings', 'siblingsAndSelf']);
+    }
+
+    #[Scope]
+    protected function withBloodline(Builder $query): Builder
+    {
+        return $query->with(['ancestors', 'descendants']);
     }
 
     protected function getClosureTable(): string
@@ -275,7 +275,7 @@ trait HasClosureTable
 
     protected function qualifyTreeColumn(string $column, ?string $table = null): string
     {
-        $table = $table ?? $this->getModelTable();
+        $table ??= $this->getModelTable();
 
         return "{$table}.{$column}";
     }

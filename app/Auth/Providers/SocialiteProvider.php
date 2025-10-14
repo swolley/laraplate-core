@@ -30,7 +30,7 @@ final class SocialiteProvider implements IAuthenticationProvider
 
             // check if the user is already registered
             if (
-                User::where('email', $socialUser->getEmail())
+                User::query()->where('email', $socialUser->getEmail())
                     ->where(fn (Builder $q) => $q->whereNull('social_id')->orWhere('social_id', '!=', $socialUser->getId()))
                     ->exists()
             ) {
@@ -43,7 +43,7 @@ final class SocialiteProvider implements IAuthenticationProvider
             }
 
             /** @var User $user */
-            $user = User::updateOrCreate([
+            $user = User::query()->updateOrCreate([
                 'social_id' => $socialUser->getId(),
             ], [
                 'name' => $socialUser->getName(),

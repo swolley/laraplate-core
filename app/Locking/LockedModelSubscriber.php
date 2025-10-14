@@ -48,9 +48,7 @@ final class LockedModelSubscriber
             return true;
         }
 
-        if ($model->wasLocked() && $model->isDirty()) {
-            throw new LockedModelException('This model is locked');
-        }
+        throw_if($model->wasLocked() && $model->isDirty(), LockedModelException::class, 'This model is locked');
 
         return true;
     }

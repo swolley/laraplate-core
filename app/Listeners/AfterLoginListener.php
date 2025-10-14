@@ -6,8 +6,8 @@ namespace Modules\Core\Listeners;
 
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\UnauthorizedException;
 use Lab404\Impersonate\Impersonate;
@@ -26,9 +26,7 @@ final class AfterLoginListener
         if (config('auth.enable_user_licenses') && class_uses_trait($user, Impersonate::class) && $user instanceof User && (! $user->isGuest() && ! $user->isSuperadmin() && $user->license_id === null)) {
             $available_licenses = License::query()->whereDoesntHave('user')->get();
 
-            if ($available_licenses->isEmpty()) {
-                throw new UnauthorizedException('No licenses available');
-            }
+            throw_if($available_licenses->isEmpty(), UnauthorizedException::class, 'No licenses available');
             $user->license()->associate($available_licenses->first());
         }
     }
@@ -43,7 +41,7 @@ final class AfterLoginListener
 
         if (! class_uses_trait($user, Impersonate::class)) {
             self::checkUserLicense($user);
-            $user->update(['last_login_at' => Carbon::now()]);
+            $user->update(['last_login_at' => Date::now()]);
 
             if ($user->isUnlocked()) {
                 Auth::logoutOtherDevices($user->password);
