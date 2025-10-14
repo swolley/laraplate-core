@@ -13,8 +13,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
+use Override;
 use Throwable;
-use Typesense\Override;
 
 /**
  * Job for bulk indexing documents in search engines
@@ -58,7 +58,7 @@ final class BulkIndexSearchJob extends CommonSearchJob
         // Validate that all models are of the same class
         $model_class = $models->first()::class;
 
-        if (! $models->every(fn ($model): bool => $model instanceof $model_class)) {
+        if (! $models->every(fn($model): bool => $model instanceof $model_class)) {
             throw new InvalidArgumentException('All models must be of the same class');
         }
 

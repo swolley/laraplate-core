@@ -6,7 +6,7 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Support\Collection;
 
-class TreeCollection extends Collection
+final class TreeCollection extends Collection
 {
     public function tree()
     {

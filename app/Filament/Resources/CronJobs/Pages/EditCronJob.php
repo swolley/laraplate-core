@@ -8,7 +8,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
 
-class EditCronJob extends EditRecord
+final class EditCronJob extends EditRecord
 {
     protected static string $resource = CronJobResource::class;
 

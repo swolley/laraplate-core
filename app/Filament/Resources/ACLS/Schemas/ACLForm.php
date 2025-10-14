@@ -9,7 +9,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
-class ACLForm
+final class ACLForm
 {
     public static function configure(Schema $schema): Schema
     {

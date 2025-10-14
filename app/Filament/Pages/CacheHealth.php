@@ -10,7 +10,7 @@ use Filament\Support\Icons\Heroicon;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
 use UnitEnum;
 
-class CacheHealth extends Page
+final class CacheHealth extends Page
 {
     // protected string $view = 'core::filament.pages.cache';
 

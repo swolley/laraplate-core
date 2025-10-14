@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListCronJobs extends ListRecords
+final class ListCronJobs extends ListRecords
 {
     use HasRecords;
 

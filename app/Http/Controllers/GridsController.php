@@ -8,7 +8,6 @@ use Exception;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\UnauthorizedException;
 use InvalidArgumentException;
 use Modules\Core\Grids\Components\Grid;
@@ -24,10 +23,10 @@ use UnexpectedValueException;
 
 final class GridsController extends Controller
 {
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
+     */
     public function getGridsConfigs(Request $request, ?string $entity = null): \Illuminate\Http\JsonResponse
     {
         $response_builder = new ResponseBuilder($request);
@@ -72,17 +71,17 @@ final class GridsController extends Controller
         }
     }
 
-	/**
-	 * @route-comment
-	 * Route(path: 'app/crud/grid/select/{entity}', name: 'core.crud.select', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/data/{entity}', name: 'core.crud.data', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/check/{entity}', name: 'core.crud.check', methods: [GET, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/layout/{entity}', name: 'core.crud.layout', methods: [GET, POST, PUT, PATCH, DELETE, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/export/{entity}', name: 'core.crud.export', methods: [GET, POST, HEAD], middleware: [web])
-	 * Route(path: 'app/crud/grid/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
-	 * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
-	 * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
-	 */
+    /**
+     * @route-comment
+     * Route(path: 'app/crud/grid/select/{entity}', name: 'core.crud.select', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/data/{entity}', name: 'core.crud.data', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/check/{entity}', name: 'core.crud.check', methods: [GET, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/layout/{entity}', name: 'core.crud.layout', methods: [GET, POST, PUT, PATCH, DELETE, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/export/{entity}', name: 'core.crud.export', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'app/crud/grid/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
+     * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
+     * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
+     */
     public function grid(GridRequest $request, string $entity): Response
     {
         try {
@@ -92,7 +91,7 @@ final class GridsController extends Controller
             $grid = new Grid($model);
 
             return $grid->process($request);
-        } catch (UnexpectedValueException|UnauthorizedException $ex) {
+        } catch (UnexpectedValueException | UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();

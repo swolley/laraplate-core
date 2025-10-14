@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListSettings extends ListRecords
+final class ListSettings extends ListRecords
 {
     use HasRecords;
 

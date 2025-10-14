@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\ACLS\Tables\ACLsTable;
 use Modules\Core\Models\ACL;
 use UnitEnum;
 
-class ACLResource extends Resource
+final class ACLResource extends Resource
 {
     protected static ?string $model = ACL::class;
 

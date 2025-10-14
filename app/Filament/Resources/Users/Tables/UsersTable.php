@@ -15,7 +15,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\User;
 
-class UsersTable
+final class UsersTable
 {
     use HasTable;
 
@@ -48,7 +48,7 @@ class UsersTable
                     Action::make('resend_verification_email')
                         ->label('Resend Verification Email')
                         ->icon('heroicon-o-envelope')
-                        ->authorize(fn (User $record) => ! $record->hasVerifiedEmail())
+                        ->authorize(fn(User $record) => ! $record->hasVerifiedEmail())
                         ->action(function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);

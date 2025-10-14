@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\CronJobs\Tables\CronJobsTable;
 use Modules\Core\Models\CronJob;
 use UnitEnum;
 
-class CronJobResource extends Resource
+final class CronJobResource extends Resource
 {
     protected static ?string $model = CronJob::class;
 

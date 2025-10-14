@@ -2,30 +2,58 @@
 
 declare(strict_types=1);
 
+use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\Config\RectorConfig;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
-use Rector\ValueObject\PhpVersion;
 use RectorLaravel\Set\LaravelSetList;
+use RectorLaravel\Set\LaravelSetProvider;
 
+$modules = array_filter(glob(__DIR__ . '/Modules/*'), 'is_dir');
 $paths = array_merge(
     [
         __DIR__ . '/app',
+        __DIR__ . '/bootstrap/app.php',
+        __DIR__ . '/config',
         __DIR__ . '/database',
+        __DIR__ . '/pubilc',
+        __DIR__ . '/routes',
+        __DIR__ . '/tests',
     ],
+    array_map(fn($module) => "{$module}/app", $modules),
 );
 
 return RectorConfig::configure()
+    ->withSetProviders(LaravelSetProvider::class)
+    ->withSets([
+        LaravelSetList::LARAVEL_ARRAYACCESS_TO_METHOD_CALL,
+        LaravelSetList::LARAVEL_ARRAY_STR_FUNCTION_TO_STATIC_CALL,
+        LaravelSetList::LARAVEL_CODE_QUALITY,
+        LaravelSetList::LARAVEL_COLLECTION,
+        LaravelSetList::LARAVEL_CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME,
+        LaravelSetList::LARAVEL_ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER,
+        LaravelSetList::LARAVEL_FACADE_ALIASES_TO_FULL_NAMES,
+        LaravelSetList::LARAVEL_FACTORIES,
+        LaravelSetList::LARAVEL_IF_HELPERS,
+        LaravelSetList::LARAVEL_LEGACY_FACTORIES_TO_CLASSES,
+    ])
+    ->withComposerBased(laravel: true)
+    ->withCache(
+        cacheDirectory: '/tmp/rector',
+        cacheClass: FileCacheStorage::class,
+    )
+    ->withPaths($paths)
     ->withSkip([
         AddOverrideAttributeToOverriddenMethodsRector::class,
         __DIR__ . '/vendor',
         __DIR__ . '/node_modules',
         __DIR__ . '/storage',
+        __DIR__ . '/Modules/*/vendor',
+        __DIR__ . '/Modules/*/node_modules',
         // Pattern per qualsiasi file che potrebbe avere conflitti di namespace con Model
         '**/Model.php',
         // Ignora file con troppe righe che potrebbero causare problemi di analisi
         '**/vendor/**',
     ])
-    ->withPaths($paths)
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,
@@ -34,10 +62,4 @@ return RectorConfig::configure()
         earlyReturn: true,
         strictBooleans: true,
     )
-    ->withSets([
-        LaravelSetList::LARAVEL_120,
-    ])
-    ->withPhpSets(
-        php84: true,
-    )
-    ->withPhpVersion(PhpVersion::PHP_84);
+    ->withPhpSets();

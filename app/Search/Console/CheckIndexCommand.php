@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use function Laravel\Prompts\confirm;
-
 use Exception;
+
+use function Laravel\Prompts\confirm;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
@@ -34,7 +34,7 @@ final class CheckIndexCommand extends Command
             if ($model) {
                 $modeles = [$model];
             } else {
-                $modeles = array_filter(models(), fn ($model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
+                $modeles = array_filter(models(), fn($model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
             }
 
             $wrong_or_missing_indexes = [];
@@ -56,7 +56,7 @@ final class CheckIndexCommand extends Command
             }
 
             if (confirm('Do you want to reindex the unmathced models?')) {
-                foreach ($wrong_or_missing_indexes as &$model) {
+                foreach ($wrong_or_missing_indexes as $model) {
                     ReindexSearchJob::dispatch($model);
 
                     // Se il modello usa il trait HasCache, invalida la cache

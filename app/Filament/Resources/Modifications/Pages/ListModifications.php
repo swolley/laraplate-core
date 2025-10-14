@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListModifications extends ListRecords
+final class ListModifications extends ListRecords
 {
     use HasRecords;
 

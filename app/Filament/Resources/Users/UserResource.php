@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
 use Modules\Core\Models\User;
 use UnitEnum;
 
-class UserResource extends Resource
+final class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 

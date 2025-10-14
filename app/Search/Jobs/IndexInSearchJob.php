@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
-use Typesense\Override;
+use Override;
 
 /**
  * Job for indexing a model in search engines

@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListRoles extends ListRecords
+final class ListRoles extends ListRecords
 {
     use HasRecords;
 

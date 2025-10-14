@@ -7,7 +7,7 @@ namespace Modules\Core\Filament\Resources\Permissions\Schemas;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
-class PermissionForm
+final class PermissionForm
 {
     public static function configure(Schema $schema): Schema
     {

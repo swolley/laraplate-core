@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Permission;
 
-class PermissionsTable
+final class PermissionsTable
 {
     use HasTable;
 

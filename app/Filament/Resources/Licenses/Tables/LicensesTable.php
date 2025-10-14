@@ -10,7 +10,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 
-class LicensesTable
+final class LicensesTable
 {
     use HasTable;
 
@@ -24,11 +24,11 @@ class LicensesTable
                         ->boolean()
                         ->alignCenter()
                         ->grow(false)
-                        ->state(fn ($record) => ! $record->isExpired() && ! $record->isDraft())
-                        ->trueColor(fn ($record) => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
-                        ->trueIcon(fn ($record) => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
+                        ->state(fn($record) => ! $record->isExpired() && ! $record->isDraft())
+                        ->trueColor(fn($record) => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
+                        ->trueIcon(fn($record) => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
                         ->falseIcon('heroicon-o-x-circle')
-                        ->tooltip(fn ($record) => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
+                        ->tooltip(fn($record) => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
                     TextColumn::make('id')
                         ->searchable(),
                 ]);

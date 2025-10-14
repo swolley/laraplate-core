@@ -10,7 +10,7 @@ use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
 use Modules\Core\Helpers\HasChildren;
 
-class SearchEngineHealthTableWidget extends Widget
+final class SearchEngineHealthTableWidget extends Widget
 {
     protected string $view = 'core::filament.widgets.search-engine-health';
 

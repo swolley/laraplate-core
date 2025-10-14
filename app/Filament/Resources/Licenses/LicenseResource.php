@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\Licenses\Tables\LicensesTable;
 use Modules\Core\Models\License;
 use UnitEnum;
 
-class LicenseResource extends Resource
+final class LicenseResource extends Resource
 {
     protected static ?string $model = License::class;
 

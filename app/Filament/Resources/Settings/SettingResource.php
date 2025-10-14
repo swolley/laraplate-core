@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Models\Setting;
 use UnitEnum;
 
-class SettingResource extends Resource
+final class SettingResource extends Resource
 {
     protected static ?string $model = Setting::class;
 

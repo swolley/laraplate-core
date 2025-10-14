@@ -11,7 +11,7 @@ use Filament\Support\Icons\Heroicon;
 use Typesense\Override;
 use UnitEnum;
 
-class HorizonHealth extends Page
+final class HorizonHealth extends Page
 {
     protected static ?string $navigationLabel = 'Queues';
 

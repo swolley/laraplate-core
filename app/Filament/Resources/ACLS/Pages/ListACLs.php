@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListACLs extends ListRecords
+final class ListACLs extends ListRecords
 {
     use HasRecords;
 

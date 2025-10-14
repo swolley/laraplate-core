@@ -15,9 +15,52 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 {
     use CommonEngineFunctions;
 
+    public function checkIndex(Model $model): bool
+    {
+        return true;
+    }
+
+    public function createIndex($name, array $options = []): void
+    {
+        parent::createIndex($name, $options);
+    }
+
+    // TODO: to be implemented
+    public function health(): array
+    {
+        return [];
+    }
+
+    // TODO: to be implemented
+    public function stats(): array
+    {
+        return [];
+    }
+
+    // TODO: to be implemented
+    public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
+    {
+        return 0;
+    }
+
+    // TODO: to be implemented
+    public function buildSearchFilters(array $filters): array|string
+    {
+        return [];
+    }
+
+    // TODO: to be implemented
+    public function getSearchMapping(Model $model): array
+    {
+        return [];
+    }
+
+    // TODO: to be implemented
+    public function reindex(string $modelClass): void {}
+
     public function supportsVectorSearch(): bool
     {
-        return $this->getDatabaseDriver() !== 'sqlite'; // SQLite ha limitazioni
+        return $this->getDatabaseDriver() !== 'sqlite'; // SQLite has limitations
     }
 
     public function search(Builder $builder)

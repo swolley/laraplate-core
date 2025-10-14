@@ -19,7 +19,7 @@ use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
 use Modules\Core\Models\Modification;
 use UnitEnum;
 
-class ModificationResource extends Resource
+final class ModificationResource extends Resource
 {
     protected static ?string $model = Modification::class;
 

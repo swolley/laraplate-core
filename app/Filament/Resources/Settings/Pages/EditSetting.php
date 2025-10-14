@@ -8,7 +8,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 
-class EditSetting extends EditRecord
+final class EditSetting extends EditRecord
 {
     protected static string $resource = SettingResource::class;
 

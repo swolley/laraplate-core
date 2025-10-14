@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\Roles\Tables\RolesTable;
 use Modules\Core\Models\Role;
 use UnitEnum;
 
-class RoleResource extends Resource
+final class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 

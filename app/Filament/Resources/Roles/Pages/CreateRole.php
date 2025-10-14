@@ -7,7 +7,7 @@ namespace Modules\Core\Filament\Resources\Roles\Pages;
 use Filament\Resources\Pages\CreateRecord;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 
-class CreateRole extends CreateRecord
+final class CreateRole extends CreateRecord
 {
     protected static string $resource = RoleResource::class;
 }

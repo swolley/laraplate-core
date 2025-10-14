@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListPermissions extends ListRecords
+final class ListPermissions extends ListRecords
 {
     use HasRecords;
 

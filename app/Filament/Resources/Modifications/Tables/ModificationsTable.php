@@ -9,7 +9,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 
-class ModificationsTable
+final class ModificationsTable
 {
     use HasTable;
 

@@ -11,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Services\ElasticsearchService;
-use Typesense\Override;
+use Override;
 
 /**
  * Job for deleting a document from a search index

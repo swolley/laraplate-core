@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
 
-class SettingsTable
+final class SettingsTable
 {
     use HasTable;
 
@@ -58,7 +58,7 @@ class SettingsTable
                             'datetime' => 'DateTime',
                         ]),
                     SelectFilter::make('group_name')
-                        ->options(fn () => Setting::distinct()->pluck('group_name', 'group_name')->toArray()),
+                        ->options(fn() => Setting::distinct()->pluck('group_name', 'group_name')->toArray()),
                     SelectFilter::make('is_public')
                         ->options([
                             '1' => 'Public',

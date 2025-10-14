@@ -11,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Searchable;
-use Typesense\Override;
+use Override;
 
 /**
  * Job for reindexing all models of a specified class

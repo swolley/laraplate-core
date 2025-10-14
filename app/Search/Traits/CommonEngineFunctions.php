@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
-use Typesense\Override;
+use Override;
 
 trait CommonEngineFunctions
 {

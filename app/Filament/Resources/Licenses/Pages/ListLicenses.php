@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
 use Modules\Core\Filament\Utils\HasRecords;
 
-class ListLicenses extends ListRecords
+final class ListLicenses extends ListRecords
 {
     use HasRecords;
 

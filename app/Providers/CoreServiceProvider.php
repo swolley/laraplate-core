@@ -90,7 +90,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(fn () => Password::min(8)
+        Password::defaults(fn() => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -130,7 +130,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if the user is super admin
-        Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(fn(?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -218,17 +218,7 @@ final class CoreServiceProvider extends ServiceProvider
 
         // Register Typesense client
         $this->app->singleton(TypesenseClient::class, function ($app) {
-            $config = config('scout.typesense.client-settings', [
-                'api_key' => env('TYPESENSE_API_KEY'),
-                'nodes' => [
-                    [
-                        'host' => env('TYPESENSE_HOST', 'localhost'),
-                        'port' => env('TYPESENSE_PORT', '8108'),
-                        'protocol' => env('TYPESENSE_PROTOCOL', 'http'),
-                    ],
-                ],
-                'connection_timeout_seconds' => 2,
-            ]);
+            $config = config('scout.typesense.client-settings');
 
             return new TypesenseClient($config);
         });
@@ -269,7 +259,7 @@ final class CoreServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
+        $this->app->singleton(Locked::class, fn(): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -434,23 +424,23 @@ final class CoreServiceProvider extends ServiceProvider
                 );
                 $repository->setEventDispatcher($app->get('events'));
 
-                $app->scoped($bindingKey, fn () => $repository);
+                $app->scoped($bindingKey, fn() => $repository);
             }
 
             return $app->make($bindingKey);
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(Repository::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, fn($app) => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn($app) => $app['cache.store']);
+        $this->app->bind(Repository::class, fn($app) => $app['cache.store']);
 
         // Register macros
-        Cache::macro('tryByRequest', fn (...$args) => app('cache.store')->tryByRequest(...$args));
-        Cache::macro('clearByEntity', fn (...$args) => app('cache.store')->clearByEntity(...$args));
-        Cache::macro('clearByRequest', fn (...$args) => app('cache.store')->clearByRequest(...$args));
-        Cache::macro('clearByUser', fn (...$args) => app('cache.store')->clearByUser(...$args));
-        Cache::macro('clearByGroup', fn (...$args) => app('cache.store')->clearByGroup(...$args));
+        Cache::macro('tryByRequest', fn(...$args) => app('cache.store')->tryByRequest(...$args));
+        Cache::macro('clearByEntity', fn(...$args) => app('cache.store')->clearByEntity(...$args));
+        Cache::macro('clearByRequest', fn(...$args) => app('cache.store')->clearByRequest(...$args));
+        Cache::macro('clearByUser', fn(...$args) => app('cache.store')->clearByUser(...$args));
+        Cache::macro('clearByGroup', fn(...$args) => app('cache.store')->clearByGroup(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array
@@ -459,7 +449,7 @@ final class CoreServiceProvider extends ServiceProvider
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         return array_map(
-            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+            fn($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
             $files,
         );
     }

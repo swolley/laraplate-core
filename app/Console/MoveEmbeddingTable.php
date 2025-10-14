@@ -10,7 +10,7 @@ use Modules\Core\Models\ModelEmbedding;
 
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
-class MoveEmbeddingTable extends Command
+final class MoveEmbeddingTable extends Command
 {
     /**
      * The name and signature of the console command.

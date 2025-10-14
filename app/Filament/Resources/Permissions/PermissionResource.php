@@ -18,7 +18,7 @@ use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Models\Permission;
 use UnitEnum;
 
-class PermissionResource extends Resource
+final class PermissionResource extends Resource
 {
     protected static ?string $model = Permission::class;
 

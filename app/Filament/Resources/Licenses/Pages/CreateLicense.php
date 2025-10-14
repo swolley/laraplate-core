@@ -7,7 +7,7 @@ namespace Modules\Core\Filament\Resources\Licenses\Pages;
 use Filament\Resources\Pages\CreateRecord;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
 
-class CreateLicense extends CreateRecord
+final class CreateLicense extends CreateRecord
 {
     protected static string $resource = LicenseResource::class;
 }

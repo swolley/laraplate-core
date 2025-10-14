@@ -8,7 +8,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 
-class EditACL extends EditRecord
+final class EditACL extends EditRecord
 {
     protected static string $resource = ACLResource::class;
 

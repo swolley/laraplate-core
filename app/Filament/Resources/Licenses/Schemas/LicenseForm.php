@@ -9,7 +9,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
-class LicenseForm
+final class LicenseForm
 {
     public static function configure(Schema $schema): Schema
     {
