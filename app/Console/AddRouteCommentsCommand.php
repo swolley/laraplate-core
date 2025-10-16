@@ -51,43 +51,46 @@ final class AddRouteCommentsCommand extends Command
 
         // Then process each method with all its routes
         foreach ($method_routes as $key => &$routes) {
-            [$controller, $method] = explode('@', $key);
-
-            $reflection_class = new ReflectionClass($controller);
-
-            if (! $reflection_class->hasMethod($method)) {
-                continue;
+            {
+                [$controller, $method] = explode('@', $key);
+    
+                $reflection_class = new ReflectionClass($controller);
+    
+                if (! $reflection_class->hasMethod($method)) {
+                    continue;
+                }
+    
+                $reflection_method = $reflection_class->getMethod($method);
+    
+                // Check if the method is inherited
+                if ($controller !== $reflection_method->getDeclaringClass()->getName()) {
+                    $this->warn("Method {$method} in {$controller} is inherited from {$reflection_method->getDeclaringClass()->getName()}. Skipping...");
+    
+                    continue;
+                }
+    
+                $file_path = $reflection_class->getFileName();
+    
+                if (! file_exists($file_path)) {
+                    continue;
+                }
+    
+                $route_comments = [];
+    
+                foreach ($routes as &$route) {
+                    $route_info = $this->getRouteInfo($route);
+                    $route_comments[] = $route_info;
+                }
+    
+                $comment = $this->generateComment($route_comments);
+                $this->addCommentToMethod($file_path, $method, $comment);
+    
+                if (! in_array($controller, $processed_controllers, true)) {
+                    $this->info("Processed controller: {$controller}");
+                    $processed_controllers[] = $controller;
+                }
             }
-
-            $reflection_method = $reflection_class->getMethod($method);
-
-            // Check if the method is inherited
-            if ($controller !== $reflection_method->getDeclaringClass()->getName()) {
-                $this->warn("Method {$method} in {$controller} is inherited from {$reflection_method->getDeclaringClass()->getName()}. Skipping...");
-
-                continue;
-            }
-
-            $file_path = $reflection_class->getFileName();
-
-            if (! file_exists($file_path)) {
-                continue;
-            }
-
-            $route_comments = [];
-
-            foreach ($routes as &$route) {
-                $route_info = $this->getRouteInfo($route);
-                $route_comments[] = $route_info;
-            }
-
-            $comment = $this->generateComment($route_comments);
-            $this->addCommentToMethod($file_path, $method, $comment);
-
-            if (! in_array($controller, $processed_controllers, true)) {
-                $this->info("Processed controller: {$controller}");
-                $processed_controllers[] = $controller;
-            }
+            gc_collect_cycles();
         }
 
         $this->info('Route comments have been added successfully!');

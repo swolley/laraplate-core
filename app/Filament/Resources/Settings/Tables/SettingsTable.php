@@ -27,6 +27,7 @@ final class SettingsTable
                         ->alignCenter()
                         ->toggleable(isToggledHiddenByDefault: true),
                     IconColumn::make('is_encrypted')
+                        ->label('Encrypted')
                         ->boolean()
                         ->alignCenter()
                         ->trueIcon('heroicon-o-key')

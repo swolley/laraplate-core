@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Carbon\Carbon;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
-use function Laravel\Prompts\text;
 
-use Carbon\Carbon;
+use function Laravel\Prompts\text;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
@@ -80,19 +80,15 @@ final class HandleLicensesCommand extends Command
                 switch ($action) {
                     case 'renew':
                         $this->renewLicenses($number, $licenses_count, $valid_to);
-
                         break;
                     case 'add':
                         $this->addLicenses($number, $valid_to);
-
                         break;
                     case 'close':
                         $this->closeLicenses($number, $valid_to);
-
                         break;
                     case 'list':
                         $this->listLicenses();
-
                         break;
                 }
 

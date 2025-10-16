@@ -8,38 +8,38 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Casts\SettingTypeEnum;
 
 final class SettingForm
 {
     public static function configure(Schema $schema): Schema
     {
+        $typeOptions = [];
+        foreach (SettingTypeEnum::cases() as $case) {
+            $typeOptions[$case->value] = $case->name;
+        }
+
         return $schema
             ->components([
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),
+                Select::make('group_name')
+                    ->required()
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (): array => $schema->model::query()->distinct()->pluck('group_name', 'group_name')->toArray())
+                    ->default('general'),
                 Select::make('type')
                     ->required()
-                    ->options([
-                        'string' => 'String',
-                        'integer' => 'Integer',
-                        'float' => 'Float',
-                        'boolean' => 'Boolean',
-                        'array' => 'Array',
-                        'json' => 'JSON',
-                        'date' => 'Date',
-                        'datetime' => 'DateTime',
-                    ])
-                    ->default('string'),
+                    ->options($typeOptions)
+                    ->default(SettingTypeEnum::STRING->value),
                 TextInput::make('value')
                     ->required()
                     ->maxLength(65535),
-                TextInput::make('group_name')
-                    ->required()
-                    ->maxLength(255)
-                    ->default('general'),
                 TextInput::make('description')
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->columnSpanFull(),
                 Toggle::make('is_public')
                     ->required()
                     ->default(false)

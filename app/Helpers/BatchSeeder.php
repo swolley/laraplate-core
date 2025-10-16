@@ -208,21 +208,24 @@ abstract class BatchSeeder extends Seeder
                     $connections = $this->setupAsyncConnections($connections['database'], $connections['cache']);
                 }
 
-                $model_instance = new $modelClass();
-                $model_instance->setConnection($connections['database']);
+                {
+                    $model_instance = new $modelClass();
+                    $model_instance->setConnection($connections['database']);
+    
+                    if ($this->isSearchable($modelClass)) {
+                        $model_instance->setCacheConnection($connections['cache']);
+                    }
+    
+                    /** @phpstan-ignore staticMethod.notFound */
+                    $factory = $model_instance->factory();
+    
+                    /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
+                    $new_models = $factory->count($batchSize)->create();
+    
+                    if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
+                        $factory->createRelations($new_models);
+                    }
 
-                if ($this->isSearchable($modelClass)) {
-                    $model_instance->setCacheConnection($connections['cache']);
-                }
-
-                /** @phpstan-ignore staticMethod.notFound */
-                $factory = $model_instance->factory();
-
-                /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
-                $new_models = $factory->count($batchSize)->create();
-
-                if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
-                    $factory->createRelations($new_models);
                 }
 
                 $success = true;
@@ -274,6 +277,8 @@ abstract class BatchSeeder extends Seeder
                 $batchSize = min(self::BATCHSIZE, $remaining);
 
                 Sleep::sleep(self::RETRY_DELAY);
+            } finally {
+                gc_collect_cycles();
             }
         }
     }

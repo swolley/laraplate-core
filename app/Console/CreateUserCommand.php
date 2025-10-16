@@ -118,6 +118,8 @@ final class CreateUserCommand extends Command
                         'roles' => $all_roles->filter(fn ($name, $id): bool => in_array($id, $roles, true))->pluck('name')->implode(', '),
                         'permissions' => $all_permissions->filter(fn ($name, $id): bool => in_array($id, $permissions, true))->pluck('name')->implode(', '),
                     ];
+
+                    gc_collect_cycles();
                 });
             } while (confirm('Do you want to create another user?', false));
 

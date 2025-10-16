@@ -48,6 +48,8 @@ use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
 trait HasTable
 {
+    private static array $permissionCache = [];
+
     /**
      * @param  ?callable(Collection<string,Column> $columns):void  $columns
      * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
@@ -62,6 +64,8 @@ trait HasTable
     {
         /** @var User $user */
         $user = Auth::user();
+
+        self::loadUserPermissionsForTable($user);
 
         $model = $table->getModel();
         $model_instance = new $model();
@@ -141,6 +145,30 @@ trait HasTable
             ->paginatedWhileReordering()
             ->reorderableColumns()
             ->deferColumnManager(true);
+    }
+
+    private static function loadUserPermissionsForTable(User $user): void
+    {
+        if (!$user) {
+            return;
+        }
+
+        // Eager load dei permessi e ruoli per evitare N+1 queries
+        $user->loadMissing([
+            'permissions',
+            'roles.permissions'
+        ]);
+    }
+
+    private static function checkPermissionCached(User $user, string $permission): bool
+    {
+        $key = $user->id . '_' . $permission;
+        
+        if (!isset(self::$permissionCache[$key])) {
+            self::$permissionCache[$key] = $user->can($permission);
+        }
+        
+        return self::$permissionCache[$key];
     }
 
     private static function configureColumns(
@@ -363,7 +391,7 @@ trait HasTable
             );
         }
 
-        if ($user->can("{$permissionsPrefix}.update")) {
+        if (self::checkPermissionCached($user, "{$permissionsPrefix}.update")) {
             $default_actions->add(
                 EditAction::make()
                     ->hiddenLabel(),
@@ -371,7 +399,7 @@ trait HasTable
         }
 
         if ($hasSoftDeletes) {
-            if ($user->can("{$permissionsPrefix}.restore")) {
+            if (self::checkPermissionCached($user, "{$permissionsPrefix}.restore")) {
                 $default_actions->add(
                     RestoreAction::make()
                         ->hiddenLabel(),
@@ -382,7 +410,7 @@ trait HasTable
                 );
             }
 
-            if ($user->can("{$permissionsPrefix}.delete")) {
+            if (self::checkPermissionCached($user, "{$permissionsPrefix}.delete")) {
                 $default_actions->add(
                     DeleteAction::make()
                         ->icon(Heroicon::OutlinedEyeSlash)
@@ -396,7 +424,7 @@ trait HasTable
             }
         }
 
-        if ($user->can("{$permissionsPrefix}.forceDelete")) {
+        if (self::checkPermissionCached($user, "{$permissionsPrefix}.forceDelete")) {
             $default_actions->add(
                 ForceDeleteAction::make()
                     ->visible(true)
@@ -480,7 +508,7 @@ trait HasTable
         }
 
         // FILTERS
-        if ($hasSoftDeletes && $user->can("{$permissionsPrefix}.restore")) {
+        if ($hasSoftDeletes && self::checkPermissionCached($user, "{$permissionsPrefix}.restore")) {
             $deleted_at_column = $model_instance->getDeletedAtColumn();
             $default_filters->push(
                 // TrashedFilter::make(),

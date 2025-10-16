@@ -84,6 +84,11 @@ final class Setting extends Model
         return $rules;
     }
 
+    protected function setTypeAttribute($value): void
+    {
+        $this->attributes['type'] = SettingTypeEnum::tryFrom($value) ?? SettingTypeEnum::STRING;
+    }
+
     protected static function newFactory(): SettingFactory
     {
         return SettingFactory::new();
