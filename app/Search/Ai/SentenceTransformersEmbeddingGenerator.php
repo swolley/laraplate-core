@@ -138,6 +138,10 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
                 $batch[$i]->embedding = $embeddings[$i];
                 $processedDocuments[] = $batch[$i];
             }
+            
+            // Force garbage collection after each batch to free memory
+            unset($batch, $embeddings, $searchResults);
+            gc_collect_cycles();
         }
 
         return $processedDocuments;

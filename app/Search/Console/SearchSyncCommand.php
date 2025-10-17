@@ -80,6 +80,10 @@ final class SearchSyncCommand extends Command
                 }
                 $progress->finish();
                 $this->newLine();
+                
+                // Force garbage collection after each chunk to free memory
+                unset($records);
+                gc_collect_cycles();
             });
             $this->info('Documents have been queued for indexing.');
 

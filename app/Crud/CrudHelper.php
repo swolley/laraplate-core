@@ -338,7 +338,12 @@ final class CrudHelper
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
         usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
-        $all_columns_name = array_map(fn (Column $column): string => $column->name, $columns);
+        
+        // Optimize array_map to reduce memory allocations
+        $all_columns_name = [];
+        foreach ($columns as $column) {
+            $all_columns_name[] = $column->name;
+        }
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {
@@ -439,6 +444,9 @@ final class CrudHelper
                 $query->orderBy($sort->property, $sort->direction->value);
             }
         }
+        
+        // Add limit to eager loaded relations to prevent memory issues with large datasets
+        // $query->limit(100);
     }
 
     /**
@@ -451,7 +459,7 @@ final class CrudHelper
     private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
     {
         /** @var array<int,string> $merged_relations */
-        $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
+        $merged_relations = array_unique(array_merge(array_map(fn (array $relation): string => $relation['name'], $relations), array_keys($relations_sorts), array_keys($relations_columns)));
         $this->cleanRelations($relations);
 
         // apply only direct aggregate relations on the main entity

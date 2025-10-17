@@ -15,7 +15,7 @@ abstract class SelectRequest extends CrudRequest
     {
         return parent::rules() + [
             'columns.*' => [new QueryColumn()],
-            'relations.*' => ['string'],
+            'relations' => ['array'],
         ];
     }
 
@@ -28,7 +28,15 @@ abstract class SelectRequest extends CrudRequest
 
     protected static function decode(string $value): array
     {
-        return is_json($value) ? json_decode($value, true) : preg_split("/,\s?/", $value);
+        $relations = is_json($value) ? json_decode($value, true) : preg_split("/,\s?/", $value);
+        foreach ($relations as &$relation) {
+            if (is_string($relation)) {
+                $relation = ['name' => $relation];
+            } elseif (is_array($relation)) {
+                $relation = [...$relation, ...['name' => $relation['name']]];
+            }
+        }
+        return $relations;
     }
 
     #[Override]

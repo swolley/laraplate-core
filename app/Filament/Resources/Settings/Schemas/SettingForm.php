@@ -28,7 +28,7 @@ final class SettingForm
                 Select::make('group_name')
                     ->required()
                     ->searchable()
-                    ->getSearchResultsUsing(fn (): array => $schema->model::query()->distinct()->pluck('group_name', 'group_name')->toArray())
+                    ->getSearchResultsUsing(fn (): array => $schema->model::query()->select('group_name')->distinct()->pluck('group_name', 'group_name')->toArray())
                     ->default('general'),
                 Select::make('type')
                     ->required()

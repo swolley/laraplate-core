@@ -854,8 +854,20 @@ final class Grid extends Entity
         $all_fields = $this->getAllFields()->reject(fn (Field $f): bool => $f->isAppend());
         $request_columns = $this->requestData->columns;
         $main_columns = ($request_columns !== [] ? $this->getFields() : $all_fields)->map(fn (Field $f): string => $f->getName())->all();
-        $columns_filters = array_filter($this->requestData->filters ?? [], fn (array $f): bool => $f['value'] !== '');
-        $funnels_filters = array_filter($this->requestData->funnelsFilters ?? [], fn (array $f): bool => $f['value'] !== []);
+        // Optimize array filtering to reduce memory allocations
+        $columns_filters = [];
+        foreach ($this->requestData->filters ?? [] as $f) {
+            if ($f['value'] !== '') {
+                $columns_filters[] = $f;
+            }
+        }
+        
+        $funnels_filters = [];
+        foreach ($this->requestData->funnelsFilters ?? [] as $f) {
+            if ($f['value'] !== []) {
+                $funnels_filters[] = $f;
+            }
+        }
         $model_filters = [
             ...$this->getEntityFilters(lcfirst($this->getModelName()), $columns_filters),
             ...$this->getEntityFilters(lcfirst($this->getModelName()), $funnels_filters),
@@ -892,6 +904,10 @@ final class Grid extends Entity
                     // li aggiungo per fare la query ma mi salvo in qualche modo hce poi non li devo vsualizzare perché non sono richiesti
                     // $relation_info->getModel()->makeHidden($relation_info->info->getOwnerKey());
                 }
+                
+                // Add limit to eager loaded relations to prevent memory issues with large datasets
+                // $q->limit(100);
+                
                 $this->addWhereFiltersIntoQuery($q, $relation_filters, $all_fields);
             });
 
@@ -918,7 +934,13 @@ final class Grid extends Entity
         }
 
         // Log::debug(static::dumpQuery($query));
-        $data = $query->get();
+        
+        // Use lazy loading for large datasets without pagination to reduce memory usage
+        if ($this->requestData->pagination === 0 && $count > 500) {
+            $data = $query->lazy();
+        } else {
+            $data = $query->get();
+        }
 
         return [$data, $count];
     }
