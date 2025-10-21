@@ -339,7 +339,7 @@ trait HasTable
     ): void {
         /** @var Collection<Action> $default_actions */
         $default_actions = collect([
-            ViewAction::make()->hiddenLabel(),
+            ViewAction::make()->hiddenLabel()->modal(true),
         ]);
 
         /** @var Collection<BulkAction> $default_bulk_actions */
@@ -394,7 +394,8 @@ trait HasTable
         if (self::checkPermissionCached($user, "{$permissionsPrefix}.update")) {
             $default_actions->add(
                 EditAction::make()
-                    ->hiddenLabel(),
+                    ->hiddenLabel()
+                    ->modal(true),
             );
         }
 

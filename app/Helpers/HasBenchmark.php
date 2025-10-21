@@ -28,7 +28,7 @@ trait HasBenchmark
      */
     protected function startBenchmark(?string $table = null): void
     {
-        $this->bootTime = LARAVEL_START ? microtime(true) - LARAVEL_START : 0;
+        $this->bootTime = defined('LARAVEL_START') && LARAVEL_START ? microtime(true) - LARAVEL_START : 0;
         $this->benchmarkStartTime = microtime(true);
         $this->benchmarkTable = $table;
         $this->benchmarkStartMemory = memory_get_usage();

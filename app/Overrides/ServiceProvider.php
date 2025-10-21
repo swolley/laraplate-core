@@ -64,9 +64,9 @@ class ServiceProvider extends BaseServiceProvider
             if (! array_key_exists($key, $array1)) {
                 $array1[$key] = $value;
             } elseif (is_array($value)) {
-                // if (! isset($array1[$key])) {
-                // 	$array1[$key] = [];
-                // }
+                if (! isset($array1[$key]) || ! is_array($array1[$key])) {
+                    $array1[$key] = [];
+                }
                 $array1[$key] = self::mergeArrays($array1[$key], $value);
             } else {
                 $array1[$key] = $value;

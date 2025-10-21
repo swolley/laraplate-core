@@ -8,7 +8,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\SettingTypeEnum;
 
 final class SettingForm

@@ -78,7 +78,7 @@ class ResponseBuilder
             $this->resourceResponse = $data;
             $realData = $this->resourceResponse->resource;
 
-            if ($realData && ($realData instanceof Collection || Arr::isList($realData))) {
+            if ($realData && ($realData instanceof Collection || (is_array($realData) && Arr::isList($realData)))) {
                 $this->setClass($data instanceof Collection ? $data->first() : $data[0]);
             } elseif (is_object($data)) {
                 $this->setClass($data);

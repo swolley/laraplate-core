@@ -126,7 +126,11 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             return true;
         }
 
-        return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
+        try {
+            return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            return false;
+        }
     }
 
     public function canBeImpersonated(): bool

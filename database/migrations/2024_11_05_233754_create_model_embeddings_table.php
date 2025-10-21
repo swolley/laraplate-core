@@ -19,7 +19,7 @@ return new class extends Migration
         $connection = new ModelEmbedding()->getConnection();
         $driver = $connection->getDriverName();
 
-        Schema::connection($connection)->create('model_embeddings', function (Blueprint $table) use ($driver): void {
+        Schema::connection($connection->getName())->create('model_embeddings', function (Blueprint $table) use ($driver): void {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
 

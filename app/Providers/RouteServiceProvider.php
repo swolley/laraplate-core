@@ -103,7 +103,6 @@ final class RouteServiceProvider extends ServiceProvider
      */
     private function mapApiRoutes(): void
     {
-        // if (config('core.expose_crud_api')) {
         $name_prefix = $this->getPrefix();
         $route_prefix = 'api';
         Route::prefix("{$route_prefix}/v1")

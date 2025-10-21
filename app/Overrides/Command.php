@@ -18,23 +18,19 @@ class Command extends BaseCommand
     {
         parent::__construct();
 
-        // if (self::class !== $this::class) {
         if ($db instanceof DatabaseManager) {
             $this->db = $db;
         }
 
-        if (config('app.debug')) {
+        if (!app()->bound('runningUnitTests') || !app()->runningUnitTests()) {
             $this->startBenchmark();
         }
-        // }
     }
 
     public function __destruct()
     {
-        // if (self::class !== static::class) {
-        if (config('app.debug') && $this->benchmarkStartTime !== null) {
+        if ((!app()->bound('runningUnitTests') || !app()->runningUnitTests()) && app()->bound('config') && $this->benchmarkStartTime !== null) {
             $this->endBenchmark();
         }
-        // }
     }
 }
