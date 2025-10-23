@@ -63,6 +63,7 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
         if ($found) {
             $to = $found;
         }
+
         parent::publishFile($from, $to);
     }
 

@@ -136,7 +136,7 @@ class ResponseBuilder
      */
     public function setStatus(int $status): self
     {
-        throw_unless(in_array($status, self::getHttpStatuses(), true), UnexpectedValueException::class, "{$status} is not a valid status");
+        throw_unless(in_array($status, self::getHttpStatuses(), true), UnexpectedValueException::class, $status . ' is not a valid status');
         $this->status = $status;
 
         return $this;
@@ -493,6 +493,7 @@ class ResponseBuilder
             if ($this->table !== null) {
                 $payload['meta']['table'] = $this->table;
             }
+
             $route = request()->route();
             $payload['meta']['controller'] = $route->getControllerClass();
             $payload['meta']['action'] = $route->getActionMethod();

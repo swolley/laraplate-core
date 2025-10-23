@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Overrides\ModuleDocGenerator;
@@ -48,8 +49,11 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             if ($module_filter && $module_name !== $module_filter) {
                 continue;
             }
+
             $this->moduleHandle($module_name);
         }
+
+        Cache::tags(Cache::getCacheTags('docs'))->flush();
 
         return Command::SUCCESS;
     }
@@ -111,6 +115,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             } else {
                 $old_doc = null;
             }
+
             file_put_contents($file, $formattedDoc);
 
             $this->verboseGeneration($doc, $old_doc);
@@ -147,7 +152,8 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
                 $color = 'green';
                 $message = 'new';
             }
-            $this->line($imploded_methods . str_repeat(' ', $post_methods_padding) . $path . str_repeat(' ', $post_route_padding) . "<fg={$color}>{$message}</fg={$color}>");
+
+            $this->line($imploded_methods . str_repeat(' ', $post_methods_padding) . $path . str_repeat(' ', $post_route_padding) . sprintf('<fg=%s>%s</fg=%s>', $color, $message, $color));
         }
 
         $this->line('');

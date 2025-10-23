@@ -11,7 +11,8 @@ use Override;
 
 final class FlushCommand extends BaseFlushCommand
 {
-    use HasBenchmark, SearchableCommandUtils;
+    use HasBenchmark;
+    use SearchableCommandUtils;
 
     protected $description = 'Flush all of the model\'s records from the index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 

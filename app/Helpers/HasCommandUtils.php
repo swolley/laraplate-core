@@ -13,6 +13,7 @@ trait HasCommandUtils
         if (! array_key_exists($attribute, $validations)) {
             return null;
         }
+
         $validator = Validator::make([$attribute => $value], array_filter($validations, fn ($k): bool => $k === $attribute, ARRAY_FILTER_USE_KEY))->stopOnFirstFailure(true);
 
         if (! $validator->passes()) {

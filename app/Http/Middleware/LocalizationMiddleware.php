@@ -26,7 +26,7 @@ final class LocalizationMiddleware
         } elseif (! $user) {
             $lang = $request->getPreferredLanguage();
 
-            if ($lang !== null && $lang !== '' && $lang !== '0') {
+            if (! in_array($lang, [null, '', '0'], true)) {
                 $lang = Str::of($lang)->before('_')->value();
                 App::setLocale($lang);
             }

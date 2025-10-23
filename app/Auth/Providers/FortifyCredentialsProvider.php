@@ -63,7 +63,7 @@ final class FortifyCredentialsProvider implements IAuthenticationProvider
         // Verifica licenza
         $error = $this->checkLicense($user);
 
-        if ($error !== null && $error !== '' && $error !== '0') {
+        if (! in_array($error, [null, '', '0'], true)) {
             return [
                 'success' => false,
                 'user' => null,

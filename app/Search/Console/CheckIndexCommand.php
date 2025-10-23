@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
-use Exception;
-
 use function Laravel\Prompts\confirm;
+
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
@@ -68,12 +68,12 @@ final class CheckIndexCommand extends Command
             }
 
             return BaseCommand::SUCCESS;
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Error in elasticsearch:reindex command', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
-            $this->error('An error occurred: ' . $e->getMessage());
+            $this->error('An error occurred: ' . $exception->getMessage());
 
             return 1;
         }

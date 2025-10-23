@@ -53,6 +53,7 @@ final class GelfLoggerFactory extends BaseGelfLoggerGelfLoggerFactory
             } else {
                 $instance = new $processor();
             }
+
             $handler->pushProcessor($instance);
         }
 

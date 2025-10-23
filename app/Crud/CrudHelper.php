@@ -50,6 +50,7 @@ final class CrudHelper
                         $only_standard_columns[] = $column->name;
                     }
                 }
+
                 // TODO: qui mancano ancora le colonne utili a fare le relation se la foreign key si trova sulla main table
                 $this->addForeignKeysToSelectedColumns($query, $only_standard_columns, $main_model, $main_entity);
                 $query->select($only_standard_columns);
@@ -63,6 +64,7 @@ final class CrudHelper
                             $only_relation_columns[] = $column;
                         }
                     }
+
                     $relations_columns[$relation] = $only_relation_columns;
 
                     if (! in_array($relation, $request_data->relations, true)) {
@@ -91,6 +93,7 @@ final class CrudHelper
                     }
                 }
             }
+
             // if (isset($request_data->group_by)) {
             //     $request_data->group_by = array_map(fn (string $group) => str_replace($main_entity . '.', '', $group), $request_data->group_by);
             // }
@@ -221,6 +224,7 @@ final class CrudHelper
         if ($exploded !== [] && $exploded[0] === $model->getTable()) {
             array_shift($exploded);
         }
+
         $field = array_pop($exploded);
         $relation = implode('.', $exploded);
         $relation_model = $model instanceof Model ? $model : $model->getModel();
@@ -283,13 +287,14 @@ final class CrudHelper
                         $q->withoutGlobalScope('global_ordered');
 
                         if ($splitted['field'] === 'deleted_at') {
-                            $permission = "{$splitted['connection']}.{$splitted['table']}.delete";
+                            $permission = sprintf('%s.%s.delete', $splitted['connection'], $splitted['table']);
                             $user = Auth::user();
 
                             if ($user && $user->can($permission)) {
                                 $q->withTrashed();
                             }
                         }
+
                         $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
                         $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
                     });
@@ -338,12 +343,14 @@ final class CrudHelper
     private function sortColumns(Builder|Relation $query, array &$columns): void
     {
         usort($columns, fn (Column $a, Column $b): int => $a->name <=> $b->name);
-        
+
         // Optimize array_map to reduce memory allocations
         $all_columns_name = [];
+
         foreach ($columns as $column) {
             $all_columns_name[] = $column->name;
         }
+
         $primary_key = Arr::wrap($query->getModel()->getKeyName());
 
         foreach ($primary_key as $key) {
@@ -367,6 +374,7 @@ final class CrudHelper
                 $simple_columns[] = $column->name;
             }
         }
+
         $query->select($simple_columns);
     }
 
@@ -395,6 +403,7 @@ final class CrudHelper
                     $query->{$method}([$subrelation . '.' . $col->name]);
                 }
             }
+
             unset($relations_aggregates[$aggregate_relation]);
         }
     }
@@ -407,6 +416,7 @@ final class CrudHelper
         if (! $model instanceof Model) {
             $model = $query->getModel();
         }
+
         $table ??= $model->getTable();
 
         foreach (Inspect::foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
@@ -444,7 +454,7 @@ final class CrudHelper
                 $query->orderBy($sort->property, $sort->direction->value);
             }
         }
-        
+
         // Add limit to eager loaded relations to prevent memory issues with large datasets
         // $query->limit(100);
     }
@@ -477,6 +487,7 @@ final class CrudHelper
                     $query->{$method}([$relation . '.' . $col->name]);
                 }
             }
+
             unset($relations_aggregates[$relation]);
         }
 
@@ -488,6 +499,7 @@ final class CrudHelper
                 $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters);
             };
         }
+
         $query->with($withs);
     }
 }

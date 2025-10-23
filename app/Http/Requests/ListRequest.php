@@ -34,7 +34,14 @@ class ListRequest extends SelectRequest
     }
 
     #[Override]
-    public function prepareForValidation(): void
+    public function parsed(): ListRequestData
+    {
+        /** @phpstan-ignore method.notFound */
+        return new ListRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+    }
+
+    #[Override]
+    protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
 
@@ -60,12 +67,5 @@ class ListRequest extends SelectRequest
 
         /** @phpstan-ignore method.notFound */
         $this->merge($to_merge);
-    }
-
-    #[Override]
-    public function parsed(): ListRequestData
-    {
-        /** @phpstan-ignore method.notFound */
-        return new ListRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
     }
 }

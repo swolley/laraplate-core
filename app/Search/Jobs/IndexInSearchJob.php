@@ -21,7 +21,10 @@ use Override;
  */
 final class IndexInSearchJob extends CommonSearchJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
      * Maximum number of attempts for the job.
@@ -74,14 +77,14 @@ final class IndexInSearchJob extends CommonSearchJob
             $this->updateDocument();
             $this->updateIndexTimestampIfNeeded();
             $this->logIndexingSuccess($document_id, $index_name);
-        } catch (Exception $e) {
-            $this->handleIndexingException($e, $document_id, $index_name, $driver);
+        } catch (Exception $exception) {
+            $this->handleIndexingException($exception, $document_id, $index_name, $driver);
         }
     }
 
     private function logIndexingStart(string $document_id, string $index_name, string $driver): void
     {
-        Log::debug("Indexing document {$document_id} in {$index_name} using {$driver} driver");
+        Log::debug(sprintf('Indexing document %s in %s using %s driver', $document_id, $index_name, $driver));
     }
 
     private function shouldDeleteDocument(): bool
@@ -108,12 +111,12 @@ final class IndexInSearchJob extends CommonSearchJob
 
     private function logIndexingSuccess(string $document_id, string $index_name): void
     {
-        Log::debug("Document {$document_id} successfully indexed in {$index_name}");
+        Log::debug(sprintf('Document %s successfully indexed in %s', $document_id, $index_name));
     }
 
     private function handleIndexingException(Exception $e, string $document_id, string $index_name, string $driver): void
     {
-        Log::error("Error indexing document {$document_id} in {$index_name}", [
+        Log::error(sprintf('Error indexing document %s in %s', $document_id, $index_name), [
             'driver' => $driver,
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),

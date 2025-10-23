@@ -26,7 +26,7 @@ final class Inspect
     public static function table(string $name, ?string $schema = null): ?Table
     {
         $key_name = self::keyName($name, $schema);
-        $inspected_data = Cache::tags(['inspector', $schema ?? 'default'])->get($key_name);
+        $inspected_data = Cache::tags(Cache::getCacheTags(['inspector', $schema ?? 'default']))->get($key_name);
 
         if ($inspected_data) {
             return $inspected_data;
@@ -55,7 +55,7 @@ final class Inspect
             $schema,
         );
 
-        Cache::tags(['inspector', $schema])->forever($key_name, $inspected_data);
+        Cache::tags(Cache::getCacheTags(['inspector', $schema]))->forever($key_name, $inspected_data);
 
         return $inspected_data;
     }
@@ -150,7 +150,7 @@ final class Inspect
      */
     private static function parseColumns(array $columns): Collection
     {
-        return collect($columns)->map(fn ($column): Column => new Column(
+        return collect($columns)->map(fn (array $column): Column => new Column(
             $column['name'],
             self::getAttributesForColumn($column),
             $column['default'],
@@ -173,7 +173,7 @@ final class Inspect
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(fn ($index): Index => new Index(
+        return collect($indexes)->map(fn (array $index): Index => new Index(
             $index['name'],
             collect($index['columns']),
             self::getAttributesForIndex($index),

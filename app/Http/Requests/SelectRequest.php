@@ -29,6 +29,7 @@ abstract class SelectRequest extends CrudRequest
     protected static function decode(string $value): array
     {
         $relations = is_json($value) ? json_decode($value, true) : preg_split("/,\s?/", $value);
+
         foreach ($relations as &$relation) {
             if (is_string($relation)) {
                 $relation = ['name' => $relation];
@@ -36,6 +37,7 @@ abstract class SelectRequest extends CrudRequest
                 $relation = [...$relation, ...['name' => $relation['name']]];
             }
         }
+
         return $relations;
     }
 

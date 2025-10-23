@@ -40,25 +40,21 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
 {
-    use ApprovesChanges,
-        HasFactory,
-        HasLocks,
-        HasRoles,
-        HasValidations,
-        HasVersions,
-        // Impersonate,
-        Notifiable,
-        SoftDeletes,
-        TwoFactorAuthenticatable {
-            getRules as protected getRulesTrait;
-            roles as protected rolesTrait;
-            HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
-        }
+    use ApprovesChanges;
+    use HasFactory;
+    use HasLocks;
+    use HasRoles {
+        HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
+    }
+    use HasValidations;
+    use HasVersions;
+    use Notifiable;
+    use SoftDeletes;
+    use TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -128,7 +124,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
         try {
             return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
-        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
             return false;
         }
     }

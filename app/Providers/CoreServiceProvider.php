@@ -272,7 +272,7 @@ final class CoreServiceProvider extends ServiceProvider
 
     private function getResourcePath(string $prefix): string
     {
-        return resource_path("{$prefix}/modules/" . $this->nameLower);
+        return resource_path($prefix . '/modules/' . $this->nameLower);
     }
 
     /**
@@ -342,14 +342,15 @@ final class CoreServiceProvider extends ServiceProvider
             $schedule = $this->app->make(Schedule::class);
             $crons = [];
             $cache_key = new CronJob()->getTable();
+            $cache_tags = Cache::getCacheTags();
 
-            if (Cache::has($cache_key)) {
-                $crons = Cache::get($cache_key);
+            if (Cache::tags($cache_tags)->has($cache_key)) {
+                $crons = Cache::tags($cache_tags)->get($cache_key);
             } else {
                 try {
                     if (Schema::hasTable($cache_key)) {
                         $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
-                        Cache::put($cache_key, $crons);
+                        Cache::tags($cache_tags)->put($cache_key, $crons);
                     }
                 } catch (Exception $e) {
                     report($e);
@@ -384,12 +385,12 @@ final class CoreServiceProvider extends ServiceProvider
         // Override the CacheManager to return our custom Repository
         $this->app->extend('cache', fn ($cacheManager, Application $app): CacheManager => new class($app) extends CacheManager
         {
-                // Create a custom CacheManager that returns our Repository
-                public function repository(Store $store, array $config = []): Repository
-                {
-                    return new Repository($store, $config);
-                }
-            });
+            // Create a custom CacheManager that returns our Repository
+            public function repository(Store $store, array $config = []): Repository
+            {
+                return new Repository($store, $config);
+            }
+        });
 
         // Override the cache.store binding to ensure it uses our Repository
         $this->app->extend('cache.store', function ($service, Application $app): Repository {
@@ -413,7 +414,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->extend('cache.memo', function ($service, Application $app): Repository {
             $driver = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.default');
 
-            if (! $app->bound($bindingKey = "cache.__memoized:{$driver}")) {
+            if (! $app->bound($bindingKey = 'cache.__memoized:' . $driver)) {
                 $store = $app->get(\Illuminate\Contracts\Cache\Factory::class)->driver($driver)->getStore();
                 $config = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.stores.' . $driver);
 
@@ -440,6 +441,7 @@ final class CoreServiceProvider extends ServiceProvider
         Cache::macro('clearByRequest', fn (...$args) => app(BaseRepository::class)->clearByRequest(...$args));
         Cache::macro('clearByUser', fn (...$args) => app(BaseRepository::class)->clearByUser(...$args));
         Cache::macro('clearByGroup', fn (...$args) => app(BaseRepository::class)->clearByGroup(...$args));
+        Cache::macro('getCacheTags', fn (...$args) => app(BaseRepository::class)->getCacheTags(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array

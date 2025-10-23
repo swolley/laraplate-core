@@ -189,7 +189,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
         $remapped = [];
 
         foreach ($rules as $name => $validations) {
-            $remapped["{$prefix}.{$name}"] = $validations;
+            $remapped[sprintf('%s.%s', $prefix, $name)] = $validations;
         }
 
         return $remapped;

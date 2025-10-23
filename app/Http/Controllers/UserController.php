@@ -60,9 +60,9 @@ final class UserController extends Controller
             return new ResponseBuilder($request)
                 ->setData(self::parseUserInfo($user))
                 ->json();
-        } catch (UnauthorizedException $ex) {
+        } catch (UnauthorizedException $unauthorizedException) {
             return new ResponseBuilder($request)
-                ->setError($ex->getMessage())
+                ->setError($unauthorizedException->getMessage())
                 ->setStatus(Response::HTTP_UNAUTHORIZED)
                 ->json();
         }
@@ -101,7 +101,7 @@ final class UserController extends Controller
             ->json();
     }
 
-    public function socialLoginRedirect(string $service): \Symfony\Component\HttpFoundation\RedirectResponse|\Illuminate\Http\RedirectResponse
+    public function socialLoginRedirect(string $service): \Symfony\Component\HttpFoundation\RedirectResponse|RedirectResponse
     {
         return $this->socialite->driver($service)->redirect();
     }

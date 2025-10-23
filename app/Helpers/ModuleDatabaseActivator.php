@@ -39,9 +39,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     public function __construct(Container $app)
     {
-        $this->cache = $app['cache'];
+        $this->cache = $app->make(\Illuminate\Contracts\Cache\Factory::class);
         // $this->files = $app['files'];
-        $this->configs = $app['config'];
+        $this->configs = $app->make(\Illuminate\Contracts\Config\Repository::class);
         // $this->statusesFile = $this->config('statuses-file');
         $this->cacheKey = $this->config('cache-key');
         $this->cacheLifetime = $this->config('cache-lifetime');
@@ -194,7 +194,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             return $this->readSettings();
         }
 
-        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, fn (): array => $this->readSettings());
+        return $this->cache->store($this->configs->get('modules.cache.driver'))->remember($this->cacheKey, $this->cacheLifetime, $this->readSettings(...));
     }
 
     private function config(string $key, mixed $default = null): mixed

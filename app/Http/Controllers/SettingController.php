@@ -23,11 +23,11 @@ final class SettingController extends Controller
      */
     public function getTranslations(TranslationsRequest $request, ?string $lang = null): HttpFoundationResponse
     {
-        if ($lang !== null && $lang !== '' && $lang !== '0') {
+        if (! in_array($lang, [null, '', '0'], true)) {
             $lang = mb_substr($lang, 0, 2);
         }
 
-        $translations = Cache::tags([config('app.name')])->remember(RequestFacade::route()->getName() . $lang . json_encode($request->validated()), config('cache.duration'), function () use ($lang): array {
+        $translations = Cache::tags(Cache::getCacheTags('translations'))->rememberForever(RequestFacade::route()->getName() . $lang . json_encode($request->validated()), function () use ($lang): array {
             $default_locale = App::getLocale();
             $languages = self::getLanguages($default_locale);
 
@@ -49,7 +49,7 @@ final class SettingController extends Controller
                 }
             }
 
-            if ($lang !== null && $lang !== '' && $lang !== '0') {
+            if (! in_array($lang, [null, '', '0'], true)) {
                 return head($translations);
             }
 
@@ -67,7 +67,7 @@ final class SettingController extends Controller
      */
     public function getSiteConfigs(Request $request): HttpFoundationResponse
     {
-        $settings = Cache::tags([config('APP_NAME')])->remember(RequestFacade::route()->getName(), config('cache.duration'), function (): array {
+        $settings = Cache::tags(Cache::getCacheTags(new Setting()->getTable()))->rememberForever(RequestFacade::route()->getName(), function (): array {
             $settings = [];
 
             foreach (Setting::query()->get() as $s) {
@@ -185,6 +185,7 @@ final class SettingController extends Controller
             if ($tag === '..') {
                 continue;
             }
+
             $tag_file = $tags_dir . '/' . $tag;
 
             if (! is_file($tag_file)) {

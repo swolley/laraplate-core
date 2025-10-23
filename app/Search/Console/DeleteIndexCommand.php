@@ -13,7 +13,8 @@ use Symfony\Component\Console\Command\Command;
 
 final class DeleteIndexCommand extends BaseDeleteIndexCommand
 {
-    use HasBenchmark, SearchableCommandUtils;
+    use HasBenchmark;
+    use SearchableCommandUtils;
 
     protected $signature = 'scout:delete-index {model : The model to delete the index for}';
 

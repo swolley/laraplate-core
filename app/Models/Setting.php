@@ -22,9 +22,12 @@ use Override;
  */
 final class Setting extends Model
 {
-    use HasApprovals, HasCache, HasFactory, HasValidations, HasVersions, SoftDeletes {
-        getRules as protected getRulesTrait;
-    }
+    use HasApprovals;
+    use HasCache;
+    use HasFactory;
+    use HasValidations;
+    use HasVersions;
+    use SoftDeletes;
 
     /**
      * @var array<int,string>
@@ -84,14 +87,14 @@ final class Setting extends Model
         return $rules;
     }
 
-    protected function setTypeAttribute($value): void
-    {
-        $this->attributes['type'] = SettingTypeEnum::tryFrom($value) ?? SettingTypeEnum::STRING;
-    }
-
     protected static function newFactory(): SettingFactory
     {
         return SettingFactory::new();
+    }
+
+    protected function setTypeAttribute($value): void
+    {
+        $this->attributes['type'] = SettingTypeEnum::tryFrom($value) ?? SettingTypeEnum::STRING;
     }
 
     #[Override]

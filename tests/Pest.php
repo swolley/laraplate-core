@@ -39,41 +39,41 @@ pest()->extend(Tests\TestCase::class)
 */
 
 /**
- * Create a test user with admin role
+ * Create a test user with admin role.
  */
-function createAdminUser(): \Modules\Core\Models\User
+function createAdminUser(): Modules\Core\Models\User
 {
-    $user = \Modules\Core\Models\User::factory()->create();
-    $adminRole = \Modules\Core\Models\Role::factory()->create(['name' => 'admin']);
+    $user = Modules\Core\Models\User::factory()->create();
+    $adminRole = Modules\Core\Models\Role::factory()->create(['name' => 'admin']);
     $user->roles()->attach($adminRole);
-    
+
     return $user;
 }
 
 /**
- * Create a test user with specific role
+ * Create a test user with specific role.
  */
-function createUserWithRole(string $roleName): \Modules\Core\Models\User
+function createUserWithRole(string $roleName): Modules\Core\Models\User
 {
-    $user = \Modules\Core\Models\User::factory()->create();
-    $role = \Modules\Core\Models\Role::factory()->create(['name' => $roleName]);
+    $user = Modules\Core\Models\User::factory()->create();
+    $role = Modules\Core\Models\Role::factory()->create(['name' => $roleName]);
     $user->roles()->attach($role);
-    
+
     return $user;
 }
 
 /**
- * Assert that a model has the expected attributes
+ * Assert that a model has the expected attributes.
  */
 function expectModelAttributes($model, array $attributes): void
 {
     foreach ($attributes as $key => $value) {
-        expect($model->$key)->toBe($value);
+        expect($model->{$key})->toBe($value);
     }
 }
 
 /**
- * Assert that a model exists in database with given attributes
+ * Assert that a model exists in database with given attributes.
  */
 function assertModelExists(string $modelClass, array $attributes): void
 {
@@ -81,7 +81,7 @@ function assertModelExists(string $modelClass, array $attributes): void
 }
 
 /**
- * Assert that a model does not exist in database with given attributes
+ * Assert that a model does not exist in database with given attributes.
  */
 function assertModelNotExists(string $modelClass, array $attributes): void
 {

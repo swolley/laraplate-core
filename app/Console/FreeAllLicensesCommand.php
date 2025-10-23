@@ -26,8 +26,8 @@ final class FreeAllLicensesCommand extends Command
             $this->output->success('All licenses have been freed');
 
             return BaseCommand::SUCCESS;
-        } catch (Throwable $ex) {
-            $message = $ex->getMessage();
+        } catch (Throwable $throwable) {
+            $message = $throwable->getMessage();
             $this->output->error($message);
             Log::error($message);
 

@@ -22,14 +22,14 @@ class Command extends BaseCommand
             $this->db = $db;
         }
 
-        if (!app()->bound('runningUnitTests') || !app()->runningUnitTests()) {
+        if (! app()->bound('runningUnitTests') || ! app()->runningUnitTests()) {
             $this->startBenchmark();
         }
     }
 
     public function __destruct()
     {
-        if ((!app()->bound('runningUnitTests') || !app()->runningUnitTests()) && app()->bound('config') && $this->benchmarkStartTime !== null) {
+        if ((! app()->bound('runningUnitTests') || ! app()->runningUnitTests()) && app()->bound('config') && $this->benchmarkStartTime !== null) {
             $this->endBenchmark();
         }
     }

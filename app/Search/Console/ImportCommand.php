@@ -13,7 +13,8 @@ use Symfony\Component\Console\Command\Command;
 
 final class ImportCommand extends BaseImportCommand
 {
-    use HasBenchmark, SearchableCommandUtils;
+    use HasBenchmark;
+    use SearchableCommandUtils;
 
     protected $description = 'Import the given model into the search index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 

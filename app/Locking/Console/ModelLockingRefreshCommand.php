@@ -62,7 +62,7 @@ final class ModelLockingRefreshCommand extends Command
 
         if ($need_bypass) {
             if (! $this->quiet_mode) {
-                $this->line("Bypassing '{$model}' class");
+                $this->line(sprintf("Bypassing '%s' class", $model));
             }
 
             return;
@@ -111,7 +111,7 @@ final class ModelLockingRefreshCommand extends Command
     private function doAddOptimisticLockingOnModel(string $model, string $optimistic_locking_column): void
     {
         if ($this->askConfirmForOperation(
-            "Model {$model} uses optimistic locking but column {$optimistic_locking_column} is missing. Would you like to create it into the schema?",
+            sprintf('Model %s uses optimistic locking but column %s is missing. Would you like to create it into the schema?', $model, $optimistic_locking_column),
             $model,
             fn () => $this->call('lock:optimistic-add', ['model' => $model]),
         )) {
@@ -125,7 +125,7 @@ final class ModelLockingRefreshCommand extends Command
     private function doRemoveOptimisticLockingOnModel(string $model, string $optimistic_locking_column): void
     {
         if ($this->askConfirmForOperation(
-            "Model {$model} doesn't use optimistic locking but column {$optimistic_locking_column} found. Would you like to remove it from the schema?",
+            sprintf("Model %s doesn't use optimistic locking but column %s found. Would you like to remove it from the schema?", $model, $optimistic_locking_column),
             $model,
             fn () => $this->call('lock:optimistic-remove', ['model' => $model]),
         )) {
@@ -159,7 +159,7 @@ final class ModelLockingRefreshCommand extends Command
     private function doAddLockableOnModel(string $model, string $lock_at_column): void
     {
         if ($this->askConfirmForOperation(
-            "Model {$model} uses locks but column {$lock_at_column} is missing. Would you like to create it into the schema?",
+            sprintf('Model %s uses locks but column %s is missing. Would you like to create it into the schema?', $model, $lock_at_column),
             $model,
             fn () => $this->call('lock:add', ['model' => $model]),
         )) {
@@ -173,7 +173,7 @@ final class ModelLockingRefreshCommand extends Command
     private function doRemoveLockableOnModel(string $model, string $lock_at_column): void
     {
         if ($this->askConfirmForOperation(
-            "Model {$model} doesn't use locks but column {$lock_at_column} found. Would you like to remove it from the schema?",
+            sprintf("Model %s doesn't use locks but column %s found. Would you like to remove it from the schema?", $model, $lock_at_column),
             $model,
             fn () => $this->call('lock:remove', ['model' => $model]),
         )) {
@@ -193,7 +193,7 @@ final class ModelLockingRefreshCommand extends Command
         }
 
         if (! $this->quiet_mode) {
-            $this->line("Ignoring '{$model}' class");
+            $this->line(sprintf("Ignoring '%s' class", $model));
         }
 
         return false;

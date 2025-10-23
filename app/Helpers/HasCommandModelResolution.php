@@ -23,8 +23,8 @@ trait HasCommandModelResolution
             $model = $this->askForUserInput($optionName, $all_models);
         }
 
-        if ($namespace !== null && $namespace !== '' && $namespace !== '0') {
-            $model = "{$namespace}\\{$model}";
+        if (! in_array($namespace, [null, '', '0'], true)) {
+            $model = sprintf('%s\%s', $namespace, $model);
         }
 
         if (! class_exists($model)) {
@@ -71,7 +71,7 @@ trait HasCommandModelResolution
     private function askForUserInput(string $optionName, array $all_models): string
     {
         return select(
-            label: "What is the {$optionName}?",
+            label: sprintf('What is the %s?', $optionName),
             options: $all_models,
             required: true,
         );

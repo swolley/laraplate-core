@@ -107,7 +107,7 @@ final class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('im-still-here', fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
-        Fortify::authenticateUsing(function ($request) {
+        Fortify::authenticateUsing(function (Request $request) {
             $service = $this->app->make(AuthenticationService::class);
             $result = $service->authenticate($request);
 

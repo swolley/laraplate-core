@@ -25,6 +25,7 @@ trait HasApprovals
             $this->append('preview');
             $this->makeHidden('preview');
         }
+
         $this->deleteWhenDisapproved = true;
     }
 

@@ -38,7 +38,7 @@ if (! function_exists('modules')) {
             $remapped_modules[ucfirst($module)] = $class;
         }
 
-        if ($onlyModule !== null && $onlyModule !== '' && $onlyModule !== '0') {
+        if (! in_array($onlyModule, [null, '', '0'], true)) {
             $onlyModule = ucfirst($onlyModule);
             $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
         }
@@ -55,6 +55,7 @@ if (! function_exists('modules')) {
             } else {
                 array_unshift($remapped_modules, 'App');
             }
+
             ksort($remapped_modules);
         }
 
@@ -129,7 +130,7 @@ if (! function_exists('translations')) {
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
             $path = $module . DIRECTORY_SEPARATOR . ($is_app ? 'lang' : $langs_subpath) . DIRECTORY_SEPARATOR;
-            $files = glob("{$path}*", GLOB_ONLYDIR);
+            $files = glob($path . '*', GLOB_ONLYDIR);
 
             foreach ($files as $file) {
                 if (! $fullpath) {
@@ -228,6 +229,7 @@ if (! function_exists('models')) {
                 if ($model_file->getExtension() !== 'php') {
                     continue;
                 }
+
                 $class_subnamespace = $namespace . preg_replace(['/\.' . $model_file->getExtension() . '/', '/\//'], ['', '\\'], $model_file->getRelativePathName());
 
                 if (! is_subclass_of($class_subnamespace, Model::class)) {
@@ -317,6 +319,7 @@ if (! function_exists('routes')) {
                 $r = new ReflectionFunction($reference);
                 $reference = $r->getName();
             }
+
             $exploded = explode('\\', (string) $reference);
 
             if (($exploded[0] !== 'Modules' && (in_array($onlyModule, [null, '', '0', 'App'], true))) || (in_array($exploded[1], $modules, true) && (in_array($onlyModule, [null, '', '0'], true) || $exploded[1] === $onlyModule))) {
@@ -458,7 +461,7 @@ if (! function_exists('cast_value')) {
      */
     function cast_value(mixed $value, ?string $type = null): mixed
     {
-        if ($type !== null && $type !== '' && $type !== '0') {
+        if (! in_array($type, [null, '', '0'], true)) {
             return match (mb_strtolower($type)) {
                 'int', 'integer' => (int) $value,
                 'float', 'double', 'real' => (float) $value,
@@ -467,7 +470,7 @@ if (! function_exists('cast_value')) {
                 'array' => (array) $value,
                 'object' => (object) $value,
                 'null' => null,
-                default => throw new InvalidArgumentException("Unsupported type: {$type}"),
+                default => throw new InvalidArgumentException('Unsupported type: ' . $type),
             };
         }
 

@@ -19,7 +19,10 @@ use Throwable;
 
 final class FinalizeReindexJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $tries = 1; // Non vogliamo retry automatici per questo job
 
@@ -49,7 +52,7 @@ final class FinalizeReindexJob implements ShouldQueue
             $elasticsearch_client = ClientBuilder::create()->build();
 
             // Verifichiamo che l'indice temporaneo esista
-            throw_unless($elasticsearch_client->indices()->exists(['index' => $this->temp_index]), Exception::class, "Temporary index {$this->temp_index} does not exist");
+            throw_unless($elasticsearch_client->indices()->exists(['index' => $this->temp_index]), Exception::class, sprintf('Temporary index %s does not exist', $this->temp_index));
 
             // Se l'indice originale esiste, lo eliminiamo
             if ($elasticsearch_client->indices()->exists(['index' => $this->index_name])) {
@@ -69,15 +72,15 @@ final class FinalizeReindexJob implements ShouldQueue
                 'index' => $this->index_name,
                 'temp_index' => $this->temp_index,
             ]);
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Elasticsearch index finalization failed', [
                 'index' => $this->index_name,
                 'temp_index' => $this->temp_index,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
-            throw $e;
+            throw $exception;
         }
     }
 

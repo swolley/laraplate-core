@@ -61,7 +61,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     public function getExistenceCompareKey(): string|array
     {
         if (is_array($this->foreignPivotKey)) {
-            return array_map(fn ($key): string => $this->getQualifiedForeignPivotKeyName($key), $this->foreignPivotKey);
+            return array_map($this->getQualifiedForeignPivotKeyName(...), $this->foreignPivotKey);
         }
 
         return $this->getQualifiedForeignPivotKeyName();
@@ -101,7 +101,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
     public function qualifyPivotColumn($column): array|string|Expression
     {
         if (is_array($column)) {
-            return array_map(fn ($c) => parent::qualifyPivotColumn($c), $column);
+            return array_map(parent::qualifyPivotColumn(...), $column);
         }
 
         return parent::qualifyPivotColumn($column);
@@ -152,6 +152,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
         foreach ($models as $model) {
             $keys[] = is_array($key) ? array_map(fn (string $k) => $model->{$k}, $key) : $model->{$key};
         }
+
         $keys = array_unique($keys, SORT_REGULAR);
         sort($keys);
 
@@ -190,6 +191,7 @@ final class ComposhipsBelongsToMany extends BelongsToMany
         } else {
             $collection->push($this->relatedPivotKey);
         }
+
         $collection = $collection->merge($this->pivotColumns);
 
         return $collection

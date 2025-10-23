@@ -42,7 +42,7 @@ class LockedAddCommand extends Command
         $className = $namespace . '\\' . $model;
 
         if (! class_exists($className)) {
-            $this->error("Model {$className} does not exist");
+            $this->error(sprintf('Model %s does not exist', $className));
 
             return BaseCommand::INVALID;
         }
@@ -58,7 +58,7 @@ class LockedAddCommand extends Command
         if (! $this->files->exists($path)) {
             $this->files->put($path, $fileContents);
         } else {
-            $this->info("File : {$path} already exists");
+            $this->info(sprintf('File : %s already exists', $path));
         }
 
         return BaseCommand::SUCCESS;
@@ -66,7 +66,7 @@ class LockedAddCommand extends Command
 
     public function generateMigrationPath(Model $instance): string
     {
-        return "_{$this->operation}_locked_columns_to_{$instance->getTable()}.php";
+        return sprintf('_%s_locked_columns_to_%s.php', $this->operation, $instance->getTable());
     }
 
     /**
@@ -90,6 +90,6 @@ class LockedAddCommand extends Command
      */
     public function getStubPath(): string
     {
-        return module_path('Core', "Locking/Stubs/{$this->operation}_locked_column_to_table.php.stub");
+        return module_path('Core', sprintf('Locking/Stubs/%s_locked_column_to_table.php.stub', $this->operation));
     }
 }

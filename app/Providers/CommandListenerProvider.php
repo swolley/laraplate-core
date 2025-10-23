@@ -35,7 +35,7 @@ final class CommandListenerProvider extends ServiceProvider
         // clears the cache og the inspected entities
         Event::listen(MigrationsEnded::class, function (): void {
             info('Cleaning Inspected entities');
-            Cache::tags(['inspector'])->flush();
+            Cache::tags(Cache::getCacheTags('inspector'))->flush();
         });
     }
 }

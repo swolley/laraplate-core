@@ -62,6 +62,7 @@ trait HasValidations
         if (! isset($rules[self::DEFAULT_RULE])) {
             $rules[self::DEFAULT_RULE] = [];
         }
+
         $rules['update'] = array_merge($rules['update'], [
             $primary_key => 'required|exists:' . $this->getTable() . ',' . $primary_key,
         ]);
@@ -90,6 +91,7 @@ trait HasValidations
             if (class_uses_trait($this, HasDynamicContents::class)) {
                 $attributes = array_merge($attributes, $this->getComponentsAttribute());
             }
+
             Validator::make($attributes, $rules)->validate();
         }
     }

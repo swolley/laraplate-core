@@ -136,7 +136,7 @@ trait HasSeedersUtils
         // Force garbage collection after bulk insert to free memory
         unset($records);
         gc_collect_cycles();
-        
+
         return collect($models);
     }
 

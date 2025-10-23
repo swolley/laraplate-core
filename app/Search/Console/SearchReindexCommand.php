@@ -23,13 +23,13 @@ final class SearchReindexCommand extends Command
             $model = $this->argument('model');
 
             if (! class_exists($model)) {
-                $this->error("Model class {$model} does not exist.");
+                $this->error(sprintf('Model class %s does not exist.', $model));
 
                 return 1;
             }
 
             if (! in_array(Searchable::class, class_uses_recursive($model), true)) {
-                $this->error("Model class {$model} does not use the Searchable trait.");
+                $this->error(sprintf('Model class %s does not use the Searchable trait.', $model));
 
                 return 1;
             }
@@ -44,12 +44,12 @@ final class SearchReindexCommand extends Command
             }
 
             return 0;
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Error in model:reindex command', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
-            $this->error('An error occurred: ' . $e->getMessage());
+            $this->error('An error occurred: ' . $exception->getMessage());
 
             return 1;
         }

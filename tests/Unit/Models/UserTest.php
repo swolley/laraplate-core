@@ -7,7 +7,7 @@ use Modules\Core\Models\User;
 test('user model has correct structure', function (): void {
     $reflection = new ReflectionClass(User::class);
     $source = file_get_contents($reflection->getFileName());
-    
+
     // Test fillable attributes
     expect($source)->toContain('protected $fillable');
     expect($source)->toContain('\'name\'');
@@ -15,7 +15,7 @@ test('user model has correct structure', function (): void {
     expect($source)->toContain('\'username\'');
     expect($source)->toContain('\'password\'');
     expect($source)->toContain('\'lang\'');
-    
+
     // Test hidden attributes
     expect($source)->toContain('protected $hidden');
     expect($source)->toContain('\'password\'');
@@ -25,7 +25,7 @@ test('user model has correct structure', function (): void {
     expect($source)->toContain('\'two_factor_secret\'');
     expect($source)->toContain('\'two_factor_recovery_codes\'');
     expect($source)->toContain('\'last_login_at\'');
-    
+
     // Test casts method
     expect($source)->toContain('protected function casts()');
     expect($source)->toContain('email_verified_at');
@@ -37,7 +37,7 @@ test('user model has correct structure', function (): void {
 test('user model uses correct traits', function (): void {
     $reflection = new ReflectionClass(User::class);
     $traits = $reflection->getTraitNames();
-    
+
     expect($traits)->toContain('Approval\\Traits\\ApprovesChanges');
     expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
     expect($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks');
@@ -51,7 +51,7 @@ test('user model uses correct traits', function (): void {
 
 test('user model has required methods', function (): void {
     $reflection = new ReflectionClass(User::class);
-    
+
     expect($reflection->hasMethod('license'))->toBeTrue();
     expect($reflection->hasMethod('isSuperAdmin'))->toBeTrue();
     expect($reflection->hasMethod('isAdmin'))->toBeTrue();
@@ -65,44 +65,44 @@ test('user model has required methods', function (): void {
 
 test('user model implements correct interfaces', function (): void {
     $reflection = new ReflectionClass(User::class);
-    
+
     expect($reflection->implementsInterface('Filament\\Models\\Contracts\\FilamentUser'))->toBeTrue();
     expect($reflection->implementsInterface('Illuminate\\Contracts\\Auth\\MustVerifyEmail'))->toBeTrue();
 });
 
 test('user model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(User::class);
-    
+
     // Test isSuperAdmin method
     $method = $reflection->getMethod('isSuperAdmin');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test isAdmin method
     $method = $reflection->getMethod('isAdmin');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test canImpersonate method
     $method = $reflection->getMethod('canImpersonate');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test canBeImpersonated method
     $method = $reflection->getMethod('canBeImpersonated');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test canAccessPanel method
     $method = $reflection->getMethod('canAccessPanel');
     expect($method->getParameters())->toHaveCount(1);
     expect($method->getParameters()[0]->getType()->getName())->toBe('Filament\\Panel');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test isGuest method
     $method = $reflection->getMethod('isGuest');
     expect($method->getReturnType()->getName())->toBe('bool');
-    
+
     // Test getImpersonator method
     $method = $reflection->getMethod('getImpersonator');
     expect($method->getReturnType()->getName())->toBe('self');
-    
+
     // Test getRules method
     $method = $reflection->getMethod('getRules');
     expect($method->getReturnType()->getName())->toBe('array');
@@ -111,7 +111,7 @@ test('user model has correct method signatures', function (): void {
 test('user model has license relationship', function (): void {
     $reflection = new ReflectionClass(User::class);
     expect($reflection->hasMethod('license'))->toBeTrue();
-    
+
     $method = $reflection->getMethod('license');
     expect($method->getReturnType()->getName())->toBe('Illuminate\\Database\\Eloquent\\Relations\\BelongsTo');
 });

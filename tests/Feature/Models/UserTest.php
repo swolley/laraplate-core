@@ -49,7 +49,7 @@ it('has hidden attributes', function (): void {
 it('has many roles relationship', function (): void {
     $role1 = Role::factory()->create(['name' => 'admin']);
     $role2 = Role::factory()->create(['name' => 'editor']);
-    
+
     $this->user->roles()->attach([$role1->id, $role2->id]);
 
     expect($this->user->roles)->toHaveCount(2);
@@ -87,7 +87,7 @@ it('can impersonate other users when has permission', function (): void {
 });
 
 it('has email verification required', function (): void {
-    expect($this->user)->toBeInstanceOf(\Illuminate\Contracts\Auth\MustVerifyEmail::class);
+    expect($this->user)->toBeInstanceOf(Illuminate\Contracts\Auth\MustVerifyEmail::class);
 });
 
 it('has two factor authentication trait', function (): void {
@@ -97,7 +97,7 @@ it('has two factor authentication trait', function (): void {
 
 it('has soft deletes trait', function (): void {
     $this->user->delete();
-    
+
     expect($this->user->trashed())->toBeTrue();
     expect(User::withTrashed()->find($this->user->id))->not->toBeNull();
 });
@@ -127,9 +127,9 @@ it('can be observed', function (): void {
 
 it('has proper casts for dates', function (): void {
     $user = User::factory()->create();
-    
-    expect($user->created_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
-    expect($user->updated_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
+
+    expect($user->created_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
+    expect($user->updated_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
 });
 
 it('can be created with specific attributes', function (): void {
@@ -151,22 +151,22 @@ it('can be created with specific attributes', function (): void {
 
 it('has proper password hashing', function (): void {
     $user = User::factory()->create(['password' => 'plaintext']);
-    
+
     expect(Hash::check('plaintext', $user->password))->toBeTrue();
 });
 
 it('can be found by email', function (): void {
     $user = User::factory()->create(['email' => 'unique@example.com']);
-    
+
     $foundUser = User::where('email', 'unique@example.com')->first();
-    
+
     expect($foundUser->id)->toBe($user->id);
 });
 
 it('can be found by username', function (): void {
     $user = User::factory()->create(['username' => 'uniqueuser']);
-    
+
     $foundUser = User::where('username', 'uniqueuser')->first();
-    
+
     expect($foundUser->id)->toBe($user->id);
 });

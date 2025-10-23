@@ -31,7 +31,7 @@ it('has one user relationship', function (): void {
 
 it('has boolean cast for is_active', function (): void {
     $license = License::factory()->create(['is_active' => true]);
-    
+
     expect($license->is_active)->toBeTrue();
     expect($license->is_active)->toBeInstanceOf('bool');
 });
@@ -49,7 +49,7 @@ it('has validations trait', function (): void {
 it('can check if license is active', function (): void {
     $activeLicense = License::factory()->create(['is_active' => true]);
     $inactiveLicense = License::factory()->create(['is_active' => false]);
-    
+
     expect($activeLicense->is_active)->toBeTrue();
     expect($inactiveLicense->is_active)->toBeFalse();
 });
@@ -68,19 +68,19 @@ it('can be created with specific attributes', function (): void {
 
 it('can be found by id', function (): void {
     $license = License::factory()->create();
-    
+
     $foundLicense = License::find($license->id);
-    
+
     expect($foundLicense->id)->toBe($license->id);
 });
 
 it('can be found by active status', function (): void {
     $activeLicense = License::factory()->create(['is_active' => true]);
     $inactiveLicense = License::factory()->create(['is_active' => false]);
-    
+
     $activeLicenses = License::where('is_active', true)->get();
     $inactiveLicenses = License::where('is_active', false)->get();
-    
+
     expect($activeLicenses)->toHaveCount(1);
     expect($inactiveLicenses)->toHaveCount(1);
     expect($activeLicenses->first()->id)->toBe($activeLicense->id);
@@ -89,35 +89,35 @@ it('can be found by active status', function (): void {
 
 it('has proper uuid format', function (): void {
     $license = License::factory()->create();
-    
+
     expect($license->id)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
 });
 
 it('can be created without user initially', function (): void {
     $license = License::factory()->create();
-    
+
     expect($license->user)->toBeNull();
 });
 
 it('can have user assigned later', function (): void {
     $license = License::factory()->create();
     $user = User::factory()->create(['license_id' => $license->id]);
-    
+
     expect($license->fresh()->user)->not->toBeNull();
     expect($license->fresh()->user->id)->toBe($user->id);
 });
 
 it('has proper timestamps', function (): void {
     $license = License::factory()->create();
-    
-    expect($license->created_at)->toBeInstanceOf(\Carbon\Carbon::class);
-    expect($license->updated_at)->toBeInstanceOf(\Carbon\Carbon::class);
+
+    expect($license->created_at)->toBeInstanceOf(Carbon\Carbon::class);
+    expect($license->updated_at)->toBeInstanceOf(Carbon\Carbon::class);
 });
 
 it('can be serialized to array', function (): void {
     $license = License::factory()->create(['is_active' => true]);
     $licenseArray = $license->toArray();
-    
+
     expect($licenseArray)->toHaveKey('id');
     expect($licenseArray)->toHaveKey('is_active');
     expect($licenseArray)->toHaveKey('created_at');

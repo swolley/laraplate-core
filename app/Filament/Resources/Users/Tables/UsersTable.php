@@ -52,10 +52,21 @@ final class UsersTable
                         ->action(function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);
+
                             $record->notify($notification);
                             Notification::make()
                                 ->title('Verification email has been resent.')
                                 ->send();
+                        })
+                        ->requiresConfirmation(),
+                );
+                $default_actions->unshift(
+                    Action::make('reset_password')
+                        ->label('Reset Password')
+                        ->icon('heroicon-o-key')
+                        ->authorize(fn (User $record): bool => true)
+                        ->action(function (User $record): void {
+                            $record->sendPasswordResetNotification($record->email);
                         })
                         ->requiresConfirmation(),
                 );

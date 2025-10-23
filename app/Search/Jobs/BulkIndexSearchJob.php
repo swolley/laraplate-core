@@ -22,7 +22,10 @@ use Throwable;
  */
 final class BulkIndexSearchJob extends CommonSearchJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
      * Maximum number of job attempts.
@@ -59,7 +62,7 @@ final class BulkIndexSearchJob extends CommonSearchJob
         throw_unless($models->every(fn ($model): bool => $model instanceof $model_class), InvalidArgumentException::class, 'All models must be of the same class');
 
         // Validate that the model implements Searchable
-        throw_if(! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true), InvalidArgumentException::class, "Model {$model_class} does not use the Searchable trait");
+        throw_if(! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true), InvalidArgumentException::class, sprintf('Model %s does not use the Searchable trait', $model_class));
 
         parent::__construct();
     }
@@ -87,12 +90,12 @@ final class BulkIndexSearchJob extends CommonSearchJob
                 'count' => $this->models->count(),
                 'driver' => $driver,
             ]);
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Error in bulk index job', [
                 'model' => $this->models->first()::class,
                 'count' => $this->models->count(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
             // If there are attempts left, retry
@@ -103,7 +106,7 @@ final class BulkIndexSearchJob extends CommonSearchJob
             }
 
             // If we've reached maximum attempts, fail permanently
-            $this->fail($e);
+            $this->fail($exception);
         }
     }
 

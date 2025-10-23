@@ -17,7 +17,7 @@ final readonly class AclService
     {
         $acls = ACL::forPermission($permission_id)->get();
 
-        return $query->where(function ($mainQuery) use ($acls, $query): void {
+        return $query->where(function (Builder $mainQuery) use ($acls, $query): void {
             foreach ($acls as $acl) {
                 // Creiamo un ListRequestData simulato con i dati dell'ACL
                 $requestData = new ListRequestData(

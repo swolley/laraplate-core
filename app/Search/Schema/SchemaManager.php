@@ -29,7 +29,7 @@ class SchemaManager
 
     public function translateForEngine(SchemaDefinition $schema, string $engine): array
     {
-        throw_unless(isset($this->translators[$engine]), InvalidArgumentException::class, "No translator found for engine: {$engine}");
+        throw_unless(isset($this->translators[$engine]), InvalidArgumentException::class, 'No translator found for engine: ' . $engine);
 
         return $this->translators[$engine]->translate($schema);
     }

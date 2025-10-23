@@ -33,13 +33,13 @@ final class SearchSyncCommand extends Command
             }
 
             if (! class_exists($model_class)) {
-                $this->error("Model class {$model_class} does not exist.");
+                $this->error(sprintf('Model class %s does not exist.', $model_class));
 
                 return 1;
             }
 
             if (! in_array(Searchable::class, class_uses_recursive($model_class), true)) {
-                $this->error("Model class {$model_class} does not use the Searchable trait.");
+                $this->error(sprintf('Model class %s does not use the Searchable trait.', $model_class));
 
                 return 1;
             }
@@ -63,7 +63,7 @@ final class SearchSyncCommand extends Command
                 return 0;
             }
 
-            $this->info("Found {$total} documents to sync.");
+            $this->info(sprintf('Found %s documents to sync.', $total));
             $total_chunks = ceil($total / 100);
             $chunk = 0;
             $use_soft_deletes = in_array(SoftDeletes::class, class_uses_recursive($model_class), true);
@@ -78,9 +78,10 @@ final class SearchSyncCommand extends Command
                     $record->dispatchSearchableJobs($use_soft_deletes && $record->trashed());
                     $progress->advance();
                 }
+
                 $progress->finish();
                 $this->newLine();
-                
+
                 // Force garbage collection after each chunk to free memory
                 unset($records);
                 gc_collect_cycles();
@@ -94,12 +95,12 @@ final class SearchSyncCommand extends Command
             }
 
             return 0;
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Error in model:sync command', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
-            $this->error('An error occurred: ' . $e->getMessage());
+            $this->error('An error occurred: ' . $exception->getMessage());
 
             return 1;
         }

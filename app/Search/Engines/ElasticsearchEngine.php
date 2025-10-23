@@ -64,14 +64,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             $schema['name'] = $collection;
 
             parent::createIndex($collection, $schema);
-            Log::info("Elasticsearch collection '{$collection}' created");
-        } catch (Exception $e) {
-            Log::error("Error creating Elasticsearch collection '{$collection}'", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            Log::info(sprintf("Elasticsearch collection '%s' created", $collection));
+        } catch (Exception $exception) {
+            Log::error(sprintf("Error creating Elasticsearch collection '%s'", $collection), [
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
-            throw $e;
+            throw $exception;
         }
     }
 
@@ -164,9 +164,9 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
-        throw_unless(class_exists($modelClass), InvalidArgumentException::class, "Class {$modelClass} does not exist");
+        throw_unless(class_exists($modelClass), InvalidArgumentException::class, sprintf('Class %s does not exist', $modelClass));
 
-        throw_unless($this->usesSearchableTrait(new $modelClass()), InvalidArgumentException::class, "Model {$modelClass} does not implement the Searchable trait");
+        throw_unless($this->usesSearchableTrait(new $modelClass()), InvalidArgumentException::class, sprintf('Model %s does not implement the Searchable trait', $modelClass));
 
         $query = $modelClass::query();
 
@@ -178,7 +178,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         // Filters
         if ($id !== null && $id !== 0) {
             $query->where('id', $id);
-        } elseif ($from !== null && $from !== '' && $from !== '0') {
+        } elseif (! in_array($from, [null, '', '0'], true)) {
             $query->where('updated_at', '>', Date::parse($from));
         } else {
             $lastIndexed = new $modelClass()->getLastIndexedTimestamp();

@@ -77,6 +77,7 @@ trait HasLocks
         if ($user instanceof User) {
             $this->{$this->getLockedByColumn()} = $user->id;
         }
+
         $this->save();
 
         return $this;

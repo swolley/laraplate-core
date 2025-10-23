@@ -15,6 +15,7 @@ final class SettingForm
     public static function configure(Schema $schema): Schema
     {
         $typeOptions = [];
+
         foreach (SettingTypeEnum::cases() as $case) {
             $typeOptions[$case->value] = $case->name;
         }

@@ -19,7 +19,10 @@ use Override;
  */
 final class ReindexSearchJob extends CommonSearchJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
      * Maximum number of attempts for the job.
@@ -79,8 +82,8 @@ final class ReindexSearchJob extends CommonSearchJob
             } else {
                 $this->individualReindex($model_instance);
             }
-        } catch (Exception $e) {
-            $this->handleReindexException($e, $driver);
+        } catch (Exception $exception) {
+            $this->handleReindexException($exception, $driver);
         }
     }
 
@@ -91,7 +94,7 @@ final class ReindexSearchJob extends CommonSearchJob
 
     private function logModelClassError(): void
     {
-        Log::error("Reindex job failed: Model class {$this->model_class} does not exist");
+        Log::error(sprintf('Reindex job failed: Model class %s does not exist', $this->model_class));
     }
 
     private function isModelSearchable(): bool
@@ -101,12 +104,12 @@ final class ReindexSearchJob extends CommonSearchJob
 
     private function logModelNotSearchableError(): void
     {
-        Log::error("Reindex job failed: Model class {$this->model_class} does not use the Searchable trait");
+        Log::error(sprintf('Reindex job failed: Model class %s does not use the Searchable trait', $this->model_class));
     }
 
     private function logReindexStart(string $driver, string $index_name): void
     {
-        Log::info("Starting reindex job for {$this->model_class} with {$driver} driver", [
+        Log::info(sprintf('Starting reindex job for %s with %s driver', $this->model_class, $driver), [
             'model' => $this->model_class,
             'index' => $index_name,
             'use_bulk' => $this->use_bulk,

@@ -86,7 +86,7 @@ class DatabaseTranslator implements ISchemaTranslator
         foreach ($schema->getFields() as $field) {
             if ($field->hasIndexType(IndexType::SEARCHABLE) || $field->hasIndexType(IndexType::FILTERABLE)) {
                 $indexes[] = [
-                    'name' => "idx_{$schema->name}_{$field->name}",
+                    'name' => sprintf('idx_%s_%s', $schema->name, $field->name),
                     'columns' => [$field->name],
                     'type' => $field->type === FieldType::TEXT ? 'fulltext' : 'btree',
                 ];
@@ -94,7 +94,7 @@ class DatabaseTranslator implements ISchemaTranslator
 
             if ($field->hasIndexType(IndexType::VECTOR)) {
                 $indexes[] = [
-                    'name' => "idx_{$schema->name}_{$field->name}_vector",
+                    'name' => sprintf('idx_%s_%s_vector', $schema->name, $field->name),
                     'columns' => [$field->name],
                     'type' => 'vector', // For vector similarity search
                 ];

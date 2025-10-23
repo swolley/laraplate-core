@@ -235,6 +235,7 @@ trait HasGridUtils
             $timestamps['createdAt'] = $prefix . $model->getCreatedAtColumn();
             $timestamps['updatedAt'] = $prefix . $model->getUpdatedAtColumn();
         }
+
         $uses = class_uses_recursive($model);
 
         if (method_exists($model, 'getDeletedAtColumn')) {
@@ -268,6 +269,7 @@ trait HasGridUtils
         if (! $filterWritable) {
             array_push($columns, ...$fillable);
         }
+
         $columns = array_unique($columns);
 
         if ($getTypes) {
@@ -364,6 +366,7 @@ trait HasGridUtils
             if (! $methodReturn instanceof Relation) {
                 return false;
             }
+
             $ref = new ReflectionClass($methodReturn);
 
             // chiave partenza dell'entità in oggetto

@@ -22,7 +22,7 @@ final class DocsController extends OpenApiJsonController
      */
     public function mergeDocs(Request $request, string $version = 'v1')
     {
-        return Cache::tags([config('APP_NAME')])->remember($request->route()->getName() . $version, config('cache.duration'), fn () => response()->json($this->getJson($version)));
+        return Cache::tags(Cache::getCacheTags('docs'))->rememberForever($request->route()->getName() . $version, fn () => response()->json($this->getJson($version)));
     }
 
     /**
@@ -43,23 +43,25 @@ final class DocsController extends OpenApiJsonController
             }
 
             foreach ($all_models as $i => $model) {
-                if (Str::startsWith($model, $module) || Str::startsWith($model, "Modules\\{$module}")) {
+                if (Str::startsWith($model, $module) || Str::startsWith($model, 'Modules\\' . $module)) {
                     $grouped[$module]['models'][] = $model;
                     unset($all_models[$i]);
                 }
             }
 
             foreach ($all_controllers as $i => $controller) {
-                if (Str::startsWith($controller, $module) || Str::startsWith($controller, "Modules\\{$module}")) {
+                if (Str::startsWith($controller, $module) || Str::startsWith($controller, 'Modules\\' . $module)) {
                     $grouped[$module]['controllers'][] = $controller;
                     unset($all_controllers[$i]);
                 }
             }
+
             $composer = json_decode(file_get_contents($module === 'App' ? base_path('composer.json') : module_path($module, 'composer.json')), true);
 
             foreach ($composer['authors'] ?? [] as $author) {
                 $grouped[$module]['authors'][] = ['name' => is_string($author) ? $author : $author['name'], 'email' => ! is_string($author) && isset($author['email']) ? $author['email'] : null];
             }
+
             $grouped[$module]['description'] = $composer['description'] ?? null;
             $grouped[$module]['version'] = $composer['version'] ?? null;
             sort($grouped[$module]['models']);

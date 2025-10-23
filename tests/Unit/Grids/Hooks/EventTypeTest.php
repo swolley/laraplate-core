@@ -6,7 +6,7 @@ use Modules\Core\Grids\Hooks\EventType;
 
 test('enum has correct class structure', function (): void {
     $reflection = new ReflectionClass(EventType::class);
-    
+
     expect($reflection->getName())->toBe('Modules\Core\Grids\Hooks\EventType');
     expect($reflection->isEnum())->toBeTrue();
 });
@@ -14,7 +14,7 @@ test('enum has correct class structure', function (): void {
 test('enum has all required cases', function (): void {
     $reflection = new ReflectionClass(EventType::class);
     $cases = $reflection->getConstants();
-    
+
     expect($cases)->toHaveKey('PRE_SELECT');
     expect($cases)->toHaveKey('POST_SELECT');
     expect($cases)->toHaveKey('PRE_INSERT');
@@ -38,14 +38,14 @@ test('enum cases have correct string values', function (): void {
 
 test('enum is backed by string', function (): void {
     $reflection = new ReflectionClass(EventType::class);
-    
+
     expect($reflection->isEnum())->toBeTrue();
     expect(EventType::PRE_SELECT->value)->toBeString();
 });
 
 test('enum has correct namespace', function (): void {
     $reflection = new ReflectionClass(EventType::class);
-    
+
     expect($reflection->getNamespaceName())->toBe('Modules\Core\Grids\Hooks');
     expect($reflection->getShortName())->toBe('EventType');
 });
@@ -68,7 +68,7 @@ test('enum has tryFrom method', function (): void {
 
 test('enum has cases method', function (): void {
     $cases = EventType::cases();
-    
+
     expect($cases)->toHaveCount(8);
     expect($cases)->toContain(EventType::PRE_SELECT);
     expect($cases)->toContain(EventType::POST_SELECT);

@@ -48,7 +48,7 @@ abstract class ListEntity extends Entity
     final public static function create(Field|string|array|null $labelField = null): Closure
     {
         if ($labelField && ! ($labelField instanceof Field)) {
-            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(fn ($label): Field => self::createField($label), $labelField);
+            $labelField = is_string($labelField) ? self::createField($labelField) : array_map(self::createField(...), $labelField);
         }
 
         return fn (Model $model, Field $valueField): static => new static($model, $valueField, $labelField ?? $valueField);

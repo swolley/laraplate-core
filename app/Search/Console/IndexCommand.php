@@ -13,7 +13,8 @@ use Symfony\Component\Console\Command\Command;
 
 final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
 {
-    use HasBenchmark, SearchableCommandUtils;
+    use HasBenchmark;
+    use SearchableCommandUtils;
 
     protected $signature = 'scout:index {model : The model to create an index for}';
 

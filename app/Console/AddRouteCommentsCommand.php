@@ -46,50 +46,49 @@ final class AddRouteCommentsCommand extends Command
             if (! isset($method_routes[$action])) {
                 $method_routes[$action] = [];
             }
+
             $method_routes[$action][] = $route;
         }
 
         // Then process each method with all its routes
         foreach ($method_routes as $key => &$routes) {
-            {
-                [$controller, $method] = explode('@', $key);
-    
-                $reflection_class = new ReflectionClass($controller);
-    
-                if (! $reflection_class->hasMethod($method)) {
-                    continue;
-                }
-    
-                $reflection_method = $reflection_class->getMethod($method);
-    
-                // Check if the method is inherited
-                if ($controller !== $reflection_method->getDeclaringClass()->getName()) {
-                    $this->warn("Method {$method} in {$controller} is inherited from {$reflection_method->getDeclaringClass()->getName()}. Skipping...");
-    
-                    continue;
-                }
-    
-                $file_path = $reflection_class->getFileName();
-    
-                if (! file_exists($file_path)) {
-                    continue;
-                }
-    
-                $route_comments = [];
-    
-                foreach ($routes as &$route) {
-                    $route_info = $this->getRouteInfo($route);
-                    $route_comments[] = $route_info;
-                }
-    
-                $comment = $this->generateComment($route_comments);
-                $this->addCommentToMethod($file_path, $method, $comment);
-    
-                if (! in_array($controller, $processed_controllers, true)) {
-                    $this->info("Processed controller: {$controller}");
-                    $processed_controllers[] = $controller;
-                }
+            [$controller, $method] = explode('@', $key);
+            $reflection_class = new ReflectionClass($controller);
+
+            if (! $reflection_class->hasMethod($method)) {
+                continue;
             }
+
+            $reflection_method = $reflection_class->getMethod($method);
+
+            // Check if the method is inherited
+            if ($controller !== $reflection_method->getDeclaringClass()->getName()) {
+                $this->warn(sprintf('Method %s in %s is inherited from %s. Skipping...', $method, $controller, $reflection_method->getDeclaringClass()->getName()));
+
+                continue;
+            }
+
+            $file_path = $reflection_class->getFileName();
+
+            if (! file_exists($file_path)) {
+                continue;
+            }
+
+            $route_comments = [];
+
+            foreach ($routes as &$route) {
+                $route_info = $this->getRouteInfo($route);
+                $route_comments[] = $route_info;
+            }
+
+            $comment = $this->generateComment($route_comments);
+            $this->addCommentToMethod($file_path, $method, $comment);
+
+            if (! in_array($controller, $processed_controllers, true)) {
+                $this->info('Processed controller: ' . $controller);
+                $processed_controllers[] = $controller;
+            }
+
             gc_collect_cycles();
         }
 
@@ -111,7 +110,7 @@ final class AddRouteCommentsCommand extends Command
         $comment = "\t/**\n\t * " . self::ROUTE_COMMENT_MARKER . "\n";
 
         foreach ($route_comments as &$route_info) {
-            $comment .= "\t * Route(path: '{$route_info['uri']}', name: '{$route_info['name']}', methods: [" . implode(', ', $route_info['methods']) . '], middleware: [' . implode(', ', $route_info['middleware']) . "])\n";
+            $comment .= sprintf("\t * Route(path: '%s', name: '%s', methods: [", $route_info['uri'], $route_info['name']) . implode(', ', $route_info['methods']) . '], middleware: [' . implode(', ', $route_info['middleware']) . "])\n";
         }
 
         return $comment . "\t */";
@@ -135,7 +134,7 @@ final class AddRouteCommentsCommand extends Command
             $line = $lines[$i];
 
             // If we find the method
-            if (str_contains($line, "function {$method_name}")) {
+            if (str_contains($line, 'function ' . $method_name)) {
                 $method_found = true;
                 $method_start_line = $i;
 
@@ -188,6 +187,7 @@ final class AddRouteCommentsCommand extends Command
             if ($i === $method_start_line) {
                 $new_content[] = $comment;
             }
+
             $new_content[] = $lines[$i];
         }
 

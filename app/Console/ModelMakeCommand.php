@@ -36,7 +36,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 final class ModelMakeCommand extends BaseModelMakeCommand
 {
-    use HasBenchmark, PromptsForMissingInput;
+    use HasBenchmark;
+    use PromptsForMissingInput;
 
     protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
 
@@ -128,6 +129,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                         /** @var string $class_code */
                         $class_code = $this->addPropertyIntoFillable($class_code, $fillable);
                     }
+
                     $casts = $class->casts();
 
                     foreach ($casts as $property => $cast) {
@@ -138,6 +140,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                         /** @var string $class_code */
                         $class_code = $this->addPropertyIntoHidden($class_code, $hidden);
                     }
+
                     $found_rules = [];
 
                     if (class_uses_trait($class, HasValidations::class)) {
@@ -158,6 +161,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                             $setter = new ReflectionMethod($class, 'set' . $method_subfix);
                             $type = $setter->getReturnType() ?? 'text';
                         }
+
                         $class_code = $this->addPropertyIntoAccessorsMutators($class_code, $append, $type, $nullable, $all_types);
                     }
 
@@ -285,7 +289,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 'form requests' => 'requests',
                 default => $option,
             })
-            ->each(function ($option) use ($input): void {
+            ->each(function (string $option) use ($input): void {
                 /** @var string $option */
                 $input->setOption($option, true);
             });
@@ -303,7 +307,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         }
 
         $this->call('make:migration', [
-            'name' => ($this->isNewClass ? 'create' : 'update') . "_{$table}_table",
+            'name' => ($this->isNewClass ? 'create' : 'update') . sprintf('_%s_table', $table),
             ($this->isNewClass ? '--create' : '--update') => $table,
             '--fullpath' => true,
         ]);
@@ -471,7 +475,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         /** @psalm-suppress InvalidArgument */
         table(['Type', 'Description'], $rows);
 
-        return $this->askPersistentlyWithCompletion("\"{$fieldName}\" relation type:", array_keys($filtered_relation_types));
+        return $this->askPersistentlyWithCompletion(sprintf('"%s" relation type:', $fieldName), array_keys($filtered_relation_types));
     }
 
     /**
@@ -631,7 +635,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     private function injectImportClass(string &$classCode, string $importName): bool
     {
         $added_import = false;
-        $search = "use {$importName};";
+        $search = sprintf('use %s;', $importName);
         $relation_import_pos = Str::position($classCode, $search);
 
         if ($relation_import_pos === false) {
@@ -740,22 +744,25 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     private function handleAskInverseRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
     {
         $short_class = $this->stripModelsNamespace($className);
-        $create_reverse_relation = $this->confirm("Do you want to create a method into class {$relatedClass} to access {$short_class}?", true);
+        $create_reverse_relation = $this->confirm(sprintf('Do you want to create a method into class %s to access %s?', $relatedClass, $short_class), true);
 
         if (! $create_reverse_relation) {
             return;
         }
+
         $reversed_relation = $this->getReversedRelationType($relationType);
 
         if (in_array($reversed_relation, [null, '', '0'], true)) {
             return;
         }
+
         $proposed_name = $this->proposeInverseName($short_class, $reversed_relation);
 
         if (in_array($proposed_name, [null, '', '0'], true)) {
             return;
         }
-        $inverted_relation_name = text("What is the name of the reversed relation? [{$proposed_name}]", default: $proposed_name);
+
+        $inverted_relation_name = text(sprintf('What is the name of the reversed relation? [%s]', $proposed_name), default: $proposed_name);
         $related_path = $this->getPath($fullRelatedClass);
         $related_code = $this->files->get($related_path);
         $this->updateClassWithNewRelation($relatedClass, $related_code, $related_path, $inverted_relation_name, $reversed_relation, $className, true);
@@ -819,7 +826,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 $field_name = Str::snake(mb_trim($field_name));
 
                 if (in_array($field_name, $newFields, true) || in_array($field_name, $alreadyExistentFields, true)) {
-                    return "The \"{$field_name}\" property already exists.";
+                    return sprintf('The "%s" property already exists.', $field_name);
                 }
 
                 return null;
@@ -838,7 +845,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $all_types = array_merge(...array_values($this->availableTypes));
         $all_input_types = array_keys($all_types);
 
-        $this->line('Let\'s add some new fields!');
+        $this->line("Let's add some new fields!");
         $this->line('You can always add more fields later manually or by re-running this command.');
         $this->newLine();
 
@@ -859,11 +866,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $related_class = null;
 
             $field_type = suggest(
-                "\"{$field_name}\" field type [{$default_type}]:",
+                sprintf('"%s" field type [%s]:', $field_name, $default_type),
                 $all_input_types,
                 placeholder: $default_type,
-                validate: fn (string $value) => match (true) {
-                    ! in_array($value, $all_input_types, true) => "Invalid type \"{$value}\"",
+                validate: fn (string $value): ?string => match (true) {
+                    ! in_array($value, $all_input_types, true) => sprintf('Invalid type "%s"', $value),
                     default => null,
                 },
             );
@@ -878,12 +885,12 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 $classCode = $this->updateClassWithNewRelation($className, $classCode, $classPath, $field_name, $field_type, $related_class);
             } else {
                 // REQUIRED
-                $field_nullable = confirm("Is \"{$field_name}\" nullable:", true);
+                $field_nullable = confirm(sprintf('Is "%s" nullable:', $field_name), true);
                 $classCode = $this->updateClassWithNewProperty($className, $classCode, $classPath, $field_name, $field_type, $field_nullable, $all_types);
                 $already_existent_fields[] = $field_name;
             }
 
-            $this->info("Model {$className} updated.");
+            $this->info(sprintf('Model %s updated.', $className));
 
             $this->newLine();
         }

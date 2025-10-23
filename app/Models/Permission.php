@@ -17,10 +17,9 @@ use Spatie\Permission\Models\Permission as ModelsPermission;
  */
 final class Permission extends ModelsPermission
 {
-    use HasCache, HasValidations {
-        getRules as protected getRulesTrait;
-    }
+    use HasCache;
     use HasFactory;
+    use HasValidations;
 
     /**
      * @var array<int,string>
@@ -89,18 +88,19 @@ final class Permission extends ModelsPermission
         return $this->hasMany(ACL::class);
     }
 
+    protected static function newFactory(): PermissionFactory
+    {
+        return PermissionFactory::new();
+    }
+
     protected function getActionAttribute(): ?ActionEnum
     {
         if ($this->name === null) {
             return null;
         }
+
         $splitted = explode('.', $this->name);
 
         return ActionEnum::tryFrom(array_pop($splitted));
-    }
-
-    private static function newFactory(): PermissionFactory
-    {
-        return PermissionFactory::new();
     }
 }

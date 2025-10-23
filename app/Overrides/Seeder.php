@@ -11,7 +11,8 @@ use Modules\Core\Helpers\HasSeedersUtils;
 
 class Seeder extends BaseSeeder
 {
-    use HasBenchmark, HasSeedersUtils;
+    use HasBenchmark;
+    use HasSeedersUtils;
 
     public function __construct(protected DatabaseManager $db)
     {

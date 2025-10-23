@@ -28,7 +28,7 @@ final class PermissionChecker
         $guard_name = $guard->name;
 
         $connection ??= 'default';
-        $permission_name = "{$connection}.{$entity}.{$operation}";
+        $permission_name = sprintf('%s.%s.%s', $connection, $entity, $operation);
 
         // if ($permissions instanceof Collection) {
         //     return $permissions->filter(

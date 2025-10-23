@@ -23,7 +23,7 @@ final class Relation extends Entity
         $this->info = $info;
         $this->name = $info->getName();
 
-        if ($fields) {
+        if ($fields !== null) {
             $this->setFields($fields);
         }
     }

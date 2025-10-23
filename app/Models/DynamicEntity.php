@@ -31,7 +31,11 @@ use UnexpectedValueException;
  */
 final class DynamicEntity extends Model
 {
-    use HasFactory, HasGridUtils, HasValidations, HasVersions /* , HasAcl? */, SoftDeletes;
+    use HasFactory;
+    use HasGridUtils;
+    use HasValidations;
+    use HasVersions;
+    use SoftDeletes;
 
     /**
      * @var bool
@@ -49,7 +53,7 @@ final class DynamicEntity extends Model
     {
         $model = self::tryResolveModel($tableName, $connection);
 
-        if ($model !== null && $model !== '' && $model !== '0') {
+        if (! in_array($model, [null, '', '0'], true)) {
             return new $model($attributes);
         }
 
@@ -110,11 +114,13 @@ final class DynamicEntity extends Model
         if ($primary_key) {
             $this->setPrimaryKeyInfo($primary_key, $inspected->getPrimaryKeyColumns());
         }
+
         $this->setDirectRelationsInfo($inspected->foreignKeys);
 
         if ($request instanceof Request) {
             $this->setReverseRelationsInfo($request);
         }
+
         $this->setColumnsInfo($inspected->columns, $inspected->foreignKeys, $inspected->indexes);
     }
 
@@ -145,7 +151,7 @@ final class DynamicEntity extends Model
     {
         $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
-        throw_if(count($found) > 1, Exception::class, "Too many models found for '{$modelName}'");
+        throw_if(count($found) > 1, Exception::class, sprintf("Too many models found for '%s'", $modelName));
 
         return count($found) === 1 ? head($found) : null;
     }
@@ -153,14 +159,14 @@ final class DynamicEntity extends Model
     private function verifyTableExistence(): void
     {
         /** @phpstan-ignore staticMethod.notFound */
-        throw_unless(Schema::connection($this->connection)->hasTable($this->table), UnexpectedValueException::class, "Table '{$this->table}' doesn't exists on '{$this->connection}' connection");
+        throw_unless(Schema::connection($this->connection)->hasTable($this->table), UnexpectedValueException::class, sprintf("Table '%s' doesn't exists on '%s' connection", $this->table, $this->connection));
     }
 
     private function setTableConnectionInfo(string $tableName, ?string $connection = null): void
     {
         $this->setTable($tableName);
 
-        if ($connection !== null && $connection !== '' && $connection !== '0') {
+        if (! in_array($connection, [null, '', '0'], true)) {
             $this->setConnection($connection);
         }
     }
@@ -207,6 +213,7 @@ final class DynamicEntity extends Model
                 $remapped_fks[$lc] = [$fk->foreignTableName, $fk->foreignColumnNames[$idx]];
             }
         }
+
         $remapped_uids = [];
 
         foreach ($indexes as $idx) {

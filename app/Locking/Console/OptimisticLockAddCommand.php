@@ -16,7 +16,7 @@ class OptimisticLockAddCommand extends LockedAddCommand
     #[Override]
     public function generateMigrationPath(Model $instance): string
     {
-        return "_{$this->operation}_optimistic_columns_to_{$instance->getTable()}.php";
+        return sprintf('_%s_optimistic_columns_to_%s.php', $this->operation, $instance->getTable());
     }
 
     /**
@@ -25,6 +25,6 @@ class OptimisticLockAddCommand extends LockedAddCommand
     #[Override]
     public function getStubPath(): string
     {
-        return module_path('Core', "Locking/Stubs/{$this->operation}_optimistic_column_to_table.php.stub");
+        return module_path('Core', sprintf('Locking/Stubs/%s_optimistic_column_to_table.php.stub', $this->operation));
     }
 }

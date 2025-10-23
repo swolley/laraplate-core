@@ -147,6 +147,7 @@ abstract class Entity
         if (! $this->getFields()->offsetExists($fieldname)) {
             return null;
         }
+
         $found_field = $this->getFields()->offsetGet($fieldname);
 
         return $fullname === $found_field->getFullAlias() ? $found_field : null;
@@ -171,16 +172,19 @@ abstract class Entity
         if ((string) $fieldpath === '') {
             return null;
         }
+
         $exploded_fieldpath = explode('.', (string) $fieldpath);
 
         if ($exploded_fieldpath[0] === lcfirst($this->getName())) {
             array_shift($exploded_fieldpath);
         }
+
         $top = array_shift($exploded_fieldpath);
 
         if (! $this->getRelations()->offsetExists($top)) {
             return null;
         }
+
         $subrelation = $this->getRelations()->offsetGet($top);
 
         return $subrelation->getFieldDeeply($field);
@@ -290,6 +294,7 @@ abstract class Entity
         if ($this->hasField($field)) {
             return false;
         }
+
         $checked = false;
         $path = $field->getPath();
 
@@ -447,6 +452,7 @@ abstract class Entity
                 $subrelation = new Relation($parent->getFullName(), $relation);
                 $parent->addRelation($subrelation);
             }
+
             $parent = $subrelation;
         }
 
@@ -463,6 +469,7 @@ abstract class Entity
         if ($this->hasRelation($relation_name)) {
             return false;
         }
+
         $this->getRelations()->offsetSet($relation_name, $relation);
 
         return true;
@@ -574,6 +581,7 @@ abstract class Entity
                             $value = '%' . mb_strtolower($value) . '%';
                         }
                     }
+
                     $params = [...$params, $operator->value, $value];
                 }
         }
@@ -668,6 +676,7 @@ abstract class Entity
         if (! ($fields instanceof Collection)) {
             $fields = collect($fields);
         }
+
         $this->fields = new Collection();
         $this->addFields($fields);
         $fields_keys = $this->getFields()->keys()->all();
@@ -697,6 +706,7 @@ abstract class Entity
                     throw new Exception('Cosa devo fare in questo caso?');
                 }
             }
+
             assertInstanceOf(Field::class, $field);
             $this->addField($field);
         }
@@ -728,6 +738,7 @@ abstract class Entity
                 $exploded = explode('.', (string) $order['property']);
                 $order['property'] = array_pop($exploded);
             }
+
             $query->orderBy($order['property'], $order['direction']);
         }
     }
@@ -771,7 +782,7 @@ abstract class Entity
         }
 
         if (! Grid::useGridUtils($model)) {
-            throw_unless(config('core.dynamic_gridutils'), UnexpectedValueException::class, 'Model ' . $model::class . ' doesn\'t use ' . HasGridUtils::class);
+            throw_unless(config('core.dynamic_gridutils'), UnexpectedValueException::class, 'Model ' . $model::class . " doesn't use " . HasGridUtils::class);
 
             // TODO: da verificare, solo imbastito
             $class = $model::class;
@@ -781,6 +792,7 @@ abstract class Entity
             if (! class_exists($extended_class_name)) {
                 eval(sprintf('class %s extends %s { use %s; }', $extended_class_name, $class, $grid_utils));
             }
+
             $model = new $extended_class_name;
         }
 

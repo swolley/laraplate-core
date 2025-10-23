@@ -21,7 +21,14 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
     }
 
     #[Override]
-    public function prepareForValidation(): void
+    public function parsed(): ModifyRequestData
+    {
+        /** @phpstan-ignore method.notFound */
+        return new ModifyRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+    }
+
+    #[Override]
+    protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
 
@@ -58,7 +65,7 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
             $main_entity = $this->route()->entity;
 
             foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
-                $key = $this->{$attribute} ?? $this->{"{$main_entity}.{$attribute}"} ?? null;
+                $key = $this->{$attribute} ?? $this->{sprintf('%s.%s', $main_entity, $attribute)} ?? null;
                 $to_merge[$key] = $key ? array_unique([...$to_merge[$key], ...$rule]) : $rule;
 
                 $to_merge['filters'][] = ['property' => $key, 'value' => $this->{$key}];
@@ -67,12 +74,5 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
         /** @phpstan-ignore method.notFound */
         $this->merge($to_merge);
-    }
-
-    #[Override]
-    public function parsed(): ModifyRequestData
-    {
-        /** @phpstan-ignore method.notFound */
-        return new ModifyRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
     }
 }

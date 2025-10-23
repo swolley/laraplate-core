@@ -61,6 +61,7 @@ final class LockedModelSubscriber
         if (new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
         }
+
         $model = $this->getModelFromPassedParams($entity);
 
         $locked = new Locked();
@@ -86,6 +87,7 @@ final class LockedModelSubscriber
         if ($locked->allowsModificationsOnLockedObjects()) {
             return true;
         }
+
         $model = $this->getModelFromPassedParams($entity);
 
         /** @var Model $model */
@@ -107,6 +109,7 @@ final class LockedModelSubscriber
         if ($locked->allowsNotificationsToLockedObjects()) {
             return false;
         }
+
         $model = $event->notifiable;
 
         if ($locked->doesNotUseHasLocks($model)) {

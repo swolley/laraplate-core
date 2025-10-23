@@ -37,6 +37,7 @@ final class ModuleDocRoute extends Route
         if (in_array($name, [null, '', '0'], true)) {
             return '';
         }
+
         $exploded = explode('.', $name);
 
         return array_shift($exploded);

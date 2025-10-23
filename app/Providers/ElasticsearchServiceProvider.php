@@ -29,7 +29,7 @@ final class ElasticsearchServiceProvider extends ServiceProvider
         // }
 
         // Register the service as singleton
-        $this->app->singleton('elasticsearch', fn (): ElasticsearchService => ElasticsearchService::getInstance());
+        $this->app->singleton('elasticsearch', ElasticsearchService::getInstance(...));
 
         // Create an alias for easier access to the service
         $this->app->alias('elasticsearch', ElasticsearchService::class);

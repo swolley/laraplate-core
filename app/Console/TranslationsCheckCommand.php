@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -49,6 +50,8 @@ final class TranslationsCheckCommand extends Command
 
         $this->output->writeln('');
 
+        Cache::tags(Cache::getCacheTags('translations'))->flush();
+
         return BaseCommand::SUCCESS;
     }
 
@@ -57,7 +60,7 @@ final class TranslationsCheckCommand extends Command
         $mapped = [];
 
         foreach (array_keys($translations) as $key) {
-            $fullpath = $subgroup !== null && $subgroup !== '' && $subgroup !== '0' ? "{$subgroup}.{$key}" : $key;
+            $fullpath = in_array($subgroup, [null, '', '0'], true) ? $key : sprintf('%s.%s', $subgroup, $key);
 
             if (gettype($translations[$key]) === 'string') {
                 $mapped[] = $fullpath;
@@ -73,6 +76,7 @@ final class TranslationsCheckCommand extends Command
     {
         $langname = explode(DIRECTORY_SEPARATOR, $lang);
         $langname = array_pop($langname);
+
         $contains_requires = Str::contains(file_get_contents($file), 'require(__DIR__');
         $required = require $file;
         $file_identifier = str_replace(DIRECTORY_SEPARATOR . $langname . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, $file);
@@ -80,11 +84,12 @@ final class TranslationsCheckCommand extends Command
         if (! array_key_exists($file_identifier, $translations)) {
             $translations[$file_identifier] = [];
         }
+
         $translations[$file_identifier][$langname] = $this->compactTranslations($required);
 
         if ($contains_requires) {
             $to_be_ignored_files[] = $file;
-            $this->output->writeln("<comment>{$file} imports another language</comment>");
+            $this->output->writeln(sprintf('<comment>%s imports another language</comment>', $file));
 
             return;
         }
@@ -93,14 +98,14 @@ final class TranslationsCheckCommand extends Command
         $imported = var_export(array_sort_keys($required), true);
 
         if ($stringified === $imported) {
-            $this->output->writeln("<info>{$file} is ok</info>");
+            $this->output->writeln(sprintf('<info>%s is ok</info>', $file));
 
             return;
         }
 
         $replaced = mb_ltrim((string) preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
         file_put_contents($file, "<?php\n\nreturn " . $replaced . ';');
-        $this->output->writeln("<info>{$file} has been sorted</info>");
+        $this->output->writeln(sprintf('<info>%s has been sorted</info>', $file));
     }
 
     private function checkLabels(array &$translations, array &$to_be_ignored_files): void
@@ -130,7 +135,7 @@ final class TranslationsCheckCommand extends Command
                 $realfile = str_replace('*', $lang, $file);
 
                 if (in_array($realfile, $to_be_ignored_files, true)) {
-                    $this->output->writeln("<comment>{$realfile} imports another language</comment>");
+                    $this->output->writeln(sprintf('<comment>%s imports another language</comment>', $realfile));
 
                     continue;
                 }
@@ -138,10 +143,10 @@ final class TranslationsCheckCommand extends Command
                 $diff = array_diff($all_labels, $labels);
 
                 if ($diff === []) {
-                    $this->output->writeln("<info>{$realfile} labels are ok</info>");
+                    $this->output->writeln(sprintf('<info>%s labels are ok</info>', $realfile));
                 } else {
                     $joined_labels = implode(', ', $diff);
-                    $this->output->writeln("<error>{$realfile} is missing the current labels: {$joined_labels}</error>");
+                    $this->output->writeln(sprintf('<error>%s is missing the current labels: %s</error>', $realfile, $joined_labels));
                 }
             }
         }
@@ -158,7 +163,7 @@ final class TranslationsCheckCommand extends Command
 
                 foreach ($diff as $lang) {
                     $realfile = str_replace('*', $lang, $file);
-                    $this->output->writeln("<error>{$realfile} is missing</error>");
+                    $this->output->writeln(sprintf('<error>%s is missing</error>', $realfile));
                 }
             }
         }

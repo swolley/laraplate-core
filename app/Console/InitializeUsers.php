@@ -30,9 +30,9 @@ final class InitializeUsers extends Command
 
         $this->db->transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
             if (! $user_class::whereName($root)->exists()) {
-                $email = text("Please specify a {$root} user email", required: true, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
-                $password = password("Please specify a {$root} user password", required: true);
-                password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? 'Passwords don\'t match' : null);
+                $email = text(sprintf('Please specify a %s user email', $root), required: true, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
+                $password = password(sprintf('Please specify a %s user password', $root), required: true);
+                password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? "Passwords don't match" : null);
                 $root_user = $user_class::make([
                     'name' => $root,
                     'username' => $root,
@@ -44,17 +44,17 @@ final class InitializeUsers extends Command
                 $root_user->save();
                 // @phpstan-ignore-next-line
                 $root_user->assignRole($groups['superadmin']);
-                $this->info("{$root} created");
+                $this->info($root . ' created');
             } else {
-                $this->info("{$root} already exists");
+                $this->info($root . ' already exists');
             }
 
             if (! $user_class::whereName($admin)->exists()) {
-                $email = text("Please specify a {$admin} user email or leave blank to skip", required: false, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
+                $email = text(sprintf('Please specify a %s user email or leave blank to skip', $admin), required: false, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
 
                 if ($email !== '' && $email !== '0') {
-                    $password = password("Please specify a {$admin} user password", required: true);
-                    password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? 'Passwords don\'t match' : null);
+                    $password = password(sprintf('Please specify a %s user password', $admin), required: true);
+                    password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? "Passwords don't match" : null);
                     $admin_user = $user_class::make([
                         'name' => $admin,
                         'username' => $admin,
@@ -65,26 +65,26 @@ final class InitializeUsers extends Command
                     $admin_user->save();
                     // @phpstan-ignore-next-line
                     $admin_user->assignRole($groups[$admin]);
-                    $this->info("{$admin} created");
+                    $this->info($admin . ' created');
                 }
             } else {
-                $this->info("{$admin} already exists");
+                $this->info($admin . ' already exists');
             }
 
             if (! $user_class::whereName($anonymous)->exists()) {
                 $anonymous_user = $user_class::make([
                     'name' => $anonymous,
                     'username' => $anonymous,
-                    'email' => "{$anonymous}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
+                    'email' => $anonymous . '@' . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                     'password' => Hash::make(config('app.name')),
                 ]);
                 $anonymous_user->email_verified_at = now();
                 $anonymous_user->save();
                 // @phpstan-ignore-next-line
                 $anonymous_user->assignRole($groups['guest']);
-                $this->info("{$anonymous} created");
+                $this->info($anonymous . ' created');
             } else {
-                $this->info("{$anonymous} already exists");
+                $this->info($anonymous . ' already exists');
             }
         });
     }

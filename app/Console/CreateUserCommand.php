@@ -85,10 +85,11 @@ final class CreateUserCommand extends Command
                             $answer = password(ucfirst($attribute), 'Type a password or let blank to randomly generate it', false, fn (string $value) => $value === '' ? null : $this->validationCallback($attribute, $value, $validations));
 
                             if ($answer !== '') {
-                                password("Confirm {$attribute}", required: true, validate: fn ($value) => $this->validationCallback($attribute, $value, ['password' => "in:{$answer}"]));
+                                password('Confirm ' . $attribute, required: true, validate: fn (string $value) => $this->validationCallback($attribute, $value, ['password' => 'in:' . $answer]));
                             } else {
                                 $answer = Str::password();
                             }
+
                             $password = $answer;
                             $answer = Hash::make($answer);
                         }
@@ -98,7 +99,7 @@ final class CreateUserCommand extends Command
 
                     do {
                         $roles = multiselect('Roles', $all_roles, required: false);
-                    } while ($roles === [] || confirm('You didn\'t choose any role, do you want to continue?', false));
+                    } while ($roles === [] || confirm("You didn't choose any role, do you want to continue?", false));
 
                     $permissions = confirm('Do you want to specify custom user permissions', false, hint: 'user already inherits choosen Roles permissions') ? multiselect('Permissions', $all_permissions, required: false) : [];
 
@@ -108,6 +109,7 @@ final class CreateUserCommand extends Command
                     if ($permissions !== []) {
                         $user->permissions()->sync($permissions);
                     }
+
                     $this->output->info('User created');
                     $total_users_created++;
 
@@ -123,13 +125,13 @@ final class CreateUserCommand extends Command
                 });
             } while (confirm('Do you want to create another user?', false));
 
-            $this->output->info("Created {$total_users_created} users");
+            $this->output->info(sprintf('Created %d users', $total_users_created));
 
             table(['User', 'Email', 'Password', 'Roles', 'Permissions'], $created_users);
 
             return BaseCommand::SUCCESS;
-        } catch (Throwable $ex) {
-            $this->error($ex->getMessage());
+        } catch (Throwable $throwable) {
+            $this->error($throwable->getMessage());
 
             return BaseCommand::FAILURE;
         }

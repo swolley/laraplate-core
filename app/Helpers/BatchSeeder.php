@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
-use ErrorException;
-
 use function Laravel\Prompts\progress;
+
+use ErrorException;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -44,11 +44,11 @@ abstract class BatchSeeder extends Seeder
             $this->execute();
             $this->command->newLine();
             $this->command->info('All data seeded successfully!');
-        } catch (Throwable $e) {
-            $this->command->error('Error during seeding: ' . $e->getMessage());
-            Log::error('Seeding error: ' . $e->getMessage(), [
-                'exception' => $e,
-                'trace' => $e->getTraceAsString(),
+        } catch (Throwable $throwable) {
+            $this->command->error('Error during seeding: ' . $throwable->getMessage());
+            Log::error('Seeding error: ' . $throwable->getMessage(), [
+                'exception' => $throwable,
+                'trace' => $throwable->getTraceAsString(),
             ]);
         }
     }
@@ -72,7 +72,7 @@ abstract class BatchSeeder extends Seeder
             return 0;
         }
 
-        $progress = progress("Creating {$entity_name}", $count_to_create);
+        $progress = progress('Creating ' . $entity_name, $count_to_create);
         $progress->start();
 
         $created = 0;
@@ -103,7 +103,7 @@ abstract class BatchSeeder extends Seeder
             return 0;
         }
 
-        $progress = progress("Creating {$entity_name}", $count_to_create);
+        $progress = progress('Creating ' . $entity_name, $count_to_create);
         $progress->start();
 
         $created = 0;
@@ -117,7 +117,7 @@ abstract class BatchSeeder extends Seeder
 
         $propagate_exception = function (Throwable $e) use (&$force_kill_all_batches, &$progress, &$entity_name): void {
             $force_kill_all_batches = $e;
-            $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . (1) . '}: ' . $e->getMessage() . '</>');
+            $progress->hint(sprintf('<fg=red>Failed to create %s batch {', $entity_name) . (1) . '}: ' . $e->getMessage() . '</>');
             $progress->render();
 
             exit(1);
@@ -208,24 +208,21 @@ abstract class BatchSeeder extends Seeder
                     $connections = $this->setupAsyncConnections($connections['database'], $connections['cache']);
                 }
 
-                {
-                    $model_instance = new $modelClass();
-                    $model_instance->setConnection($connections['database']);
-    
-                    if ($this->isSearchable($modelClass)) {
-                        $model_instance->setCacheConnection($connections['cache']);
-                    }
-    
-                    /** @phpstan-ignore staticMethod.notFound */
-                    $factory = $model_instance->factory();
-    
-                    /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
-                    $new_models = $factory->count($batchSize)->create();
-    
-                    if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
-                        $factory->createRelations($new_models);
-                    }
+                $model_instance = new $modelClass();
+                $model_instance->setConnection($connections['database']);
 
+                if ($this->isSearchable($modelClass)) {
+                    $model_instance->setCacheConnection($connections['cache']);
+                }
+
+                /** @phpstan-ignore staticMethod.notFound */
+                $factory = $model_instance->factory();
+
+                /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
+                $new_models = $factory->count($batchSize)->create();
+
+                if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
+                    $factory->createRelations($new_models);
                 }
 
                 $success = true;
@@ -234,10 +231,10 @@ abstract class BatchSeeder extends Seeder
                 $progress->hint('');
                 $progress->advance($batchSize);
             } catch (QueryException|ErrorException|ValidationException $e) {
-                $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+                $progress->hint(sprintf('<fg=red>Failed to create %s batch {', $entity_name) . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
-                if ($force_kill_batches) {
+                if ($force_kill_batches !== null) {
                     $force_kill_batches($e);
 
                     return;
@@ -248,12 +245,12 @@ abstract class BatchSeeder extends Seeder
                 $retry_count++;
 
                 if ($retry_count >= self::MAX_RETRIES) {
-                    $progress->hint("<fg=red>Failed to create {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+                    $progress->hint(sprintf('<fg=red>Failed to create %s batch {', $entity_name) . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                     $progress->render();
 
                     $this->command->error($e->getTraceAsString());
 
-                    if ($force_kill_batches) {
+                    if ($force_kill_batches !== null) {
                         $force_kill_batches($e);
 
                         return;
@@ -270,7 +267,7 @@ abstract class BatchSeeder extends Seeder
                 $created_before = $created;
                 $created = $this->countCurrentRecords($modelClass) - $currentCount;
                 $progress->advance($created - $created_before);
-                $progress->hint("<fg=yellow>Retry {$retry_count} for {$entity_name} batch {" . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
+                $progress->hint(sprintf('<fg=yellow>Retry %d for %s batch {', $retry_count, $entity_name) . ($batch + 1) . '}: ' . $e->getMessage() . '</>');
                 $progress->render();
 
                 $remaining = $countToCreate - $created;
@@ -302,12 +299,12 @@ abstract class BatchSeeder extends Seeder
     private function setupAsyncDatabaseConnection(string $connection_name): string
     {
         // Disable prepared statements for better async performance
-        config(["database.connections.{$connection_name}.prepared_statements" => false]);
+        config([sprintf('database.connections.%s.prepared_statements', $connection_name) => false]);
 
         // Create a new connection with unique name
         $tmp_connection_name = 'async_db_' . uniqid();
         config([
-            "database.connections.{$tmp_connection_name}" => config("database.connections.{$connection_name}"),
+            'database.connections.' . $tmp_connection_name => config('database.connections.' . $connection_name),
         ]);
 
         // Set the new connection as default
@@ -329,7 +326,7 @@ abstract class BatchSeeder extends Seeder
 
         // Copy the default Redis configuration
         config([
-            "cache.stores.{$tmp_cache_connection_name}" => $cache_config,
+            'cache.stores.' . $tmp_cache_connection_name => $cache_config,
         ]);
 
         // Clear and reconnect Redis

@@ -16,7 +16,7 @@ final class ModifyRequestData extends CrudRequestData
         parent::__construct($request, $mainEntity, $validated, $primaryKey);
 
         foreach ($validated as $property => $value) {
-            $this->changes[Str::replaceFirst("{$this->mainEntity}.", '', $property)] = $value;
+            $this->changes[Str::replaceFirst($this->mainEntity . '.', '', $property)] = $value;
         }
     }
 }

@@ -51,6 +51,7 @@ final class ResponseBuilder extends BaseResponseBuilder
             foreach ($this->options as $option) {
                 $remapped[] = $option->getPayload();
             }
+
             $payload['options'] = $remapped;
         }
 
@@ -60,12 +61,14 @@ final class ResponseBuilder extends BaseResponseBuilder
             foreach ($this->funnels as $funnel) {
                 $remapped[] = $funnel->getPayload();
             }
+
             $payload['funnels'] = $remapped;
         }
 
         if ($this->layouts) {
             $payload['layouts'] = $this->layouts;
         }
+
         $meta['primaryKey'] = $this->primaryKey;
         $meta['created'] = $this->created;
         $meta['updated'] = $this->updated;

@@ -33,9 +33,10 @@ trait HasBenchmark
         $this->benchmarkTable = $table;
         $this->benchmarkStartMemory = memory_get_usage();
 
-        if ($table !== null && $table !== '' && $table !== '0') {
+        if (! in_array($table, [null, '', '0'], true)) {
             $this->startRowCount = DB::table($table)->count();
         }
+
         DB::enableQueryLog();
 
         $this->startQueries = match (DB::connection()->getDriverName()) {
@@ -125,6 +126,7 @@ trait HasBenchmark
         if ($rowDiff !== 0) {
             $this->addBlockToOutput($output, $output_values, 'ROWS', number_format($rowDiff), 'bright-magenta', 'black', $is_in_console);
         }
+
         $this->addBlockToOutput($output, $output_values, '', static::class, 'gray', 'black', $is_in_console);
         $output = sprintf($output, ...$output_values);
 
@@ -158,7 +160,8 @@ trait HasBenchmark
         if ($blockName !== '' && $blockName !== '0') {
             $blockName .= ' ';
         }
-        $output .= $isInConsole ? " <bg={$blockBgColor};fg={$blockFgColor}> {$blockName}%s </>" : " {$blockName}%s";
+
+        $output .= $isInConsole ? sprintf(' <bg=%s;fg=%s> %s%%s </>', $blockBgColor, $blockFgColor, $blockName) : sprintf(' %s%%s', $blockName);
         $outputValues[] = $blockValue;
     }
 }

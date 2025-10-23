@@ -36,7 +36,7 @@ final class MoveEmbeddingTable extends Command
         $other_connection_exists = $default_connection !== $configured_connection && DB::connection($default_connection)->table('model_embeddings')->exists();
 
         if ($already_migrated) {
-            $this->error("The embedding table already exists on the {$configured_connection} connection.");
+            $this->error(sprintf('The embedding table already exists on the %s connection.', $configured_connection));
 
             return SymfonyCommand::SUCCESS;
         }
@@ -46,7 +46,7 @@ final class MoveEmbeddingTable extends Command
                 return SymfonyCommand::SUCCESS;
             }
 
-            $this->info("Dropping the embedding table on {$default_connection} connection...");
+            $this->info(sprintf('Dropping the embedding table on %s connection...', $default_connection));
             Schema::connection($default_connection)->dropIfExists('model_embeddings');
         }
 
@@ -54,7 +54,7 @@ final class MoveEmbeddingTable extends Command
         $migration_class = eval($code);
         $migration_class::up();
 
-        $this->info("Embedding table migrated to {$configured_connection} connection.");
+        $this->info(sprintf('Embedding table migrated to %s connection.', $configured_connection));
 
         return SymfonyCommand::SUCCESS;
     }

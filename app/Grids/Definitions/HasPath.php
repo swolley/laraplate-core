@@ -46,6 +46,7 @@ trait HasPath
     {
         $fullpath = explode('.', $fullpath);
         $fullpath = array_map('lcfirst', $fullpath);
+
         $name = array_pop($fullpath);
         $path = implode('.', $fullpath);
 

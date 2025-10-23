@@ -16,7 +16,7 @@ final class SearchEngineHealthTableWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
-    public function getViewData(): array
+    protected function getViewData(): array
     {
         $data = [
             'engine' => null,
@@ -35,7 +35,7 @@ final class SearchEngineHealthTableWidget extends Widget
             }
 
             // Get searchable models and their counts
-            $models = models(filter: fn ($model): bool => class_uses_trait($model, Searchable::class) && ! class_uses_trait($model, HasChildren::class, false));
+            $models = models(filter: fn (string|object $model): bool => class_uses_trait($model, Searchable::class) && ! class_uses_trait($model, HasChildren::class, false));
             $modelData = [];
 
             foreach ($models as $model) {
@@ -51,8 +51,8 @@ final class SearchEngineHealthTableWidget extends Widget
             }
 
             $data['models'] = $modelData;
-        } catch (Exception $e) {
-            $data['error'] = $e->getMessage();
+        } catch (Exception $exception) {
+            $data['error'] = $exception->getMessage();
         }
 
         return $data;

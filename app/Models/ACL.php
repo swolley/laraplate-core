@@ -22,9 +22,10 @@ use Override;
  */
 final class ACL extends Model
 {
-    use HasFactory, HasValidations, HasVersions, SoftDeletes {
-        getRules as protected getRulesTrait;
-    }
+    use HasFactory;
+    use HasValidations;
+    use HasVersions;
+    use SoftDeletes;
 
     protected $table = 'acls';
 

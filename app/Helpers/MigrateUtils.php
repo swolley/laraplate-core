@@ -80,7 +80,7 @@ final class MigrateUtils
             if (! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) && ! Schema::hasIndex($table_name, $index_name)) {
                 DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
                     match (DB::connection()->getDriverName()) {
-                        'pgsql' => DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column})"),
+                        'pgsql' => DB::statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
                         default => $table->index([$valid_from_column, $valid_to_column], $index_name),
                     };
                 });
@@ -92,7 +92,7 @@ final class MigrateUtils
         if ($hasSoftDelete && $hasValidity && ! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column, 'is_deleted']) && ! Schema::hasIndex($table_name, $index_name)) {
             DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
                 match (DB::connection()->getDriverName()) {
-                    'pgsql' => DB::statement("CREATE INDEX {$index_name} ON {$table_name} ({$valid_from_column} DESC, {$valid_to_column}, is_deleted)"),
+                    'pgsql' => DB::statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s, is_deleted)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
                     default => $table->index([$valid_from_column, $valid_to_column, 'is_deleted'], $index_name),
                 };
             });
@@ -144,7 +144,7 @@ final class MigrateUtils
         if ($hasValidity) {
             $valid_from_column = HasValidity::validFromKey();
             $valid_to_column = HasValidity::validToKey();
-            $index_name = "{$table_name}.validity_range";
+            $index_name = $table_name . '.validity_range';
 
             if (Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) || Schema::hasIndex($table_name, $index_name)) {
                 $table->dropIndex($index_name);
@@ -213,6 +213,7 @@ final class MigrateUtils
         if ($locked_at_column !== '' && $locked_at_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_at_column)) {
             $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
         }
+
         $locked_by_column = $locked->lockedByColumn();
 
         if ($locked_by_column !== '' && $locked_by_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_by_column)) {
@@ -255,6 +256,7 @@ final class MigrateUtils
         if ($locked_at_column !== '' && $locked_at_column !== '0' && Schema::hasColumn($table->getTable(), $locked_at_column)) {
             $table->dropColumn($locked_at_column);
         }
+
         $locked_by_column = $locked->lockedByColumn();
 
         if ($locked_by_column !== '' && $locked_by_column !== '0' && Schema::hasColumn($table->getTable(), $locked_by_column)) {

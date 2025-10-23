@@ -126,7 +126,8 @@ trait HasCrudOperations
                 if (in_array($property, $fillables, true)) {
                     continue;
                 }
-                $discarder_values[] = "Discarder '{$property}', because is not a fillable property";
+
+                $discarder_values[] = sprintf("Discarder '%s', because is not a fillable property", $property);
                 unset($values[$property]);
             }
         }
@@ -156,7 +157,7 @@ trait HasCrudOperations
         $operator = $filter['operator'] ?? '=';
 
         match ($operator) {
-            'like' => $query->where($field, 'like', "%{$value}%"),
+            'like' => $query->where($field, 'like', sprintf('%%%s%%', $value)),
             'in' => $query->whereIn($field, (array) $value),
             'between' => $query->whereBetween($field, (array) $value),
             default => $query->where($field, $operator, $value),

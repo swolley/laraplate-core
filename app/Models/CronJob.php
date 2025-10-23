@@ -6,7 +6,6 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
@@ -22,9 +21,11 @@ use Override;
  */
 final class CronJob extends Model
 {
-    use HasFactory, HasLocks, HasValidations, HasVersions, SoftDeletes {
-        getRules as protected getRulesTrait;
-    }
+    use HasFactory;
+    use HasLocks;
+    use HasValidations;
+    use HasVersions;
+    use SoftDeletes;
 
     /**
      * @var array<int,string>
@@ -78,17 +79,6 @@ final class CronJob extends Model
     protected static function newFactory(): CronJobFactory
     {
         return CronJobFactory::new();
-    }
-
-    #[Override]
-    protected static function booted(): void
-    {
-        self::saved(function (CronJob $cronJob): void {
-            Cache::forget($cronJob->getTable());
-        });
-        self::deleted(function (CronJob $cronJob): void {
-            Cache::forget($cronJob->getTable());
-        });
     }
 
     #[Override]

@@ -87,10 +87,10 @@ trait CommonEngineFunctions
                 ->get()
                 ->first()
                 ?->{self::INDEXED_AT_FIELD};
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Error getting last indexed timestamp from Typesense', [
                 'index' => $model->searchableAs(),
-                'error' => $e->getMessage(),
+                'error' => $exception->getMessage(),
             ]);
 
             return null;
@@ -107,11 +107,6 @@ trait CommonEngineFunctions
 
     private function extractVectorFromBuilder(Builder $builder): array
     {
-        // Find the vector in the builder parameters.
-        if (isset($builder->wheres['vector'])) {
-            return $builder->wheres['vector'];
-        }
-
-        return $builder->wheres['embedding'] ?? [];
+        return $builder->wheres['vector'] ?? $builder->wheres['embedding'] ?? [];
     }
 }

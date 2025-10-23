@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Carbon\Carbon;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
-
 use function Laravel\Prompts\text;
+
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
@@ -55,12 +55,13 @@ final class HandleLicensesCommand extends Command
                 if ($licenses_groups->isNotEmpty()) {
                     $choices[] = 'renew';
                 }
+
                 $action = select('Choose an action', $choices);
 
                 if ($action !== 'list') {
                     $number = (int) text(
-                        "Number of licenses to {$action}",
-                        validate: fn ($value) => $this->validationCallback('number', $value, ['number' => 'numeric|min:0']),
+                        'Number of licenses to ' . $action,
+                        validate: fn (string $value) => $this->validationCallback('number', $value, ['number' => 'numeric|min:0']),
                     );
 
                     if ($number === 0) {
@@ -72,7 +73,7 @@ final class HandleLicensesCommand extends Command
                     $valid_to = text(
                         "Specify an expiring date, otherwise it'll be " . ($action === 'close' ? 'today' : 'perpetual'),
                         'yyyy-mm-dd',
-                        validate: fn ($value) => $this->validationCallback('valid_to', $value, $validations),
+                        validate: fn (string $value) => $this->validationCallback('valid_to', $value, $validations),
                     );
                     $valid_to = $valid_to !== '' && $valid_to !== '0' ? new Carbon($valid_to) : null;
                 }
@@ -80,15 +81,19 @@ final class HandleLicensesCommand extends Command
                 switch ($action) {
                     case 'renew':
                         $this->renewLicenses($number, $licenses_count, $valid_to);
+
                         break;
                     case 'add':
                         $this->addLicenses($number, $valid_to);
+
                         break;
                     case 'close':
                         $this->closeLicenses($number, $valid_to);
+
                         break;
                     case 'list':
                         $this->listLicenses();
+
                         break;
                 }
 
@@ -97,8 +102,8 @@ final class HandleLicensesCommand extends Command
 
                 return BaseCommand::SUCCESS;
             });
-        } catch (Throwable $ex) {
-            $this->output->error($ex->getMessage());
+        } catch (Throwable $throwable) {
+            $this->output->error($throwable->getMessage());
 
             return BaseCommand::FAILURE;
         }
@@ -112,6 +117,7 @@ final class HandleLicensesCommand extends Command
         foreach ($licenses as $license) {
             $remapped[] = [$license->id, $license->valid_to, $license->user->name];
         }
+
         table(['License', 'Expiration', 'User'], $remapped);
         $this->output->info('Current max sessions available: ' . (Setting::query()->where('name', 'maxConcurrentSessions')->first()?->value ?? 'unlimited'));
     }
@@ -122,7 +128,7 @@ final class HandleLicensesCommand extends Command
             'valid_from' => today(),
             'valid_to' => $validTo,
         ]);
-        $message = "Renewed {$updated} licenses";
+        $message = sprintf('Renewed %d licenses', $updated);
         $this->output->info($message);
         Log::info($message);
 
@@ -130,15 +136,15 @@ final class HandleLicensesCommand extends Command
             $closed = License::query()->offset($number)->update([
                 'valid_to' => $validTo ?? today(),
             ]);
-            $message = "Closed {$closed} licenses";
+            $message = sprintf('Closed %d licenses', $closed);
             $this->output->info($message);
             Log::info($message);
         } elseif ($licensesCount < $number) {
             $difference = $licensesCount - $number;
 
-            if (confirm("{$licensesCount} licenses found. Do you confirm {$difference} licenses creation?")) {
+            if (confirm(sprintf('%d licenses found. Do you confirm %d licenses creation?', $licensesCount, $difference))) {
                 License::factory()->count($difference)->create();
-                $message = "Added {$difference} new licenses";
+                $message = sprintf('Added %d new licenses', $difference);
                 $this->output->info($message);
                 Log::info($message);
             }
@@ -150,11 +156,11 @@ final class HandleLicensesCommand extends Command
         $query = License::expired()->take($number);
         $expired = $query->count();
 
-        if ($expired && confirm("Found {$expired} expired licenses. Would you renew them, before creating new ones?")) {
+        if ($expired && confirm(sprintf('Found %d expired licenses. Would you renew them, before creating new ones?', $expired))) {
             $query->update([
                 'valid_to' => $validTo ?? null,
             ]);
-            $message = "Renewed {$expired} licenses";
+            $message = sprintf('Renewed %d licenses', $expired);
             $this->output->info($message);
             Log::info($message);
             $number -= $expired;
@@ -164,7 +170,7 @@ final class HandleLicensesCommand extends Command
             License::factory($number)->create([
                 'valid_to' => $validTo ?? today(),
             ]);
-            $message = "Added {$number} new licenses";
+            $message = sprintf('Added %s new licenses', $number);
             $this->output->info($message);
             Log::info($message);
         }
@@ -177,7 +183,7 @@ final class HandleLicensesCommand extends Command
         $query->update([
             'valid_to' => $validTo ?? today(),
         ]);
-        $message = "Closed {$closed} licenses";
+        $message = sprintf('Closed %d licenses', $closed);
         $this->output->info($message);
         Log::info($message);
     }

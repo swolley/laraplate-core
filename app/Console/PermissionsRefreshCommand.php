@@ -86,112 +86,114 @@ final class PermissionsRefreshCommand extends Command
         $this->db->beginTransaction();
 
         foreach ($all_models as $model) {
-            {
+            $need_bypass = $this->checkIfBlacklisted($model);
 
-                $need_bypass = $this->checkIfBlacklisted($model);
-    
-                if ($need_bypass) {
-                    if (! $quiet_mode) {
-                        $this->line("Bypassing '{$model}' class");
-                    }
-    
-                    continue;
+            if ($need_bypass) {
+                if (! $quiet_mode) {
+                    $this->line(sprintf("Bypassing '%s' class", $model));
                 }
-    
-                $instance = new $model();
-    
-                if (class_uses_trait($instance, $parental_class) && ! in_array($parental_class, class_uses($instance), true)) {
-                    continue;
-                }
-    
-                $connection = $instance->getConnectionName() ?? 'default';
-                $table = $instance->getTable();
-    
-                $permission_class::flushEventListeners();
-    
-                /** @var array<int,string> $found_permissions */
-                $found_permissions = $permission_class::query()->where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
-                $new_model_suffix = $found_permissions !== [] ? " for new model {$model}" : '';
-    
-                foreach ($common_permissions as $permission) {
-                    $permission_name = $connection . '.' . $table . '.' . $permission->value;
-                    $all_permissions[] = $permission_name;
-    
-                    // permessi di cancellazione logica
-                    if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && ! class_uses_trait($model, SoftDeletes::class)) {
-                        if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
-                            if (! $quiet_mode) {
-                                $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
-                            }
-                            $changes = true;
-                        }
-    
-                        continue;
-                    }
-    
-                    // permessi di approvazione
-                    if ($permission === ActionEnum::APPROVE && ! class_uses_trait($model, RequiresApproval::class)) {
-                        if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
-                            if (! $quiet_mode) {
-                                $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
-                            }
-                            $changes = true;
-                        }
-    
-                        continue;
-                    }
-    
-                    // permessi di pubblicazione
-                    if ($permission === ActionEnum::PUBLISH && ! class_uses_trait($model, HasValidity::class)) {
-                        if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
-                            if (! $quiet_mode) {
-                                $this->line("<fg=red>Deleted</> '{$permission_name}' permission");
-                            }
-                            $changes = true;
-                        }
-    
-                        continue;
-                    }
-    
-                    if (! in_array($permission_name, $found_permissions, true)) {
-                        $query = $permission_class::query()->where('name', $permission_name);
-    
-                        if ($query->exists()) {
-                            $query->restore();
-    
-                            if (! $quiet_mode) {
-                                $this->line("<fg=green>Restored</> '{$permission_name}' permission {$new_model_suffix}");
-                            }
-                            $changes = true;
-                        } else {
-                            $permission_class::create([
-                                'name' => $permission_name,
-                            ]);
-    
-                            if (! $quiet_mode) {
-                                $this->line("<fg=green>Created</> '{$permission_name}' permission {$new_model_suffix}");
-                            }
-                            $changes = true;
-                        }
-                    }
-                }
-    
-                if ($model === $user_class) {
-                    // solo per gli utenti aggiungo l'impersonificazione
-                    $permission_name = "{$connection}.{$table}." . ActionEnum::IMPERSONATE->value;
-                    $all_permissions[] = $permission_name;
-    
-                    if (! in_array($permission_name, $found_permissions, true)) {
-                        $permission_class::query()->updateOrCreate(
-                            ['name' => $permission_name],
-                            ['name' => $permission_name],
-                        );
-    
+
+                continue;
+            }
+
+            $instance = new $model();
+
+            if (class_uses_trait($instance, $parental_class) && ! in_array($parental_class, class_uses($instance), true)) {
+                continue;
+            }
+
+            $connection = $instance->getConnectionName() ?? 'default';
+            $table = $instance->getTable();
+            $permission_class::flushEventListeners();
+
+            /** @var array<int,string> $found_permissions */
+            $found_permissions = $permission_class::query()->where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
+            $new_model_suffix = $found_permissions !== [] ? ' for new model ' . $model : '';
+
+            foreach ($common_permissions as $permission) {
+                $permission_name = $connection . '.' . $table . '.' . $permission->value;
+                $all_permissions[] = $permission_name;
+
+                // permessi di cancellazione logica
+                if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && ! class_uses_trait($model, SoftDeletes::class)) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
-                            $this->line("<fg=green>Created</> '{$permission_name}' permission {$new_model_suffix}");
+                            $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
                         }
+
                         $changes = true;
                     }
+
+                    continue;
+                }
+
+                // permessi di approvazione
+                if ($permission === ActionEnum::APPROVE && ! class_uses_trait($model, RequiresApproval::class)) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
+                        }
+
+                        $changes = true;
+                    }
+
+                    continue;
+                }
+
+                // permessi di pubblicazione
+                if ($permission === ActionEnum::PUBLISH && ! class_uses_trait($model, HasValidity::class)) {
+                    if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
+                        }
+
+                        $changes = true;
+                    }
+
+                    continue;
+                }
+
+                if (! in_array($permission_name, $found_permissions, true)) {
+                    $query = $permission_class::query()->where('name', $permission_name);
+
+                    if ($query->exists()) {
+                        $query->restore();
+
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=green>Restored</> '%s' permission %s", $permission_name, $new_model_suffix));
+                        }
+
+                        $changes = true;
+                    } else {
+                        $permission_class::create([
+                            'name' => $permission_name,
+                        ]);
+
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
+                        }
+
+                        $changes = true;
+                    }
+                }
+            }
+
+            if ($model === $user_class) {
+                // solo per gli utenti aggiungo l'impersonificazione
+                $permission_name = sprintf('%s.%s.', $connection, $table) . ActionEnum::IMPERSONATE->value;
+                $all_permissions[] = $permission_name;
+
+                if (! in_array($permission_name, $found_permissions, true)) {
+                    $permission_class::query()->updateOrCreate(
+                        ['name' => $permission_name],
+                        ['name' => $permission_name],
+                    );
+
+                    if (! $quiet_mode) {
+                        $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
+                    }
+
+                    $changes = true;
                 }
             }
 
@@ -211,7 +213,7 @@ final class PermissionsRefreshCommand extends Command
 
             if (! $quiet_mode) {
                 foreach ($to_be_deleted as $permission) {
-                    $this->info("Deleted '{$permission}' permission");
+                    $this->info(sprintf("Deleted '%s' permission", $permission));
                 }
             }
         }

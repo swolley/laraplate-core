@@ -116,7 +116,7 @@ trait HasClosureTable
         $closureTable = $this->getClosureTable();
 
         return Cache::remember(
-            "{$this->getTable()}.{$this->id}.depth",
+            sprintf('%s.%s.depth', $this->getTable(), $this->id),
             now()->addHours(24),
             fn () => DB::table($closureTable)
                 ->where($this->qualifyTreeColumn('ancestor_id', $closureTable), $this->id)
@@ -277,7 +277,7 @@ trait HasClosureTable
     {
         $table ??= $this->getModelTable();
 
-        return "{$table}.{$column}";
+        return sprintf('%s.%s', $table, $column);
     }
 
     protected function updateClosureTable(): void
@@ -316,6 +316,6 @@ trait HasClosureTable
         }
 
         // Clear cache
-        Cache::forget("{$this->getTable()}.{$this->id}.depth");
+        Cache::forget(sprintf('%s.%s.depth', $this->getTable(), $this->id));
     }
 }

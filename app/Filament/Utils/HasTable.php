@@ -71,7 +71,7 @@ trait HasTable
         $model_instance = new $model();
         $model_table = $model_instance->getTable();
         $model_connection = $model_instance->getConnectionName() ?? 'default';
-        $permissions_prefix = "{$model_connection}.{$model_table}";
+        $permissions_prefix = sprintf('%s.%s', $model_connection, $model_table);
 
         $traits = class_uses_recursive($model);
         $has_soft_deletes = in_array(SoftDeletes::class, $traits, true) || in_array(BaseSoftDeletes::class, $traits, true);
@@ -149,25 +149,25 @@ trait HasTable
 
     private static function loadUserPermissionsForTable(User $user): void
     {
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
         // Eager load dei permessi e ruoli per evitare N+1 queries
         $user->loadMissing([
             'permissions',
-            'roles.permissions'
+            'roles.permissions',
         ]);
     }
 
     private static function checkPermissionCached(User $user, string $permission): bool
     {
         $key = $user->id . '_' . $permission;
-        
-        if (!isset(self::$permissionCache[$key])) {
+
+        if (! isset(self::$permissionCache[$key])) {
             self::$permissionCache[$key] = $user->can($permission);
         }
-        
+
         return self::$permissionCache[$key];
     }
 
@@ -294,6 +294,7 @@ trait HasTable
                             </div>';
                             $values[] = $record->{$record->getDeletedAtColumn() ?? 'deleted_at'}?->format('Y-m-d H:i:s');
                         }
+
                         $string .= '</div>';
 
                         return sprintf($string, ...$values);
@@ -319,6 +320,7 @@ trait HasTable
                     ->toggleable(isToggledHiddenByDefault: true),
             );
         }
+
         $default_columns->each(function (Column $column): void {
             if ($column->isSearchable()) {
                 $column->searchable(isIndividual: true);
@@ -391,7 +393,7 @@ trait HasTable
             );
         }
 
-        if (self::checkPermissionCached($user, "{$permissionsPrefix}.update")) {
+        if (self::checkPermissionCached($user, $permissionsPrefix . '.update')) {
             $default_actions->add(
                 EditAction::make()
                     ->hiddenLabel()
@@ -400,18 +402,20 @@ trait HasTable
         }
 
         if ($hasSoftDeletes) {
-            if (self::checkPermissionCached($user, "{$permissionsPrefix}.restore")) {
+            if (self::checkPermissionCached($user, $permissionsPrefix . '.restore')) {
                 $default_actions->add(
                     RestoreAction::make()
-                        ->hiddenLabel(),
+                        ->hiddenLabel()
+                        ->requiresConfirmation(),
                 );
                 $default_bulk_actions->add(
                     RestoreBulkAction::make()
-                        ->deselectRecordsAfterCompletion(),
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation(),
                 );
             }
 
-            if (self::checkPermissionCached($user, "{$permissionsPrefix}.delete")) {
+            if (self::checkPermissionCached($user, $permissionsPrefix . '.delete')) {
                 $default_actions->add(
                     DeleteAction::make()
                         ->icon(Heroicon::OutlinedEyeSlash)
@@ -425,7 +429,7 @@ trait HasTable
             }
         }
 
-        if (self::checkPermissionCached($user, "{$permissionsPrefix}.forceDelete")) {
+        if (self::checkPermissionCached($user, $permissionsPrefix . '.forceDelete')) {
             $default_actions->add(
                 ForceDeleteAction::make()
                     ->visible(true)
@@ -440,7 +444,7 @@ trait HasTable
             );
         }
 
-        if ($actions) {
+        if ($actions !== null) {
             $actions($default_actions);
         }
 
@@ -459,6 +463,7 @@ trait HasTable
         if ($grouped_actions_list !== []) {
             $fixed_actions_list[] = ActionGroup::make($grouped_actions_list);
         }
+
         $table->recordActions($fixed_actions_list);
 
         if ($default_bulk_actions->isNotEmpty()) {
@@ -509,7 +514,7 @@ trait HasTable
         }
 
         // FILTERS
-        if ($hasSoftDeletes && self::checkPermissionCached($user, "{$permissionsPrefix}.restore")) {
+        if ($hasSoftDeletes && self::checkPermissionCached($user, $permissionsPrefix . '.restore')) {
             $deleted_at_column = $model_instance->getDeletedAtColumn();
             $default_filters->push(
                 // TrashedFilter::make(),
@@ -637,7 +642,7 @@ trait HasTable
             );
         }
 
-        if ($filters) {
+        if ($filters !== null) {
             $filters($default_filters);
         }
 

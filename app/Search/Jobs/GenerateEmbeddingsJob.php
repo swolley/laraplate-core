@@ -45,7 +45,10 @@ use Throwable;
 
 final class GenerateEmbeddingsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public int $tries = 3;
 
@@ -88,6 +91,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     {
         $document = new Document();
         $document->content = Str::of($data)->replaceMatches("/\n|\t/", ' ')->replaceMatches("/\s+/", ' ')->trim()->toString();
+
         $splitDocuments = DocumentSplitter::splitDocument($document);
         $formattedDocuments = EmbeddingFormatter::formatEmbeddings($splitDocuments);
 
@@ -142,14 +146,14 @@ final class GenerateEmbeddingsJob implements ShouldQueue
             foreach ($embeddedDocuments as $embeddedDocument) {
                 $this->model->embeddings()->create(['embedding' => $embeddedDocument->embedding]);
             }
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             Log::error('Embedding generation failed for model: ' . $this->model::class, [
                 'model_id' => $this->model->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
-            throw $e; // Rethrow to make the join chain fails
+            throw $exception; // Rethrow to make the join chain fails
         }
     }
 

@@ -12,7 +12,10 @@ use Illuminate\Queue\SerializesModels;
 
 abstract class CommonSearchJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
      * Maximum number of job attempts.

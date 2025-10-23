@@ -62,14 +62,14 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             $schema['name'] = $collection;
 
             $this->typesense->collections->create($schema);
-            Log::info("Typesense collection '{$collection}' created");
-        } catch (Exception $e) {
-            Log::error("Error creating Typesense collection '{$collection}'", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+            Log::info(sprintf("Typesense collection '%s' created", $collection));
+        } catch (Exception $exception) {
+            Log::error(sprintf("Error creating Typesense collection '%s'", $collection), [
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
-            throw $e;
+            throw $exception;
         }
     }
 
@@ -94,16 +94,16 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             if (is_array($value)) {
                 if (count($value) === 2 && is_numeric($value[0]) && is_numeric($value[1])) {
                     // Range filter
-                    $filterStrings[] = "{$field}:>={$value[0]} && {$field}:<={$value[1]}";
+                    $filterStrings[] = sprintf('%s:>=%s && %s:<=%s', $field, $value[0], $field, $value[1]);
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn ($val) => is_string($val) ? "\"{$val}\"" : $val, $value));
-                    $filterStrings[] = "{$field}:[{$values}]";
+                    $values = implode(',', array_map(fn ($val) => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+                    $filterStrings[] = sprintf('%s:[%s]', $field, $values);
                 }
             } else {
                 // Exact match
-                $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
-                $filterStrings[] = "{$field}:={$formattedValue}";
+                $formattedValue = is_string($value) ? sprintf('"%s"', $value) : $value;
+                $filterStrings[] = sprintf('%s:=%s', $field, $formattedValue);
             }
         }
 
@@ -138,7 +138,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         // Filters
         if ($id !== null && $id !== 0) {
             $query->where('id', $id);
-        } elseif ($from !== null && $from !== '' && $from !== '0') {
+        } elseif (! in_array($from, [null, '', '0'], true)) {
             $query->where('updated_at', '>', Date::parse($from));
         } else {
             $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
@@ -398,13 +398,14 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     private function buildFilter(string $fieldName, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(fn ($val): mixed => is_string($val) ? "\"{$val}\"" : $val, $value));
+            $values = implode(',', array_map(fn ($val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
 
-            return "{$fieldName}:[{$values}]";
+            return sprintf('%s:[%s]', $fieldName, $values);
         }
-        $formattedValue = is_string($value) ? "\"{$value}\"" : $value;
 
-        return "{$fieldName}:={$formattedValue}";
+        $formattedValue = is_string($value) ? sprintf('"%s"', $value) : $value;
+
+        return sprintf('%s:=%s', $fieldName, $formattedValue);
     }
 
     private function buildFiltersFromBuilder(Builder $builder): string

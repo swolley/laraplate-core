@@ -26,9 +26,13 @@ use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
  */
 final class Role extends BaseRole
 {
-    use HasCache, HasFactory, HasLocks, HasRecursiveRelationships, HasValidations, HasVersions, SoftDeletes {
-        getRules as protected getRulesTrait;
-    }
+    use HasCache;
+    use HasFactory;
+    use HasLocks;
+    use HasRecursiveRelationships;
+    use HasValidations;
+    use HasVersions;
+    use SoftDeletes;
 
     /**
      * @var array<int,string>

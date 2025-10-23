@@ -83,7 +83,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
             'pgsql' => $this->performPostgreSQLVectorSearch($queryVector, $model, $builder),
             'mysql' => $this->performMySQLVectorSearch($queryVector, $model, $builder),
             'sqlite' => $this->performSQLiteVectorSearch($queryVector, $model, $builder),
-            default => throw new InvalidArgumentException("Vector search not supported for driver: {$driver}"),
+            default => throw new InvalidArgumentException('Vector search not supported for driver: ' . $driver),
         };
     }
 

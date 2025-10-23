@@ -35,7 +35,7 @@ final class GridsController extends Controller
             $grids = [];
             // $permissions = $request->user()->getAllPermissions();
 
-            if ($entity !== null && $entity !== '' && $entity !== '0') {
+            if (! in_array($entity, [null, '', '0'], true)) {
                 $entity = $this->getModel($entity);
             }
 
@@ -50,8 +50,8 @@ final class GridsController extends Controller
                 }
             }
 
-            if ($entity !== null && $entity !== '' && $entity !== '0') {
-                throw_if($grids === [], UnexpectedValueException::class, "'{$entity}' is not a Grid");
+            if (! in_array($entity, [null, '', '0'], true)) {
+                throw_if($grids === [], UnexpectedValueException::class, sprintf("'%s' is not a Grid", $entity));
                 $grids = head($grids);
             }
 
@@ -100,7 +100,7 @@ final class GridsController extends Controller
     {
         $entity_instance = DynamicEntity::tryResolveModel($entity);
 
-        throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, "Unable to find entity '{$entity}'");
+        throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, sprintf("Unable to find entity '%s'", $entity));
 
         return $entity_instance;
     }

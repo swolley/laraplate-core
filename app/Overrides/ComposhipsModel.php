@@ -75,8 +75,8 @@ class ComposhipsModel extends Model
     /**
      * Validate the related model for Compoships compatibility.
      */
-    protected function validateRelatedModel($related): void
+    private function validateRelatedModel(string $related): void
     {
-        throw_unless(is_subclass_of($related, self::class), InvalidArgumentException::class, "The related model '{$related}' must extend " . self::class);
+        throw_unless(is_subclass_of($related, self::class), InvalidArgumentException::class, sprintf("The related model '%s' must extend ", $related) . self::class);
     }
 }

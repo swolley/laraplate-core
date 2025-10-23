@@ -25,7 +25,7 @@ trait HasCache
     public function invalidateCache(): void
     {
         if (Cache::supportsTags()) {
-            Cache::tags([$this->getTable()])->flush();
+            Cache::tags(Cache::getCacheTags($this->getTable()))->flush();
         } else {
             Cache::forget($this->getCacheKey());
         }

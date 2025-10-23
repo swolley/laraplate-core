@@ -41,7 +41,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             'read_timeout' => $config->timeout,
         ];
 
-        if ($config->apiKey !== null && $config->apiKey !== '' && $config->apiKey !== '0') {
+        if (! in_array($config->apiKey, [null, '', '0'], true)) {
             $options['headers'] = ['Authorization' => 'Bearer ' . $config->apiKey];
         }
 
@@ -104,7 +104,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
         $processedDocuments = [];
 
         foreach ($batches as $batch) {
-            $texts = array_map('LLPhant\Embeddings\DocumentUtils::getUtf8Data', $batch);
+            $texts = array_map(DocumentUtils::class . '::getUtf8Data', $batch);
 
             $body = [
                 'texts' => $texts,
@@ -132,13 +132,13 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             $embeddingsCount = count($embeddings);
 
             // Check if embeddings count matches batch size
-            throw_if($embeddingsCount !== $batchSize, Exception::class, "Embeddings count mismatch: expected {$batchSize}, got {$embeddingsCount}. Response: " . json_encode($searchResults));
+            throw_if($embeddingsCount !== $batchSize, Exception::class, sprintf('Embeddings count mismatch: expected %d, got %d. Response: ', $batchSize, $embeddingsCount) . json_encode($searchResults));
 
             for ($i = 0; $i < $batchSize; $i++) {
                 $batch[$i]->embedding = $embeddings[$i];
                 $processedDocuments[] = $batch[$i];
             }
-            
+
             // Force garbage collection after each batch to free memory
             unset($batch, $embeddings, $searchResults);
             gc_collect_cycles();

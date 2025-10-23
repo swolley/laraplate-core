@@ -19,9 +19,10 @@ use Modules\Core\Helpers\HasValidity;
  */
 final class License extends Model
 {
-    use HasFactory, HasUuids, HasValidations, HasValidity {
-        getRules as protected getRulesTrait;
-    }
+    use HasFactory;
+    use HasUuids;
+    use HasValidations;
+    use HasValidity;
 
     protected $keyType = 'string';
 

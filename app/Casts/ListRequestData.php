@@ -59,7 +59,7 @@ class ListRequestData extends SelectRequestData
 
         if (isset($validated['group_by'])) {
             $this->addGroupsToColumns($validated['group_by']);
-            $validated['group_by'] = array_map(fn (string $group): ?string => preg_replace("/^{$mainEntity}\./", '', $group), $validated['group_by']);
+            $validated['group_by'] = array_map(fn (string $group): ?string => preg_replace(sprintf('/^%s\./', $mainEntity), '', $group), $validated['group_by']);
             $this->group_by = $validated['group_by'];
         }
     }
@@ -72,7 +72,8 @@ class ListRequestData extends SelectRequestData
     protected function extractPagination(array $validated): void
     {
         if (isset($validated['pagination']) || isset($validated['page'])) {
-            $this->take = $this->pagination = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
+            $this->take = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
+            $this->pagination = (int) ($validated['pagination'] ?? $this->getDefaultPagination());
             $this->page = (int) ($validated['page'] ?? 1);
             $this->skip = ($this->page - 1) * $this->pagination;
             $this->from = $this->skip + 1;
@@ -83,23 +84,21 @@ class ListRequestData extends SelectRequestData
             $this->to = isset($validated['to']) ? (int) $validated['to'] : null;
 
             if ($this->to !== null && $this->to !== 0) {
-                $this->take = $this->pagination = $this->to - $this->from;
+                $this->take = $this->to - $this->from;
+                $this->pagination = $this->to - $this->from;
             }
         } elseif (isset($validated['limit'])) {
-            $this->take = $this->limit = (int) $validated['limit'];
+            $this->take = (int) $validated['limit'];
+            $this->limit = (int) $validated['limit'];
             $this->page = 1;
             $this->skip = 0;
             $this->pagination = $this->limit;
         } else {
             $this->page = 1;
             $this->skip = 0;
-            $this->take = $this->pagination = $this->getDefaultPagination();
+            $this->take = $this->getDefaultPagination();
+            $this->pagination = $this->take;
         }
-    }
-
-    protected function conformRelations(array $relations): array
-    {
-        return array_map(fn (string $relation): string => preg_replace(["/^{$this->mainEntity}\./", "/^{$this->model->getTable()}\./"], '', $relation), $relations);
     }
 
     protected function conformFilterOperators(array &$filter): void
@@ -131,6 +130,7 @@ class ListRequestData extends SelectRequestData
             foreach ($filters as &$filter) {
                 $this->conformFiltersToQueryBuilderFormat($filter, $level + 1);
             }
+
             unset($filter);
         } elseif (Arr::has($filters, 'filters')) {
             $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower((string) $filters['operator'])) : WhereClause::AND;
@@ -145,6 +145,11 @@ class ListRequestData extends SelectRequestData
         if ($level === 0 && ! ($filters instanceof FiltersGroup) && Arr::isList($filters)) {
             $filters = new FiltersGroup($filters);
         }
+    }
+
+    private function conformRelations(array $relations): array
+    {
+        return array_map(fn (string $relation): string => preg_replace([sprintf('/^%s\./', $this->mainEntity), sprintf('/^%s\./', $this->model->getTable())], '', $relation), $relations);
     }
 
     private function getDefaultPagination(): int
@@ -165,6 +170,7 @@ class ListRequestData extends SelectRequestData
                 $value = new Sort($value['property'], $value['direction'] ?? SortDirection::ASC);
             }
         }
+
         unset($value);
 
         return $sorts;

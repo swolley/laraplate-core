@@ -19,7 +19,10 @@ use Override;
  */
 final class DeleteFromSearchJob extends CommonSearchJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     /**
      * Maximum number of attempts.
@@ -55,7 +58,7 @@ final class DeleteFromSearchJob extends CommonSearchJob
     {
         try {
             $driver = config('scout.driver');
-            Log::debug("Deleting document {$this->document_id} from {$this->index} using {$driver} driver");
+            Log::debug(sprintf('Deleting document %s from %s using %s driver', $this->document_id, $this->index, $driver));
 
             $success = false;
 
@@ -82,14 +85,14 @@ final class DeleteFromSearchJob extends CommonSearchJob
             if ($success) {
                 Log::debug('Document deletion completed successfully');
             } else {
-                Log::warning("Document deletion failed, document {$this->document_id} not found or other error");
+                Log::warning(sprintf('Document deletion failed, document %s not found or other error', $this->document_id));
             }
-        } catch (Exception $e) {
-            Log::error("Error deleting document {$this->document_id}", [
+        } catch (Exception $exception) {
+            Log::error('Error deleting document ' . $this->document_id, [
                 'index' => $this->index,
                 'driver' => config('scout.driver'),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
             ]);
 
             // If there are attempts left, retry
@@ -100,7 +103,7 @@ final class DeleteFromSearchJob extends CommonSearchJob
             }
 
             // If we've reached the maximum number of attempts, fail permanently
-            $this->fail($e);
+            $this->fail($exception);
         }
     }
 }

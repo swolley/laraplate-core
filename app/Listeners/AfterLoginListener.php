@@ -46,6 +46,7 @@ final class AfterLoginListener
             if ($user->isUnlocked()) {
                 Auth::logoutOtherDevices($user->password);
             }
+
             Log::info('{username} logged in', ['username' => $user->username]);
         } elseif ($user->isImpersonated()) {
             $impersonator = $user->getImpersonator();

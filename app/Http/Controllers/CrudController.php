@@ -82,6 +82,7 @@ class CrudController extends Controller
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
+
                 $total_records = $query->count();
 
                 $data = match (true) {
@@ -185,13 +186,14 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, HistoryRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
-            throw_unless($this->hasHistory($model), BadMethodCallException::class, "'{$filters->mainEntity}' doesn't have history handling");
+            throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $filters->mainEntity));
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
             return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
                 $query = $model::query();
                 $crud_helper = new CrudHelper();
                 $crud_helper->prepareQuery($query, $filters);
+
                 $query->with('history', function (Builder $q) use ($filters): void {
                     $q->latest();
 
@@ -222,7 +224,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, TreeRequestData $filters): ResponseBuilder {
             $model = $filters->model;
 
-            throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, "'{$filters->mainEntity}' is not a hierarchical class");
+            throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $filters->mainEntity));
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
 
             return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
@@ -443,7 +445,7 @@ class CrudController extends Controller
             Cache::clearByEntity($model);
 
             return $responseBuilder
-                ->setData("{$table} cached cleared")
+                ->setData($table . ' cached cleared')
                 ->setStatus(Response::HTTP_OK);
         });
     }
@@ -488,6 +490,7 @@ class CrudController extends Controller
         if (is_string($key)) {
             return $filters->{$key};
         }
+
         $key_value = array_flip($key);
 
         foreach ($key as $k) {
@@ -680,7 +683,7 @@ class CrudController extends Controller
             } else {
                 $modifications = $model::query()->findOrFail($filters->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
 
-                throw_if($modifications->isEmpty(), LogicException::class, "No modifications to be {$operation}d");
+                throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
                 foreach ($modifications as $modification) {
                     if ($operation === 'approve') {
@@ -712,7 +715,7 @@ class CrudController extends Controller
         return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): Response {
             $model = $filters->model;
 
-            throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . ' doesn\'t support locks');
+            throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
             PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'lock', $model->getConnectionName());
             $key_value = $this->getModelKeyValue($filters);
 
@@ -722,7 +725,7 @@ class CrudController extends Controller
             throw_if($found_records->isEmpty() && $filters->request->has('id'), ModelNotFoundException::class, 'No model Found');
             $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
 
-            throw_if($found_records->count() === 1 && $filters->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : 'Record isn\'t locked');
+            throw_if($found_records->count() === 1 && $filters->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
             $locked_records = new Collection();
             DB::transaction(function () use ($found_records, $locked_records): void {
                 foreach ($found_records as $found_record) {

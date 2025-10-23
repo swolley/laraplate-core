@@ -68,7 +68,7 @@ final class RouteServiceProvider extends ServiceProvider
         $name_prefix = $this->getPrefix();
         Route::middleware('web')
             ->namespace($this->namespace)
-            ->name("{$name_prefix}.")
+            ->name($name_prefix . '.')
             ->group([
                 module_path($this->name, '/routes/dev.php'),
             ]);
@@ -77,23 +77,23 @@ final class RouteServiceProvider extends ServiceProvider
         Route::middleware(['web'/* , 'verified' */])
             ->namespace($this->namespace)
             ->prefix($route_prefix)
-            ->name("{$name_prefix}.")
+            ->name($name_prefix . '.')
             ->group(module_path($this->name, '/routes/web.php'));
 
         Route::middleware('auth')
-            ->prefix("{$route_prefix}/auth")
-            ->name("{$name_prefix}.")
+            ->prefix($route_prefix . '/auth')
+            ->name($name_prefix . '.')
             ->namespace($this->namespace)
             ->group(module_path($this->name, '/routes/auth.php'));
 
         Route::middleware('info')
-            ->name("{$name_prefix}.")
+            ->name($name_prefix . '.')
             ->prefix($route_prefix)
             ->namespace($this->namespace)
             ->group(module_path($this->name, '/routes/info.php'));
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
-        Route::get("{$route_prefix}/auth/reset-password", fn () => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
+        Route::get($route_prefix . '/auth/reset-password', fn () => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
     }
 
     /**
@@ -105,9 +105,9 @@ final class RouteServiceProvider extends ServiceProvider
     {
         $name_prefix = $this->getPrefix();
         $route_prefix = 'api';
-        Route::prefix("{$route_prefix}/v1")
+        Route::prefix($route_prefix . '/v1')
             ->middleware([$route_prefix, 'crud_api'])
-            ->name("{$name_prefix}.{$route_prefix}.")
+            ->name(sprintf('%s.%s.', $name_prefix, $route_prefix))
             ->namespace($this->namespace)
             ->group([
                 module_path($this->name, '/routes/crud.php'),
