@@ -19,11 +19,13 @@ return new class extends Migration
         $connection = new ModelEmbedding()->getConnection();
         $driver = $connection->getDriverName();
 
-        Schema::connection($connection->getName())->create('model_embeddings', function (Blueprint $table) use ($driver): void {
+        $supports_vector = $driver === 'pgsql' && DB::connection($connection->getName())->table('pg_available_extensions')->where('name', 'vector')->exists();
+
+        Schema::connection($connection->getName())->create('model_embeddings', function (Blueprint $table) use ($supports_vector): void {
             $table->id();
             $table->morphs('model', 'embedding_model_IDX');
 
-            if ($driver === 'pgsql') {
+            if ($supports_vector) {
                 $table->vector('embedding', 1536)->nullable(false)->comment('The generated embedding of the model'); // 1536 dimensions for OpenAI
             } else {
                 $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
@@ -34,7 +36,7 @@ return new class extends Migration
             );
         });
 
-        if ($driver === 'pgsql') {
+        if ($driver === 'pgsql' && $supports_vector) {
             DB::connection($connection)->statement('CREATE INDEX idx_model_embeddings_embedding ON model_embeddings USING ivfflat (embedding vector_cosine_ops);');
         }
     }
