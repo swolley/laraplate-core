@@ -1,5 +1,6 @@
 {
     "name": "swolley/laraplate-core",
+    "vendor": "swolley",
     "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
     "version": "v1.25.0",
     "keywords": [
@@ -106,9 +107,7 @@
     "extra": {
         "laravel": {
             "providers": [],
-            "aliases": {
-
-            }
+            "aliases": {}
         }
     },
     "autoload": {

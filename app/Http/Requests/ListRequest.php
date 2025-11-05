@@ -8,6 +8,20 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
 
+/**
+ * 
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property ?int $pagination
+ * @property ?int $page
+ * @property ?int $from
+ * @property ?int $to
+ * @property ?int $limit
+ * @property ?bool $count
+ * @property ?array<list{property:string,direction:string}> $sort
+ * @property array<int, list{property:string,value:mixed}> $filters
+ * @property ?array $group_by
+ */
 class ListRequest extends SelectRequest
 {
     /**

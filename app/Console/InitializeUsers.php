@@ -7,6 +7,7 @@ namespace Modules\Core\Console;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
@@ -28,7 +29,7 @@ final class InitializeUsers extends Command
 
         $groups = Role::all()->keyBy('name');
 
-        $this->db->transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
+        DB::transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
             if (! $user_class::whereName($root)->exists()) {
                 $email = text(sprintf('Please specify a %s user email', $root), required: true, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
                 $password = password(sprintf('Please specify a %s user password', $root), required: true);

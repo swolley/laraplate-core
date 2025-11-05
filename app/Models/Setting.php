@@ -25,7 +25,9 @@ final class Setting extends Model
     use HasApprovals;
     use HasCache;
     use HasFactory;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasVersions;
     use SoftDeletes;
 
@@ -94,7 +96,7 @@ final class Setting extends Model
 
     protected function setTypeAttribute($value): void
     {
-        $this->attributes['type'] = SettingTypeEnum::tryFrom($value) ?? SettingTypeEnum::STRING;
+        $this->attributes['type'] = ($value instanceof SettingTypeEnum ? $value : (SettingTypeEnum::tryFrom($value)) ?? SettingTypeEnum::STRING);
     }
 
     #[Override]

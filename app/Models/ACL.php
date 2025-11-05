@@ -23,7 +23,9 @@ use Override;
 final class ACL extends Model
 {
     use HasFactory;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasVersions;
     use SoftDeletes;
 

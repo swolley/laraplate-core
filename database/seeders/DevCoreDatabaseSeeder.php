@@ -12,9 +12,9 @@ use Modules\Core\Models\User;
 
 final class DevCoreDatabaseSeeder extends BatchSeeder
 {
-    private const TARGET_COUNT_USERS = 1000;
+    private const TARGET_COUNT_USERS = 5000;
 
-    private const TARGET_COUNT_LICENSES = 200;
+    private const TARGET_COUNT_LICENSES = 1000;
 
     protected function execute(): void
     {
@@ -28,11 +28,11 @@ final class DevCoreDatabaseSeeder extends BatchSeeder
 
     private function seedUsers(): void
     {
-        $this->createInBatches(User::class, self::TARGET_COUNT_USERS);
+        $this->createInParallelBatches(User::class, self::TARGET_COUNT_USERS);
     }
 
     private function seedLicenses(): void
     {
-        $this->createInBatches(License::class, self::TARGET_COUNT_LICENSES);
+        $this->createInParallelBatches(License::class, self::TARGET_COUNT_LICENSES);
     }
 }

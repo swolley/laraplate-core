@@ -12,6 +12,10 @@ use Override;
 
 // use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ */
 final class ModifyRequest extends CrudRequest implements IParsableRequest
 {
     #[Override]

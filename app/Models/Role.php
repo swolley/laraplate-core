@@ -30,7 +30,9 @@ final class Role extends BaseRole
     use HasFactory;
     use HasLocks;
     use HasRecursiveRelationships;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasVersions;
     use SoftDeletes;
 

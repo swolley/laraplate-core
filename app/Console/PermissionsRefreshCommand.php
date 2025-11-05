@@ -7,6 +7,7 @@ namespace Modules\Core\Console;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Models\DynamicEntity;
@@ -83,7 +84,7 @@ final class PermissionsRefreshCommand extends Command
             $this->newLine();
         }
 
-        $this->db->beginTransaction();
+        DB::beginTransaction();
 
         foreach ($all_models as $model) {
             $need_bypass = $this->checkIfBlacklisted($model);
@@ -224,9 +225,9 @@ final class PermissionsRefreshCommand extends Command
         }
 
         if (! $pretend_mode) {
-            $this->db->commit();
+            DB::commit();
         } else {
-            $this->db->rollBack();
+            DB::rollBack();
         }
     }
 

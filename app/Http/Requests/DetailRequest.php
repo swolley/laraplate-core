@@ -7,6 +7,10 @@ namespace Modules\Core\Http\Requests;
 use Modules\Core\Casts\DetailRequestData;
 use Override;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ */
 class DetailRequest extends SelectRequest
 {
     #[Override]

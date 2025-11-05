@@ -48,9 +48,12 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     use HasFactory;
     use HasLocks;
     use HasRoles {
-        HasRoles::getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
+        getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
+        roles as protected rolesTrait;
     }
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasVersions;
     use Notifiable;
     use SoftDeletes;
@@ -144,7 +147,10 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      */
     public function getImpersonator(): self
     {
-        return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
+        /** @var self $impersonator */
+        $impersonator = $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
+
+        return $impersonator;
     }
 
     /**

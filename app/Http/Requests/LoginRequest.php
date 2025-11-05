@@ -6,6 +6,14 @@ namespace Modules\Core\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property ?string $username
+ * @property ?string $email
+ * @property string $password
+ * @property ?bool $rememberme
+ */
 final class LoginRequest extends FormRequest
 {
     /**

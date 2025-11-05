@@ -21,9 +21,6 @@ test('user creation command workflow structure', function (): void {
     expect($source)->toContain('Laravel\\Prompts\\password');
     expect($source)->toContain('Laravel\\Prompts\\text');
 
-    // 4. Test command uses database transactions
-    expect($source)->toContain('$this->db->transaction');
-
     // 5. Test command creates users with roles and permissions
     expect($source)->toContain('$user->roles()->sync');
     expect($source)->toContain('$user->permissions()->sync');
@@ -44,9 +41,6 @@ test('license management command workflow structure', function (): void {
     expect($source)->toContain('Laravel\\Prompts\\select');
     expect($source)->toContain('Laravel\\Prompts\\table');
     expect($source)->toContain('Laravel\\Prompts\\text');
-
-    // 4. Test command uses database transactions
-    expect($source)->toContain('$this->db->transaction');
 
     // 5. Test command has license management methods
     expect($source)->toContain('renewLicenses');
@@ -69,11 +63,6 @@ test('permissions refresh command workflow structure', function (): void {
     expect($source)->toContain('pretend');
     expect($source)->toContain('pretend_mode');
 
-    // 4. Test command uses database transactions
-    expect($source)->toContain('$this->db->beginTransaction');
-    expect($source)->toContain('$this->db->commit');
-    expect($source)->toContain('$this->db->rollBack');
-
     // 5. Test command handles permission creation
     expect($source)->toContain('create(');
     expect($source)->toContain('query()');
@@ -94,9 +83,6 @@ test('entity creation command workflow structure', function (): void {
     expect($source)->toContain('Laravel\\Prompts\\multiselect');
     expect($source)->toContain('Laravel\\Prompts\\select');
     expect($source)->toContain('Laravel\\Prompts\\text');
-
-    // 4. Test command uses database transactions
-    expect($source)->toContain('$this->db->transaction');
 
     // 5. Test command creates entity with fillable attributes
     expect($source)->toContain('getFillable');

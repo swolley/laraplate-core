@@ -19,7 +19,9 @@ final class Permission extends ModelsPermission
 {
     use HasCache;
     use HasFactory;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
 
     /**
      * @var array<int,string>

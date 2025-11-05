@@ -10,6 +10,7 @@ use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
@@ -27,12 +28,12 @@ final class HandleLicensesCommand extends Command
     public function handle()
     {
         try {
-            return $this->db->transaction(function (): int {
+            return DB::transaction(function (): int {
                 $number = 0;
                 $valid_to = null;
 
                 $licenses_groups = License::query()->groupBy('valid_to')
-                    ->select($this->db->raw('valid_to'), $this->db->raw('count(*) as count'))
+                    ->select(DB::raw('valid_to'), DB::raw('count(*) as count'))
                     ->get();
                 $licenses_count = (int) $licenses_groups->reduce(fn (int $total, object $current): int|float => $total + $current->count, 0);
 
@@ -98,7 +99,7 @@ final class HandleLicensesCommand extends Command
                 }
 
                 $this->output->info('User class is not Modules\Core\Models\User');
-                $this->db->commit();
+                DB::commit();
 
                 return BaseCommand::SUCCESS;
             });

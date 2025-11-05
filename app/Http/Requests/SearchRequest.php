@@ -8,6 +8,11 @@ use Illuminate\Support\Str;
 use Modules\Core\Casts\SearchRequestData;
 use Override;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property string $qs
+ */
 final class SearchRequest extends ListRequest
 {
     /**

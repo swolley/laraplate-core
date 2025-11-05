@@ -7,6 +7,12 @@ namespace Modules\Core\Http\Requests;
 use Modules\Core\Casts\TreeRequestData;
 use Override;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property bool $parents
+ * @property bool $children
+ */
 final class TreeRequest extends DetailRequest
 {
     /**

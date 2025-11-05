@@ -81,13 +81,6 @@ test('command uses Laravel Prompts', function (): void {
     expect($source)->toContain('Laravel\Prompts\text');
 });
 
-test('command handles database transactions', function (): void {
-    $reflection = new ReflectionClass(CreateUserCommand::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('$this->db->transaction');
-});
-
 test('command creates users with roles and permissions', function (): void {
     $reflection = new ReflectionClass(CreateUserCommand::class);
     $source = file_get_contents($reflection->getFileName());

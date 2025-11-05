@@ -8,6 +8,12 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Rules\QueryColumn;
 use Override;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property array $columns
+ * @property array $relations
+ */
 abstract class SelectRequest extends CrudRequest
 {
     #[Override]

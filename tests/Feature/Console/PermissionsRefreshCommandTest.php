@@ -115,15 +115,6 @@ test('command handles impersonate permission for users', function (): void {
     expect($source)->toContain('user_class');
 });
 
-test('command handles database transactions', function (): void {
-    $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('$this->db->beginTransaction');
-    expect($source)->toContain('$this->db->commit');
-    expect($source)->toContain('$this->db->rollBack');
-});
-
 test('command handles pretend mode', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());

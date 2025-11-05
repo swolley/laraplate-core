@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use ReflectionClass;
 
 trait HasSeedersUtils
@@ -125,7 +126,7 @@ trait HasSeedersUtils
 
         // Se il model ha un incrementing ID, aggiorna gli ID dei model
         if ($models[0]->getIncrementing()) {
-            $firstId = $this->db->getPdo()->lastInsertId();
+            $firstId = DB::getPdo()->lastInsertId();
 
             foreach ($models as $index => $model) {
                 $model->setAttribute($model->getKeyName(), $firstId + $index);

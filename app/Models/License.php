@@ -21,7 +21,9 @@ final class License extends Model
 {
     use HasFactory;
     use HasUuids;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasValidity;
 
     protected $keyType = 'string';

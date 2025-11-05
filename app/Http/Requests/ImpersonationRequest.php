@@ -8,6 +8,11 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Lab404\Impersonate\Impersonate;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property int $user
+ */
 final class ImpersonationRequest extends FormRequest
 {
     /**

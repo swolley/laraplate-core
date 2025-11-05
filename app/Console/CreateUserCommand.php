@@ -12,6 +12,7 @@ use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasCommandUtils;
@@ -53,7 +54,7 @@ final class CreateUserCommand extends Command
             $created_users = [];
 
             do {
-                $this->db->transaction(function () use ($user, $fillables, $validations, $all_roles, $all_permissions, &$created_users, &$total_users_created): void {
+                DB::transaction(function () use ($user, $fillables, $validations, $all_roles, $all_permissions, &$created_users, &$total_users_created): void {
                     /** @var User $user */
                     $user = new (user_class());
                     $password = '';

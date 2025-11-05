@@ -7,6 +7,11 @@ namespace Modules\Core\Http\Requests;
 use Modules\Core\Casts\HistoryRequestData;
 use Override;
 
+/**
+ * @inheritdoc
+ * @package Modules\Core\Http\Requests
+ * @property ?int $limit
+ */
 final class HistoryRequest extends DetailRequest
 {
     #[Override]

@@ -23,7 +23,9 @@ final class CronJob extends Model
 {
     use HasFactory;
     use HasLocks;
-    use HasValidations;
+    use HasValidations {
+        getRules as protected getRulesTrait;
+    }
     use HasVersions;
     use SoftDeletes;
 

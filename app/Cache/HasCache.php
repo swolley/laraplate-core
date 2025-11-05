@@ -31,13 +31,6 @@ trait HasCache
         }
     }
 
-    /**
-     * define $cacheKey to override the default one.
-     *
-     * @var string
-     */
-    // protected static string $cacheKey;
-
     protected static function bootHasCache(): void
     {
         static::saved(function (Model $model): void {

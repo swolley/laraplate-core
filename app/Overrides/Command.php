@@ -5,22 +5,15 @@ declare(strict_types=1);
 namespace Modules\Core\Overrides;
 
 use Illuminate\Console\Command as BaseCommand;
-use Illuminate\Database\DatabaseManager;
 use Modules\Core\Helpers\HasBenchmark;
 
 class Command extends BaseCommand
 {
     use HasBenchmark;
 
-    protected DatabaseManager $db;
-
-    public function __construct(?DatabaseManager $db = null)
+    public function __construct()
     {
         parent::__construct();
-
-        if ($db instanceof DatabaseManager) {
-            $this->db = $db;
-        }
 
         if (! app()->bound('runningUnitTests') || ! app()->runningUnitTests()) {
             $this->startBenchmark();
