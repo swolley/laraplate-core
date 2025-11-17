@@ -13,13 +13,15 @@ use Throwable;
 
 trait HasBenchmark
 {
-    protected $benchmarkStartTime;
+    protected ?float $bootTime = null;
 
-    protected $benchmarkStartMemory;
+    protected ?float $benchmarkStartTime = null;
 
-    protected $startQueries;
+    protected ?int $benchmarkStartMemory = null;
 
-    protected $startRowCount;
+    protected ?int $startQueries = null;
+
+    protected ?int $startRowCount = null;
 
     protected ?string $benchmarkTable = null;
 
@@ -38,7 +40,10 @@ trait HasBenchmark
      */
     protected function startBenchmark(?string $table = null): void
     {
-        $this->bootTime = defined('LARAVEL_START') && LARAVEL_START ? microtime(true) - LARAVEL_START : 0;
+        if (! $this->bootTime) {
+            $this->bootTime = defined('LARAVEL_START') && LARAVEL_START ? microtime(true) - LARAVEL_START : 0;
+        }
+
         $this->benchmarkStartTime = microtime(true);
         $this->benchmarkTable = $table;
         $this->benchmarkStartMemory = memory_get_usage();
@@ -52,10 +57,12 @@ trait HasBenchmark
         $this->startQueries = self::getQueryCount();
     }
 
-    /**
-     * End the benchmark.
-     */
-    protected function endBenchmark(): void
+    protected function cancelBenchmark(): void
+    {
+        $this->benchmarkStartTime = null;
+    }
+
+    protected function stepBenchmark(): void
     {
         if (! $this->benchmarkStartTime) {
             return;
@@ -81,6 +88,21 @@ trait HasBenchmark
         DB::disableQueryLog();
 
         $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime);
+    }
+
+    protected function stepBenchmarkAndRestart(): void
+    {
+        $this->stepBenchmark();
+        $this->startBenchmark();
+    }
+
+    /**
+     * End the benchmark.
+     */
+    protected function endBenchmark(): void
+    {
+        $this->stepBenchmark();
+        $this->cancelBenchmark();
     }
 
     private static function formatTime(float $time): string

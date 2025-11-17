@@ -38,7 +38,7 @@ final class InitializeUsers extends Command
                     'name' => $root,
                     'username' => $root,
                     'email' => $email,
-                    'password' => Hash::make($password),
+                    'password' => $password,
                 ]);
                 $root_user->email_verified_at = now();
                 $root_user->locked_at = now();
@@ -60,7 +60,7 @@ final class InitializeUsers extends Command
                         'name' => $admin,
                         'username' => $admin,
                         'email' => $email,
-                        'password' => Hash::make(config('app.name')),
+                        'password' => $password,
                     ]);
                     $admin_user->email_verified_at = now();
                     $admin_user->save();
@@ -77,7 +77,7 @@ final class InitializeUsers extends Command
                     'name' => $anonymous,
                     'username' => $anonymous,
                     'email' => $anonymous . '@' . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
-                    'password' => Hash::make(config('app.name')),
+                    'password' => $password,
                 ]);
                 $anonymous_user->email_verified_at = now();
                 $anonymous_user->save();

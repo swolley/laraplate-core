@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Fortify;
 
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -37,8 +36,9 @@ final class CreateNewUser implements CreatesNewUsers
 
         return $user_class::create([
             'name' => $input['name'],
+            'username' => $input['username'],
             'email' => $input['email'],
-            'password' => Hash::make($input['password']),
+            'password' => $input['password'],
         ]);
     }
 }

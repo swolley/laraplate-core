@@ -39,4 +39,6 @@ return [
     'soft_deletes_expiration_days' => env('SOFT_DELETES_EXPIRATION_DAYS'),
 
     'extended_class_suffix' => '_extended',
+
+    'editor' => env('APP_EDITOR', 'VSCode'),
 ];

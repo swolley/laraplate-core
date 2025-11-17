@@ -9,7 +9,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Tests\TestCase;
@@ -20,7 +19,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);
@@ -143,8 +142,8 @@ test('can validate license', function (): void {
 });
 
 test('license resource has required form fields', function (): void {
-    $resource = new App\Filament\Resources\Core\LicenseResource();
-    $form = $resource->form(new Filament\Forms\Form());
+    $resource = new Modules\Core\Filament\Resources\Licenses\LicenseResource();
+    $form = $resource->form(new Filament\Schemas\Schema());
 
     $fields = [
         'name' => TextInput::class,
@@ -170,7 +169,7 @@ test('license resource has required form fields', function (): void {
 });
 
 test('license resource has required table columns', function (): void {
-    $resource = new App\Filament\Resources\Core\LicenseResource();
+    $resource = new Modules\Core\Filament\Resources\Licenses\LicenseResource();
     $table = $resource->table(new Filament\Tables\Table());
 
     $columns = [
@@ -189,10 +188,10 @@ test('license resource has required table columns', function (): void {
 });
 
 test('license resource has required actions', function (): void {
-    $resource = new App\Filament\Resources\Core\LicenseResource();
+    $resource = new Modules\Core\Filament\Resources\Licenses\LicenseResource();
     $table = $resource->table(new Filament\Tables\Table());
 
-    $actions = $table->getActions();
+    $actions = $table->getRecordActions();
     expect($actions)->toHaveKey('edit');
     expect($actions)->toHaveKey('delete');
     expect($actions)->toHaveKey('validate');

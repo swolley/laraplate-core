@@ -349,7 +349,7 @@ final class CoreServiceProvider extends ServiceProvider
             } else {
                 try {
                     if (Schema::hasTable($cache_key)) {
-                        $crons = CronJob::query()->where('is_active', true)->select(['command', 'schedule'])->get()->toArray();
+                        $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
                         Cache::tags($cache_tags)->put($cache_key, $crons);
                     }
                 } catch (Exception $e) {

@@ -6,8 +6,8 @@ namespace Modules\Core\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Core\Helpers\HasUniqueFactoryValues;
 use Modules\Core\Models\User;
 use Override;
 
@@ -16,6 +16,8 @@ use Override;
  */
 final class UserFactory extends Factory
 {
+    use HasUniqueFactoryValues;
+
     /**
      * The name of the factory's corresponding model.
      *
@@ -35,16 +37,17 @@ final class UserFactory extends Factory
     {
         $name = fake()->boolean() ? fake()->name() : fake()->userName();
         $username = Str::slug($name) . (fake()->boolean() ? fake()->numberBetween(0, 999999) : '');
-        $email_name = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
-        $suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
-
+        
+        $email_prefix = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
+        $email_suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
+        $email = sprintf('%s%s@%s', $email_prefix, $email_suffix, fake()->domainName());
+        
         return [
             'name' => $name,
-            'username' => $username,
-            'email' => sprintf('%s%s@%s', $email_name, $suffix, fake()->domainName()),
-            'email_verified_at' => now(),
-            'password' => Hash::make(Str::random(16)),
-            'remember_token' => Str::random(10),
+            'username' => $this->uniqueValue(fn () => $username, $this->model, 'username'),
+            'email' => $this->uniqueEmail($this->model, fn () => $email),
+            'email_verified_at' => fake()->boolean() ? now() : null,
+            'password' => Str::random(16),
         ];
     }
 

@@ -6,7 +6,6 @@ namespace Modules\Core\Observers;
 
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 final class UserObserver
@@ -20,7 +19,7 @@ final class UserObserver
 
         $user->lang ??= App::getLocale();
 
-        $user->password ??= Hash::make(Str::password());
+        $user->password ??= Str::password();
     }
 
     public function created(User $user): void

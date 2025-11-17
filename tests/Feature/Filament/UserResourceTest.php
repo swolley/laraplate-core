@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Models\Role;
 
 uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
@@ -11,7 +10,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);
@@ -83,8 +82,8 @@ test('can delete user', function (): void {
 });
 
 test('user resource has required form fields', function (): void {
-    $resource = new App\Filament\Resources\Core\UserResource();
-    $form = $resource->form(new Filament\Forms\Form());
+    $resource = new Modules\Core\Filament\Resources\Users\UserResource();
+    $form = $resource->form(new Filament\Schemas\Schema());
 
     expect($form->hasComponent('name', 'text'))->toBeTrue();
     expect($form->hasComponent('email', 'email'))->toBeTrue();
@@ -93,7 +92,7 @@ test('user resource has required form fields', function (): void {
 });
 
 test('user resource has required table columns', function (): void {
-    $resource = new App\Filament\Resources\Core\UserResource();
+    $resource = new Modules\Core\Filament\Resources\Users\UserResource();
     $table = $resource->table(new Filament\Tables\Table());
 
     expect($table->hasColumn('name', 'text'))->toBeTrue();
@@ -102,10 +101,10 @@ test('user resource has required table columns', function (): void {
 });
 
 test('user resource has required actions', function (): void {
-    $resource = new App\Filament\Resources\Core\UserResource();
+    $resource = new Modules\Core\Filament\Resources\Users\UserResource();
     $table = $resource->table(new Filament\Tables\Table());
 
-    $actions = $table->getActions();
+    $actions = $table->getRecordActions();
     expect($actions)->toHaveKey('edit');
     expect($actions)->toHaveKey('delete');
 });

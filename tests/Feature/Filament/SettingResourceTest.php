@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
@@ -15,7 +14,7 @@ uses(Tests\TestCase::class)->in('Feature');
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);

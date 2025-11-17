@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -13,7 +12,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);
@@ -91,8 +90,8 @@ test('can delete acl', function (): void {
 });
 
 test('acl resource has required form fields', function (): void {
-    $resource = new App\Filament\Resources\Core\ACLResource();
-    $form = $resource->form(new Filament\Forms\Form());
+    $resource = new Modules\Core\Filament\Resources\ACLS\ACLResource();
+    $form = $resource->form(new Filament\Schemas\Schema());
 
     expect($form->hasComponent('permission_id', 'select'))->toBeTrue();
     expect($form->hasComponent('filters', 'json'))->toBeTrue();
@@ -101,7 +100,7 @@ test('acl resource has required form fields', function (): void {
 });
 
 test('acl resource has required table columns', function (): void {
-    $resource = new App\Filament\Resources\Core\ACLResource();
+    $resource = new Modules\Core\Filament\Resources\ACLS\ACLResource();
     $table = $resource->table(new Filament\Tables\Table());
 
     expect($table->hasColumn('permission.name', 'text'))->toBeTrue();
@@ -112,10 +111,10 @@ test('acl resource has required table columns', function (): void {
 });
 
 test('acl resource has required actions', function (): void {
-    $resource = new App\Filament\Resources\Core\ACLResource();
+    $resource = new Modules\Core\Filament\Resources\ACLS\ACLResource();
     $table = $resource->table(new Filament\Tables\Table());
 
-    $actions = $table->getActions();
+    $actions = $table->getRecordActions();
     expect($actions)->toHaveKey('edit');
     expect($actions)->toHaveKey('delete');
 });

@@ -29,7 +29,7 @@ final class UpdateUserPassword implements UpdatesUserPasswords
         ])->validateWithBag('updatePassword');
 
         $user->forceFill([
-            'password' => Hash::make($input['password']),
+            'password' => $input['password'],
         ])->save();
     }
 }

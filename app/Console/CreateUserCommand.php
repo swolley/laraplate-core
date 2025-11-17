@@ -92,7 +92,6 @@ final class CreateUserCommand extends Command
                             }
 
                             $password = $answer;
-                            $answer = Hash::make($answer);
                         }
 
                         $user->{$attribute} = $answer;
@@ -115,7 +114,8 @@ final class CreateUserCommand extends Command
                     $total_users_created++;
 
                     $created_users[] = [
-                        'user' => $user->name,
+                        'username' => $user->username,
+                        'name' => $user->name,
                         'email' => $user->email,
                         'password' => $password,
                         'roles' => $all_roles->filter(fn ($name, $id): bool => in_array($id, $roles, true))->pluck('name')->implode(', '),
@@ -128,7 +128,7 @@ final class CreateUserCommand extends Command
 
             $this->output->info(sprintf('Created %d users', $total_users_created));
 
-            table(['User', 'Email', 'Password', 'Roles', 'Permissions'], $created_users);
+            table(['Username', 'Name', 'Email', 'Password', 'Roles', 'Permissions'], $created_users);
 
             return BaseCommand::SUCCESS;
         } catch (Throwable $throwable) {

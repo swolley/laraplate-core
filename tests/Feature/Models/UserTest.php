@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Tests\TestCase;
@@ -137,7 +136,7 @@ it('can be created with specific attributes', function (): void {
         'name' => 'John Doe',
         'username' => 'johndoe',
         'email' => 'john@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
         'lang' => 'it',
     ];
 

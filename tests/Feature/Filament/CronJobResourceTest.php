@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Role;
 
@@ -12,7 +11,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => Hash::make('password'),
+        'password' => 'password',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);
@@ -101,8 +100,8 @@ test('can run cron job', function (): void {
 });
 
 test('cron job resource has required form fields', function (): void {
-    $resource = new App\Filament\Resources\Core\CronJobResource();
-    $form = $resource->form(new Filament\Forms\Form());
+    $resource = new Modules\Core\Filament\Resources\CronJobs\CronJobResource();
+    $form = $resource->form(new Filament\Schemas\Schema());
 
     expect($form->hasComponent('name', 'text'))->toBeTrue();
     expect($form->hasComponent('command', 'text'))->toBeTrue();
@@ -112,7 +111,7 @@ test('cron job resource has required form fields', function (): void {
 });
 
 test('cron job resource has required table columns', function (): void {
-    $resource = new App\Filament\Resources\Core\CronJobResource();
+    $resource = new Modules\Core\Filament\Resources\CronJobs\CronJobResource();
     $table = $resource->table(new Filament\Tables\Table());
 
     expect($table->hasColumn('name', 'text'))->toBeTrue();
@@ -123,10 +122,10 @@ test('cron job resource has required table columns', function (): void {
 });
 
 test('cron job resource has required actions', function (): void {
-    $resource = new App\Filament\Resources\Core\CronJobResource();
+    $resource = new Modules\Core\Filament\Resources\CronJobs\CronJobResource();
     $table = $resource->table(new Filament\Tables\Table());
 
-    $actions = $table->getActions();
+    $actions = $table->getRecordActions();
     expect($actions)->toHaveKey('edit');
     expect($actions)->toHaveKey('delete');
     expect($actions)->toHaveKey('run');

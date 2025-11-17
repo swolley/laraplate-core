@@ -23,6 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 // use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -36,6 +37,7 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
+use Modules\Cms\Models\Entity;
 use Modules\Cms\Models\Preset;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\SoftDeletes;
@@ -45,6 +47,7 @@ use Modules\Core\Models\User;
 use Modules\Core\Search\Traits\Searchable;
 use PHPUnit\Event\InvalidArgumentException;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
+use Modules\Core\Helpers\HasActivation;
 
 trait HasTable
 {
@@ -76,6 +79,7 @@ trait HasTable
         $traits = class_uses_recursive($model);
         $has_soft_deletes = in_array(SoftDeletes::class, $traits, true) || in_array(BaseSoftDeletes::class, $traits, true);
         $has_validity = in_array(HasValidity::class, $traits, true);
+        $has_activation = in_array(HasActivation::class, $traits, true);
         $has_locks = in_array(HasLocks::class, $traits, true);
         $has_sorts = in_array(SortableTrait::class, $traits, true) || in_array(BaseSortableTrait::class, $traits, true);
         $has_dynamic_contents = in_array(HasDynamicContents::class, $traits, true);
@@ -95,6 +99,7 @@ trait HasTable
             $has_locks,
             $has_sorts,
             $has_dynamic_contents,
+            $has_activation,
             $columns,
             $model_instance,
         );
@@ -104,6 +109,7 @@ trait HasTable
             $has_soft_deletes,
             $has_validity,
             $has_searchable,
+            $has_activation,
             $actions,
             $fixedActions,
             $permissions_prefix,
@@ -116,6 +122,7 @@ trait HasTable
             $has_validity,
             $has_locks,
             $has_dynamic_contents,
+            $has_activation,
             $filters,
             $model_instance,
             $permissions_prefix,
@@ -178,6 +185,7 @@ trait HasTable
         bool $hasLocks,
         bool $hasSorts,
         bool $hasDynamicContents,
+        bool $hasActivation,
         ?callable $columns,
         Model $model_instance,
     ): void {
@@ -225,6 +233,16 @@ trait HasTable
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
                     ->html(),
+            );
+        }
+
+        if ($hasActivation) {
+            $default_columns->add(
+                IconColumn::make($model_instance::activationColumn())
+                    ->boolean()
+                    ->alignCenter()
+                    ->grow(false)
+                    ->toggleable(isToggledHiddenByDefault: false),
             );
         }
 
@@ -334,6 +352,7 @@ trait HasTable
         bool $hasSoftDeletes,
         bool $hasValidity,
         bool $hasSearchable,
+        bool $hasActivation,
         ?callable $actions,
         array $fixedActions,
         string $permissionsPrefix,
@@ -346,6 +365,23 @@ trait HasTable
 
         /** @var Collection<BulkAction> $default_bulk_actions */
         $default_bulk_actions = collect([]);
+
+        if ($hasActivation) {
+            $default_actions->push(
+                Action::make('activate')
+                    ->hiddenLabel()
+                    ->icon(Heroicon::OutlinedCheckCircle)
+                    ->action(function (Model $record): void {
+                        $record->activate();
+                    }),
+                Action::make('deactivate')
+                    ->hiddenLabel()
+                    ->icon(Heroicon::OutlinedXCircle)
+                    ->action(function (Model $record): void {
+                        $record->deactivate();
+                    }),
+            );
+        }
 
         if ($hasValidity) {
             $default_actions->push(
@@ -479,6 +515,7 @@ trait HasTable
         bool $hasValidity,
         bool $hasLocks,
         bool $hasDynamicContents,
+        bool $hasActivation,
         ?callable $filters,
         Model $model_instance,
         string $permissionsPrefix,
@@ -496,9 +533,9 @@ trait HasTable
                         ->multiple()
                         ->options(fn () => Preset::query()
                             ->join('entities', 'presets.entity_id', '=', 'entities.id')
-                            ->where('presets.is_active', true)
+                            ->where('presets.' . Preset::activationColumn(), true)
                             ->whereHas('entity', fn (Builder $query) => $query->where([
-                                'entities.is_active' => true,
+                                'entities.' . Entity::activationColumn() => true,
                                 'entities.type' => $entity_type,
                             ]))
                             ->orderBy('entities.name')
@@ -572,6 +609,15 @@ trait HasTable
                         'year' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
                         default => $query,
                     })),
+            );
+        }
+
+        if ($hasActivation) {
+            $default_filters->add(
+                TernaryFilter::make($model_instance::activationColumn())
+                    ->label('Active')
+                    ->attribute($model_instance::activationColumn())
+                    ->nullable(),
             );
         }
 

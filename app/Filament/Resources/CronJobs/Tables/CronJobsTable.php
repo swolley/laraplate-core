@@ -24,11 +24,6 @@ final class CronJobsTable
             table: $table,
             columns: function (Collection $default_columns): void {
                 $default_columns->unshift(...[
-                    ToggleColumn::make('is_active')
-                        // ->toggleable()
-                        // ->sortable()
-                        ->grow(false)
-                        ->alignCenter(),
                     TextColumn::make('name')
                         ->searchable()
                         ->sortable(),
@@ -59,14 +54,6 @@ final class CronJobsTable
                     ->icon('heroicon-o-play')
                     ->action(fn (CronJob $record) => $record->run())
                     ->requiresConfirmation());
-            },
-            filters: function (Collection $default_filters): void {
-                $default_filters->unshift(
-                    TernaryFilter::make('is_active')
-                        ->label('Active')
-                        ->attribute('is_active')
-                        ->nullable(),
-                );
             },
         );
     }

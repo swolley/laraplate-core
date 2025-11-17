@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
+use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
@@ -23,6 +24,7 @@ final class CronJob extends Model
 {
     use HasFactory;
     use HasLocks;
+    use HasActivation;
     use HasValidations {
         getRules as protected getRulesTrait;
     }
@@ -41,7 +43,6 @@ final class CronJob extends Model
         'parameters',
         'schedule',
         'description',
-        'is_active',
     ];
 
     protected $attributes = [
@@ -86,15 +87,14 @@ final class CronJob extends Model
     #[Override]
     protected function casts(): array
     {
-        return [
+        return array_merge($this->activationCasts(), [
             'name' => 'string',
             'command' => 'string',
             'parameters' => 'json',
             'schedule' => CronExpressionCast::class,
             'description' => 'string',
-            'is_active' => 'boolean',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
-        ];
+        ]);
     }
 }
