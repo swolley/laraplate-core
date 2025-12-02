@@ -109,15 +109,16 @@ final class Repository extends BaseRepository
     }
 
     /**
-     * clear cache by specified entity.
-     *
-     * @param   Model|string|array<string|object>
-     */
+      * Clear cache by the specified entity.
+      *
+      * @param  Model|string|array<Model|string>  $entity
+      * @return void
+      */
     public function clearByEntity(Model|string|array $entity): void
     {
         $models = Arr::wrap($entity);
 
-        foreach ($models as &$model) {
+        foreach ($models as $model) {
             if (is_string($model)) {
                 $model = new $model();
             }
@@ -131,16 +132,16 @@ final class Repository extends BaseRepository
     /**
      * clear cache by request extracted info.
      *
-     * @param  Model|string|array<string|object>|null
+     * @param  Model|string|array<Model|string>|null  $entity
      */
     public function clearByRequest(Request $request, Model|string|array|null $entity = null): void
     {
         $key = $this->getKeyFromRequest($request);
 
         if ($entity) {
-            $entity = Arr::wrap($entity);
+            $models = Arr::wrap($entity);
 
-            foreach ($entity as $model) {
+            foreach ($models as $model) {
                 if (is_string($model)) {
                     $model = new $model();
                 }
@@ -157,7 +158,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache elements by user and only by entity if specified.
      *
-     * @param  Model|string|array<string|object>|null
+     * @param  Model|string|array<Model|string>|null
      */
     public function clearByUser(User $user, Model|string|array|null $entity = null): void
     {
@@ -183,7 +184,7 @@ final class Repository extends BaseRepository
     /**
      * clear cache elements by user group and only by entity if specified.
      *
-     * @param  Model|string|array<string|object>|null
+     * @param  Model|string|array<Model|string>|null
      */
     public function clearByGroup(Role $role, Model|string|array|null $entity = null): void
     {
@@ -269,7 +270,7 @@ final class Repository extends BaseRepository
             array_push($tags, ...$groups);
         }
 
-        return array_map('strval', $tags);
+        return array_map(strval(...), $tags);
     }
 
     private function getDuration(): int|array

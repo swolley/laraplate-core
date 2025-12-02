@@ -24,6 +24,8 @@ final class DevCoreDatabaseSeeder extends BatchSeeder
             $this->seedUsers();
             $this->seedLicenses();
         });
+
+        Artisan::call('cache:clear');
     }
 
     private function seedUsers(): void

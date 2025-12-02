@@ -8,7 +8,6 @@ use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;

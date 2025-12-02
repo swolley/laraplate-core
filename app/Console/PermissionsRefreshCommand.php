@@ -8,6 +8,9 @@ use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Modules\Cms\Models\Translations\CategoryTranslation;
+use Modules\Cms\Models\Translations\ContentTranslation;
+use Modules\Cms\Models\Translations\TagTranslation;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Models\DynamicEntity;
@@ -44,6 +47,9 @@ final class PermissionsRefreshCommand extends Command
         License::class,
         ModelEmbedding::class,
         Pivot::class,
+        CategoryTranslation::class,
+        ContentTranslation::class,
+        TagTranslation::class,
     ];
 
     /**
@@ -77,8 +83,7 @@ final class PermissionsRefreshCommand extends Command
 
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
-        $parental_class = \Parental\HasChildren::class;
-
+        
         if ($pretend_mode) {
             $this->info('Running in pretend mode, no changes will be made');
             $this->newLine();
@@ -98,10 +103,6 @@ final class PermissionsRefreshCommand extends Command
             }
 
             $instance = new $model();
-
-            if (class_uses_trait($instance, $parental_class) && ! in_array($parental_class, class_uses($instance), true)) {
-                continue;
-            }
 
             $connection = $instance->getConnectionName() ?? 'default';
             $table = $instance->getTable();

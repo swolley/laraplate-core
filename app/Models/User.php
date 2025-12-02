@@ -34,7 +34,6 @@ use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
-use Override;
 use Spatie\Permission\Traits\HasRoles;
 
 #[ObservedBy([UserObserver::class])]
@@ -147,10 +146,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      */
     public function getImpersonator(): self
     {
-        /** @var self $impersonator */
-        $impersonator = $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
-
-        return $impersonator;
+        return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
     }
 
     /**
@@ -261,7 +257,6 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      *
      * @return array<string, string>
      */
-    #[Override]
     protected function casts(): array
     {
         return [

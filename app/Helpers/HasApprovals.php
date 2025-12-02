@@ -29,7 +29,7 @@ trait HasApprovals
         $this->deleteWhenDisapproved = true;
     }
 
-    public function toArray()
+    public function toArray(?array $parsed = null): array
     {
         if (! $this->preview) {
             return parent::toArray();

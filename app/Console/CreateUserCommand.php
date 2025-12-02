@@ -13,7 +13,6 @@ use function Laravel\Prompts\text;
 
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasCommandUtils;
 use Modules\Core\Models\Permission;

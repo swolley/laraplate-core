@@ -138,7 +138,6 @@ final class DynamicEntity extends Model
     /**
      * @return array<string, string>
      */
-    #[Override]
     protected function casts(): array
     {
         return $this->dynamic_casts;

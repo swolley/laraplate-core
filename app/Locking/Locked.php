@@ -11,12 +11,28 @@ final class Locked
 {
     public function lockedAtColumn(): string
     {
-        return config('core.locking.lock_at_column', 'locked_at');
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return 'locked_at';
+            }
+
+            return config('core.locking.lock_at_column', 'locked_at');
+        } catch (\Throwable $e) {
+            return 'locked_at';
+        }
     }
 
     public function lockedByColumn(): string
     {
-        return config('core.locking.lock_by_column', 'locked_user_id');
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return 'locked_user_id';
+            }
+
+            return config('core.locking.lock_by_column', 'locked_user_id');
+        } catch (\Throwable $e) {
+            return 'locked_user_id';
+        }
     }
 
     public function canBeUnlocked($model): bool
@@ -35,12 +51,28 @@ final class Locked
 
     public function unlockAllowed(): bool
     {
-        return config('core.locking.unlock_allowed', true);
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return true;
+            }
+
+            return config('core.locking.unlock_allowed', true);
+        } catch (\Throwable $e) {
+            return true;
+        }
     }
 
     public function classesThatCanBeUnlocked(): array
     {
-        return config('core.locking.can_be_unlocked', []);
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return [];
+            }
+
+            return config('core.locking.can_be_unlocked', []);
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function usesHasLocks(Model $model): bool
@@ -55,7 +87,15 @@ final class Locked
 
     public function preventsModificationsOnLockedObjects(): bool
     {
-        return config('core.locking.prevent_modifications_on_locked_objects', false);
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return false;
+            }
+
+            return config('core.locking.prevent_modifications_on_locked_objects', false);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function allowsModificationsOnLockedObjects(): bool
@@ -65,6 +105,14 @@ final class Locked
 
     public function allowsNotificationsToLockedObjects(): bool
     {
-        return config('core.locking.prevent_notifications_to_locked_objects', false);
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return false;
+            }
+
+            return config('core.locking.prevent_notifications_to_locked_objects', false);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

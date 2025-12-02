@@ -7,7 +7,6 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Override;
 
 /**
  * @mixin IdeHelperModelEmbedding
@@ -42,7 +41,6 @@ final class ModelEmbedding extends Model
         return $this->morphTo();
     }
 
-    #[Override]
     protected function casts(): array
     {
         return [

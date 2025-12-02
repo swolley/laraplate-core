@@ -7,8 +7,6 @@ namespace Modules\Core\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * @inheritdoc
- * @package Modules\Core\Http\Requests
  * @property ?string $prefix
  */
 class TranslationsRequest extends FormRequest

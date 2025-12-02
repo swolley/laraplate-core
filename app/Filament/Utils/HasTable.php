@@ -37,9 +37,13 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
+use Modules\Cms\Jobs\TranslateModelJob;
 use Modules\Cms\Models\Entity;
 use Modules\Cms\Models\Preset;
+use Modules\Core\Helpers\HasActivation;
+use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -47,7 +51,6 @@ use Modules\Core\Models\User;
 use Modules\Core\Search\Traits\Searchable;
 use PHPUnit\Event\InvalidArgumentException;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
-use Modules\Core\Helpers\HasActivation;
 
 trait HasTable
 {
@@ -84,6 +87,7 @@ trait HasTable
         $has_sorts = in_array(SortableTrait::class, $traits, true) || in_array(BaseSortableTrait::class, $traits, true);
         $has_dynamic_contents = in_array(HasDynamicContents::class, $traits, true);
         $has_searchable = in_array(Searchable::class, $traits, true);
+        $has_translations = in_array(HasTranslations::class, $traits, true);
 
         if ($has_soft_deletes) {
             $table->recordClasses(fn ($record): array => $record->deleted_at ? [
@@ -100,6 +104,7 @@ trait HasTable
             $has_sorts,
             $has_dynamic_contents,
             $has_activation,
+            $has_translations,
             $columns,
             $model_instance,
         );
@@ -110,6 +115,7 @@ trait HasTable
             $has_validity,
             $has_searchable,
             $has_activation,
+            $has_translations,
             $actions,
             $fixedActions,
             $permissions_prefix,
@@ -186,6 +192,7 @@ trait HasTable
         bool $hasSorts,
         bool $hasDynamicContents,
         bool $hasActivation,
+        bool $hasTranslations,
         ?callable $columns,
         Model $model_instance,
     ): void {
@@ -209,6 +216,23 @@ trait HasTable
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+            );
+        }
+
+        if ($hasTranslations) {
+            $default_columns->push(
+                TextColumn::make('translations.locale')
+                    ->searchable()
+                    ->circular()
+                    ->toggleable(isToggledHiddenByDefault: false)
+                    ->grow(false)
+                    ->formatStateUsing(fn ($locales): string => collect($locales)->map(fn (string $locale): string => "<picture>
+                            <source type='image/webp' srcset='https://flagcdn.com/40x30/{$locale}.webp, https://flagcdn.com/80x60/{$locale}.webp 2x, https://flagcdn.com/120x90/{$locale}.webp 3x'>
+                            <source type='image/png' srcset='https://flagcdn.com/40x30/{$locale}.png, https://flagcdn.com/80x60/{$locale}.png 2x, https://flagcdn.com/120x90/{$locale}.png 3x'>
+                            <img src='https://flagcdn.com/40x30/{$locale}.png' width='40' height='30' alt='{$locale}' loading='lazy'>
+                        </picture>")->implode('&nbsp;'),
+                    )
+                    ->html(),
             );
         }
 
@@ -353,6 +377,7 @@ trait HasTable
         bool $hasValidity,
         bool $hasSearchable,
         bool $hasActivation,
+        bool $hasTranslations,
         ?callable $actions,
         array $fixedActions,
         string $permissionsPrefix,
@@ -408,6 +433,17 @@ trait HasTable
                         $record->refresh();
                     })
                     ->requiresConfirmation(),
+            );
+        }
+
+        if ($hasTranslations) {
+            $default_actions->push(
+                Action::make('translate')
+                    ->hiddenLabel()
+                    ->icon(Heroicon::OutlinedFlag)
+                    ->action(function (Model $record): void {
+                        dispatch(new TranslateModelJob($record));
+                    }),
             );
         }
 
@@ -516,6 +552,7 @@ trait HasTable
         bool $hasLocks,
         bool $hasDynamicContents,
         bool $hasActivation,
+        bool $hasTranslations,
         ?callable $filters,
         Model $model_instance,
         string $permissionsPrefix,
@@ -642,6 +679,16 @@ trait HasTable
                         'draft' => $query->draft(),
                         default => $query,
                     }),
+            );
+        }
+
+        if ($hasTranslations) {
+            $default_filters->add(
+                SelectFilter::make('translations.locale')
+                    ->label('Translations')
+                    ->multiple()
+                    ->options(LocaleContext::getAvailable())
+                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
             );
         }
 

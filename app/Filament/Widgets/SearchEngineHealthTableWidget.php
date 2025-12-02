@@ -8,7 +8,6 @@ use Exception;
 use Filament\Widgets\Widget;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
-use Modules\Core\Helpers\HasChildren;
 
 final class SearchEngineHealthTableWidget extends Widget
 {
@@ -35,7 +34,7 @@ final class SearchEngineHealthTableWidget extends Widget
             }
 
             // Get searchable models and their counts
-            $models = models(filter: fn (string|object $model): bool => class_uses_trait($model, Searchable::class) && ! class_uses_trait($model, HasChildren::class, false));
+            $models = models(filter: fn (string|object $model): bool => class_uses_trait($model, Searchable::class));
             $modelData = [];
 
             foreach ($models as $model) {

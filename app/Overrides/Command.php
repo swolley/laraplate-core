@@ -15,15 +15,41 @@ class Command extends BaseCommand
     {
         parent::__construct();
 
-        if (! app()->bound('runningUnitTests') || ! app()->runningUnitTests()) {
+        if (!$this->isRunningUnitTests() && $this->isLaunchedManually()) {
             $this->startBenchmark();
         }
     }
 
     public function __destruct()
     {
-        if ((! app()->bound('runningUnitTests') || ! app()->runningUnitTests()) && app()->bound('config') && $this->benchmarkStartTime !== null) {
+        if ($this->benchmarkStartTime !== null && !$this->isRunningUnitTests() && app()->bound('config')) {
             $this->endBenchmark();
         }
     }
+
+    private function isRunningUnitTests(): bool
+    {
+        return app()->bound('runningUnitTests') && app()->runningUnitTests();
+    }
+
+    private function isRunningInConsole(): bool
+    {
+        return app()->runningInConsole();
+    }
+
+    private function isLaunchedManually(): bool
+	{
+		if (!$this->isRunningInConsole()) {
+			return false;
+		}
+
+		$interactive = $this->input?->isInteractive() ?? false;
+
+		$has_tty = false;
+		if (function_exists('posix_isatty') && defined('STDIN')) {
+			$has_tty = posix_isatty(STDIN);
+		}
+
+		return $interactive || $has_tty;
+	}
 }

@@ -11,13 +11,6 @@ trait HasActivation
 {
     protected static $activation_column = 'is_active';
 
-    protected function activationCasts(): array
-    {
-        return [
-            static::$activation_column => 'boolean',
-        ];
-    }
-
     public static function activationColumn(): string
     {
         return static::$activation_column;
@@ -38,6 +31,13 @@ trait HasActivation
     {
         $this->{static::$activation_column} = false;
         $this->save();
+    }
+
+    protected function casts(): array
+    {
+        return [
+            static::$activation_column => 'boolean',
+        ];
     }
 
     #[Scope]

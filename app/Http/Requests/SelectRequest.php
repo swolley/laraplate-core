@@ -9,8 +9,6 @@ use Modules\Core\Rules\QueryColumn;
 use Override;
 
 /**
- * @inheritdoc
- * @package Modules\Core\Http\Requests
  * @property array $columns
  * @property array $relations
  */

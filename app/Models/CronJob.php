@@ -15,21 +15,24 @@ use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
-use Override;
 
 /**
  * @mixin IdeHelperCronJob
  */
 final class CronJob extends Model
 {
+    // region Traits
+    use HasActivation {
+        HasActivation::casts as protected activationCasts;
+    }
     use HasFactory;
     use HasLocks;
-    use HasActivation;
     use HasValidations {
         getRules as protected getRulesTrait;
     }
     use HasVersions;
     use SoftDeletes;
+    // endregion
 
     /**
      * @var array<int,string>
@@ -84,7 +87,6 @@ final class CronJob extends Model
         return CronJobFactory::new();
     }
 
-    #[Override]
     protected function casts(): array
     {
         return array_merge($this->activationCasts(), [

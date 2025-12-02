@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
@@ -45,6 +44,8 @@ final class CoreDatabaseSeeder extends Seeder
             $this->defaultUsers();
             $this->defaultCrons();
         });
+
+        Artisan::call('cache:clear');
     }
 
     private function defaultPermissions(): void

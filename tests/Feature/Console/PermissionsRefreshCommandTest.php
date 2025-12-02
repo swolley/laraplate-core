@@ -153,13 +153,6 @@ test('command handles permission restoration', function (): void {
     expect($source)->toContain('restore()');
 });
 
-test('command handles parental models', function (): void {
-    $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('Parental\HasChildren');
-});
-
 test('command handles connection and table names', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());

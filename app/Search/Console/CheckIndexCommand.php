@@ -7,13 +7,13 @@ namespace Modules\Core\Search\Console;
 use function Laravel\Prompts\confirm;
 
 use Exception;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Symfony\Component\Console\Command\Command as BaseCommand;
-use Illuminate\Support\Facades\Bus;
 
 final class CheckIndexCommand extends Command
 {
@@ -57,7 +57,7 @@ final class CheckIndexCommand extends Command
 
             if (confirm('Do you want to reindex the unmatched models?')) {
                 Bus::chain(
-                    collect($wrong_or_missing_indexes)->map(fn (string $model): object => new ReindexSearchJob($model))
+                    collect($wrong_or_missing_indexes)->map(fn (string $model): object => new ReindexSearchJob($model)),
                 )->dispatch();
                 $this->info('Reindexing has been queued for the unmatched models.');
             }

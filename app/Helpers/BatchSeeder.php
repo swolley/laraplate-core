@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
-use Modules\Cms\Database\Factories\DynamicContentFactory;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Search\Traits\Searchable;
+use RuntimeException;
 use Throwable;
 
 abstract class BatchSeeder extends Seeder
@@ -92,7 +92,7 @@ abstract class BatchSeeder extends Seeder
                 $count_to_create,
                 $created,
                 $remaining,
-                $progress
+                $progress,
             );
             $batch++;
         }
@@ -135,18 +135,17 @@ abstract class BatchSeeder extends Seeder
         try {
             $created = $this->executeParallelBatches(
                 $modelClass,
-                $entity_name,
                 $count_to_create,
                 $effective_batch_size,
                 $total_batches,
                 $maxParallelCount,
                 $temp_dir,
-                $progress
+                $progress,
             );
 
             $progress->finish();
-            return $created;
 
+            return $created;
         } finally {
             // Cleanup
             $this->cleanupTempDirectory($temp_dir);
@@ -158,13 +157,12 @@ abstract class BatchSeeder extends Seeder
      */
     private function executeParallelBatches(
         string $modelClass,
-        string $entity_name,
         int $count_to_create,
         int $effective_batch_size,
         int $total_batches,
         int $maxParallelCount,
         string $temp_dir,
-        Progress $progress
+        Progress $progress,
     ): int {
         $driver = Concurrency::driver('fork');
         $created = 0;
@@ -173,11 +171,13 @@ abstract class BatchSeeder extends Seeder
 
         while ($created < $count_to_create) {
             // Avvia nuovi processi fino al limite
-            while (count($active_processes) < $maxParallelCount && $batch < $total_batches) {
+            while ($maxParallelCount > count($active_processes) && $batch < $total_batches) {
                 $remaining = $count_to_create - $created;
                 $current_batch_size = min($effective_batch_size, $remaining);
 
-                if ($current_batch_size <= 0) break;
+                if ($current_batch_size <= 0) {
+                    break;
+                }
 
                 $batch_file = $temp_dir . "/batch_{$batch}.json";
                 $error_file = $temp_dir . "/error_{$batch}.txt";
@@ -188,7 +188,7 @@ abstract class BatchSeeder extends Seeder
                     $batch,
                     $batch_file,
                     $error_file,
-                    $driver
+                    $driver,
                 );
 
                 $active_processes[$process_id] = [
@@ -202,15 +202,13 @@ abstract class BatchSeeder extends Seeder
             }
 
             // Controlla processi completati
-            $this->checkCompletedProcesses($active_processes, $progress, $created, $entity_name);
+            $this->checkCompletedProcesses($active_processes, $progress, $created);
 
             // Se non ci sono processi attivi e abbiamo ancora lavoro da fare, c'è un errore
-            if (empty($active_processes) && $created < $count_to_create) {
-                throw new \RuntimeException("No active processes but still have work to do. Check error files in {$temp_dir}");
-            }
+            throw_if($active_processes === [] && $created < $count_to_create, RuntimeException::class, "No active processes but still have work to do. Check error files in {$temp_dir}");
 
             // Piccola pausa per evitare busy waiting
-            usleep(100000); // 100ms
+            Sleep::usleep(100000); // 100ms
         }
 
         return $created;
@@ -225,15 +223,15 @@ abstract class BatchSeeder extends Seeder
         int $batchNumber,
         string $batchFile,
         string $errorFile,
-        $driver
+        $driver,
     ): string {
         $process_id = uniqid("batch_{$batchNumber}_");
-        
+
         $driver->run([
-            function () use ($modelClass, $batchSize, $batchNumber, $batchFile, $errorFile) {
+            function () use ($modelClass, $batchSize, $batchNumber, $batchFile, $errorFile): void {
                 try {
-                    $result = $this->executeSingleBatch($modelClass, $batchSize, $batchNumber);
-                    
+                    $result = $this->executeSingleBatch($modelClass, $batchSize);
+
                     // Scrivi risultato su file
                     file_put_contents($batchFile, json_encode([
                         'batch' => $batchNumber,
@@ -241,7 +239,6 @@ abstract class BatchSeeder extends Seeder
                         'success' => true,
                         'timestamp' => microtime(true),
                     ]));
-                    
                 } catch (Throwable $e) {
                     // Scrivi errore su file
                     file_put_contents($errorFile, json_encode([
@@ -250,10 +247,10 @@ abstract class BatchSeeder extends Seeder
                         'trace' => $e->getTraceAsString(),
                         'timestamp' => microtime(true),
                     ]));
-                    
+
                     throw $e;
                 }
-            }
+            },
         ]);
 
         return $process_id;
@@ -262,18 +259,18 @@ abstract class BatchSeeder extends Seeder
     /**
      * Execute a single batch in an isolated process.
      */
-    private function executeSingleBatch(string $modelClass, int $batchSize, int $batchNumber): int
+    private function executeSingleBatch(string $modelClass, int $batchSize): int
     {
         // Setup connessioni isolate per questo processo
         $this->setupIsolatedConnections($modelClass);
 
         $model_instance = new $modelClass();
-        
+
         // Usa connessione isolata
-        $model_instance->setConnection($this->getIsolatedConnectionName($modelClass));
+        $model_instance->setConnection($this->getIsolatedConnectionName());
 
         if ($this->isSearchable($modelClass)) {
-            $model_instance->setCacheConnection($this->getIsolatedCacheConnectionName($modelClass));
+            $model_instance->setCacheConnection($this->getIsolatedCacheConnectionName());
         }
 
         /** @phpstan-ignore staticMethod.notFound */
@@ -282,8 +279,8 @@ abstract class BatchSeeder extends Seeder
         /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
         $new_models = $factory->count($batchSize)->create();
 
-        if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
-            $factory->createRelations($new_models);
+        if ($new_models->isNotEmpty() && method_exists($factory, 'createDynamicContentRelations')) {
+            $factory->createDynamicContentRelations($new_models);
         }
 
         return $batchSize;
@@ -292,7 +289,7 @@ abstract class BatchSeeder extends Seeder
     /**
      * Check for completed processes and update progress.
      */
-    private function checkCompletedProcesses(array &$active_processes, Progress $progress, int &$created, string $entity_name): void
+    private function checkCompletedProcesses(array &$active_processes, Progress $progress, int &$created): void
     {
         $completed_processes = [];
 
@@ -304,27 +301,27 @@ abstract class BatchSeeder extends Seeder
             // Controlla se il processo è completato
             if (file_exists($batch_file)) {
                 $result = json_decode(file_get_contents($batch_file), true);
-                
+
                 if ($result && $result['success']) {
                     $created += $result['created'];
                     $progress->advance($result['created']);
                     $completed_processes[] = $process_id;
-                    
+
                     // Cleanup file
                     unlink($batch_file);
                 }
             } elseif (file_exists($error_file)) {
                 $error = json_decode(file_get_contents($error_file), true);
-                
+
                 if ($error) {
                     $progress->hint(sprintf(
                         '<fg=red>Batch %d failed: %s</>',
                         $batch_number + 1,
-                        $error['error']
+                        $error['error'],
                     ));
                     $progress->render();
-                    
-                    throw new \RuntimeException("Batch {$batch_number} failed: " . $error['error']);
+
+                    throw new RuntimeException("Batch {$batch_number} failed: " . $error['error']);
                 }
             }
         }
@@ -340,28 +337,26 @@ abstract class BatchSeeder extends Seeder
      */
     private function setupIsolatedConnections(string $modelClass): void
     {
-        $this->setupIsolatedDatabaseConnection($modelClass);
-        
+        $this->setupIsolatedDatabaseConnection();
+
         if ($this->isSearchable($modelClass)) {
-            $this->setupIsolatedCacheConnection($modelClass);
+            $this->setupIsolatedCacheConnection();
         }
     }
 
     /**
      * Setup isolated database connection.
      */
-    private function setupIsolatedDatabaseConnection(string $modelClass): void
+    private function setupIsolatedDatabaseConnection(): void
     {
-        $connection_name = $this->getIsolatedConnectionName($modelClass);
-        
+        $connection_name = $this->getIsolatedConnectionName();
         // Crea connessione isolata
         config([
             'database.connections.' . $connection_name => array_merge(
                 config('database.connections.' . config('database.default')),
-                ['name' => $connection_name]
+                ['name' => $connection_name],
             ),
         ]);
-
         DB::purge();
         DB::setDefaultConnection($connection_name);
         DB::reconnect();
@@ -370,25 +365,23 @@ abstract class BatchSeeder extends Seeder
     /**
      * Setup isolated cache connection.
      */
-    private function setupIsolatedCacheConnection(string $modelClass): void
+    private function setupIsolatedCacheConnection(): void
     {
-        $cache_connection_name = $this->getIsolatedCacheConnectionName($modelClass);
-        
+        $cache_connection_name = $this->getIsolatedCacheConnectionName();
         // Crea connessione cache isolata
         config([
             'cache.stores.' . $cache_connection_name => array_merge(
                 config('cache.stores.' . config('cache.default')),
-                ['name' => $cache_connection_name]
+                ['name' => $cache_connection_name],
             ),
         ]);
-
         Cache::purge();
     }
 
     /**
      * Get isolated database connection name.
      */
-    private function getIsolatedConnectionName(string $modelClass): string
+    private function getIsolatedConnectionName(): string
     {
         return 'isolated_db_' . uniqid() . '_' . getmypid();
     }
@@ -396,7 +389,7 @@ abstract class BatchSeeder extends Seeder
     /**
      * Get isolated cache connection name.
      */
-    private function getIsolatedCacheConnectionName(string $modelClass): string
+    private function getIsolatedCacheConnectionName(): string
     {
         return 'isolated_cache_' . uniqid() . '_' . getmypid();
     }
@@ -408,6 +401,7 @@ abstract class BatchSeeder extends Seeder
     {
         if (is_dir($temp_dir)) {
             $files = glob($temp_dir . '/*');
+
             foreach ($files as $file) {
                 if (is_file($file)) {
                     unlink($file);
@@ -419,7 +413,7 @@ abstract class BatchSeeder extends Seeder
 
     private function countCurrentRecords(string $modelClass): int
     {
-        return $modelClass::count();
+        return $modelClass::query()->withoutGlobalScopes()->count();
     }
 
     private function countToCreate(int $totalCount, int $currentCount): int
@@ -485,17 +479,13 @@ abstract class BatchSeeder extends Seeder
                 if ($this->isSearchable($modelClass)) {
                     $model_instance->setCacheConnection($connections['cache']);
                 }
+                $factory = $model_instance->factory();
 
-                {
-                    /** @phpstan-ignore staticMethod.notFound */
-                    $factory = $model_instance->factory();
-    
-                    /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
-                    $new_models = $factory->count($batchSize)->create();
-    
-                    if ($new_models->isNotEmpty() && $factory instanceof DynamicContentFactory) {
-                        $factory->createRelations($new_models);
-                    }
+                /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
+                $new_models = $factory->count($batchSize)->create();
+
+                if ($new_models->isNotEmpty() && method_exists($factory, 'createDynamicContentRelations')) {
+                    $factory->createDynamicContentRelations($new_models);
                 }
 
                 $success = true;

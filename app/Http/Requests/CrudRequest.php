@@ -12,9 +12,8 @@ use Modules\Core\Models\DynamicEntity;
 use Override;
 
 /**
- * @inheritdoc
- * @package Modules\Core\Http\Requests
  * @property ?string $connection
+ *
  * @method mixed route(?string $name = null)
  * @method mixed input(string $name)
  * @method mixed validated(array|string $key = null, $default = null)

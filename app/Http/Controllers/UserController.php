@@ -17,7 +17,6 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\ImpersonationRequest;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Modules\Core\Listeners\AfterLoginListener;
-use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class UserController extends Controller
 {
@@ -46,7 +45,7 @@ final class UserController extends Controller
      * @route-comment
      * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [auth])
      */
-    public function userInfo(Request $request): HttpFoundationResponse
+    public function userInfo(Request $request): \Illuminate\Http\JsonResponse
     {
         /** @var User|null $user */
         $user = Auth::user();
@@ -72,7 +71,7 @@ final class UserController extends Controller
      * @route-comment
      * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [auth, can:impersonate])
      */
-    public function impersonate(ImpersonationRequest $request): HttpFoundationResponse
+    public function impersonate(ImpersonationRequest $request): \Illuminate\Http\JsonResponse
     {
         $user_to_impersonate_id = $request->validated()['user'];
         $user_to_impersonate = user_class()::findOrFail($user_to_impersonate_id);
@@ -90,7 +89,7 @@ final class UserController extends Controller
      * @route-comment
      * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [auth, can:impersonate])
      */
-    public function leaveImpersonate(Request $request): HttpFoundationResponse
+    public function leaveImpersonate(Request $request): \Illuminate\Http\JsonResponse
     {
         /** @var User $current_user */
         $current_user = Auth::user();

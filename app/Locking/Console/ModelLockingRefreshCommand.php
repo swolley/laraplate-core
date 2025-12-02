@@ -41,11 +41,10 @@ final class ModelLockingRefreshCommand extends Command
         $this->quiet_mode = $this->option('quiet');
 
         $all_models = models();
-        $parental_class = \Parental\HasParent::class;
         $this->changes = false;
 
         foreach ($all_models as $model) {
-            $this->checkModel($model, $parental_class);
+            $this->checkModel($model);
         }
 
         if (! $this->changes && ! $this->quiet_mode) {
@@ -56,7 +55,7 @@ final class ModelLockingRefreshCommand extends Command
     /**
      * @param  class-string<Model>  $model
      */
-    private function checkModel(string $model, string $parental_class): void
+    private function checkModel(string $model): void
     {
         $need_bypass = $this->checkIfBlacklisted($model);
 
@@ -71,10 +70,6 @@ final class ModelLockingRefreshCommand extends Command
         /** @var Model $instance */
         $instance = new $model();
         $table = $instance->getTable();
-
-        if (in_array($parental_class, class_uses($instance), true)) {
-            return;
-        }
 
         $this->optimisticLockingCheck($instance, $model, $table);
         $this->lockableCheck($instance, $model, $table);

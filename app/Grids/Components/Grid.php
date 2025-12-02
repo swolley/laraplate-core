@@ -524,7 +524,7 @@ final class Grid extends Entity
         }
 
         unset($config);
-        $fields = array_map(fn ($generator) => $generator($this->getModel()), array_values($necessary_fields));
+        $fields = array_map(fn (Closure $generator): Field => $generator($this->getModel()), array_values($necessary_fields));
         $this->setFields($fields);
     }
 

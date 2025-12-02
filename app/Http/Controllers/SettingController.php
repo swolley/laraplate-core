@@ -13,7 +13,6 @@ use Illuminate\Support\Str;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\TranslationsRequest;
 use Modules\Core\Models\Setting;
-use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 
 final class SettingController extends Controller
 {
@@ -21,7 +20,7 @@ final class SettingController extends Controller
      * @route-comment
      * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
      */
-    public function getTranslations(TranslationsRequest $request, ?string $lang = null): HttpFoundationResponse
+    public function getTranslations(TranslationsRequest $request, ?string $lang = null): \Illuminate\Http\JsonResponse
     {
         if (! in_array($lang, [null, '', '0'], true)) {
             $lang = mb_substr($lang, 0, 2);
@@ -65,7 +64,7 @@ final class SettingController extends Controller
      * @route-comment
      * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
      */
-    public function getSiteConfigs(Request $request): HttpFoundationResponse
+    public function getSiteConfigs(Request $request): \Illuminate\Http\JsonResponse
     {
         $settings = Cache::tags(Cache::getCacheTags(new Setting()->getTable()))->rememberForever(RequestFacade::route()->getName(), function (): array {
             $settings = [];
@@ -88,7 +87,7 @@ final class SettingController extends Controller
      * @route-comment
      * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
      */
-    public function siteInfo(Request $request): HttpFoundationResponse
+    public function siteInfo(Request $request): \Illuminate\Http\JsonResponse
     {
         return new ResponseBuilder($request)
             ->setData([

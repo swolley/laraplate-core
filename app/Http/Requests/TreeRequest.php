@@ -8,8 +8,6 @@ use Modules\Core\Casts\TreeRequestData;
 use Override;
 
 /**
- * @inheritdoc
- * @package Modules\Core\Http\Requests
  * @property bool $parents
  * @property bool $children
  */

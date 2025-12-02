@@ -80,7 +80,7 @@ final class GridsController extends Controller
      * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
      * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
      */
-    public function grid(GridRequest $request, string $entity): Response
+    public function grid(GridRequest $request, string $entity): \Illuminate\Http\JsonResponse
     {
         try {
             $filters = $request->parsed();

@@ -37,11 +37,11 @@ final class UserFactory extends Factory
     {
         $name = fake()->boolean() ? fake()->name() : fake()->userName();
         $username = Str::slug($name) . (fake()->boolean() ? fake()->numberBetween(0, 999999) : '');
-        
+
         $email_prefix = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
         $email_suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
         $email = sprintf('%s%s@%s', $email_prefix, $email_suffix, fake()->domainName());
-        
+
         return [
             'name' => $name,
             'username' => $this->uniqueValue(fn () => $username, $this->model, 'username'),

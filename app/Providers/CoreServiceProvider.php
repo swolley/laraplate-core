@@ -431,17 +431,26 @@ final class CoreServiceProvider extends ServiceProvider
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn ($app) => $app['cache.store']);
-        $this->app->bind(Repository::class, fn ($app) => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, fn ($app): Repository => $app['cache.store']);
+        $this->app->bind(BaseContract::class, fn ($app): Repository => $app['cache.store']);
+        $this->app->bind(Repository::class, fn ($app): Repository => $app['cache.store']);
 
         // Register macros
-        Cache::macro('tryByRequest', fn (...$args) => app(BaseRepository::class)->tryByRequest(...$args));
-        Cache::macro('clearByEntity', fn (...$args) => app(BaseRepository::class)->clearByEntity(...$args));
-        Cache::macro('clearByRequest', fn (...$args) => app(BaseRepository::class)->clearByRequest(...$args));
-        Cache::macro('clearByUser', fn (...$args) => app(BaseRepository::class)->clearByUser(...$args));
-        Cache::macro('clearByGroup', fn (...$args) => app(BaseRepository::class)->clearByGroup(...$args));
-        Cache::macro('getCacheTags', fn (...$args) => app(BaseRepository::class)->getCacheTags(...$args));
+        Cache::macro('memo', fn (): Repository => app('cache.memo'));
+        Cache::macro('tryByRequest', fn (...$args): mixed => app(BaseRepository::class)->tryByRequest(...$args));
+        Cache::macro('clearByEntity', function ($entity): void {
+            app(BaseRepository::class)->clearByEntity($entity);
+        });
+        Cache::macro('clearByRequest', function ($request, $entity = null): void {
+            app(BaseRepository::class)->clearByRequest($request, $entity);
+        });
+        Cache::macro('clearByUser', function ($request, $entity = null): void {
+            app(BaseRepository::class)->clearByUser($request->user(), $entity);
+        });
+        Cache::macro('clearByGroup', function ($role, $entity = null): void {
+            app(BaseRepository::class)->clearByGroup($role, $entity);
+        });
+        Cache::macro('getCacheTags', fn (...$args): array => app(BaseRepository::class)->getCacheTags(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array

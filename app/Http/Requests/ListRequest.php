@@ -9,9 +9,6 @@ use Modules\Core\Rules\QueryBuilder;
 use Override;
 
 /**
- * 
- * @inheritdoc
- * @package Modules\Core\Http\Requests
  * @property ?int $pagination
  * @property ?int $page
  * @property ?int $from

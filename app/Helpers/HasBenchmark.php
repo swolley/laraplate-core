@@ -25,16 +25,6 @@ trait HasBenchmark
 
     protected ?string $benchmarkTable = null;
 
-    private static function getQueryCount(): int
-    {
-        return match (DB::connection()->getDriverName()) {
-            'mysql' => (int) DB::select("SHOW SESSION STATUS LIKE 'Questions'")[0]->Value,
-            'pgsql' => (int) DB::select('SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count')[0]->count,
-            'sqlite' => count(DB::getQueryLog()),  // it requires DB::enableQueryLog()
-            default => 0,
-        };
-    }
-
     /**
      * Start the benchmark.
      */
@@ -57,7 +47,7 @@ trait HasBenchmark
         $this->startQueries = self::getQueryCount();
     }
 
-    protected function cancelBenchmark(): void
+    public function cancelBenchmark(): void
     {
         $this->benchmarkStartTime = null;
     }
@@ -85,7 +75,7 @@ trait HasBenchmark
             $rowDiff = 0;
         }
 
-        DB::disableQueryLog();
+        DB::flushQueryLog();
 
         $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime);
     }
@@ -102,7 +92,18 @@ trait HasBenchmark
     protected function endBenchmark(): void
     {
         $this->stepBenchmark();
-        $this->cancelBenchmark();
+        // $this->cancelBenchmark();
+        DB::disableQueryLog();
+    }
+
+    private static function getQueryCount(): int
+    {
+        return match (DB::connection()->getDriverName()) {
+            'mysql' => (int) DB::select("SHOW SESSION STATUS LIKE 'Questions'")[0]->Value,
+            'pgsql' => (int) DB::select('SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count')[0]->count,
+            'sqlite' => count(DB::getQueryLog()),  // it requires DB::enableQueryLog()
+            default => 0,
+        };
     }
 
     private static function formatTime(float $time): string

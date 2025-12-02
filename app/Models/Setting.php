@@ -15,7 +15,6 @@ use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
-use Override;
 
 /**
  * @mixin IdeHelperSetting
@@ -99,8 +98,7 @@ final class Setting extends Model
         $this->attributes['type'] = ($value instanceof SettingTypeEnum ? $value : (SettingTypeEnum::tryFrom($value)) ?? SettingTypeEnum::STRING);
     }
 
-    #[Override]
-    protected function casts()
+    protected function casts(): array
     {
         return [
             'value' => 'json',

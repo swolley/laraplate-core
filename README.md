@@ -299,7 +299,6 @@ The Core Module utilizes several packages to enhance its functionality. Below is
     -   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): Adds versioning capabilities to Eloquent models.
     -   [spatie/laravel-permission](https://github.com/spatie/spatie-laravel-permission): Manages user roles and permissions.
     -   [staudenmeir/laravel-adjacency-list](https://github.com/staudenmeir/laravel-adjacency-list): Provides adjacency list pattern for hierarchical data.
-    -   [awobaz/compoships](https://github.com/topclaudy/compoships): Enables composite primary keys in Laravel Eloquent.
 
 -   **Logging and Monitoring:**
 

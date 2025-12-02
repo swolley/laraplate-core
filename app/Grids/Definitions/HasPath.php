@@ -45,7 +45,7 @@ trait HasPath
     private static function splitPath(string $fullpath): array
     {
         $fullpath = explode('.', $fullpath);
-        $fullpath = array_map('lcfirst', $fullpath);
+        $fullpath = array_map(lcfirst(...), $fullpath);
 
         $name = array_pop($fullpath);
         $path = implode('.', $fullpath);

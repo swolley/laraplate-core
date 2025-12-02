@@ -15,7 +15,6 @@ use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Rules\QueryBuilder;
-use Override;
 
 /**
  * @mixin IdeHelperACL
@@ -68,8 +67,7 @@ final class ACL extends Model
         return $query->where('permission_id', $permission_id);
     }
 
-    #[Override]
-    protected function casts()
+    protected function casts(): array
     {
         return [
             'filters' => FiltersGroup::class,
