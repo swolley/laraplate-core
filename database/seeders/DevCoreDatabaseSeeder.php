@@ -30,11 +30,11 @@ final class DevCoreDatabaseSeeder extends BatchSeeder
 
     private function seedUsers(): void
     {
-        $this->createInBatches(User::class, self::TARGET_COUNT_USERS);
+        $this->createInParallelBatches(User::class, self::TARGET_COUNT_USERS);
     }
 
     private function seedLicenses(): void
     {
-        $this->createInBatches(License::class, self::TARGET_COUNT_LICENSES);
+        $this->createInParallelBatches(License::class, self::TARGET_COUNT_LICENSES);
     }
 }
