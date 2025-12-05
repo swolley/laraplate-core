@@ -270,7 +270,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         $mapping = [
             'name' => $model->searchableAs(),
             'fields' => [
-                'id ' => ['name' => 'id', 'type' => 'string', 'index' => true],
+                'id' => ['name' => 'id', 'type' => 'string', 'index' => true],
                 'entity' => ['name' => 'entity', 'type' => 'string', 'facet' => true],
                 'connection' => ['name' => 'connection', 'type' => 'string', 'facet' => true],
                 self::INDEXED_AT_FIELD => ['name' => self::INDEXED_AT_FIELD, 'type' => 'string', 'sort' => true],
@@ -279,10 +279,12 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         // Add a vector field if needed
         if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
+            // Typesense vector field configuration
+            // The embedding is pre-computed, so we just need to define it as float[]
             $mapping['fields']['embedding'] = [
                 'name' => 'embedding',
                 'type' => 'float[]',
-                'embed' => true,
+                'optional' => true,
             ];
         }
 
@@ -377,9 +379,18 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
 
+        if (empty($vector)) {
+            // Fallback to regular search if no vector provided
+            return parent::search($builder);
+        }
+
+        // Build vector query for Typesense
+        // Typesense expects vector_query in format: "field_name:([vector_values])"
+        $vectorString = implode(',', array_map(fn ($v): string => (string) $v, $vector));
+
         $searchParams = [
             'q' => $builder->query ?: '*',
-            'vector_query' => 'embedding:(' . implode(',', $vector) . ')',
+            'vector_query' => sprintf('embedding:(%s)', $vectorString),
             'per_page' => $builder->limit ?: 10,
         ];
 
@@ -392,7 +403,27 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             }
         }
 
-        return $this->typesense->collections[$collection]->documents->search($searchParams);
+        try {
+            $response = $this->typesense->collections[$collection]->documents->search($searchParams);
+
+            // Transform results to match Scout's expected format
+            $hits = $response['hits'] ?? [];
+
+            return collect($hits)->map(function ($hit) {
+                $document = $hit['document'] ?? [];
+                $document['_id'] = $hit['document']['id'] ?? null;
+                $document['_score'] = $hit['text_match'] ?? 0;
+
+                return $document;
+            });
+        } catch (TypesenseClientError $e) {
+            Log::error('Typesense vector search failed', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 
     private function buildFilter(string $fieldName, mixed $value): string

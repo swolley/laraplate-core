@@ -534,11 +534,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
         // Add a vector field if needed
         if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
+            $dimension = config('scout.vector_search.dimensions', config('search.vector_search.dimension', 1536));
+            $similarity = config('search.vector_search.similarity', 'cosine');
+
             $mapping['mappings']['properties']['embedding'] = [
                 'type' => 'dense_vector',
-                'dims' => config('scout.vector_search.dimensions', 1536),
+                'dims' => $dimension,
                 'index' => true,
-                'similarity' => 'cosine',
+                'similarity' => $similarity,
             ];
         }
 
@@ -629,49 +632,80 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
 
-        // Build the vector search query
-        //        $query = [
-        //            'script_score' => [
-        //                'query' => ['match_all' => new stdClass()],
-        //                'script' => [
-        //                    'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-        //                    'params' => ['query_vector' => $vector],
-        //                ],
-        //            ],
-        //        ];
+        if (empty($vector)) {
+            // Fallback to regular search if no vector provided
+            return parent::search($builder);
+        }
+
+        /** @var Model&Searchable $model */
+        $model = $builder->model;
+        $index = $model->searchableAs();
+
+        // Build the vector search query using knn (more efficient than script_score)
+        $query = [
+            'knn' => [
+                'field' => 'embedding',
+                'query_vector' => $vector,
+                'k' => $builder->limit ?: 10,
+                'num_candidates' => min(($builder->limit ?: 10) * 10, 100),
+            ],
+        ];
 
         // Add filters if any are present
-        //        if (! empty($builder->wheres)) {
-        //            $filters = $this->buildFiltersFromBuilder($builder);
-        //
-        //            if ($filters) {
-        //                $query = [
-        //                    'bool' => [
-        //                        'must' => $filters,
-        //                        'should' => [$query],
-        //                        'minimum_should_match' => 1,
-        //                    ],
-        //                ];
-        //            }
-        //        }
+        if (! empty($builder->wheres)) {
+            $filters = $this->buildSearchFilters($builder->wheres);
 
-        // Execute the search query
-        return $builder
-            ->query(fn ($query): array => [
+            if (! empty($filters)) {
+                $query['knn']['filter'] = [
+                    'bool' => [
+                        'must' => $filters,
+                    ],
+                ];
+            }
+        }
+
+        // Combine with text search if query is provided
+        $body = [
+            'knn' => $query['knn'],
+        ];
+
+        if ($builder->query && $builder->query !== '*') {
+            $body['query'] = [
                 'bool' => [
-                    'must' => $query,
                     'should' => [
-                        'script_score' => [
-                            'query' => ['match_all' => new stdClass()],
-                            'script' => [
-                                'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                                'params' => ['query_vector' => $vector],
+                        [
+                            'multi_match' => [
+                                'query' => $builder->query,
+                                'fields' => ['*'],
+                                'type' => 'best_fields',
                             ],
                         ],
                     ],
                 ],
-            ])
-            ->take($builder->limit ?: 10)
-            ->get();
+            ];
+        }
+
+        // Execute the search query using ElasticsearchService
+        $client = ElasticsearchService::getInstance()->client;
+
+        $params = [
+            'index' => $index,
+            'body' => $body,
+            'size' => $builder->limit ?: 10,
+        ];
+
+        $response = $client->search($params);
+
+        // Transform results to match Scout's expected format
+        $results = $response->asArray();
+        $hits = $results['hits']['hits'] ?? [];
+
+        return collect($hits)->map(function ($hit) {
+            $document = $hit['_source'] ?? [];
+            $document['_id'] = $hit['_id'] ?? null;
+            $document['_score'] = $hit['_score'] ?? 0;
+
+            return $document;
+        });
     }
 }

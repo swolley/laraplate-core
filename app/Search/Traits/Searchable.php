@@ -39,7 +39,7 @@ trait Searchable
     /**
      * Field name for indexing timestamp.
      */
-    public static string $indexedAtField = 'indexed_at';
+    public static string $indexedAtField = '_indexed_at';
 
     private ?string $cacheConnection = null;
 
