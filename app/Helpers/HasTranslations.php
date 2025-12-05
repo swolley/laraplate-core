@@ -42,37 +42,7 @@ trait HasTranslations
 
         // Check if it's a translatable field (cache the result to avoid recursion)
         if ($this->isTranslatableField($key)) {
-            $current_locale = LocaleContext::get();
-            $default_locale = config('app.locale');
-            $fallback_enabled = LocaleContext::isFallbackEnabled();
-
-            // First, check pending translations (values set but not yet saved)
-            if (isset($this->pending_translations[$current_locale][$key])) {
-                return $this->pending_translations[$current_locale][$key];
-            }
-
-            // If fallback enabled, check pending translation for default locale
-            if ($fallback_enabled && isset($this->pending_translations[$default_locale][$key])) {
-                return $this->pending_translations[$default_locale][$key];
-            }
-
-            // Then check saved translation relation
-            $translation = $this->getRelationValue('translation');
-
-            if ($translation && isset($translation->{$key})) {
-                return $translation->{$key};
-            }
-
-            // Fallback to default translation if enabled
-            if ($fallback_enabled) {
-                $default_translation = $this->getDefaultTranslation();
-
-                if ($default_translation && isset($default_translation->{$key})) {
-                    return $default_translation->{$key};
-                }
-            }
-
-            return null;
+            return $this->getTranslatableFieldValue($key);
         }
 
         return parent::__get($key);
@@ -457,6 +427,41 @@ trait HasTranslations
         return $this->translations()
             ->where('locale', config('app.locale'))
             ->first();
+    }
+
+    private function getTranslatableFieldValue(string $key)
+    {
+        $current_locale = LocaleContext::get();
+        $default_locale = config('app.locale');
+        $fallback_enabled = LocaleContext::isFallbackEnabled();
+
+        // First, check pending translations (values set but not yet saved)
+        if (isset($this->pending_translations[$current_locale][$key])) {
+            return $this->pending_translations[$current_locale][$key];
+        }
+
+        // If fallback enabled, check pending translation for default locale
+        if ($fallback_enabled && isset($this->pending_translations[$default_locale][$key])) {
+            return $this->pending_translations[$default_locale][$key];
+        }
+
+        // Then check saved translation relation
+        $translation = $this->getRelationValue('translation');
+
+        if ($translation && isset($translation->{$key})) {
+            return $translation->{$key};
+        }
+
+        // Fallback to default translation if enabled
+        if ($fallback_enabled) {
+            $default_translation = $this->getDefaultTranslation();
+
+            if ($default_translation && isset($default_translation->{$key})) {
+                return $default_translation->{$key};
+            }
+        }
+
+        return null;
     }
 
     private function setTranslatableFieldValue(string $key, $value): void

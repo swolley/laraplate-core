@@ -126,6 +126,7 @@ abstract class BatchSeeder extends Seeder
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
 
         $progress = progress('Creating ' . $entity_name . ' (parallel)', $count_to_create);
+        $progress->hint('Using ' . $maxParallelCount . ' parallel processes, ' . $effective_batch_size . ' records per batch, ' . $total_batches . ' total batches');
         $progress->start();
 
         // Temporary directory for inter-process communication
@@ -192,7 +193,7 @@ abstract class BatchSeeder extends Seeder
 
         while ($batch < $total_batches) {
             $current_group++;
-            $group_start_time = microtime(true);
+            // $group_start_time = microtime(true);
             // Collect batches for parallel execution (grouped approach for memory efficiency)
             $batches_to_run = [];
             $batch_info = [];
@@ -205,11 +206,8 @@ abstract class BatchSeeder extends Seeder
                     break;
                 }
 
-                $batch_file = $temp_dir . "/batch_{$batch}.json";
-                $error_file = $temp_dir . "/error_{$batch}.txt";
-
                 // Create closure for this batch with timing
-                $batches_to_run["batch_{$batch}"] = function () use ($modelClass, $current_batch_size, $batch, $batch_file, $error_file, $progress_file, $progress_lock_file) {
+                $batches_to_run["batch_{$batch}"] = function () use ($modelClass, $current_batch_size, $batch, $progress_file, $progress_lock_file) {
                     $batch_start_time = microtime(true);
 
                     try {
@@ -226,8 +224,7 @@ abstract class BatchSeeder extends Seeder
                         $batch_end_time = microtime(true);
                         $batch_duration = $batch_end_time - $batch_start_time;
 
-                        // Write result to file for verification with detailed timing
-                        file_put_contents($batch_file, json_encode([
+                        return [
                             'batch' => $batch,
                             'created' => $result,
                             'success' => true,
@@ -235,32 +232,23 @@ abstract class BatchSeeder extends Seeder
                             'db_duration' => $db_duration,
                             'file_lock_duration' => $file_lock_time,
                             'timestamp' => microtime(true),
-                        ]));
-
-                        return [
-                            'created' => $result,
-                            'duration' => $batch_duration,
-                            'db_duration' => $db_duration,
-                            'file_lock_duration' => $file_lock_time,
                         ];
                     } catch (Throwable $e) {
-                        // Write error to file
-                        file_put_contents($error_file, json_encode([
+                        return [
+                            'created' => $result ?? 0,
+                            'duration' => $batch_duration ?? 0,
+                            'db_duration' => $db_duration ?? 0,
+                            'file_lock_duration' => $file_lock_time ?? 0,
                             'batch' => $batch,
                             'error' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
                             'trace' => $e->getTraceAsString(),
                             'timestamp' => microtime(true),
-                        ]));
-
-                        throw $e;
+                            'success' => false,
+                        ];
                     }
                 };
-
-                $batch_info[$batch] = [
-                    'batch_file' => $batch_file,
-                    'error_file' => $error_file,
-                    'batch_size' => $current_batch_size,
-                ];
 
                 $batch++;
             }
@@ -270,56 +258,63 @@ abstract class BatchSeeder extends Seeder
             }
 
             // Execute all batches in parallel using Concurrency
-            try {
-                $results = $driver->run($batches_to_run);
+            // try {
+            $results = $driver->run($batches_to_run);
 
-                // Update progressbar based on results and collect timing statistics
-                foreach ($results as $key => $result) {
-                    if (is_array($result) && isset($result['created']) && $result['created'] > 0) {
-                        $records_created = $result['created'];
-                        $batch_duration = $result['duration'] ?? 0;
+            // Update progressbar based on results and collect timing statistics
+            foreach ($results as $key => $result) {
+                if (! $result['success']) {
+                    $this->command->error("Batch {$result['batch']} failed: " . $result['error'] . ' in ' . $result['file'] . ' on line ' . $result['line']);
+                    $this->command->error($result['trace']);
 
-                        // Update weighted average: sum(time * records) / sum(records)
-                        $total_time_weighted += $batch_duration * $records_created;
-                        $total_records_processed += $records_created;
-
-                        $progress->advance($records_created);
-                        $last_progress += $records_created;
-                    } elseif (is_int($result) && $result > 0) {
-                        // Fallback for old format
-                        $progress->advance($result);
-                        $last_progress += $result;
-                    }
+                    exit();
                 }
 
-                // Calculate weighted average time per record
-                $weighted_avg_time_per_record = $total_records_processed > 0
-                    ? $total_time_weighted / $total_records_processed
-                    : 0;
+                if (is_array($result) && isset($result['created']) && $result['created'] > 0) {
+                    $records_created = $result['created'];
+                    $batch_duration = $result['duration'] ?? 0;
 
-                // Update progressbar hint with statistics
-                $this->updateProgressHint(
-                    $progress,
-                    $current_group,
-                    $total_groups,
-                    $weighted_avg_time_per_record,
-                    $total_records_processed,
-                    $count_to_create,
-                );
-            } catch (Throwable $e) {
-                // Check for individual batch errors
-                foreach ($batch_info as $batch_num => $info) {
-                    if (file_exists($info['error_file'])) {
-                        $error = json_decode(file_get_contents($info['error_file']), true);
+                    // Update weighted average: sum(time * records) / sum(records)
+                    $total_time_weighted += $batch_duration * $records_created;
+                    $total_records_processed += $records_created;
 
-                        if ($error) {
-                            throw new RuntimeException("Batch {$batch_num} failed: " . $error['error']);
-                        }
-                    }
+                    $progress->advance($records_created);
+                    $last_progress += $records_created;
+                } elseif (is_int($result) && $result > 0) {
+                    // Fallback for old format
+                    $progress->advance($result);
+                    $last_progress += $result;
                 }
-
-                throw $e;
             }
+
+            // Calculate weighted average time per record
+            $weighted_avg_time_per_record = $total_records_processed > 0
+                ? $total_time_weighted / $total_records_processed
+                : 0;
+
+            // Update progressbar hint with statistics
+            $this->updateProgressHint(
+                $progress,
+                $current_group,
+                $total_groups,
+                $weighted_avg_time_per_record,
+                $total_records_processed,
+                $count_to_create,
+            );
+            // } catch (Throwable $e) {
+            //     // Check for individual batch errors
+            //     foreach ($batch_info as $batch_num => $info) {
+            //         if (file_exists($info['error_file'])) {
+            //             $error = json_decode(file_get_contents($info['error_file']), true);
+
+            //             if ($error) {
+            //                 throw new RuntimeException("Batch {$batch_num} failed: " . $error['error']);
+            //             }
+            //         }
+            //     }
+
+            //     throw $e;
+            // }
 
             // Update progressbar from shared file (in case some updates were missed)
             $current_progress = $this->readProgressFile($progress_file, $progress_lock_file);
@@ -402,6 +397,7 @@ abstract class BatchSeeder extends Seeder
 
         if (! empty($hint_parts)) {
             $progress->hint(implode(' | ', $hint_parts));
+            $progress->render();
         }
     }
 
