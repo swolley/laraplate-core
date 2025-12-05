@@ -11,7 +11,7 @@ use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
-use Illuminate\Cache\CacheManager;
+use Illuminate\Cache\CacheManager as BaseCacheManager;
 use Illuminate\Cache\MemoizedStore;
 use Illuminate\Cache\Repository as BaseRepository;
 use Illuminate\Console\Scheduling\Schedule;
@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
+use Modules\Core\Cache\CacheManager;
 use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -320,11 +321,11 @@ final class CoreServiceProvider extends ServiceProvider
         $module_commands_subpath = config('modules.paths.generator.command.path');
         $commands = $this->inspectFolderCommands($module_commands_subpath);
 
-        $locking_commands_subpath = Str::replace('Console', 'Locking/Console', $module_commands_subpath);
+        $locking_commands_subpath = (string) Str::replace('Console', 'Locking/Console', $module_commands_subpath);
         $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
         array_push($commands, ...$locking_commands);
 
-        $search_commands_subpath = Str::replace('Console', 'Search/Console', $module_commands_subpath);
+        $search_commands_subpath = (string) Str::replace('Console', 'Search/Console', $module_commands_subpath);
         $search_commands = $this->inspectFolderCommands($search_commands_subpath);
         array_push($commands, ...$search_commands);
 
@@ -383,14 +384,7 @@ final class CoreServiceProvider extends ServiceProvider
     private function registerCache(): void
     {
         // Override the CacheManager to return our custom Repository
-        $this->app->extend('cache', fn ($cacheManager, Application $app): CacheManager => new class($app) extends CacheManager
-        {
-            // Create a custom CacheManager that returns our Repository
-            public function repository(Store $store, array $config = []): Repository
-            {
-                return new Repository($store, $config);
-            }
-        });
+        $this->app->extend('cache', fn ($cacheManager, Application $app): BaseCacheManager => new CacheManager($app));
 
         // Override the cache.store binding to ensure it uses our Repository
         $this->app->extend('cache.store', function ($service, Application $app): Repository {

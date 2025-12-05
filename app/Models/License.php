@@ -22,7 +22,7 @@ final class License extends Model
     use HasFactory;
     use HasUuids;
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
     use HasValidity;
 

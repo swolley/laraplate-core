@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-return [
+$default_locale = (string) (config('app.locale'));
+
+$translations = [
     'accepted' => 'El campo :attribute debe ser aceptado.',
     'accepted_if' => 'El campo :attribute debe ser aceptado cuando :other sea :value.',
     'active_url' => 'El campo :attribute debe ser una URL válida.',
@@ -157,3 +159,9 @@ return [
     'url' => 'El campo :attribute debe ser una URL válida.',
     'uuid' => 'El campo :attribute debe ser un UUID válido.',
 ];
+
+if ($default_locale !== 'es') {
+    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/validation.php"));
+}
+
+return $translations;

@@ -14,21 +14,26 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role as BaseRole;
 use Spatie\Permission\PermissionRegistrar;
 
 final class CoreDatabaseSeeder extends Seeder
 {
     /**
-     * @var Collection<string, Role>
+     * @var Collection<string, BaseRole>
      */
     private Collection $groups;
 
+    /**
+     * @return array<string,string>
+     */
     public static function getDefaultUserRoles(): array
     {
         return [
-            'superadmin' => config('permission.roles.superadmin'),
-            'admin' => config('permission.roles.admin'),
-            'guest' => config('permission.roles.guest'),
+            'superadmin' => (string) config('permission.roles.superadmin'),
+            'admin' => (string) config('permission.roles.admin'),
+            'guest' => (string) config('permission.roles.guest'),
         ];
     }
 
@@ -52,7 +57,7 @@ final class CoreDatabaseSeeder extends Seeder
     {
         // il comando ha già le transaction
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $this->logOperation(config('permission.models.permission'));
+        $this->logOperation((string) config('permission.models.permission'));
         Artisan::call('permission:refresh');
         $this->command->line('    - permissions updated');
     }
@@ -60,9 +65,13 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultRoles(): void
     {
         $user_class = user_class();
+
+        /** @var class-string<BaseRole> $role_class */
         $role_class = config('permission.models.role');
-        $permission_class = config('permission.models.permission');
         $role_table = (new $role_class)->getTable();
+
+        /** @var class-string<Permission> $permission_class */
+        $permission_class = config('permission.models.permission');
         $user_table = (new $user_class)->getTable();
 
         $this->logOperation($role_class);
@@ -77,7 +86,7 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['admin'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where(function ($query) use ($user_table, $role_table): void {
+                'permissions' => fn () => $permission_class::query()->where(function ($query) use ($user_table, $role_table): void {
                     $query->whereIn('table_name', [$user_table, $role_table])
                         ->orWhere('name', 'like', '%.' . ActionEnum::SELECT->value);
                 })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get(),
@@ -85,13 +94,13 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['guest'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::where('name', 'like', '%.' . ActionEnum::SELECT->value)
+                'permissions' => fn () => $permission_class::query()->where('name', 'like', '%.' . ActionEnum::SELECT->value)
                     ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
                     ->get(),
             ],
         ];
 
-        $this->groups = $role_class::withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
+        $this->groups = $role_class::query()->withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
         $existing_roles = $this->groups->keys()->all();
         $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
 
@@ -146,7 +155,7 @@ final class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $existing_users = $user_class::withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
+        $existing_users = $user_class::query()->withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
         $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
 
         if ($new_users === []) {

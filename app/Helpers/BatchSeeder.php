@@ -395,10 +395,8 @@ abstract class BatchSeeder extends Seeder
             }
         }
 
-        if (! empty($hint_parts)) {
-            $progress->hint(implode(' | ', $hint_parts));
-            $progress->render();
-        }
+        $progress->hint(implode(' | ', $hint_parts));
+        $progress->render();
     }
 
     /**

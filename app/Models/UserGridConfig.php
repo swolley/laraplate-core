@@ -17,7 +17,9 @@ final class UserGridConfig extends Model
 {
     use HasCache;
     use HasFactory;
-    use HasValidations;
+    use HasValidations {
+        getRules as private getRulesTrait;
+    }
 
     /**
      * The attributes that are mass assignable.

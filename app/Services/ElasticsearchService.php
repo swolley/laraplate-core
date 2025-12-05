@@ -48,8 +48,8 @@ final class ElasticsearchService
      * Create or update index.
      *
      * @param  string  $index  Index name
-     * @param  array  $settings  Index settings
-     * @param  array  $mappings  Index mappings
+     * @param  array<string,mixed>  $settings  Index settings
+     * @param  array<string,mixed>  $mappings  Index mappings
      *
      * @throws ElasticsearchException|MissingParameterException
      */
@@ -137,7 +137,7 @@ final class ElasticsearchService
      * Bulk index documents.
      *
      * @param  string  $index  Index name
-     * @param  array  $documents  Documents to index
+     * @param  array<string|int,array<string,mixed>>  $documents  Documents to index
      *
      * @throws ElasticsearchException
      *
@@ -203,7 +203,7 @@ final class ElasticsearchService
      * Search documents.
      *
      * @param  string  $index  Index name
-     * @param  array  $query  Elasticsearch query
+     * @param  array<string,mixed>  $query  Elasticsearch query
      *
      * @throws ElasticsearchException
      *
@@ -239,7 +239,7 @@ final class ElasticsearchService
      *
      * @throws ElasticsearchException
      *
-     * @return array|null Document data or null if not found
+     * @return array<string,mixed>|null Document data or null if not found
      */
     public function getDocument(string $index, string $id): ?array
     {
@@ -307,7 +307,7 @@ final class ElasticsearchService
             ];
 
             if ($refresh) {
-                $params['refresh'] = true;
+                $params['refresh'] = 'true';
             }
 
             $response = $this->client->delete($params);

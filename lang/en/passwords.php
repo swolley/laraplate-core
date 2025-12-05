@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-return [
+$default_locale = (string) (config('app.locale'));
+
+$translations = [
     /*
     |--------------------------------------------------------------------------
     | Password Reset Language Lines
@@ -19,3 +21,9 @@ return [
     'token' => 'This password reset token is invalid.',
     'user' => "We can't find a user with that email address.",
 ];
+
+if ($default_locale !== 'en') {
+    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/passwords.php"));
+}
+
+return $translations;

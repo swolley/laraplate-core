@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 trait SortableTrait
 {
     use \Spatie\EloquentSortable\SortableTrait {
-        scopeOrdered as protected scopeOrderedTrait;
+        scopeOrdered as private scopeOrderedTrait;
     }
 
     // public function determineOrderColumnName(): string

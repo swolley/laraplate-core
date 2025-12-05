@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Models\License;
 use Override;
 
+/**
+ * @extends Factory<License>
+ */
 final class LicenseFactory extends Factory
 {
     /**

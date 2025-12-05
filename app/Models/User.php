@@ -25,6 +25,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Lab404\Impersonate\Exceptions\InvalidUserProvider;
 use Lab404\Impersonate\Exceptions\MissingUserProvider;
+use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
@@ -39,6 +40,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -47,13 +49,14 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     use HasFactory;
     use HasLocks;
     use HasRoles {
-        getPermissionsViaRoles as protected getPermissionsViaRolesTrait;
-        roles as protected rolesTrait;
+        getPermissionsViaRoles as private getPermissionsViaRolesTrait;
+        roles as private rolesTrait;
     }
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
     use HasVersions;
+    use Impersonate;
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;

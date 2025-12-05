@@ -20,7 +20,7 @@ final class Permission extends ModelsPermission
     use HasCache;
     use HasFactory;
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
 
     /**

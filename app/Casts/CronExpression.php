@@ -20,7 +20,7 @@ final class CronExpression implements CastsAttributes
     #[Override]
     public function get(Model $model, string $key, mixed $value, array $attributes): ?CoreCronExpression
     {
-        if (! isset($value)) {
+        if ($value === null) {
             return null;
         }
 
@@ -36,7 +36,7 @@ final class CronExpression implements CastsAttributes
     #[Override]
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string
     {
-        if (! isset($value)) {
+        if ($value === null) {
             return null;
         }
 

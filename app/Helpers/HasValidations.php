@@ -88,6 +88,7 @@ trait HasValidations
             $attributes = $this->getAttributes();
 
             if (class_uses_trait($this, HasDynamicContents::class)) {
+                /** @phpstan-ignore method.notFound */
                 $attributes = array_merge($attributes, $this->getComponentsAttribute());
             }
 

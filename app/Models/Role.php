@@ -31,7 +31,7 @@ final class Role extends BaseRole
     use HasLocks;
     use HasRecursiveRelationships;
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
     use HasVersions;
     use SoftDeletes;

@@ -25,7 +25,7 @@ final class Setting extends Model
     use HasCache;
     use HasFactory;
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
     use HasVersions;
     use SoftDeletes;

@@ -11,7 +11,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Services\ElasticsearchService;
-use Override;
 
 /**
  * Job for deleting a document from a search index
@@ -45,7 +44,6 @@ final class DeleteFromSearchJob extends CommonSearchJob
      * @param  string  $index  Search index name
      * @param  string|int  $document_id  Document ID to delete
      */
-    #[Override]
     public function __construct(private string $index, private string|int $document_id)
     {
         parent::__construct();

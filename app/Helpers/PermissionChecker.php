@@ -30,14 +30,6 @@ final class PermissionChecker
         $connection ??= 'default';
         $permission_name = sprintf('%s.%s.%s', $connection, $entity, $operation);
 
-        // if ($permissions instanceof Collection) {
-        //     return $permissions->filter(
-        //         fn($permission) => $permission->guard === $guard_name && $operation && $operation !== '*'
-        //             ? $permission->name === $permission_name
-        //             : Str::startsWith($permission->name, $permission_name),
-        //     )->isNotEmpty();
-        // }
-
         $user = $request->user();
 
         if (! $user) {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Traits;
 
-use Elastic\ScoutDriver\Engine;
-use Elastic\ScoutDriverPlus\Searchable as ScoutSearchable;
+use Elastic\ScoutDriver\Engine as ElasticEngine;
+use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -30,10 +30,10 @@ use Modules\Core\Search\Schema\SchemaManager;
  */
 trait Searchable
 {
-    use ScoutSearchable {
-        queueMakeSearchable as protected baseQueueMakeSearchable;
-        syncMakeSearchable as protected baseSyncMakeSearchableSync;
-        searchableConnection as protected baseSearchableConnection;
+    use ElasticScoutSearchable {
+        queueMakeSearchable as private baseQueueMakeSearchable;
+        syncMakeSearchable as private baseSyncMakeSearchableSync;
+        searchableConnection as private baseSearchableConnection;
     }
 
     /**
@@ -63,7 +63,7 @@ trait Searchable
 
     public function queueMakeSearchable($models): void
     {
-        if (config('scout.vector_search.enabled')) {
+        if (config('search.vector_search.enabled')) {
             if (! is_iterable($models)) {
                 $models = collect([$models]);
             }
@@ -93,7 +93,7 @@ trait Searchable
 
     public function syncMakeSearchable($models): void
     {
-        if (config('scout.vector_search.enabled')) {
+        if (config('search.vector_search.enabled')) {
             $engine = $this->searchableUsing();
 
             if (! is_iterable($models)) {
@@ -137,11 +137,11 @@ trait Searchable
         }
 
         if (class_uses_trait($this, SoftDeletes::class)) {
-            $array['is_deleted'] = $this->is_deleted;
+            $array['is_deleted'] = $this->{self::getIsDeletedColumn()};
         }
 
         // Add embeddings if available
-        if (config('scout.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
+        if (config('search.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
 
             if ($embeddings !== []) {
@@ -210,7 +210,7 @@ trait Searchable
         // Get the current engine and translate
         $engine = $this->searchableUsing();
 
-        if ($engine instanceof Engine) {
+        if ($engine instanceof ElasticEngine) {
             $engineName = 'elasticsearch';
         } elseif ($engine instanceof TypesenseEngine) {
             $engineName = 'typesense';
@@ -237,7 +237,10 @@ trait Searchable
         }
 
         // Use Scout's native method if available.
-        if (method_exists($engine, 'createIndex') && (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this))) {
+        if (
+            method_exists($engine, 'createIndex')
+            && (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this))
+        ) {
             $engine->createIndex($this);
 
             return true;

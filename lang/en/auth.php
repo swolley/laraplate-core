@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-return [
+$default_locale = (string) (config('app.locale'));
+
+$translations = [
     /*
     |--------------------------------------------------------------------------
     | Authentication Language Lines
@@ -18,3 +20,9 @@ return [
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
 ];
+
+if ($default_locale !== 'en') {
+    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/auth.php"));
+}
+
+return $translations;

@@ -55,7 +55,7 @@ trait CommonEngineFunctions
         $this->ensureSearchable($model);
 
         if (! $this->checkIndex($model)) {
-            /** @var Model|Searchable $model */
+            /** @var Model&Searchable $model */
             $this->createIndex($model);
 
             return true;

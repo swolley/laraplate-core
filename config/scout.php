@@ -211,15 +211,4 @@ return [
         // ],
         // ],
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Vector search configuration
-    |--------------------------------------------------------------------------
-    */
-    'vector_search' => [
-        'enabled' => env('VECTOR_SEARCH_ENABLED', true),
-        'dimensions' => env('VECTOR_DIMENSIONS', 1536), // OpenAI default
-        'provider' => env('EMBEDDING_PROVIDER', 'openai'),
-    ],
 ];

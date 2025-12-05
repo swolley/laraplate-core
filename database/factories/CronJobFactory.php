@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Models\CronJob;
 use Override;
 
+/**
+ * @extends Factory<CronJob>
+ */
 final class CronJobFactory extends Factory
 {
     /**

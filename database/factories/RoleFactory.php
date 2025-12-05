@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Models\Role;
 use Override;
 
+/**
+ * @extends Factory<Role>
+ */
 final class RoleFactory extends Factory
 {
     /**

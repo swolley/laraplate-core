@@ -129,6 +129,7 @@ trait HasTable
             $has_locks,
             $has_dynamic_contents,
             $has_activation,
+            $has_translations,
             $filters,
             $model_instance,
             $permissions_prefix,

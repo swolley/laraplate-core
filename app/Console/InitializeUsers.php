@@ -76,7 +76,7 @@ final class InitializeUsers extends Command
                     'name' => $anonymous,
                     'username' => $anonymous,
                     'email' => $anonymous . '@' . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
-                    'password' => $password,
+                    'password' => Str::random(16),
                 ]);
                 $anonymous_user->email_verified_at = now();
                 $anonymous_user->save();

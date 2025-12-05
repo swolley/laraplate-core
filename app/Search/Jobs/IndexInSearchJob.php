@@ -13,7 +13,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
-use Override;
 
 /**
  * Job for indexing a model in search engines
@@ -46,7 +45,6 @@ final class IndexInSearchJob extends CommonSearchJob
      *
      * @param  Model  $model  The model to index
      */
-    #[Override]
     public function __construct(
         private Model $model,
     ) {
@@ -62,6 +60,8 @@ final class IndexInSearchJob extends CommonSearchJob
     public function handle(): void
     {
         $driver = config('scout.driver');
+
+        /** @phpstan-ignore method.notFound */
         $index_name = $this->model->searchableAs();
         $document_id = $this->model->getKey();
 
@@ -94,11 +94,13 @@ final class IndexInSearchJob extends CommonSearchJob
 
     private function deleteDocument(): void
     {
+        /** @phpstan-ignore method.notFound */
         $this->model->unsearchable();
     }
 
     private function updateDocument(): void
     {
+        /** @phpstan-ignore method.notFound */
         $this->model->searchableUsing()->update($this->model);
     }
 

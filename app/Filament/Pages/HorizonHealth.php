@@ -9,7 +9,7 @@ use Deprecated;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Typesense\Override;
+use Override;
 use UnitEnum;
 
 final class HorizonHealth extends Page

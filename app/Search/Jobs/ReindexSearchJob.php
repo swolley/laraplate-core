@@ -11,7 +11,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Searchable;
-use Override;
 
 /**
  * Job for reindexing all models of a specified class
@@ -46,7 +45,6 @@ final class ReindexSearchJob extends CommonSearchJob
      * @param  bool  $use_bulk  Whether to use bulk indexing
      * @param  int  $batch_size  Number of records to process in each batch (for bulk)
      */
-    #[Override]
     public function __construct(private string $model_class, private bool $use_bulk = true, private int $batch_size = 500)
     {
         parent::__construct();

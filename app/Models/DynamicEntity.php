@@ -34,7 +34,7 @@ final class DynamicEntity extends Model
     use HasFactory;
     use HasGridUtils;
     use HasValidations {
-        getRules as protected getRulesTrait;
+        getRules as private getRulesTrait;
     }
     use HasVersions;
     use SoftDeletes;

@@ -278,7 +278,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         ];
 
         // Add a vector field if needed
-        if (config('scout.vector_search.enabled') && $this->supportsVectorSearch()) {
+        if (config('search.vector_search.enabled') && $this->supportsVectorSearch()) {
             // Typesense vector field configuration
             // The embedding is pre-computed, so we just need to define it as float[]
             $mapping['fields']['embedding'] = [

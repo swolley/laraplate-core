@@ -12,6 +12,9 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Override;
 
+/**
+ * @extends Factory<Setting>
+ */
 final class SettingFactory extends Factory
 {
     /**
@@ -24,8 +27,6 @@ final class SettingFactory extends Factory
     /**
      * @throws BindingResolutionException
      * @throws ExtensionNotFound
-     *
-     * @return array<string, mixed>
      */
     #[Override]
     public function definition(): array

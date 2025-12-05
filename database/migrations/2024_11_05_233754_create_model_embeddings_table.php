@@ -37,7 +37,7 @@ return new class extends Migration
         });
 
         if ($driver === 'pgsql' && $supports_vector) {
-            DB::connection($connection)->statement('CREATE INDEX idx_model_embeddings_embedding ON model_embeddings USING ivfflat (embedding vector_cosine_ops);');
+            DB::connection($connection->getName())->statement('CREATE INDEX idx_model_embeddings_embedding ON model_embeddings USING ivfflat (embedding vector_cosine_ops);');
         }
     }
 
@@ -48,7 +48,7 @@ return new class extends Migration
     {
         $connection = new ModelEmbedding()->getConnection();
 
-        Schema::connection($connection)->dropIfExists('model_embeddings');
+        Schema::connection($connection->getName())->dropIfExists('model_embeddings');
         Schema::dropIfExists('model_embeddings');
     }
 };

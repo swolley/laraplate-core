@@ -35,7 +35,7 @@ class TypesenseTranslator implements ISchemaTranslator
     {
         $tsField = [
             'name' => $field->name,
-            'type' => $this->getTypesenseType($field->type),
+            'type' => $this->getTypesenseType($field->type, $field->options),
         ];
 
         // Add index-specific options
@@ -58,7 +58,7 @@ class TypesenseTranslator implements ISchemaTranslator
         return $tsField;
     }
 
-    private function getTypesenseType(FieldType $type): string
+    private function getTypesenseType(FieldType $type, array $options = []): string
     {
         return match ($type) {
             FieldType::TEXT, FieldType::KEYWORD => 'string',
@@ -67,7 +67,7 @@ class TypesenseTranslator implements ISchemaTranslator
             FieldType::BOOLEAN => 'bool',
             FieldType::DATE => 'string', // Typesense uses string for dates
             FieldType::VECTOR => 'float[]',
-            FieldType::ARRAY => isset($type->options['properties']) ? 'object[]' : 'string[]',
+            FieldType::ARRAY => isset($options['properties']) ? 'object[]' : 'string[]',
             FieldType::OBJECT, FieldType::GEOCODE => 'object',
         };
     }

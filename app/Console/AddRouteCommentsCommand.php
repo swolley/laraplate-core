@@ -76,7 +76,8 @@ final class AddRouteCommentsCommand extends Command
 
             $route_comments = [];
 
-            foreach ($routes as &$route) {
+            foreach ($routes as $route) {
+                /** @var \Illuminate\Routing\Route $route */
                 $route_info = $this->getRouteInfo($route);
                 $route_comments[] = $route_info;
             }
@@ -95,7 +96,7 @@ final class AddRouteCommentsCommand extends Command
         $this->info('Route comments have been added successfully!');
     }
 
-    private function getRouteInfo($route): array
+    private function getRouteInfo(\Illuminate\Routing\Route $route): array
     {
         return [
             'methods' => $route->methods(),

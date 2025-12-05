@@ -13,7 +13,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
-use Override;
 use Throwable;
 
 /**
@@ -48,7 +47,6 @@ final class BulkIndexSearchJob extends CommonSearchJob
      * @param  Collection  $models  Collection of models to index
      * @param  bool  $force  If true, forces indexing even if model shouldn't be searchable
      */
-    #[Override]
     public function __construct(
         private Collection $models,
         private bool $force = false,

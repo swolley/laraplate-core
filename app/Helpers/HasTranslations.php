@@ -213,10 +213,14 @@ trait HasTranslations
         return $this->translations;
     }
 
+    /**
+     * Eloquent accessor for locale attribute.
+     * This makes locale available in toArray() and JSON serialization.
+     */
     public function locale(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->current_setter_locale ?? LocaleContext::get(),
+            get: fn () => $this->getCurrentLocale(),
         );
     }
 
@@ -233,7 +237,7 @@ trait HasTranslations
             }
         }
 
-        $locale = $this->locale;
+        $locale = $this->getCurrentLocale();
 
         if (isset($this->pending_translations[$locale])) {
             $content = array_merge($content, $this->pending_translations[$locale]);
@@ -429,6 +433,15 @@ trait HasTranslations
             ->first();
     }
 
+    /**
+     * Get the current locale for setter operations.
+     * This is a helper method used internally by the trait.
+     */
+    private function getCurrentLocale(): string
+    {
+        return $this->current_setter_locale ?? LocaleContext::get();
+    }
+
     private function getTranslatableFieldValue(string $key)
     {
         $current_locale = LocaleContext::get();
@@ -466,7 +479,7 @@ trait HasTranslations
 
     private function setTranslatableFieldValue(string $key, $value): void
     {
-        $locale = $this->locale;
+        $locale = $this->getCurrentLocale();
 
         // Store in pending translations to be saved on save()
         if (! isset($this->pending_translations[$locale])) {

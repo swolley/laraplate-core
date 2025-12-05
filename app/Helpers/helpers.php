@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
@@ -444,7 +445,7 @@ if (! function_exists('user_class')) {
     /**
      * Get the user model class.
      *
-     * @return class-string
+     * @return class-string<User>
      */
     function user_class(): string
     {

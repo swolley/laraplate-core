@@ -13,8 +13,8 @@ use Modules\Core\Overrides\CustomSoftDeletingScope;
 trait SoftDeletes
 {
     use BaseSoftDeletes {
-        bootSoftDeletes as protected baseBootSoftDeletes;
-        initializeSoftDeletes as protected baseInitializeSoftDeletes;
+        bootSoftDeletes as private baseBootSoftDeletes;
+        initializeSoftDeletes as private baseInitializeSoftDeletes;
     }
 
     /**

@@ -9,6 +9,9 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\Permission;
 use Override;
 
+/**
+ * @extends Factory<Permission>
+ */
 final class PermissionFactory extends Factory
 {
     /**

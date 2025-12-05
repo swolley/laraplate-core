@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-return [
+$default_locale = (string) (config('app.locale'));
+
+$translations = [
     'all' => 'Tutte',
     'next' => 'Prossimo &raquo;',
     'previous' => '&laquo; Precedente',
@@ -10,3 +12,9 @@ return [
     'rowsOf' => 'righe di',
     'selected' => 'selezionate',
 ];
+
+if ($default_locale !== 'it') {
+    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/pagination.php"));
+}
+
+return $translations;
