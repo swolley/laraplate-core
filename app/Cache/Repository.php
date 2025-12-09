@@ -109,11 +109,10 @@ final class Repository extends BaseRepository
     }
 
     /**
-      * Clear cache by the specified entity.
-      *
-      * @param  Model|string|array<Model|string>  $entity
-      * @return void
-      */
+     * Clear cache by the specified entity.
+     *
+     * @param  Model|string|array<Model|string>  $entity
+     */
     public function clearByEntity(Model|string|array $entity): void
     {
         $models = Arr::wrap($entity);

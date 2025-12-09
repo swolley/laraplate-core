@@ -147,7 +147,6 @@ abstract class BatchSeeder extends Seeder
                 $effective_batch_size,
                 $total_batches,
                 $maxParallelCount,
-                $temp_dir,
                 $progress,
                 $progress_file,
                 $progress_lock_file,
@@ -176,7 +175,6 @@ abstract class BatchSeeder extends Seeder
         int $effective_batch_size,
         int $total_batches,
         int $maxParallelCount,
-        string $temp_dir,
         Progress $progress,
         string $progress_file,
         string $progress_lock_file,
@@ -207,7 +205,7 @@ abstract class BatchSeeder extends Seeder
                 }
 
                 // Create closure for this batch with timing
-                $batches_to_run["batch_{$batch}"] = function () use ($modelClass, $current_batch_size, $batch, $progress_file, $progress_lock_file) {
+                $batches_to_run["batch_{$batch}"] = function () use ($modelClass, $current_batch_size, $batch, $progress_file, $progress_lock_file): array {
                     $batch_start_time = microtime(true);
 
                     try {
@@ -253,7 +251,7 @@ abstract class BatchSeeder extends Seeder
                 $batch++;
             }
 
-            if (empty($batches_to_run)) {
+            if ($batches_to_run === []) {
                 break;
             }
 
@@ -262,7 +260,7 @@ abstract class BatchSeeder extends Seeder
             $results = $driver->run($batches_to_run);
 
             // Update progressbar based on results and collect timing statistics
-            foreach ($results as $key => $result) {
+            foreach ($results as $result) {
                 if (! $result['success']) {
                     $this->command->error("Batch {$result['batch']} failed: " . $result['error'] . ' in ' . $result['file'] . ' on line ' . $result['line']);
                     $this->command->error($result['trace']);
@@ -409,18 +407,13 @@ abstract class BatchSeeder extends Seeder
         // In a forked process, each process already has isolated memory
         // So we can use the default connections without issues
         // Just make sure the connections are fresh
-        $reconnect_start = microtime(true);
         DB::reconnect();
         Cache::flush();
-        $reconnect_time = microtime(true) - $reconnect_start;
 
         $model_instance = new $modelClass();
 
         /** @phpstan-ignore staticMethod.notFound */
         $factory = $model_instance->factory();
-
-        // Time the database insert operation
-        $db_start = microtime(true);
 
         /** @var \Illuminate\Database\Eloquent\Factories\Factory<Model> $factory */
         $new_models = $factory->count($batchSize)->create();
@@ -443,9 +436,7 @@ abstract class BatchSeeder extends Seeder
     {
         $lock = fopen($lockFile, 'c+');
 
-        if ($lock === false) {
-            throw new RuntimeException("Unable to create lock file: {$lockFile}");
-        }
+        throw_if($lock === false, RuntimeException::class, "Unable to create lock file: {$lockFile}");
 
         // Try to acquire exclusive lock (non-blocking)
         $attempts = 0;
@@ -460,7 +451,7 @@ abstract class BatchSeeder extends Seeder
                 throw new RuntimeException("Unable to acquire lock on progress file after {$max_attempts} attempts");
             }
 
-            usleep(100000); // 100ms
+            Sleep::usleep(100000); // 100ms
         }
 
         try {

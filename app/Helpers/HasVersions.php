@@ -156,7 +156,7 @@ trait HasVersions
     {
         $user_class = user_class();
 
-        return $user_class::withoutGlobalScopes()->find($userId);
+        return $user_class::query()->withoutGlobalScopes()->find($userId);
     }
 
     // // TODO: sarà sicuramente da overridare per via delle primary key multiple

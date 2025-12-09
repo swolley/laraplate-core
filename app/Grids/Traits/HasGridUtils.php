@@ -244,7 +244,7 @@ trait HasGridUtils
 
         if (in_array(HasLocks::class, $uses, true)) {
             /** @phpstan-ignore method.notFound  */
-            $timestamps['lockedAt'] = $prefix . app('locked')->getLockedColumnName();
+            $timestamps['lockedAt'] = $prefix . resolve('locked')->getLockedColumnName();
         }
 
         return $timestamps;

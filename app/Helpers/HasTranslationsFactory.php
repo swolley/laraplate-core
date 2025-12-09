@@ -13,7 +13,7 @@ trait HasTranslationsFactory
     {
         $default_locale = config('app.locale');
         $all_locales = translations();
-        $locales_to_create = collect($all_locales)->inRandomOrder()->limit(fake()->numberBetween(0, count($all_locales)))->filter(fn (string $locale) => $locale !== $default_locale)->toArray();
+        $locales_to_create = collect($all_locales)->inRandomOrder()->limit(fake()->numberBetween(0, count($all_locales)))->filter(fn (string $locale): bool => $locale !== $default_locale)->toArray();
         array_unshift($locales_to_create, $default_locale);
 
         $fields = $content->getTranslatableFields();

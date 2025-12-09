@@ -104,7 +104,7 @@ trait HasSeedersUtils
 
         // Crea i model e prepara i dati per insert
         foreach ($items as $attributes) {
-            $model = $class::make($attributes);
+            $model = $class::query()->make($attributes);
 
             if (class_uses_trait($model, HasApprovals::class)) {
                 /** @phpstan-ignore method.notFound */

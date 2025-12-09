@@ -220,7 +220,7 @@ trait Searchable
             throw new Exception('Unsupported engine ' . $engine::class);
         }
 
-        $schemaManager = app(SchemaManager::class);
+        $schemaManager = resolve(SchemaManager::class);
 
         return $schemaManager->translateForEngine($schema, $engineName);
     }

@@ -632,7 +632,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
 
-        if (empty($vector)) {
+        if ($vector === []) {
             // Fallback to regular search if no vector provided
             return parent::search($builder);
         }
@@ -655,7 +655,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if (! empty($builder->wheres)) {
             $filters = $this->buildSearchFilters($builder->wheres);
 
-            if (! empty($filters)) {
+            if ($filters !== []) {
                 $query['knn']['filter'] = [
                     'bool' => [
                         'must' => $filters,
@@ -700,7 +700,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         $results = $response->asArray();
         $hits = $results['hits']['hits'] ?? [];
 
-        return collect($hits)->map(function ($hit) {
+        return collect($hits)->map(function (array $hit) {
             $document = $hit['_source'] ?? [];
             $document['_id'] = $hit['_id'] ?? null;
             $document['_score'] = $hit['_score'] ?? 0;

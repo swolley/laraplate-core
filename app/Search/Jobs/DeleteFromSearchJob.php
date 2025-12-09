@@ -67,7 +67,7 @@ final class DeleteFromSearchJob extends CommonSearchJob
             } elseif ($driver === 'typesense') {
                 // For Typesense, use the client directly
                 try {
-                    $client = app('typesense');
+                    $client = resolve('typesense');
                     $client->collections[$this->index]->documents[$this->document_id]->delete();
                     $success = true;
                 } catch (Exception $e) {

@@ -74,7 +74,7 @@ final class UserController extends Controller
     public function impersonate(ImpersonationRequest $request): \Illuminate\Http\JsonResponse
     {
         $user_to_impersonate_id = $request->validated()['user'];
-        $user_to_impersonate = user_class()::findOrFail($user_to_impersonate_id);
+        $user_to_impersonate = user_class()::query()->findOrFail($user_to_impersonate_id);
 
         /** @var User $current_user */
         $current_user = Auth::user();

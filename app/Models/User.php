@@ -149,7 +149,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      */
     public function getImpersonator(): self
     {
-        return $this->isImpersonated() ? app(ImpersonateManager::class)->getImpersonator() : $this;
+        return $this->isImpersonated() ? resolve(ImpersonateManager::class)->getImpersonator() : $this;
     }
 
     /**

@@ -25,7 +25,7 @@ final class SearchEngineHealthTableWidget extends Widget
         ];
 
         try {
-            $engine = app(EngineManager::class)->engine();
+            $engine = resolve(EngineManager::class)->engine();
             $data['engine'] = $engine;
 
             // Try to get health information

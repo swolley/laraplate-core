@@ -366,7 +366,7 @@ final class CoreServiceProvider extends ServiceProvider
 
     private function registerMiddlewares(): void
     {
-        $router = app(Router::class);
+        $router = resolve(Router::class);
         $router->middleware(LocalizationMiddleware::class);
         $router->middleware(PreviewMiddleware::class);
         $router->middleware(ConvertStringToBoolean::class);
@@ -430,21 +430,21 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->bind(Repository::class, fn ($app): Repository => $app['cache.store']);
 
         // Register macros
-        Cache::macro('memo', fn (): Repository => app('cache.memo'));
-        Cache::macro('tryByRequest', fn (...$args): mixed => app(BaseRepository::class)->tryByRequest(...$args));
+        Cache::macro('memo', fn (): Repository => resolve('cache.memo'));
+        Cache::macro('tryByRequest', fn (...$args): mixed => resolve(BaseRepository::class)->tryByRequest(...$args));
         Cache::macro('clearByEntity', function ($entity): void {
-            app(BaseRepository::class)->clearByEntity($entity);
+            resolve(BaseRepository::class)->clearByEntity($entity);
         });
         Cache::macro('clearByRequest', function ($request, $entity = null): void {
-            app(BaseRepository::class)->clearByRequest($request, $entity);
+            resolve(BaseRepository::class)->clearByRequest($request, $entity);
         });
         Cache::macro('clearByUser', function ($request, $entity = null): void {
-            app(BaseRepository::class)->clearByUser($request->user(), $entity);
+            resolve(BaseRepository::class)->clearByUser($request->user(), $entity);
         });
         Cache::macro('clearByGroup', function ($role, $entity = null): void {
-            app(BaseRepository::class)->clearByGroup($role, $entity);
+            resolve(BaseRepository::class)->clearByGroup($role, $entity);
         });
-        Cache::macro('getCacheTags', fn (...$args): array => app(BaseRepository::class)->getCacheTags(...$args));
+        Cache::macro('getCacheTags', fn (...$args): array => resolve(BaseRepository::class)->getCacheTags(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array

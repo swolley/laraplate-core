@@ -660,7 +660,7 @@ abstract class Entity
 
         if (class_uses_trait($model, HasLocks::class)) {
             // @phpstan-ignore  method.notFound
-            $timestamps[] = app('locked')->getLockedColumnName();
+            $timestamps[] = resolve('locked')->getLockedColumnName();
         }
 
         return $timestamps;

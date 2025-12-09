@@ -90,7 +90,7 @@ trait HasTranslations
         if (! isset(static::$cached_translatable_fields[$model_class])) {
             static::$cached_translatable_fields[$model_class] = array_filter(
                 (new (static::getTranslationModelClass()))->getFillable(),
-                fn ($field) => $field !== 'locale' && ! str_ends_with($field, '_id'),
+                fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
             );
         }
 
@@ -217,7 +217,7 @@ trait HasTranslations
      * Eloquent accessor for locale attribute.
      * This makes locale available in toArray() and JSON serialization.
      */
-    public function locale(): Attribute
+    protected function locale(): Attribute
     {
         return Attribute::make(
             get: fn () => $this->getCurrentLocale(),
@@ -240,7 +240,7 @@ trait HasTranslations
         $locale = $this->getCurrentLocale();
 
         if (isset($this->pending_translations[$locale])) {
-            $content = array_merge($content, $this->pending_translations[$locale]);
+            return array_merge($content, $this->pending_translations[$locale]);
         }
 
         return $content;

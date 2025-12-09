@@ -33,7 +33,7 @@ final class InitializeUsers extends Command
                 $email = text(sprintf('Please specify a %s user email', $root), required: true, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
                 $password = password(sprintf('Please specify a %s user password', $root), required: true);
                 password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? "Passwords don't match" : null);
-                $root_user = $user_class::make([
+                $root_user = $user_class::query()->make([
                     'name' => $root,
                     'username' => $root,
                     'email' => $email,
@@ -55,7 +55,7 @@ final class InitializeUsers extends Command
                 if ($email !== '' && $email !== '0') {
                     $password = password(sprintf('Please specify a %s user password', $admin), required: true);
                     password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? "Passwords don't match" : null);
-                    $admin_user = $user_class::make([
+                    $admin_user = $user_class::query()->make([
                         'name' => $admin,
                         'username' => $admin,
                         'email' => $email,
@@ -72,7 +72,7 @@ final class InitializeUsers extends Command
             }
 
             if (! $user_class::whereName($anonymous)->exists()) {
-                $anonymous_user = $user_class::make([
+                $anonymous_user = $user_class::query()->make([
                     'name' => $anonymous,
                     'username' => $anonymous,
                     'email' => $anonymous . '@' . str_replace('_', '', Str::slug(config('app.name'))) . '.com',

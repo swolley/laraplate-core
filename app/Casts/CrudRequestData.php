@@ -22,7 +22,7 @@ class CrudRequestData
     {
         $this->connection = $validated['connection'] ?? null;
 
-        throw_if($this->mainEntity === '', new Exception('Main entity is required'));
+        throw_if($this->mainEntity === '', Exception::class, 'Main entity is required');
         $this->model = DynamicEntity::resolve($this->mainEntity, $this->connection, request: $this->request);
     }
 }

@@ -22,7 +22,7 @@ final class FreeAllLicensesCommand extends Command
     {
         try {
             $user_class = user_class();
-            $user_class::whereNotNull('license_id')->update(['license_id' => null]);
+            $user_class::query()->whereNotNull('license_id')->update(['license_id' => null]);
             $this->output->success('All licenses have been freed');
 
             return BaseCommand::SUCCESS;

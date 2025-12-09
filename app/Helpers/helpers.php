@@ -310,7 +310,7 @@ if (! function_exists('routes')) {
         /** @var array<int,Route> $routes */
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
-        $all_routes = app(Router::class)->getRoutes()->getRoutes();
+        $all_routes = resolve(Router::class)->getRoutes()->getRoutes();
         usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
@@ -354,7 +354,7 @@ if (! function_exists('api_versions')) {
      */
     function api_versions(): array
     {
-        $routes = app(Router::class)->getRoutes()->getRoutes();
+        $routes = resolve(Router::class)->getRoutes()->getRoutes();
         $versions = [];
 
         foreach ($routes as $route) {

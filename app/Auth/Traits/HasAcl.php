@@ -16,6 +16,6 @@ trait HasAcl
 
     protected function scopeWithAcl(Builder $query, int $permission_id): Builder
     {
-        return app(AclService::class)->applyAclToQuery($query, $permission_id);
+        return resolve(AclService::class)->applyAclToQuery($query, $permission_id);
     }
 }

@@ -26,7 +26,7 @@ trait HasUniqueFactoryValues
         ?string $column = null,
         ?int $maxAttempts = null,
     ): string {
-        $maxAttempts = $maxAttempts ?? $this->maxAttempts;
+        $maxAttempts ??= $this->maxAttempts;
 
         $attempting_values = [];
         for ($i = 0; $i < $maxAttempts; $i++) {
@@ -47,15 +47,10 @@ trait HasUniqueFactoryValues
             if ($modelClass && $column) {
                 $already_existing_values = $modelClass::query()->whereIn($column, $attempting_values)->select($column)->pluck($column)->unique()->toArray();
                 $attempting_values = array_diff($attempting_values, $already_existing_values);
-
-
                 if (count($attempting_values) > 0) {
                     break;
                 }
-
-                if ($attempts >= $maxAttempts) {
-                    throw new Exception('Failed to generate a unique value after ' . $maxAttempts . ' attempts');
-                }
+                throw_if($attempts >= $maxAttempts, Exception::class, 'Failed to generate a unique value after ' . $maxAttempts . ' attempts');
             }
         }
 

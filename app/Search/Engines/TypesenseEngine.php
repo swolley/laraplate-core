@@ -379,7 +379,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
 
-        if (empty($vector)) {
+        if ($vector === []) {
             // Fallback to regular search if no vector provided
             return parent::search($builder);
         }
@@ -409,7 +409,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             // Transform results to match Scout's expected format
             $hits = $response['hits'] ?? [];
 
-            return collect($hits)->map(function ($hit) {
+            return collect($hits)->map(function (array $hit) {
                 $document = $hit['document'] ?? [];
                 $document['_id'] = $hit['document']['id'] ?? null;
                 $document['_score'] = $hit['text_match'] ?? 0;
