@@ -13,6 +13,8 @@ final class LocaleScope implements Scope
 {
     /**
      * Apply the scope to a given Eloquent query builder.
+     *
+     * @param  Builder<Model>  $builder
      */
     public function apply(Builder $builder, Model $model): void
     {
@@ -44,6 +46,8 @@ final class LocaleScope implements Scope
 
     /**
      * Extend the query builder with the needed functions.
+     *
+     * @param  Builder<Model>  $builder
      */
     public function extend(Builder $builder): void
     {
@@ -88,6 +92,8 @@ final class LocaleScope implements Scope
 
     /**
      * Eager load translation with fallback logic.
+     *
+     * @param  Builder<Model>  $builder
      */
     private function eagerLoadTranslation(
         Builder $builder,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Traits;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
@@ -191,25 +193,38 @@ trait HasLocks
         return $this->wasLocked() && $user->id === $this->getOriginal(new Locked()->lockedByColumn());
     }
 
+    /**
+     * @param  Builder<static>  $query
+     */
     protected function scopeLocked($query): void
     {
         $query->where(new Locked()->lockedAtColumn(), '!=', null);
     }
 
-    protected function scopeLockedBy($query, User $user): void
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function lockedBy(Builder $query, User $user): Builder
     {
-        $this->scopeLocked($query);
-        $query->where(new Locked()->lockedByColumn(), $user->id);
+        return $query->locked()->where(new Locked()->lockedByColumn(), $user->id);
     }
 
-    protected function scopeUnlocked($query): void
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function unlocked(Builder $query): Builder
     {
-        $query->where(new Locked()->lockedAtColumn(), null);
+        return $query->where(new Locked()->lockedAtColumn(), null);
     }
 
-    protected function scopeUnlockedBy($query, User $user): void
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function unlockedBy(Builder $query, User $user): Builder
     {
-        $this->scopeUnlocked($query);
-        $query->where(new Locked()->lockedByColumn(), '!=', $user->id);
+        return $query->unlocked()->where(new Locked()->lockedByColumn(), '!=', $user->id);
     }
 }

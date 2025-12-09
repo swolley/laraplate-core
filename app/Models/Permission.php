@@ -85,6 +85,9 @@ final class Permission extends ModelsPermission
         return $rules;
     }
 
+    /**
+     * @return HasMany<ACL>
+     */
     public function acls(): HasMany
     {
         return $this->hasMany(ACL::class);

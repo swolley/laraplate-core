@@ -59,6 +59,9 @@ final class Role extends BaseRole
         'pivot',
     ];
 
+    /**
+     * @return BelongsToMany<User>
+     */
     #[Override]
     public function users(): BelongsToMany
     {

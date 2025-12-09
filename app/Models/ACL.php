@@ -61,6 +61,10 @@ final class ACL extends Model
         return $rules;
     }
 
+    /**
+     * @param Builder<static> $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function forPermission(Builder $query, $permission_id): Builder
     {

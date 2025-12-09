@@ -9,10 +9,19 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\ListRequestData;
 
+/**
+ * @template TModel of Model
+ */
 trait HasCrudOperations
 {
     // private array $preparedQueries = [];
 
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Collection<int, TModel>
+     */
     protected function listByPagination(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
     {
         $query->skip($filters->from - 1)->take($filters->to - $filters->from + 1);
@@ -27,6 +36,12 @@ trait HasCrudOperations
         return $data;
     }
 
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Collection<int, TModel>
+     */
     protected function listByFromTo(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
     {
         $query->skip($filters->from - 1);
@@ -45,7 +60,13 @@ trait HasCrudOperations
         return $data;
     }
 
-    protected function listByOthers(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Collection<int, TModel>|int
+     */
+    protected function listByOthers(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection|int
     {
         if (isset($filters->limit)) {
             $query->take($filters->take);
@@ -91,6 +112,9 @@ trait HasCrudOperations
     // }
 
     /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @param  array<int,array{field:string,direction?:'asc'|'desc'}>  $sorts
      */
     protected function applySorting(Builder $query, array $sorts): void
@@ -151,6 +175,11 @@ trait HasCrudOperations
         return $data->groupBy($groupBy);
     }
 
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
     private function applyFilter(Builder $query, string $field, array $filter): void
     {
         $value = $filter['value'];

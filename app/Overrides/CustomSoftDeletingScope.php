@@ -13,6 +13,8 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
 {
     /**
      * Apply the scope to a given Eloquent query builder.
+     *
+     * @param  Builder<Model>  $builder
      */
     #[Override]
     public function apply(Builder $builder, Model $model): void
@@ -23,7 +25,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     /**
      * Add the without-trashed extension to the builder.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<*>  $builder
+     * @param  Builder<Model>  $builder
      */
     #[Override]
     protected function addWithoutTrashed(Builder $builder): void
@@ -40,7 +42,7 @@ final class CustomSoftDeletingScope extends SoftDeletingScope
     /**
      * Add the only-trashed extension to the builder.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<*>  $builder
+     * @param  Builder<Model>  $builder
      */
     #[Override]
     protected function addOnlyTrashed(Builder $builder): void

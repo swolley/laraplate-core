@@ -16,6 +16,9 @@ use InvalidFormatException;
 
 // use Illuminate\Validation\UnauthorizedException;
 
+/**
+ * @template TModel of Model
+ */
 trait HasValidity
 {
     protected static $valid_from_column = 'valid_from';
@@ -122,15 +125,24 @@ trait HasValidity
         $this->{static::$valid_to_column} = null;
     }
 
-    protected function scopeValidityOrdered(Builder $query): void
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function validityOrdered(Builder $query): Builder
     {
-        $query->orderBy($this->qualifyColumn(static::$valid_from_column), 'desc')/* ->orderBy(static::$valid_to_column, 'desc') */;
+        return $query->orderBy($this->qualifyColumn(static::$valid_from_column), 'desc')/* ->orderBy(static::$valid_to_column, 'desc') */;
     }
 
     /**
      * Currently valid records.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     protected function scopeValid(Builder $query): Builder
     {
@@ -142,7 +154,11 @@ trait HasValidity
     /**
      * Expired records.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function expired(Builder $query): Builder
@@ -153,7 +169,11 @@ trait HasValidity
     /**
      * Expired records at a given date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function expiredAt(Builder $query, Carbon $date): Builder
@@ -164,7 +184,11 @@ trait HasValidity
     /**
      * Filter records by validity on specified date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function validAt(Builder $query, Carbon $date): Builder
@@ -175,7 +199,11 @@ trait HasValidity
     /**
      * Filter records by validity on specified date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function published(Builder $query): Builder
@@ -188,7 +216,11 @@ trait HasValidity
     /**
      * Filter records by validity on specified date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function draft(Builder $query): Builder
@@ -199,7 +231,11 @@ trait HasValidity
     /**
      * Filter records by validity on specified date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     #[Scope]
     protected function scheduled(Builder $query): Builder
@@ -210,7 +246,11 @@ trait HasValidity
     /**
      * Filter records by validity on specified date.
      *
+     * @param  Builder<static>  $query
+     *
      * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
      */
     protected function withValidityFilter(Builder $query, Carbon $date): Builder
     {

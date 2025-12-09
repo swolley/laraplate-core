@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,9 @@ use Modules\Cms\Jobs\TranslateModelJob;
 use Modules\Core\Overrides\LocaleScope;
 use Override;
 
+/**
+ * @template TModel of Model
+ */
 trait HasTranslations
 {
     /**
@@ -104,6 +108,8 @@ trait HasTranslations
 
     /**
      * Get the translations relation.
+     *
+     * @return HasMany<Model>
      */
     public function translations(): HasMany
     {
@@ -112,6 +118,8 @@ trait HasTranslations
 
     /**
      * Get the translation for current locale (with conditional fallback).
+     *
+     * @return HasOne<Model>
      */
     public function translation(): HasOne
     {
@@ -359,8 +367,12 @@ trait HasTranslations
 
     /**
      * Scope to filter by specific locale (removes default locale scope).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
-    protected function scopeForLocale(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
+    #[Scope]
+    protected function forLocale(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
     {
         $locale ??= LocaleContext::get();
         $default_locale = config('app.locale');
@@ -401,8 +413,12 @@ trait HasTranslations
 
     /**
      * Scope to include translation without filtering.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
-    protected function scopeWithTranslation(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
+    #[Scope]
+    protected function withTranslation(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
     {
         $locale ??= LocaleContext::get();
         $default_locale = config('app.locale');

@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @template TModel of Model
+ */
 trait HasClosureTable
 {
     public static function rebuildClosure(): void
@@ -27,6 +30,9 @@ trait HasClosureTable
         }
     }
 
+    /**
+     * @return BelongsToMany<static>
+     */
     public function ancestors(): BelongsToMany
     {
         $closureTable = $this->getClosureTable();
@@ -46,6 +52,9 @@ trait HasClosureTable
             ]);
     }
 
+    /**
+     * @return BelongsToMany<static>
+     */
     public function descendants(): BelongsToMany
     {
         $closureTable = $this->getClosureTable();
@@ -65,6 +74,9 @@ trait HasClosureTable
             ]);
     }
 
+    /**
+     * @return BelongsToMany<static>
+     */
     public function closure(): BelongsToMany
     {
         $closureTable = $this->getClosureTable();
@@ -80,32 +92,50 @@ trait HasClosureTable
             ->select('closure_categories.*');
     }
 
+    /**
+     * @return HasMany<static>
+     */
     public function children(): HasMany
     {
         return $this->hasMany(static::class, 'parent_id');
     }
 
+    /**
+     * @return BelongsTo<static>
+     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(static::class, 'parent_id');
     }
 
+    /**
+     * @return HasMany<static>
+     */
     public function siblings(): HasMany
     {
         return $this->hasMany(static::class, 'parent_id')
             ->where('id', '!=', $this->id);
     }
 
+    /**
+     * @return HasMany<static>
+     */
     public function siblingsAndSelf(): HasMany
     {
         return $this->hasMany(static::class, 'parent_id');
     }
 
+    /**
+     * @return Collection<int, static>
+     */
     public function bloodline(): Collection
     {
         return $this->ancestors->reverse()->push($this)->merge($this->descendants);
     }
 
+    /**
+     * @return Collection<int, static>
+     */
     public function bloodlineAndSelf(): Collection
     {
         return $this->ancestors->reverse()->push($this);
@@ -233,13 +263,22 @@ trait HasClosureTable
         });
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function withClosure(Builder $query): Builder
     {
         return $query->with(['closure', 'ancestors']);
     }
 
-    protected function scopeTree(Builder $query): Builder
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function tree(Builder $query): Builder
     {
         $closureTable = $this->getClosureTable();
         // $modelTable = $this->getModelTable();
@@ -251,12 +290,20 @@ trait HasClosureTable
             ]);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function withSiblings(Builder $query): Builder
     {
         return $query->with(['siblings', 'siblingsAndSelf']);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function withBloodline(Builder $query): Builder
     {
