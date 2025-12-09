@@ -21,6 +21,7 @@ trait HasTranslationsFactory
 
         foreach ($locales_to_create as $locale) {
             $data = [];
+
             foreach ($fields as $field) {
                 if ($field !== 'slug') {
                     $data[$field] = match ($casts[$field]) {

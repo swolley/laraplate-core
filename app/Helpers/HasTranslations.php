@@ -213,17 +213,6 @@ trait HasTranslations
         return $this->translations;
     }
 
-    /**
-     * Eloquent accessor for locale attribute.
-     * This makes locale available in toArray() and JSON serialization.
-     */
-    protected function locale(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => $this->getCurrentLocale(),
-        );
-    }
-
     public function toArray(?array $parsed = null): array
     {
         $content = $parsed ?? (method_exists(parent::class, 'toArray') ? parent::toArray() : $this->attributesToArray());
@@ -328,6 +317,17 @@ trait HasTranslations
             // Dispatch translation job to update translations
             dispatch(new TranslateModelJob($model, [], true));
         });
+    }
+
+    /**
+     * Eloquent accessor for locale attribute.
+     * This makes locale available in toArray() and JSON serialization.
+     */
+    protected function locale(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->getCurrentLocale(),
+        );
     }
 
     /**

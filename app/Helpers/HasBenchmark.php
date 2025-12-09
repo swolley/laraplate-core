@@ -25,6 +25,11 @@ trait HasBenchmark
 
     protected ?string $benchmarkTable = null;
 
+    public function cancelBenchmark(): void
+    {
+        $this->benchmarkStartTime = null;
+    }
+
     /**
      * Start the benchmark.
      */
@@ -45,11 +50,6 @@ trait HasBenchmark
         DB::enableQueryLog();
 
         $this->startQueries = self::getQueryCount();
-    }
-
-    public function cancelBenchmark(): void
-    {
-        $this->benchmarkStartTime = null;
     }
 
     protected function stepBenchmark(): void

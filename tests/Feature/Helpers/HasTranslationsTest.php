@@ -143,6 +143,7 @@ it('can handle fallback when translation missing', function (): void {
 
     // Try to access with different locale (should fallback to default if enabled)
     $original_locale = LocaleContext::get();
+
     if (method_exists(LocaleContext::class, 'set')) {
         LocaleContext::set('fr');
     }
@@ -222,4 +223,3 @@ it('can update existing translation', function (): void {
     expect($content->title)->toBe('Updated Title');
     expect($content->slug)->toBe('original-slug'); // Should remain unchanged
 });
-

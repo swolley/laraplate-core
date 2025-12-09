@@ -83,7 +83,7 @@ final class PermissionsRefreshCommand extends Command
 
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
-        
+
         if ($pretend_mode) {
             $this->info('Running in pretend mode, no changes will be made');
             $this->newLine();

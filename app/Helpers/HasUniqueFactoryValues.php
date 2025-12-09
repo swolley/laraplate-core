@@ -29,24 +29,25 @@ trait HasUniqueFactoryValues
         $maxAttempts ??= $this->maxAttempts;
 
         $attempting_values = [];
+
         for ($i = 0; $i < $maxAttempts; $i++) {
             $attempting_values[] = $fakerCall();
         }
-
 
         $attempting_values = array_unique($attempting_values);
 
         $attempts = count($attempting_values);
 
-        while($attempts <= $maxAttempts) {
+        while ($attempts <= $maxAttempts) {
             $available = $maxAttempts - $attempts;
             array_push($attempting_values, ...$this->generateFallbackValues($available, $fakerCall));
             $attempts += $available;
-            
+
             // If model and column are provided, verify database uniqueness
             if ($modelClass && $column) {
                 $already_existing_values = $modelClass::query()->whereIn($column, $attempting_values)->select($column)->pluck($column)->unique()->toArray();
                 $attempting_values = array_diff($attempting_values, $already_existing_values);
+
                 if (count($attempting_values) > 0) {
                     break;
                 }
@@ -55,15 +56,6 @@ trait HasUniqueFactoryValues
         }
 
         return head($attempting_values);
-    }
-
-    private function generateFallbackValues(int $total, callable $fakerCall): array
-    {
-        $fallback_values = [];
-        for ($i = 0; $i < $total; $i++) {
-            $fallback_values[] = $this->generateFallbackValue($fakerCall);
-        }
-        return $fallback_values;
     }
 
     /**
@@ -132,6 +124,17 @@ trait HasUniqueFactoryValues
             'url',
             $maxAttempts,
         );
+    }
+
+    private function generateFallbackValues(int $total, callable $fakerCall): array
+    {
+        $fallback_values = [];
+
+        for ($i = 0; $i < $total; $i++) {
+            $fallback_values[] = $this->generateFallbackValue($fakerCall);
+        }
+
+        return $fallback_values;
     }
 
     /**

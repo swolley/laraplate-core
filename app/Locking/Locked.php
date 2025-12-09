@@ -6,6 +6,7 @@ namespace Modules\Core\Locking;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Locking\Traits\HasLocks;
+use Throwable;
 
 final class Locked
 {
@@ -17,7 +18,7 @@ final class Locked
             }
 
             return config('core.locking.lock_at_column', 'locked_at');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'locked_at';
         }
     }
@@ -30,7 +31,7 @@ final class Locked
             }
 
             return config('core.locking.lock_by_column', 'locked_user_id');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'locked_user_id';
         }
     }
@@ -57,7 +58,7 @@ final class Locked
             }
 
             return config('core.locking.unlock_allowed', true);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return true;
         }
     }
@@ -70,7 +71,7 @@ final class Locked
             }
 
             return config('core.locking.can_be_unlocked', []);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -93,7 +94,7 @@ final class Locked
             }
 
             return config('core.locking.prevent_modifications_on_locked_objects', false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -111,7 +112,7 @@ final class Locked
             }
 
             return config('core.locking.prevent_notifications_to_locked_objects', false);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
