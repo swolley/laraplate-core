@@ -36,6 +36,7 @@ use Laravel\Scout\EngineManager;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
@@ -50,6 +51,7 @@ use Nwidart\Modules\Traits\PathNamespace;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use ReflectionClass;
 use ReflectionException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -342,7 +344,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->booted(function (): void {
             $schedule = $this->app->make(Schedule::class);
             $crons = [];
-            $cache_key = new CronJob()->getTable();
+            $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
             $cache_tags = Cache::getCacheTags();
 
             if (Cache::tags($cache_tags)->has($cache_key)) {
@@ -370,6 +372,7 @@ final class CoreServiceProvider extends ServiceProvider
         $router->middleware(LocalizationMiddleware::class);
         $router->middleware(PreviewMiddleware::class);
         $router->middleware(ConvertStringToBoolean::class);
+        $router->middleware(AddContext::class);
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);

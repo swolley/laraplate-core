@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\HasOptimisticLocking;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Overrides\Command;
+use ReflectionClass;
 
 final class ModelLockingRefreshCommand extends Command
 {
@@ -68,7 +69,7 @@ final class ModelLockingRefreshCommand extends Command
         }
 
         /** @var Model $instance */
-        $instance = new $model();
+        $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
         $table = $instance->getTable();
 
         $this->optimisticLockingCheck($instance, $model, $table);

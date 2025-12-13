@@ -22,11 +22,21 @@ use Spatie\Permission\Models\Role;
 final class Repository extends BaseRepository
 {
     /**
+     * Cached app name to avoid repeated config calls.
+     */
+    private static ?string $app_name = null;
+
+    /**
      * Get the cache tags.
      */
     public function getCacheTags(array|string $tags = []): array
     {
-        return array_merge([config('app.name')], is_string($tags) ? [$tags] : $tags);
+        // Cache app name to avoid repeated config calls
+        if (self::$app_name === null) {
+            self::$app_name = config('app.name');
+        }
+
+        return array_merge([self::$app_name], is_string($tags) ? [$tags] : $tags);
     }
 
     #[Override]
@@ -61,7 +71,7 @@ final class Repository extends BaseRepository
      * @template TCacheValue
      *
      * @param   Model|string|array<string|object>|null
-     * @param  Closure(TCacheValue): mixed  $callback
+     * @param  Closure(): TCacheValue  $callback
      * @return TCacheValue
      */
     public function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, ?int $duration = null): mixed
@@ -93,19 +103,15 @@ final class Repository extends BaseRepository
         $key = $this->getKeyFromRequest($request);
         $duration ??= config('cache.duration');
 
-        if ($this->has($key)) {
-            return $this->get($key);
-        }
+        return $this->remember($key, function () use ($callback) {
+            $data = $callback();
 
-        $data = $callback();
+            if ($data instanceof ResponseBuilder) {
+                $data = $data->getResponse();
+            }
 
-        if ($data instanceof ResponseBuilder) {
-            $data = $data->getResponse();
-        }
-
-        $this->put($key, $data, $duration ?: config('cache.duration'));
-
-        return $data;
+            return $data;
+        }, $duration ?: config('cache.duration'));
     }
 
     /**

@@ -147,7 +147,7 @@ trait HasSeedersUtils
     protected function logOperation(string $model): void
     {
         $already_exists = $model::query()->exists();
-        $table = new $model()->getTable();
+        $table = new ReflectionClass($model)->newInstanceWithoutConstructor()->getTable();
         $this->command->line('  ' . ($already_exists ? 'Updating' : 'Creating') . ' default <fg=cyan;options=bold>' . $table . '</>');
     }
 }

@@ -19,6 +19,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Search\Traits\Searchable;
+use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -64,7 +65,7 @@ abstract class BatchSeeder extends Seeder
     {
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
-        $entity_name = new $modelClass()->getTable();
+        $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');
@@ -112,9 +113,22 @@ abstract class BatchSeeder extends Seeder
      */
     final protected function createInParallelBatches(string $modelClass, int $totalCount, ?int $batchSize = null, int $maxParallelCount = 10): int
     {
+        // Calcolare il numero ideale di processi paralleli ("maxParallelCount") dipende principalmente dal numero di CPU core disponibili,
+        // ma vanno considerate anche la quantità di RAM e la natura del carico (CPU bound vs. IO bound).
+        // Per la maggior parte degli scenari CPU bound (come la generazione intensiva di dati), conviene eseguire un processo parallelo per ogni core.
+        // In PHP puoi rilevare il numero di core in modo portabile e adattare "maxParallelCount" automaticamente. Ad esempio:
+
+        $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
+
+        if ($safe_max_parallel_count <= $maxParallelCount) {
+            $this->command->newLine();
+            $this->command->info('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
+            $this->command->newLine();
+        }
+
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
-        $entity_name = new $modelClass()->getTable();
+        $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');
@@ -126,7 +140,7 @@ abstract class BatchSeeder extends Seeder
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
 
         $progress = progress('Creating ' . $entity_name . ' (parallel)', $count_to_create);
-        $progress->hint('Using ' . $maxParallelCount . ' parallel processes, ' . $effective_batch_size . ' records per batch, ' . $total_batches . ' total batches');
+        $progress->hint("Using {$safe_max_parallel_count} parallel processes, {$effective_batch_size} records per batch, {$total_batches} total batches");
         $progress->start();
 
         // Temporary directory for inter-process communication
@@ -146,7 +160,7 @@ abstract class BatchSeeder extends Seeder
                 $count_to_create,
                 $effective_batch_size,
                 $total_batches,
-                $maxParallelCount,
+                $safe_max_parallel_count,
                 $progress,
                 $progress_file,
                 $progress_lock_file,
@@ -159,6 +173,31 @@ abstract class BatchSeeder extends Seeder
             // Cleanup
             $this->cleanupTempDirectory($temp_dir);
         }
+    }
+
+    private function getCpuCores(): int
+    {
+        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Linux')) {
+            return (int) shell_exec('nproc') ?: 1;
+        }
+
+        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Darwin')) {
+            return (int) shell_exec('sysctl -n hw.ncpu') ?: 1;
+        }
+
+        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Windows')) {
+            return (int) getenv('NUMBER_OF_PROCESSORS') ?: 1;
+        }
+
+        return 1;
+    }
+
+    private function getMaxParallelCount(int $maxParallelCount): int
+    {
+        $cpu_cores = $this->getCpuCores();
+
+        // Heuristic: keep some margin for other system activities; don't exceed the CPU core count.
+        return min($maxParallelCount, max(1, $cpu_cores - 1));
     }
 
     /**

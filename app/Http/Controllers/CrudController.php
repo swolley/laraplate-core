@@ -65,8 +65,6 @@ class CrudController extends Controller
 {
     use HasCrudOperations;
 
-    // region READ OPERATIONS
-
     /**
      * @route-comment
      * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: ['GET', 'POST', 'HEAD'], middleware: ['api', 'crud_api'])
@@ -552,56 +550,48 @@ class CrudController extends Controller
     {
         $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
 
-        $cache = Cache::store();
-        $cachedTemplate = $cache->get($templateKey);
-
-        if ($cachedTemplate) {
-            return $cachedTemplate;
-        }
-
-        $params = [
-            'body' => [
-                'query' => [
-                    'bool' => [
-                        'must' => [],
-                        'should' => [],
-                        'minimum_should_match' => 1,
-                    ],
-                ],
-            ],
-        ];
-
-        if ($embeddings !== null && $embeddings !== []) {
-            $params['body']['query']['bool']['should'][] = [
-                'script_score' => [
-                    'query' => ['match_all' => new stdClass()],
-                    'script' => [
-                        'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                        'params' => ['query_vector' => $embeddings],
+        return Cache::remember($templateKey, 3600, function () use ($filters, $embeddings) {
+            $params = [
+                'body' => [
+                    'query' => [
+                        'bool' => [
+                            'must' => [],
+                            'should' => [],
+                            'minimum_should_match' => 1,
+                        ],
                     ],
                 ],
             ];
-        }
 
-        if ($filters->filters instanceof FiltersGroup) {
-            $params['body']['query']['bool']['must'] = $this->translateFiltersToElasticsearch($filters->filters);
-        }
+            if ($embeddings !== null && $embeddings !== []) {
+                $params['body']['query']['bool']['should'][] = [
+                    'script_score' => [
+                        'query' => ['match_all' => new stdClass()],
+                        'script' => [
+                            'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                            'params' => ['query_vector' => $embeddings],
+                        ],
+                    ],
+                ];
+            }
 
-        // Aggiungiamo ottimizzazioni per la query
-        $params['body']['_source'] = ['includes' => $filters->fields ?? ['*']];
-        $params['body']['sort'] = ['_score' => ['order' => 'desc']];
+            if ($filters->filters instanceof FiltersGroup) {
+                $params['body']['query']['bool']['must'] = $this->translateFiltersToElasticsearch($filters->filters);
+            }
 
-        if ($filters->mainEntity !== '' && $filters->mainEntity !== '0') {
-            $params['index'] = $filters->mainEntity;
-        }
+            $params['body']['_source'] = ['includes' => $filters->fields ?? ['*']];
+            $params['body']['sort'] = ['_score' => ['order' => 'desc']];
 
-        if ($filters->take !== null && $filters->take !== 0) {
-            $params['size'] = $filters->take;
-        }
+            if ($filters->mainEntity !== '' && $filters->mainEntity !== '0') {
+                $params['index'] = $filters->mainEntity;
+            }
 
-        $cache->put($templateKey, $params, 3600); // cache per 1 ora
+            if ($filters->take !== null && $filters->take !== 0) {
+                $params['size'] = $filters->take;
+            }
 
-        return $params;
+            return $params;
+        });
     }
 
     private function translateFiltersToElasticsearch(FiltersGroup $filtersGroup): array
@@ -639,10 +629,6 @@ class CrudController extends Controller
             FilterOperator::BETWEEN => ['range' => [$filter->property => ['gte' => $filter->value[0], 'lte' => $filter->value[1]]]],
         };
     }
-
-    // endregion
-
-    // region WRITE OPERATIONS
 
     private function removeNotFillableProperties(Model $model, array &$values): array
     {

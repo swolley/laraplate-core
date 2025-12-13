@@ -366,6 +366,7 @@ final class CrudHelper
      */
     private function applyColumnsToSelect(Builder|Relation $query, array &$relation_columns): void
     {
+        // TODO: da finire di scrivere
         $this->sortColumns($query, $relation_columns);
         $simple_columns = [];
 

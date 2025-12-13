@@ -190,12 +190,6 @@ trait Searchable
     {
         if (! $schema instanceof SchemaDefinition) {
             $schema = $this->getSchemaDefinition();
-            // $table = Inspect::table($this->getTable());
-
-            // $table->columns->each(function (Column $column) use ($schema) {
-            //     $schema->addField(new FieldDefinition($column->name, FieldType::fromDoctrine($column->type)));
-            // });
-
             $document = $this->toSearchableArray();
 
             foreach ($document as $key => $value) {

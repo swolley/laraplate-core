@@ -19,6 +19,7 @@ use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
+use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 
 final class PermissionsRefreshCommand extends Command
@@ -102,7 +103,7 @@ final class PermissionsRefreshCommand extends Command
                 continue;
             }
 
-            $instance = new $model();
+            $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
 
             $connection = $instance->getConnectionName() ?? 'default';
             $table = $instance->getTable();

@@ -89,7 +89,20 @@ trait HasValidations
 
             if (class_uses_trait($this, HasDynamicContents::class)) {
                 /** @phpstan-ignore method.notFound */
-                $attributes = array_merge($attributes, $this->getComponentsAttribute());
+                $components = $this->getComponentsAttribute();
+
+                // Convert JSON rule fields (OBJECT/EDITOR) to JSON strings for validation
+                // Laravel's 'json' rule only accepts JSON strings, not PHP objects/arrays
+                foreach ($components as $key => $value) {
+                    if (isset($rules[$key]) && str_contains($rules[$key], 'json')) {
+                        // Convert objects/arrays to JSON string for validation
+                        if (is_object($value) || is_array($value)) {
+                            $components[$key] = json_encode($value);
+                        }
+                    }
+                }
+
+                $attributes = array_merge($attributes, $components);
             }
 
             Validator::make($attributes, $rules)->validate();

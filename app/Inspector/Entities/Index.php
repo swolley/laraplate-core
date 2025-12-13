@@ -28,6 +28,11 @@ final readonly class Index
         return $this->attributes->contains('primary');
     }
 
+    public function isUnique(): bool
+    {
+        return $this->attributes->contains('unique');
+    }
+
     public function isCompositePrimaryKey(): bool
     {
         return $this->isPrimaryKey() && $this->isComposite();

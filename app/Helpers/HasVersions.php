@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
+use Modules\Core\Events\ModelVersioningRequested;
+use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Services\VersioningService;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -33,6 +36,10 @@ trait HasVersions
 
     protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
 
+    protected bool $asyncVersioning = true;
+
+    protected array $encryptedVersionable = [];
+
     /**
      * @param  string|DateTimeInterface|null  $time
      *
@@ -40,16 +47,55 @@ trait HasVersions
      */
     public function createVersion(array $replacements = [], $time = null): ?Version
     {
-        if ($this->shouldBeVersioning() || $replacements !== []) {
-            return tap(
-                config('versionable.version_model')::createForModel($this, $replacements, $time),
-                function (): void {
-                    $this->removeOldVersions((int) $this->getKeepVersionsCount());
-                },
-            );
+        if (! $this->shouldBeVersioning() && $replacements === []) {
+            return null;
         }
 
-        return null;
+        if ($this->asyncVersioning) {
+            ModelVersioningRequested::dispatch(
+                static::class,
+                $this->getKey(),
+                $this->getConnectionName(),
+                $this->getTable(),
+                $this->getAttributes(),
+                $replacements,
+                $this->getVersionUserId(),
+                (int) $this->getKeepVersionsCount(),
+                $this->encryptedVersionable,
+                $this->versionStrategy,
+                $time,
+            );
+
+            CreateVersionJob::dispatch(
+                modelClass: static::class,
+                modelId: $this->getKey(),
+                modelConnection: $this->getConnectionName(),
+                table: $this->getTable(),
+                attributes: $this->getAttributes(),
+                replacements: $replacements,
+                userId: $this->getVersionUserId(),
+                keepVersionsCount: (int) $this->getKeepVersionsCount(),
+                encryptedVersionable: $this->encryptedVersionable,
+                versionStrategy: $this->versionStrategy,
+                time: $time,
+            )->afterCommit();
+
+            return null;
+        }
+
+        return app(VersioningService::class)->createVersion(
+            modelClass: static::class,
+            modelId: $this->getKey(),
+            connection: $this->getConnectionName(),
+            table: $this->getTable(),
+            attributes: $this->getAttributes(),
+            replacements: $replacements,
+            userId: $this->getVersionUserId(),
+            keepVersionsCount: (int) $this->getKeepVersionsCount(),
+            encryptedVersionable: $this->encryptedVersionable,
+            versionStrategy: $this->versionStrategy,
+            time: $time,
+        );
     }
 
     /**

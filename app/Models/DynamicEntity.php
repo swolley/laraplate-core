@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -21,7 +20,7 @@ use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
-use Modules\Core\Inspector\Inspect;
+use Modules\Core\Services\DynamicEntityService;
 use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 use UnexpectedValueException;
@@ -53,24 +52,7 @@ final class DynamicEntity extends Model
      */
     public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
-        $model = self::tryResolveModel($tableName, $connection);
-
-        if (! in_array($model, [null, '', '0'], true)) {
-            return new $model($attributes);
-        }
-
-        if (config('crud.dynamic_entities', false)) {
-            $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
-
-            return Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request): DynamicEntity {
-                $model = new self($attributes);
-                $model->inspect($tableName, $connection, $request);
-
-                return $model;
-            });
-        }
-
-        throw new UnexpectedValueException('Dynamic tables mapping is not enabled');
+        return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
     }
 
     /**
@@ -109,8 +91,13 @@ final class DynamicEntity extends Model
         $this->setTableConnectionInfo($tableName, $connection);
         $this->verifyTableExistence();
 
-        // TODO: to be tested with oracle and sqlserver
-        $inspected = Inspect::table($this->getTable(), $this->getConnectionName());
+        // Use service to get inspected table with in-memory caching
+        $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
+
+        if ($inspected === null) {
+            return;
+        }
+
         $primary_key = $inspected->primaryKey;
 
         if ($primary_key) {
@@ -210,15 +197,15 @@ final class DynamicEntity extends Model
         $remapped_fks = [];
 
         foreach ($foreignKeys as $fk) {
-            foreach ($fk->localColumnNames as $idx => $lc) {
-                $remapped_fks[$lc] = [$fk->foreignTableName, $fk->foreignColumnNames[$idx]];
+            foreach ($fk->localColumnNames() as $idx => $lc) {
+                $remapped_fks[$lc] = [$fk->foreignTable, $fk->foreignColumnNames()[$idx]];
             }
         }
 
         $remapped_uids = [];
 
         foreach ($indexes as $idx) {
-            if (count($idx->columns) === 1 && ($idx->primary || $idx->unique)) {
+            if (count($idx->columns) === 1 && ($idx->isPrimaryKey() || $idx->isUnique())) {
                 $remapped_uids[] = $idx->columns[0];
             }
         }
@@ -311,7 +298,8 @@ final class DynamicEntity extends Model
 
         foreach ($reverse_relations as $relation => $relation_data) {
             if ($relation === $this->table) {
-                $this->dynamic_relations[$resolved_model->getTable()] = [
+                $table = $resolved_model->getTable();
+                $this->dynamic_relations[$table] = [
                     'type' => 'belongsToMany',
                     'foreignKey' => new ForeignKey(
                         'reversed_' . $relation_data->name,
@@ -320,7 +308,7 @@ final class DynamicEntity extends Model
                         $relation_data->localConnection,
                         $relation_data->columns,
                         $resolved_model->getConnectionName(),
-                        $resolved_model->getTable(),
+                        $table,
                     ),
                 ];
 

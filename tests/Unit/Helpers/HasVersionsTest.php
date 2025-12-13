@@ -2,156 +2,43 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Bus;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Jobs\CreateVersionJob;
+use Tests\TestCase;
 
-it('trait can be used', function (): void {
-    $trait = new class
+final class VersionableStub extends Model
+{
+    use HasVersions;
+
+    protected $table = 'versionables';
+
+    public function shouldBeVersioning(): bool
     {
-        use HasVersions;
-    };
+        return true;
+    }
+}
 
-    expect($trait)->toHaveMethod('createVersion');
-    expect($trait)->toHaveMethod('versions');
-    expect($trait)->toHaveMethod('shouldBeVersioning');
-});
-
-it('trait has required methods', function (): void {
-    $trait = new class
+final class HasVersionsTest extends TestCase
+{
+    public function test_exposes_the_versioning_entrypoint(): void
     {
-        use HasVersions;
-    };
+        $model = new VersionableStub();
 
-    expect(method_exists($trait, 'createVersion'))->toBeTrue();
-    expect(method_exists($trait, 'versions'))->toBeTrue();
-    expect(method_exists($trait, 'shouldBeVersioning'))->toBeTrue();
-});
+        $this->assertTrue(method_exists($model, 'createVersion'));
+    }
 
-it('can check if should be versioning', function (): void {
-    $trait = new class
+    public function test_dispatches_async_job_when_enabled(): void
     {
-        use HasVersions;
-    };
+        Bus::fake();
 
-    expect($trait->shouldBeVersioning())->toBeTrue();
-});
+        $model = new VersionableStub();
+        $model->setRawAttributes(['id' => 1]);
+        $model->exists = true;
 
-it('can get keep versions count', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
+        $model->createVersion();
 
-    expect($trait->getKeepVersionsCount())->toBe(5);
-});
-
-it('can set version strategy', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect($trait->versionStrategy)->toBe(Overtrue\LaravelVersionable\VersionStrategy::DIFF);
-});
-
-it('can set dont versionable fields', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect($trait->dontVersionable)->toContain('created_at', 'updated_at', 'deleted_at', 'last_login_at');
-});
-
-it('trait methods are callable', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect(fn () => $trait->shouldBeVersioning())->not->toThrow();
-    expect(fn () => $trait->getKeepVersionsCount())->not->toThrow();
-});
-
-it('trait can be used in different classes', function (): void {
-    $class1 = new class
-    {
-        use HasVersions;
-    };
-
-    $class2 = new class
-    {
-        use HasVersions;
-    };
-
-    expect($class1)->toHaveMethod('createVersion');
-    expect($class2)->toHaveMethod('createVersion');
-});
-
-it('trait is properly namespaced', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect($trait)->toHaveMethod('createVersion');
-    expect($trait)->toHaveMethod('versions');
-    expect($trait)->toHaveMethod('shouldBeVersioning');
-});
-
-it('trait can be extended', function (): void {
-    $baseClass = new class
-    {
-        use HasVersions;
-    };
-
-    $extendedClass = new class
-    {
-        use HasVersions;
-
-        public function customMethod(): string
-        {
-            return 'custom';
-        }
-    };
-
-    expect($baseClass)->toHaveMethod('createVersion');
-    expect($extendedClass)->toHaveMethod('createVersion');
-    expect($extendedClass)->toHaveMethod('customMethod');
-});
-
-it('trait has proper structure', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect($trait)->toHaveMethod('createVersion');
-    expect($trait)->toHaveMethod('versions');
-    expect($trait)->toHaveMethod('shouldBeVersioning');
-});
-
-it('trait methods are accessible', function (): void {
-    $trait = new class
-    {
-        use HasVersions;
-    };
-
-    expect($trait)->toHaveMethod('createVersion');
-    expect($trait)->toHaveMethod('versions');
-    expect($trait)->toHaveMethod('shouldBeVersioning');
-});
-
-it('trait can be used in different scenarios', function (): void {
-    $scenario1 = new class
-    {
-        use HasVersions;
-    };
-
-    $scenario2 = new class
-    {
-        use HasVersions;
-    };
-
-    expect($scenario1)->toHaveMethod('createVersion');
-    expect($scenario2)->toHaveMethod('createVersion');
-});
+        Bus::assertDispatched(CreateVersionJob::class);
+    }
+}

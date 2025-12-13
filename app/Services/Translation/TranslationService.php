@@ -16,6 +16,11 @@ final class TranslationService implements TranslationServiceInterface
 
     private readonly bool $cache_enabled;
 
+    /**
+     * In-memory cache for translations during the request.
+     */
+    private array $memory_cache = [];
+
     public function __construct()
     {
         $provider = config('core.auto_translate_provider', 'deepl');
@@ -40,55 +45,30 @@ final class TranslationService implements TranslationServiceInterface
             return $text;
         }
 
-        // Check cache
-        if ($this->cache_enabled) {
-            $cache_key = $this->getCacheKey($text, $from_locale, $to_locale);
-            $cached = Cache::get($cache_key);
+        $cache_key = $this->getCacheKey($text, $from_locale, $to_locale);
 
-            if ($cached !== null) {
-                return $cached;
-            }
+        // Check in-memory cache first
+        if (isset($this->memory_cache[$cache_key])) {
+            return $this->memory_cache[$cache_key];
         }
 
-        try {
-            $translated = $this->primary_service->translate($text, $from_locale, $to_locale);
-
-            // Cache result
-            if ($this->cache_enabled) {
-                Cache::put($cache_key, $translated, now()->addDays(30));
-            }
+        // Check cache
+        if (! $this->cache_enabled) {
+            $translated = $this->performTranslation($text, $from_locale, $to_locale);
+            // Store in memory even if external cache is disabled
+            $this->memory_cache[$cache_key] = $translated;
 
             return $translated;
-        } catch (Exception $e) {
-            Log::warning('Primary translation service failed, trying fallback', [
-                'error' => $e->getMessage(),
-                'from' => $from_locale,
-                'to' => $to_locale,
-            ]);
-
-            // Try fallback service
-            if ($this->fallback_service instanceof TranslationServiceInterface) {
-                try {
-                    $translated = $this->fallback_service->translate($text, $from_locale, $to_locale);
-
-                    // Cache result
-                    if ($this->cache_enabled) {
-                        Cache::put($cache_key, $translated, now()->addDays(30));
-                    }
-
-                    return $translated;
-                } catch (Exception $fallback_error) {
-                    Log::error('Fallback translation service also failed', [
-                        'error' => $fallback_error->getMessage(),
-                        'from' => $from_locale,
-                        'to' => $to_locale,
-                    ]);
-                }
-            }
-
-            // If all services fail, return original text
-            return $text;
         }
+
+        $translated = Cache::remember($cache_key, now()->addDays(30), function () use ($text, $from_locale, $to_locale) {
+            return $this->performTranslation($text, $from_locale, $to_locale);
+        });
+
+        // Store in memory
+        $this->memory_cache[$cache_key] = $translated;
+
+        return $translated;
     }
 
     public function translateBatch(array $texts, string $from_locale, string $to_locale): array
@@ -104,6 +84,33 @@ final class TranslationService implements TranslationServiceInterface
         }
 
         return $translations;
+    }
+
+    private function performTranslation(string $text, string $from_locale, string $to_locale): string
+    {
+        try {
+            return $this->primary_service->translate($text, $from_locale, $to_locale);
+        } catch (Exception $e) {
+            Log::warning('Primary translation service failed, trying fallback', [
+                'error' => $e->getMessage(),
+                'from' => $from_locale,
+                'to' => $to_locale,
+            ]);
+
+            if ($this->fallback_service instanceof TranslationServiceInterface) {
+                try {
+                    return $this->fallback_service->translate($text, $from_locale, $to_locale);
+                } catch (Exception $fallback_error) {
+                    Log::error('Fallback translation service also failed', [
+                        'error' => $fallback_error->getMessage(),
+                        'from' => $from_locale,
+                        'to' => $to_locale,
+                    ]);
+                }
+            }
+
+            return $text;
+        }
     }
 
     private function getCacheKey(string $text, string $from_locale, string $to_locale): string

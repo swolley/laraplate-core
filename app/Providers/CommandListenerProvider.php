@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Providers;
 
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Override;
@@ -16,7 +18,15 @@ final class CommandListenerProvider extends ServiceProvider
      * Register the service provider.
      */
     #[Override]
-    public function register(): void {}
+    public function register(): void
+    {
+        Context::add([
+            'scope' => $this->app->runningInConsole() ? 'console' : 'web',
+            'locale' => $this->app->getLocale(),
+            'user' => Auth::user()?->id,
+            'command' => $this->getCommand(),
+        ]);
+    }
 
     /**
      * Get the services provided by the provider.
@@ -37,5 +47,14 @@ final class CommandListenerProvider extends ServiceProvider
             info('Cleaning Inspected entities');
             Cache::tags(Cache::getCacheTags('inspector'))->flush();
         });
+    }
+
+    private function getCommand(): ?string
+    {
+        return $this->app->runningInConsole() && defined('ARTISAN_BINARY')
+            ? ($this->app->runningUnitTests()
+                ? 'unit-test'
+                : ($_SERVER['argv'][1] ?? null))
+            : null;
     }
 }

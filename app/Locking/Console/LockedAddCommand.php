@@ -9,6 +9,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
+use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class LockedAddCommand extends Command
@@ -47,12 +48,13 @@ class LockedAddCommand extends Command
             return BaseCommand::INVALID;
         }
 
-        $instance = new $className();
+        $instance = new ReflectionClass($className)->newInstanceWithoutConstructor();
+        $table = $instance->getTable();
         $fileContents = $this->getStubContents($this->getStubPath(), [
-            'ModelTable' => $instance->getTable(),
+            'ModelTable' => $table,
         ]);
 
-        $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($instance->getTable());
+        $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($table);
         $path = App::databasePath('migrations/' . $filePath);
 
         if (! $this->files->exists($path)) {

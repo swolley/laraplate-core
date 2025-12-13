@@ -50,6 +50,7 @@ use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\User;
 use Modules\Core\Search\Traits\Searchable;
 use PHPUnit\Event\InvalidArgumentException;
+use ReflectionClass;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
 trait HasTable
@@ -74,7 +75,7 @@ trait HasTable
         self::loadUserPermissionsForTable($user);
 
         $model = $table->getModel();
-        $model_instance = new $model();
+        $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
         $model_table = $model_instance->getTable();
         $model_connection = $model_instance->getConnectionName() ?? 'default';
         $permissions_prefix = sprintf('%s.%s', $model_connection, $model_table);

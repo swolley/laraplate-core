@@ -14,6 +14,7 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
 use Spatie\Permission\PermissionRegistrar;
@@ -68,11 +69,13 @@ final class CoreDatabaseSeeder extends Seeder
 
         /** @var class-string<BaseRole> $role_class */
         $role_class = config('permission.models.role');
-        $role_table = (new $role_class)->getTable();
+        $role_instance = new ReflectionClass($role_class)->newInstanceWithoutConstructor();
+        $role_table = $role_instance->getTable();
 
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
-        $user_table = (new $user_class)->getTable();
+        $user_instance = new ReflectionClass($user_class)->newInstanceWithoutConstructor();
+        $user_table = $user_instance->getTable();
 
         $this->logOperation($role_class);
 

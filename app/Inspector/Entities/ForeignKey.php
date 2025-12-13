@@ -47,6 +47,16 @@ final readonly class ForeignKey
         }
     }
 
+    public function localColumnNames(): Collection
+    {
+        return $this->columns->map(fn ($column) => $column->name);
+    }
+
+    public function foreignColumnNames(): Collection
+    {
+        return $this->foreignColumns->map(fn ($column) => $column->name);
+    }
+
     public function isComposite(): bool
     {
         return $this->columns->count() > 1;

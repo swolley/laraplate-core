@@ -11,17 +11,21 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\UnauthorizedException;
-use Laravel\Socialite\Contracts\User as SocialUser;
-use Laravel\Socialite\Facades\Socialite;
+use Modules\Core\Actions\Users\GetUserInfoAction;
+use Modules\Core\Actions\Users\HandleSocialLoginAction;
+use Modules\Core\Actions\Users\ImpersonateUserAction;
+use Modules\Core\Actions\Users\LeaveImpersonationAction;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\ImpersonationRequest;
 use Modules\Core\Http\Resources\UserInfoResponse;
-use Modules\Core\Listeners\AfterLoginListener;
 
 final class UserController extends Controller
 {
     public function __construct(
-        private readonly Socialite $socialite,
+        private readonly GetUserInfoAction $getUserInfoAction,
+        private readonly ImpersonateUserAction $impersonateUserAction,
+        private readonly LeaveImpersonationAction $leaveImpersonationAction,
+        private readonly HandleSocialLoginAction $handleSocialLoginAction,
     ) {
         parent::__construct();
     }
@@ -52,12 +56,8 @@ final class UserController extends Controller
 
         // questo riassegna una licenza all'utente in sessione se da comando si è fatto un aggiornamento delle licenze che ha disassociato i riferimenti
         try {
-            if ($user) {
-                AfterLoginListener::checkUserLicense($user);
-            }
-
             return new ResponseBuilder($request)
-                ->setData(self::parseUserInfo($user))
+                ->setData(($this->getUserInfoAction)($user))
                 ->json();
         } catch (UnauthorizedException $unauthorizedException) {
             return new ResponseBuilder($request)
@@ -78,10 +78,9 @@ final class UserController extends Controller
 
         /** @var User $current_user */
         $current_user = Auth::user();
-        $current_user->impersonate($user_to_impersonate);
 
         return new ResponseBuilder($request)
-            ->setData(self::parseUserInfo())
+            ->setData(($this->impersonateUserAction)($current_user, $user_to_impersonate))
             ->json();
     }
 
@@ -93,38 +92,20 @@ final class UserController extends Controller
     {
         /** @var User $current_user */
         $current_user = Auth::user();
-        $current_user->leaveImpersonation();
 
         return new ResponseBuilder($request)
-            ->setData(self::parseUserInfo())
+            ->setData(($this->leaveImpersonationAction)($current_user))
             ->json();
     }
 
     public function socialLoginRedirect(string $service): \Symfony\Component\HttpFoundation\RedirectResponse|RedirectResponse
     {
-        return $this->socialite->driver($service)->redirect();
+        return $this->handleSocialLoginAction->redirect($service);
     }
 
     public function socialLoginCallback(string $service): Redirector|RedirectResponse
     {
-        /** @var SocialUser $social_user */
-        $social_user = $this->socialite->driver($service)->user();
-
-        $user = User::query()->updateOrCreate([
-            'social_id' => $social_user->getId(),
-        ], [
-            'name' => $social_user->getName(),
-            'username' => $social_user->getNickname(),
-            'email' => $social_user->getEmail(),
-            'social_service' => $service,
-            'social_token' => $social_user->token,
-            'social_refresh_token' => $social_user->refreshToken ?? null,
-            'social_token_secret' => $social_user->tokenSecret ?? null,
-        ]);
-
-        Auth::login($user);
-
-        return redirect('/dashboard');
+        return ($this->handleSocialLoginAction)($service);
     }
 
     /**

@@ -12,15 +12,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use ReflectionClass;
 
 /**
  * @template TModel of Model
  */
 trait HasClosureTable
 {
+    /**
+     * In-memory cache for depth values during the request.
+     */
+    private static array $depth_cache = [];
+
     public static function rebuildClosure(): void
     {
-        $table_name = new static()->getTable() . '_closure';
+        $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
         DB::table($table_name)->truncate();
 
         $models = static::with('children')->get()->keyBy('id');
@@ -143,16 +149,28 @@ trait HasClosureTable
 
     public function getDepth(): int
     {
+        $cache_key = sprintf('%s.%s.depth', $this->getTable(), $this->id);
+
+        // Check in-memory cache first
+        if (isset(self::$depth_cache[$cache_key])) {
+            return self::$depth_cache[$cache_key];
+        }
+
         $closureTable = $this->getClosureTable();
 
-        return Cache::remember(
-            sprintf('%s.%s.depth', $this->getTable(), $this->id),
+        $depth = Cache::remember(
+            $cache_key,
             now()->addHours(24),
             fn () => DB::table($closureTable)
                 ->where($this->qualifyTreeColumn('ancestor_id', $closureTable), $this->id)
                 ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
                 ->value($this->qualifyTreeColumn('depth', $closureTable)) ?? 0,
         );
+
+        // Store in memory
+        self::$depth_cache[$cache_key] = $depth;
+
+        return $depth;
     }
 
     public function isRoot(): bool
@@ -234,7 +252,7 @@ trait HasClosureTable
             ];
         }
 
-        $table_name = new static()->getTable() . '_closure';
+        $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
         DB::table($table_name)->insert($rows);
 
         foreach ($model->children as $child) {
@@ -255,7 +273,7 @@ trait HasClosureTable
         });
 
         static::deleted(function ($model): void {
-            $table_name = new static()->getTable() . '_closure';
+            $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
             DB::table($table_name)
                 ->where('descendant_id', $model->id)
                 ->orWhere('ancestor_id', $model->id)
@@ -362,7 +380,11 @@ trait HasClosureTable
             }
         }
 
-        // Clear cache
-        Cache::forget(sprintf('%s.%s.depth', $this->getTable(), $this->id));
+        // Clear in-memory cache for this model
+        $cache_key = sprintf('%s.%s.depth', $this->getTable(), $this->id);
+        unset(self::$depth_cache[$cache_key]);
+
+        // Clear external cache
+        Cache::forget($cache_key);
     }
 }

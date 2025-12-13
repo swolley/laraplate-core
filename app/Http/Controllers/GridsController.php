@@ -10,19 +10,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\UnauthorizedException;
 use InvalidArgumentException;
+use Modules\Core\Actions\Grids\GetGridConfigsAction;
+use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\DynamicEntity;
 use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
+use ReflectionClass;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
 final class GridsController extends Controller
 {
+    public function __construct(
+        private readonly GetGridConfigsAction $getGridConfigsAction,
+        private readonly ProcessGridAction $processGridAction,
+    ) {
+    }
+
     /**
      * @route-comment
      * Route(path: 'app/crud/grid/configs/{entity?}', name: 'core.crud.grids.getGridsConfigs', methods: [GET, HEAD], middleware: [web])
@@ -32,30 +40,9 @@ final class GridsController extends Controller
         $response_builder = new ResponseBuilder($request);
 
         try {
-            $grids = [];
-            // $permissions = $request->user()->getAllPermissions();
+            $targetEntity = ! in_array($entity, [null, '', '0'], true) ? $this->getModel($entity) : null;
 
-            if (! in_array($entity, [null, '', '0'], true)) {
-                $entity = $this->getModel($entity);
-            }
-
-            foreach (models() as $model) {
-                /** @var Model $instance */
-                $instance = new $model();
-                $table = $instance->getTable();
-                $grid = $this->getModelGridConfigs($entity, $instance, $table, $request/* , $permissions */);
-
-                if ($grid !== null) {
-                    $grids[$table] = $grid;
-                }
-            }
-
-            if (! in_array($entity, [null, '', '0'], true)) {
-                throw_if($grids === [], UnexpectedValueException::class, sprintf("'%s' is not a Grid", $entity));
-                $grids = head($grids);
-            }
-
-            $response_builder->setData($grids);
+            $response_builder->setData(($this->getGridConfigsAction)($request, $targetEntity));
         } catch (UnexpectedValueException $ex) {
             $response_builder
                 ->setData($ex)
@@ -80,15 +67,10 @@ final class GridsController extends Controller
      * Route(path: 'app/crud/grid/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
      * Route(path: 'app/crud/grid/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
      */
-    public function grid(GridRequest $request, string $entity): \Illuminate\Http\JsonResponse
+    public function grid(\Modules\Core\Grids\Requests\GridRequest $request, string $entity): \Illuminate\Http\JsonResponse
     {
         try {
-            $filters = $request->parsed();
-            $model = DynamicEntity::resolve($entity, $filters['connection'] ?? null, request: $request);
-            PermissionChecker::ensurePermissions($request, $model->getTable(), $filters->action->value, $model->getConnectionName());
-            $grid = new Grid($model);
-
-            return $grid->process($request);
+            return ($this->processGridAction)($request, $entity);
         } catch (UnexpectedValueException|UnauthorizedException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
@@ -103,32 +85,5 @@ final class GridsController extends Controller
         throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, sprintf("Unable to find entity '%s'", $entity));
 
         return $entity_instance;
-    }
-
-    /**
-     * @throws InvalidArgumentException
-     * @throws BindingResolutionException
-     * @throws UnauthorizedException
-     * @throws Exception
-     * @throws FrameworkException
-     * @throws ExpectationFailedException
-     * @throws UnknownClassOrInterfaceException
-     * @throws Exception
-     * @throws UnexpectedValueException
-     */
-    private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request/* , Collection $permissions */): ?array
-    {
-        if (
-            (in_array($entity, [null, '', '0'], true) || $instance::class === $entity::class)
-            && Grid::useGridUtils($instance)
-            && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName()/* , permissions: $permissions */)
-        ) {
-            /** @var Grid $grid */
-            $grid = $instance->getGrid();
-
-            return $grid->getConfigs();
-        }
-
-        return null;
     }
 }

@@ -39,7 +39,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     public function __construct(Container $app)
     {
-        $this->cache = $app->make(\Illuminate\Contracts\Cache\Factory::class);
+        $this->cache = $app->make(\Modules\Core\Cache\Repository::class);
         // $this->files = $app['files'];
         $this->configs = $app->make(\Illuminate\Contracts\Config\Repository::class);
         // $this->statusesFile = $this->config('statuses-file');
