@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\PermissionsRefreshCommand;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
-test('command exists and has correct signature', function (): void {
+it('command exists and has correct signature', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -15,40 +16,40 @@ test('command exists and has correct signature', function (): void {
     expect($source)->toContain('Refresh the Permission table');
 });
 
-test('command class has correct properties', function (): void {
+it('command class has correct properties', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Console\PermissionsRefreshCommand');
     expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
 });
 
-test('command can be instantiated', function (): void {
+it('command can be instantiated', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
 
     expect($reflection->isInstantiable())->toBeTrue();
     expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
 });
 
-test('command has correct namespace', function (): void {
+it('command has correct namespace', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
 
     expect($reflection->getNamespaceName())->toBe('Modules\Core\Console');
     expect($reflection->getShortName())->toBe('PermissionsRefreshCommand');
 });
 
-test('command has handle method', function (): void {
+it('command has handle method', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
 
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 
-test('command handle method returns void', function (): void {
+it('command handle method returns void', function (): void {
     $reflection = new ReflectionMethod(PermissionsRefreshCommand::class, 'handle');
 
     expect($reflection->getReturnType()->getName())->toBe('void');
 });
 
-test('command has pretend option', function (): void {
+it('command has pretend option', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -56,7 +57,7 @@ test('command has pretend option', function (): void {
     expect($source)->toContain('pretend_mode');
 });
 
-test('command handles blacklisted models', function (): void {
+it('command handles blacklisted models', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -64,7 +65,7 @@ test('command handles blacklisted models', function (): void {
     expect($source)->toContain('checkIfBlacklisted');
 });
 
-test('command handles common permissions', function (): void {
+it('command handles common permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -75,7 +76,7 @@ test('command handles common permissions', function (): void {
     expect($source)->toContain('DELETE');
 });
 
-test('command handles soft delete permissions', function (): void {
+it('command handles soft delete permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -84,7 +85,7 @@ test('command handles soft delete permissions', function (): void {
     expect($source)->toContain('FORCE_DELETE');
 });
 
-test('command handles approval permissions', function (): void {
+it('command handles approval permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -92,7 +93,7 @@ test('command handles approval permissions', function (): void {
     expect($source)->toContain('APPROVE');
 });
 
-test('command handles publish permissions', function (): void {
+it('command handles publish permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -100,14 +101,14 @@ test('command handles publish permissions', function (): void {
     expect($source)->toContain('PUBLISH');
 });
 
-test('command handles lock permissions', function (): void {
+it('command handles lock permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('LOCK');
 });
 
-test('command handles impersonate permission for users', function (): void {
+it('command handles impersonate permission for users', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -115,7 +116,7 @@ test('command handles impersonate permission for users', function (): void {
     expect($source)->toContain('user_class');
 });
 
-test('command handles pretend mode', function (): void {
+it('command handles pretend mode', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -123,14 +124,14 @@ test('command handles pretend mode', function (): void {
     expect($source)->toContain('Running in pretend mode');
 });
 
-test('command handles quiet mode', function (): void {
+it('command handles quiet mode', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('quiet_mode');
 });
 
-test('command handles permission creation', function (): void {
+it('command handles permission creation', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -138,7 +139,7 @@ test('command handles permission creation', function (): void {
     expect($source)->toContain('query()');
 });
 
-test('command handles permission deletion', function (): void {
+it('command handles permission deletion', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -146,14 +147,14 @@ test('command handles permission deletion', function (): void {
     expect($source)->toContain('whereNotIn');
 });
 
-test('command handles permission restoration', function (): void {
+it('command handles permission restoration', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('restore()');
 });
 
-test('command handles connection and table names', function (): void {
+it('command handles connection and table names', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -161,7 +162,7 @@ test('command handles connection and table names', function (): void {
     expect($source)->toContain('getTable');
 });
 
-test('command handles permission naming convention', function (): void {
+it('command handles permission naming convention', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -170,7 +171,7 @@ test('command handles permission naming convention', function (): void {
     expect($source)->toContain('permission_name');
 });
 
-test('command handles changes tracking', function (): void {
+it('command handles changes tracking', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -178,7 +179,7 @@ test('command handles changes tracking', function (): void {
     expect($source)->toContain('No changes needed');
 });
 
-test('command handles output messages', function (): void {
+it('command handles output messages', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 

@@ -5,8 +5,9 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->license = License::factory()->create();
@@ -37,13 +38,15 @@ it('has boolean cast for is_active', function (): void {
 });
 
 it('has validity trait', function (): void {
-    expect($this->license)->toHaveMethod('isValid');
-    expect($this->license)->toHaveMethod('isExpired');
-    expect($this->license)->toHaveMethod('getValidityPeriod');
+    /** @var TestCase $this */
+    expect(method_exists($this->license, 'isValid'))->toBeTrue();
+    expect(method_exists($this->license, 'isExpired'))->toBeTrue();
+    expect(method_exists($this->license, 'getValidityPeriod'))->toBeTrue();
 });
 
 it('has validations trait', function (): void {
-    expect($this->license)->toHaveMethod('getRules');
+    /** @var TestCase $this */
+    expect(method_exists($this->license, 'getRules'))->toBeTrue();
 });
 
 it('can check if license is active', function (): void {

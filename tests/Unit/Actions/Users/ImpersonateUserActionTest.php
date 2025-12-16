@@ -9,30 +9,27 @@ use Modules\Core\Events\UserImpersonated;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Tests\TestCase;
 
-final class ImpersonateUserActionTest extends TestCase
-{
-    public function test_impersonates_and_dispatches_event(): void
+uses(TestCase::class);
+
+it('impersonates and dispatches event', function (): void {
+    Event::fake();
+
+    $current = new class extends User
     {
-        Event::fake();
+        public bool $impersonated = false;
 
-        $current = new class extends User
+        public function impersonate($user): void
         {
-            public bool $impersonated = false;
+            $this->impersonated = true;
+        }
+    };
 
-            public function impersonate($user): void
-            {
-                $this->impersonated = true;
-            }
-        };
+    $target = new class extends User {};
 
-        $target = new class extends User {};
+    $action = new ImpersonateUserAction();
+    $response = $action($current, $target);
 
-        $action = new ImpersonateUserAction();
-        $response = $action($current, $target);
-
-        $this->assertTrue($current->impersonated);
-        $this->assertInstanceOf(UserInfoResponse::class, $response);
-        Event::assertDispatched(UserImpersonated::class);
-    }
-}
-
+    expect($current->impersonated)->toBeTrue();
+    expect($response)->toBeInstanceOf(UserInfoResponse::class);
+    Event::assertDispatched(UserImpersonated::class);
+});

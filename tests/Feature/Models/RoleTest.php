@@ -7,10 +7,12 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
+    /** @var TestCase $this */
     $this->role = Role::factory()->create();
 });
 
@@ -153,22 +155,26 @@ it('has soft deletes trait', function (): void {
 });
 
 it('has versions trait', function (): void {
-    expect($this->role)->toHaveMethod('versions');
-    expect($this->role)->toHaveMethod('createVersion');
+    /** @var TestCase $this */
+    expect(method_exists($this->role, 'versions'))->toBeTrue();
+    expect(method_exists($this->role, 'createVersion'))->toBeTrue();
 });
 
 it('has locks trait', function (): void {
-    expect($this->role)->toHaveMethod('lock');
-    expect($this->role)->toHaveMethod('unlock');
+    /** @var TestCase $this */
+    expect(method_exists($this->role, 'lock'))->toBeTrue();
+    expect(method_exists($this->role, 'unlock'))->toBeTrue();
 });
 
 it('has validations trait', function (): void {
-    expect($this->role)->toHaveMethod('getRules');
+    /** @var TestCase $this */
+    expect(method_exists($this->role, 'getRules'))->toBeTrue();
 });
 
 it('has cache trait', function (): void {
-    expect($this->role)->toHaveMethod('cache');
-    expect($this->role)->toHaveMethod('forgetCache');
+    /** @var TestCase $this */
+    expect(method_exists($this->role, 'cache'))->toBeTrue();
+    expect(method_exists($this->role, 'forgetCache'))->toBeTrue();
 });
 
 it('has proper casts for dates', function (): void {

@@ -6,27 +6,13 @@ use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Actions\Docs\MergeSwaggerDocsAction;
 use Tests\TestCase;
 
-final class MergeSwaggerDocsActionTest extends TestCase
-{
-    private string $tmpDir;
+uses(TestCase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('merges app and module paths', function (): void {
+    $tmpDir = sys_get_temp_dir() . '/swagger-' . bin2hex(random_bytes(5));
+    mkdir($tmpDir, 0777, true);
 
-        $this->tmpDir = sys_get_temp_dir() . '/swagger-' . bin2hex(random_bytes(5));
-        mkdir($this->tmpDir, 0777, true);
-    }
-
-    protected function tearDown(): void
-    {
-        (new Filesystem())->deleteDirectory($this->tmpDir);
-
-        parent::tearDown();
-    }
-
-    public function test_merges_app_and_module_paths(): void
-    {
+    try {
         $fs = new Filesystem();
         $appJson = [
             'paths' => [
@@ -41,21 +27,23 @@ final class MergeSwaggerDocsActionTest extends TestCase
             ],
         ];
 
-        $fs->put($this->tmpDir . '/App-swagger.json', json_encode($appJson));
-        $fs->put($this->tmpDir . '/Cms-swagger.json', json_encode($moduleJson));
+        $fs->put($tmpDir . '/App-swagger.json', json_encode($appJson));
+        $fs->put($tmpDir . '/Cms-swagger.json', json_encode($moduleJson));
 
         $action = new MergeSwaggerDocsAction(
             filesystem: $fs,
             modulesProvider: fn () => ['Cms'],
-            basePath: $this->tmpDir,
+            basePath: $tmpDir,
         );
 
         $result = $action('v1');
 
-        $this->assertArrayHasKey('paths', $result);
-        $this->assertArrayHasKey('/v1/keep', $result['paths']);
-        $this->assertArrayHasKey('/v1/module-path', $result['paths']);
-        $this->assertArrayNotHasKey('/api/should-be-removed', $result['paths']);
-        $this->assertArrayNotHasKey('/api/module-remove', $result['paths']);
+        expect($result)->toHaveKey('paths');
+        expect($result['paths'])->toHaveKey('/v1/keep');
+        expect($result['paths'])->toHaveKey('/v1/module-path');
+        expect($result['paths'])->not->toHaveKey('/api/should-be-removed');
+        expect($result['paths'])->not->toHaveKey('/api/module-remove');
+    } finally {
+        (new Filesystem())->deleteDirectory($tmpDir);
     }
-}
+});

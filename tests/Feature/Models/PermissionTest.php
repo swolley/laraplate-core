@@ -6,8 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->permission = Permission::factory()->create();
@@ -119,12 +120,12 @@ it('validates unique name on update ignoring self', function (): void {
 });
 
 it('has validations trait', function (): void {
-    expect($this->permission)->toHaveMethod('getRules');
+    expect(method_exists($this->permission, 'getRules'))->toBeTrue();
 });
 
 it('has cache trait', function (): void {
-    expect($this->permission)->toHaveMethod('cache');
-    expect($this->permission)->toHaveMethod('forgetCache');
+    expect(method_exists($this->permission, 'cache'))->toBeTrue();
+    expect(method_exists($this->permission, 'forgetCache'))->toBeTrue();
 });
 
 it('can be created with specific attributes', function (): void {

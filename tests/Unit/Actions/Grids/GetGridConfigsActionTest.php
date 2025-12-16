@@ -5,30 +5,26 @@ declare(strict_types=1);
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Tests\TestCase;
 
-final class GetGridConfigsActionTest extends TestCase
-{
-    public function test_returns_configs_for_models(): void
-    {
-        $action = new GetGridConfigsAction(
-            modelsProvider: fn () => ['ModelOne'],
-            gridResolver: fn () => ['config' => true],
-        );
+uses(TestCase::class);
 
-        $result = $action(request(), null);
+it('returns configs for models', function (): void {
+    $action = new GetGridConfigsAction(
+        modelsProvider: fn () => ['ModelOne'],
+        gridResolver: fn () => ['config' => true],
+    );
 
-        $this->assertSame(['ModelOne' => ['config' => true]], $result);
-    }
+    $result = $action(request(), null);
 
-    public function test_filters_single_entity(): void
-    {
-        $action = new GetGridConfigsAction(
-            modelsProvider: fn () => ['ModelOne'],
-            gridResolver: fn ($model, $entity) => $entity === 'ModelOne' ? ['only' => true] : null,
-        );
+    expect($result)->toBe(['ModelOne' => ['config' => true]]);
+});
 
-        $result = $action(request(), 'ModelOne');
+it('filters single entity', function (): void {
+    $action = new GetGridConfigsAction(
+        modelsProvider: fn () => ['ModelOne'],
+        gridResolver: fn ($model, $entity) => $entity === 'ModelOne' ? ['only' => true] : null,
+    );
 
-        $this->assertSame(['only' => true], $result);
-    }
-}
+    $result = $action(request(), 'ModelOne');
 
+    expect($result)->toBe(['only' => true]);
+});

@@ -7,61 +7,60 @@ use Modules\Core\Actions\Settings\GetTranslationsAction;
 use Modules\Core\Services\Translation\TranslationCatalogService;
 use Tests\TestCase;
 
-final class GetTranslationsActionTest extends TestCase
-{
-    private string $tmpDir;
+uses(TestCase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+beforeEach(function (): void {
+    app()->setLocale('en');
+});
 
-        app()->setLocale('en');
+it('returns all translations', function (): void {
+    $tmpDir = sys_get_temp_dir() . '/langs-' . bin2hex(random_bytes(5));
+    mkdir($tmpDir . '/en', 0777, true);
+    mkdir($tmpDir . '/it', 0777, true);
 
-        $this->tmpDir = sys_get_temp_dir() . '/langs-' . bin2hex(random_bytes(5));
-        mkdir($this->tmpDir . '/en', 0777, true);
-        mkdir($this->tmpDir . '/it', 0777, true);
+    file_put_contents($tmpDir . '/en/app.php', "<?php return ['foo' => 'bar'];");
+    file_put_contents($tmpDir . '/it/app.php', "<?php return ['foo' => 'baz'];");
 
-        file_put_contents($this->tmpDir . '/en/app.php', "<?php return ['foo' => 'bar'];");
-        file_put_contents($this->tmpDir . '/it/app.php', "<?php return ['foo' => 'baz'];");
-    }
-
-    protected function tearDown(): void
-    {
-        (new Filesystem())->deleteDirectory($this->tmpDir);
-
-        parent::tearDown();
-    }
-
-    public function test_returns_all_translations(): void
-    {
+    try {
         $service = new TranslationCatalogService(
             filesystem: new Filesystem(),
-            languagesProvider: fn () => [$this->tmpDir . '/en', $this->tmpDir . '/it'],
+            languagesProvider: fn () => [$tmpDir . '/en', $tmpDir . '/it'],
         );
 
         $action = new GetTranslationsAction($service);
 
         $result = $action(null);
 
-        $this->assertArrayHasKey('en', $result);
-        $this->assertArrayHasKey('it', $result);
-        $this->assertSame('bar', $result['en']['app.foo']);
-        $this->assertSame('baz', $result['it']['app.foo']);
+        expect($result)->toHaveKey('en');
+        expect($result)->toHaveKey('it');
+        expect($result['en']['app.foo'])->toBe('bar');
+        expect($result['it']['app.foo'])->toBe('baz');
+    } finally {
+        (new Filesystem())->deleteDirectory($tmpDir);
     }
+});
 
-    public function test_returns_specific_language(): void
-    {
+it('returns specific language', function (): void {
+    $tmpDir = sys_get_temp_dir() . '/langs-' . bin2hex(random_bytes(5));
+    mkdir($tmpDir . '/en', 0777, true);
+    mkdir($tmpDir . '/it', 0777, true);
+
+    file_put_contents($tmpDir . '/en/app.php', "<?php return ['foo' => 'bar'];");
+    file_put_contents($tmpDir . '/it/app.php', "<?php return ['foo' => 'baz'];");
+
+    try {
         $service = new TranslationCatalogService(
             filesystem: new Filesystem(),
-            languagesProvider: fn () => [$this->tmpDir . '/en', $this->tmpDir . '/it'],
+            languagesProvider: fn () => [$tmpDir . '/en', $tmpDir . '/it'],
         );
 
         $action = new GetTranslationsAction($service);
 
         $result = $action('it');
 
-        $this->assertArrayHasKey('app.foo', $result);
-        $this->assertSame('baz', $result['app.foo']);
+        expect($result)->toHaveKey('app.foo');
+        expect($result['app.foo'])->toBe('baz');
+    } finally {
+        (new Filesystem())->deleteDirectory($tmpDir);
     }
-}
-
+});

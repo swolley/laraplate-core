@@ -2,43 +2,27 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Tests\Unit\Helpers\VersionableStub;
 use Tests\TestCase;
 
-final class VersionableStub extends Model
-{
-    use HasVersions;
+uses(TestCase::class);
 
-    protected $table = 'versionables';
+it('exposes the versioning entrypoint', function (): void {
+    $model = new VersionableStub();
 
-    public function shouldBeVersioning(): bool
-    {
-        return true;
-    }
-}
+    expect(method_exists($model, 'createVersion'))->toBeTrue();
+});
 
-final class HasVersionsTest extends TestCase
-{
-    public function test_exposes_the_versioning_entrypoint(): void
-    {
-        $model = new VersionableStub();
+it('dispatches async job when enabled', function (): void {
+    Bus::fake();
 
-        $this->assertTrue(method_exists($model, 'createVersion'));
-    }
+    $model = new VersionableStub();
+    $model->setRawAttributes(['id' => 1]);
+    $model->exists = true;
 
-    public function test_dispatches_async_job_when_enabled(): void
-    {
-        Bus::fake();
+    $model->createVersion();
 
-        $model = new VersionableStub();
-        $model->setRawAttributes(['id' => 1]);
-        $model->exists = true;
-
-        $model->createVersion();
-
-        Bus::assertDispatched(CreateVersionJob::class);
-    }
-}
+    Bus::assertDispatched(CreateVersionJob::class);
+});

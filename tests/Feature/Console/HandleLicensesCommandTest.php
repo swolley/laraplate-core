@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\HandleLicensesCommand;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
-test('command exists and has correct signature', function (): void {
+it('command exists and has correct signature', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -15,34 +16,34 @@ test('command exists and has correct signature', function (): void {
     expect($source)->toContain('Renew, add or delete user licenses');
 });
 
-test('command class has correct properties', function (): void {
+it('command class has correct properties', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Console\HandleLicensesCommand');
     expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
 });
 
-test('command can be instantiated', function (): void {
+it('command can be instantiated', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->isInstantiable())->toBeTrue();
     expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
 });
 
-test('command has correct namespace', function (): void {
+it('command has correct namespace', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->getNamespaceName())->toBe('Modules\Core\Console');
     expect($reflection->getShortName())->toBe('HandleLicensesCommand');
 });
 
-test('command has handle method', function (): void {
+it('command has handle method', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 
-test('command handle method returns int', function (): void {
+it('command handle method returns int', function (): void {
     $reflection = new ReflectionMethod(HandleLicensesCommand::class, 'handle');
 
     // The handle method may not have explicit return type, so we check the source code
@@ -51,7 +52,7 @@ test('command handle method returns int', function (): void {
     expect($source)->toContain('return BaseCommand::FAILURE');
 });
 
-test('command uses Laravel Prompts', function (): void {
+it('command uses Laravel Prompts', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -61,7 +62,7 @@ test('command uses Laravel Prompts', function (): void {
     expect($source)->toContain('Laravel\Prompts\text');
 });
 
-test('command has license management methods', function (): void {
+it('command has license management methods', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -71,7 +72,7 @@ test('command has license management methods', function (): void {
     expect($source)->toContain('listLicenses');
 });
 
-test('command handles license status display', function (): void {
+it('command handles license status display', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -79,14 +80,14 @@ test('command handles license status display', function (): void {
     expect($source)->toContain('table(');
 });
 
-test('command validates input', function (): void {
+it('command validates input', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('validationCallback');
 });
 
-test('command handles expired licenses', function (): void {
+it('command handles expired licenses', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -94,14 +95,14 @@ test('command handles expired licenses', function (): void {
     expect($source)->toContain('License::expired()');
 });
 
-test('command shows max sessions setting', function (): void {
+it('command shows max sessions setting', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('maxConcurrentSessions');
 });
 
-test('command handles license creation', function (): void {
+it('command handles license creation', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -109,7 +110,7 @@ test('command handles license creation', function (): void {
     expect($source)->toContain('create(');
 });
 
-test('command handles license updates', function (): void {
+it('command handles license updates', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -118,14 +119,14 @@ test('command handles license updates', function (): void {
     expect($source)->toContain('valid_to');
 });
 
-test('command logs license operations', function (): void {
+it('command logs license operations', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('Log::info');
 });
 
-test('command handles different license actions', function (): void {
+it('command handles different license actions', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -135,7 +136,7 @@ test('command handles different license actions', function (): void {
     expect($source)->toContain('close');
 });
 
-test('command handles license grouping', function (): void {
+it('command handles license grouping', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 

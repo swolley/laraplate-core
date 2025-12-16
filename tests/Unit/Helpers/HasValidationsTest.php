@@ -10,9 +10,9 @@ it('trait can be used', function (): void {
         use HasValidations;
     };
 
-    expect($trait)->toHaveMethod('setSkipValidation');
-    expect($trait)->toHaveMethod('shouldSkipValidation');
-    expect($trait)->toHaveMethod('getRules');
+    expect(method_exists($trait, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'shouldSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'getRules'))->toBeTrue();
 });
 
 it('trait has required methods', function (): void {
@@ -42,12 +42,14 @@ it('can skip validation', function (): void {
 });
 
 it('has default rules', function (): void {
-    $trait = new class
+    $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
+
+        protected $table = 'test_table';
     };
 
-    $rules = $trait->getRules();
+    $rules = $model->getRules();
 
     expect($rules)->toHaveKey('create');
     expect($rules)->toHaveKey('update');
@@ -55,13 +57,15 @@ it('has default rules', function (): void {
 });
 
 it('can get operation rules', function (): void {
-    $trait = new class
+    $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
+
+        protected $table = 'test_table';
     };
 
-    $createRules = $trait->getOperationRules('create');
-    $updateRules = $trait->getOperationRules('update');
+    $createRules = $model->getOperationRules('create');
+    $updateRules = $model->getOperationRules('update');
 
     expect($createRules)->toBeArray();
     expect($updateRules)->toBeArray();
@@ -73,9 +77,9 @@ it('trait methods are callable', function (): void {
         use HasValidations;
     };
 
-    expect(fn () => $trait->setSkipValidation(true))->not->toThrow();
-    expect(fn () => $trait->shouldSkipValidation())->not->toThrow();
-    expect(fn () => $trait->getRules())->not->toThrow();
+    expect(fn () => $trait->setSkipValidation(true))->not->toThrow(Throwable::class);
+    expect(fn () => $trait->shouldSkipValidation())->not->toThrow(Throwable::class);
+    expect(fn () => $trait->getRules())->not->toThrow(Throwable::class);
 });
 
 it('trait can be used in different classes', function (): void {
@@ -89,8 +93,8 @@ it('trait can be used in different classes', function (): void {
         use HasValidations;
     };
 
-    expect($class1)->toHaveMethod('setSkipValidation');
-    expect($class2)->toHaveMethod('setSkipValidation');
+    expect(method_exists($class1, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($class2, 'setSkipValidation'))->toBeTrue();
 });
 
 it('trait is properly namespaced', function (): void {
@@ -99,9 +103,9 @@ it('trait is properly namespaced', function (): void {
         use HasValidations;
     };
 
-    expect($trait)->toHaveMethod('setSkipValidation');
-    expect($trait)->toHaveMethod('shouldSkipValidation');
-    expect($trait)->toHaveMethod('getRules');
+    expect(method_exists($trait, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'shouldSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'getRules'))->toBeTrue();
 });
 
 it('trait can be extended', function (): void {
@@ -120,9 +124,9 @@ it('trait can be extended', function (): void {
         }
     };
 
-    expect($baseClass)->toHaveMethod('setSkipValidation');
-    expect($extendedClass)->toHaveMethod('setSkipValidation');
-    expect($extendedClass)->toHaveMethod('customMethod');
+    expect(method_exists($baseClass, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($extendedClass, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($extendedClass, 'customMethod'))->toBeTrue();
 });
 
 it('trait has proper structure', function (): void {
@@ -131,9 +135,9 @@ it('trait has proper structure', function (): void {
         use HasValidations;
     };
 
-    expect($trait)->toHaveMethod('setSkipValidation');
-    expect($trait)->toHaveMethod('shouldSkipValidation');
-    expect($trait)->toHaveMethod('getRules');
+    expect(method_exists($trait, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'shouldSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'getRules'))->toBeTrue();
 });
 
 it('trait methods are accessible', function (): void {
@@ -142,9 +146,9 @@ it('trait methods are accessible', function (): void {
         use HasValidations;
     };
 
-    expect($trait)->toHaveMethod('setSkipValidation');
-    expect($trait)->toHaveMethod('shouldSkipValidation');
-    expect($trait)->toHaveMethod('getRules');
+    expect(method_exists($trait, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'shouldSkipValidation'))->toBeTrue();
+    expect(method_exists($trait, 'getRules'))->toBeTrue();
 });
 
 it('trait can be used in different scenarios', function (): void {
@@ -158,6 +162,6 @@ it('trait can be used in different scenarios', function (): void {
         use HasValidations;
     };
 
-    expect($scenario1)->toHaveMethod('setSkipValidation');
-    expect($scenario2)->toHaveMethod('setSkipValidation');
+    expect(method_exists($scenario1, 'setSkipValidation'))->toBeTrue();
+    expect(method_exists($scenario2, 'setSkipValidation'))->toBeTrue();
 });

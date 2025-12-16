@@ -9,28 +9,25 @@ use Modules\Core\Events\UserLeftImpersonation;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Tests\TestCase;
 
-final class LeaveImpersonationActionTest extends TestCase
-{
-    public function test_leaves_impersonation_and_dispatches_event(): void
+uses(TestCase::class);
+
+it('leaves impersonation and dispatches event', function (): void {
+    Event::fake();
+
+    $current = new class extends User
     {
-        Event::fake();
+        public bool $left = false;
 
-        $current = new class extends User
+        public function leaveImpersonation(): void
         {
-            public bool $left = false;
+            $this->left = true;
+        }
+    };
 
-            public function leaveImpersonation(): void
-            {
-                $this->left = true;
-            }
-        };
+    $action = new LeaveImpersonationAction();
+    $response = $action($current);
 
-        $action = new LeaveImpersonationAction();
-        $response = $action($current);
-
-        $this->assertTrue($current->left);
-        $this->assertInstanceOf(UserInfoResponse::class, $response);
-        Event::assertDispatched(UserLeftImpersonation::class);
-    }
-}
-
+    expect($current->left)->toBeTrue();
+    expect($response)->toBeInstanceOf(UserInfoResponse::class);
+    Event::assertDispatched(UserLeftImpersonation::class);
+});

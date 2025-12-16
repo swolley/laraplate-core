@@ -3,41 +3,33 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Validation\UnauthorizedException;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Tests\TestCase;
 
-final class GetUserInfoActionTest extends TestCase
-{
-    protected function tearDown(): void
-    {
-        \Mockery::close();
+uses(TestCase::class);
 
-        parent::tearDown();
-    }
+afterEach(function (): void {
+    Mockery::close();
+});
 
-    public function test_returns_user_info_and_checks_license(): void
-    {
-        \Mockery::mock('alias:Modules\Core\Listeners\AfterLoginListener')
-            ->shouldReceive('checkUserLicense')
-            ->once();
+it('returns user info and checks license', function (): void {
+    Mockery::mock('alias:Modules\Core\Listeners\AfterLoginListener')
+        ->shouldReceive('checkUserLicense')
+        ->once();
 
-        $user = new class extends User {};
+    $user = new class extends User {};
 
-        $action = new GetUserInfoAction();
-        $response = $action($user);
+    $action = new GetUserInfoAction();
+    $response = $action($user);
 
-        $this->assertInstanceOf(UserInfoResponse::class, $response);
-    }
+    expect($response)->toBeInstanceOf(UserInfoResponse::class);
+});
 
-    public function test_returns_anonymous_when_no_user(): void
-    {
-        $action = new GetUserInfoAction();
+it('returns anonymous when no user', function (): void {
+    $action = new GetUserInfoAction();
 
-        $response = $action(null);
+    $response = $action(null);
 
-        $this->assertInstanceOf(UserInfoResponse::class, $response);
-    }
-}
-
+    expect($response)->toBeInstanceOf(UserInfoResponse::class);
+});

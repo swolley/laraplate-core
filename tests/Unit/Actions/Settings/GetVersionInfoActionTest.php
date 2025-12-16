@@ -6,35 +6,32 @@ use Modules\Core\Actions\Settings\GetVersionInfoAction;
 use Modules\Core\Services\Docs\VersionService;
 use Tests\TestCase;
 
-final class GetVersionInfoActionTest extends TestCase
-{
-    public function test_returns_version_data(): void
+uses(TestCase::class);
+
+it('returns version data', function (): void {
+    $service = new class extends VersionService
     {
-        $service = new class extends VersionService
+        public function getCurrentPackageVersion(): string
         {
-            public function getCurrentPackageVersion(): string
-            {
-                return '1.2.3';
-            }
+            return '1.2.3';
+        }
 
-            public function getCurrentCommitHash(): ?string
-            {
-                return 'abc';
-            }
+        public function getCurrentCommitHash(): ?string
+        {
+            return 'abc';
+        }
 
-            public function getCommitDate(?string $commitHash): ?string
-            {
-                return '2024-01-01 00:00:00';
-            }
-        };
+        public function getCommitDate(?string $commitHash): ?string
+        {
+            return '2024-01-01 00:00:00';
+        }
+    };
 
-        $action = new GetVersionInfoAction($service);
+    $action = new GetVersionInfoAction($service);
 
-        $result = $action();
+    $result = $action();
 
-        $this->assertSame('1.2.3', $result['version']);
-        $this->assertSame('abc', $result['commit']);
-        $this->assertSame('2024-01-01 00:00:00', $result['date']);
-    }
-}
-
+    expect($result['version'])->toBe('1.2.3');
+    expect($result['commit'])->toBe('abc');
+    expect($result['date'])->toBe('2024-01-01 00:00:00');
+});

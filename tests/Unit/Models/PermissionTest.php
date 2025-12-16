@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Models\Permission;
 
-test('permission model has correct structure', function (): void {
+it('permission model has correct structure', function (): void {
     $reflection = new ReflectionClass(Permission::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -18,7 +18,7 @@ test('permission model has correct structure', function (): void {
     expect($source)->toContain('\'pivot\'');
 });
 
-test('permission model uses correct traits', function (): void {
+it('permission model uses correct traits', function (): void {
     $reflection = new ReflectionClass(Permission::class);
     $traits = $reflection->getTraitNames();
 
@@ -27,7 +27,7 @@ test('permission model uses correct traits', function (): void {
     expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidations');
 });
 
-test('permission model has required methods', function (): void {
+it('permission model has required methods', function (): void {
     $reflection = new ReflectionClass(Permission::class);
 
     expect($reflection->hasMethod('users'))->toBeTrue();
@@ -35,7 +35,7 @@ test('permission model has required methods', function (): void {
     expect($reflection->hasMethod('getRules'))->toBeTrue();
 });
 
-test('permission model has correct relationships', function (): void {
+it('permission model has correct relationships', function (): void {
     $reflection = new ReflectionClass(Permission::class);
 
     // Test users relationship
@@ -47,7 +47,7 @@ test('permission model has correct relationships', function (): void {
     expect($method->getReturnType()->getName())->toBe('Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany');
 });
 
-test('permission model has correct method signatures', function (): void {
+it('permission model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(Permission::class);
 
     // Test getRules method

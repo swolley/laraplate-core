@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Models\CronJob;
 
-test('cron job model has correct structure', function (): void {
+it('cron job model has correct structure', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -18,7 +18,7 @@ test('cron job model has correct structure', function (): void {
     expect($source)->toContain('\'is_active\'');
 });
 
-test('cron job model uses correct traits', function (): void {
+it('cron job model uses correct traits', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
     $traits = $reflection->getTraitNames();
 
@@ -29,13 +29,13 @@ test('cron job model uses correct traits', function (): void {
     expect($traits)->toContain('Modules\\Core\\Helpers\\SoftDeletes');
 });
 
-test('cron job model has required methods', function (): void {
+it('cron job model has required methods', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
 
     expect($reflection->hasMethod('getRules'))->toBeTrue();
 });
 
-test('cron job model has correct method signatures', function (): void {
+it('cron job model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
 
     // Test getRules method

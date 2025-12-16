@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Models\License;
 
-test('license model has correct structure', function (): void {
+it('license model has correct structure', function (): void {
     $reflection = new ReflectionClass(License::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -13,7 +13,7 @@ test('license model has correct structure', function (): void {
     expect($source)->toContain('[]');
 });
 
-test('license model uses correct traits', function (): void {
+it('license model uses correct traits', function (): void {
     $reflection = new ReflectionClass(License::class);
     $traits = $reflection->getTraitNames();
 
@@ -23,14 +23,14 @@ test('license model uses correct traits', function (): void {
     expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidity');
 });
 
-test('license model has required methods', function (): void {
+it('license model has required methods', function (): void {
     $reflection = new ReflectionClass(License::class);
 
     expect($reflection->hasMethod('user'))->toBeTrue();
     expect($reflection->hasMethod('getRules'))->toBeTrue();
 });
 
-test('license model has correct relationships', function (): void {
+it('license model has correct relationships', function (): void {
     $reflection = new ReflectionClass(License::class);
 
     // Test user relationship
@@ -38,7 +38,7 @@ test('license model has correct relationships', function (): void {
     expect($method->getReturnType()->getName())->toBe('Illuminate\\Database\\Eloquent\\Relations\\HasOne');
 });
 
-test('license model has correct method signatures', function (): void {
+it('license model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(License::class);
 
     // Test getRules method

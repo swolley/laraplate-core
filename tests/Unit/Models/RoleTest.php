@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Models\Role;
 
-test('role model has correct structure', function (): void {
+it('role model has correct structure', function (): void {
     $reflection = new ReflectionClass(Role::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -18,7 +18,7 @@ test('role model has correct structure', function (): void {
     expect($source)->toContain('\'pivot\'');
 });
 
-test('role model uses correct traits', function (): void {
+it('role model uses correct traits', function (): void {
     $reflection = new ReflectionClass(Role::class);
     $traits = $reflection->getTraitNames();
 
@@ -29,7 +29,7 @@ test('role model uses correct traits', function (): void {
     expect($traits)->toContain('Modules\\Core\\Helpers\\SoftDeletes');
 });
 
-test('role model has required methods', function (): void {
+it('role model has required methods', function (): void {
     $reflection = new ReflectionClass(Role::class);
 
     expect($reflection->hasMethod('users'))->toBeTrue();
@@ -37,7 +37,7 @@ test('role model has required methods', function (): void {
     expect($reflection->hasMethod('getRules'))->toBeTrue();
 });
 
-test('role model has correct relationships', function (): void {
+it('role model has correct relationships', function (): void {
     $reflection = new ReflectionClass(Role::class);
 
     // Test users relationship
@@ -49,7 +49,7 @@ test('role model has correct relationships', function (): void {
     expect($method->getReturnType()->getName())->toBe('Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany');
 });
 
-test('role model has correct method signatures', function (): void {
+it('role model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(Role::class);
 
     // Test getRules method

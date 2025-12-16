@@ -294,51 +294,70 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 -   **Database and ORM:**
 
-    -   [doctrine/dbal](https://github.com/doctrine/dbal): A database abstraction layer for PHP.
-    -   [laravel/fortify](https://github.com/laravel/fortify): Provides authentication features for Laravel applications.
-    -   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): Adds versioning capabilities to Eloquent models.
-    -   [spatie/laravel-permission](https://github.com/spatie/spatie-laravel-permission): Manages user roles and permissions.
-    -   [staudenmeir/laravel-adjacency-list](https://github.com/staudenmeir/laravel-adjacency-list): Provides adjacency list pattern for hierarchical data.
+    -   [doctrine/dbal](https://github.com/doctrine/dbal): Database abstraction layer.
+    -   [laravel/fortify](https://github.com/laravel/fortify): Authentication scaffolding.
+    -   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): Model versioning.
+    -   [spatie/laravel-permission](https://github.com/spatie/laravel-permission): Roles and permissions.
+    -   [staudenmeir/laravel-adjacency-list](https://github.com/staudenmeir/laravel-adjacency-list): Hierarchical data handling.
+    -   [spatie/eloquent-sortable](https://github.com/spatie/eloquent-sortable): Ordering helpers for Eloquent.
+
+-   **UI / Admin:**
+
+    -   [filament/filament](https://github.com/filamentphp/filament): Admin panel toolkit (v4).
+    -   [pxlrbt/filament-environment-indicator](https://github.com/pxlrbt/filament-environment-indicator): Environment badge in Filament.
+
+-   **Media:**
+
+    -   [spatie/laravel-medialibrary](https://github.com/spatie/laravel-medialibrary): Media handling for models.
 
 -   **Logging and Monitoring:**
 
-    -   [hedii/laravel-gelf-logger](https://github.com/hedii/laravel-gelf-logger): Sends logs to Graylog using the GELF format.
-    -   [laravel/horizon](https://github.com/laravel/horizon): Provides a dashboard and code-driven configuration for Laravel queues.
+    -   [hedii/laravel-gelf-logger](https://github.com/hedii/laravel-gelf-logger): Graylog via GELF.
+    -   [laravel/horizon](https://github.com/laravel/horizon): Queue dashboard and management.
 
 -   **User Management:**
 
-    -   [lab404/laravel-impersonate](https://github.com/404labfr/laravel-impersonate): Allows user impersonation for testing and support.
-    -   [stephenlake/laravel-approval](https://github.com/stephenlake/laravel-approval): Implements an approval workflow for models.
-    -   [laravel/socialite](https://github.com/laravel/socialite): Provides OAuth authentication for Laravel applications.
+    -   [lab404/laravel-impersonate](https://github.com/404labfr/laravel-impersonate): User impersonation.
+    -   [stephenlake/laravel-approval](https://github.com/stephenlake/laravel-approval): Approval workflow.
+    -   [laravel/socialite](https://github.com/laravel/socialite): OAuth providers.
 
 -   **API and Documentation:**
 
-    -   [wotz/laravel-swagger-ui](https://github.com/wotzebra/laravel-swagger-ui): Generates Swagger UI documentation for your API.
-    -   [mtrajano/laravel-swagger](https://github.com/mtrajano/laravel-swagger): Provides Swagger annotations for Laravel.
+    -   [wotz/laravel-swagger-ui](https://github.com/wotzebra/laravel-swagger-ui): Swagger UI hosting.
+    -   [mtrajano/laravel-swagger](https://github.com/mtrajano/laravel-swagger): Swagger annotations.
 
 -   **Search and Caching:**
 
-    -   [elasticsearch/elasticsearch](https://github.com/elasticsearch/elasticsearch): Integrates Elasticsearch for advanced search capabilities.
-    -   [theodo-group/llphant](https://github.com/theodo-group/llphant): Provides a library for handling Elasticsearch indexing.
-    -   [babenkoivan/elastic-scout-driver](https://github.com/babenkoivan/elastic-scout-driver): Laravel Scout driver for Elasticsearch.
-    -   [babenkoivan/elastic-scout-driver-plus](https://github.com/babenkoivan/elastic-scout-driver-plus): Enhanced Laravel Scout driver for Elasticsearch.
-    -   [typesense/typesense-php](https://github.com/typesense/typesense-php): PHP client for Typesense search engine.
-    -   [laravel/scout](https://github.com/laravel/scout): Laravel Scout provides a simple, driver-based solution for adding full-text search to your Eloquent models.
+    -   [elasticsearch/elasticsearch](https://github.com/elasticsearch/elasticsearch): Elasticsearch client.
+    -   [theodo-group/llphant](https://github.com/theodo-group/llphant): Elasticsearch indexing helpers.
+    -   [babenkoivan/elastic-scout-driver](https://github.com/babenkoivan/elastic-scout-driver): Scout driver for Elasticsearch.
+    -   [babenkoivan/elastic-scout-driver-plus](https://github.com/babenkoivan/elastic-scout-driver-plus): Enhanced Elasticsearch features.
+    -   [typesense/typesense-php](https://github.com/typesense/typesense-php): Typesense client.
+    -   [laravel/scout](https://github.com/laravel/scout): Scout full-text abstraction.
 
 -   **Spatial Data:**
 
-    -   [matanyadaev/laravel-eloquent-spatial](https://github.com/matanyadaev/laravel-eloquent-spatial): Provides spatial data support for Laravel Eloquent models.
+    -   [matanyadaev/laravel-eloquent-spatial](https://github.com/matanyadaev/laravel-eloquent-spatial): Spatial types for Eloquent.
 
 -   **Development and Testing:**
 
-    -   [pestphp/pest](https://github.com/pestphp/pest): A testing framework for PHP.
-    -   [pestphp/pest-plugin-laravel](https://github.com/pestphp/pest-plugin-laravel): Adds Laravel-specific testing features to Pest.
-    -   [pestphp/pest-plugin-stressless](https://github.com/pestphp/pest-plugin-stressless): Stress testing plugin for Pest.
-    -   [pestphp/pest-plugin-type-coverage](https://github.com/pestphp/pest-plugin-type-coverage): Type coverage plugin for Pest.
-    -   [laravel/pint](https://github.com/laravel/pint): Laravel's code style fixer.
-    -   [nunomaduro/phpinsights](https://github.com/nunomaduro/phpinsights): PHP quality checker.
-    -   [peckphp/peck](https://github.com/peckphp/peck): PHP typo checker.
-    -   [rector/rector](https://github.com/rectorphp/rector): Automated PHP code refactoring tool.
+    -   [pestphp/pest](https://github.com/pestphp/pest) (+ stressless, type-coverage, laravel plugins).
+    -   [laravel/pint](https://github.com/laravel/pint): Code style fixer.
+    -   [nunomaduro/phpinsights](https://github.com/nunomaduro/phpinsights): Quality insights.
+    -   [peckphp/peck](https://github.com/peckphp/peck): Typo checker.
+    -   [rector/rector](https://github.com/rectorphp/rector): Automated refactoring.
+    -   [driftingly/rector-laravel](https://github.com/driftingly/rector-laravel): Rector rules for Laravel.
+    -   [larastan/larastan](https://github.com/nunomaduro/larastan): PHPStan for Laravel.
+    -   [barryvdh/laravel-ide-helper](https://github.com/barryvdh/laravel-ide-helper): IDE helpers.
+    -   [laravel/boost](https://github.com/laravel/boost): Local dev helper.
+    -   [laravel/pail](https://github.com/laravel/pail): CLI log viewer.
+
+### Environment (principali variabili)
+
+-   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
+-   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`.
+-   Search/AI: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (quando abilitato).
+-   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE`, `QUEUE_CONNECTION=failover`, `FILESYSTEM_DISK`, `LOG_*`.
 
 ### Additional Functionalities
 

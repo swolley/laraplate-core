@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Models\User;
 
-test('user model has correct structure', function (): void {
+it('user model has correct structure', function (): void {
     $reflection = new ReflectionClass(User::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -34,7 +34,7 @@ test('user model has correct structure', function (): void {
     expect($source)->toContain('updated_at');
 });
 
-test('user model uses correct traits', function (): void {
+it('user model uses correct traits', function (): void {
     $reflection = new ReflectionClass(User::class);
     $traits = $reflection->getTraitNames();
 
@@ -49,7 +49,7 @@ test('user model uses correct traits', function (): void {
     expect($traits)->toContain('Laravel\\Fortify\\TwoFactorAuthenticatable');
 });
 
-test('user model has required methods', function (): void {
+it('user model has required methods', function (): void {
     $reflection = new ReflectionClass(User::class);
 
     expect($reflection->hasMethod('license'))->toBeTrue();
@@ -63,14 +63,14 @@ test('user model has required methods', function (): void {
     expect($reflection->hasMethod('getRules'))->toBeTrue();
 });
 
-test('user model implements correct interfaces', function (): void {
+it('user model implements correct interfaces', function (): void {
     $reflection = new ReflectionClass(User::class);
 
     expect($reflection->implementsInterface('Filament\\Models\\Contracts\\FilamentUser'))->toBeTrue();
     expect($reflection->implementsInterface('Illuminate\\Contracts\\Auth\\MustVerifyEmail'))->toBeTrue();
 });
 
-test('user model has correct method signatures', function (): void {
+it('user model has correct method signatures', function (): void {
     $reflection = new ReflectionClass(User::class);
 
     // Test isSuperAdmin method
@@ -108,7 +108,7 @@ test('user model has correct method signatures', function (): void {
     expect($method->getReturnType()->getName())->toBe('array');
 });
 
-test('user model has license relationship', function (): void {
+it('user model has license relationship', function (): void {
     $reflection = new ReflectionClass(User::class);
     expect($reflection->hasMethod('license'))->toBeTrue();
 

@@ -5,8 +5,9 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\CronJob;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->cronJob = CronJob::factory()->create();
@@ -87,17 +88,17 @@ it('has soft deletes trait', function (): void {
 });
 
 it('has versions trait', function (): void {
-    expect($this->cronJob)->toHaveMethod('versions');
-    expect($this->cronJob)->toHaveMethod('createVersion');
+    expect(method_exists($this->cronJob, 'versions'))->toBeTrue();
+    expect(method_exists($this->cronJob, 'createVersion'))->toBeTrue();
 });
 
 it('has locks trait', function (): void {
-    expect($this->cronJob)->toHaveMethod('lock');
-    expect($this->cronJob)->toHaveMethod('unlock');
+    expect(method_exists($this->cronJob, 'lock'))->toBeTrue();
+    expect(method_exists($this->cronJob, 'unlock'))->toBeTrue();
 });
 
 it('has validations trait', function (): void {
-    expect($this->cronJob)->toHaveMethod('getRules');
+    expect(method_exists($this->cronJob, 'getRules'))->toBeTrue();
 });
 
 it('can be created with specific attributes', function (): void {
