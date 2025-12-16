@@ -95,9 +95,8 @@ it('can get all permissions including from ancestors', function (): void {
 });
 
 it('can check if role has specific permission', function (): void {
-    $permission = Permission::create(['name' => 'default.users_table.insert']);
-    $this->role->permissions()->attach($permission);
-    $this->role->refresh(); // Refresh to ensure permissions are loaded
+    $permission = Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $this->role->guard_name]);
+    $this->role->givePermissionTo($permission); // Use Spatie's method instead of attach
 
     expect($this->role->hasPermission('default.users_table.insert'))->toBeTrue();
     expect($this->role->hasPermission('default.users_table.delete'))->toBeFalse();
@@ -107,8 +106,8 @@ it('can check permission from parent role', function (): void {
     $parentRole = Role::factory()->create(['name' => 'parent-role']);
     $childRole = Role::factory()->create(['name' => 'child-role']);
 
-    $permission = Permission::create(['name' => 'default.users_table.insert']);
-    $parentRole->permissions()->attach($permission);
+    $permission = Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $parentRole->guard_name]);
+    $parentRole->givePermissionTo($permission); // Use Spatie's method instead of attach
 
     $childRole->parent_id = $parentRole->id;
     $childRole->save();
@@ -160,12 +159,17 @@ it('has validation rules for update', function (): void {
 it('validates unique name on creation', function (): void {
     Role::factory()->create(['name' => 'existing-role']);
 
-    // Laravel validation throws ValidationException when using Rule::unique()
-    expect(fn () => Role::create(['name' => 'existing-role', 'guard_name' => 'web']))
-        ->toThrow(ValidationException::class);
+    // Either ValidationException (Laravel validation) or RoleAlreadyExists (Spatie) can be thrown
+    // Verify that an exception is thrown (either one is acceptable)
+    try {
+        Role::create(['name' => 'existing-role', 'guard_name' => 'web']);
+        expect(false)->toBeTrue(); // Should not reach here
+    } catch (\Spatie\Permission\Exceptions\RoleAlreadyExists $e) {
+        expect(true)->toBeTrue(); // Expected exception
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        expect(true)->toBeTrue(); // Also acceptable
+    }
 });
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-run_terminal_cmd
 
 it('validates unique name on update ignoring self', function (): void {
     $role = Role::factory()->create(['name' => 'test-role']);

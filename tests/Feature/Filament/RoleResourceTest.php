@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
+use Tests\TestCase;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
+    /** @var TestCase $this */
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
         'password' => 'password',
@@ -18,19 +21,21 @@ beforeEach(function (): void {
 });
 
 test('can list roles', function (): void {
-    $response = actingAs($this->admin)
+    /** @var TestCase $this */
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.roles.index'));
 
     $response->assertSuccessful();
 });
 
 test('can create role', function (): void {
+    /** @var TestCase $this */
     $roleData = [
         'name' => 'Test Role',
         'description' => 'Test role description',
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->post(route('filament.admin.resources.core.roles.create'), $roleData);
 
     $response->assertSuccessful();
@@ -41,22 +46,24 @@ test('can create role', function (): void {
 });
 
 test('can edit role', function (): void {
+    /** @var TestCase $this */
     $role = Role::factory()->create();
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.roles.edit', ['record' => $role]));
 
     $response->assertSuccessful();
 });
 
 test('can update role', function (): void {
+    /** @var TestCase $this */
     $role = Role::factory()->create();
     $updateData = [
         'name' => 'Updated Role',
         'description' => 'Updated role description',
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->put(route('filament.admin.resources.core.roles.update', ['record' => $role]), $updateData);
 
     $response->assertSuccessful();
@@ -68,9 +75,10 @@ test('can update role', function (): void {
 });
 
 test('can delete role', function (): void {
+    /** @var TestCase $this */
     $role = Role::factory()->create();
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->delete(route('filament.admin.resources.core.roles.delete', ['record' => $role]));
 
     $response->assertSuccessful();

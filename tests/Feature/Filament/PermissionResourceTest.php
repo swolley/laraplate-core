@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use Modules\Core\Models\User;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
@@ -27,7 +30,7 @@ test('can list permissions', function (): void {
 
 test('can create permission', function (): void {
     $permissionData = [
-        'name' => 'test.permission',
+        'name' => 'default.test_table.select',
         'description' => 'Test permission description',
     ];
 
@@ -36,13 +39,13 @@ test('can create permission', function (): void {
 
     $response->assertSuccessful();
     expect(Illuminate\Support\Facades\DB::table('permissions')->where([
-        'name' => 'test.permission',
+        'name' => 'default.test_table.select',
         'description' => 'Test permission description',
     ])->exists())->toBeTrue();
 });
 
 test('can edit permission', function (): void {
-    $permission = Permission::factory()->create();
+    $permission = Permission::create(['name' => 'default.test_table.select']);
 
     $response = actingAs($this->admin)
         ->get(route('filament.admin.resources.core.permissions.edit', ['record' => $permission]));
@@ -51,9 +54,9 @@ test('can edit permission', function (): void {
 });
 
 test('can update permission', function (): void {
-    $permission = Permission::factory()->create();
+    $permission = Permission::create(['name' => 'default.test_table.select']);
     $updateData = [
-        'name' => 'updated.permission',
+        'name' => 'default.updated_table.select',
         'description' => 'Updated permission description',
     ];
 
@@ -63,13 +66,13 @@ test('can update permission', function (): void {
     $response->assertSuccessful();
     expect(Illuminate\Support\Facades\DB::table('permissions')->where([
         'id' => $permission->id,
-        'name' => 'updated.permission',
+        'name' => 'default.updated_table.select',
         'description' => 'Updated permission description',
     ])->exists())->toBeTrue();
 });
 
 test('can delete permission', function (): void {
-    $permission = Permission::factory()->create();
+    $permission = Permission::create(['name' => 'default.test_table.select']);
 
     $response = actingAs($this->admin)
         ->delete(route('filament.admin.resources.core.permissions.delete', ['record' => $permission]));

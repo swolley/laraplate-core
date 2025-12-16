@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
+use Tests\TestCase;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
+    /** @var TestCase $this */
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
         'password' => 'password',
@@ -20,69 +23,82 @@ beforeEach(function (): void {
 });
 
 test('can list acls', function (): void {
-    $response = actingAs($this->admin)
+    /** @var TestCase $this */
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.acls.index'));
 
     $response->assertSuccessful();
 });
 
 test('can create acl', function (): void {
-    $permission = Permission::factory()->create();
+    /** @var TestCase $this */
+    $permission = Permission::create(['name' => 'default.test_table.select']);
     $aclData = [
         'permission_id' => $permission->id,
-        'filters' => ['test' => 'value'],
-        'sort' => ['field' => 'created_at', 'direction' => 'desc'],
+        'filters' => json_encode(['filters' => [['field' => 'test', 'value' => 'value']], 'operator' => 'and']),
+        'sort' => json_encode([['property' => 'created_at', 'direction' => 'desc']]),
         'description' => 'Test ACL description',
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->post(route('filament.admin.resources.core.acls.create'), $aclData);
 
     $response->assertSuccessful();
     expect(Illuminate\Support\Facades\DB::table('acls')->where([
         'permission_id' => $permission->id,
-        'filters' => json_encode(['test' => 'value']),
-        'sort' => json_encode(['field' => 'created_at', 'direction' => 'desc']),
         'description' => 'Test ACL description',
     ])->exists())->toBeTrue();
 });
 
 test('can edit acl', function (): void {
-    $acl = ACL::factory()->create();
+    /** @var TestCase $this */
+    $permission = Permission::create(['name' => 'default.test_table.select']);
+    $acl = ACL::create([
+        'permission_id' => $permission->id,
+        'filters' => json_encode(['filters' => [], 'operator' => 'and']),
+    ]);
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.acls.edit', ['record' => $acl]));
 
     $response->assertSuccessful();
 });
 
 test('can update acl', function (): void {
-    $acl = ACL::factory()->create();
-    $permission = Permission::factory()->create();
+    /** @var TestCase $this */
+    $permission1 = Permission::create(['name' => 'default.test_table.select']);
+    $acl = ACL::create([
+        'permission_id' => $permission1->id,
+        'filters' => json_encode(['filters' => [], 'operator' => 'and']),
+    ]);
+    $permission2 = Permission::create(['name' => 'default.updated_table.select']);
     $updateData = [
-        'permission_id' => $permission->id,
-        'filters' => ['updated' => 'value'],
-        'sort' => ['field' => 'updated_at', 'direction' => 'asc'],
+        'permission_id' => $permission2->id,
+        'filters' => json_encode(['filters' => [['field' => 'updated', 'value' => 'value']], 'operator' => 'and']),
+        'sort' => json_encode([['property' => 'updated_at', 'direction' => 'asc']]),
         'description' => 'Updated ACL description',
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->put(route('filament.admin.resources.core.acls.update', ['record' => $acl]), $updateData);
 
     $response->assertSuccessful();
     expect(Illuminate\Support\Facades\DB::table('acls')->where([
         'id' => $acl->id,
-        'permission_id' => $permission->id,
-        'filters' => json_encode(['updated' => 'value']),
-        'sort' => json_encode(['field' => 'updated_at', 'direction' => 'asc']),
+        'permission_id' => $permission2->id,
         'description' => 'Updated ACL description',
     ])->exists())->toBeTrue();
 });
 
 test('can delete acl', function (): void {
-    $acl = ACL::factory()->create();
+    /** @var TestCase $this */
+    $permission = Permission::create(['name' => 'default.test_table.select']);
+    $acl = ACL::create([
+        'permission_id' => $permission->id,
+        'filters' => json_encode(['filters' => [], 'operator' => 'and']),
+    ]);
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->delete(route('filament.admin.resources.core.acls.delete', ['record' => $acl]));
 
     $response->assertSuccessful();

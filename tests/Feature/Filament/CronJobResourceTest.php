@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
+use Tests\TestCase;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
+    /** @var TestCase $this */
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
         'password' => 'password',
@@ -19,13 +22,15 @@ beforeEach(function (): void {
 });
 
 test('can list cron jobs', function (): void {
-    $response = actingAs($this->admin)
+    /** @var TestCase $this */
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.cron-jobs.index'));
 
     $response->assertSuccessful();
 });
 
 test('can create cron job', function (): void {
+    /** @var TestCase $this */
     $cronJobData = [
         'name' => 'Test Cron Job',
         'command' => 'test:command',
@@ -34,7 +39,7 @@ test('can create cron job', function (): void {
         'is_active' => true,
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->post(route('filament.admin.resources.core.cron-jobs.create'), $cronJobData);
 
     $response->assertSuccessful();
@@ -48,15 +53,17 @@ test('can create cron job', function (): void {
 });
 
 test('can edit cron job', function (): void {
+    /** @var TestCase $this */
     $cronJob = CronJob::factory()->create();
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->get(route('filament.admin.resources.core.cron-jobs.edit', ['record' => $cronJob]));
 
     $response->assertSuccessful();
 });
 
 test('can update cron job', function (): void {
+    /** @var TestCase $this */
     $cronJob = CronJob::factory()->create();
     $updateData = [
         'name' => 'Updated Cron Job',
@@ -66,7 +73,7 @@ test('can update cron job', function (): void {
         'is_active' => false,
     ];
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->put(route('filament.admin.resources.core.cron-jobs.update', ['record' => $cronJob]), $updateData);
 
     $response->assertSuccessful();
@@ -81,9 +88,10 @@ test('can update cron job', function (): void {
 });
 
 test('can delete cron job', function (): void {
+    /** @var TestCase $this */
     $cronJob = CronJob::factory()->create();
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->delete(route('filament.admin.resources.core.cron-jobs.delete', ['record' => $cronJob]));
 
     $response->assertSuccessful();
@@ -91,9 +99,10 @@ test('can delete cron job', function (): void {
 });
 
 test('can run cron job', function (): void {
+    /** @var TestCase $this */
     $cronJob = CronJob::factory()->create();
 
-    $response = actingAs($this->admin)
+    $response = $this->actingAs($this->admin)
         ->post(route('filament.admin.resources.core.cron-jobs.run', ['record' => $cronJob]));
 
     $response->assertSuccessful();
