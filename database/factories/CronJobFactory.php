@@ -29,10 +29,10 @@ final class CronJobFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => 'inspire',
+            'name' => 'inspire-' . uniqid(),
             'command' => 'php artisan inspire',
             // 'parameters',
-            'schedule' => '9 * * * * *',
+            'schedule' => '0 * * * *',
             'description' => 'Display an inspiring quote',
             'is_active' => false,
         ];

@@ -56,9 +56,76 @@ return new class() extends Migration
             DB::statement('CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)');
             DB::statement("ALTER TABLE permissions ADD CONSTRAINT permissions_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
         } elseif ($connection->getDriverName() === 'sqlite') {
-            DB::statement("ALTER TABLE permissions ADD COLUMN connection_name TEXT AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
-            DB::statement("ALTER TABLE permissions ADD COLUMN table_name TEXT AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
+            // SQLite doesn't support regexp_replace in generated columns, so we use regular columns with triggers
+            DB::statement('ALTER TABLE permissions ADD COLUMN connection_name TEXT');
+            DB::statement('ALTER TABLE permissions ADD COLUMN table_name TEXT');
             DB::statement('CREATE INDEX permissions_ref_IDX ON permissions (connection_name, table_name)');
+
+            // Trigger to extract connection_name (first part before first dot, removing dots if multiple)
+            DB::statement("
+                CREATE TRIGGER permissions_set_connection_name 
+                AFTER INSERT ON permissions
+                BEGIN
+                    UPDATE permissions 
+                    SET connection_name = substr(name, 1, CASE 
+                        WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
+                        THEN instr(name, '.') - 1 
+                        ELSE length(name) 
+                    END)
+                    WHERE id = NEW.id;
+                END
+            ");
+
+            DB::statement("
+                CREATE TRIGGER permissions_update_connection_name 
+                AFTER UPDATE OF name ON permissions
+                BEGIN
+                    UPDATE permissions 
+                    SET connection_name = substr(name, 1, CASE 
+                        WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
+                        THEN instr(name, '.') - 1 
+                        ELSE length(name) 
+                    END)
+                    WHERE id = NEW.id;
+                END
+            ");
+
+            // Trigger to extract table_name (middle part between first and last dot)
+            DB::statement("
+                CREATE TRIGGER permissions_set_table_name 
+                AFTER INSERT ON permissions
+                BEGIN
+                    UPDATE permissions 
+                    SET table_name = substr(
+                        name, 
+                        instr(name, '.') + 1,
+                        CASE 
+                            WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
+                            THEN instr(substr(name, instr(name, '.') + 1), '.') - 1
+                            ELSE 0
+                        END
+                    )
+                    WHERE id = NEW.id;
+                END
+            ");
+
+            DB::statement("
+                CREATE TRIGGER permissions_update_table_name 
+                AFTER UPDATE OF name ON permissions
+                BEGIN
+                    UPDATE permissions 
+                    SET table_name = substr(
+                        name, 
+                        instr(name, '.') + 1,
+                        CASE 
+                            WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
+                            THEN instr(substr(name, instr(name, '.') + 1), '.') - 1
+                            ELSE 0
+                        END
+                    )
+                    WHERE id = NEW.id;
+                END
+            ");
         } else {
             throw new Exception('Unsupported database driver');
         }

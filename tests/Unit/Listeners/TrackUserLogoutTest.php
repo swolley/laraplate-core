@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Listeners\TrackUserLogout;
 
-test('listener has correct class structure', function (): void {
+it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Listeners\TrackUserLogout');
@@ -12,7 +12,7 @@ test('listener has correct class structure', function (): void {
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 
-test('listener handle method has correct signature', function (): void {
+it('listener handle method has correct signature', function (): void {
     $reflection = new ReflectionMethod(TrackUserLogout::class, 'handle');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -20,14 +20,14 @@ test('listener handle method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('listener uses correct imports', function (): void {
+it('listener uses correct imports', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('use Illuminate\Auth\Events\Logout;');
 });
 
-test('listener handle method processes logout event', function (): void {
+it('listener handle method processes logout event', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -35,14 +35,14 @@ test('listener handle method processes logout event', function (): void {
     expect($source)->toContain('$user = $event->user;');
 });
 
-test('listener handles user license deletion', function (): void {
+it('listener handles user license deletion', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('$user->license?->delete();');
 });
 
-test('listener has commented session handling', function (): void {
+it('listener has commented session handling', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -50,7 +50,7 @@ test('listener has commented session handling', function (): void {
     expect($source)->toContain('// Remove session from the database');
 });
 
-test('listener has proper type annotation', function (): void {
+it('listener has proper type annotation', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 

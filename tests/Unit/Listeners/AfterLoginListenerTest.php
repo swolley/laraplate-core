@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Listeners\AfterLoginListener;
 
-test('listener has correct class structure', function (): void {
+it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Listeners\AfterLoginListener');
@@ -13,7 +13,7 @@ test('listener has correct class structure', function (): void {
     expect($reflection->hasMethod('checkUserLicense'))->toBeTrue();
 });
 
-test('listener handle method has correct signature', function (): void {
+it('listener handle method has correct signature', function (): void {
     $reflection = new ReflectionMethod(AfterLoginListener::class, 'handle');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -21,7 +21,7 @@ test('listener handle method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('listener checkUserLicense method has correct signature', function (): void {
+it('listener checkUserLicense method has correct signature', function (): void {
     $reflection = new ReflectionMethod(AfterLoginListener::class, 'checkUserLicense');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -30,7 +30,7 @@ test('listener checkUserLicense method has correct signature', function (): void
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('listener uses correct imports', function (): void {
+it('listener uses correct imports', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -46,7 +46,7 @@ test('listener uses correct imports', function (): void {
     expect($source)->toContain('use RuntimeException;');
 });
 
-test('listener handle method processes login event', function (): void {
+it('listener handle method processes login event', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -54,28 +54,28 @@ test('listener handle method processes login event', function (): void {
     expect($source)->toContain('$user = $login->user;');
 });
 
-test('listener checks for impersonate trait', function (): void {
+it('listener checks for impersonate trait', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('class_uses_trait($user, Impersonate::class)');
 });
 
-test('listener calls checkUserLicense method', function (): void {
+it('listener calls checkUserLicense method', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('self::checkUserLicense($user);');
 });
 
-test('listener updates last login timestamp', function (): void {
+it('listener updates last login timestamp', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('$user->update([\'last_login_at\' => Date::now()]);');
 });
 
-test('listener handles unlocked users', function (): void {
+it('listener handles unlocked users', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -83,7 +83,7 @@ test('listener handles unlocked users', function (): void {
     expect($source)->toContain('Auth::logoutOtherDevices($user->password);');
 });
 
-test('listener logs user login', function (): void {
+it('listener logs user login', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -91,7 +91,7 @@ test('listener logs user login', function (): void {
     expect($source)->toContain('[\'username\' => $user->username]');
 });
 
-test('listener handles impersonation', function (): void {
+it('listener handles impersonation', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -100,7 +100,7 @@ test('listener handles impersonation', function (): void {
     expect($source)->toContain('Log::info(\'{impersonator} is impersonating {impersonated}\'');
 });
 
-test('listener checkUserLicense method handles license logic', function (): void {
+it('listener checkUserLicense method handles license logic', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -110,7 +110,7 @@ test('listener checkUserLicense method handles license logic', function (): void
     expect($source)->toContain('$user->license_id === null');
 });
 
-test('listener checkUserLicense method queries available licenses', function (): void {
+it('listener checkUserLicense method queries available licenses', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -119,7 +119,7 @@ test('listener checkUserLicense method queries available licenses', function ():
     expect($source)->toContain('$user->license()->associate($available_licenses->first())');
 });
 
-test('listener has proper exception handling', function (): void {
+it('listener has proper exception handling', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
     $source = file_get_contents($reflection->getFileName());
 

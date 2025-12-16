@@ -101,7 +101,7 @@ it('user model has correct method signatures', function (): void {
 
     // Test getImpersonator method
     $method = $reflection->getMethod('getImpersonator');
-    expect($method->getReturnType()->getName())->toBe('self');
+    expect($method->getReturnType()->getName())->toBe('Modules\\Core\\Models\\User');
 
     // Test getRules method
     $method = $reflection->getMethod('getRules');

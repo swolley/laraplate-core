@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 use Modules\Core\Grids\Hooks\HasWriteHooks;
 
-test('trait has correct class structure', function (): void {
+it('trait has correct class structure', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Grids\Hooks\HasWriteHooks');
     expect($reflection->isTrait())->toBeTrue();
 });
 
-test('trait has writeEvents property', function (): void {
+it('trait has writeEvents property', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
 
     expect($reflection->hasProperty('writeEvents'))->toBeTrue();
@@ -21,7 +21,7 @@ test('trait has writeEvents property', function (): void {
     expect($property->getType()->getName())->toBe('array');
 });
 
-test('trait has all required methods', function (): void {
+it('trait has all required methods', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
 
     expect($reflection->hasMethod('onPreInsert'))->toBeTrue();
@@ -32,7 +32,7 @@ test('trait has all required methods', function (): void {
     expect($reflection->hasMethod('onPostDelete'))->toBeTrue();
 });
 
-test('trait onPreInsert method has correct signature', function (): void {
+it('trait onPreInsert method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPreInsert');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -40,7 +40,7 @@ test('trait onPreInsert method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait onPostInsert method has correct signature', function (): void {
+it('trait onPostInsert method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPostInsert');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -48,7 +48,7 @@ test('trait onPostInsert method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait onPreUpdate method has correct signature', function (): void {
+it('trait onPreUpdate method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPreUpdate');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -56,7 +56,7 @@ test('trait onPreUpdate method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait onPostUpdate method has correct signature', function (): void {
+it('trait onPostUpdate method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPostUpdate');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -64,7 +64,7 @@ test('trait onPostUpdate method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait onPreDelete method has correct signature', function (): void {
+it('trait onPreDelete method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPreDelete');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -72,7 +72,7 @@ test('trait onPreDelete method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait onPostDelete method has correct signature', function (): void {
+it('trait onPostDelete method has correct signature', function (): void {
     $reflection = new ReflectionMethod(HasWriteHooks::class, 'onPostDelete');
 
     expect($reflection->getNumberOfParameters())->toBe(1);
@@ -80,7 +80,7 @@ test('trait onPostDelete method has correct signature', function (): void {
     expect($reflection->isPublic())->toBeTrue();
 });
 
-test('trait methods use EventType enum values', function (): void {
+it('trait methods use EventType enum values', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -92,16 +92,17 @@ test('trait methods use EventType enum values', function (): void {
     expect($source)->toContain('EventType::POST_DELETE->value');
 });
 
-test('trait methods handle callback parameters', function (): void {
+it('trait methods handle callback parameters', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('?callable $callback = null');
-    expect($source)->toContain('if (! $callback)');
+    // Verifica che ci sia un controllo sul callback (può essere scritto in modi diversi)
+    expect($source)->toMatch('/(if\s*\(\s*!?\s*\$callback|if\s*\(\s*\$callback\s*===?\s*null)/');
     expect($source)->toContain('return $this->writeEvents[EventType::');
 });
 
-test('trait methods set callbacks in writeEvents array', function (): void {
+it('trait methods set callbacks in writeEvents array', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -110,7 +111,7 @@ test('trait methods set callbacks in writeEvents array', function (): void {
     expect($source)->toContain('return $this;');
 });
 
-test('trait methods return callbacks when no parameter provided', function (): void {
+it('trait methods return callbacks when no parameter provided', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
@@ -118,14 +119,14 @@ test('trait methods return callbacks when no parameter provided', function (): v
     expect($source)->toContain('] ?? null;');
 });
 
-test('trait methods support method chaining', function (): void {
+it('trait methods support method chaining', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('return $this;');
 });
 
-test('trait has correct namespace', function (): void {
+it('trait has correct namespace', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
 
     expect($reflection->getNamespaceName())->toBe('Modules\Core\Grids\Hooks');

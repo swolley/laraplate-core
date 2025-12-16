@@ -36,8 +36,7 @@ final class PermissionFactory extends Factory
         return [
             'name' => "{$connection}.{$table}.{$action}",
             'guard_name' => fake()->randomElement(['web', 'api', null]),
-            'connection_name' => $connection,
-            'table_name' => $table,
+            // connection_name and table_name are generated columns, cannot be inserted
         ];
     }
 }
