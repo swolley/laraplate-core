@@ -8,14 +8,14 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-final class UserImpersonated
+final readonly class UserImpersonated
 {
     use Dispatchable;
     use SerializesModels;
 
     public function __construct(
-        public readonly User $currentUser,
-        public readonly User $impersonatedUser,
+        public User $currentUser,
+        public User $impersonatedUser,
     ) {
     }
 }

@@ -20,9 +20,9 @@ trait HasForm
         self::loadUserPermissionsForTable($user);
 
         $model = $schema->getModel();
-        $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
-        $table = $model_instance->getTable();
-        $connection = $model_instance->getConnectionName() ?? 'default';
+        // $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
+        // $model_instance->getTable();
+        // $model_instance->getConnectionName() ?? 'default';
 
         class_uses_recursive($model);
     }

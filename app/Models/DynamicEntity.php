@@ -20,6 +20,7 @@ use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
+use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Services\DynamicEntityService;
 use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
@@ -50,7 +51,7 @@ final class DynamicEntity extends Model
     /**
      * @throws Exception
      */
-    public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
+    public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): self
     {
         return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
     }
@@ -94,13 +95,13 @@ final class DynamicEntity extends Model
         // Use service to get inspected table with in-memory caching
         $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
 
-        if ($inspected === null) {
+        if (! $inspected instanceof Table) {
             return;
         }
 
         $primary_key = $inspected->primaryKey;
 
-        if ($primary_key) {
+        if ($primary_key instanceof Index) {
             $this->setPrimaryKeyInfo($primary_key, $inspected->getPrimaryKeyColumns());
         }
 

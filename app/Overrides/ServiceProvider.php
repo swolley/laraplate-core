@@ -61,7 +61,7 @@ class ServiceProvider extends BaseServiceProvider
     private static function mergeArrays(array &$array1, array $array2): array
     {
         foreach ($array2 as $key => $value) {
-            if (! array_key_exists($key, $array1)) {
+            if (! array_key_exists((string) $key, $array1)) {
                 $array1[$key] = $value;
             } elseif (is_array($value)) {
                 if (! isset($array1[$key]) || ! is_array($array1[$key])) {

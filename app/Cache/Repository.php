@@ -107,7 +107,7 @@ final class Repository extends BaseRepository
             $data = $callback();
 
             if ($data instanceof ResponseBuilder) {
-                $data = $data->getResponse();
+                return $data->getResponse();
             }
 
             return $data;

@@ -16,11 +16,10 @@ final class GetUserInfoAction
      */
     public function __invoke(?User $user): UserInfoResponse
     {
-        if ($user) {
+        if ($user instanceof User) {
             AfterLoginListener::checkUserLicense($user);
         }
 
         return new UserInfoResponse($user);
     }
 }
-

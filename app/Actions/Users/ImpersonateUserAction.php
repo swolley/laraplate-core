@@ -14,9 +14,8 @@ final class ImpersonateUserAction
     {
         $currentUser->impersonate($targetUser);
 
-        UserImpersonated::dispatch($currentUser, $targetUser);
+        event(new UserImpersonated($currentUser, $targetUser));
 
         return new UserInfoResponse($targetUser);
     }
 }
-

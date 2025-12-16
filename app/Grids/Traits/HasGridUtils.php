@@ -277,7 +277,7 @@ trait HasGridUtils
             $mapped_columns = [];
 
             foreach ($columns as $column) {
-                $mapped_columns[$column] = array_key_exists($column, $casts) ? $casts[$column] : 'string';
+                $mapped_columns[$column] = array_key_exists((string) $column, $casts) ? $casts[$column] : 'string';
             }
 
             $columns = $mapped_columns;
@@ -316,13 +316,13 @@ trait HasGridUtils
         }
 
         foreach ($this->getFillableFields() as $fillable) {
-            if (! array_key_exists($fillable, $casts)) {
+            if (! array_key_exists((string) $fillable, $casts)) {
                 $casts[$fillable] = 'string';
             }
         }
 
         foreach ($this->getTimestampColumns($this) as $name) {
-            if ($name && ! array_key_exists($name, $casts)) {
+            if ($name && ! array_key_exists((string) $name, $casts)) {
                 $casts[$name] = 'date';
             }
         }

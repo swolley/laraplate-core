@@ -9,22 +9,22 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
-final class ModelVersioningRequested implements ShouldDispatchAfterCommit
+final readonly class ModelVersioningRequested implements ShouldDispatchAfterCommit
 {
     use Dispatchable;
     use SerializesModels;
 
     public function __construct(
-        public readonly string $modelClass,
-        public readonly string|int|array|null $modelId,
-        public readonly ?string $connection,
-        public readonly string $table,
-        public readonly array $attributes,
-        public readonly array $replacements,
-        public readonly ?int $userId,
-        public readonly int $keepVersionsCount,
-        public readonly array $encryptedVersionable,
-        public readonly VersionStrategy|string|null $versionStrategy,
-        public readonly mixed $time = null,
+        public string $modelClass,
+        public string|int|array|null $modelId,
+        public ?string $connection,
+        public string $table,
+        public array $attributes,
+        public array $replacements,
+        public ?int $userId,
+        public int $keepVersionsCount,
+        public array $encryptedVersionable,
+        public VersionStrategy|string|null $versionStrategy,
+        public mixed $time = null,
     ) {}
 }

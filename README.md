@@ -276,7 +276,7 @@ If you need to override the Core Module or dependencies configs you can publish 
 
 ### Requirements
 
--   PHP >= 8.4
+-   PHP >= 8.5
 -   Laravel 12.0+
 -   **PHP Extensions:**
 

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Support\ServiceProvider;
 use Override;
 
@@ -54,7 +55,7 @@ final class CommandListenerProvider extends ServiceProvider
         return $this->app->runningInConsole() && defined('ARTISAN_BINARY')
             ? ($this->app->runningUnitTests()
                 ? 'unit-test'
-                : ($_SERVER['argv'][1] ?? null))
+                : (Request::server('argv')[1] ?? null))
             : null;
     }
 }

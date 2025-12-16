@@ -52,38 +52,14 @@ trait HasVersions
         }
 
         if ($this->asyncVersioning) {
-            ModelVersioningRequested::dispatch(
-                static::class,
-                $this->getKey(),
-                $this->getConnectionName(),
-                $this->getTable(),
-                $this->getAttributes(),
-                $replacements,
-                $this->getVersionUserId(),
-                (int) $this->getKeepVersionsCount(),
-                $this->encryptedVersionable,
-                $this->versionStrategy,
-                $time,
-            );
+            event(new \Modules\Core\Events\ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $this->versionStrategy, $time));
 
-            CreateVersionJob::dispatch(
-                modelClass: static::class,
-                modelId: $this->getKey(),
-                modelConnection: $this->getConnectionName(),
-                table: $this->getTable(),
-                attributes: $this->getAttributes(),
-                replacements: $replacements,
-                userId: $this->getVersionUserId(),
-                keepVersionsCount: (int) $this->getKeepVersionsCount(),
-                encryptedVersionable: $this->encryptedVersionable,
-                versionStrategy: $this->versionStrategy,
-                time: $time,
-            )->afterCommit();
+            dispatch(new \Modules\Core\Jobs\CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $this->versionStrategy, time: $time))->afterCommit();
 
             return null;
         }
 
-        return app(VersioningService::class)->createVersion(
+        return resolve(VersioningService::class)->createVersion(
             modelClass: static::class,
             modelId: $this->getKey(),
             connection: $this->getConnectionName(),

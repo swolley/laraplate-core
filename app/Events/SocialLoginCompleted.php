@@ -8,14 +8,14 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-final class SocialLoginCompleted
+final readonly class SocialLoginCompleted
 {
     use Dispatchable;
     use SerializesModels;
 
     public function __construct(
-        public readonly Authenticatable $user,
-        public readonly string $service,
+        public Authenticatable $user,
+        public string $service,
     ) {
     }
 }

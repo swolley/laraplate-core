@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Translation;
 
-use Illuminate\Filesystem\Filesystem;
+use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
-final class TranslationCatalogService
+final readonly class TranslationCatalogService
 {
     public function __construct(
-        private readonly Filesystem $filesystem,
-        private readonly ?\Closure $languagesProvider = null,
-    ) {
-    }
+        private ?Closure $languagesProvider = null,
+    ) {}
 
     /**
-        * @return array<string,mixed>
-        */
+     * @return array<string,mixed>
+     */
     public function buildTranslations(?string $lang, string $defaultLocale): array
     {
         $languages = $this->getLanguages($defaultLocale);
@@ -51,7 +49,7 @@ final class TranslationCatalogService
      */
     public function getLanguages(string $defaultLocale): array
     {
-        $languages = $this->languagesProvider ? ($this->languagesProvider)() : translations(true, true);
+        $languages = $this->languagesProvider instanceof Closure ? ($this->languagesProvider)() : translations(true, true);
 
         usort($languages, function ($a, $b) use ($defaultLocale): int {
             if (Str::endsWith($a, DIRECTORY_SEPARATOR . $defaultLocale)) {
@@ -86,4 +84,3 @@ final class TranslationCatalogService
         return Arr::dot($translations);
     }
 }
-

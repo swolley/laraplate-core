@@ -7,9 +7,9 @@ namespace Modules\Core\Actions\Settings;
 use Illuminate\Support\Facades\App;
 use Modules\Core\Services\Translation\TranslationCatalogService;
 
-final class GetTranslationsAction
+final readonly class GetTranslationsAction
 {
-    public function __construct(private readonly TranslationCatalogService $translationService)
+    public function __construct(private TranslationCatalogService $translationService)
     {
     }
 

@@ -4,25 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Grids;
 
+use Closure;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Helpers\PermissionChecker;
-use Modules\Core\Models\DynamicEntity;
 use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
 use ReflectionClass;
 use UnexpectedValueException;
 
-final class GetGridConfigsAction
+final readonly class GetGridConfigsAction
 {
     public function __construct(
-        private readonly ?\Closure $modelsProvider = null,
-        private readonly ?\Closure $gridResolver = null,
-    ) {
-    }
+        private ?Closure $modelsProvider = null,
+        private ?Closure $gridResolver = null,
+    ) {}
 
     /**
      * @throws BindingResolutionException
@@ -33,15 +32,17 @@ final class GetGridConfigsAction
      */
     public function __invoke(Request $request, ?string $entity = null): array
     {
-        $models = $this->modelsProvider ? ($this->modelsProvider)() : models();
+        $models = $this->modelsProvider instanceof Closure ? ($this->modelsProvider)() : models();
         $grids = [];
 
         foreach ($models as $model) {
-            if ($this->gridResolver) {
+            if ($this->gridResolver instanceof Closure) {
                 $grid = ($this->gridResolver)($model, $entity, $request);
+
                 if ($grid !== null) {
                     $grids[$model] = $grid;
                 }
+
                 continue;
             }
 
@@ -88,4 +89,3 @@ final class GetGridConfigsAction
         return null;
     }
 }
-

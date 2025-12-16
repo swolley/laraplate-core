@@ -29,7 +29,7 @@ final class SettingController extends Controller
     public function getTranslations(TranslationsRequest $request, ?string $lang = null): \Illuminate\Http\JsonResponse
     {
         $translations = Cache::tags(Cache::getCacheTags('translations'))->rememberForever(RequestFacade::route()->getName() . $lang . json_encode($request->validated()), function () use ($lang): array {
-            $selectedLang = (! in_array($lang, [null, '', '0'], true)) ? mb_substr($lang, 0, 2) : null;
+            $selectedLang = (in_array($lang, [null, '', '0'], true)) ? null : mb_substr($lang, 0, 2);
 
             return ($this->getTranslationsAction)($selectedLang);
         });

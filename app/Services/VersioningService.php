@@ -29,7 +29,7 @@ final class VersioningService
         mixed $time = null,
     ): ?Version {
         /** @var Model&object $model */
-        $model = app($modelClass);
+        $model = resolve($modelClass);
 
         if ($connection !== null) {
             $model->setConnection($connection);

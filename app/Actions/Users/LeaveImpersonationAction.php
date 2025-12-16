@@ -14,9 +14,8 @@ final class LeaveImpersonationAction
     {
         $currentUser->leaveImpersonation();
 
-        UserLeftImpersonation::dispatch($currentUser);
+        event(new UserLeftImpersonation($currentUser));
 
         return new UserInfoResponse($currentUser);
     }
 }
-

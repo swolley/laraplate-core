@@ -6,9 +6,9 @@ namespace Modules\Core\Actions\Settings;
 
 use Modules\Core\Services\Docs\VersionService;
 
-final class GetVersionInfoAction
+final readonly class GetVersionInfoAction
 {
-    public function __construct(private readonly VersionService $versionService)
+    public function __construct(private VersionService $versionService)
     {
     }
 

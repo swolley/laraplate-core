@@ -8,19 +8,19 @@ use Closure;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 
-final class MergeSwaggerDocsAction
+final readonly class MergeSwaggerDocsAction
 {
     public function __construct(
-        private readonly Filesystem $filesystem,
-        private readonly ?Closure $modulesProvider = null,
-        private readonly ?string $basePath = null,
+        private Filesystem $filesystem,
+        private ?Closure $modulesProvider = null,
+        private ?string $basePath = null,
     ) {}
 
     public function __invoke(string $version): array
     {
         $assetsPath = $this->basePath ?? resource_path('swagger');
         $files = glob($assetsPath . DIRECTORY_SEPARATOR . '*-swagger.json');
-        $modules = $this->modulesProvider ? ($this->modulesProvider)() : modules(true, false, true);
+        $modules = $this->modulesProvider instanceof Closure ? ($this->modulesProvider)() : modules(true, false, true);
 
         $additionalPaths = [];
         $mainJson = [];

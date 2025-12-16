@@ -198,7 +198,7 @@ trait HasLocks
      */
     protected function scopeLocked($query): void
     {
-        $query->where(new Locked()->lockedAtColumn(), '!=', null);
+        $query->whereNotNull(new Locked()->lockedAtColumn());
     }
 
     /**
@@ -216,7 +216,7 @@ trait HasLocks
     #[Scope]
     protected function unlocked(Builder $query): Builder
     {
-        return $query->where(new Locked()->lockedAtColumn(), null);
+        return $query->whereNull(new Locked()->lockedAtColumn());
     }
 
     /**

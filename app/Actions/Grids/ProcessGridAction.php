@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Grids;
 
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Models\DynamicEntity;
-use UnexpectedValueException;
 
-final class ProcessGridAction
+final readonly class ProcessGridAction
 {
     public function __construct(
-        private readonly ?\Closure $entityResolver = null,
-        private readonly ?\Closure $gridFactory = null,
-    ) {
-    }
+        private ?Closure $entityResolver = null,
+        private ?Closure $gridFactory = null,
+    ) {}
 
     public function __invoke(object $request, string $entity): JsonResponse
     {
@@ -26,14 +25,14 @@ final class ProcessGridAction
 
         $model = $this->resolveEntity($entity, $connection, $request);
         PermissionChecker::ensurePermissions($request, $model->getTable(), $actionValue, $model->getConnectionName());
-        $grid = $this->gridFactory ? ($this->gridFactory)($model) : new Grid($model);
+        $grid = $this->gridFactory instanceof Closure ? ($this->gridFactory)($model) : new Grid($model);
 
         return $grid->process($request);
     }
 
     private function resolveEntity(string $entity, ?string $connection, object $request)
     {
-        if ($this->entityResolver) {
+        if ($this->entityResolver instanceof Closure) {
             return ($this->entityResolver)($entity, $connection, $request);
         }
 
@@ -53,4 +52,3 @@ final class ProcessGridAction
         return 'select';
     }
 }
-

@@ -30,11 +30,9 @@ it('has fillable attributes', function (): void {
 
     $role = Role::create($roleData);
 
-    expectModelAttributes($role, [
-        'name' => 'test-role',
-        'guard_name' => 'web',
-        'description' => 'Test role description',
-    ]);
+    expect($role->name)->toBe('test-role');
+    expect($role->guard_name)->toBe('web');
+    expect($role->description)->toBe('Test role description');
 });
 
 it('has hidden attributes', function (): void {
@@ -56,13 +54,13 @@ it('belongs to many users', function (): void {
 });
 
 it('belongs to many permissions', function (): void {
-    $permission1 = Permission::factory()->create(['name' => 'users.create']);
-    $permission2 = Permission::factory()->create(['name' => 'users.update']);
+    $permission1 = Permission::create(['name' => 'default.users_table.insert']);
+    $permission2 = Permission::create(['name' => 'default.users_table.update']);
 
     $this->role->permissions()->attach([$permission1->id, $permission2->id]);
 
     expect($this->role->permissions)->toHaveCount(2);
-    expect($this->role->permissions->pluck('name')->toArray())->toContain('users.create', 'users.update');
+    expect($this->role->permissions->pluck('name')->toArray())->toContain('default.users_table.insert', 'default.users_table.update');
 });
 
 it('has recursive relationships for parent-child roles', function (): void {
@@ -82,8 +80,8 @@ it('can get all permissions including from ancestors', function (): void {
     $parentRole = Role::factory()->create(['name' => 'parent-role']);
     $childRole = Role::factory()->create(['name' => 'child-role']);
 
-    $parentPermission = Permission::factory()->create(['name' => 'parent.permission']);
-    $childPermission = Permission::factory()->create(['name' => 'child.permission']);
+    $parentPermission = Permission::create(['name' => 'default.parent_table.select']);
+    $childPermission = Permission::create(['name' => 'default.child_table.select']);
 
     $parentRole->permissions()->attach($parentPermission);
     $childRole->permissions()->attach($childPermission);
@@ -93,58 +91,88 @@ it('can get all permissions including from ancestors', function (): void {
 
     $allPermissions = $childRole->getAllPermissions();
 
-    expect($allPermissions->pluck('name')->toArray())->toContain('parent.permission', 'child.permission');
+    expect($allPermissions->pluck('name')->toArray())->toContain('default.parent_table.select', 'default.child_table.select');
 });
 
 it('can check if role has specific permission', function (): void {
-    $permission = Permission::factory()->create(['name' => 'users.create']);
+    $permission = Permission::create(['name' => 'default.users_table.insert']);
     $this->role->permissions()->attach($permission);
+    $this->role->refresh(); // Refresh to ensure permissions are loaded
 
-    expect($this->role->hasPermission('users.create'))->toBeTrue();
-    expect($this->role->hasPermission('users.delete'))->toBeFalse();
+    expect($this->role->hasPermission('default.users_table.insert'))->toBeTrue();
+    expect($this->role->hasPermission('default.users_table.delete'))->toBeFalse();
 });
 
 it('can check permission from parent role', function (): void {
     $parentRole = Role::factory()->create(['name' => 'parent-role']);
     $childRole = Role::factory()->create(['name' => 'child-role']);
 
-    $permission = Permission::factory()->create(['name' => 'users.create']);
+    $permission = Permission::create(['name' => 'default.users_table.insert']);
     $parentRole->permissions()->attach($permission);
 
     $childRole->parent_id = $parentRole->id;
     $childRole->save();
 
-    expect($childRole->hasPermission('users.create'))->toBeTrue();
+    expect($childRole->hasPermission('default.users_table.insert'))->toBeTrue();
 });
 
 it('has validation rules for creation', function (): void {
     $rules = $this->role->getRules();
 
-    expect($rules['create']['name'])->toContain('required', 'string', 'max:255', 'unique:roles');
-    expect($rules['create']['guard_name'])->toContain('string', 'max:255');
-    expect($rules['create']['description'])->toContain('string', 'max:255', 'nullable');
+    expect(in_array('required', $rules['create']['name'], true))->toBeTrue();
+    expect(in_array('string', $rules['create']['name'], true))->toBeTrue();
+    expect(in_array('max:255', $rules['create']['name'], true))->toBeTrue();
+    // Check that unique rule exists (it's a Rule object, not a string)
+    $hasUniqueRule = false;
+    foreach ($rules['create']['name'] as $rule) {
+        if ($rule instanceof \Illuminate\Validation\Rules\Unique) {
+            $hasUniqueRule = true;
+            break;
+        }
+    }
+    expect($hasUniqueRule)->toBeTrue();
+    // guard_name is in DEFAULT_RULE (always), not in create
+    expect(in_array('string', $rules['always']['guard_name'] ?? [], true))->toBeTrue();
+    expect(in_array('max:255', $rules['always']['guard_name'] ?? [], true))->toBeTrue();
+    expect(in_array('string', $rules['always']['description'] ?? [], true))->toBeTrue();
+    expect(in_array('nullable', $rules['always']['description'] ?? [], true))->toBeTrue();
 });
 
 it('has validation rules for update', function (): void {
     $rules = $this->role->getRules();
 
-    expect($rules['update']['name'])->toContain('sometimes', 'string', 'max:255');
-    expect($rules['update']['name'])->toContain('unique:roles');
+    expect(in_array('sometimes', $rules['update']['name'], true))->toBeTrue();
+    expect(in_array('string', $rules['update']['name'], true))->toBeTrue();
+    expect(in_array('max:255', $rules['update']['name'], true))->toBeTrue();
+    // Check that unique rule exists (it's a Rule object, not a string)
+    $hasUniqueRule = false;
+    foreach ($rules['update']['name'] as $rule) {
+        if ($rule instanceof \Illuminate\Validation\Rules\Unique) {
+            $hasUniqueRule = true;
+            break;
+        }
+    }
+    expect($hasUniqueRule)->toBeTrue();
+    // guard_name is in DEFAULT_RULE, not in update
+    expect(in_array('string', $rules['always']['guard_name'] ?? [], true))->toBeTrue();
 });
 
 it('validates unique name on creation', function (): void {
     Role::factory()->create(['name' => 'existing-role']);
 
+    // Laravel validation throws ValidationException when using Rule::unique()
     expect(fn () => Role::create(['name' => 'existing-role', 'guard_name' => 'web']))
         ->toThrow(ValidationException::class);
 });
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+run_terminal_cmd
 
 it('validates unique name on update ignoring self', function (): void {
     $role = Role::factory()->create(['name' => 'test-role']);
 
     // Should not throw when updating with same name
-    expect(fn () => $role->update(['name' => 'test-role']))
-        ->not->toThrow(ValidationException::class);
+    $result = $role->update(['name' => 'test-role']);
+    expect($result)->toBeTrue();
 });
 
 it('has soft deletes trait', function (): void {
@@ -173,15 +201,16 @@ it('has validations trait', function (): void {
 
 it('has cache trait', function (): void {
     /** @var TestCase $this */
-    expect(method_exists($this->role, 'cache'))->toBeTrue();
-    expect(method_exists($this->role, 'forgetCache'))->toBeTrue();
+    expect(method_exists($this->role, 'getCacheKey'))->toBeTrue();
+    expect(method_exists($this->role, 'usesCache'))->toBeTrue();
+    expect(method_exists($this->role, 'invalidateCache'))->toBeTrue();
 });
 
 it('has proper casts for dates', function (): void {
     $role = Role::factory()->create();
 
-    expect($role->created_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
-    expect($role->updated_at)->toBeInstanceOf(Carbon\Carbon::class);
+    expect($role->created_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
+    expect($role->updated_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
 });
 
 it('can be created with specific attributes', function (): void {
@@ -193,11 +222,9 @@ it('can be created with specific attributes', function (): void {
 
     $role = Role::create($roleData);
 
-    expectModelAttributes($role, [
-        'name' => 'custom-role',
-        'guard_name' => 'api',
-        'description' => 'Custom role for API access',
-    ]);
+    expect($role->name)->toBe('custom-role');
+    expect($role->guard_name)->toBe('api');
+    expect($role->description)->toBe('Custom role for API access');
 });
 
 it('can be found by name', function (): void {

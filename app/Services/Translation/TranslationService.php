@@ -61,9 +61,7 @@ final class TranslationService implements TranslationServiceInterface
             return $translated;
         }
 
-        $translated = Cache::remember($cache_key, now()->addDays(30), function () use ($text, $from_locale, $to_locale) {
-            return $this->performTranslation($text, $from_locale, $to_locale);
-        });
+        $translated = Cache::remember($cache_key, now()->addDays(30), fn(): string => $this->performTranslation($text, $from_locale, $to_locale));
 
         // Store in memory
         $this->memory_cache[$cache_key] = $translated;

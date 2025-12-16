@@ -40,7 +40,7 @@ final class GridsController extends Controller
         $response_builder = new ResponseBuilder($request);
 
         try {
-            $targetEntity = ! in_array($entity, [null, '', '0'], true) ? $this->getModel($entity) : null;
+            $targetEntity = in_array($entity, [null, '', '0'], true) ? null : $this->getModel($entity);
 
             $response_builder->setData(($this->getGridConfigsAction)($request, $targetEntity));
         } catch (UnexpectedValueException $ex) {

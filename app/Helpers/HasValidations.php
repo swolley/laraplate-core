@@ -94,12 +94,17 @@ trait HasValidations
                 // Convert JSON rule fields (OBJECT/EDITOR) to JSON strings for validation
                 // Laravel's 'json' rule only accepts JSON strings, not PHP objects/arrays
                 foreach ($components as $key => $value) {
-                    if (isset($rules[$key]) && str_contains($rules[$key], 'json')) {
-                        // Convert objects/arrays to JSON string for validation
-                        if (is_object($value) || is_array($value)) {
-                            $components[$key] = json_encode($value);
-                        }
+                    if (!isset($rules[$key])) {
+                        continue;
                     }
+                    if (!str_contains($rules[$key], 'json')) {
+                        continue;
+                    }
+                    // Convert objects/arrays to JSON string for validation
+                    if (!is_object($value) && !is_array($value)) {
+                        continue;
+                    }
+                    $components[$key] = json_encode($value);
                 }
 
                 $attributes = array_merge($attributes, $components);

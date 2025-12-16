@@ -7,9 +7,7 @@ namespace Modules\Core\Services\Crud;
 use Approval\Traits\RequiresApproval;
 use BadMethodCallException;
 use Closure;
-use Doctrine\DBAL\Exception;
 use Elastic\Elasticsearch\ClientBuilder;
-use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -34,7 +32,6 @@ use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
-use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Crud\CrudHelper;
@@ -433,7 +430,7 @@ class CrudService
     {
         $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
 
-        return Cache::remember($templateKey, 3600, function () use ($filters, $embeddings) {
+        return Cache::remember($templateKey, 3600, function () use ($filters, $embeddings): array {
             $params = [
                 'body' => [
                     'query' => [
@@ -600,6 +597,3 @@ class CrudService
         });
     }
 }
-
-
-

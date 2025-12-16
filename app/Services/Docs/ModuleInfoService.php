@@ -8,7 +8,7 @@ use Closure;
 use Illuminate\Support\Str;
 use Nwidart\Modules\Facades\Module;
 
-final class ModuleInfoService
+final readonly class ModuleInfoService
 {
     /**
      * @param  callable():array<int,string>  $modulesProvider
@@ -18,11 +18,11 @@ final class ModuleInfoService
      * @param  callable(string):bool  $moduleEnabled
      */
     public function __construct(
-        private readonly ?Closure $modulesProvider = null,
-        private readonly ?Closure $modelsProvider = null,
-        private readonly ?Closure $controllersProvider = null,
-        private readonly ?Closure $composerReader = null,
-        private readonly ?Closure $moduleEnabled = null,
+        private ?Closure $modulesProvider = null,
+        private ?Closure $modelsProvider = null,
+        private ?Closure $controllersProvider = null,
+        private ?Closure $composerReader = null,
+        private ?Closure $moduleEnabled = null,
     ) {}
 
     /**
@@ -30,14 +30,14 @@ final class ModuleInfoService
      */
     public function groupedModules(): array
     {
-        $allModules = $this->modulesProvider ? ($this->modulesProvider)() : modules(true, false, false);
-        $allModels = $this->modelsProvider ? ($this->modelsProvider)(false) : models(false);
-        $allControllers = $this->controllersProvider ? ($this->controllersProvider)(false) : controllers(false);
+        $allModules = $this->modulesProvider instanceof Closure ? ($this->modulesProvider)() : modules(true, false, false);
+        $allModels = $this->modelsProvider instanceof Closure ? ($this->modelsProvider)(false) : models(false);
+        $allControllers = $this->controllersProvider instanceof Closure ? ($this->controllersProvider)(false) : controllers(false);
 
         $grouped = [];
 
         foreach ($allModules as $module) {
-            if (! array_key_exists($module, $grouped)) {
+            if (! array_key_exists((string) $module, $grouped)) {
                 $grouped[$module] = ['models' => [], 'controllers' => [], 'routes' => [], 'authors' => []];
             }
 
@@ -95,14 +95,14 @@ final class ModuleInfoService
             ? base_path('composer.json')
             : module_path($module, 'composer.json');
 
-        $content = $this->composerReader ? ($this->composerReader)($path) : file_get_contents($path);
+        $content = $this->composerReader instanceof Closure ? ($this->composerReader)($path) : file_get_contents($path);
 
-        return json_decode($content ?: '{}', true) ?? [];
+        return json_decode((string) $content ?: '{}', true) ?? [];
     }
 
     private function isModuleEnabled(string $module): bool
     {
-        if ($this->moduleEnabled) {
+        if ($this->moduleEnabled instanceof Closure) {
             return ($this->moduleEnabled)($module);
         }
 

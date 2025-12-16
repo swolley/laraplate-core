@@ -68,9 +68,7 @@ final class DynamicEntityService
             $this->dynamic_entities_enabled = config('crud.dynamic_entities', false);
         }
 
-        if (! $this->dynamic_entities_enabled) {
-            throw new UnexpectedValueException('Dynamic tables mapping is not enabled');
-        }
+        throw_unless($this->dynamic_entities_enabled, UnexpectedValueException::class, 'Dynamic tables mapping is not enabled');
 
         $resolved = Cache::remember($cache_key, null, function () use ($tableName, $connection, $attributes, $request): DynamicEntity {
             $model = new DynamicEntity($attributes);
@@ -103,7 +101,7 @@ final class DynamicEntityService
         $inspected = Inspect::table($tableName, $connection);
 
         // Store in memory
-        if ($inspected !== null) {
+        if ($inspected instanceof Table) {
             $this->inspected_tables_cache[$inspect_key] = $inspected;
         }
 
