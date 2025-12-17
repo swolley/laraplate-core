@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Jobs;
 
 use Exception;
-use Illuminate\Bus\Queueable;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Searchable;
@@ -21,26 +17,6 @@ use Throwable;
  */
 final class BulkIndexSearchJob extends CommonSearchJob
 {
-    use Dispatchable;
-    use InteractsWithQueue;
-    use Queueable;
-    use SerializesModels;
-
-    /**
-     * Maximum number of job attempts.
-     */
-    public int $tries;
-
-    /**
-     * Job timeout in seconds.
-     */
-    public int $timeout;
-
-    /**
-     * Backoff time between attempts (in seconds).
-     */
-    public array $backoff;
-
     /**
      * Create a new job instance.
      *

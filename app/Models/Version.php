@@ -51,20 +51,14 @@ final class Version extends OvertrueVersion
         $version->versionable_type = $model->getMorphClass();
         $version->{$userForeignKeyName} = $model->getVersionUserId();
         $version->contents = $model->getVersionableAttributes($model->getVersionStrategy(), $replacements);
+        $version->original_contents = method_exists($model, 'getOriginalVersionableAttributes')
+            ? $model->getOriginalVersionableAttributes($model->getVersionStrategy(), $replacements)
+            : [];
 
         if ($time) {
             $version->created_at = Date::parse($time);
         }
 
-        // custom additional logic
-
-        // if (is_array($version->versionable_id)) {
-        //     $versionable_id = '';
-        //     foreach ($version->versionable_id as $key => $value) {
-        //         $versionable_id .= $key . ':' . $value . ':';
-        //     }
-        //     $version->versionable_id = rtrim($versionable_id, ':');
-        // }
         if (self::isDynamicEntity($model)) {
             $version->connection_ref = $model->getConnection();
             $version->table_ref = $model->getTable();
@@ -140,7 +134,11 @@ final class Version extends OvertrueVersion
     {
         $versionable = $this->getCompleteVersionable();
 
-        return $versionable?->versions()
+        if (! $versionable instanceof Model) {
+            return null;
+        }
+
+        return $versionable->versions()
             ->where(function (Builder $query): void {
                 $query->where('created_at', '>', $this->created_at)
                     ->orWhere(function (Builder $q): void {
@@ -165,6 +163,21 @@ final class Version extends OvertrueVersion
         }
 
         return $serialized;
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'contents' => 'json',
+            'original_contents' => 'json',
+            'created_at' => 'immutable_datetime',
+            'updated_at' => 'datetime',
+        ];
     }
 
     private static function isDynamicEntity(Model $model): bool

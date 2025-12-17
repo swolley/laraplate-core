@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Arr;
 use Modules\Core\Events\ModelVersioningRequested;
 use Modules\Core\Jobs\CreateVersionJob;
 use Modules\Core\Services\VersioningService;
@@ -26,7 +27,9 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 trait HasVersions
 {
-    use Versionable;
+    use Versionable {
+        Versionable::shouldBeVersioning as private internalShouldBeVersioning;
+    }
 
     protected ?User $_creator;
 
@@ -34,11 +37,46 @@ trait HasVersions
 
     protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
-    protected array $dontVersionable = ['created_at', 'updated_at', 'deleted_at', 'last_login_at'];
+    protected array $dontVersionable = ['created_at', 'updated_at'/* , 'deleted_at' */, 'last_login_at'];
 
     protected bool $asyncVersioning = true;
 
     protected array $encryptedVersionable = [];
+
+    public function shouldBeVersioning(): bool
+    {
+        // xxx: fix break change
+        if (method_exists($this, 'shouldVersioning')) {
+            return call_user_func([$this, 'shouldVersioning']);
+        }
+
+        $versionableAttributes = $this->getVersionableAttributes($this->getVersionStrategy());
+
+        // no need to count already existent versions
+        return Arr::hasAny($this->getDirty(), array_keys($versionableAttributes));
+    }
+
+    public function getOriginalVersionableAttributes(VersionStrategy $strategy, array $replacements = []): array
+    {
+        $versionable = $this->getVersionable();
+        $dontVersionable = $this->getDontVersionable();
+
+        $refreshed = $this->getRefreshedModel($this);
+        $originalRaw = $refreshed->getRawOriginal();
+
+        $keys = match ($strategy) {
+            VersionStrategy::DIFF => array_keys($this->getDirty()),
+            VersionStrategy::SNAPSHOT => array_keys($refreshed->attributesToArray()),
+        };
+
+        $attributes = Arr::only($originalRaw, $keys);
+
+        if (count($versionable) > 0) {
+            $attributes = Arr::only($attributes, $versionable);
+        }
+
+        return Arr::except(array_merge($attributes, $replacements), $dontVersionable);
+    }
 
     /**
      * @param  string|DateTimeInterface|null  $time
@@ -52,9 +90,9 @@ trait HasVersions
         }
 
         if ($this->asyncVersioning) {
-            event(new \Modules\Core\Events\ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $this->versionStrategy, $time));
+            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $this->versionStrategy, $time));
 
-            dispatch(new \Modules\Core\Jobs\CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $this->versionStrategy, time: $time))->afterCommit();
+            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $this->versionStrategy, time: $time))->afterCommit();
 
             return null;
         }

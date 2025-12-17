@@ -26,7 +26,11 @@ return new class() extends Migration
 
             // TODO: serve aggiungere un indice su versionable_type e versionable_id?
 
+            $table->json('original_contents')
+                ->nullable()
+                ->comment('Original model attributes before the change');
             $table->json('contents')->nullable()->comment('The changed model attributes');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

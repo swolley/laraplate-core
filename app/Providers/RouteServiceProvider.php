@@ -26,9 +26,19 @@ final class RouteServiceProvider extends ServiceProvider
     {
         parent::boot();
 
-        RateLimiter::for('embeddings', function () {
-            return Limit::perMinute(60); // 60 jobs per minute
+        // Rate limiters for Core module queues
+        RateLimiter::for('versions', function () {
+            return Limit::perMinute(120); // 120 version jobs per minute (2 per second)
         });
+
+        RateLimiter::for('translations', function ($job) {
+            return Limit::perMinute(30); // 30 job al minuto
+        });
+
+        RateLimiter::for('embeddings', function () {
+            return Limit::perMinute(10); // 10 embedding jobs per minute (0.16 per second)
+        });
+
         RateLimiter::for('indexing', fn () => app()->environment('production') ? [
             // Single worker limit
             Limit::perMinute(300)  // 300 operations per minute (5 per second)

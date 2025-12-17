@@ -5,10 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Jobs;
 
 use Exception;
-use Illuminate\Bus\Queueable;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Services\ElasticsearchService;
 
@@ -18,26 +14,6 @@ use Modules\Core\Services\ElasticsearchService;
  */
 final class DeleteFromSearchJob extends CommonSearchJob
 {
-    use Dispatchable;
-    use InteractsWithQueue;
-    use Queueable;
-    use SerializesModels;
-
-    /**
-     * Maximum number of attempts.
-     */
-    public int $tries;
-
-    /**
-     * Job timeout in seconds.
-     */
-    public int $timeout;
-
-    /**
-     * Backoff time between retries (in seconds).
-     */
-    public array $backoff;
-
     /**
      * Create a new job instance.
      *

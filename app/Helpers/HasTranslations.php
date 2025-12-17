@@ -10,17 +10,32 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 use Modules\Cms\Jobs\TranslateModelJob;
 use Modules\Core\Overrides\LocaleScope;
-use Override;
 
 /**
+ * Trait for models that store translatable fields in a separate translation table.
+ *
+ * Architecture:
+ * - Translatable fields are determined dynamically from the translation model's $fillable
+ * - Values are stored in pending_translations until model is saved
+ * - On save, pending_translations are persisted to the translation table
+ * - Custom accessors (getXxxAttribute) and mutators (setXxxAttribute) are supported
+ *
+ * Usage:
+ * - Add trait to model: use HasTranslations;
+ * - Create translation model with $fillable containing translatable fields
+ * - Translation model class is auto-resolved: ModelTranslation in Translations subfolder
+ *
  * @template TModel of Model
  */
 trait HasTranslations
 {
     /**
      * Temporary storage for translatable fields to be saved.
+     *
+     * @var array<string, array<string, mixed>>
      */
     protected array $pending_translations = [];
 
@@ -32,48 +47,62 @@ trait HasTranslations
     /**
      * Cached translatable fields to avoid creating new instances.
      * Key: model class name, Value: array of translatable fields.
+     *
+     * @var array<class-string, array<string>>
      */
     protected static array $cached_translatable_fields = [];
 
     /**
-     * Intercept __get for translatable fields.
+     * Override getAttribute to handle translatable fields.
+     *
+     * Priority:
+     * 1. If translatable field with custom accessor → call accessor with translated value
+     * 2. If translatable field → return translated value
+     * 3. Otherwise → delegate to parent
+     *
+     * @param  string  $key
      */
-    public function __get($key)
+    public function getAttribute($key): mixed
     {
-        if ($this->hasAttribute($key) || method_exists(self::class, $key) || in_array($key, $this->fillable, true) || $key === 'pivot') {
-            return parent::__get($key);
-        }
-
-        // Check if it's a translatable field (cache the result to avoid recursion)
         if ($this->isTranslatableField($key)) {
-            return $this->getTranslatableFieldValue($key);
+            $value = $this->getTranslatableFieldValue($key);
+
+            // Check for custom accessor (e.g., getNameAttribute)
+            $accessor = 'get' . Str::studly($key) . 'Attribute';
+
+            if (method_exists($this, $accessor)) {
+                return $this->{$accessor}($value);
+            }
+
+            return $value;
         }
 
-        return parent::__get($key);
-    }
-
-    /**
-     * Intercept __set for translatable fields.
-     */
-    public function __set($key, $value): void
-    {
-        // Check if it's a translatable field (cache the result to avoid recursion)
-        if ($this->isTranslatableField($key)) {
-            $this->setTranslatableFieldValue($key, $value);
-
-            return;
-        }
-
-        parent::__set($key, $value);
+        return parent::getAttribute($key);
     }
 
     /**
      * Override setAttribute to handle translatable fields.
+     *
+     * Priority:
+     * 1. If translatable field with custom mutator → call mutator (it should call setTranslatableFieldValue)
+     * 2. If translatable field → store in pending translations
+     * 3. Otherwise → delegate to parent
+     *
+     * @param  string  $key
+     * @return $this
      */
     public function setAttribute($key, $value)
     {
-        // Check if it's a translatable field (cache the result to avoid recursion)
         if ($this->isTranslatableField($key)) {
+            // Check for custom mutator (e.g., setNameAttribute)
+            $mutator = 'set' . Str::studly($key) . 'Attribute';
+
+            if (method_exists($this, $mutator)) {
+                $this->{$mutator}($value);
+
+                return $this;
+            }
+
             $this->setTranslatableFieldValue($key, $value);
 
             return $this;
@@ -450,15 +479,18 @@ trait HasTranslations
     }
 
     /**
-     * Get the current locale for setter operations.
-     * This is a helper method used internally by the trait.
+     * Get value for a translatable field.
+     *
+     * Checks in order:
+     * 1. Pending translations for current locale
+     * 2. Pending translations for default locale (if fallback enabled)
+     * 3. Saved translation relation
+     * 4. Default translation (if fallback enabled)
+     *
+     * @param  string  $key  The field name
+     * @return mixed The field value or null
      */
-    private function getCurrentLocale(): string
-    {
-        return $this->current_setter_locale ?? LocaleContext::get();
-    }
-
-    private function getTranslatableFieldValue(string $key)
+    protected function getTranslatableFieldValue(string $key): mixed
     {
         $current_locale = LocaleContext::get();
         $default_locale = config('app.locale');
@@ -493,7 +525,15 @@ trait HasTranslations
         return null;
     }
 
-    private function setTranslatableFieldValue(string $key, $value): void
+    /**
+     * Set value for a translatable field.
+     *
+     * Stores the value in pending_translations to be persisted on save().
+     *
+     * @param  string  $key  The field name
+     * @param  mixed  $value  The value to set
+     */
+    protected function setTranslatableFieldValue(string $key, $value): void
     {
         $locale = $this->getCurrentLocale();
 
@@ -503,5 +543,14 @@ trait HasTranslations
         }
 
         $this->pending_translations[$locale][$key] = $value;
+    }
+
+    /**
+     * Get the current locale for setter operations.
+     * This is a helper method used internally by the trait.
+     */
+    private function getCurrentLocale(): string
+    {
+        return $this->current_setter_locale ?? LocaleContext::get();
     }
 }

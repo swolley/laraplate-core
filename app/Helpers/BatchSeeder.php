@@ -73,6 +73,8 @@ abstract class BatchSeeder extends Seeder
             return 0;
         }
 
+        $start_time = microtime(true);
+
         $progress = progress('Creating ' . $entity_name, $count_to_create);
         $progress->start();
 
@@ -98,6 +100,14 @@ abstract class BatchSeeder extends Seeder
             $batch++;
         }
 
+        // Show final message in hint before finishing
+        if ($created > 0) {
+            $progress->label("Successfully created {$created} {$entity_name} records in " . microtime(true) - $start_time . ' seconds');
+            $progress->render();
+            // Small pause to ensure the hint is visible
+            usleep(250_000);
+        }
+
         $progress->finish();
 
         return $created;
@@ -113,19 +123,6 @@ abstract class BatchSeeder extends Seeder
      */
     final protected function createInParallelBatches(string $modelClass, int $totalCount, ?int $batchSize = null, int $maxParallelCount = 10): int
     {
-        // Calcolare il numero ideale di processi paralleli ("maxParallelCount") dipende principalmente dal numero di CPU core disponibili,
-        // ma vanno considerate anche la quantità di RAM e la natura del carico (CPU bound vs. IO bound).
-        // Per la maggior parte degli scenari CPU bound (come la generazione intensiva di dati), conviene eseguire un processo parallelo per ogni core.
-        // In PHP puoi rilevare il numero di core in modo portabile e adattare "maxParallelCount" automaticamente. Ad esempio:
-
-        $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
-
-        if ($safe_max_parallel_count <= $maxParallelCount) {
-            $this->command->newLine();
-            $this->command->info('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
-            $this->command->newLine();
-        }
-
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
@@ -134,6 +131,14 @@ abstract class BatchSeeder extends Seeder
             $this->command->info($entity_name . ' already at target count.');
 
             return 0;
+        }
+
+        $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
+
+        if ($safe_max_parallel_count <= $maxParallelCount) {
+            $this->command->newLine();
+            $this->command->info('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
+            $this->command->newLine();
         }
 
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
@@ -224,13 +229,17 @@ abstract class BatchSeeder extends Seeder
         $total_groups = (int) ceil($total_batches / $maxParallelCount);
         $current_group = 0;
 
-        // Statistics for weighted average calculation
-        $total_time_weighted = 0.0; // Sum of (time_per_batch * records_in_batch)
+        // Track start time for accurate speed calculation
+        $start_time = microtime(true);
         $total_records_processed = 0; // Sum of all records processed so far
+
+        // Statistics for moving average calculation (recent performance window)
+        $recent_stats = []; // Array of ['time' => float, 'records' => int] for recent groups
+        $recent_window_seconds = 30; // Use last 30 seconds for speed calculation
 
         while ($batch < $total_batches) {
             $current_group++;
-            // $group_start_time = microtime(true);
+            $group_start_time = microtime(true);
             // Collect batches for parallel execution (grouped approach for memory efficiency)
             $batches_to_run = [];
             $batch_info = [];
@@ -298,6 +307,8 @@ abstract class BatchSeeder extends Seeder
             // try {
             $results = $driver->run($batches_to_run);
 
+            $group_records_processed = 0;
+
             // Update progressbar based on results and collect timing statistics
             foreach ($results as $result) {
                 if (! $result['success']) {
@@ -309,11 +320,9 @@ abstract class BatchSeeder extends Seeder
 
                 if (is_array($result) && isset($result['created']) && $result['created'] > 0) {
                     $records_created = $result['created'];
-                    $batch_duration = $result['duration'] ?? 0;
 
-                    // Update weighted average: sum(time * records) / sum(records)
-                    $total_time_weighted += $batch_duration * $records_created;
                     $total_records_processed += $records_created;
+                    $group_records_processed += $records_created;
 
                     $progress->advance($records_created);
                     $last_progress += $records_created;
@@ -321,22 +330,38 @@ abstract class BatchSeeder extends Seeder
                     // Fallback for old format
                     $progress->advance($result);
                     $last_progress += $result;
+                    $group_records_processed += $result;
                 }
             }
 
-            // Calculate weighted average time per record
-            $weighted_avg_time_per_record = $total_records_processed > 0
-                ? $total_time_weighted / $total_records_processed
-                : 0;
+            // Record statistics for this group
+            $group_end_time = microtime(true);
+            $group_duration = $group_end_time - $group_start_time;
+
+            if ($group_records_processed > 0) {
+                $recent_stats[] = [
+                    'time' => $group_end_time,
+                    'duration' => $group_duration,
+                    'records' => $group_records_processed,
+                ];
+
+                // Keep only statistics from the last N seconds
+                $cutoff_time = $group_end_time - $recent_window_seconds;
+                $recent_stats = array_filter($recent_stats, function ($stat) use ($cutoff_time) {
+                    return $stat['time'] >= $cutoff_time;
+                });
+                $recent_stats = array_values($recent_stats); // Re-index array
+            }
 
             // Update progressbar hint with statistics
             $this->updateProgressHint(
                 $progress,
                 $current_group,
                 $total_groups,
-                $weighted_avg_time_per_record,
+                $start_time,
                 $total_records_processed,
                 $count_to_create,
+                $recent_stats,
             );
             // } catch (Throwable $e) {
             //     // Check for individual batch errors
@@ -362,14 +387,15 @@ abstract class BatchSeeder extends Seeder
                 $last_progress = $current_progress;
 
                 // Update hint with current progress (if we have statistics)
-                if ($total_records_processed > 0 && $weighted_avg_time_per_record > 0) {
+                if ($total_records_processed > 0) {
                     $this->updateProgressHint(
                         $progress,
                         $current_group,
                         $total_groups,
-                        $weighted_avg_time_per_record,
+                        $start_time,
                         $current_progress,
                         $count_to_create,
+                        $recent_stats,
                     );
                 }
             }
@@ -391,44 +417,72 @@ abstract class BatchSeeder extends Seeder
 
     /**
      * Update the progressbar hint with statistics.
+     *
+     * @param  array<int, array{time: float, duration: float, records: int}>  $recent_stats
      */
     private function updateProgressHint(
         Progress $progress,
         int $current_group,
         int $total_groups,
-        float $weighted_avg_time_per_record,
+        float $start_time,
         int $total_records_processed,
         int $count_to_create,
+        array $recent_stats = [],
     ): void {
         $hint_parts = [];
 
         // Group information
         $hint_parts[] = sprintf('Group %d/%d', $current_group, $total_groups);
 
-        // Weighted average time per record
-        if ($weighted_avg_time_per_record > 0 && $total_records_processed > 0) {
-            $time_per_record_ms = $weighted_avg_time_per_record * 1000;
+        // Calculate records per second using recent statistics (moving average)
+        $records_per_second = 0;
 
-            if ($time_per_record_ms < 1) {
-                $hint_parts[] = sprintf('~%.2f μs/record', $time_per_record_ms * 1000);
-            } elseif ($time_per_record_ms < 1000) {
-                $hint_parts[] = sprintf('~%.2f ms/record', $time_per_record_ms);
-            } else {
-                $hint_parts[] = sprintf('~%.2f s/record', $time_per_record_ms / 1000);
+        if (! empty($recent_stats)) {
+            // Calculate speed based on recent window (more accurate for current performance)
+            $recent_total_records = 0;
+            $recent_total_duration = 0;
+
+            foreach ($recent_stats as $stat) {
+                $recent_total_records += $stat['records'];
+                $recent_total_duration += $stat['duration'];
+            }
+
+            if ($recent_total_duration > 0) {
+                $records_per_second = $recent_total_records / $recent_total_duration;
             }
         }
 
-        // Estimated time remaining (if we have enough data)
-        if ($weighted_avg_time_per_record > 0 && $total_records_processed > 0 && $total_records_processed < $count_to_create) {
-            $remaining_records = $count_to_create - $total_records_processed;
-            $estimated_seconds = $weighted_avg_time_per_record * $remaining_records;
+        // Fallback to overall average if we don't have enough recent data
+        if ($records_per_second <= 0 && $total_records_processed > 0) {
+            $elapsed_time = microtime(true) - $start_time;
 
-            if ($estimated_seconds < 60) {
-                $hint_parts[] = sprintf('ETA: ~%.0f s', $estimated_seconds);
-            } elseif ($estimated_seconds < 3600) {
-                $hint_parts[] = sprintf('ETA: ~%.1f min', $estimated_seconds / 60);
+            if ($elapsed_time > 0) {
+                $records_per_second = $total_records_processed / $elapsed_time;
+            }
+        }
+
+        // Display speed
+        if ($records_per_second > 0) {
+            if ($records_per_second < 0.001) {
+                $hint_parts[] = sprintf('~%.2f records/h', $records_per_second * 3600);
+            } elseif ($records_per_second < 1) {
+                $hint_parts[] = sprintf('~%.2f records/min', $records_per_second * 60);
             } else {
-                $hint_parts[] = sprintf('ETA: ~%.1f h', $estimated_seconds / 3600);
+                $hint_parts[] = sprintf('~%.1f records/s', $records_per_second);
+            }
+
+            // Estimated time remaining (if we have enough data)
+            if ($total_records_processed < $count_to_create) {
+                $remaining_records = $count_to_create - $total_records_processed;
+                $estimated_seconds = $remaining_records / $records_per_second;
+
+                if ($estimated_seconds < 60) {
+                    $hint_parts[] = sprintf('ETA: ~%.0f s', $estimated_seconds);
+                } elseif ($estimated_seconds < 3600) {
+                    $hint_parts[] = sprintf('ETA: ~%.1f min', $estimated_seconds / 60);
+                } else {
+                    $hint_parts[] = sprintf('ETA: ~%.1f h', $estimated_seconds / 3600);
+                }
             }
         }
 
