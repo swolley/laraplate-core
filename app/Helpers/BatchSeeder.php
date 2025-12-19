@@ -280,13 +280,24 @@ abstract class BatchSeeder extends Seeder
                             'timestamp' => microtime(true),
                         ];
                     } catch (Throwable $e) {
+                        if ($e instanceof ValidationException) {
+                            $errors = $e->errors();
+                            $failedField = array_key_first($errors);
+                            $failedMessages = $errors[$failedField] ?? [];
+                            $data = method_exists($e->validator, 'getData') ? $e->validator->getData() : [];
+                            $failedValue = $data[$failedField] ?? 'N/A';
+                            $message = sprintf('Validation failed for field "%s": %s (value: %s)', $failedField, implode(', ', $failedMessages), $failedValue);
+                        } else {
+                            $message = $e->getMessage();
+                        }
+
                         return [
                             'created' => $result ?? 0,
                             'duration' => $batch_duration ?? 0,
                             'db_duration' => $db_duration ?? 0,
                             'file_lock_duration' => $file_lock_time ?? 0,
                             'batch' => $batch,
-                            'error' => $e->getMessage(),
+                            'error' => $message,
                             'file' => $e->getFile(),
                             'line' => $e->getLine(),
                             'trace' => $e->getTraceAsString(),

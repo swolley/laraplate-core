@@ -31,7 +31,7 @@ final class UserFactory extends Factory
     public function definition(): array
     {
         $name = fake()->boolean() ? fake()->name() : fake()->userName();
-        $username = Str::slug($name) . (fake()->boolean() ? fake()->numberBetween(0, 999999) : '');
+        $username = Str::slug($name) . (microtime(true) * 10000);
 
         $email_prefix = fake()->boolean() ? Str::slug(str_replace(' ', '.', $name)) : Str::slug($username);
         $email_suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
