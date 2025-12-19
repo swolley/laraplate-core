@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- Update cliff.toml and version.sh for improved commit parsing and version update handling
+
+## [1.30.1] - 2025-12-19
+
 ### 🚜 Refactor
 
 - Improve index creation logic and enhance Elasticsearch service tests
