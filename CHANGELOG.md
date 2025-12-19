@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Enhance error handling in BatchSeeder and update UserFactory for unique username generation
+- Enhance translatable field handling in HasTranslations trait
+
+### ⚙️ Miscellaneous Tasks
+
+- Update cliff.toml to modify commit filtering settings
+
+## [1.30.2] - 2025-12-19
+
 ### ⚙️ Miscellaneous Tasks
 
 - Update cliff.toml and version.sh for improved commit parsing and version update handling
