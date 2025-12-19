@@ -257,7 +257,7 @@ trait HasTranslations
 
         if ($translation) {
             foreach ($this->getTranslatableFields() as $field) {
-                if (isset($translation->{$field})) {
+                if (isset($translation->{$field}) && ! in_array($field, $this->hidden, true)) {
                     $content[$field] = $translation->{$field};
                 }
             }
