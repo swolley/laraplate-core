@@ -194,6 +194,8 @@ final class CoreServiceProvider extends ServiceProvider
             // Set authentication if configured
             if (isset($config['username']) && isset($config['password'])) {
                 $builder->setBasicAuthentication($config['username'], $config['password']);
+            } else if (isset($config['api_key']) && $config['api_key'] !== '') {
+                $builder->setApiKey($config['api_key'], $config['api_key_id'] ?? null);
             }
 
             // Set retry configuration

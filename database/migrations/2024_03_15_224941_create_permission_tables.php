@@ -33,7 +33,7 @@ return new class() extends Migration
             $table->bigIncrements('id'); // permission id
             $table->string('name', 125)->nullable(false)->comment('The name of the permission');       // For MySQL 8.0 use string('name', 125);
             $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the permission'); // For MySQL 8.0 use string('guard_name', 125);
-            $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the permission');
+            $table->string('description')->nullable(true)->comment('The description of the permission');
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
@@ -139,7 +139,7 @@ return new class() extends Migration
             }
             $table->string('name', 125)->nullable(false)->comment('The name of the role');       // For MySQL 8.0 use string('name', 125);
             $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the role'); // For MySQL 8.0 use string('guard_name', 125);
-            $table->string('description')->after('guard_name')->nullable(true)->comment('The description of the role');
+            $table->string('description')->nullable(true)->comment('The description of the role');
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

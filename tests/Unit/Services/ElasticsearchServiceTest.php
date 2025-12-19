@@ -2,7 +2,16 @@
 
 declare(strict_types=1);
 
+use Elastic\Elasticsearch\Client;
+use Elastic\Elasticsearch\ClientBuilder;
+use Elastic\Elasticsearch\Response\Elasticsearch;
+use GuzzleHttp\Psr7\Response;
 use Modules\Core\Services\ElasticsearchService;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use ReflectionClass;
+use ReflectionMethod;
 
 it('has proper class structure', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
@@ -222,3 +231,179 @@ it('has bulk operation methods', function (): void {
 
     expect($reflection->hasMethod('bulkIndex'))->toBeTrue();
 });
+
+it('has all required CRUD methods', function (): void {
+    $reflection = new ReflectionClass(ElasticsearchService::class);
+
+    expect($reflection->hasMethod('createIndex'))->toBeTrue();
+    expect($reflection->hasMethod('deleteIndex'))->toBeTrue();
+    expect($reflection->hasMethod('getDocument'))->toBeTrue();
+    expect($reflection->hasMethod('deleteDocument'))->toBeTrue();
+});
+
+it('has bulk operation methods', function (): void {
+    $reflection = new ReflectionClass(ElasticsearchService::class);
+
+    expect($reflection->hasMethod('bulkIndex'))->toBeTrue();
+});
+
+beforeEach(function (): void {
+    resetElasticsearchSingleton();
+});
+
+it('creates index when missing', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->createIndex('my-index'))->toBeTrue();
+});
+
+it('updates mappings and settings when index exists', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->createIndex(
+        'my-index',
+        ['number_of_shards' => 1],
+        ['properties' => ['foo' => ['type' => 'keyword']]]
+    ))->toBeTrue();
+});
+
+it('deletes index gracefully if missing', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteIndex('missing-index'))->toBeTrue();
+});
+
+it('bulk indexes documents and counts successes/failures', function (): void {
+    $bulk_response = [
+        'items' => [
+            ['index' => ['status' => 201]],
+            ['index' => ['status' => 500, 'error' => 'boom']],
+        ],
+    ];
+
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode($bulk_response)),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $result = $service->bulkIndex('idx', [
+        1 => ['foo' => 'bar'],
+        2 => ['foo' => 'baz'],
+    ]);
+
+    expect($result)->toMatchArray([
+        'indexed' => 1,
+        'failed' => 1,
+        'errors' => ['boom'],
+    ]);
+});
+
+it('searches and returns array payload', function (): void {
+    $body = ['hits' => ['hits' => [['foo' => 'bar']]]];
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode($body)),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->search('idx', ['match_all' => (object) []]))->toBe($body);
+});
+
+it('returns null when document is not found', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->getDocument('idx', 'missing'))->toBeNull();
+});
+
+it('deletes document when present and returns true', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['deleted' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteDocument('idx', '1'))->toBeTrue();
+});
+
+function makeClientWithResponses(array $responses): Client
+{
+    $http_client = new QueueHttpClient($responses);
+
+    return ClientBuilder::create()
+        ->setHttpClient($http_client)
+        ->build();
+}
+
+function setElasticsearchInstance(Client $client): ElasticsearchService
+{
+    $reflection = new ReflectionClass(ElasticsearchService::class);
+    $instance = $reflection->newInstanceWithoutConstructor();
+
+    $client_property = $reflection->getProperty('client');
+    $client_property->setAccessible(true);
+    $client_property->setValue($instance, $client);
+
+    $instance_property = $reflection->getProperty('instance');
+    $instance_property->setAccessible(true);
+    $instance_property->setValue(null, $instance);
+
+    return $instance;
+}
+
+function resetElasticsearchSingleton(): void
+{
+    $reflection = new ReflectionClass(ElasticsearchService::class);
+    $instance_property = $reflection->getProperty('instance');
+    $instance_property->setAccessible(true);
+    $instance_property->setValue(null, null);
+}
+
+/**
+ * Simple queue-based PSR-18 client that returns canned responses.
+ */
+final class QueueHttpClient implements ClientInterface
+{
+    /**
+     * @param  array<int,ResponseInterface>  $responses
+     */
+    public function __construct(private array $responses)
+    {
+    }
+
+    public function sendRequest(RequestInterface $request): ResponseInterface
+    {
+        if ($this->responses === []) {
+            throw new RuntimeException('No more queued responses for Elasticsearch mock client.');
+        }
+
+        return array_shift($this->responses);
+    }
+}

@@ -306,21 +306,22 @@ final class MigrateUtils
     private static function createDateIndex(Blueprint $table, string $column): void
     {
         $index_name = $table->getTable() . '_' . $column . '_idx';
+        $driver_name = DB::connection()->getDriverName();
 
-        if (! Schema::hasIndex($table->getTable(), $column) && ! Schema::hasIndex($table->getTable(), $index_name)) {
-            DB::afterCommit(function () use ($table, $column, $index_name): void {
-                switch (DB::connection()->getDriverName()) {
-                    case 'pgsql':
-                        DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' USING BRIN (' . $column . ')');
-
-                        break;
-                    case 'oracle':
-                    case 'mysql':
-                        DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' (' . $column . ' DESC)');
-
-                        break;
-                }
-            });
+        if (Schema::hasIndex($table->getTable(), $column) || Schema::hasIndex($table->getTable(), $index_name)) {
+            return;
         }
+
+        if ($driver_name === 'pgsql') {
+            DB::afterCommit(function () use ($table, $column, $index_name): void {
+                DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' USING BRIN (' . $column . ')');
+            });
+
+            return;
+        }
+
+        // MySQL and Oracle are not able to handle DESC indexes through Blueprint; to avoid
+        // race conditions during table creation we use a standard index created along with the table.
+        $table->index($column, $index_name);
     }
 }

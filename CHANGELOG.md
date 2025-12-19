@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Improve index creation logic and enhance Elasticsearch service tests
+
+## [1.30.0] - 2025-12-17
+
+### 🚜 Refactor
+
 - Update CronJob and Permission factories, migrations, and tests for improved functionality and consistency
 - Update Filament resource tests for improved structure and consistency
 - Enhance BatchSeeder and translation traits for improved performance and clarity

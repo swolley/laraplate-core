@@ -18,6 +18,8 @@ return [
             // Autenticazione
             'username' => env('ELASTIC_USERNAME'),
             'password' => env('ELASTIC_PASSWORD'),
+            'api_key' => env('ELASTIC_API_KEY'),
+            'api_key_id' => env('ELASTIC_API_KEY_ID'),
 
             // Logging
             'log_enabled' => env('ELASTIC_LOG_ENABLED', false),
