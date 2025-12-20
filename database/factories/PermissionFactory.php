@@ -6,6 +6,7 @@ namespace Modules\Core\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Helpers\HasUniqueFactoryValues;
 use Modules\Core\Models\Permission;
 use Override;
 
@@ -14,6 +15,8 @@ use Override;
  */
 final class PermissionFactory extends Factory
 {
+    use HasUniqueFactoryValues;
+
     /**
      * The name of the factory's corresponding model.
      *

@@ -24,8 +24,8 @@ final class BulkIndexSearchJob extends CommonSearchJob
      * @param  bool  $force  If true, forces indexing even if model shouldn't be searchable
      */
     public function __construct(
-        private Collection $models,
-        private bool $force = false,
+        private readonly Collection $models,
+        private readonly bool $force = false,
     ) {
         // Validate that collection is not empty
         throw_if($models->isEmpty(), InvalidArgumentException::class, 'Cannot index an empty collection');

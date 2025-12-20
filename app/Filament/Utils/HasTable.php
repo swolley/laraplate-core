@@ -91,7 +91,7 @@ trait HasTable
         $has_translations = in_array(HasTranslations::class, $traits, true);
 
         if ($has_soft_deletes) {
-            $table->recordClasses(fn ($record): array => $record->deleted_at ? [
+            $table->recordClasses(static fn ($record): array => $record->deleted_at ? [
                 'line-through' => true,
                 'text-gray-500' => true,
             ] : []);
@@ -228,7 +228,7 @@ trait HasTable
                     ->circular()
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
-                    ->formatStateUsing(fn ($locales): string => collect($locales)->map(fn (string $locale): string => "<picture>
+                    ->formatStateUsing(static fn ($locales): string => collect($locales)->map(static fn (string $locale): string => "<picture>
                             <source type='image/webp' srcset='https://flagcdn.com/40x30/{$locale}.webp, https://flagcdn.com/80x60/{$locale}.webp 2x, https://flagcdn.com/120x90/{$locale}.webp 3x'>
                             <source type='image/png' srcset='https://flagcdn.com/40x30/{$locale}.png, https://flagcdn.com/80x60/{$locale}.png 2x, https://flagcdn.com/120x90/{$locale}.png 3x'>
                             <img src='https://flagcdn.com/40x30/{$locale}.png' width='40' height='30' alt='{$locale}' loading='lazy'>
@@ -242,7 +242,7 @@ trait HasTable
             $default_columns->add(
                 TextColumn::make('validity')
                     /** @var Model&HasValidity $record */
-                    ->formatStateUsing(fn (Model $record): string => sprintf(
+                    ->formatStateUsing(static fn (Model $record): string => sprintf(
                         '<div class="space-y-1">
                             <div class="flex justify-between">
                                 <span>Valid from:</span>
@@ -279,7 +279,7 @@ trait HasTable
                     ->alignCenter()
                     ->trueIcon('heroicon-o-lock-closed')
                     ->tooltip(
-                        function (Model $record): ?string {
+                        static function (Model $record): ?string {
                             if (! $record->isLocked()) {
                                 return null;
                             }
@@ -353,7 +353,7 @@ trait HasTable
             $columns($default_columns);
         }
 
-        $default_columns->keyBy(fn (Column $column): string => $column->getName());
+        $default_columns->keyBy(static fn (Column $column): string => $column->getName());
         $primary_key = $model_instance->getKeyName();
 
         if (! $default_columns->offsetExists($primary_key)) {
@@ -365,7 +365,7 @@ trait HasTable
             );
         }
 
-        $default_columns->each(function (Column $column): void {
+        $default_columns->each(static function (Column $column): void {
             if ($column->isSearchable()) {
                 $column->searchable(isIndividual: true);
             }
@@ -398,13 +398,13 @@ trait HasTable
                 Action::make('activate')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedCheckCircle)
-                    ->action(function (Model $record): void {
+                    ->action(static function (Model $record): void {
                         $record->activate();
                     }),
                 Action::make('deactivate')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedXCircle)
-                    ->action(function (Model $record): void {
+                    ->action(static function (Model $record): void {
                         $record->deactivate();
                     }),
             );
@@ -415,21 +415,21 @@ trait HasTable
                 Action::make('publish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedPlay)
-                    ->action(function (Model $record): void {
+                    ->action(static function (Model $record): void {
                         $valid_from_column = $record::validFromKey();
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_from_column => now(), $valid_to_column => null]);
                         $record->refresh();
                     })
-                    ->disabled(fn (Model $record) => $record->isValid())
-                    ->color(fn (Model $record): string => $record->isValid() ? 'gray' : 'success')
+                    ->disabled(static fn (Model $record) => $record->isValid())
+                    ->color(static fn (Model $record): string => $record->isValid() ? 'gray' : 'success')
                     ->requiresConfirmation(),
                 Action::make('unpublish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedStop)
-                    ->color(fn (Model $record): string => $record->isDraft() ? 'gray' : 'warning')
-                    ->disabled(fn (Model $record) => $record->isDraft())
-                    ->action(function (Model $record): void {
+                    ->color(static fn (Model $record): string => $record->isDraft() ? 'gray' : 'warning')
+                    ->disabled(static fn (Model $record) => $record->isDraft())
+                    ->action(static function (Model $record): void {
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_to_column => now()]);
                         $record->refresh();
@@ -443,7 +443,7 @@ trait HasTable
                 Action::make('translate')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedFlag)
-                    ->action(function (Model $record): void {
+                    ->action(static function (Model $record): void {
                         dispatch(new TranslateModelJob($record));
                     }),
             );
@@ -454,15 +454,15 @@ trait HasTable
                 Action::make('reindex')
                     ->hiddenLabel()
                     ->icon(Heroicon::ArrowPath)
-                    ->action(function (Model $record): void {
+                    ->action(static function (Model $record): void {
                         $record->reindex();
                     }),
             );
             $default_bulk_actions->add(
                 BulkAction::make('reindex')
                     ->icon(Heroicon::ArrowPath)
-                    ->action(function (Collection $records): void {
-                        $records->each(fn (Model $record) => $record->reindex());
+                    ->action(static function (Collection $records): void {
+                        $records->each(static fn (Model $record) => $record->reindex());
                     }),
             );
         }
@@ -524,7 +524,7 @@ trait HasTable
 
         $fixed_actions_list = [];
         $grouped_actions_list = [];
-        $default_actions->keyBy(fn (Action $action): ?string => $action->getName());
+        $default_actions->keyBy(static fn (Action $action): ?string => $action->getName());
 
         foreach ($default_actions as $name => $action) {
             if ($fixedActions !== [] && in_array($name, $fixedActions, true)) {
@@ -580,10 +580,10 @@ trait HasTable
                             ->orderBy('entities.name')
                             ->orderBy('presets.name')
                             ->get(['presets.id', 'presets.name', 'presets.entity_id', 'entities.name'])
-                            ->mapWithKeys(fn (Preset $preset): array => [$preset->id => $preset->entity->name . ' - ' . $preset->name]))
-                        ->query(fn (Builder $query, array $data): Builder => $query->when(
+                            ->mapWithKeys(static fn (Preset $preset): array => [$preset->id => $preset->entity->name . ' - ' . $preset->name]))
+                        ->query(static fn (Builder $query, array $data): Builder => $query->when(
                             $data['values'],
-                            fn (Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
+                            static fn (Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
                         )),
                 );
             }
@@ -606,7 +606,7 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query->withTrashed(),
                         'none' => $query->withoutTrashed(),
                         'only' => $query->onlyTrashed(),
@@ -638,7 +638,7 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query->withLocked(),
                         'none' => $query->withoutLocked(),
                         'only' => $query->onlyLocked(),
@@ -672,7 +672,7 @@ trait HasTable
                         'expired' => 'Expired',
                         'draft' => 'Draft',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => match ($data['value']) {
+                    ->query(static fn (Builder $query, array $data): Builder => match ($data['value']) {
                         // 'all' => $query,
                         'valid' => $query->valid(),
                         'scheduled' => $query->scheduled(),
@@ -690,7 +690,7 @@ trait HasTable
                     ->label('Translations')
                     ->multiple()
                     ->options(LocaleContext::getAvailable())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
             );
         }
 
@@ -708,7 +708,7 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query,
                         'today' => $query->whereDate($created_at_column, '>=', today()),
                         'week' => $query->whereDate($created_at_column, '>=', now()->startOfWeek()),
@@ -726,7 +726,7 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'], fn (Builder $query, $value): Builder => match ($value) {
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query,
                         'today' => $query->whereDate($updated_at_column, '>=', today()),
                         'week' => $query->whereDate($updated_at_column, '>=', now()->startOfWeek()),

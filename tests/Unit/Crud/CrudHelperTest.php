@@ -46,7 +46,7 @@ it('has required public methods', function (): void {
     $reflection = new ReflectionClass(CrudHelper::class);
 
     $publicMethods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
-    $methodNames = array_map(fn ($method) => $method->getName(), $publicMethods);
+    $methodNames = array_map(static fn ($method) => $method->getName(), $publicMethods);
 
     expect($methodNames)->toContain('prepareQuery');
 });

@@ -39,8 +39,8 @@ final readonly class AuthenticationService
     public function getAvailableProviders(): array
     {
         return array_map(
-            fn (IAuthenticationProvider $provider): string => $provider->getProviderName(),
-            array_filter($this->providers, fn (IAuthenticationProvider $p): bool => $p->isEnabled()),
+            static fn (IAuthenticationProvider $provider): string => $provider->getProviderName(),
+            array_filter($this->providers, static fn (IAuthenticationProvider $p): bool => $p->isEnabled()),
         );
     }
 }

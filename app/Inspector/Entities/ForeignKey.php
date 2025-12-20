@@ -49,12 +49,12 @@ final readonly class ForeignKey
 
     public function localColumnNames(): Collection
     {
-        return $this->columns->map(fn ($column) => $column->name);
+        return $this->columns->map(static fn ($column) => $column->name);
     }
 
     public function foreignColumnNames(): Collection
     {
-        return $this->foreignColumns->map(fn ($column) => $column->name);
+        return $this->foreignColumns->map(static fn ($column) => $column->name);
     }
 
     public function isComposite(): bool

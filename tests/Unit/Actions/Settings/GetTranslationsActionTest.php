@@ -23,7 +23,7 @@ it('returns all translations', function (): void {
 
     try {
         $service = new TranslationCatalogService(
-            filesystem: new Filesystem(),
+            // filesystem: new Filesystem(),
             languagesProvider: fn () => [$tmpDir . '/en', $tmpDir . '/it'],
         );
 
@@ -50,7 +50,7 @@ it('returns specific language', function (): void {
 
     try {
         $service = new TranslationCatalogService(
-            filesystem: new Filesystem(),
+            // filesystem: new Filesystem(),
             languagesProvider: fn () => [$tmpDir . '/en', $tmpDir . '/it'],
         );
 

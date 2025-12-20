@@ -123,9 +123,11 @@ it('has validation rules for creation', function (): void {
     expect(in_array('max:255', $rules['create']['name'], true))->toBeTrue();
     // Check that unique rule exists (it's a Rule object, not a string)
     $hasUniqueRule = false;
+
     foreach ($rules['create']['name'] as $rule) {
-        if ($rule instanceof \Illuminate\Validation\Rules\Unique) {
+        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
             $hasUniqueRule = true;
+
             break;
         }
     }
@@ -145,9 +147,11 @@ it('has validation rules for update', function (): void {
     expect(in_array('max:255', $rules['update']['name'], true))->toBeTrue();
     // Check that unique rule exists (it's a Rule object, not a string)
     $hasUniqueRule = false;
+
     foreach ($rules['update']['name'] as $rule) {
-        if ($rule instanceof \Illuminate\Validation\Rules\Unique) {
+        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
             $hasUniqueRule = true;
+
             break;
         }
     }
@@ -164,9 +168,9 @@ it('validates unique name on creation', function (): void {
     try {
         Role::create(['name' => 'existing-role', 'guard_name' => 'web']);
         expect(false)->toBeTrue(); // Should not reach here
-    } catch (\Spatie\Permission\Exceptions\RoleAlreadyExists $e) {
+    } catch (Spatie\Permission\Exceptions\RoleAlreadyExists $e) {
         expect(true)->toBeTrue(); // Expected exception
-    } catch (\Illuminate\Validation\ValidationException $e) {
+    } catch (ValidationException $e) {
         expect(true)->toBeTrue(); // Also acceptable
     }
 });
@@ -213,8 +217,8 @@ it('has cache trait', function (): void {
 it('has proper casts for dates', function (): void {
     $role = Role::factory()->create();
 
-    expect($role->created_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
-    expect($role->updated_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
+    expect($role->created_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
+    expect($role->updated_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
 });
 
 it('can be created with specific attributes', function (): void {

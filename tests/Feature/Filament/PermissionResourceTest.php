@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\Core\Models\User;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

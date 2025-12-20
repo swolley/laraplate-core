@@ -5,16 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
-// use Modules\Core\Casts\ActionEnum;
-// use Illuminate\Support\Facades\Auth;
-// use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
 use InvalidFormatException;
-
-// use Illuminate\Validation\UnauthorizedException;
 
 /**
  * @template TModel of Model
@@ -37,12 +32,6 @@ trait HasValidity
 
     public function initializeHasValidity(): void
     {
-        // if (! isset($this->casts[static::$valid_from_column])) {
-        //     $this->casts[static::$valid_from_column] = 'date';
-        // }
-        // if (! isset($this->casts[static::$valid_to_column])) {
-        //     $this->casts[static::$valid_to_column] = 'date';
-        // }
         if (! in_array(static::$valid_from_column, $this->fillable, true)) {
             $this->fillable[] = static::$valid_from_column;
         }

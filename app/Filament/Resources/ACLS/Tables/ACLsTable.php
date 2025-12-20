@@ -17,7 +17,7 @@ final class ACLsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): void {
+            columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('permission.name')
                         ->searchable()

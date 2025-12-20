@@ -109,7 +109,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf('Model %s uses optimistic locking but column %s is missing. Would you like to create it into the schema?', $model, $optimistic_locking_column),
             $model,
-            fn () => $this->call('lock:optimistic-add', ['model' => $model]),
+            fn (): int => $this->call('lock:optimistic-add', ['model' => $model]),
         )) {
             $this->changes = true;
         }
@@ -123,7 +123,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf("Model %s doesn't use optimistic locking but column %s found. Would you like to remove it from the schema?", $model, $optimistic_locking_column),
             $model,
-            fn () => $this->call('lock:optimistic-remove', ['model' => $model]),
+            fn (): int => $this->call('lock:optimistic-remove', ['model' => $model]),
         )) {
             $this->changes = true;
         }
@@ -157,7 +157,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf('Model %s uses locks but column %s is missing. Would you like to create it into the schema?', $model, $lock_at_column),
             $model,
-            fn () => $this->call('lock:add', ['model' => $model]),
+            fn (): int => $this->call('lock:add', ['model' => $model]),
         )) {
             $this->changes = true;
         }
@@ -171,7 +171,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf("Model %s doesn't use locks but column %s found. Would you like to remove it from the schema?", $model, $lock_at_column),
             $model,
-            fn () => $this->call('lock:remove', ['model' => $model]),
+            fn (): int => $this->call('lock:remove', ['model' => $model]),
         )) {
             $this->changes = true;
         }

@@ -18,17 +18,17 @@ final class LicensesTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): void {
+            columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     IconColumn::make('is_active')
                         ->boolean()
                         ->alignCenter()
                         ->grow(false)
-                        ->state(fn ($record): bool => ! $record->isExpired() && ! $record->isDraft())
-                        ->trueColor(fn ($record): string => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
-                        ->trueIcon(fn ($record): string => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
+                        ->state(static fn ($record): bool => ! $record->isExpired() && ! $record->isDraft())
+                        ->trueColor(static fn ($record): string => $record->isValid() ? 'success' : ($record->isDraft() ? 'gray' : 'warning'))
+                        ->trueIcon(static fn ($record): string => $record->isValid() ? 'heroicon-o-check-circle' : ($record->isDraft() ? 'heroicon-o-clock' : 'heroicon-o-exclamation-triangle'))
                         ->falseIcon('heroicon-o-x-circle')
-                        ->tooltip(fn ($record): string => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
+                        ->tooltip(static fn ($record): string => $record->isDraft() ? 'Waiting' : ($record->isExpired() ? 'Expired' : 'Valid')),
                     TextColumn::make('id')
                         ->searchable(),
                 ]);

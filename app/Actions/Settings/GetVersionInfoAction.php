@@ -8,9 +8,7 @@ use Modules\Core\Services\Docs\VersionService;
 
 final readonly class GetVersionInfoAction
 {
-    public function __construct(private VersionService $versionService)
-    {
-    }
+    public function __construct(private VersionService $versionService) {}
 
     public function __invoke(): array
     {
@@ -23,4 +21,3 @@ final readonly class GetVersionInfoAction
         ];
     }
 }
-

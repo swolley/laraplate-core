@@ -270,7 +270,7 @@ final class Repository extends BaseRepository
         }
 
         if ($group_method) {
-            $groups = $user->{$group_method}->map(fn (Model $r): string => 'R' . $r->id)->toArray();
+            $groups = $user->{$group_method}->map(static fn (Model $r): string => 'R' . $r->id)->toArray();
             sort($groups);
             array_push($tags, ...$groups);
         }

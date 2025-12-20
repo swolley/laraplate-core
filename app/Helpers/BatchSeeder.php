@@ -105,7 +105,7 @@ abstract class BatchSeeder extends Seeder
             $progress->label("Successfully created {$created} {$entity_name} records in " . microtime(true) - $start_time . ' seconds');
             $progress->render();
             // Small pause to ensure the hint is visible
-            usleep(250_000);
+            Sleep::usleep(250_000);
         }
 
         $progress->finish();
@@ -315,7 +315,6 @@ abstract class BatchSeeder extends Seeder
             }
 
             // Execute all batches in parallel using Concurrency
-            // try {
             $results = $driver->run($batches_to_run);
 
             $group_records_processed = 0;
@@ -358,9 +357,7 @@ abstract class BatchSeeder extends Seeder
 
                 // Keep only statistics from the last N seconds
                 $cutoff_time = $group_end_time - $recent_window_seconds;
-                $recent_stats = array_filter($recent_stats, function ($stat) use ($cutoff_time) {
-                    return $stat['time'] >= $cutoff_time;
-                });
+                $recent_stats = array_filter($recent_stats, fn (array $stat): bool => $stat['time'] >= $cutoff_time);
                 $recent_stats = array_values($recent_stats); // Re-index array
             }
 
@@ -374,20 +371,6 @@ abstract class BatchSeeder extends Seeder
                 $count_to_create,
                 $recent_stats,
             );
-            // } catch (Throwable $e) {
-            //     // Check for individual batch errors
-            //     foreach ($batch_info as $batch_num => $info) {
-            //         if (file_exists($info['error_file'])) {
-            //             $error = json_decode(file_get_contents($info['error_file']), true);
-
-            //             if ($error) {
-            //                 throw new RuntimeException("Batch {$batch_num} failed: " . $error['error']);
-            //             }
-            //         }
-            //     }
-
-            //     throw $e;
-            // }
 
             // Update progressbar from shared file (in case some updates were missed)
             $current_progress = $this->readProgressFile($progress_file, $progress_lock_file);
@@ -448,7 +431,7 @@ abstract class BatchSeeder extends Seeder
         // Calculate records per second using recent statistics (moving average)
         $records_per_second = 0;
 
-        if (! empty($recent_stats)) {
+        if ($recent_stats !== []) {
             // Calculate speed based on recent window (more accurate for current performance)
             $recent_total_records = 0;
             $recent_total_duration = 0;

@@ -13,8 +13,4 @@ declare(strict_types=1);
     |
 */
 
-// Route::middleware(['auth:sanctum'])->prefix('v1')->name('api.')->group(function () {
-//     Route::get('core', fn (Request $request) => $request->user())->name('core');
-// });
-
 require __DIR__ . '/crud.php';

@@ -23,7 +23,7 @@ final class UsersTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): Collection {
+            columns: static function (Collection $default_columns): Collection {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -43,13 +43,13 @@ final class UsersTable
 
                 return $default_columns;
             },
-            actions: function (Collection $default_actions): void {
+            actions: static function (Collection $default_actions): void {
                 $default_actions->unshift(
                     Action::make('resend_verification_email')
                         ->label('Resend Verification Email')
                         ->icon('heroicon-o-envelope')
-                        ->authorize(fn (User $record): bool => ! $record->hasVerifiedEmail())
-                        ->action(function (User $record): void {
+                        ->authorize(static fn (User $record): bool => ! $record->hasVerifiedEmail())
+                        ->action(static function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);
 
@@ -71,7 +71,7 @@ final class UsersTable
                         ->requiresConfirmation(),
                 );
             },
-            filters: function (Collection $default_filters): void {
+            filters: static function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('roles')
                         ->relationship('roles', 'name')

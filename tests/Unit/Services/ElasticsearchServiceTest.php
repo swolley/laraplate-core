@@ -86,7 +86,7 @@ it('has required public methods', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
     $publicMethods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
-    $methodNames = array_map(fn ($method) => $method->getName(), $publicMethods);
+    $methodNames = array_map(static fn ($method) => $method->getName(), $publicMethods);
 
     expect($methodNames)->toContain('createIndex');
     expect($methodNames)->toContain('search');
@@ -276,7 +276,7 @@ it('updates mappings and settings when index exists', function (): void {
     expect($service->createIndex(
         'my-index',
         ['number_of_shards' => 1],
-        ['properties' => ['foo' => ['type' => 'keyword']]]
+        ['properties' => ['foo' => ['type' => 'keyword']]],
     ))->toBeTrue();
 });
 
@@ -394,9 +394,7 @@ final class QueueHttpClient implements ClientInterface
     /**
      * @param  array<int,ResponseInterface>  $responses
      */
-    public function __construct(private array $responses)
-    {
-    }
+    public function __construct(private array $responses) {}
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {

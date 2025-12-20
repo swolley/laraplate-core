@@ -34,7 +34,7 @@ final class CheckIndexCommand extends Command
             if ($model) {
                 $modeles = [$model];
             } else {
-                $modeles = array_filter(models(), fn (string $model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
+                $modeles = array_filter(models(), static fn (string $model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
             }
 
             $wrong_or_missing_indexes = [];
@@ -57,7 +57,7 @@ final class CheckIndexCommand extends Command
 
             if (confirm('Do you want to reindex the unmatched models?')) {
                 Bus::chain(
-                    collect($wrong_or_missing_indexes)->map(fn (string $model): object => new ReindexSearchJob($model)),
+                    collect($wrong_or_missing_indexes)->map(static fn (string $model): object => new ReindexSearchJob($model)),
                 )->dispatch();
                 $this->info('Reindexing has been queued for the unmatched models.');
             }

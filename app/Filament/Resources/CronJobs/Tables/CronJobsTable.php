@@ -20,7 +20,7 @@ final class CronJobsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): void {
+            columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -37,7 +37,7 @@ final class CronJobsTable
                         ->grow(false)
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('runs')
-                        ->formatStateUsing(fn (CronJob $record): string => sprintf(
+                        ->formatStateUsing(static fn (CronJob $record): string => sprintf(
                             'Last run: %s<br>Next run: %s',
                             $record->last_run_at?->format('Y-m-d H:i:s'),
                             $record->next_run_at?->format('Y-m-d H:i:s'),
@@ -47,10 +47,10 @@ final class CronJobsTable
                         ->html(),
                 ]);
             },
-            actions: function (Collection $default_actions): void {
+            actions: static function (Collection $default_actions): void {
                 $default_actions->unshift(Action::make('run')
                     ->icon('heroicon-o-play')
-                    ->action(fn (CronJob $record) => $record->run())
+                    ->action(static fn (CronJob $record) => $record->run())
                     ->requiresConfirmation());
             },
         );

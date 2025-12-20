@@ -19,8 +19,7 @@ final class SettingController extends Controller
         private readonly GetTranslationsAction $getTranslationsAction,
         private readonly GetSiteConfigsAction $getSiteConfigsAction,
         private readonly GetVersionInfoAction $getVersionInfoAction,
-    ) {
-    }
+    ) {}
 
     /**
      * @route-comment

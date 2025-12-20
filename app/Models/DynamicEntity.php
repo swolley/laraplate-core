@@ -120,7 +120,7 @@ final class DynamicEntity extends Model
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, static fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     /**

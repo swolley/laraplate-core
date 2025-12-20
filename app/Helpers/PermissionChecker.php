@@ -33,7 +33,7 @@ final class PermissionChecker
         $user = $request->user();
 
         if (! $user) {
-            $user = Cache::rememberForever('anonymous_user', fn () => user_class()::whereName('anonymous')->first());
+            $user = Cache::rememberForever('anonymous_user', static fn () => user_class()::whereName('anonymous')->first());
 
             if (! $user) {
                 return false;

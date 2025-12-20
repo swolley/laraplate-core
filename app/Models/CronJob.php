@@ -67,7 +67,7 @@ final class CronJob extends Model
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(fn ($query) => $query->whereNull('deleted_at')),
+                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at')),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -75,7 +75,7 @@ final class CronJob extends Model
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('cron_jobs')->where(fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
+                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
             ],
         ]);
 

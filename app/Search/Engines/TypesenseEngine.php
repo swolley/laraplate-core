@@ -97,7 +97,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
                     $filterStrings[] = sprintf('%s:>=%s && %s:<=%s', $field, $value[0], $field, $value[1]);
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(fn ($val) => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+                    $values = implode(',', array_map(static fn ($val) => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
                     $filterStrings[] = sprintf('%s:[%s]', $field, $values);
                 }
             } else {
@@ -386,7 +386,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         // Build vector query for Typesense
         // Typesense expects vector_query in format: "field_name:([vector_values])"
-        $vectorString = implode(',', array_map(fn ($v): string => (string) $v, $vector));
+        $vectorString = implode(',', array_map(static fn ($v): string => (string) $v, $vector));
 
         $searchParams = [
             'q' => $builder->query ?: '*',
@@ -409,7 +409,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             // Transform results to match Scout's expected format
             $hits = $response['hits'] ?? [];
 
-            return collect($hits)->map(function (array $hit) {
+            return collect($hits)->map(static function (array $hit) {
                 $document = $hit['document'] ?? [];
                 $document['_id'] = $hit['document']['id'] ?? null;
                 $document['_score'] = $hit['text_match'] ?? 0;
@@ -429,7 +429,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     private function buildFilter(string $fieldName, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(fn ($val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+            $values = implode(',', array_map(static fn ($val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
 
             return sprintf('%s:[%s]', $fieldName, $values);
         }

@@ -17,20 +17,20 @@ trait HasTranslationsFactory
         array_unshift($locales_to_create, $default_locale);
 
         $fields = $content->getTranslatableFields();
-        $casts = $content->getTranslationModelClass()->casts();
+        $content->getTranslationModelClass()->casts();
 
         foreach ($locales_to_create as $locale) {
             $data = [];
 
             foreach ($fields as $field) {
                 if ($field !== 'slug') {
-                    $data[$field] = match ($casts[$field]) {
+                    $data[$field] = /*match ($casts[$field]) {
                         // 'array' => fake($locale)->paragraphs(fake()->rand(1, 10)),
                         // 'object' => (object) [
                         //     'text' => fake($locale)->text(fake()->numberBetween(100, 255)),
                         // ],
-                        default => fake($locale)->text(fake()->numberBetween(100, 255)),
-                    };
+                        default =>*/ fake($locale)->text(fake()->numberBetween(100, 255))/*,
+                     }*/;
                 }
             }
 

@@ -78,7 +78,7 @@ trait Searchable
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
                 Bus::chain([
-                    ...$models->map(fn (Model $model): GenerateEmbeddingsJob => new GenerateEmbeddingsJob($model))->toArray(),
+                    ...$models->map(static fn (Model $model): GenerateEmbeddingsJob => new GenerateEmbeddingsJob($model))->toArray(),
                     new Scout::$makeSearchableJob($models),
                 ])->dispatch()
                     ->onQueue($models->first()->syncWithSearchUsingQueue())

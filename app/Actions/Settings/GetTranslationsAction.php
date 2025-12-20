@@ -9,9 +9,7 @@ use Modules\Core\Services\Translation\TranslationCatalogService;
 
 final readonly class GetTranslationsAction
 {
-    public function __construct(private TranslationCatalogService $translationService)
-    {
-    }
+    public function __construct(private TranslationCatalogService $translationService) {}
 
     public function __invoke(?string $lang = null): array
     {
@@ -20,4 +18,3 @@ final readonly class GetTranslationsAction
         return $this->translationService->buildTranslations($lang, $defaultLocale);
     }
 }
-

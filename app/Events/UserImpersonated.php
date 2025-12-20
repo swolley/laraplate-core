@@ -16,7 +16,5 @@ final readonly class UserImpersonated
     public function __construct(
         public User $currentUser,
         public User $impersonatedUser,
-    ) {
-    }
+    ) {}
 }
-

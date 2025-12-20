@@ -117,8 +117,8 @@ it('can have user assigned later', function (): void {
 it('has proper timestamps', function (): void {
     $license = License::factory()->create();
 
-    expect($license->created_at)->toBeInstanceOf(\Carbon\CarbonInterface::class);
-    expect($license->updated_at)->toBeInstanceOf(\Carbon\CarbonInterface::class);
+    expect($license->created_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
+    expect($license->updated_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
 });
 
 it('can be serialized to array', function (): void {

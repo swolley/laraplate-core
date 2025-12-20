@@ -16,7 +16,5 @@ final readonly class SocialLoginCompleted
     public function __construct(
         public Authenticatable $user,
         public string $service,
-    ) {
-    }
+    ) {}
 }
-

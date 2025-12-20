@@ -32,7 +32,7 @@ it('merges app and module paths', function (): void {
 
         $action = new MergeSwaggerDocsAction(
             filesystem: $fs,
-            modulesProvider: fn () => ['Cms'],
+            modulesProvider: static fn () => ['Cms'],
             basePath: $tmpDir,
         );
 

@@ -30,7 +30,7 @@ final class InitializeUsers extends Command
 
         DB::transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
             if (! $user_class::whereName($root)->exists()) {
-                $email = text(sprintf('Please specify a %s user email', $root), required: true, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
+                $email = text(sprintf('Please specify a %s user email', $root), required: true, validate: static fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
                 $password = password(sprintf('Please specify a %s user password', $root), required: true);
                 password('Please confirm the password', required: true, validate: fn (string $value): ?string => $password !== $value ? "Passwords don't match" : null);
                 $root_user = $user_class::query()->make([
@@ -50,7 +50,7 @@ final class InitializeUsers extends Command
             }
 
             if (! $user_class::whereName($admin)->exists()) {
-                $email = text(sprintf('Please specify a %s user email or leave blank to skip', $admin), required: false, validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
+                $email = text(sprintf('Please specify a %s user email or leave blank to skip', $admin), required: false, validate: static fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_EMAIL) ? null : 'Please type a valid email');
 
                 if ($email !== '' && $email !== '0') {
                     $password = password(sprintf('Please specify a %s user password', $admin), required: true);

@@ -140,7 +140,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                     'embedding' => $embedding->embedding,
                 ];
             })
-            ->filter(fn ($item): bool => $item['similarity_score'] > 0.7)
+            ->filter(static fn ($item): bool => $item['similarity_score'] > 0.7)
             ->sortByDesc('similarity_score')
             ->take($builder->limit ?? 10)
             ->values()

@@ -22,7 +22,7 @@ final class IndexInSearchJob extends CommonSearchJob
      * @param  Model  $model  The model to index
      */
     public function __construct(
-        private Model $model,
+        private readonly Model $model,
     ) {
         // Validate that the model implements Searchable
         throw_unless(in_array(Searchable::class, class_uses_recursive($model::class), true), InvalidArgumentException::class, 'Model ' . $model::class . ' does not implement the Searchable trait');

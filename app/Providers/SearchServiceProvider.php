@@ -45,7 +45,7 @@ final class SearchServiceProvider extends ServiceProvider
         // });
 
         // Register the search engine interface for backward compatibility
-        $this->app->singleton(ISearchEngine::class, fn ($app) => $app->make(EngineManager::class)->engine());
+        $this->app->singleton(ISearchEngine::class, static fn ($app) => $app->make(EngineManager::class)->engine());
 
         // Create an alias for easier access
         $this->app->alias(ISearchEngine::class, 'search');

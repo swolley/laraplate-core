@@ -21,7 +21,7 @@ final class ReindexSearchJob extends CommonSearchJob
      * @param  bool  $use_bulk  Whether to use bulk indexing
      * @param  int  $batch_size  Number of records to process in each batch (for bulk)
      */
-    public function __construct(private string $model_class, private bool $use_bulk = true, private int $batch_size = 500)
+    public function __construct(private readonly string $model_class, private readonly bool $use_bulk = true, private readonly int $batch_size = 500)
     {
         parent::__construct();
     }

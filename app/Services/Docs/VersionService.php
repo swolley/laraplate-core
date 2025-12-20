@@ -6,9 +6,7 @@ namespace Modules\Core\Services\Docs;
 
 class VersionService
 {
-    public function __construct(private readonly ?string $gitBasePath = null)
-    {
-    }
+    public function __construct(private readonly ?string $gitBasePath = null) {}
 
     public function getCurrentPackageVersion(): string
     {
@@ -150,4 +148,3 @@ class VersionService
         return ($this->gitBasePath ?? base_path()) . '/.git';
     }
 }
-

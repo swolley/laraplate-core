@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Models\CronJob;
 use Tests\TestCase;
 
@@ -75,7 +74,7 @@ it('has validation rules for update', function (): void {
 it('validates cron expression format', function (): void {
     $uniqueName1 = 'invalid-cron-test-' . uniqid();
     $uniqueName2 = 'valid-cron-test-' . uniqid();
-    
+
     expect(fn () => CronJob::create([
         'name' => $uniqueName1,
         'command' => 'test:command',
@@ -156,7 +155,7 @@ it('can be found by active status', function (): void {
     $activeCronJob = CronJob::factory()->create(['name' => $uniqueName1]);
     $activeCronJob->setAttribute('is_active', true);
     $activeCronJob->save();
-    
+
     $inactiveCronJob = CronJob::factory()->create(['name' => $uniqueName2]);
     $inactiveCronJob->setAttribute('is_active', false);
     $inactiveCronJob->save();
@@ -185,8 +184,8 @@ it('can be found by schedule', function (): void {
 it('has proper timestamps', function (): void {
     $cronJob = CronJob::factory()->create();
 
-    expect($cronJob->created_at)->toBeInstanceOf(\Carbon\CarbonInterface::class);
-    expect($cronJob->updated_at)->toBeInstanceOf(\Carbon\CarbonInterface::class);
+    expect($cronJob->created_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
+    expect($cronJob->updated_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
 });
 
 it('can be serialized to array', function (): void {

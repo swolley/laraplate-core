@@ -245,13 +245,13 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.superadmin')));
+        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.superadmin')));
     }
 
     #[Scope]
     protected static function admin(Builder $query): Builder
     {
-        return $query->whereHas('roles', fn ($query) => $query->where('name', config('permission.roles.admin')));
+        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.admin')));
     }
 
     /**

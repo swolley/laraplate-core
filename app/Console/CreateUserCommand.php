@@ -67,7 +67,7 @@ final class CreateUserCommand extends Command
                                 if (is_string($validations[$attribute]) && preg_match('/in:([^|]*)/', $validations[$attribute], $matches)) {
                                     $options = explode(',', $matches[1]);
                                 } elseif (is_array($validations[$attribute])) {
-                                    $found = array_filter($validations[$attribute], fn ($v): bool => is_string($v) && Str::contains($v, 'in:'));
+                                    $found = array_filter($validations[$attribute], static fn ($v): bool => is_string($v) && Str::contains($v, 'in:'));
 
                                     if ($found !== []) {
                                         preg_match('/in:([^|]*)/', (string) head($found), $matches);

@@ -72,7 +72,7 @@ trait HasUniqueFactoryValues
         ?int $maxAttempts = null,
     ): string {
         return $this->uniqueValue(
-            fn () => Str::slug($name),
+            static fn () => Str::slug($name),
             $modelClass,
             $column,
             $maxAttempts,
@@ -89,7 +89,7 @@ trait HasUniqueFactoryValues
     protected function uniqueEmail(?string $modelClass = null, ?callable $fakerCall = null, ?string $column = 'email', ?int $maxAttempts = null): string
     {
         return $this->uniqueValue(
-            $fakerCall ?? fn () => fake()->unique()->email(),
+            $fakerCall ?? static fn () => fake()->unique()->email(),
             $modelClass,
             $column,
             $maxAttempts,
@@ -104,7 +104,7 @@ trait HasUniqueFactoryValues
     protected function uniquePhoneNumber(?string $modelClass = null, ?int $maxAttempts = null): string
     {
         return $this->uniqueValue(
-            fn () => fake()->unique()->phoneNumber(),
+            static fn () => fake()->unique()->phoneNumber(),
             $modelClass,
             'phone',
             $maxAttempts,
@@ -119,7 +119,7 @@ trait HasUniqueFactoryValues
     protected function uniqueUrl(?string $modelClass = null, ?int $maxAttempts = null): string
     {
         return $this->uniqueValue(
-            fn () => fake()->unique()->url(),
+            static fn () => fake()->unique()->url(),
             $modelClass,
             'url',
             $maxAttempts,

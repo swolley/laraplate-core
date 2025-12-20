@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace [TRANSLATION_NAMESPACE];
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use [MODEL_FULL_NAME];
+
+final class [TRANSLATION_CLASS_NAME] extends Model
+{
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     */
+    protected $fillable = [
+        '[MODEL_FK]',
+        'locale',
+        [FILLABLE_ATTTRIBUTES]
+    ];
+
+    protected $hidden = [
+        [HIDDEN_ATTRIBUTES]
+    ];
+
+    /**
+     * The [main_relation] that belongs to the translation.
+     *
+     * @return BelongsTo<Author>
+     */
+    public function [MODEL_RELATION](): BelongsTo
+    {
+        return $this->belongsTo([MODEL_CLASS_NAME]::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            [CASTS_ATTRIBUTES]
+        ];
+    }
+}

@@ -81,7 +81,7 @@ final class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(AuthenticationService::class, fn ($app): AuthenticationService => new AuthenticationService([
+        $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),
         ]));
@@ -97,17 +97,17 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
-        RateLimiter::for('login', function (Request $request) {
+        RateLimiter::for('login', static function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())) . '|' . $request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });
 
-        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+        RateLimiter::for('two-factor', static fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
 
-        RateLimiter::for('im-still-here', fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
+        RateLimiter::for('im-still-here', static fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
-        Fortify::authenticateUsing(function (Request $request) {
+        Fortify::authenticateUsing(static function (Request $request) {
             $service = $this->app->make(AuthenticationService::class);
             $result = $service->authenticate($request);
 

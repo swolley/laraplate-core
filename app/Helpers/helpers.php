@@ -45,7 +45,7 @@ if (! function_exists('modules')) {
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, static fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
         }
 
         $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);
@@ -311,7 +311,7 @@ if (! function_exists('routes')) {
         $routes = [];
         $modules = modules(true, false, $onlyActive, $onlyModule);
         $all_routes = resolve(Router::class)->getRoutes()->getRoutes();
-        usort($all_routes, fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
+        usort($all_routes, static fn (Route $a, Route $b): int => $a->uri() <=> $b->uri());
 
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];

@@ -150,7 +150,7 @@ final class Inspect
      */
     private static function parseColumns(array $columns): Collection
     {
-        return collect($columns)->map(fn (array $column): Column => new Column(
+        return collect($columns)->map(static fn (array $column): Column => new Column(
             $column['name'],
             self::getAttributesForColumn($column),
             $column['default'],
@@ -173,7 +173,7 @@ final class Inspect
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(fn (array $index): Index => new Index(
+        return collect($indexes)->map(static fn (array $index): Index => new Index(
             $index['name'],
             collect($index['columns']),
             self::getAttributesForIndex($index),

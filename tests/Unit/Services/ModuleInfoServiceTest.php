@@ -9,15 +9,15 @@ uses(TestCase::class);
 
 it('groups modules with models and controllers', function (): void {
     $service = new ModuleInfoService(
-        modulesProvider: fn () => ['App', 'Cms'],
-        modelsProvider: fn () => ['App\\Models\\User', 'Modules\\Cms\\Models\\Post'],
-        controllersProvider: fn () => ['App\\Http\\Controllers\\HomeController', 'Modules\\Cms\\Http\\Controllers\\PostController'],
-        composerReader: fn (string $path) => json_encode([
+        modulesProvider: static fn () => ['App', 'Cms'],
+        modelsProvider: static fn () => ['App\\Models\\User', 'Modules\\Cms\\Models\\Post'],
+        controllersProvider: static fn () => ['App\\Http\\Controllers\\HomeController', 'Modules\\Cms\\Http\\Controllers\\PostController'],
+        composerReader: static fn (string $path) => json_encode([
             'authors' => [['name' => 'Alice', 'email' => 'a@example.com']],
             'description' => 'Desc',
             'version' => '1.0.0',
         ]),
-        moduleEnabled: fn (string $module) => $module === 'App',
+        moduleEnabled: static fn (string $module) => $module === 'App',
     );
 
     $grouped = $service->groupedModules();

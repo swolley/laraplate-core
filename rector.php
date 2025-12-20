@@ -19,7 +19,7 @@ $paths = array_merge(
         __DIR__ . '/routes',
         __DIR__ . '/tests',
     ],
-    array_map(fn ($module) => "{$module}/app", $modules),
+    array_map(static fn ($module) => "{$module}/app", $modules),
 );
 
 return RectorConfig::configure()

@@ -19,7 +19,7 @@ final class PermissionsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): void {
+            columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     TextColumn::make('name')
                         ->searchable()
@@ -36,7 +36,7 @@ final class PermissionsTable
                         ->searchable(),
                 ]);
             },
-            filters: function (Collection $default_filters): void {
+            filters: static function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('guard_name')
                         ->options(Permission::query()->distinct('guard_name')->pluck('guard_name'))

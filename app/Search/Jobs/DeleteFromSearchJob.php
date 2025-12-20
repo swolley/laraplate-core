@@ -20,7 +20,7 @@ final class DeleteFromSearchJob extends CommonSearchJob
      * @param  string  $index  Search index name
      * @param  string|int  $document_id  Document ID to delete
      */
-    public function __construct(private string $index, private string|int $document_id)
+    public function __construct(private readonly string $index, private readonly string|int $document_id)
     {
         parent::__construct();
     }

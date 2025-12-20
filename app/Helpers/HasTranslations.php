@@ -123,7 +123,7 @@ trait HasTranslations
         if (! isset(static::$cached_translatable_fields[$model_class])) {
             static::$cached_translatable_fields[$model_class] = array_filter(
                 (new (static::getTranslationModelClass()))->getFillable(),
-                fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
+                static fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
             );
         }
 
@@ -363,7 +363,7 @@ trait HasTranslations
     protected function locale(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->getCurrentLocale(),
+            get: static fn () => $this->getCurrentLocale(),
         );
     }
 

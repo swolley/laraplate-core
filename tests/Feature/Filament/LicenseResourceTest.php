@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -14,6 +13,7 @@ use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
 use Tests\TestCase;
 
 uses(TestCase::class);

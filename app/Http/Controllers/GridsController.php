@@ -4,22 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Exception;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\UnauthorizedException;
-use InvalidArgumentException;
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\DynamicEntity;
-use PHPUnit\Framework\Exception as FrameworkException;
-use PHPUnit\Framework\ExpectationFailedException;
-use PHPUnit\Framework\UnknownClassOrInterfaceException;
-use ReflectionClass;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
@@ -28,8 +19,7 @@ final class GridsController extends Controller
     public function __construct(
         private readonly GetGridConfigsAction $getGridConfigsAction,
         private readonly ProcessGridAction $processGridAction,
-    ) {
-    }
+    ) {}
 
     /**
      * @route-comment

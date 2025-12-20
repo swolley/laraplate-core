@@ -34,7 +34,7 @@ final class SearchEngineHealthTableWidget extends Widget
             }
 
             // Get searchable models and their counts
-            $models = models(filter: fn (string|object $model): bool => class_uses_trait($model, Searchable::class));
+            $models = models(filter: static fn (string|object $model): bool => class_uses_trait($model, Searchable::class));
             $modelData = [];
 
             foreach ($models as $model) {

@@ -23,7 +23,7 @@ final readonly class Table
         public string $schema,
         public ?string $connection = null,
     ) {
-        $primaryKey = $indexes->filter(fn ($index) => $index->attributes->contains('primary'));
+        $primaryKey = $indexes->filter(static fn ($index) => $index->attributes->contains('primary'));
 
         $this->primaryKey = $primaryKey->isNotEmpty() ? $primaryKey->first() : null;
     }

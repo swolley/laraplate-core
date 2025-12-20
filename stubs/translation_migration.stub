@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('[TRANSLATION_TABLE_NAME]', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('[MODEL_FK]')->nullable(false)->constrained('[MODEL_TABLE]', 'id', '[TRANSLATION_TABLE_NAME]_[MODEL_TABLE]_id_FK')->cascadeOnDelete()->comment('The model that the translation belongs to');
+            $table->string('locale', 10)->nullable(false)->index('[TRANSLATION_TABLE_NAME]_locale_IDX')->comment('The locale of the translation');
+            [TRANSLATED_FIELDS]
+            MigrateUtils::timestamps($table);
+
+            $table->unique(['[MODEL_FK]', 'locale'], '[TRANSLATION_TABLE_NAME]_[MODEL_TABLE]_locale_UN');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('[TRANSLATION_TABLE_NAME]');
+    }
+};

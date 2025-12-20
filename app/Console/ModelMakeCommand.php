@@ -284,7 +284,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 default: $this->isNewClass ? ['migration'] : [],
             ),
         )
-            ->map(fn ($option): int|string => match ($option) {
+            ->map(static fn ($option): int|string => match ($option) {
                 'resource controller' => 'resource',
                 'form requests' => 'requests',
                 default => $option,
@@ -456,7 +456,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $exploded = explode('\\', $relatedName);
         $targetEntityShort = end($exploded);
 
-        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], fn (string $type): bool => $type !== 'relation');
+        $filtered_relation_types = array_filter($this->availableTypes['Relationships/Associations'], static fn (string $type): bool => $type !== 'relation');
 
         $rows = new Collection();
 

@@ -271,7 +271,7 @@ final class CrudHelper
                         $filter->operator->value,
                         $filter->value,
                         Str::startsWith($method, 'or') ? 'or' : 'and',
-                        fn (Builder $q) => $q->withoutGlobalScope('global_ordered'),
+                        static fn (Builder $q) => $q->withoutGlobalScope('global_ordered'),
                     );
 
                     return;

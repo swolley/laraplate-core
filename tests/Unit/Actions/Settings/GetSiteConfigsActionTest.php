@@ -15,7 +15,7 @@ it('builds settings array', function (): void {
 
     $action = new GetSiteConfigsAction(
         settingsProvider: fn () => $settings,
-        modulesProvider: fn () => ['mod1'],
+        modulesProvider: static fn () => ['mod1'],
     );
 
     $result = $action();

@@ -20,7 +20,7 @@ final class SettingsTable
     {
         return self::configureTable(
             table: $table,
-            columns: function (Collection $default_columns): void {
+            columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
                     IconColumn::make('is_public')
                         ->boolean()
@@ -45,7 +45,7 @@ final class SettingsTable
                         ->alignCenter(),
                 ]);
             },
-            filters: function (Collection $default_filters): void {
+            filters: static function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('type')
                         ->options([
@@ -59,7 +59,7 @@ final class SettingsTable
                             'datetime' => 'DateTime',
                         ]),
                     SelectFilter::make('group_name')
-                        ->options(fn () => Setting::query()->distinct()->pluck('group_name', 'group_name')->toArray()),
+                        ->options(static fn () => Setting::query()->distinct()->pluck('group_name', 'group_name')->toArray()),
                     SelectFilter::make('is_public')
                         ->options([
                             '1' => 'Public',

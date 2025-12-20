@@ -27,7 +27,7 @@ final class UserInfoResponse extends JsonResource
                 }
             }
 
-            $roles = $this->resource->roles->map(fn ($role) => $role->name);
+            $roles = $this->resource->roles->map(static fn ($role) => $role->name);
 
             return [
                 'id' => $this->resource->id,

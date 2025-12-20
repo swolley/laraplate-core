@@ -71,7 +71,7 @@ final class SearchSyncCommand extends Command
                 $chunk++;
                 $progress = new Progress(
                     'Syncing documents chunk ' . $chunk . ' of ' . $total_chunks,
-                    $records->map(fn ($record): string => 'Record ' . $record->id)->toArray(),
+                    $records->map(static fn ($record): string => 'Record ' . $record->id)->toArray(),
                 );
 
                 foreach ($records as $record) {

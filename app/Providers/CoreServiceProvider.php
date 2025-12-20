@@ -94,7 +94,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(fn () => Password::min(8)
+        Password::defaults(static fn () => Password::min(8)
             ->letters()
             ->mixedCase()
             ->numbers()
@@ -134,7 +134,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if the user is super admin
-        Gate::before(fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(static fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -185,7 +185,7 @@ final class CoreServiceProvider extends ServiceProvider
     private function registerSearchClients(): void
     {
         // Register Elasticsearch client
-        $this->app->singleton(function ($app): ElasticsearchClient {
+        $this->app->singleton(static function ($app): ElasticsearchClient {
             $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
 
             $builder = ClientBuilder::create();
@@ -194,7 +194,7 @@ final class CoreServiceProvider extends ServiceProvider
             // Set authentication if configured
             if (isset($config['username']) && isset($config['password'])) {
                 $builder->setBasicAuthentication($config['username'], $config['password']);
-            } else if (isset($config['api_key']) && $config['api_key'] !== '') {
+            } elseif (isset($config['api_key']) && $config['api_key'] !== '') {
                 $builder->setApiKey($config['api_key'], $config['api_key_id'] ?? null);
             }
 
@@ -223,7 +223,7 @@ final class CoreServiceProvider extends ServiceProvider
         });
 
         // Register Typesense client
-        $this->app->singleton(function ($app): TypesenseClient {
+        $this->app->singleton(static function ($app): TypesenseClient {
             $config = config('scout.typesense.client-settings');
 
             return new TypesenseClient($config);
@@ -238,7 +238,7 @@ final class CoreServiceProvider extends ServiceProvider
     private function registerSearchEngines(): void
     {
         // Extend Laravel Scout with custom engines
-        $this->app->make(EngineManager::class)->extend('elasticsearch', function ($app) {
+        $this->app->make(EngineManager::class)->extend('elasticsearch', static function ($app) {
             $config = config('search.engines.elasticsearch');
 
             // Get the Elasticsearch client from the container
@@ -251,7 +251,7 @@ final class CoreServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->make(EngineManager::class)->extend('typesense', function ($app) {
+        $this->app->make(EngineManager::class)->extend('typesense', static function ($app) {
             $config = config('search.engines.typesense');
 
             // Get the Typesense client from the container
@@ -265,7 +265,7 @@ final class CoreServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->singleton(Locked::class, fn (): Locked => new Locked());
+        $this->app->singleton(Locked::class, static fn (): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
@@ -389,10 +389,10 @@ final class CoreServiceProvider extends ServiceProvider
     private function registerCache(): void
     {
         // Override the CacheManager to return our custom Repository
-        $this->app->extend('cache', fn ($cacheManager, Application $app): BaseCacheManager => new CacheManager($app));
+        $this->app->extend('cache', static fn ($cacheManager, Application $app): BaseCacheManager => new CacheManager($app));
 
         // Override the cache.store binding to ensure it uses our Repository
-        $this->app->extend('cache.store', function ($service, Application $app): Repository {
+        $this->app->extend('cache.store', static function ($service, Application $app): Repository {
             // Get the underlying store
             /** @var Store $store */
             $store = $app->get(\Illuminate\Contracts\Cache\Factory::class)->driver()->getStore();
@@ -410,7 +410,7 @@ final class CoreServiceProvider extends ServiceProvider
         });
 
         // Override the cache.memo binding to use our Repository
-        $this->app->extend('cache.memo', function ($service, Application $app): Repository {
+        $this->app->extend('cache.memo', static function ($service, Application $app): Repository {
             $driver = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.default');
 
             if (! $app->bound($bindingKey = 'cache.__memoized:' . $driver)) {
@@ -423,33 +423,33 @@ final class CoreServiceProvider extends ServiceProvider
                 );
                 $repository->setEventDispatcher($app->get(\Illuminate\Contracts\Events\Dispatcher::class));
 
-                $app->scoped($bindingKey, fn (): Repository => $repository);
+                $app->scoped($bindingKey, static fn (): Repository => $repository);
             }
 
             return $app->make($bindingKey);
         });
 
         // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, fn ($app): Repository => $app['cache.store']);
-        $this->app->bind(BaseContract::class, fn ($app): Repository => $app['cache.store']);
-        $this->app->bind(Repository::class, fn ($app): Repository => $app['cache.store']);
+        $this->app->bind(BaseRepository::class, static fn ($app): Repository => $app['cache.store']);
+        $this->app->bind(BaseContract::class, static fn ($app): Repository => $app['cache.store']);
+        $this->app->bind(Repository::class, static fn ($app): Repository => $app['cache.store']);
 
         // Register macros
-        Cache::macro('memo', fn (): Repository => resolve('cache.memo'));
-        Cache::macro('tryByRequest', fn (...$args): mixed => resolve(BaseRepository::class)->tryByRequest(...$args));
-        Cache::macro('clearByEntity', function ($entity): void {
+        Cache::macro('memo', static fn (): Repository => resolve('cache.memo'));
+        Cache::macro('tryByRequest', static fn (...$args): mixed => resolve(BaseRepository::class)->tryByRequest(...$args));
+        Cache::macro('clearByEntity', static function ($entity): void {
             resolve(BaseRepository::class)->clearByEntity($entity);
         });
-        Cache::macro('clearByRequest', function ($request, $entity = null): void {
+        Cache::macro('clearByRequest', static function ($request, $entity = null): void {
             resolve(BaseRepository::class)->clearByRequest($request, $entity);
         });
-        Cache::macro('clearByUser', function ($request, $entity = null): void {
+        Cache::macro('clearByUser', static function ($request, $entity = null): void {
             resolve(BaseRepository::class)->clearByUser($request->user(), $entity);
         });
-        Cache::macro('clearByGroup', function ($role, $entity = null): void {
+        Cache::macro('clearByGroup', static function ($role, $entity = null): void {
             resolve(BaseRepository::class)->clearByGroup($role, $entity);
         });
-        Cache::macro('getCacheTags', fn (...$args): array => resolve(BaseRepository::class)->getCacheTags(...$args));
+        Cache::macro('getCacheTags', static fn (...$args): array => resolve(BaseRepository::class)->getCacheTags(...$args));
     }
 
     private function inspectFolderCommands(string $commandsSubpath): array
