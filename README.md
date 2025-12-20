@@ -272,6 +272,25 @@ class ... extends Model
 
 If you need to override the Core Module or dependencies configs you can publish them by running the following command:
 
+## PHP Attributes
+
+This module uses PHP 8 attributes to improve type safety and follow modern PHP standards.
+
+### Override Attribute
+
+Use `#[Override]` when overriding parent methods for better type safety:
+
+```php
+use Override;
+
+#[Override]
+public function getAttribute($key): mixed
+{
+    // Your implementation
+}
+```
+
+
 ## Features
 
 ### Requirements

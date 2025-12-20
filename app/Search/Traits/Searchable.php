@@ -125,7 +125,7 @@ trait Searchable
         $engine = $this->searchableUsing();
 
         $array = [
-            'id' => $this->getKey(),
+            'id' => (string) $this->getKey(),
             'connection' => $this->getConnectionName() ?: 'default',
             'entity' => $this->getTable(),
             self::$indexedAtField => now()->utc()->toIso8601ZuluString(),
@@ -217,6 +217,29 @@ trait Searchable
         $schemaManager = resolve(SchemaManager::class);
 
         return $schemaManager->translateForEngine($schema, $engineName);
+    }
+
+    /**
+     * Typesense collection schema hook.
+     */
+    public function typesenseCollectionSchema(): array
+    {
+        $schema = $this->getSearchMapping();
+
+        // Enable nested fields automatically when object/object[] types are present.
+        if (! array_key_exists('enable_nested_fields', $schema)) {
+            foreach ($schema['fields'] ?? [] as $field) {
+                $type = $field['type'] ?? '';
+
+                if ($type === 'object' || $type === 'object[]') {
+                    $schema['enable_nested_fields'] = true;
+
+                    break;
+                }
+            }
+        }
+
+        return $schema;
     }
 
     /**

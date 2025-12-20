@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Modules\Cms\Jobs\TranslateModelJob;
 use Modules\Core\Overrides\LocaleScope;
+use Override;
 
 /**
  * Trait for models that store translatable fields in a separate translation table.
@@ -62,6 +63,7 @@ trait HasTranslations
      *
      * @param  string  $key
      */
+    #[Override]
     public function getAttribute($key): mixed
     {
         if ($this->isTranslatableField($key)) {
@@ -91,6 +93,7 @@ trait HasTranslations
      * @param  string  $key
      * @return $this
      */
+    #[Override]
     public function setAttribute($key, $value)
     {
         if ($this->isTranslatableField($key)) {
@@ -363,7 +366,7 @@ trait HasTranslations
     protected function locale(): Attribute
     {
         return Attribute::make(
-            get: static fn () => $this->getCurrentLocale(),
+            get: fn () => $this->getCurrentLocale(),
         );
     }
 

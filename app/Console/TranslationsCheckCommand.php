@@ -7,10 +7,8 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
-use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
-#[AsCommand(name: 'lang:check-translations')]
 final class TranslationsCheckCommand extends Command
 {
     /**

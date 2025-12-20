@@ -40,6 +40,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -191,10 +192,16 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
+
+        // Rules for properties that could use attributes in the future
+        // Note: name, email, password are defined in parent class, so attributes
+        // would need to be added there or we use array-based rules for now
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'lang' => ['nullable', 'in:' . implode(',', translations())],
             'locked_at' => ['nullable', 'date'],
         ]);
+
+        // Create rules - complex rules (unique with closure) must stay in array format
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],
             'username' => [
@@ -213,6 +220,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             ],
             'password' => [Password::required()],
         ]);
+
+        // Update rules - complex rules (unique with closure and ignore) must stay in array format
         $rules['update'] = array_merge($rules['update'], [
             'name' => ['nullable', 'string', 'max:255'],
             'username' => [

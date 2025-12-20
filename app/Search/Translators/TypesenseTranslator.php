@@ -38,6 +38,19 @@ class TypesenseTranslator implements ISchemaTranslator
             'type' => $this->getTypesenseType($field->type, $field->options),
         ];
 
+        // Nested fields for object/object[] types
+        if (isset($field->options['properties']) && is_array($field->options['properties'])) {
+            $tsField['fields'] = [];
+
+            foreach ($field->options['properties'] as $name => $type) {
+                $resolvedType = $type instanceof FieldType ? $type : FieldType::fromValue($type);
+                $tsField['fields'][] = [
+                    'name' => $name,
+                    'type' => $this->getTypesenseType($resolvedType),
+                ];
+            }
+        }
+
         // Add index-specific options
         if ($field->hasIndexType(IndexType::SEARCHABLE)) {
             $tsField['index'] = true;
@@ -49,10 +62,6 @@ class TypesenseTranslator implements ISchemaTranslator
 
         if ($field->hasIndexType(IndexType::SORTABLE)) {
             $tsField['sort'] = true;
-        }
-
-        if ($field->hasIndexType(IndexType::VECTOR)) {
-            $tsField['embed'] = true;
         }
 
         return $tsField;

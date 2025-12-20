@@ -61,8 +61,11 @@ abstract class BatchSeeder extends Seeder
      * @param  int  $totalCount  The total number of data to create
      * @param  int|null  $batchSize  The size of the batch to create
      */
-    final protected function createInBatches(string $modelClass, int $totalCount, ?int $batchSize = null): int
-    {
+    final protected function createInBatches(
+        string $modelClass,
+        int $totalCount,
+        ?int $batchSize = null,
+    ): int {
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
@@ -137,8 +140,19 @@ abstract class BatchSeeder extends Seeder
 
         if ($safe_max_parallel_count <= $maxParallelCount) {
             $this->command->newLine();
-            $this->command->info('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
+            $this->command->warn('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
             $this->command->newLine();
+
+            $reduction_percent = 1.0 - ($safe_max_parallel_count / max($maxParallelCount, 1));
+            $proportional_batch_size = max(
+                10, // Reasonable minimum batch size
+                (int) round(($batchSize ?? self::BATCHSIZE) * (1.0 - ($reduction_percent * 0.7))),
+            );
+
+            if ($proportional_batch_size !== ($batchSize ?? self::BATCHSIZE)) {
+                $this->command->warn("Batch size has been reduced to {$proportional_batch_size} to avoid system overload (proportional to available cores).");
+            }
+            $batchSize = $proportional_batch_size;
         }
 
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
