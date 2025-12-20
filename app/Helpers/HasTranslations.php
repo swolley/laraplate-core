@@ -63,7 +63,6 @@ trait HasTranslations
      *
      * @param  string  $key
      */
-    #[Override]
     public function getAttribute($key): mixed
     {
         if ($this->isTranslatableField($key)) {
@@ -93,7 +92,6 @@ trait HasTranslations
      * @param  string  $key
      * @return $this
      */
-    #[Override]
     public function setAttribute($key, $value)
     {
         if ($this->isTranslatableField($key)) {
