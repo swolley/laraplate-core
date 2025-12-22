@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies and version constraints in composer files
+
+## [1.30.6] - 2025-12-22
+
 ### 🚜 Refactor
 
 - Update Elasticsearch client configuration for improved clarity
