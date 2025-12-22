@@ -42,7 +42,7 @@ return [
         ],
 
         // Index prefix
-        'prefix' => env('ELASTICSEARCH_INDEX_PREFIX', ''),
+        'prefix' => env('ELASTIC_INDEX_PREFIX', ''),
     ],
 
     /*
@@ -51,10 +51,10 @@ return [
     |--------------------------------------------------------------------------
     */
     'queue' => [
-        'connection' => env('ELASTICSEARCH_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'sync')),
-        'queue' => env('ELASTICSEARCH_QUEUE', 'indexing'),
-        'timeout' => env('ELASTICSEARCH_QUEUE_TIMEOUT', 300), // 5 minutes
-        'tries' => env('ELASTICSEARCH_QUEUE_TRIES', 3),
+        'connection' => env('ELASTIC_QUEUE_CONNECTION', env('QUEUE_CONNECTION', 'sync')),
+        'queue' => env('ELASTIC_QUEUE', 'indexing'),
+        'timeout' => env('ELASTIC_QUEUE_TIMEOUT', 300), // 5 minutes
+        'tries' => env('ELASTIC_QUEUE_TRIES', 3),
         'backoff' => [30, 60, 120], // waiting time between retries in seconds
     ],
 ];

@@ -119,11 +119,11 @@ SCOUT_QUEUE_BACKOFF=30,60,120					#scout queue backoff times
 SCOUT_IDENTIFY=false							#identify user in search engine
 
 #elasticsearch
-ELASTICSEARCH_INDEX_PREFIX=						#elasticsearch index prefix
-ELASTICSEARCH_QUEUE_CONNECTION=sync				#elasticsearch queue connection
-ELASTICSEARCH_QUEUE=indexing					#elasticsearch queue name
-ELASTICSEARCH_QUEUE_TIMEOUT=300					#elasticsearch queue timeout
-ELASTICSEARCH_QUEUE_TRIES=3						#elasticsearch queue retry attempts
+ELASTIC_INDEX_PREFIX=						#elasticsearch index prefix
+ELASTIC_QUEUE_CONNECTION=sync				#elasticsearch queue connection
+ELASTIC_QUEUE=indexing					#elasticsearch queue name
+ELASTIC_QUEUE_TIMEOUT=300					#elasticsearch queue timeout
+ELASTIC_QUEUE_TRIES=3						#elasticsearch queue retry attempts
 ELASTIC_CONNECTION=default						#elasticsearch connection name
 ELASTIC_HOST=localhost:9200						#elasticsearch host
 ELASTIC_RETRIES=3								#elasticsearch retry attempts

@@ -77,10 +77,19 @@ trait Searchable
             $engine = $this->searchableUsing();
 
             if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-                Bus::chain([
+                $pendingDispatch = Bus::chain([
                     ...$models->map(static fn (Model $model): GenerateEmbeddingsJob => new GenerateEmbeddingsJob($model))->toArray(),
                     new Scout::$makeSearchableJob($models),
-                ])->dispatch()
+                ])->dispatch();
+
+                // If dispatch returns null (e.g., in forked processes), fall back to sync execution
+                if ($pendingDispatch === null) {
+                    $this->syncMakeSearchable($models);
+
+                    return;
+                }
+
+                $pendingDispatch
                     ->onQueue($models->first()->syncWithSearchUsingQueue())
                     ->onConnection($models->first()->syncWithSearchUsing());
 

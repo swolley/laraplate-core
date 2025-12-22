@@ -343,36 +343,8 @@ final class ElasticsearchService
     private function createClient(): Client
     {
         $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
-
-        $builder = ClientBuilder::create();
-        $builder->setHosts($config['hosts']);
-
-        // Set authentication if configured
-        if (isset($config['username']) && isset($config['password'])) {
-            $builder->setBasicAuthentication($config['username'], $config['password']);
-        }
-
-        // Set retry configuration
-        if ($config['retries'] !== null && $config['retries'] !== 0) {
-            $builder->setRetries($config['retries']);
-        }
-
-        // Set timeout options
-        $builder->setHttpClientOptions([
-            'timeout' => $config['timeout'] ?? 60,
-            'connect_timeout' => $config['connect_timeout'] ?? 10,
-        ]);
-
-        // Set cloud ID if available
-        if (isset($config['cloud_id']) && $config['cloud_id'] !== '') {
-            $builder->setElasticCloudId($config['cloud_id']);
-        }
-
-        // Set SSL configuration
-        if (isset($config['ssl_verification'])) {
-            $builder->setSSLVerification($config['ssl_verification']);
-        }
-
-        return $builder->build();
+        
+        return ClientBuilder::fromConfig($config);
+        
     }
 }

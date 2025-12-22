@@ -37,7 +37,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
         $options = [
             'base_uri' => $url,
             'timeout' => $config->timeout,
-            'connect_timeout' => $config->timeout,
+            // 'connect_timeout' => $config->timeout,
             'read_timeout' => $config->timeout,
         ];
 

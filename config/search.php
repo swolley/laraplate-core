@@ -42,7 +42,7 @@ return [
     'engines' => [
         'elasticsearch' => [
             'class' => Modules\Core\Search\Engines\ElasticsearchEngine::class,
-            'index_prefix' => env('ELASTICSEARCH_INDEX_PREFIX', ''),
+            'index_prefix' => env('ELASTIC_INDEX_PREFIX', ''),
         ],
         'typesense' => [
             'class' => Modules\Core\Search\Engines\TypesenseEngine::class,

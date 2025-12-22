@@ -2,32 +2,30 @@
 
 declare(strict_types=1);
 
-return [
+$config = [
     'default' => env('ELASTIC_CONNECTION', 'default'),
     'connections' => [
-        'default' => [
+        'default' => array_filter([
             'hosts' => [
                 env('ELASTIC_HOST', 'localhost:9200'),
             ],
-            // Configurazione timeout e connessione
-            'retries' => env('ELASTIC_RETRIES', 3),
-            'timeout' => env('ELASTIC_TIMEOUT', 60),
-            'connect_timeout' => env('ELASTIC_CONNECT_TIMEOUT', 10),
-            'ssl_verification' => env('ELASTIC_SSL_VERIFICATION', true),
-
-            // Autenticazione
-            'username' => env('ELASTIC_USERNAME'),
-            'password' => env('ELASTIC_PASSWORD'),
-            'api_key' => env('ELASTIC_API_KEY'),
-            'api_key_id' => env('ELASTIC_API_KEY_ID'),
-
-            // Logging
-            'log_enabled' => env('ELASTIC_LOG_ENABLED', false),
-            'log_level' => env('ELASTIC_LOG_LEVEL', 'error'),
-        ],
+            'retries' => (int) env('ELASTIC_RETRIES', 3),
+            'sslVerification' => env('ELASTIC_SSL_VERIFICATION', true),
+            'httpClientOptions' => [
+                'timeout' => (int) env('ELASTIC_TIMEOUT', 60),
+            ],
+            // Include basicAuthentication only if username is set
+            'basicAuthentication' => (env('ELASTIC_USERNAME') !== null && env('ELASTIC_USERNAME') !== '')
+                ? [env('ELASTIC_USERNAME'), env('ELASTIC_PASSWORD', '')]
+                : null,
+            // Include apiKey only if api_key is set
+            'apiKey' => (env('ELASTIC_API_KEY') !== null && env('ELASTIC_API_KEY') !== '')
+                ? [env('ELASTIC_API_KEY'), env('ELASTIC_API_KEY_ID', '')]
+                : null,
+        ], fn ($value) => $value !== null),
     ],
-
-    // Configurazione globale
     'retry_on_conflict' => env('ELASTIC_RETRY_ON_CONFLICT', 3),
     'bulk_size' => env('ELASTIC_BULK_SIZE', 500),
 ];
+
+return $config;

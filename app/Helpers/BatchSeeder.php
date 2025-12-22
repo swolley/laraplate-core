@@ -138,7 +138,7 @@ abstract class BatchSeeder extends Seeder
 
         $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
 
-        if ($safe_max_parallel_count <= $maxParallelCount) {
+        if ($safe_max_parallel_count < $maxParallelCount) {
             $this->command->newLine();
             $this->command->warn('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
             $this->command->newLine();

@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Update closures to static functions for improved performance and consistency
+- Remove #[Override] attributes from getAttribute and setAttribute methods in HasTranslations trait
+- Update Elasticsearch configuration and improve BatchSeeder logic
+
+### 📚 Documentation
+
+- Update README and implement PHP attributes for type safety
+
+## [1.30.3] - 2025-12-19
+
+### 🚜 Refactor
+
 - Enhance error handling in BatchSeeder and update UserFactory for unique username generation
 - Enhance translatable field handling in HasTranslations trait
 
