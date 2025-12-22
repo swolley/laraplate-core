@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚜 Refactor
+
+- Update Elasticsearch client configuration for improved clarity
+
 ## [1.30.4] - 2025-12-22
 
 ### 🚜 Refactor

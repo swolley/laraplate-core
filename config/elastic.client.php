@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-$config = [
+return [
     'default' => env('ELASTIC_CONNECTION', 'default'),
     'connections' => [
         'default' => array_filter([
@@ -22,10 +22,8 @@ $config = [
             'apiKey' => (env('ELASTIC_API_KEY') !== null && env('ELASTIC_API_KEY') !== '')
                 ? [env('ELASTIC_API_KEY'), env('ELASTIC_API_KEY_ID', '')]
                 : null,
-        ], fn ($value) => $value !== null),
+        ], static fn ($value) => $value !== null),
     ],
     'retry_on_conflict' => env('ELASTIC_RETRY_ON_CONFLICT', 3),
     'bulk_size' => env('ELASTIC_BULK_SIZE', 500),
 ];
-
-return $config;
