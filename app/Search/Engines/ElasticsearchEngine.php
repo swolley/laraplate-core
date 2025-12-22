@@ -36,28 +36,44 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     /**
-     * @param  Model&Searchable  $name
-     *
      * @throws Exception
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = []): void
+    public function createIndex($name, array $options = [], bool $force = false): void
     {
-        if ($this->checkIndex(new $name())) {
-            return;
-        }
-
-        $collection = $name->searchableAs();
-
         try {
+            $matched = $this->matchModelToCollectionName($name);
+
+            if ($matched === null) {
+                throw new Exception('Unable to resolve collection name for index creation.');
+            }
+
+            $model = $matched['model'];
+            $collection = $matched['collection'];
+
+            if (! $force && $this->checkIndex($model)) {
+                return;
+            }
+
             // Get mapping from the model
             $schema = [];
 
-            if (method_exists($name, 'getSearchMapping')) {
-                $schema = $name->getSearchMapping();
-            } elseif (method_exists($name, 'toSearchableIndex')) {
-                $schema = $name->toSearchableIndex();
+            if (method_exists($model, 'getSearchMapping')) {
+                $schema = $model->getSearchMapping();
+            } elseif (method_exists($model, 'toSearchableIndex')) {
+                $schema = $model->toSearchableIndex();
+            } else {
+                throw new Exception('No schema definition method found on model ' . $model::class);
+            }
+
+            if ($force) {
+                // Drop existing collection to ensure schema is up to date
+                try {
+                    $this->deleteIndex($collection);
+                } catch (Exception) {
+                    // Ignore if it does not exist
+                }
             }
 
             // Add collection name to schema
@@ -549,13 +565,22 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     /**
-     * @param  Model&Searchable  $model
+     * @param  string|Model|class-string<Model>  $model
      */
     #[Override]
-    public function checkIndex(Model $model): bool
+    public function checkIndex(string|Model $model): bool
     {
         try {
-            return $this->indexManager->exists($model->searchableAs());
+            if ($model instanceof Model) {
+                $this->ensureSearchable($model);
+                $collection = $model->searchableAs();
+            } elseif (is_string($model) && class_exists($model)) {
+                $collection = new $model()->searchableAs();
+            } else {
+                $collection = $model;
+            }
+
+            return $this->indexManager->exists($collection);
         } catch (Exception) {
             return false;
         }

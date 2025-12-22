@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
 use Laravel\Scout\Scout;
@@ -63,7 +64,9 @@ trait Searchable
 
     public function queueMakeSearchable($models): void
     {
-        if (config('search.vector_search.enabled')) {
+        $this->ensureIndexesForModels($models);
+
+        if ($this->vectorSearchEnabled()) {
             if (! is_iterable($models)) {
                 $models = collect([$models]);
             }
@@ -102,7 +105,9 @@ trait Searchable
 
     public function syncMakeSearchable($models): void
     {
-        if (config('search.vector_search.enabled')) {
+        $this->ensureIndexesForModels($models);
+
+        if ($this->vectorSearchEnabled()) {
             $engine = $this->searchableUsing();
 
             if (! is_iterable($models)) {
@@ -150,7 +155,7 @@ trait Searchable
         }
 
         // Add embeddings if available
-        if (config('search.vector_search.enabled') && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
+        if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
 
             if ($embeddings !== []) {
@@ -229,29 +234,6 @@ trait Searchable
     }
 
     /**
-     * Typesense collection schema hook.
-     */
-    public function typesenseCollectionSchema(): array
-    {
-        $schema = $this->getSearchMapping();
-
-        // Enable nested fields automatically when object/object[] types are present.
-        if (! array_key_exists('enable_nested_fields', $schema)) {
-            foreach ($schema['fields'] ?? [] as $field) {
-                $type = $field['type'] ?? '';
-
-                if ($type === 'object' || $type === 'object[]') {
-                    $schema['enable_nested_fields'] = true;
-
-                    break;
-                }
-            }
-        }
-
-        return $schema;
-    }
-
-    /**
      * Check if the index exists and create if needed.
      */
     public function ensureIndexExists(): bool
@@ -262,14 +244,20 @@ trait Searchable
             return $engine->ensureIndex($this);
         }
 
-        // Use Scout's native method if available.
-        if (
-            method_exists($engine, 'createIndex')
-            && (! method_exists($engine, 'indexExists') || ! $engine->checkIndex($this))
-        ) {
-            $engine->createIndex($this);
+        if (method_exists($engine, 'createIndex')) {
+            $needs_creation = true;
 
-            return true;
+            if (is_callable([$engine, 'indexExists'])) {
+                $needs_creation = ! (bool) call_user_func([$engine, 'indexExists'], $this->searchableAs());
+            } elseif (is_callable([$engine, 'checkIndex'])) {
+                $needs_creation = ! (bool) call_user_func([$engine, 'checkIndex'], $this);
+            }
+
+            if ($needs_creation) {
+                call_user_func([$engine, 'createIndex'], $this);
+
+                return true;
+            }
         }
 
         return false;
@@ -302,6 +290,40 @@ trait Searchable
         }
 
         return null;
+    }
+
+    private function ensureIndexesForModels($models): void
+    {
+        if (! is_iterable($models)) {
+            $this->ensureIndexExists();
+
+            return;
+        }
+
+        $by_class = [];
+
+        foreach ($models as $model) {
+            $class = $model::class;
+
+            if (isset($by_class[$class])) {
+                continue;
+            }
+
+            $model->ensureIndexExists();
+
+            $by_class[$class] = $model;
+        }
+    }
+
+    private function vectorSearchEnabled(): bool
+    {
+        /** @phpstan-ignore-next-line false-positive: config loaded via module */
+        if (! Config::has('search.vector_search.enabled')) {
+            return false;
+        }
+
+        /** @phpstan-ignore-next-line false-positive: config loaded via module */
+        return (bool) Config::get('search.vector_search.enabled');
     }
 
     private function getSchemaDefinition(): SchemaDefinition

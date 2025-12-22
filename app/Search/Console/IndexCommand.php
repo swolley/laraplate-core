@@ -26,13 +26,11 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         $model = $this->getModelClass();
 
         if (in_array($model, ['', '0', false], true)) {
-            $this->error('Model not found');
-
             return Command::INVALID;
         }
 
         $this->addArgument('name');
-        $this->input->setArgument('name', new $model()->indexableAs());
+        $this->input->setArgument('name', /* new $model()->indexableAs() */ $model);
         $this->addOption('key');
 
         parent::handle($manager);

@@ -16,6 +16,10 @@ trait SearchableCommandUtils
     {
         $model = $this->getModelClassFromTrait('model');
 
+        if (! $model) {
+            return false;
+        }
+
         if (! class_uses_trait($model, Searchable::class)) {
             $this->error('Model does not use Searchable trait');
 

@@ -129,6 +129,7 @@ abstract class BatchSeeder extends Seeder
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
+        $db_connection_name = (new $modelClass())->getConnectionName() ?? config('database.default');
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');
@@ -137,6 +138,7 @@ abstract class BatchSeeder extends Seeder
         }
 
         $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
+        $db_safe_parallel_count = $this->getMaxDbParallelCount($db_connection_name, $safe_max_parallel_count);
 
         if ($safe_max_parallel_count < $maxParallelCount) {
             $this->command->newLine();
@@ -154,6 +156,25 @@ abstract class BatchSeeder extends Seeder
             }
             $batchSize = $proportional_batch_size;
         }
+
+        if ($db_safe_parallel_count < $safe_max_parallel_count) {
+            $this->command->newLine();
+            $this->command->warn('Safely reduced max parallel count to ' . $db_safe_parallel_count . ' because of database connection limits on ' . $db_connection_name . '.');
+            $this->command->newLine();
+
+            $reduction_percent = 1.0 - ($db_safe_parallel_count / max($safe_max_parallel_count, 1));
+            $proportional_batch_size = max(
+                10, // Reasonable minimum batch size
+                (int) round(($batchSize ?? self::BATCHSIZE) * (1.0 - ($reduction_percent * 0.7))),
+            );
+
+            if ($proportional_batch_size !== ($batchSize ?? self::BATCHSIZE)) {
+                $this->command->warn("Batch size has been reduced to {$proportional_batch_size} to respect DB connection limits.");
+            }
+            $batchSize = $proportional_batch_size;
+        }
+
+        $safe_max_parallel_count = $db_safe_parallel_count;
 
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
@@ -217,6 +238,34 @@ abstract class BatchSeeder extends Seeder
 
         // Heuristic: keep some margin for other system activities; don't exceed the CPU core count.
         return min($maxParallelCount, max(1, $cpu_cores - 1));
+    }
+
+    private function getMaxDbParallelCount(string $connectionName, int $currentLimit): int
+    {
+        try {
+            $connection = DB::connection($connectionName);
+            $driver = $connection->getDriverName();
+
+            if ($driver !== 'pgsql') {
+                return $currentLimit;
+            }
+
+            $max_connections = (int) ($connection->selectOne('SHOW max_connections')->max_connections ?? 0);
+            $reserved = (int) ($connection->selectOne('SHOW superuser_reserved_connections')->superuser_reserved_connections ?? 0);
+            $active = (int) ($connection->selectOne('SELECT sum(numbackends) AS active_backends FROM pg_stat_database')->active_backends ?? 0);
+
+            // Keep a small safety margin of one connection.
+            $available = max(1, $max_connections - $reserved - $active - 1);
+
+            return max(1, min($currentLimit, $available));
+        } catch (Throwable $e) {
+            Log::warning('Unable to determine DB parallel limit, keeping current limit.', [
+                'connection' => $connectionName,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $currentLimit;
+        }
     }
 
     /**
@@ -300,6 +349,7 @@ abstract class BatchSeeder extends Seeder
                             $failedMessages = $errors[$failedField] ?? [];
                             $data = method_exists($e->validator, 'getData') ? $e->validator->getData() : [];
                             $failedValue = $data[$failedField] ?? 'N/A';
+
                             $message = sprintf('Validation failed for field "%s": %s (value: %s)', $failedField, implode(', ', $failedMessages), $failedValue);
                         } else {
                             $message = $e->getMessage();

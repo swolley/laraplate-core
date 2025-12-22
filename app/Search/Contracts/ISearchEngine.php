@@ -20,7 +20,14 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
      */
     public function supportsVectorSearch(): bool;
 
-    public function createIndex($name, array $options = []): void;
+    /**
+     * Create an index.
+     *
+     * @param  string|Model&Searchable|class-string<Model>  $name
+     * @param  array<string,mixed>  $options  Index options
+     * @param  bool  $force  Force index creation even if it already exists
+     */
+    public function createIndex($name, array $options = [], bool $force = false): void;
 
     public function health(): array;
 

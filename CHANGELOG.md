@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Enhance BatchSeeder and Searchable trait functionality
+
+## [1.30.7] - 2025-12-22
+
 ### ⚙️ Miscellaneous Tasks
 
 - Update dependencies and version constraints in composer files

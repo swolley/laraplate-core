@@ -46,12 +46,12 @@ interface ISearchable
     /**
      * Check if the index exists.
      */
-    public function checkIndex(Model $model): bool;
+    public function checkIndex(string|Model $model): bool;
 
     /**
      * Check if the index exists.
      */
-    public function ensureIndex(Model $model): bool;
+    public function ensureIndex(string|Model $model): bool;
 
     /**
      * Get the timestamp of the last indexing.

@@ -45,15 +45,13 @@ trait CommonEngineFunctions
         return $model->prepareDataToEmbed();
     }
 
-    #[Override]
     /**
      * @throws \Http\Client\Exception
      * @throws Exception
      */
-    public function ensureIndex(Model $model): bool
+    #[Override]
+    public function ensureIndex(string|Model $model): bool
     {
-        $this->ensureSearchable($model);
-
         if (! $this->checkIndex($model)) {
             /** @var Model&Searchable $model */
             $this->createIndex($model);
@@ -103,6 +101,47 @@ trait CommonEngineFunctions
     protected function usesSearchableTrait(Model $model): bool
     {
         return in_array(Searchable::class, class_uses_recursive($model), true);
+    }
+
+    /**
+     * @param  string|Model&Searchable|class-string<Model>  $name
+     * @return array{model:Model,collection:string}|null
+     */
+    private function matchModelToCollectionName(string|Model $name): ?array
+    {
+        $model = null;
+        $collection = null;
+
+        if ($name instanceof Model) {
+            $model = $name;
+            $collection = $model->searchableAs();
+        } elseif (is_string($name) && class_exists($name)) {
+            $model = new $name();
+            $collection = $model->searchableAs();
+        } elseif (is_string($name)) {
+            $models = models(true, filter: fn (string $model): bool => class_uses_trait($model, Searchable::class) && new $model()->searchableAs() === $name);
+
+            if (count($models) > 1) {
+                throw new Exception('Multiple models found for collection name: ' . $name);
+            }
+
+            $model = head($models);
+            $collection = $name;
+        }
+
+        if ($collection === null) {
+            throw new Exception('Unable to resolve collection name for index creation.');
+        }
+
+        // Get mapping from the model if available; otherwise fail
+        if ($model === null) {
+            return null;
+        }
+
+        return [
+            'model' => $model,
+            'collection' => $collection,
+        ];
     }
 
     private function extractVectorFromBuilder(Builder $builder): array

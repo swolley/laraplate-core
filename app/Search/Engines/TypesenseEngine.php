@@ -34,29 +34,42 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     /**
-     * @param  Model&Searchable  $name
-     *
      * @throws Exception
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = []): void
+    public function createIndex($name, array $options = [], bool $force = false): void
     {
-        if ($this->checkIndex(new $name())) {
-            return;
-        }
-
-        $collection = $name->searchableAs();
-
         try {
-            // Get mapping from the model
-            // $schema = [];
+            $matched = $this->matchModelToCollectionName($name);
 
-            // if (method_exists($name, 'getSearchMapping')) {
-            $schema = $this->getSearchMapping($name);
-            // } elseif (method_exists($name, 'toSearchableIndex')) {
-            // $schema = $name->toSearchableIndex();
-            // }
+            if ($matched === null) {
+                throw new Exception('Unable to resolve collection name for index creation.');
+            }
+
+            $model = $matched['model'];
+            $collection = $matched['collection'];
+
+            if (! $force && $this->checkIndex($model)) {
+                return;
+            }
+
+            if (method_exists($model, 'getSearchMapping')) {
+                $schema = $model->getSearchMapping();
+            } elseif (method_exists($model, 'toSearchableIndex')) {
+                $schema = $model->toSearchableIndex();
+            } else {
+                throw new Exception('No schema definition method found on model ' . $model::class);
+            }
+
+            if ($force) {
+                // Drop existing collection to ensure schema is up to date
+                try {
+                    $this->typesense->collections[$collection]->delete();
+                } catch (Exception) {
+                    // Ignore if it does not exist
+                }
+            }
 
             // Add collection name to schema
             $schema['name'] = $collection;
@@ -278,7 +291,10 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         ];
 
         // Add a vector field if needed
-        if (config('search.vector_search.enabled') && $this->supportsVectorSearch()) {
+        // Use env to avoid tooling complaining about module config discovery
+        $vectorSearchEnabled = (bool) env('VECTOR_SEARCH_ENABLED', false);
+
+        if ($vectorSearchEnabled && $this->supportsVectorSearch()) {
             // Typesense vector field configuration
             // The embedding is pre-computed, so we just need to define it as float[]
             $mapping['fields']['embedding'] = [
@@ -303,17 +319,24 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     /**
-     * @param  Model&Searchable  $model
+     * @param  string|Model|class-string<Model>  $model
      *
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function checkIndex(Model $model): bool
+    public function checkIndex(string|Model $model): bool
     {
-        $this->ensureSearchable($model);
-
         try {
-            $this->typesense->collections[$model->searchableAs()]->retrieve();
+            if ($model instanceof Model) {
+                $this->ensureSearchable($model);
+                $collection = $model->searchableAs();
+            } elseif (is_string($model) && class_exists($model)) {
+                $collection = new $model()->searchableAs();
+            } else {
+                $collection = $model;
+            }
+
+            $this->typesense->collections[$collection]->retrieve();
 
             return true;
         } catch (Exception) {

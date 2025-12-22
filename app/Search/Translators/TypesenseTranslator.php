@@ -19,8 +19,19 @@ class TypesenseTranslator implements ISchemaTranslator
             'fields' => [],
         ];
 
+        $requires_nested = false;
+
         foreach ($schema->getFields() as $field) {
-            $collection['fields'][] = $this->translateField($field);
+            $translated = $this->translateField($field);
+            $collection['fields'][] = $translated;
+
+            if ($translated['type'] === 'object' || $translated['type'] === 'object[]') {
+                $requires_nested = true;
+            }
+        }
+
+        if ($requires_nested) {
+            $collection['enable_nested_fields'] = true;
         }
 
         return $collection;
