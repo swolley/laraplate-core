@@ -53,10 +53,19 @@ trait CommonEngineFunctions
     public function ensureIndex(string|Model $model): bool
     {
         if (! $this->checkIndex($model)) {
-            /** @var Model&Searchable $model */
-            $this->createIndex($model);
+            try {
+                /** @var Model&Searchable $model */
+                $this->createIndex($model);
 
-            return true;
+                return true;
+            } catch (\Elastic\Elasticsearch\Exception\ClientResponseException $e) {
+                // If index already exists (race condition in parallel processing), ignore the error
+                if ($e->getCode() === 400 && str_contains($e->getMessage(), 'resource_already_exists_exception')) {
+                    return false;
+                }
+
+                throw $e;
+            }
         }
 
         return false;
@@ -86,7 +95,7 @@ trait CommonEngineFunctions
                 ->first()
                 ?->{self::INDEXED_AT_FIELD};
         } catch (Exception $exception) {
-            Log::error('Error getting last indexed timestamp from Typesense', [
+            Log::error('Error getting last indexed timestamp from Search Engine', [
                 'index' => $model->searchableAs(),
                 'error' => $exception->getMessage(),
             ]);

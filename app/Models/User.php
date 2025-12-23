@@ -102,7 +102,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             return true;
         }
 
-        return $this->can('*', ['guard' => $panel->getAuthGuard()]);
+        return $this->hasPermissionTo('*', $panel->getAuthGuard());
     }
 
     public function isGuest(): bool
