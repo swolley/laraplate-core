@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Users\Tables;
 
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Notifications\Notification;
@@ -13,7 +14,6 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
-use Modules\Core\Models\User;
 
 final class UsersTable
 {

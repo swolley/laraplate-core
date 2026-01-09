@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Auth\Providers;
 
+use App\Models\User;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Models\License;
-use Modules\Core\Models\User;
 use Override;
 
 final class SocialiteProvider implements IAuthenticationProvider

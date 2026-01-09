@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Listeners;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\UnauthorizedException;
 use Lab404\Impersonate\Impersonate;
 use Modules\Core\Models\License;
-use Modules\Core\Models\User;
 use RuntimeException;
 
 final class AfterLoginListener

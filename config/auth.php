@@ -11,7 +11,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', Modules\Core\Models\User::class),
+            'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
         'socialite' => [
             'enabled' => env('ENABLE_SOCIAL_LOGIN', false),

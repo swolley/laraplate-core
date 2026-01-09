@@ -84,6 +84,7 @@ final class CoreDatabaseSeeder extends Seeder
         $roles_data = [
             [
                 'name' => $roles['superadmin'],
+                'description' => 'superadmin is the only one who can bypass all the system guards and permissions',
                 'locked_at' => now(),
             ],
             [
@@ -138,7 +139,7 @@ final class CoreDatabaseSeeder extends Seeder
                 'email' => "{$superadmin}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'assignRole' => $this->groups->get('superadmin'),
+                'roles' => [$this->groups->get('superadmin')],
             ],
             [
                 'name' => $admin,
@@ -146,7 +147,7 @@ final class CoreDatabaseSeeder extends Seeder
                 'email' => "{$admin}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'assignRole' => $this->groups->get('admin'),
+                'roles' => [$this->groups->get('admin')],
             ],
             [
                 'name' => $anonymous,
@@ -154,7 +155,7 @@ final class CoreDatabaseSeeder extends Seeder
                 'email' => "{$anonymous}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'assignRole' => $this->groups->get('guest'),
+                'roles' => [$this->groups->get('guest')],
             ],
         ];
 

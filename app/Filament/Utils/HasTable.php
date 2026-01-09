@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Utils;
 
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
@@ -19,8 +20,8 @@ use Filament\Actions\ViewAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
 // use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -47,7 +48,6 @@ use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Models\User;
 use Modules\Core\Search\Traits\Searchable;
 use PHPUnit\Event\InvalidArgumentException;
 use ReflectionClass;

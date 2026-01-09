@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasUniqueFactoryValues;
-use Modules\Core\Models\User;
 use Override;
 
 /**

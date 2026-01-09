@@ -98,7 +98,6 @@ final class HandleLicensesCommand extends Command
                         break;
                 }
 
-                $this->output->info('User class is not Modules\Core\Models\User');
                 DB::commit();
 
                 return BaseCommand::SUCCESS;

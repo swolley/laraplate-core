@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use App\Models\User;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Carbon\CarbonImmutable;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
@@ -21,7 +22,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Foundation\Application;
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
@@ -86,6 +86,10 @@ final class CoreServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! is_subclass_of(user_class(), \Modules\Core\Models\User::class)) {
+            throw new Exception('User class is not ' . \Modules\Core\Models\User::class);
+        }
+
         $this->registerCommands();
         $this->registerCommandSchedules();
         $this->registerTranslations();
@@ -134,7 +138,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function registerAuths(): void
     {
         // bypass all other checks if the user is super admin
-        Gate::before(static fn (?User $user): ?true => $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin() ? true : null);
+        Gate::before(static fn (?User $user): ?true => $user instanceof User && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -187,9 +191,8 @@ final class CoreServiceProvider extends ServiceProvider
         // Register Elasticsearch client
         $this->app->singleton(static function ($app): ElasticsearchClient {
             $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
-            
+
             return ClientBuilder::fromConfig($config);
-            
         });
 
         // Register Typesense client

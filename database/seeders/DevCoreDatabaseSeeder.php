@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Modules\Core\Helpers\BatchSeeder;
 use Modules\Core\Models\License;
-use Modules\Core\Models\User;
 
 final class DevCoreDatabaseSeeder extends BatchSeeder
 {

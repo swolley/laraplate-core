@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Users;
 
+use App\Models\User;
 use BackedEnum;
 use Coolsam\Modules\Resource;
 use Filament\Panel;
@@ -15,7 +16,6 @@ use Modules\Core\Filament\Resources\Users\Pages\EditUser;
 use Modules\Core\Filament\Resources\Users\Pages\ListUsers;
 use Modules\Core\Filament\Resources\Users\Schemas\UserForm;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
-use Modules\Core\Models\User;
 use UnitEnum;
 
 final class UserResource extends Resource

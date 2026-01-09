@@ -973,7 +973,7 @@
             <div class="relative w-full max-w-2xl px-6 lg:max-w-7xl">
                 <header class="grid items-center gap-2 py-10">
                     <div class="flex justify-center w-auto text-[#a5ac56] gap-2">
-                        <img src="https://raw.githubusercontent.com/swolley/images/refs/heads/master/swolley-1.jpg" />
+                        <img src="https://raw.githubusercontent.com/swolley/images/refs/heads/master/logo_laraplate.png?raw=true" />
                     </div>
 
                     <!-- session -->

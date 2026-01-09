@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
 use Override;
@@ -18,6 +19,6 @@ final class HorizonServiceProvider extends HorizonApplicationServiceProvider
     #[Override]
     protected function gate(): void
     {
-        Gate::define('viewHorizon', static fn ($user): bool => $user && $user instanceof \Modules\Core\Models\User && $user->isSuperAdmin());
+        Gate::define('viewHorizon', static fn ($user): bool => $user && $user instanceof User && $user->isSuperAdmin());
     }
 }

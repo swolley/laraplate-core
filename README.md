@@ -1,7 +1,7 @@
 <p>&nbsp;</p>
 <p align="center">
 	<a href="https://github.com/swolley" target="_blank">
-		<img src="https://raw.githubusercontent.com/swolley/images/refs/heads/master/logo_laraplate.png" width="400" alt="Laravel Logo" />
+		<img src="https://raw.githubusercontent.com/swolley/images/refs/heads/master/logo_laraplate.png?raw=true" width="400" alt="Laravel Logo" />
     </a>
 </p>
 <p>&nbsp;</p>
@@ -56,7 +56,7 @@ ENABLE_USER_REGISTRATION=true					#enables user registration
 ENABLE_SOCIAL_LOGIN=true						#enables social login
 ENABLE_USER_LICENSE=false						#enables user licenses
 ENABLE_USER_2FA=false							#enables two-factor authentication
-AUTH_MODEL=Modules\Core\Models\User				#authentication model
+AUTH_MODEL=App\Models\User				#authentication model
 
 #locking
 LOCKIN_LOCK_VERSION_COLUMN=lock_version			#column name for the lock version

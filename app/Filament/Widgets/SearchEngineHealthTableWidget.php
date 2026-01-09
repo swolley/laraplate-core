@@ -18,20 +18,14 @@ final class SearchEngineHealthTableWidget extends Widget
     protected function getViewData(): array
     {
         $data = [
-            'engine' => null,
-            'health' => null,
+            'driver' => null,
             'models' => [],
             'error' => null,
         ];
 
         try {
             $engine = resolve(EngineManager::class)->engine();
-            $data['engine'] = $engine;
-
-            // Try to get health information
-            if (method_exists($engine, 'health')) {
-                $data['health'] = $engine->health();
-            }
+            $data['driver'] = config('scout.driver', 'unknown');
 
             // Get searchable models and their counts
             $models = models(filter: static fn (string|object $model): bool => class_uses_trait($model, Searchable::class));
@@ -40,12 +34,20 @@ final class SearchEngineHealthTableWidget extends Widget
             foreach ($models as $model) {
                 $instance = new $model();
 
+                try {
+                    $stats = $engine->stats();
+                    $documents = $stats[$instance->searchableAs()]['num_documents'] ?? 0;
+                } catch (Exception) {
+                    $documents = 0;
+                }
+
                 $modelData[] = [
-                    'name' => $model,
+                    'name' => class_basename($model),
+                    'full_name' => $model,
                     'searchable_as' => $instance->searchableAs(),
                     'count' => $model::query()->count(),
                     'index_exists' => $engine->checkIndex($instance),
-                    'documents' => $engine->stats()[$instance->searchableAs()]['num_documents'] ?? 0,
+                    'documents' => $documents,
                 ];
             }
 

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use App\Models\User;
 use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\Facades\App;
 use InvalidArgumentException;
-use Modules\Core\Models\User;
 use TypeError;
 
 /**
