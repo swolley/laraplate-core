@@ -2,53 +2,89 @@
     <x-filament::section>
         <x-slot name="heading">
             <div class="flex items-center gap-2">
-                <x-filament::icon icon="heroicon-o-clock" class="w-5 h-5" />
+                {{-- <x-filament::icon icon="heroicon-o-clock" class="w-5 h-5" /> --}}
                 Recent Activity
             </div>
         </x-slot>
 
         <div class="fi-section-content">
-            <div class="grid gap-6 md:grid-cols-2">
+            {{-- <div class="grid gap-6 md:grid-cols-2"> --}}
                 @if(!empty($recent_contents))
-                    <div>
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Recent Contents</h3>
-                        <div class="space-y-2">
-                            @foreach($recent_contents as $content)
-                                <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            {{ $content['title'] }}
-                                        </p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $content['created_at'] }}
-                                        </p>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
+                    <div class="fi-table">
+                        <table class="fi-ta-table">
+                            <thead class="fi-ta-header">
+                                <tr class="fi-ta-row">
+                                    <th colspan="3" class="fi-ta-header-cell text-center">Recent Contents</th>
+                                </tr>
+                                <tr class="fi-ta-row">
+                                    <th class="fi-ta-header-cell">Id</th>
+                                    <th class="fi-ta-header-cell">Reference</th>
+                                    <th class="fi-ta-header-cell">Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody class="fi-ta-body">
+                                @foreach($recent_contents as $content)
+                                    <tr class="fi-ta-row">
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate text-right">
+                                                {{ $content['title']['id'] }}
+                                            </div>
+                                        </td>
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate">
+                                                {{ $content['title']['title'] }}
+                                            </div>
+                                        </td>
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate">
+                                                {{ $content['created_at'] }}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 @endif
 
                 @if(!empty($recent_users))
-                    <div>
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Recent Users</h3>
-                        <div class="space-y-2">
-                            @foreach($recent_users as $user)
-                                <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            {{ $user['name'] }}
-                                        </p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $user['email'] }} · {{ $user['created_at'] }}
-                                        </p>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
+                    <div class="fi-table">
+                        <table class="fi-ta-table">
+                            <thead class="fi-ta-header">
+                                <tr class="fi-ta-row">
+                                    <th colspan="3" class="fi-ta-header-cell text-center">Recent Users</th>
+                                </tr>
+                                <tr class="fi-ta-row">
+                                    <th class="fi-ta-header-cell">Id</th>
+                                    <th class="fi-ta-header-cell">Name</th>
+                                    <th class="fi-ta-header-cell">Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody class="fi-ta-body">
+                                @foreach($recent_users as $user)
+                                    <tr class="fi-ta-row">
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate text-right">
+                                                {{ $user['id'] }}
+                                            </div>
+                                        </td>
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate">
+                                                {{ $user['name'] }}
+                                            </div>
+                                        </td>
+                                        <td class="fi-ta-cell">
+                                            <div class="fi-ta-cell-content truncate">
+                                                {{ $user['created_at'] }}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 @endif
-            </div>
+            {{-- </div> --}}
 
             @if(empty($recent_contents) && empty($recent_users))
                 <div class="fi-alert fi-color-gray fi-size-sm">

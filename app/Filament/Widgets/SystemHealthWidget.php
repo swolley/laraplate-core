@@ -14,6 +14,15 @@ final class SystemHealthWidget extends BaseWidget
 {
     protected static ?int $sort = 3;
 
+    protected ?string $pollingInterval = null;
+
+    public function getColumns(): int|array|null
+    {
+        return [
+            'md' => 2,
+        ];
+    }
+
     protected function getStats(): array
     {
         $stats = [];

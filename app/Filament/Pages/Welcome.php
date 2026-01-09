@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Filament\Pages\Documentation;
+namespace Modules\Core\Filament\Pages;
 
 use BackedEnum;
 use Filament\Pages\Page;
@@ -41,4 +41,3 @@ final class Welcome extends Page
         return translations();
     }
 }
-

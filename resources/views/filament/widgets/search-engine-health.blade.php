@@ -15,75 +15,66 @@
             </div>
         @else
             <div class="fi-section-content">
-                <div class="fi-field-wrp mb-4">
-                    <div class="fi-field">
-                        <div class="fi-field-label-wrp">
-                            <label class="fi-field-label">Driver</label>
-                        </div>
-                        <div class="fi-field-content">
-                            <div class="fi-input-wrp">
-                                <div class="fi-input font-semibold">{{ ucfirst($driver ?? 'Unknown') }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                @if(!empty($models))
-                    <div class="fi-table">
-                        <table class="fi-ta-table">
-                            <thead class="fi-ta-header">
+                <div class="fi-table">
+                    <table class="fi-ta-table">
+                        <thead class="fi-ta-header">
+                            <tr class="fi-ta-row">
+                                <th colspan="5" class="fi-ta-header-cell text-center">{{ ucfirst($driver ?? 'Unknown') }}</th>
+                            </tr>
+                            <tr class="fi-ta-row">
+                                <th class="fi-ta-header-cell">Model</th>
+                                <th class="fi-ta-header-cell">Index</th>
+                                <th class="fi-ta-header-cell">Status</th>
+                                <th class="fi-ta-header-cell">Records</th>
+                                <th class="fi-ta-header-cell">Documents</th>
+                            </tr>
+                        </thead>
+                        <tbody class="fi-ta-body">
+                            @foreach($models as $model)
                                 <tr class="fi-ta-row">
-                                    <th class="fi-ta-header-cell">Model</th>
-                                    <th class="fi-ta-header-cell">Index</th>
-                                    <th class="fi-ta-header-cell">Status</th>
-                                    <th class="fi-ta-header-cell">Records</th>
-                                    <th class="fi-ta-header-cell">Documents</th>
+                                    <td class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content">
+                                            {{ $model['name'] }}
+                                        </div>
+                                    </td>
+                                    <td class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content">
+                                            <code class="text-xs">{{ $model['searchable_as'] }}</code>
+                                        </div>
+                                    </td>
+                                    <td class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content text-center">
+                                            @if($model['index_exists'])
+                                                <x-filament::badge color="success" size="sm">Active</x-filament::badge>
+                                            @else
+                                                <x-filament::badge color="warning" size="sm">Missing</x-filament::badge>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content text-right">
+                                            {{ number_format($model['count']) }}
+                                        </div>
+                                    </td>
+                                    <td class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content text-right">
+                                            {{ number_format($model['documents']) }}
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody class="fi-ta-body">
-                                @foreach($models as $model)
-                                    <tr class="fi-ta-row">
-                                        <td class="fi-ta-cell">
-                                            <div class="fi-ta-cell-content">
-                                                {{ $model['name'] }}
-                                            </div>
-                                        </td>
-                                        <td class="fi-ta-cell">
-                                            <div class="fi-ta-cell-content">
-                                                <code class="text-xs">{{ $model['searchable_as'] }}</code>
-                                            </div>
-                                        </td>
-                                        <td class="fi-ta-cell">
-                                            <div class="fi-ta-cell-content">
-                                                @if($model['index_exists'])
-                                                    <x-filament::badge color="success" size="sm">Active</x-filament::badge>
-                                                @else
-                                                    <x-filament::badge color="warning" size="sm">Missing</x-filament::badge>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="fi-ta-cell">
-                                            <div class="fi-ta-cell-content">
-                                                {{ number_format($model['count']) }}
-                                            </div>
-                                        </td>
-                                        <td class="fi-ta-cell">
-                                            <div class="fi-ta-cell-content">
-                                                {{ number_format($model['documents']) }}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="fi-alert fi-color-gray fi-size-sm">
-                        <div class="fi-alert-content">
-                            No searchable models found.
-                        </div>
-                    </div>
-                @endif
+                            @endforeach
+                            @if(empty($models))
+                                <tr class="fi-ta-row">
+                                    <td colspan="5" class="fi-ta-cell">
+                                        <div class="fi-ta-cell-content">
+                                            No searchable models found.
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
             </div>
         @endif
     </x-filament::section>

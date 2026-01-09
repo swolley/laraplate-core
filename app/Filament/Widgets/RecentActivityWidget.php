@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Widgets;
 
 use App\Models\User;
+use Exception;
 use Filament\Widgets\Widget;
 use Modules\Cms\Models\Content;
 
@@ -14,6 +15,8 @@ final class RecentActivityWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected static ?int $sort = 50;
+
     protected function getViewData(): array
     {
         $data = [
@@ -21,15 +24,16 @@ final class RecentActivityWidget extends Widget
             'recent_users' => [],
         ];
 
-        // Recent contents (last 5)
+        // Recent contents (last 10)
         if (class_exists(Content::class)) {
             $data['recent_contents'] = Content::query()
                 ->latest('created_at')
-                ->limit(5)
+                ->limit(10)
                 ->get()
                 ->map(function ($content) {
                     // Try to get title from translation or use a fallback
                     $title = 'Untitled';
+
                     try {
                         if (method_exists($content, 'getTranslation') && $content->getTranslation('title')) {
                             $title = $content->getTranslation('title');
@@ -39,7 +43,7 @@ final class RecentActivityWidget extends Widget
                             $default_translation = $content->translations()->where('locale', app()->getLocale())->first();
                             $title = $default_translation?->title ?? 'Untitled';
                         }
-                    } catch (\Exception) {
+                    } catch (Exception) {
                         // Fallback to Untitled
                     }
 
@@ -69,4 +73,3 @@ final class RecentActivityWidget extends Widget
         return $data;
     }
 }
-

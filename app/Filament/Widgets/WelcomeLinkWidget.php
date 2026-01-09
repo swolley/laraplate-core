@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Widgets;
 
 use Filament\Widgets\Widget;
+use Modules\Core\Filament\Pages\Welcome;
 
 final class WelcomeLinkWidget extends Widget
 {
@@ -15,7 +16,7 @@ final class WelcomeLinkWidget extends Widget
     protected function getViewData(): array
     {
         return [
-            'welcome_url' => \Modules\Core\Filament\Pages\Documentation\Welcome::getUrl(),
+            'welcome_url' => Welcome::getUrl(),
         ];
     }
 }

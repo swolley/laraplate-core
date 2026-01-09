@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Add Swagger and Welcome pages for API documentation
+
+### 🚜 Refactor
+
+- Update permission handling and error management in search index functions
+- Update user model references and enhance documentation structure
+
+## [1.30.8] - 2025-12-22
+
 ### 🚜 Refactor
 
 - Enhance BatchSeeder and Searchable trait functionality
