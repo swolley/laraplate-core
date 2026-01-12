@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Update RecentActivityWidget and HasTable trait for improved functionality
+
+## [1.31.0] - 2026-01-09
+
 ### 🚀 Features
 
 - Add Swagger and Welcome pages for API documentation

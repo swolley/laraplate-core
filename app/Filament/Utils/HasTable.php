@@ -225,16 +225,15 @@ trait HasTable
             $default_columns->push(
                 TextColumn::make('translations.locale')
                     ->searchable()
-                    ->circular()
                     ->toggleable(isToggledHiddenByDefault: false)
-                    ->grow(false)
-                    ->formatStateUsing(static fn ($locales): string => collect($locales)->map(static fn (string $locale): string => "<picture>
-                            <source type='image/webp' srcset='https://flagcdn.com/40x30/{$locale}.webp, https://flagcdn.com/80x60/{$locale}.webp 2x, https://flagcdn.com/120x90/{$locale}.webp 3x'>
-                            <source type='image/png' srcset='https://flagcdn.com/40x30/{$locale}.png, https://flagcdn.com/80x60/{$locale}.png 2x, https://flagcdn.com/120x90/{$locale}.png 3x'>
-                            <img src='https://flagcdn.com/40x30/{$locale}.png' width='40' height='30' alt='{$locale}' loading='lazy'>
-                        </picture>")->implode('&nbsp;'),
-                    )
-                    ->html(),
+                    ->grow(false),
+                // ->formatStateUsing(static fn ($locales): string => collect($locales)->map(static fn (string $locale): string => "<picture>
+                //         <source type='image/webp' srcset='https://flagcdn.com/40x30/{$locale}.webp, https://flagcdn.com/80x60/{$locale}.webp 2x, https://flagcdn.com/120x90/{$locale}.webp 3x'>
+                //         <source type='image/png' srcset='https://flagcdn.com/40x30/{$locale}.png, https://flagcdn.com/80x60/{$locale}.png 2x, https://flagcdn.com/120x90/{$locale}.png 3x'>
+                //         <img src='https://flagcdn.com/40x30/{$locale}.png' width='40' height='30' alt='{$locale}' loading='lazy'>
+                //     </picture>")->join('&nbsp;'),
+                // )
+                // ->html(),
             );
         }
 
@@ -690,7 +689,7 @@ trait HasTable
                     ->label('Translations')
                     ->multiple()
                     ->options(LocaleContext::getAvailable())
-                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
+                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['values'], static fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
             );
         }
 

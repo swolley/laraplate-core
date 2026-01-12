@@ -1,10 +1,11 @@
 <x-filament-widgets::widget>
     <x-filament::section>
         <x-slot name="heading">
+            <x-filament::icon icon="heroicon-o-magnifying-glass" class="w-5 h-5 inline mr-2" />
             Search Engine
         </x-slot>
 
-        @if($error)
+        @isset($error)
             <div class="fi-alert fi-color-danger fi-size-sm">
                 <div class="fi-alert-icon">
                     <x-filament::icon icon="heroicon-o-exclamation-triangle" />
@@ -15,67 +16,60 @@
             </div>
         @else
             <div class="fi-section-content">
-                <div class="fi-table">
-                    <table class="fi-ta-table">
-                        <thead class="fi-ta-header">
-                            <tr class="fi-ta-row">
-                                <th colspan="5" class="fi-ta-header-cell text-center">{{ ucfirst($driver ?? 'Unknown') }}</th>
-                            </tr>
-                            <tr class="fi-ta-row">
-                                <th class="fi-ta-header-cell">Model</th>
-                                <th class="fi-ta-header-cell">Index</th>
-                                <th class="fi-ta-header-cell">Status</th>
-                                <th class="fi-ta-header-cell">Records</th>
-                                <th class="fi-ta-header-cell">Documents</th>
-                            </tr>
-                        </thead>
-                        <tbody class="fi-ta-body">
-                            @foreach($models as $model)
-                                <tr class="fi-ta-row">
-                                    <td class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content">
-                                            {{ $model['name'] }}
-                                        </div>
-                                    </td>
-                                    <td class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content">
-                                            <code class="text-xs">{{ $model['searchable_as'] }}</code>
-                                        </div>
-                                    </td>
-                                    <td class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content text-center">
-                                            @if($model['index_exists'])
-                                                <x-filament::badge color="success" size="sm">Active</x-filament::badge>
-                                            @else
-                                                <x-filament::badge color="warning" size="sm">Missing</x-filament::badge>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content text-right">
-                                            {{ number_format($model['count']) }}
-                                        </div>
-                                    </td>
-                                    <td class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content text-right">
-                                            {{ number_format($model['documents']) }}
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                            @if(empty($models))
-                                <tr class="fi-ta-row">
-                                    <td colspan="5" class="fi-ta-cell">
-                                        <div class="fi-ta-cell-content">
-                                            No searchable models found.
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endif
-                        </tbody>
-                    </table>
+                <div class="fi-ta">
+                    <div class="fi-ta-ctn fi-ta-ctn-with-header">
+                        <div class="fi-ta-main">
+                            <div class="fi-ta-content-ctn">
+                                <table class="fi-ta-table">
+                                    <thead>
+                                        <tr>
+                                            <th colspan="5" class="fi-ta-header-cell text-center">{{ ucfirst($driver ?? 'Unknown') }}</th>
+                                        </tr>
+                                        <tr>
+                                            <th class="fi-ta-header-cell">Model</th>
+                                            <th class="fi-ta-header-cell">Index</th>
+                                            <th class="fi-ta-header-cell">Status</th>
+                                            <th class="fi-ta-header-cell text-right">Records</th>
+                                            <th class="fi-ta-header-cell text-right">Documents</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($models as $model)
+                                            <tr class="fi-ta-row">
+                                                <td class="fi-ta-cell">
+                                                    <div class="fi-ta-col">
+                                                        <div class="fi-ta-text-item fi-ta-text">{{ $model['name'] }}</div>
+                                                    </div>
+                                                </td>
+                                                <td class="fi-ta-cell">
+                                                    <div class="fi-ta-col">
+                                                        <div class="fi-ta-text-item fi-ta-text">{{ $model['searchable_as'] }}</div>
+                                                    </div>
+                                                </td>
+                                                <td class="fi-ta-cell">
+                                                    <div class="fi-ta-col">
+                                                        <div class="fi-ta-text-item fi-ta-text fi-color {{$model['index_exists'] ? 'fi-color-success fi-text-color-700 dark:fi-text-color-400' : 'fi-color-danger fi-text-color-500 dark:fi-text-color-600' }}">{{ $model['index_exists'] ? 'Active' : 'Missing' }}</div>
+                                                    </div>
+                                                </td>
+                                                <td class="fi-ta-cell">
+                                                    <div class="fi-ta-col">
+                                                        <div class="fi-ta-text-item fi-ta-text text-right">{{ number_format($model['count']) }}</div>
+                                                    </div>
+                                                </td>
+                                                <td class="fi-ta-cell">
+                                                    <div class="fi-ta-col">
+                                                        <div class="fi-ta-text-item fi-ta-text text-right fi-color {{ $model['count'] === $model['documents'] ? 'fi-text-color-700 dark:fi-text-color-400' : 'fi-text-color-500 dark:fi-text-color-600' }}">{{ number_format($model['documents']) }}</div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        @endif
+        @endisset
     </x-filament::section>
 </x-filament-widgets::widget>

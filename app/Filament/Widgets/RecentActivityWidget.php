@@ -27,9 +27,10 @@ final class RecentActivityWidget extends Widget
         // Recent contents (last 10)
         if (class_exists(Content::class)) {
             $data['recent_contents'] = Content::query()
-                ->latest('created_at')
-                ->limit(10)
-                ->get()
+                ->with('translations', fn ($query) => $query->select(['title', 'locale', 'content_id']))
+                ->latest('updated_at')
+                ->limit(8)
+                ->get(['id', 'presettable_id', 'updated_at'])
                 ->map(function ($content) {
                     // Try to get title from translation or use a fallback
                     $title = 'Untitled';
@@ -50,8 +51,8 @@ final class RecentActivityWidget extends Widget
                     return [
                         'id' => $content->id,
                         'title' => $title,
-                        'created_at' => $content->created_at?->diffForHumans(),
-                        'url' => null, // Could be generated if there's a resource
+                        'locale' => $content->locale,
+                        'updated_at' => $content->updated_at?->diffForHumans(),
                     ];
                 })
                 ->toArray();
@@ -59,14 +60,18 @@ final class RecentActivityWidget extends Widget
 
         // Recent users (last 5)
         $data['recent_users'] = User::query()
-            ->latest('created_at')
-            ->limit(5)
-            ->get()
+            ->latest('last_login_at')
+            ->whereNotNull('last_login_at')
+            ->whereDoesntHave('roles', function ($query): void {
+                $query->where('name', config('permission.roles.superadmin'));
+            })
+            ->limit(8)
+            ->get(['id', 'name', 'email', 'last_login_at'])
             ->map(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'created_at' => $user->created_at?->diffForHumans(),
+                'last_login_at' => $user->last_login_at?->diffForHumans(),
             ])
             ->toArray();
 

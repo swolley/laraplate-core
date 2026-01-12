@@ -12,7 +12,7 @@
     <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
 
     <!-- Styles -->
-    <style>
+    {{-- <style>
         /* ! tailwindcss v3.4.1 | MIT License | https://tailwindcss.com */
         *,
         ::after,
@@ -963,7 +963,7 @@
             transform: translate(-50%, -50%);
             opacity: .1;
         }
-    </style>
+    </style> --}}
 </head>
 
 <body class="font-sans antialiased dark:bg-black dark:text-white/50">
@@ -1048,7 +1048,7 @@
                                         $debug = config('app.debug');
                                         @endphp
                                         <i>Debug Mode:</i>
-                                        <div class="flex items-center  gap-2" style="float: right">
+                                        <div class="flex items-center gap-2 {{ $debug ? 'fi-color-danger fi-text-color-500 dark:fi-text-color-600' : 'fi-color-success fi-text-color-700 dark:fi-text-color-400' }}" style="float: right">
                                             @if ($debug)
                                                 @include('core::components.alert-icon')
                                             @else
@@ -1156,9 +1156,9 @@
                                         </h2>
                                     </div>
 
-                                    @if (isset($data['description']))
+                                    @isset($data['description'])
                                         <p class="mt-4 text-sm/relaxed">{{ $data['description'] }}</p>
-                                    @endif
+                                    @endisset
 
                                     <div class="mt-4 text-sm/relaxed flex grow">
                                         <!-- models -->

@@ -1,3 +1,5 @@
+@use(\Modules\Core\Filament\Pages\Swagger)
+
 <x-filament-panels::page>
     <div class="fi-page-content p-6">
         @php
@@ -127,7 +129,7 @@
                             </div>
 
                             <div id="docs-card-content" class="flex flex-col gap-2 w-full">
-                                <a href="{{ \Modules\Core\Filament\Pages\Documentation\Swagger::getUrl() }}" class="flex items-center justify-center gap-2">
+                                <a href="{{ Swagger::getUrl() }}" class="flex items-center justify-center gap-2">
                                     <div class="flex items-center justify-center" style="min-width:60px;">
                                         @include('core::components.swagger-icon')
                                     </div>
