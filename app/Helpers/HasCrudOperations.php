@@ -22,18 +22,11 @@ trait HasCrudOperations
      * @param  Builder<TModel>  $query
      * @return Collection<int, TModel>
      */
-    protected function listByPagination(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
+    protected function listByPagination(Builder $query, ListRequestData $filters, int $totalRecords): Collection
     {
         $query->skip($filters->from - 1)->take($filters->to - $filters->from + 1);
 
-        $data = $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords($data->count())
-            ->setCurrentPage($filters->page)
-            ->setPagination($filters->pagination);
-
-        return $data;
+        return $query->get();
     }
 
     /**
@@ -42,7 +35,7 @@ trait HasCrudOperations
      * @param  Builder<TModel>  $query
      * @return Collection<int, TModel>
      */
-    protected function listByFromTo(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection
+    protected function listByFromTo(Builder $query, ListRequestData $filters, int $totalRecords): Collection
     {
         $query->skip($filters->from - 1);
 
@@ -50,14 +43,7 @@ trait HasCrudOperations
             $query->take($filters->to - $filters->from + 1);
         }
 
-        $data = $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords($data->count())
-            ->setFrom($filters->from)
-            ->setTo($filters->to);
-
-        return $data;
+        return $query->get();
     }
 
     /**
@@ -66,18 +52,13 @@ trait HasCrudOperations
      * @param  Builder<TModel>  $query
      * @return Collection<int, TModel>|int
      */
-    protected function listByOthers(Builder $query, ListRequestData $filters, ResponseBuilder $responseBuilder, int $totalRecords): Collection|int
+    protected function listByOthers(Builder $query, ListRequestData $filters, int $totalRecords): Collection|int
     {
         if (isset($filters->limit)) {
             $query->take($filters->take);
         }
 
-        $data = $filters->count ? $totalRecords : $query->get();
-        $responseBuilder
-            ->setTotalRecords($totalRecords)
-            ->setCurrentRecords(is_numeric($data) ? $data : $data->count());
-
-        return $data;
+        return $filters->count ? $totalRecords : $query->get();
     }
 
     // protected function applyFilters(Builder $query, array $filters): void

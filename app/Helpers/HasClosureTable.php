@@ -29,10 +29,12 @@ trait HasClosureTable
         $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
         DB::table($table_name)->truncate();
 
-        $models = static::with('children')->get()->keyBy('id');
+        // Process only root nodes (nodes without parent) to avoid loading entire tree
+        // Then recursively process children as needed
+        $root_nodes = static::whereNull('parent_id')->with('children')->get();
 
-        foreach ($models as $model) {
-            self::insertClosures($model);
+        foreach ($root_nodes as $root) {
+            self::insertClosures($root);
         }
     }
 
@@ -253,9 +255,17 @@ trait HasClosureTable
         }
 
         $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
-        DB::table($table_name)->insert($rows);
 
-        foreach ($model->children as $child) {
+        // Batch insert for better performance
+        if (! empty($rows)) {
+            DB::table($table_name)->insert($rows);
+        }
+
+        // Load children only when needed (lazy loading)
+        // This prevents loading entire tree in memory at once
+        $children = $model->children()->with('children')->get();
+
+        foreach ($children as $child) {
             self::insertClosures($child, array_merge([$model], $ancestors));
         }
     }
@@ -349,36 +359,47 @@ trait HasClosureTable
     {
         $closureTable = $this->getClosureTable();
 
-        // Delete old closure entries
+        // Delete old closure entries for this node
         DB::table($closureTable)
             ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
             ->delete();
 
-        // Insert self-referential record
-        DB::table($closureTable)->insert([
-            'ancestor_id' => $this->id,
-            'descendant_id' => $this->id,
-            'depth' => 0,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // Prepare rows for batch insert
+        $rows = [
+            [
+                'ancestor_id' => $this->id,
+                'descendant_id' => $this->id,
+                'depth' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ];
 
-        // Insert records for all ancestors
+        // Insert records for all ancestors (batch insert for better performance)
         if ($this->parent_id) {
             $ancestors = DB::table($closureTable)
                 ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->parent_id)
                 ->get();
 
             foreach ($ancestors as $ancestor) {
-                DB::table($closureTable)->insert([
+                $rows[] = [
                     'ancestor_id' => $ancestor->ancestor_id,
                     'descendant_id' => $this->id,
                     'depth' => $ancestor->depth + 1,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
             }
         }
+
+        // Batch insert all rows at once (more efficient than multiple inserts)
+        if (! empty($rows)) {
+            DB::table($closureTable)->insert($rows);
+        }
+
+        // Note: When a node moves, its descendants' closure entries also need to be updated
+        // This is currently handled by calling rebuildClosure() when needed, or can be
+        // optimized in the future with a more efficient SQL-based approach
 
         // Clear in-memory cache for this model
         $cache_key = sprintf('%s.%s.depth', $this->getTable(), $this->id);

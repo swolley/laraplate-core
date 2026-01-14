@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Enhance CRUD operations and introduce DTOs for improved data handling
+
+## [1.32.0] - 2026-01-12
+
+### 🚜 Refactor
+
 - Update RecentActivityWidget and HasTable trait for improved functionality
 
 ## [1.31.0] - 2026-01-09

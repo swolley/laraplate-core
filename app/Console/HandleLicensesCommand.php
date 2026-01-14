@@ -34,7 +34,7 @@ final class HandleLicensesCommand extends Command
 
                 $licenses_groups = License::query()->groupBy('valid_to')
                     ->select(DB::raw('valid_to'), DB::raw('count(*) as count'))
-                    ->get();
+                    ->lazy(100);
                 $licenses_count = (int) $licenses_groups->reduce(static fn (int $total, object $current): int|float => $total + $current->count, 0);
 
                 if ($licenses_groups->isEmpty()) {
@@ -153,7 +153,7 @@ final class HandleLicensesCommand extends Command
 
     private function addLicenses(int $number, ?Carbon $validTo): void
     {
-        $query = License::expired()->take($number);
+        $query = License::query()->expired()->take($number);
         $expired = $query->count();
 
         if ($expired && confirm(sprintf('Found %d expired licenses. Would you renew them, before creating new ones?', $expired))) {

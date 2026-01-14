@@ -6,21 +6,17 @@ namespace Modules\Core\Services\Crud;
 
 use Approval\Traits\RequiresApproval;
 use BadMethodCallException;
-use Closure;
 use Elastic\Elasticsearch\ClientBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\UnauthorizedException;
 use LogicException;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
@@ -28,7 +24,6 @@ use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\HistoryRequestData;
-use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
@@ -37,315 +32,331 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Crud\CrudHelper;
 use Modules\Core\Helpers\HasCrudOperations;
 use Modules\Core\Helpers\PermissionChecker;
-use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Http\Requests\DetailRequest;
-use Modules\Core\Http\Requests\HistoryRequest;
-use Modules\Core\Http\Requests\ListRequest;
-use Modules\Core\Http\Requests\ModifyRequest;
-use Modules\Core\Http\Requests\SearchRequest;
-use Modules\Core\Http\Requests\TreeRequest;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
-use Modules\Core\Locking\Exceptions\CannotUnlockException;
-use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
 use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\Crud\DTOs\CrudMeta;
+use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 use UnexpectedValueException;
 
 class CrudService
 {
     use HasCrudOperations;
 
-    public function list(ListRequest $request): Response
+    public function list(ListRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ListRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
-                $query = $model::query();
-                $crud_helper = new CrudHelper();
-                $crud_helper->prepareQuery($query, $filters);
+        $query = $model::query();
+        $crud_helper = new CrudHelper();
+        $crud_helper->prepareQuery($query, $requestData);
 
-                $total_records = $query->count();
+        $total_records = $query->count();
 
-                $data = match (true) {
-                    $filters->page !== null => $this->listByPagination($query, $filters, $responseBuilder, $total_records),
-                    $filters->from !== null => $this->listByFromTo($query, $filters, $responseBuilder, $total_records),
-                    default => $this->listByOthers($query, $filters, $responseBuilder, $total_records),
-                };
+        $data = match (true) {
+            $requestData->page !== null => $this->listByPagination($query, $requestData, $total_records),
+            $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
+            default => $this->listByOthers($query, $requestData, $total_records),
+        };
 
-                if (isset($filters->group_by) && $filters->group_by !== []) {
-                    $data = $this->applyGroupBy($data, $filters->group_by);
-                }
+        if (isset($requestData->group_by) && $requestData->group_by !== []) {
+            $data = $this->applyGroupBy($data, $requestData->group_by);
+        }
 
-                return $responseBuilder
-                    ->setClass($model)
-                    ->setData($data)
-                    ->setCachedAt(Date::now());
-            });
-        });
+        $current_records = is_numeric($data) ? $data : $data->count();
+
+        $meta = new CrudMeta(
+            totalRecords: $total_records,
+            currentRecords: $current_records,
+            currentPage: $requestData->page,
+            totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+            pagination: $requestData->pagination,
+            from: $requestData->from,
+            to: $requestData->to,
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
     }
 
-    public function detail(DetailRequest $request): Response
+    public function detail(DetailRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, DetailRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
-                $query = $model::query();
-                $crud_helper = new CrudHelper();
-                $crud_helper->prepareQuery($query, $filters);
+        $query = $model::query();
+        $crud_helper = new CrudHelper();
+        $crud_helper->prepareQuery($query, $requestData);
 
-                return $responseBuilder
-                    ->setClass($model)
-                    ->setData($query->sole())
-                    ->setCachedAt(Date::now());
-            });
-        });
+        $data = $query->sole();
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
     }
 
-    public function search(SearchRequest $request): Response
+    public function search(SearchRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, SearchRequestData $filters): ResponseBuilder {
-            $is_searchable_class = class_uses_trait($filters->model, Searchable::class);
+        $is_searchable_class = class_uses_trait($requestData->model, Searchable::class);
 
-            if (! isset($filters->model) || $is_searchable_class) {
-                $embeddedDocument = null;
-                $search_text = Str::of($filters->qs)->trim()->toString();
+        if (! isset($requestData->model) || ! $is_searchable_class) {
+            return new CrudResult(
+                data: null,
+                error: 'Full-search operation can be done only on Searchable entities',
+                statusCode: Response::HTTP_BAD_REQUEST,
+            );
+        }
 
-                if (property_exists($filters->model, 'embed') && $filters->model->embed !== null && $filters->model->embed !== [] && Str::wordCount($search_text) > 10) {
-                    $embeddedDocument = GenerateEmbeddingsJob::embedText($search_text);
-                }
+        $embeddedDocument = null;
+        $search_text = Str::of($requestData->qs)->trim()->toString();
 
-                $elastic_query = $this->getElasticSearchQuery($filters, $embeddedDocument);
+        if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
+            $embeddedDocument = GenerateEmbeddingsJob::embedText($search_text);
+        }
 
-                $client = ClientBuilder::create()->build();
-                $response = $client->search($elastic_query);
-                $totalRecords = $response['hits']['total']['value'] ?? 0;
-                $data = $response['hits']['hits'] ?? [];
+        $elastic_query = $this->getElasticSearchQuery($requestData, $embeddedDocument);
 
-                $responseBuilder
-                    ->setTotalRecords($totalRecords)
-                    ->setCurrentRecords(count($data))
-                    ->setPagination($filters->pagination)
-                    ->setCurrentPage($filters->page)
-                    ->setTotalPages($filters->calculateTotalPages($totalRecords));
+        $client = ClientBuilder::create()->build();
+        $response = $client->search($elastic_query);
+        $totalRecords = $response['hits']['total']['value'] ?? 0;
+        $data = $response['hits']['hits'] ?? [];
 
-                return $responseBuilder
-                    ->setData($data);
+        $meta = new CrudMeta(
+            totalRecords: $totalRecords,
+            currentRecords: count($data),
+            pagination: $requestData->pagination,
+            currentPage: $requestData->page,
+            totalPages: $requestData->calculateTotalPages($totalRecords),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
+    }
+
+    public function history(HistoryRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $requestData->mainEntity));
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
+
+        $query = $model::query();
+        $crud_helper = new CrudHelper();
+        $crud_helper->prepareQuery($query, $requestData);
+
+        $query->with('history', function (Builder $q) use ($requestData): void {
+            $q->latest();
+
+            if (isset($requestData->limit)) {
+                $q->take($requestData->limit);
             }
-
-            return $responseBuilder->setError('Full-search operation can be done only on Searchable entities');
         });
+
+        if (! preview() && $this->useHasApproval($model)) {
+            $query->with('modifications');
+        }
+
+        $data = $query->sole();
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
     }
 
-    public function history(HistoryRequest $request): Response
+    public function tree(TreeRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, HistoryRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
+        $model = $requestData->model;
 
-            throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $filters->mainEntity));
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
+        throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $requestData->mainEntity));
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
-                $query = $model::query();
-                $crud_helper = new CrudHelper();
-                $crud_helper->prepareQuery($query, $filters);
+        $tree_relation_type = [];
 
-                $query->with('history', function (Builder $q) use ($filters): void {
-                    $q->latest();
+        if ($requestData->parents && $requestData->children) {
+            $tree_relation_type = 'bloodline';
+        } elseif ($requestData->parents) {
+            $tree_relation_type = 'ancestorsAndSelf';
+        } elseif ($requestData->children) {
+            $tree_relation_type = 'descendantsAndSelf';
+        }
 
-                    if (isset($filters->limit)) {
-                        $q->take($filters->limit);
-                    }
-                });
+        $query = $model::with($tree_relation_type);
+        $crud_helper = new CrudHelper();
+        $crud_helper->prepareQuery($query, $requestData);
 
-                if (! preview() && $this->useHasApproval($model)) {
-                    $query->with('modifications');
+        $data = $query->sole();
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
+    }
+
+    public function insert(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
+        $discarded_values = $this->removeNonFillableProperties($model, $requestData->changes);
+
+        $created = $model->create($requestData->changes);
+
+        throw_unless($created, LogicException::class, 'Record not created');
+
+        $created->fresh();
+
+        $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
+
+        return new CrudResult(
+            data: $created,
+            statusCode: Response::HTTP_CREATED,
+            error: $error,
+        );
+    }
+
+    public function update(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
+
+        throw_if($model->usesTimestamps() && ! isset($requestData->{Model::UPDATED_AT}), BadMethodCallException::class, Model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_records = $model->query()->where($key_value)->lazy(100);
+        $discarded_values = $this->removeNonFillableProperties($model, $requestData->changes);
+
+        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+        $updated_records = new Collection();
+        DB::transaction(function () use ($found_records, $updated_records, $requestData): void {
+            foreach ($found_records as $found_record) {
+                /** @psalm-suppress InvalidArgument */
+                if ($found_record->update($requestData->changes)) {
+                    $updated_records->add($found_record->fresh());
                 }
-
-                return $responseBuilder
-                    ->setClass($model)
-                    ->setData($query->sole())
-                    ->setCachedAt(Date::now());
-            });
-        });
-    }
-
-    public function tree(TreeRequest $request): Response
-    {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, TreeRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
-
-            throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $filters->mainEntity));
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'select', $model->getConnectionName());
-
-            return Cache::tryByRequest($model, $filters->request, function () use ($model, $filters, $responseBuilder): ResponseBuilder {
-                $tree_relation_type = [];
-
-                if ($filters->parents && $filters->children) {
-                    $tree_relation_type = 'bloodline';
-                } elseif ($filters->parents) {
-                    $tree_relation_type = 'ancestorsAndSelf';
-                } elseif ($filters->children) {
-                    $tree_relation_type = 'descendantsAndSelf';
-                }
-
-                $query = $model::with($tree_relation_type);
-                $crud_helper = new CrudHelper();
-                $crud_helper->prepareQuery($query, $filters);
-
-                return $responseBuilder
-                    ->setClass($model)
-                    ->setData($query->sole())
-                    ->setCachedAt(Date::now());
-            });
-        });
-    }
-
-    public function insert(Request $request): Response
-    {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values, $request): ResponseBuilder {
-            $model = $values->model;
-            PermissionChecker::ensurePermissions($values->request, $model->getTable(), 'insert', $model->getConnectionName());
-            $discarded_values = $this->removeNotFillableProperties($model, $values->changes);
-
-            $created = $model->create($values->changes);
-
-            throw_unless($created, LogicException::class, 'Record not created');
-
-            $created->fresh();
-
-            return $responseBuilder
-                ->setData($created)
-                ->setStatus(Response::HTTP_CREATED)
-                ->setError($discarded_values === [] ? null : $discarded_values);
-        });
-    }
-
-    public function update(ModifyRequest $request): Response
-    {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $values): ResponseBuilder {
-            $model = $values->model;
-            PermissionChecker::ensurePermissions($values->request, $model->getTable(), 'update', $model->getConnectionName());
-
-            throw_if($model->usesTimestamps() && ! isset($values->{Model::UPDATED_AT}), BadMethodCallException::class, Model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
-            $key_value = $this->getModelKeyValue($values);
-            $found_records = $model->where($key_value)->get();
-            $discarded_values = $this->removeNonFillableProperties($model, $values->changes);
-
-            throw_if($found_records->isEmpty() && $values->request->has('id'), ModelNotFoundException::class, 'No model Found');
-            $updated_records = new Collection();
-            DB::transaction(function () use ($found_records, $updated_records, $values): void {
-                foreach ($found_records as $found_record) {
-                    /** @psalm-suppress InvalidArgument */
-                    if ($found_record->update($values->changes)) {
-                        $updated_records->add($found_record->fresh());
-                    }
-                }
-            });
-
-            if ($discarded_values !== []) {
-                $responseBuilder->setError($discarded_values);
             }
-
-            return $responseBuilder
-                ->setData($updated_records);
         });
+
+        $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
+
+        return new CrudResult(
+            data: $updated_records,
+            error: $error,
+        );
     }
 
-    public function delete(ModifyRequest $request): Response
+    public function delete(ModifyRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
-            $key_value = $this->getModelKeyValue($filters);
-            $found_records = $model->where($key_value)->get();
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_records = $model->query()->where($key_value)->lazy(100);
 
-            throw_if($found_records->isEmpty() && $filters->request->has('id'), ModelNotFoundException::class, 'No model Found');
-            $deleted_records = new Collection();
-            DB::transaction(function () use ($found_records, $deleted_records): void {
-                foreach ($found_records as $found_record) {
-                    if ($found_record->forceDelete()) {
-                        $deleted_records->add($found_record);
-                    }
+        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+        $deleted_records = new Collection();
+        DB::transaction(function () use ($found_records, $deleted_records): void {
+            foreach ($found_records as $found_record) {
+                if ($found_record->forceDelete()) {
+                    $deleted_records->add($found_record);
                 }
-            });
-
-            return $responseBuilder
-                ->setData($deleted_records);
+            }
         });
+
+        return new CrudResult(
+            data: $deleted_records,
+        );
     }
 
-    public function doActivateOperation(ModifyRequest $request, string $operation): Response
+    public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): ResponseBuilder {
-            $model = $filters->model;
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'restore', $model->getConnectionName());
-            $key = $filters->primaryKey;
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
-            $found_record = $model->withTrashed()->findOrFail($key_value);
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
+        $key = $requestData->primaryKey;
+        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
+        $found_record = $model->query()->withTrashed()->where($key_value)->firstOrFail();
 
-            throw_if($operation === 'activate' && ! $found_record->restore(), LogicException::class, 'Record not activated');
+        throw_if($operation === 'activate' && ! $found_record->restore(), LogicException::class, 'Record not activated');
 
-            throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
+        throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
 
-            $found_record->fresh();
+        $found_record->fresh();
 
-            return $responseBuilder
-                ->setData($found_record);
-        });
+        return new CrudResult(
+            data: $found_record,
+        );
     }
 
-    public function activate(ModifyRequest $request): Response
+    public function activate(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doActivateOperation($request, 'activate');
+        return $this->doActivateOperation($requestData, 'activate');
     }
 
-    public function inactivate(ModifyRequest $request): Response
+    public function inactivate(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doActivateOperation($request, 'inactivate');
+        return $this->doActivateOperation($requestData, 'inactivate');
     }
 
-    public function approve(ModifyRequest $request): Response
+    public function approve(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doApproveOperation($request, 'approve');
+        return $this->doApproveOperation($requestData, 'approve');
     }
 
-    public function disapprove(ModifyRequest $request): Response
+    public function disapprove(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doApproveOperation($request, 'disapprove');
+        return $this->doApproveOperation($requestData, 'disapprove');
     }
 
-    public function lock(ModifyRequest $request): Response
+    public function lock(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doLockOperation($request, 'lock');
+        return $this->doLockOperation($requestData, 'lock');
     }
 
-    public function unlock(ModifyRequest $request): Response
+    public function unlock(ModifyRequestData $requestData): CrudResult
     {
-        return $this->doLockOperation($request, 'unlock');
+        return $this->doLockOperation($requestData, 'unlock');
     }
 
-    public function clearModelCache(Request $request): Response
+    public function clearModelCache(CrudRequestData $requestData): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, CrudRequestData $filters): ResponseBuilder {
-            $model = $filters->model;
-            $table = $model->getTable();
-            Cache::clearByEntity($model);
+        $model = $requestData->model;
+        $table = $model->getTable();
+        Cache::clearByEntity($model);
 
-            return $responseBuilder
-                ->setData($table . ' cached cleared')
-                ->setStatus(Response::HTTP_OK);
-        });
+        return new CrudResult(
+            data: $table . ' cached cleared',
+            statusCode: Response::HTTP_OK,
+        );
     }
 
     private function useRecursiveRelationships(Model $model): bool
@@ -361,11 +372,6 @@ class CrudService
     private function hasHistory(Model $model): bool
     {
         return class_uses_trait($model, Versionable::class);
-    }
-
-    private function isParsableRequest(Request $request): bool
-    {
-        return in_array(IParsableRequest::class, class_implements($request), true);
     }
 
     private function getModelKeyValue(ModifyRequestData $filters): string|array
@@ -384,46 +390,6 @@ class CrudService
         }
 
         return $key_value;
-    }
-
-    private function executeOperation(Request|IParsableRequest $request, Closure $operation): Response
-    {
-        $response_builder = new ResponseBuilder($request);
-        $filters = $this->isParsableRequest($request) ? $request->parsed() : $request->validated();
-
-        try {
-            $operation($response_builder, $filters);
-        } catch (QueryException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
-        } catch (LockedModelException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_LOCKED);
-        } catch (UnexpectedValueException|BadMethodCallException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_BAD_REQUEST);
-        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_NOT_MODIFIED);
-        } catch (ModelNotFoundException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_NO_CONTENT);
-        } catch (UnauthorizedException $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_UNAUTHORIZED);
-        } catch (Throwable $ex) {
-            $response_builder
-                ->setData($ex)
-                ->setStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
-        } finally {
-            return $response_builder->getResponse();
-        }
     }
 
     private function getElasticSearchQuery(SearchRequestData $filters, ?array $embeddings = null): array
@@ -510,90 +476,75 @@ class CrudService
         };
     }
 
-    private function removeNotFillableProperties(Model $model, array &$values): array
+    private function doApproveOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
-        $non_fillables = array_diff(array_keys($model->getFillable()), array_keys($values));
+        $model = $requestData->model;
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
-        foreach ($non_fillables as $property) {
-            unset($values[$property]);
-        }
+        /** @var string|array $key */
+        $key = $model->getKeyName();
+        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
+        $found_record = $model->query()->withTrashed()->where($key_value)->firstOrFail();
 
-        return $non_fillables;
-    }
+        /** @var User $user */
+        $user = Auth::user();
 
-    private function doApproveOperation(ModifyRequest $request, string $operation): Response
-    {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): Response {
-            $model = $filters->model;
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'approve', $model->getConnectionName());
+        if (isset($requestData->changes['modification'])) {
+            $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $requestData->primaryKey])->findOrFail($requestData->changes['modification']);
 
-            /** @var string|array $key */
-            $key = $model->getKeyName();
-            $key_value = is_string($key) ? $filters->{$key} : array_map(fn ($k) => $filters->{$k}, $key);
-            $found_record = $model->withTrashed()->findOrFail($key_value);
+            if ($operation === 'approve') {
+                $user->approve($modification);
+            } else {
+                $user->disapprove($modification);
+            }
+        } else {
+            $modifications = $model::query()->findOrFail($requestData->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
 
-            /** @var User $user */
-            $user = Auth::user();
+            throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
-            if ($filters['modification']) {
-                $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $filters->primaryKey])->findOrFail($filters['modification']);
-
+            foreach ($modifications as $modification) {
                 if ($operation === 'approve') {
                     $user->approve($modification);
                 } else {
                     $user->disapprove($modification);
                 }
-            } else {
-                $modifications = $model::query()->findOrFail($filters->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
-
-                throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
-
-                foreach ($modifications as $modification) {
-                    if ($operation === 'approve') {
-                        $user->approve($modification);
-                    } else {
-                        $user->disapprove($modification);
-                    }
-                }
             }
+        }
 
-            $found_record->refresh();
+        $found_record->refresh();
 
-            return $responseBuilder
-                ->setData($found_record)
-                ->getResponse();
-        });
+        return new CrudResult(
+            data: $found_record,
+        );
     }
 
-    private function doLockOperation(ModifyRequest $request, string $operation): Response
+    private function doLockOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
-        return $this->executeOperation($request, function (ResponseBuilder $responseBuilder, ModifyRequestData $filters) use ($operation): Response {
-            $model = $filters->model;
+        $model = $requestData->model;
 
-            throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
-            PermissionChecker::ensurePermissions($filters->request, $model->getTable(), 'lock', $model->getConnectionName());
-            $key_value = $this->getModelKeyValue($filters);
+        throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
+        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());
+        $key_value = $this->getModelKeyValue($requestData);
 
-            /** @var Model&HasLocks $found_records */
-            $found_records = $model->where($key_value)->get();
+        /** @var Model&HasLocks $found_records */
+        $found_records = $model->query()->where($key_value)->lazy(100);
 
-            throw_if($found_records->isEmpty() && $filters->request->has('id'), ModelNotFoundException::class, 'No model Found');
-            $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
+        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+        $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
 
-            throw_if($found_records->count() === 1 && $filters->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
-            $locked_records = new Collection();
-            DB::transaction(function () use ($found_records, $locked_records): void {
-                foreach ($found_records as $found_record) {
-                    /** @psalm-suppress InvalidArgument */
-                    if (! $found_record->isLocked() && $found_record->lock()) {
-                        $locked_records->add($found_record->fresh());
-                    }
+        throw_if($found_records->count() === 1 && $requestData->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
+        $locked_records = new Collection();
+        DB::transaction(function () use ($found_records, $locked_records): void {
+            foreach ($found_records as $found_record) {
+                /** @psalm-suppress InvalidArgument */
+                if (! $found_record->isLocked() && $found_record->lock()) {
+                    $locked_records->add($found_record->fresh());
                 }
-            });
-
-            return $responseBuilder
-                ->setData($locked_records)
-                ->getResponse();
+            }
         });
+
+        return new CrudResult(
+            data: $locked_records,
+        );
     }
 }

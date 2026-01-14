@@ -18,7 +18,7 @@ class CrudRequestData
      */
     public Model $model;
 
-    public function __construct(public Request $request, public string $mainEntity, array $validated, public string|array $primaryKey)
+    public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey)
     {
         $this->connection = $validated['connection'] ?? null;
 

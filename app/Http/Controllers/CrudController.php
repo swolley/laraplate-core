@@ -4,15 +4,30 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
+use BadMethodCallException;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\UnauthorizedException;
+use LogicException;
+use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\DetailRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TreeRequest;
+use Modules\Core\Locking\Exceptions\AlreadyLockedException;
+use Modules\Core\Locking\Exceptions\CannotUnlockException;
+use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
+use UnexpectedValueException;
 
 class CrudController extends Controller
 {
@@ -25,7 +40,13 @@ class CrudController extends Controller
      */
     public function list(ListRequest $request): Response
     {
-        return $this->crudService->list($request);
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn () => $this->crudService->list($requestData),
+            $request,
+            $requestData->model,
+        );
     }
 
     /**
@@ -42,7 +63,13 @@ class CrudController extends Controller
      */
     public function detail(DetailRequest $request): Response
     {
-        return $this->crudService->detail($request);
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn () => $this->crudService->detail($requestData),
+            $request,
+            $requestData->model,
+        );
     }
 
     /**
@@ -52,7 +79,14 @@ class CrudController extends Controller
      */
     public function search(SearchRequest $request): Response
     {
-        return $this->crudService->search($request);
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn () => $this->crudService->search($requestData),
+            $request,
+            $requestData->model,
+            shouldCache: false, // Search uses ElasticSearch, cache handled differently
+        );
     }
 
     /**
@@ -62,7 +96,13 @@ class CrudController extends Controller
      */
     public function history(HistoryRequest $request): Response
     {
-        return $this->crudService->history($request);
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn () => $this->crudService->history($requestData),
+            $request,
+            $requestData->model,
+        );
     }
 
     /**
@@ -72,7 +112,13 @@ class CrudController extends Controller
      */
     public function tree(TreeRequest $request): Response
     {
-        return $this->crudService->tree($request);
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn () => $this->crudService->tree($requestData),
+            $request,
+            $requestData->model,
+        );
     }
 
     /**
@@ -80,9 +126,20 @@ class CrudController extends Controller
      * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api, crud_api])
      * Route(path: 'app/crud/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
      */
-    public function insert(Request $request): Response
+    public function insert(ModifyRequest $request): Response
     {
-        return $this->crudService->insert($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->insert($requestData);
+
+            // Invalidate cache after insert
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -92,7 +149,18 @@ class CrudController extends Controller
      */
     public function update(ModifyRequest $request): Response
     {
-        return $this->crudService->update($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->update($requestData);
+
+            // Invalidate cache after update
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -102,7 +170,18 @@ class CrudController extends Controller
      */
     public function delete(ModifyRequest $request): Response
     {
-        return $this->crudService->delete($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->delete($requestData);
+
+            // Invalidate cache after delete
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -115,7 +194,18 @@ class CrudController extends Controller
      */
     public function doActivateOperation(ModifyRequest $request, string $operation): Response
     {
-        return $this->crudService->doActivateOperation($request, $operation);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->doActivateOperation($requestData, $operation);
+
+            // Invalidate cache after activate/inactivate
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -142,7 +232,18 @@ class CrudController extends Controller
      */
     public function approve(ModifyRequest $request): Response
     {
-        return $this->crudService->approve($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->approve($requestData);
+
+            // Invalidate cache after approve
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -151,7 +252,18 @@ class CrudController extends Controller
      */
     public function disapprove(ModifyRequest $request): Response
     {
-        return $this->crudService->disapprove($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->disapprove($requestData);
+
+            // Invalidate cache after disapprove
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -160,7 +272,18 @@ class CrudController extends Controller
      */
     public function lock(ModifyRequest $request): Response
     {
-        return $this->crudService->lock($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->lock($requestData);
+
+            // Invalidate cache after lock
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
@@ -169,15 +292,179 @@ class CrudController extends Controller
      */
     public function unlock(ModifyRequest $request): Response
     {
-        return $this->crudService->unlock($request);
+        $requestData = $request->parsed();
+
+        try {
+            $result = $this->crudService->unlock($requestData);
+
+            // Invalidate cache after unlock
+            Cache::clearByEntity($requestData->model);
+
+            return $this->buildResponse($result, $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
     }
 
     /**
      * @route-comment
      * Route(path: 'app/crud/cache-clear/{entity}', name: 'core.crud.cache-clear', methods: [DELETE], middleware: [web])
      */
-    public function clearModelCache(Request $request): Response
+    public function clearModelCache(CrudRequest $request): Response
     {
-        return $this->crudService->clearModelCache($request);
+        $requestData = $request->parsed();
+        $result = $this->crudService->clearModelCache($requestData);
+
+        return $this->buildResponse($result, $request);
+    }
+
+    /**
+     * Build HTTP Response from CrudResult.
+     */
+    private function buildResponse(CrudResult $result, Request $request): Response
+    {
+        $builder = new ResponseBuilder($request);
+        $builder->setData($result->data);
+
+        if ($result->meta) {
+            if ($result->meta->totalRecords !== null) {
+                $builder->setTotalRecords($result->meta->totalRecords);
+            }
+
+            if ($result->meta->currentRecords !== null) {
+                $builder->setCurrentRecords($result->meta->currentRecords);
+            }
+
+            if ($result->meta->currentPage !== null) {
+                $builder->setCurrentPage($result->meta->currentPage);
+            }
+
+            if ($result->meta->totalPages !== null) {
+                $builder->setTotalPages($result->meta->totalPages);
+            }
+
+            if ($result->meta->pagination !== null) {
+                $builder->setPagination($result->meta->pagination);
+            }
+
+            if ($result->meta->from !== null) {
+                $builder->setFrom($result->meta->from);
+            }
+
+            if ($result->meta->to !== null) {
+                $builder->setTo($result->meta->to);
+            }
+
+            if ($result->meta->class !== null) {
+                $builder->setClass($result->meta->class);
+            }
+
+            if ($result->meta->table !== null) {
+                $builder->setTable($result->meta->table);
+            }
+
+            if ($result->meta->cachedAt !== null) {
+                $builder->setCachedAt($result->meta->cachedAt);
+            }
+        }
+
+        if ($result->error) {
+            $builder->setError($result->error);
+        }
+
+        if ($result->statusCode) {
+            $builder->setStatus($result->statusCode);
+        }
+
+        return $builder->getResponse();
+    }
+
+    /**
+     * Handle service call with error handling and optional caching.
+     */
+    private function handleServiceCall(callable $serviceCall, Request $request, ?Model $model = null, bool $shouldCache = true): Response
+    {
+        try {
+            $result = $serviceCall();
+
+            // Handle cache for read operations
+            if ($model && $shouldCache && $this->shouldCache($request)) {
+                return Cache::tryByRequest($model, $request, fn () => $this->buildResponse($result, $request));
+            }
+
+            return $this->buildResponse($result, $request);
+        } catch (QueryException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_INTERNAL_SERVER_ERROR,
+                ),
+                $request,
+            );
+        } catch (LockedModelException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_LOCKED,
+                ),
+                $request,
+            );
+        } catch (UnexpectedValueException|BadMethodCallException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_BAD_REQUEST,
+                ),
+                $request,
+            );
+        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_NOT_MODIFIED,
+                ),
+                $request,
+            );
+        } catch (ModelNotFoundException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_NO_CONTENT,
+                ),
+                $request,
+            );
+        } catch (UnauthorizedException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_UNAUTHORIZED,
+                ),
+                $request,
+            );
+        } catch (Throwable $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_INTERNAL_SERVER_ERROR,
+                ),
+                $request,
+            );
+        }
+    }
+
+    /**
+     * Determine if request should be cached.
+     */
+    private function shouldCache(Request $request): bool
+    {
+        // Cache is enabled by default, can be disabled via query parameter
+        return ! $request->boolean('no_cache');
     }
 }
