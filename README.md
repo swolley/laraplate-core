@@ -95,12 +95,14 @@ HORIZON_DOMAIN=									#horizon domain
 HORIZON_PATH=									#horizon path
 HORIZON_PREFIX=									#horizon prefix
 
-#ai
-OPENAI_API_KEY=									#openai api key
-OPENAI_API_URL=                                 #openai compatible api url
-OPENAI_MODEL=                                   #openai model
-OLLAMA_API_URL=                                 #ollama compatible api url
-OLLAMA_MODEL="llama3.2:3b"						#ollama model
+#ai (deprecated - moved to AI module)
+# AI configuration is now in the AI module. See Modules/AI/README.md for configuration.
+# These variables are kept for backward compatibility but will be removed in future versions.
+OPENAI_API_KEY=									#openai api key (deprecated - use AI module config)
+OPENAI_API_URL=                                 #openai compatible api url (deprecated - use AI module config)
+OPENAI_MODEL=                                   #openai model (deprecated - use AI module config)
+OLLAMA_API_URL=                                 #ollama compatible api url (deprecated - use AI module config)
+OLLAMA_MODEL="llama3.2:3b"						#ollama model (deprecated - use AI module config)
 
 #search
 SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
@@ -375,7 +377,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 -   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
 -   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`.
--   Search/AI: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (quando abilitato).
+-   Search: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (embeddings generation requires AI module).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE`, `QUEUE_CONNECTION=failover`, `FILESYSTEM_DISK`, `LOG_*`.
 
 ### Additional Functionalities
@@ -386,7 +388,7 @@ The Core Module includes built-in features such as:
 -   Email verification for new users.
 -   Command-line tools for user registration and model management.
 -   Redis caching for improved performance.
--   Automatic indexing of entities with Elasticsearch and OpenAI support for tokenization.
+-   Automatic indexing of entities with Elasticsearch (embeddings generation requires AI module).
 -   Enhanced Swagger documentation generation.
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.
