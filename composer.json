@@ -37,7 +37,6 @@
     "stephenlake/laravel-approval": "^1.1",
     "wotz/laravel-swagger-ui": "^1.2",
     "elasticsearch/elasticsearch": "^8.17",
-    "theodo-group/llphant": "^0.11.1",
     "laravel/horizon": "^5.31",
     "babenkoivan/elastic-scout-driver": "^4.0",
     "typesense/typesense-php": "^5.0",
@@ -96,7 +95,7 @@
       "composer bump",
       "npx npm-check-updates -u"
     ],
-    "version": "v1.32.1",
+    "version": "v1.33.0",
     "version:silent": "./scripts/version.sh --silent --nointeractive",
     "version:major": "./scripts/version.sh major",
     "version:minor": "./scripts/version.sh minor",

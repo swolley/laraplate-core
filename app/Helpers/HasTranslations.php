@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
-use Modules\Cms\Jobs\TranslateModelJob;
+use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Overrides\LocaleScope;
 use Override;
 
@@ -323,7 +323,7 @@ trait HasTranslations
 
         static::created(function (Model $model): void {
             /** @phpstan-ignore-next-line */
-            if (! config('core.auto_translate_enabled', false)) {
+            if (! config('ai.features.translation.enabled', false)) {
                 return;
             }
 
@@ -334,13 +334,14 @@ trait HasTranslations
                 return;
             }
 
-            // Dispatch translation job
-            dispatch(new TranslateModelJob($model));
+            // Emit event instead of dispatching job directly
+            // AI listener will handle the translation job
+            event(new TranslatedModelSaved($model));
         });
 
         static::updated(function (Model $model): void {
             /** @phpstan-ignore-next-line */
-            if (! config('core.auto_translate_enabled', false)) {
+            if (! config('ai.features.translation.enabled', false)) {
                 return;
             }
 
@@ -352,8 +353,9 @@ trait HasTranslations
                 return;
             }
 
-            // Dispatch translation job to update translations
-            dispatch(new TranslateModelJob($model, [], true));
+            // Emit event instead of dispatching job directly
+            // AI listener will handle the translation job
+            event(new TranslatedModelSaved($model, [], true));
         });
     }
 

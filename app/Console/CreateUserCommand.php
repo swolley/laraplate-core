@@ -33,7 +33,7 @@ final class CreateUserCommand extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Create new user <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Create new user <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**
      * Execute the console command.

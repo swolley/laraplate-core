@@ -13,7 +13,7 @@ final class FreeAllLicensesCommand extends Command
 {
     protected $signature = 'auth:free-all-licenses';
 
-    protected $description = 'Free all the assigned licenses. <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Free all the assigned licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**
      * Execute the console command.

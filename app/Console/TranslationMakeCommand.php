@@ -23,7 +23,7 @@ class TranslationMakeCommand extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Make a translation model for a given model <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Make a translation model for a given model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**
      * Execute the console command.

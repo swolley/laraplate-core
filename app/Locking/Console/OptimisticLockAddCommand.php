@@ -11,7 +11,7 @@ class OptimisticLockAddCommand extends LockedAddCommand
 {
     public $signature = 'lock:optimistic-add {model} {--namespace=}';
 
-    public $description = 'Add a migration to add optimistic locking columns to a model <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    public $description = 'Add a migration to add optimistic locking columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
     public function generateMigrationPath(Model $instance): string

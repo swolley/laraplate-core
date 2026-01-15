@@ -18,7 +18,14 @@ final class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        \Modules\Core\Events\ModelRequiresIndexing::class => [
+            \Modules\Core\Listeners\IndexModelFallbackListener::class, // Executes after AI listeners
+        ],
+        \Modules\Core\Events\ModelPreProcessingCompleted::class => [
+            \Modules\Core\Listeners\FinalizeModelIndexingListener::class, // Handles finalization
+        ],
+    ];
 
     /**
      * Indicates if events should be discovered.

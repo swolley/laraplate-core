@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Update command descriptions and remove deprecated files
+
+## [1.32.1] - 2026-01-14
+
+### 🚜 Refactor
+
 - Enhance CRUD operations and introduce DTOs for improved data handling
 
 ## [1.32.0] - 2026-01-12

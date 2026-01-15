@@ -23,7 +23,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -44,10 +43,9 @@ use Modules\Core\Http\Middleware\PreviewMiddleware;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
-use Modules\Core\Overrides\ServiceProvider;
+use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
-use Nwidart\Modules\Traits\PathNamespace;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -61,19 +59,17 @@ use Typesense\Client as TypesenseClient;
 /**
  * @property Application $app
  */
-final class CoreServiceProvider extends ServiceProvider
+final class CoreServiceProvider extends ModuleServiceProvider
 {
-    use PathNamespace;
-
     protected string $name = 'Core';
 
     protected string $nameLower = 'core';
 
-    private array $subscribe = [
+    protected array $subscribe = [
         LockedModelSubscriber::class,
     ];
 
-    private array $listen = [
+    protected array $listen = [
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
@@ -86,15 +82,12 @@ final class CoreServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        parent::boot();
+
         if (! is_subclass_of(user_class(), \Modules\Core\Models\User::class)) {
             throw new Exception('User class is not ' . \Modules\Core\Models\User::class);
         }
 
-        $this->registerCommands();
-        $this->registerCommandSchedules();
-        $this->registerTranslations();
-        $this->registerViews();
-        $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
         $this->registerAuths();
         $this->registerMiddlewares();
 
@@ -122,11 +115,9 @@ final class CoreServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
-        $this->registerConfig();
-        $this->registerCache();
+        parent::register();
 
-        $this->app->register(EventServiceProvider::class);
-        $this->app->register(RouteServiceProvider::class);
+        $this->registerCache();
 
         // Register search clients
         $this->registerSearchClients();
@@ -142,45 +133,56 @@ final class CoreServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register translations.
-     */
-    public function registerTranslations(): void
-    {
-        $langPath = $this->getResourcePath('lang');
-
-        if (is_dir($langPath)) {
-            $this->loadTranslationsFrom($langPath, $this->nameLower);
-            $this->loadJsonTranslationsFrom($langPath);
-        } else {
-            $lang_path = module_path($this->name, 'lang');
-            $this->loadTranslationsFrom($lang_path, $this->nameLower);
-            $this->loadJsonTranslationsFrom($lang_path);
-        }
-    }
-
-    /**
-     * Register views.
-     */
-    public function registerViews(): void
-    {
-        $viewPath = $this->getResourcePath('views');
-        $sourcePath = module_path($this->name, 'resources/views');
-
-        $this->publishes([$sourcePath => $viewPath], ['views', $this->nameLower . '-module-views']);
-
-        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
-
-        $componentNamespace = $this->module_namespace($this->name, $this->app_path(config('modules.paths.generator.component-class.path')));
-        Blade::componentNamespace($componentNamespace, $this->nameLower);
-    }
-
-    /**
-     * Get the services provided by the provider.
+     * Register commands in the format of Command::class.
      */
     #[Override]
-    public function provides(): array
+    protected function registerCommands(): void
     {
-        return [];
+        $module_commands_subpath = config('modules.paths.generator.command.path');
+        $commands = $this->inspectFolderCommands($module_commands_subpath);
+
+        $locking_commands_subpath = (string) Str::replace('Console', 'Locking/Console', $module_commands_subpath);
+        $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
+        array_push($commands, ...$locking_commands);
+
+        $search_commands_subpath = (string) Str::replace('Console', 'Search/Console', $module_commands_subpath);
+        $search_commands = $this->inspectFolderCommands($search_commands_subpath);
+        array_push($commands, ...$search_commands);
+
+        $this->commands($commands);
+    }
+
+    /**
+     * Register command Schedules.
+     *
+     * @throws BindingResolutionException
+     */
+    #[Override]
+    protected function registerCommandSchedules(): void
+    {
+        $this->app->booted(function (): void {
+            $schedule = $this->app->make(Schedule::class);
+            $crons = [];
+            $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
+            $cache_tags = Cache::getCacheTags();
+
+            if (Cache::tags($cache_tags)->has($cache_key)) {
+                $crons = Cache::tags($cache_tags)->get($cache_key);
+            } else {
+                try {
+                    if (Schema::hasTable($cache_key)) {
+                        $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
+                        Cache::tags($cache_tags)->put($cache_key, $crons);
+                    }
+                } catch (Exception $e) {
+                    report($e);
+                }
+            }
+
+            foreach ($crons as $cron) {
+                $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
+            }
+        });
     }
 
     /**
@@ -248,11 +250,6 @@ final class CoreServiceProvider extends ServiceProvider
         }
     }
 
-    private function getResourcePath(string $prefix): string
-    {
-        return resource_path($prefix . '/modules/' . $this->nameLower);
-    }
-
     /**
      * Configure the commands.
      */
@@ -288,57 +285,6 @@ final class CoreServiceProvider extends ServiceProvider
         if ($this->app->isProduction() && config('core.force_https')) {
             URL::forceScheme('https');
         }
-    }
-
-    /**
-     * Register commands in the format of Command::class.
-     */
-    private function registerCommands(): void
-    {
-        $module_commands_subpath = config('modules.paths.generator.command.path');
-        $commands = $this->inspectFolderCommands($module_commands_subpath);
-
-        $locking_commands_subpath = (string) Str::replace('Console', 'Locking/Console', $module_commands_subpath);
-        $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
-        array_push($commands, ...$locking_commands);
-
-        $search_commands_subpath = (string) Str::replace('Console', 'Search/Console', $module_commands_subpath);
-        $search_commands = $this->inspectFolderCommands($search_commands_subpath);
-        array_push($commands, ...$search_commands);
-
-        $this->commands($commands);
-    }
-
-    /**
-     * Register command Schedules.
-     *
-     * @throws BindingResolutionException
-     */
-    private function registerCommandSchedules(): void
-    {
-        $this->app->booted(function (): void {
-            $schedule = $this->app->make(Schedule::class);
-            $crons = [];
-            $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
-            $cache_tags = Cache::getCacheTags();
-
-            if (Cache::tags($cache_tags)->has($cache_key)) {
-                $crons = Cache::tags($cache_tags)->get($cache_key);
-            } else {
-                try {
-                    if (Schema::hasTable($cache_key)) {
-                        $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
-                        Cache::tags($cache_tags)->put($cache_key, $crons);
-                    }
-                } catch (Exception $e) {
-                    report($e);
-                }
-            }
-
-            foreach ($crons as $cron) {
-                $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
-            }
-        });
     }
 
     private function registerMiddlewares(): void
@@ -423,29 +369,5 @@ final class CoreServiceProvider extends ServiceProvider
             resolve(BaseRepository::class)->clearByGroup($role, $entity);
         });
         Cache::macro('getCacheTags', static fn (...$args): array => resolve(BaseRepository::class)->getCacheTags(...$args));
-    }
-
-    private function inspectFolderCommands(string $commandsSubpath): array
-    {
-        $modules_namespace = config('modules.namespace');
-        $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
-
-        return array_map(
-            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
-            $files,
-        );
-    }
-
-    private function getPublishableViewPaths(): array
-    {
-        $paths = [];
-
-        foreach (config('view.paths') as $path) {
-            if (is_dir($path . '/modules/' . $this->nameLower)) {
-                $paths[] = $path . '/modules/' . $this->nameLower;
-            }
-        }
-
-        return $paths;
     }
 }

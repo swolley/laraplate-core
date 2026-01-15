@@ -12,7 +12,7 @@ final class FreeExpiredLicensesCommand extends Command
 {
     protected $signature = 'auth:free-expired-licenses';
 
-    protected $description = 'Free expired licenses. <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Free expired licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int
     {

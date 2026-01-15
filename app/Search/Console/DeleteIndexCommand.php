@@ -18,7 +18,7 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
 
     protected $signature = 'scout:delete-index {model : The model to delete the index for}';
 
-    protected $description = 'Delete an index for a model <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Delete an index for a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
     public function handle(EngineManager $manager)

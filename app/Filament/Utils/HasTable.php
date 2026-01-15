@@ -38,7 +38,7 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
-use Modules\Cms\Jobs\TranslateModelJob;
+use Modules\AI\Jobs\TranslateModelJob;
 use Modules\Cms\Models\Entity;
 use Modules\Cms\Models\Preset;
 use Modules\Core\Helpers\HasActivation;

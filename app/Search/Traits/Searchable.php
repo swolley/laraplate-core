@@ -14,11 +14,13 @@ use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
 use Laravel\Scout\Scout;
+use Modules\Core\Events\ModelRequiresIndexing;
+use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Helpers\SoftDeletes;
-use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
+use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
 use Modules\Core\Search\Schema\IndexType;
@@ -66,66 +68,50 @@ trait Searchable
     {
         $this->ensureIndexesForModels($models);
 
-        if ($this->vectorSearchEnabled()) {
-            if (! is_iterable($models)) {
-                $models = collect([$models]);
-            }
+        if (! is_iterable($models)) {
+            $models = collect([$models]);
+        }
 
-            if (! config('scout.queue')) {
-                $this->syncMakeSearchable($models);
+        $sync = ! config('scout.queue');
 
-                return;
-            }
+        foreach ($models as $model) {
+            // Emit event instead of calling job directly
+            // Listeners will handle pre-processing (embeddings, translations, etc.)
+            // and finalize listener will dispatch IndexInSearchJob when all are completed
+            $event = new ModelRequiresIndexing($model, $sync);
+            event($event);
 
-            $engine = $this->searchableUsing();
-
-            if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-                $pendingDispatch = Bus::chain([
-                    ...$models->map(static fn (Model $model): GenerateEmbeddingsJob => new GenerateEmbeddingsJob($model))->toArray(),
-                    new Scout::$makeSearchableJob($models),
-                ])->dispatch();
-
-                // If dispatch returns null (e.g., in forked processes), fall back to sync execution
-                if ($pendingDispatch === null) {
-                    $this->syncMakeSearchable($models);
-
-                    return;
-                }
-
-                $pendingDispatch
-                    ->onQueue($models->first()->syncWithSearchUsingQueue())
-                    ->onConnection($models->first()->syncWithSearchUsing());
-
-                return;
+            // Save event in cache for the finalize listener
+            if (! $sync) {
+                $cache_key = "model_indexing:{$model->getTable()}:{$model->getKey()}";
+                \Illuminate\Support\Facades\Cache::put($cache_key, $event, now()->addMinutes(10));
             }
         }
 
-        $this->baseQueueMakeSearchable($models);
+        // If sync mode, the finalize listener will handle everything synchronously
+        // Otherwise, events will be handled by listeners asynchronously
+        if ($sync) {
+            // In sync mode, we still need to call base method for immediate indexing
+            // if no pre-processing is required
+            $this->baseQueueMakeSearchable($models);
+        }
     }
 
     public function syncMakeSearchable($models): void
     {
         $this->ensureIndexesForModels($models);
 
-        if ($this->vectorSearchEnabled()) {
-            $engine = $this->searchableUsing();
+        if (! is_iterable($models)) {
+            $models = collect([$models]);
+        }
 
-            if (! is_iterable($models)) {
-                $models = collect([$models]);
-            }
+        foreach ($models as $model) {
+            // Emit event for sync mode
+            $event = new ModelRequiresIndexing($model, true);
+            event($event);
 
-            if ($engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
-                foreach ($models as $model) {
-                    // If Scout queue is disabled, run embeddings job synchronously
-                    if (! config('scout.queue')) {
-                        new GenerateEmbeddingsJob($model)->handle();
-                    } else {
-                        dispatch(new GenerateEmbeddingsJob($model)
-                            ->onQueue($model->syncWithSearchUsingQueue())
-                            ->onConnection($model->syncWithSearchUsing()));
-                    }
-                }
-            }
+            // In sync mode, listeners will handle everything synchronously
+            // The finalize listener will dispatch IndexInSearchJob immediately
         }
 
         $this->baseSyncMakeSearchableSync($models);
@@ -156,6 +142,11 @@ trait Searchable
 
         // Add embeddings if available
         if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
+            // Use ModelEmbedding from AI module if available
+            $model_class = class_exists(\Modules\AI\Models\ModelEmbedding::class)
+                ? \Modules\AI\Models\ModelEmbedding::class
+                : \Modules\Core\Models\ModelEmbedding::class;
+
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
 
             if ($embeddings !== []) {
@@ -168,6 +159,7 @@ trait Searchable
 
     /**
      * Prepare text data for embedding generation.
+     * If the model has translations, concatenate all translations for multilingual embedding.
      */
     public function prepareDataToEmbed(): ?string
     {
@@ -177,15 +169,35 @@ trait Searchable
 
         $data = '';
 
-        foreach ($this->embed as $attribute) {
-            $value = $this->{$attribute};
+        // If the model has translations, concatenate all translations for multilingual embedding
+        if (class_uses_trait($this, HasTranslations::class)) {
+            $available_locales = LocaleContext::getAvailable();
 
-            if ($this->isValidEmbedValue($value)) {
-                $data .= ' ' . $value;
+            foreach ($available_locales as $locale) {
+                $translation = $this->getTranslation($locale);
+
+                if ($translation) {
+                    foreach ($this->embed as $attribute) {
+                        $value = $translation->{$attribute} ?? null;
+
+                        if ($this->isValidEmbedValue($value)) {
+                            $data .= ' ' . $value;
+                        }
+                    }
+                }
+            }
+        } else {
+            // If no translations, use direct values (current behavior)
+            foreach ($this->embed as $attribute) {
+                $value = $this->{$attribute};
+
+                if ($this->isValidEmbedValue($value)) {
+                    $data .= ' ' . $value;
+                }
             }
         }
 
-        return $data;
+        return trim($data);
     }
 
     /**
@@ -193,7 +205,12 @@ trait Searchable
      */
     public function embeddings(): MorphMany
     {
-        return $this->morphMany(ModelEmbedding::class, 'model');
+        // Use ModelEmbedding from AI module if available, otherwise fallback to Core
+        $model_class = class_exists(\Modules\AI\Models\ModelEmbedding::class)
+            ? \Modules\AI\Models\ModelEmbedding::class
+            : \Modules\Core\Models\ModelEmbedding::class;
+
+        return $this->morphMany($model_class, 'model');
     }
 
     /**

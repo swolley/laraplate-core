@@ -18,7 +18,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
 
     protected $signature = 'scout:index {model : The model to create an index for}';
 
-    protected $description = 'Create an index <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Create an index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
     public function handle(EngineManager $manager)

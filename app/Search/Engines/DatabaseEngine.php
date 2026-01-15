@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\DatabaseEngine as BaseDatabaseEngine;
-use Modules\Core\Models\ModelEmbedding;
+use Modules\AI\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 

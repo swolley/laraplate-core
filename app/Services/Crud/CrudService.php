@@ -35,7 +35,7 @@ use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
-use Modules\Core\Search\Jobs\GenerateEmbeddingsJob;
+use Modules\AI\Services\EmbeddingService;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
@@ -130,7 +130,16 @@ class CrudService
         $search_text = Str::of($requestData->qs)->trim()->toString();
 
         if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
-            $embeddedDocument = GenerateEmbeddingsJob::embedText($search_text);
+            // Use EmbeddingService from AI module if available
+            $embedding_service = class_exists(\Modules\AI\Services\EmbeddingService::class)
+                ? app(\Modules\AI\Services\EmbeddingService::class)
+                : null;
+
+            if ($embedding_service) {
+                $embeddedDocument = $embedding_service->embedText($search_text);
+            } else {
+                $embeddedDocument = null;
+            }
         }
 
         $elastic_query = $this->getElasticSearchQuery($requestData, $embeddedDocument);

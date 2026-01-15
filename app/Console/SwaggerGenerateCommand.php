@@ -28,7 +28,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $this->signature .= '
                 {--m|module= : Filter to a specific Module}
         ';
-        $this->description .= ' <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+        $this->description .= ' <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
         parent::__construct();
     }

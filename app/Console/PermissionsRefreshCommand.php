@@ -8,6 +8,7 @@ use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Modules\AI\Models\ModelEmbedding;
 use Modules\Cms\Models\Translations\CategoryTranslation;
 use Modules\Cms\Models\Translations\ContentTranslation;
 use Modules\Cms\Models\Translations\TagTranslation;
@@ -15,7 +16,6 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
-use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
@@ -36,7 +36,7 @@ final class PermissionsRefreshCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⛭ Modules\Core)</fg=yellow>';
+    protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**
      * @var array<int,string>
