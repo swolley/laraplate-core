@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Mtrajano\LaravelSwagger\Generator;
 use Override;
+use ReflectionClass;
+use ReflectionMethod;
 
 final class ModuleDocGenerator extends Generator
 {
@@ -75,6 +78,61 @@ final class ModuleDocGenerator extends Generator
                 'text/html' => [],
             ];
         }
+    }
+
+    /**
+     * Override to handle abstract FormRequest classes.
+     *
+     * @return array<string, array<int, string>|string>
+     */
+    #[Override]
+    protected function getFormRules(): array
+    {
+        $action_instance = $this->getActionClassInstance();
+
+        if (! $action_instance) {
+            return [];
+        }
+
+        $parameters = $action_instance->getParameters();
+
+        foreach ($parameters as $parameter) {
+            $class = $parameter->getClass();
+
+            if (! $class) {
+                continue;
+            }
+
+            $class_name = $class->getName();
+
+            if (is_subclass_of($class_name, FormRequest::class)) {
+                $reflection = new ReflectionClass($class_name);
+
+                // Skip abstract classes as they cannot be instantiated
+                if ($reflection->isAbstract()) {
+                    continue;
+                }
+
+                return (new $class_name)->rules();
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Get the action class instance as ReflectionMethod.
+     * Replicates the private method from parent class.
+     */
+    private function getActionClassInstance(): ?ReflectionMethod
+    {
+        [$class, $method] = Str::parseCallback($this->route->action());
+
+        if (! $class || ! $method) {
+            return null;
+        }
+
+        return new ReflectionMethod($class, $method);
     }
 
     /**

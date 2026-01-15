@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Enhance ModuleDocGenerator to support abstract FormRequest classes
+
+## [1.33.0] - 2026-01-15
+
+### 🚜 Refactor
+
 - Update command descriptions and remove deprecated files
 
 ## [1.32.1] - 2026-01-14
