@@ -72,22 +72,22 @@ class CrudController extends Controller
         );
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api, crud_api])
-     * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
-     */
-    public function search(SearchRequest $request): Response
-    {
-        $requestData = $request->parsed();
+    // /**
+    //  * @route-comment
+    //  * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api, crud_api])
+    //  * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
+    //  */
+    // public function search(SearchRequest $request): Response
+    // {
+    //     $requestData = $request->parsed();
 
-        return $this->handleServiceCall(
-            fn () => $this->crudService->search($requestData),
-            $request,
-            $requestData->model,
-            shouldCache: false, // Search uses ElasticSearch, cache handled differently
-        );
-    }
+    //     return $this->handleServiceCall(
+    //         fn () => $this->crudService->search($requestData),
+    //         $request,
+    //         $requestData->model,
+    //         shouldCache: false, // Search uses ElasticSearch, cache handled differently
+    //     );
+    // }
 
     /**
      * @route-comment

@@ -7,20 +7,16 @@ namespace Modules\Core\Search\Traits;
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
 use Exception;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
-use Laravel\Scout\Scout;
 use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
 use Modules\Core\Search\Schema\IndexType;
@@ -142,11 +138,6 @@ trait Searchable
 
         // Add embeddings if available
         if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
-            // Use ModelEmbedding from AI module if available
-            $model_class = class_exists(\Modules\AI\Models\ModelEmbedding::class)
-                ? \Modules\AI\Models\ModelEmbedding::class
-                : \Modules\Core\Models\ModelEmbedding::class;
-
             $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
 
             if ($embeddings !== []) {
@@ -197,20 +188,16 @@ trait Searchable
             }
         }
 
-        return trim($data);
+        return mb_trim($data);
     }
 
     /**
      * Relationship with model embeddings.
+     * ModelEmbedding is in Core (structure), AI module handles generation/population.
      */
     public function embeddings(): MorphMany
     {
-        // Use ModelEmbedding from AI module if available, otherwise fallback to Core
-        $model_class = class_exists(\Modules\AI\Models\ModelEmbedding::class)
-            ? \Modules\AI\Models\ModelEmbedding::class
-            : \Modules\Core\Models\ModelEmbedding::class;
-
-        return $this->morphMany($model_class, 'model');
+        return $this->morphMany(\Modules\Core\Models\ModelEmbedding::class, 'model');
     }
 
     /**

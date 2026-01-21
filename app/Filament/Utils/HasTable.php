@@ -38,7 +38,7 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
-use Modules\AI\Jobs\TranslateModelJob;
+use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Cms\Models\Entity;
 use Modules\Cms\Models\Preset;
 use Modules\Core\Helpers\HasActivation;
@@ -443,7 +443,9 @@ trait HasTable
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedFlag)
                     ->action(static function (Model $record): void {
-                        dispatch(new TranslateModelJob($record));
+                        // Emit event instead of dispatching job directly
+                        // AI listener will handle the translation job
+                        event(new TranslatedModelSaved($record));
                     }),
             );
         }

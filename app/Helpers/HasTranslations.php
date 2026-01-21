@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Exception;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Overrides\LocaleScope;
-use Override;
+use Modules\Core\Services\Translation\Definitions\ITranslated;
 
 /**
  * Trait for models that store translatable fields in a separate translation table.
@@ -30,6 +32,7 @@ use Override;
  * - Translation model class is auto-resolved: ModelTranslation in Translations subfolder
  *
  * @template TModel of Model
+ * @template TTranslationModel of Model&ITranslated
  */
 trait HasTranslations
 {
@@ -52,6 +55,25 @@ trait HasTranslations
      * @var array<class-string, array<string>>
      */
     protected static array $cached_translatable_fields = [];
+
+    /**
+     * Get translatable fields for this model.
+     * Cached to avoid creating new instances and potential recursion.
+     */
+    public static function getTranslatableFields(): array
+    {
+        $model_class = static::class;
+
+        // Cache per classe per evitare ricorsione durante l'inizializzazione
+        if (! isset(static::$cached_translatable_fields[$model_class])) {
+            static::$cached_translatable_fields[$model_class] = array_filter(
+                (new (static::getTranslationModelClass()))->getFillable(),
+                static fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
+            );
+        }
+
+        return static::$cached_translatable_fields[$model_class];
+    }
 
     /**
      * Override getAttribute to handle translatable fields.
@@ -114,32 +136,16 @@ trait HasTranslations
 
     /**
      * Get translatable fields for this model.
-     * Cached to avoid creating new instances and potential recursion.
      */
-    public function getTranslatableFields(): array
-    {
-        $model_class = static::class;
-
-        // Cache per classe per evitare ricorsione durante l'inizializzazione
-        if (! isset(static::$cached_translatable_fields[$model_class])) {
-            static::$cached_translatable_fields[$model_class] = array_filter(
-                (new (static::getTranslationModelClass()))->getFillable(),
-                static fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
-            );
-        }
-
-        return static::$cached_translatable_fields[$model_class];
-    }
-
     public function isTranslatableField(string $field): bool
     {
-        return in_array($field, $this->getTranslatableFields(), true);
+        return in_array($field, $this::getTranslatableFields(), true);
     }
 
     /**
      * Get the translations relation.
      *
-     * @return HasMany<Model>
+     * @return HasMany<TTranslationModel>
      */
     public function translations(): HasMany
     {
@@ -149,7 +155,7 @@ trait HasTranslations
     /**
      * Get the translation for current locale (with conditional fallback).
      *
-     * @return HasOne<Model>
+     * @return HasOne<TTranslationModel>
      */
     public function translation(): HasOne
     {
@@ -186,6 +192,8 @@ trait HasTranslations
 
     /**
      * Get translation for specific locale.
+     *
+     * @return TTranslationModel|null
      */
     public function getTranslation(?string $locale = null, ?bool $with_fallback = null): ?Model
     {
@@ -245,8 +253,10 @@ trait HasTranslations
 
     /**
      * Get all translations.
+     *
+     * @return Collection<TTranslationModel>
      */
-    public function getAllTranslations(): \Illuminate\Database\Eloquent\Collection
+    public function getAllTranslations(): Collection
     {
         return $this->translations;
     }
@@ -257,7 +267,7 @@ trait HasTranslations
         $translation = $this->getRelationValue('translation');
 
         if ($translation) {
-            foreach ($this->getTranslatableFields() as $field) {
+            foreach ($this::getTranslatableFields() as $field) {
                 if (isset($translation->{$field}) && ! in_array($field, $this->hidden, true)) {
                     $content[$field] = $translation->{$field};
                 }
@@ -291,7 +301,7 @@ trait HasTranslations
     /**
      * Get the translation model class name.
      *
-     * @return class-string<Model>
+     * @return class-string<TTranslationModel>
      */
     protected static function getTranslationModelClass(): string
     {
@@ -305,7 +315,17 @@ trait HasTranslations
             $current_class = $parent_class;
         }
 
-        return str_replace('\\Models\\', '\\Models\\Translations\\', $current_class) . 'Translation';
+        $class_name = str_replace('\\Models\\', '\\Models\\Translations\\', $current_class) . 'Translation';
+
+        if (! class_exists($class_name)) {
+            throw new Exception('Translation model class not found: ' . $class_name);
+        }
+
+        if (! is_subclass_of($class_name, ITranslated::class)) {
+            throw new Exception('Translation model class does not implement ITranslated: ' . $class_name);
+        }
+
+        return $class_name;
     }
 
     /**
@@ -322,11 +342,6 @@ trait HasTranslations
         });
 
         static::created(function (Model $model): void {
-            /** @phpstan-ignore-next-line */
-            if (! config('ai.features.translation.enabled', false)) {
-                return;
-            }
-
             // Check if default translation exists
             $default_locale = config('app.locale');
 
@@ -340,11 +355,6 @@ trait HasTranslations
         });
 
         static::updated(function (Model $model): void {
-            /** @phpstan-ignore-next-line */
-            if (! config('ai.features.translation.enabled', false)) {
-                return;
-            }
-
             // Only translate if default translation was modified
             $default_locale = config('app.locale');
             $default_translation = $model->getTranslation($default_locale);
@@ -473,6 +483,8 @@ trait HasTranslations
 
     /**
      * Get default translation.
+     *
+     * @return TTranslationModel|null
      */
     protected function getDefaultTranslation(): ?Model
     {

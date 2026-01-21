@@ -6,7 +6,6 @@ namespace Modules\Core\Services\Crud;
 
 use Approval\Traits\RequiresApproval;
 use BadMethodCallException;
-use Elastic\Elasticsearch\ClientBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -16,9 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use LogicException;
-use Modules\AI\Services\EmbeddingService;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
 use Modules\Core\Casts\Filter;
@@ -36,7 +33,6 @@ use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
-use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Overtrue\LaravelVersionable\Versionable;
@@ -119,54 +115,55 @@ class CrudService
         );
     }
 
-    public function search(SearchRequestData $requestData): CrudResult
-    {
-        $is_searchable_class = class_uses_trait($requestData->model, Searchable::class);
+    // TODO: Implementare funzionalità di search senza creare dipendenze con il modulo AI
+    // public function search(SearchRequestData $requestData): CrudResult
+    // {
+    //     $is_searchable_class = class_uses_trait($requestData->model, Searchable::class);
 
-        if (! isset($requestData->model) || ! $is_searchable_class) {
-            return new CrudResult(
-                data: null,
-                error: 'Full-search operation can be done only on Searchable entities',
-                statusCode: Response::HTTP_BAD_REQUEST,
-            );
-        }
+    //     if (! isset($requestData->model) || ! $is_searchable_class) {
+    //         return new CrudResult(
+    //             data: null,
+    //             error: 'Full-search operation can be done only on Searchable entities',
+    //             statusCode: Response::HTTP_BAD_REQUEST,
+    //         );
+    //     }
 
-        $embeddedDocument = null;
-        $search_text = Str::of($requestData->qs)->trim()->toString();
+    //     $embeddedDocument = null;
+    //     $search_text = Str::of($requestData->qs)->trim()->toString();
 
-        if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
-            // Use EmbeddingService from AI module if available
-            $embedding_service = class_exists(EmbeddingService::class)
-                ? app(EmbeddingService::class)
-                : null;
+    //     if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
+    //         // Use EmbeddingService from AI module if available
+    //         $embedding_service = class_exists(EmbeddingService::class)
+    //             ? app(EmbeddingService::class)
+    //             : null;
 
-            if ($embedding_service) {
-                $embeddedDocument = $embedding_service->embedText($search_text);
-            } else {
-                $embeddedDocument = null;
-            }
-        }
+    //         if ($embedding_service) {
+    //             $embeddedDocument = $embedding_service->embedText($search_text);
+    //         } else {
+    //             $embeddedDocument = null;
+    //         }
+    //     }
 
-        $elastic_query = $this->getElasticSearchQuery($requestData, $embeddedDocument);
+    //     $elastic_query = $this->getElasticSearchQuery($requestData, $embeddedDocument);
 
-        $client = ClientBuilder::create()->build();
-        $response = $client->search($elastic_query);
-        $totalRecords = $response['hits']['total']['value'] ?? 0;
-        $data = $response['hits']['hits'] ?? [];
+    //     $client = ClientBuilder::create()->build();
+    //     $response = $client->search($elastic_query);
+    //     $totalRecords = $response['hits']['total']['value'] ?? 0;
+    //     $data = $response['hits']['hits'] ?? [];
 
-        $meta = new CrudMeta(
-            totalRecords: $totalRecords,
-            currentRecords: count($data),
-            pagination: $requestData->pagination,
-            currentPage: $requestData->page,
-            totalPages: $requestData->calculateTotalPages($totalRecords),
-        );
+    //     $meta = new CrudMeta(
+    //         totalRecords: $totalRecords,
+    //         currentRecords: count($data),
+    //         pagination: $requestData->pagination,
+    //         currentPage: $requestData->page,
+    //         totalPages: $requestData->calculateTotalPages($totalRecords),
+    //     );
 
-        return new CrudResult(
-            data: $data,
-            meta: $meta,
-        );
-    }
+    //     return new CrudResult(
+    //         data: $data,
+    //         meta: $meta,
+    //     );
+    // }
 
     public function history(HistoryRequestData $requestData): CrudResult
     {

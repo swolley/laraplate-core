@@ -45,7 +45,7 @@ describe('initializeHasTranslations', function (): void {
 describe('getTranslatableFields', function (): void {
     it('returns translatable fields for model', function (): void {
         $content = Content::factory()->create();
-        $fields = $content->getTranslatableFields();
+        $fields = $content::getTranslatableFields();
 
         expect($fields)->toBeArray();
         expect($fields)->toContain('title', 'slug', 'components');
@@ -53,7 +53,7 @@ describe('getTranslatableFields', function (): void {
 
     it('returns translatable fields for Author model', function (): void {
         $author = Author::factory()->create();
-        $fields = $author->getTranslatableFields();
+        $fields = $author::getTranslatableFields();
 
         expect($fields)->toBeArray();
         expect($fields)->toContain('name', 'components');
@@ -63,8 +63,8 @@ describe('getTranslatableFields', function (): void {
         $author1 = Author::factory()->create();
         $author2 = Author::factory()->create();
 
-        $fields1 = $author1->getTranslatableFields();
-        $fields2 = $author2->getTranslatableFields();
+        $fields1 = $author1::getTranslatableFields();
+        $fields2 = $author2::getTranslatableFields();
 
         // Should be the same (cached)
         expect($fields1)->toBe($fields2);
@@ -72,7 +72,7 @@ describe('getTranslatableFields', function (): void {
 
     it('excludes locale and foreign keys from translatable fields', function (): void {
         $author = Author::factory()->create();
-        $fields = $author->getTranslatableFields();
+        $fields = $author::getTranslatableFields();
 
         expect($fields)->not->toContain('locale');
         expect($fields)->not->toContain('author_id');

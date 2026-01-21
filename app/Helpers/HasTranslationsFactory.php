@@ -16,7 +16,7 @@ trait HasTranslationsFactory
         $locales_to_create = collect($all_locales)->inRandomOrder()->limit(fake()->numberBetween(0, count($all_locales)))->filter(fn (string $locale): bool => $locale !== $default_locale)->toArray();
         array_unshift($locales_to_create, $default_locale);
 
-        $fields = $content->getTranslatableFields();
+        $fields = $content::getTranslatableFields();
         $content->getTranslationModelClass()->casts();
 
         foreach ($locales_to_create as $locale) {

@@ -29,8 +29,6 @@ return [
         'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
     ],
 
-    'embedding_model_connection' => env('EMBEDDING_MODEL_CONNECTION', config('database.default')),
-
     /*
     |--------------------------------------------------------------------------
     | Engines configurati

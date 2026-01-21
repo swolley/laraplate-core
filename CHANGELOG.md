@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Introduce MoveEmbeddingTable command and ModelEmbedding model
+
+## [1.33.2] - 2026-01-21
+
 ### 🚜 Refactor
 
 - Deprecate AI configuration in README and update documentation
