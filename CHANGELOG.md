@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Deprecate AI configuration in README and update documentation
+- Enhance CRUD helper and service for computed methods and relations
+
+## [1.33.1] - 2026-01-15
+
+### 🚜 Refactor
+
 - Enhance ModuleDocGenerator to support abstract FormRequest classes
 
 ## [1.33.0] - 2026-01-15

@@ -35,6 +35,20 @@ final class CrudHelper
         $relations_sorts = [];
         $relations_columns = [];
         $relations_filters = [];
+        $normalized_relations = $this->normalizeRelations($request_data->relations);
+        $computed_columns = $this->extractComputedColumns($main_entity, $request_data->columns);
+        $computed_main = $computed_columns['main'];
+        $computed_relations = $computed_columns['relations'];
+        $computed_main_dependencies = $this->resolveComputedDependencies($main_model, $computed_main);
+        $force_select_all_main = $computed_main_dependencies['force_select_all'];
+
+        if ($computed_main['append'] !== []) {
+            $this->applyModelAppends($main_model, $computed_main['append']);
+        }
+
+        if ($computed_main_dependencies['relations'] !== []) {
+            $normalized_relations = array_values(array_unique(array_merge($normalized_relations, $computed_main_dependencies['relations'])));
+        }
 
         $columns = $this->groupColumns($main_entity, $request_data->columns);
 
@@ -51,12 +65,25 @@ final class CrudHelper
                     }
                 }
 
+                if ($computed_main_dependencies['columns'] !== [] && ! $force_select_all_main) {
+                    foreach ($computed_main_dependencies['columns'] as $dependency_column) {
+                        if (! in_array($dependency_column, $only_standard_columns, true)) {
+                            $only_standard_columns[] = $dependency_column;
+                        }
+                    }
+                }
+
+                if ($force_select_all_main) {
+                    $only_standard_columns = [$main_entity . '.*'];
+                }
+
                 // TODO: qui mancano ancora le colonne utili a fare le relation se la foreign key si trova sulla main table
-                $this->addForeignKeysToSelectedColumns($query, $only_standard_columns, $main_model, $main_entity);
+                if (! $force_select_all_main) {
+                    $this->addForeignKeysToSelectedColumns($query, $only_standard_columns, $main_model, $main_entity);
+                }
                 $query->select($only_standard_columns);
-            } elseif ($type === 'relations' && $cols === []) {
+            } elseif ($type === 'relations' && $cols !== []) {
                 foreach ($cols as $relation => $relation_cols) {
-                    $this->sortColumns($query, $relation_cols);
                     $only_relation_columns = [];
 
                     foreach ($relation_cols as $column) {
@@ -67,8 +94,8 @@ final class CrudHelper
 
                     $relations_columns[$relation] = $only_relation_columns;
 
-                    if (! in_array($relation, $request_data->relations, true)) {
-                        $request_data->relations[] = $relation;
+                    if (! in_array($relation, $normalized_relations, true)) {
+                        $normalized_relations[] = $relation;
                     }
                 }
             }
@@ -78,19 +105,29 @@ final class CrudHelper
             // check for sorts and prepare data
             if (isset($request_data->sort)) {
                 foreach ($request_data->sort as $column) {
-                    if (preg_match("/^\w+\.\w+$/", (string) $column->property)) {
-                        $query->orderBy($column->property, $column->direction->value);
-                    } else {
-                        $index = str_replace($main_entity . '.', '', $column->property);
-                        $splitted = $this->splitColumnNameOnLastDot($index);
-                        $cloned_column = new Sort($splitted[1], $column->direction);
+                    $property = (string) $column->property;
 
-                        if (! array_key_exists($index, $columns['relations'])) {
-                            $relations_sorts[$splitted[0]] = [$cloned_column];
-                        } else {
-                            $relations_sorts[$splitted[0]][] = $cloned_column;
-                        }
+                    if (! Str::contains($property, '.')) {
+                        $query->orderBy($property, $column->direction->value);
+
+                        continue;
                     }
+
+                    if (Str::startsWith($property, $main_entity . '.')) {
+                        $query->orderBy($property, $column->direction->value);
+
+                        continue;
+                    }
+
+                    $index = str_replace($main_entity . '.', '', $property);
+                    $splitted = $this->splitColumnNameOnLastDot($index);
+
+                    if (! isset($splitted[1])) {
+                        continue;
+                    }
+
+                    $cloned_column = new Sort($splitted[1], $column->direction);
+                    $relations_sorts[$splitted[0]][] = $cloned_column;
                 }
             }
 
@@ -100,8 +137,7 @@ final class CrudHelper
         }
 
         if ($request_data instanceof ListRequestData && isset($request_data->filters)) {
-            // TODO: come faccio a smontare filters e raggrupparlo per la singola relation?
-            // forse devo fare un filter ricorsivo nell'oggetto FiltersGroup e tirare fuori solo i campi relativi alla singoal relation o sottorelation conservando la struttura originale?
+            // TODO: come faccio a smontare filters e raggrupparlo per la singola relation? Forse devo fare un filter ricorsivo nell'oggetto FiltersGroup e tirare fuori solo i campi relativi alla singoal relation o sottorelation conservando la struttura originale?
 
             // foreach ($request_data->filters->filters as $filter) {
             //     if (preg_match("/^\w+\.\w+$/", $filter->property)) {
@@ -120,8 +156,8 @@ final class CrudHelper
             $this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations']);
         }
 
-        if ($request_data->relations !== []) {
-            $this->applyRelations($query, $request_data->relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters);
+        if ($normalized_relations !== []) {
+            $this->applyRelations($query, $normalized_relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters, $computed_relations);
         }
     }
 
@@ -228,10 +264,9 @@ final class CrudHelper
         $field = array_pop($exploded);
         $relation = implode('.', $exploded);
         $relation_model = $model instanceof Model ? $model : $model->getModel();
-        array_shift($exploded);
 
-        while ($exploded !== []) {
-            $relation_model = $relation_model->{array_shift($exploded)}()->getModel();
+        foreach ($exploded as $relation_name) {
+            $relation_model = $relation_model->{$relation_name}()->getModel();
         }
 
         return [
@@ -278,7 +313,7 @@ final class CrudHelper
                 }
             }
 
-            if ($path_length > 1) {
+            if ($splitted['relation'] !== '') {
                 $has_method = $method . 'Has';
 
                 // Ensure the method name is valid
@@ -308,11 +343,33 @@ final class CrudHelper
             // is or is not null
             $method .= $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
             $query->{$method}($filter->property);
-        } elseif (in_array($filter->operator, [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
+
+            return;
+        }
+
+        if ($filter->operator === FilterOperator::IN) {
+            $in_method = $method === 'orWhere' ? 'orWhereIn' : 'whereIn';
+            $query->{$in_method}($filter->property, Arr::wrap($filter->value));
+
+            return;
+        }
+
+        if ($filter->operator === FilterOperator::BETWEEN && is_array($filter->value)) {
+            $between_method = $method === 'orWhere' ? 'orWhereBetween' : 'whereBetween';
+            $query->{$between_method}($filter->property, $filter->value);
+
+            return;
+        }
+
+        if (in_array($filter->operator, [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
             // like not like
             $method .= Str::studly($filter->operator->value);
             $query->{$method}($filter->property, $filter->value);
-        } elseif ($method !== '' && method_exists($query, $method)) {
+
+            return;
+        }
+
+        if ($method !== '' && method_exists($query, $method)) {
             // all the others
             $query->{$method}($filter->property, $filter->operator->value, $filter->value);
         }
@@ -362,7 +419,7 @@ final class CrudHelper
     }
 
     /**
-     * @param  array<string,array<int,Column>>  $relation_columns
+     * @param  array<int,Column>  $relation_columns
      */
     private function applyColumnsToSelect(Builder|Relation $query, array &$relation_columns): void
     {
@@ -374,6 +431,10 @@ final class CrudHelper
             if ($column->type === ColumnType::COLUMN) {
                 $simple_columns[] = $column->name;
             }
+        }
+
+        if ($simple_columns === []) {
+            return;
         }
 
         $query->select($simple_columns);
@@ -398,11 +459,13 @@ final class CrudHelper
             foreach ($aggregates_cols as $col) {
                 $method = 'with' . ucfirst((string) $col->type->value);
 
-                if ($col->type === ColumnType::SUM || $col->type === ColumnType::COUNT) {
+                if ($col->type === ColumnType::COUNT) {
                     $query->{$method}([$subrelation]);
-                } else {
-                    $query->{$method}([$subrelation . '.' . $col->name]);
+
+                    continue;
                 }
+
+                $query->{$method}($subrelation, $col->name);
             }
 
             unset($relations_aggregates[$aggregate_relation]);
@@ -412,7 +475,7 @@ final class CrudHelper
     /**
      * @param  array<int,string>  $selectColumns
      */
-    private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, ?Model $model = null, ?string $table = null): void
+    private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, ?Model $model = null, ?string $table = null, bool $as_columns = false): void
     {
         if (! $model instanceof Model) {
             $model = $query->getModel();
@@ -420,27 +483,57 @@ final class CrudHelper
 
         $table ??= $model->getTable();
 
+        $existing_columns = [];
+
+        foreach ($selectColumns as $select_column) {
+            $existing_columns[] = $select_column instanceof Column ? $select_column->name : $select_column;
+        }
+
         foreach (Inspect::foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
             foreach ($foreign->columns as $column) {
-                $selectColumns[] = new Column($column);
+                if (in_array($column, $existing_columns, true)) {
+                    continue;
+                }
+
+                $selectColumns[] = $as_columns ? new Column($column) : $column;
+                $existing_columns[] = $column;
             }
         }
     }
 
     /**
-     * @param  array<string,array<int,string>>  $relations_columns
+     * @param  array<string,array<int,Column>>  $relations_columns
      * @param  array<string,array<int,Sort>>  $relations_sorts
      * @param  array<string,array<int,Column>>  $relations_aggregates
      * @param  array<string,array<int,Filter>>  $relations_filters
+     * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
      */
-    private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
+    private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
     {
         // if (! array_key_exists($relation, $relations_columns)) {
         //     throw new InvalidArgumentException('Relation not found: ' . $relation);
         // }
 
+        $computed = $computed_relations[$relation] ?? ['append' => [], 'method' => []];
+        $computed_dependencies = $this->resolveComputedDependencies($query->getModel(), $computed);
+        $force_select_all = $computed_dependencies['force_select_all'];
+
+        if ($computed['append'] !== []) {
+            $this->applyModelAppends($query->getModel(), $computed['append']);
+        }
+
+        if ($computed_dependencies['relations'] !== []) {
+            $query->with($computed_dependencies['relations']);
+        }
+
+        if (! $force_select_all && $computed_dependencies['columns'] !== []) {
+            $this->mergeComputedDependencies($relations_columns, $relation, $computed_dependencies['columns']);
+        } elseif ($force_select_all) {
+            unset($relations_columns[$relation]);
+        }
+
         if (array_key_exists($relation, $relations_columns) && $relations_columns[$relation] !== []) {
-            $this->addForeignKeysToSelectedColumns($query, $relations_columns[$relation]);
+            $this->addForeignKeysToSelectedColumns($query, $relations_columns[$relation], as_columns: true);
             $this->applyColumnsToSelect($query, $relations_columns[$relation]);
         }
 
@@ -466,11 +559,13 @@ final class CrudHelper
      * @param  array<string,array<int,Sort>>  $relations_sorts
      * @param  array<string,array<int,Column>>  $relations_aggregates
      * @param  array<string,array<int,Filter>>  $relations_filters
+     * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
      */
-    private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters): void
+    private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
     {
         /** @var array<int,string> $merged_relations */
-        $merged_relations = array_unique(array_merge(array_map(fn (array $relation): string => $relation['name'], $relations), array_keys($relations_sorts), array_keys($relations_columns)));
+        $relations = $this->normalizeRelations($relations);
+        $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
         $this->cleanRelations($relations);
 
         // apply only direct aggregate relations on the main entity
@@ -482,11 +577,13 @@ final class CrudHelper
             foreach ($aggregates_cols as $col) {
                 $method = 'with' . ucfirst((string) $col->type->value);
 
-                if ($col->type === ColumnType::SUM || $col->type === ColumnType::COUNT) {
+                if ($col->type === ColumnType::COUNT) {
                     $query->{$method}([$relation]);
-                } else {
-                    $query->{$method}([$relation . '.' . $col->name]);
+
+                    continue;
                 }
+
+                $query->{$method}($relation, $col->name);
             }
 
             unset($relations_aggregates[$relation]);
@@ -496,11 +593,163 @@ final class CrudHelper
         $withs = [];
 
         foreach ($merged_relations as $relation) {
-            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters): void {
-                $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters);
+            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations): void {
+                $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations);
             };
         }
 
         $query->with($withs);
+    }
+
+    /**
+     * @param  array<int,string|array{name:string}>  $relations
+     * @return array<int,string>
+     */
+    private function normalizeRelations(array $relations): array
+    {
+        $normalized = [];
+
+        foreach ($relations as $relation) {
+            if (is_string($relation)) {
+                $normalized[] = $relation;
+
+                continue;
+            }
+
+            if (is_array($relation) && isset($relation['name'])) {
+                $normalized[] = $relation['name'];
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<int,Column>  $columns
+     * @return array{main:array{append:array<int,string>,method:array<int,string>},relations:array<string,array{append:array<int,string>,method:array<int,string>}>}
+     */
+    private function extractComputedColumns(string $main_entity, array $columns): array
+    {
+        $computed = [
+            'main' => ['append' => [], 'method' => []],
+            'relations' => [],
+        ];
+
+        foreach ($columns as $column) {
+            if (! in_array($column->type, [ColumnType::APPEND, ColumnType::METHOD], true)) {
+                continue;
+            }
+
+            $index = str_replace($main_entity . '.', '', $column->name);
+            $splitted = $this->splitColumnNameOnLastDot($index);
+            $relation = $splitted[1] ?? null ? $splitted[0] : '';
+            $name = $splitted[1] ?? $splitted[0];
+            $bucket = $column->type === ColumnType::APPEND ? 'append' : 'method';
+
+            if ($relation === '') {
+                $computed['main'][$bucket][] = $name;
+            } else {
+                if (! isset($computed['relations'][$relation])) {
+                    $computed['relations'][$relation] = ['append' => [], 'method' => []];
+                }
+
+                $computed['relations'][$relation][$bucket][] = $name;
+            }
+        }
+
+        return $computed;
+    }
+
+    /**
+     * @param  array{append:array<int,string>,method:array<int,string>}  $computed
+     * @return array{columns:array<int,string>,relations:array<int,string>,force_select_all:bool}
+     */
+    private function resolveComputedDependencies(Model $model, array $computed): array
+    {
+        $computed_names = array_values(array_unique(array_merge($computed['append'], $computed['method'])));
+        $resolved = [
+            'columns' => [],
+            'relations' => [],
+            'force_select_all' => false,
+        ];
+
+        if ($computed_names === []) {
+            return $resolved;
+        }
+
+        if (! method_exists($model, 'crudComputedDependencies')) {
+            $resolved['force_select_all'] = true;
+
+            return $resolved;
+        }
+
+        /** @var array<string,mixed> $dependencies_map */
+        $dependencies_map = $model->crudComputedDependencies();
+        $table = $model->getTable();
+
+        foreach ($computed_names as $computed_name) {
+            $dependency = $dependencies_map[$computed_name] ?? $dependencies_map[$table . '.' . $computed_name] ?? null;
+
+            if ($dependency === null) {
+                $resolved['force_select_all'] = true;
+
+                continue;
+            }
+
+            $dependency_columns = Arr::wrap($dependency['columns'] ?? $dependency);
+            $dependency_relations = Arr::wrap($dependency['relations'] ?? []);
+
+            foreach ($dependency_columns as $dependency_column) {
+                $dependency_column = str_replace($table . '.', '', (string) $dependency_column);
+
+                if (! in_array($dependency_column, $resolved['columns'], true)) {
+                    $resolved['columns'][] = $dependency_column;
+                }
+            }
+
+            foreach ($dependency_relations as $dependency_relation) {
+                $dependency_relation = str_replace($table . '.', '', (string) $dependency_relation);
+
+                if (! in_array($dependency_relation, $resolved['relations'], true)) {
+                    $resolved['relations'][] = $dependency_relation;
+                }
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * @param  array<string,array<int,Column>>  $relations_columns
+     * @param  array<int,string>  $dependency_columns
+     */
+    private function mergeComputedDependencies(array &$relations_columns, string $relation, array $dependency_columns): void
+    {
+        if (! array_key_exists($relation, $relations_columns)) {
+            $relations_columns[$relation] = [];
+        }
+
+        $existing_columns = array_map(static fn (Column $column): string => $column->name, $relations_columns[$relation]);
+
+        foreach ($dependency_columns as $dependency_column) {
+            if (in_array($dependency_column, $existing_columns, true)) {
+                continue;
+            }
+
+            $relations_columns[$relation][] = new Column($dependency_column, ColumnType::COLUMN);
+            $existing_columns[] = $dependency_column;
+        }
+    }
+
+    /**
+     * @param  array<int,string>  $appends
+     */
+    private function applyModelAppends(Model $model, array $appends): void
+    {
+        if ($appends === []) {
+            return;
+        }
+
+        $model->append($appends);
     }
 }

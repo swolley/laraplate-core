@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
+use Modules\AI\Services\EmbeddingService;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
 use Modules\Core\Casts\Filter;
@@ -35,11 +36,11 @@ use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
-use Modules\AI\Services\EmbeddingService;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Overtrue\LaravelVersionable\Versionable;
+use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
@@ -65,6 +66,8 @@ class CrudService
             $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
             default => $this->listByOthers($query, $requestData, $total_records),
         };
+
+        $this->applyComputedMethods($data, $requestData);
 
         if (isset($requestData->group_by) && $requestData->group_by !== []) {
             $data = $this->applyGroupBy($data, $requestData->group_by);
@@ -102,6 +105,8 @@ class CrudService
 
         $data = $query->sole();
 
+        $this->applyComputedMethods($data, $requestData);
+
         $meta = new CrudMeta(
             class: $model::class,
             table: $model->getTable(),
@@ -131,8 +136,8 @@ class CrudService
 
         if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
             // Use EmbeddingService from AI module if available
-            $embedding_service = class_exists(\Modules\AI\Services\EmbeddingService::class)
-                ? app(\Modules\AI\Services\EmbeddingService::class)
+            $embedding_service = class_exists(EmbeddingService::class)
+                ? app(EmbeddingService::class)
                 : null;
 
             if ($embedding_service) {
@@ -188,6 +193,8 @@ class CrudService
 
         $data = $query->sole();
 
+        $this->applyComputedMethods($data, $requestData);
+
         $meta = new CrudMeta(
             class: $model::class,
             table: $model->getTable(),
@@ -222,6 +229,8 @@ class CrudService
         $crud_helper->prepareQuery($query, $requestData);
 
         $data = $query->sole();
+
+        $this->applyComputedMethods($data, $requestData);
 
         $meta = new CrudMeta(
             class: $model::class,
@@ -555,5 +564,138 @@ class CrudService
         return new CrudResult(
             data: $locked_records,
         );
+    }
+
+    private function applyComputedMethods(mixed $data, ListRequestData|\Modules\Core\Casts\SelectRequestData $request_data): void
+    {
+        $methods_by_relation = $this->extractMethodColumns($request_data);
+
+        if ($methods_by_relation === []) {
+            return;
+        }
+
+        if ($data instanceof Model) {
+            $this->applyMethodsToModel($data, $methods_by_relation);
+
+            return;
+        }
+
+        if (is_iterable($data)) {
+            foreach ($data as $model) {
+                if ($model instanceof Model) {
+                    $this->applyMethodsToModel($model, $methods_by_relation);
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array<string,array<int,string>>
+     */
+    private function extractMethodColumns(\Modules\Core\Casts\SelectRequestData $request_data): array
+    {
+        $methods_by_relation = [];
+        $main_entity = $request_data->model->getTable();
+
+        foreach ($request_data->columns as $column) {
+            if ($column->type !== \Modules\Core\Casts\ColumnType::METHOD) {
+                continue;
+            }
+
+            $index = str_replace($main_entity . '.', '', $column->name);
+            $splitted = preg_split('/\.(?=[^.]*$)/', $index, 2);
+            $relation = $splitted[1] ?? null ? $splitted[0] : '';
+            $method = $splitted[1] ?? $splitted[0];
+
+            if (! array_key_exists($relation, $methods_by_relation)) {
+                $methods_by_relation[$relation] = [];
+            }
+
+            if (! in_array($method, $methods_by_relation[$relation], true)) {
+                $methods_by_relation[$relation][] = $method;
+            }
+        }
+
+        return $methods_by_relation;
+    }
+
+    /**
+     * @param  array<string,array<int,string>>  $methods_by_relation
+     */
+    private function applyMethodsToModel(Model $model, array $methods_by_relation): void
+    {
+        foreach ($methods_by_relation as $relation_path => $methods) {
+            if ($relation_path === '') {
+                $this->applyMethodsToTarget($model, $methods);
+
+                continue;
+            }
+
+            $this->applyMethodsToRelationPath($model, $relation_path, $methods);
+        }
+    }
+
+    /**
+     * @param  array<int,string>  $methods
+     */
+    private function applyMethodsToTarget(Model $model, array $methods): void
+    {
+        foreach ($methods as $method) {
+            $value = $this->resolveMethodValue($model, $method);
+            $model->setAttribute($method, $value);
+        }
+    }
+
+    /**
+     * @param  array<int,string>  $methods
+     */
+    private function applyMethodsToRelationPath(Model $model, string $relation_path, array $methods): void
+    {
+        $segments = explode('.', $relation_path);
+        $targets = [$model];
+
+        foreach ($segments as $segment) {
+            $next_targets = [];
+
+            foreach ($targets as $target) {
+                if (! $target instanceof Model || ! method_exists($target, $segment)) {
+                    continue;
+                }
+
+                $related = $target->{$segment};
+
+                if ($related instanceof \Illuminate\Support\Collection || $related instanceof Collection) {
+                    foreach ($related as $item) {
+                        if ($item instanceof Model) {
+                            $next_targets[] = $item;
+                        }
+                    }
+                } elseif ($related instanceof Model) {
+                    $next_targets[] = $related;
+                }
+            }
+
+            if ($next_targets === []) {
+                return;
+            }
+
+            $targets = $next_targets;
+        }
+
+        foreach ($targets as $target) {
+            if ($target instanceof Model) {
+                $this->applyMethodsToTarget($target, $methods);
+            }
+        }
+    }
+
+    private function resolveMethodValue(Model $model, string $method): mixed
+    {
+        throw_unless(method_exists($model, $method), UnexpectedValueException::class, sprintf('Method %s not found on %s', $method, $model::class));
+
+        $reflected_method = new ReflectionMethod($model, $method);
+        throw_if($reflected_method->getNumberOfRequiredParameters() > 0, UnexpectedValueException::class, sprintf('Method %s requires parameters on %s', $method, $model::class));
+
+        return $model->{$method}();
     }
 }
