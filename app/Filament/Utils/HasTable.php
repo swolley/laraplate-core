@@ -20,6 +20,7 @@ use Filament\Actions\ViewAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 // use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -38,9 +39,9 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Cms\Casts\EntityType;
 use Modules\Cms\Helpers\HasDynamicContents;
-use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Cms\Models\Entity;
 use Modules\Cms\Models\Preset;
+use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
@@ -49,6 +50,7 @@ use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\FlagCDNService;
 use PHPUnit\Event\InvalidArgumentException;
 use ReflectionClass;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
@@ -222,18 +224,38 @@ trait HasTable
         }
 
         if ($hasTranslations) {
+            $flag_cdn_service = new FlagCDNService();
+
             $default_columns->push(
-                TextColumn::make('translations.locale')
-                    ->searchable()
+                ImageColumn::make('translations.locale')
+                    ->state(fn (Model $record) => collect($record->translations)->map(fn (Model $translation): string => sprintf(
+                        $flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp'))))
+                    ->stacked()
+                    ->limit(3)
+                    ->limitedRemainingText()
+                    ->extraImgAttributes(['loading' => 'lazy'])
                     ->toggleable(isToggledHiddenByDefault: false)
-                    ->grow(false),
-                // ->formatStateUsing(static fn ($locales): string => collect($locales)->map(static fn (string $locale): string => "<picture>
-                //         <source type='image/webp' srcset='https://flagcdn.com/40x30/{$locale}.webp, https://flagcdn.com/80x60/{$locale}.webp 2x, https://flagcdn.com/120x90/{$locale}.webp 3x'>
-                //         <source type='image/png' srcset='https://flagcdn.com/40x30/{$locale}.png, https://flagcdn.com/80x60/{$locale}.png 2x, https://flagcdn.com/120x90/{$locale}.png 3x'>
-                //         <img src='https://flagcdn.com/40x30/{$locale}.png' width='40' height='30' alt='{$locale}' loading='lazy'>
-                //     </picture>")->join('&nbsp;'),
-                // )
-                // ->html(),
+                    ->extraImgAttributes(['loading' => 'lazy']),
+                // TextColumn::make('translations.locale')
+                //     ->searchable()
+                //     ->toggleable(isToggledHiddenByDefault: false)
+                //     ->grow(false)
+                //     ->formatStateUsing(fn ($locales): string => collect($locales)->map(fn (string $locale): string => sprintf(
+                //         '<picture>
+                //             <source type="image/webp" srcset="%s, %s 2x, %s 3x">
+                //             <source type="image/png" srcset="%s, %s 2x, %s 3x">
+                //             <img src="%s" width="40" height="30" alt="%s" loading="lazy">
+                //         </picture>',
+                //         $flag_cdn_service->getUrl($locale, 40, 30, 'webp'),
+                //         $flag_cdn_service->getUrl($locale, 80, 60, 'webp'),
+                //         $flag_cdn_service->getUrl($locale, 120, 90, 'webp'),
+                //         $flag_cdn_service->getUrl($locale, 40, 30, 'png'),
+                //         $flag_cdn_service->getUrl($locale, 80, 60, 'png'),
+                //         $flag_cdn_service->getUrl($locale, 120, 90, 'png'),
+                //         $flag_cdn_service->getUrl($locale, 40, 30, 'png'),
+                //         $locale,
+                //     ))->join('&nbsp;'))
+                //     ->html(),
             );
         }
 

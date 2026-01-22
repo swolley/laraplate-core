@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use ArrayAccess;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Actions\Docs\MergeSwaggerDocsAction;
@@ -31,27 +30,6 @@ final class DocsController extends OpenApiJsonController
             $request->route()->getName() . $version,
             fn () => response()->json(($this->mergeSwaggerDocsAction)($version)),
         );
-    }
-
-    /**
-     * @route-comment
-     * Route(path: 'welcome', name: 'core.docs.welcome', methods: [GET, HEAD], middleware: [web])
-     */
-    public function welcome(): View
-    {
-        return view('core::welcome', [
-            'grouped_modules' => $this->moduleInfoService->groupedModules(),
-            'translations' => translations(),
-        ]);
-    }
-
-    /**
-     * @route-comment
-     * Route(path: 'phpinfo', name: 'core.docs.phpinfo', methods: [GET, HEAD], middleware: [web])
-     */
-    public function phpinfo(): View
-    {
-        return view('core::phpinfo');
     }
 
     /**

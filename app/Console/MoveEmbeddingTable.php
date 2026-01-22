@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\AI\Console;
+namespace Modules\Core\Console;
 
 use function Laravel\Prompts\confirm;
 

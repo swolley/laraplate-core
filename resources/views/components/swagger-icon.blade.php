@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" height="40">
+@props(['class' => '', 'style' => ''])
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" height="40" class="{{ $class }}" style="{{ $style }}">
 	<defs>
 		<clipPath id="logo_small_svg__clip-SW_TM-logo-on-dark">
 			<path d="M0 0h407v116H0z"></path>

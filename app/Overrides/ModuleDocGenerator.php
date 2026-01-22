@@ -187,8 +187,9 @@ final class ModuleDocGenerator extends Generator
         }
 
         $route_name = $route->getName();
+        $route_uri = $route->uri();
 
-        if ($route_name === '' || Str::startsWith($route->uri(), ['_', '/_'])) {
+        if ($route_name === '' || Str::startsWith($route_uri, ['_', '/_'])) {
             return true;
         }
 
@@ -201,9 +202,9 @@ final class ModuleDocGenerator extends Generator
                 continue;
             }
 
-            $regex = str_replace('\*', '.*', preg_quote((string) $pattern, '/'));
+            $regex = '/^' . str_replace('\*', '.*', preg_quote((string) $pattern, '/')) . '$/';
 
-            if (preg_match('/^' . $regex . '$/', (string) $route_name)) {
+            if (preg_match($regex, (string) $route_name) || preg_match($regex, (string) $route_uri)) {
                 return true;
             }
         }

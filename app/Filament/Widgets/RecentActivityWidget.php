@@ -17,6 +17,8 @@ final class RecentActivityWidget extends Widget
 
     protected static ?int $sort = 50;
 
+    private int $limit = 8;
+
     protected function getViewData(): array
     {
         $data = [
@@ -29,7 +31,7 @@ final class RecentActivityWidget extends Widget
             $data['recent_contents'] = Content::query()
                 ->with('translations', fn ($query) => $query->select(['title', 'locale', 'content_id']))
                 ->latest('updated_at')
-                ->limit(8)
+                ->limit($this->limit)
                 ->get(['id', 'presettable_id', 'updated_at'])
                 ->map(function ($content) {
                     // Try to get title from translation or use a fallback
@@ -65,7 +67,7 @@ final class RecentActivityWidget extends Widget
             ->whereDoesntHave('roles', function ($query): void {
                 $query->where('name', config('permission.roles.superadmin'));
             })
-            ->limit(8)
+            ->limit($this->limit)
             ->get(['id', 'name', 'email', 'last_login_at'])
             ->map(fn ($user) => [
                 'id' => $user->id,

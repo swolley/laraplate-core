@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Widgets;
 
 use Exception;
+use Filament\Pages\Dashboard;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
+use Modules\Core\Filament\Pages\CacheHealth;
 
 final class SearchEngineHealthTableWidget extends Widget
 {
@@ -16,6 +19,15 @@ final class SearchEngineHealthTableWidget extends Widget
     protected int|string|array $columnSpan = 'full';
 
     protected static ?int $sort = 51;
+
+    public static function canView(): bool
+    {
+        // Only show on CacheHealth page, hide from dashboard
+        $url = request()->url();
+        $cacheHealthUrl = CacheHealth::getUrl();
+
+        return Str::contains($url, $cacheHealthUrl) || Str::contains($url, '/health/cache');
+    }
 
     protected function getViewData(): array
     {

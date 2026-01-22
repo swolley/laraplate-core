@@ -55,6 +55,7 @@ return [
         'password.reset',
         'horizon.*',
         'livewire.*',
+        'livewire/*',
         'filament.*',
         'telescope.*',
     ],

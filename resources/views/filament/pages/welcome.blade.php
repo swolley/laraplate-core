@@ -7,6 +7,12 @@
             $translations = $this->getTranslations();
         @endphp
 
+        <header class="grid items-center gap-2 py-10 max-w-md mx-auto">
+            <div class="flex justify-center w-auto text-[#a5ac56] gap-2">
+                <img src="https://raw.githubusercontent.com/swolley/images/refs/heads/master/logo_laraplate.png?raw=true" />
+            </div>
+        </header>
+
         <div class="prose dark:prose-invert max-w-none">
             <main class="mt-6">
                 <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
@@ -38,9 +44,9 @@
                                     <i>Migrations:</i>
                                     <div class="ml-4 flex items-center gap-2" style="float: right">
                                         @if ($done !== $total)
-                                            @include('core::components.alert-icon')
+                                            <x-core::alert-icon style="color: var(--warning-400);" />
                                         @else
-                                            @include('core::components.check-icon')
+                                            <x-core::check-icon style="color: var(--primary-400);" />
                                         @endif
                                         <span>{{ migrations(true, true) }} / {{ migrations(true, false) }}</span>
                                     </div>
@@ -58,11 +64,11 @@
                                     $debug = config('app.debug');
                                     @endphp
                                     <i>Debug Mode:</i>
-                                    <div class="flex items-center  gap-2" style="float: right">
+                                    <div class="flex items-center gap-2" style="float: right; {{ $debug ? 'color: var(--warning-400);' : 'color: var(--color-gray-600);' }}">
                                         @if ($debug)
-                                            @include('core::components.alert-icon')
+                                            <x-core::alert-icon />
                                         @else
-                                            @include('core::components.cancel-icon')
+                                            <x-core::cancel-icon />
                                         @endif
                                     </div>
                                 </div>
@@ -84,9 +90,9 @@
                                     <i>Enable User registration:</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('core.enable_user_registration'))
-                                            @include('core::components.check-icon')
+                                            <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
-                                            @include('core::components.cancel-icon')
+                                            <x-core::cancel-icon style="color: var(--color-gray-600);" />
                                         @endif
                                     </div>
                                 </div>
@@ -96,9 +102,9 @@
                                     <i>Verify new user:</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('core.verify_new_user'))
-                                            @include('core::components.check-icon')
+                                            <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
-                                            @include('core::components.cancel-icon')
+                                            <x-core::cancel-icon style="color: var(--color-gray-600);" />
                                         @endif
                                     </div>
                                 </div>
@@ -108,9 +114,9 @@
                                     <i>Enable dynamic entities:</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('crud.dynamic_entities'))
-                                            @include('core::components.check-icon')
+                                            <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
-                                            @include('core::components.cancel-icon')
+                                            <x-core::cancel-icon style="color: var(--color-gray-600);" />
                                         @endif
                                     </div>
                                 </div>
@@ -120,55 +126,19 @@
                                     <i>Maintenance mode:</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (app()->isDownForMaintenance())
-                                        @include('core::components.alert-icon')
+                                            <x-core::alert-icon style="color: var(--warning-400);" />
                                         @else
-                                        @include('core::components.cancel-icon')
+                                            <x-core::cancel-icon style="color: var(--color-gray-600);" />
                                         @endif
                                     </div>
                                 </div>
-                            </div>
-
-                            <div id="docs-card-content" class="flex flex-col gap-2 w-full">
-                                <a href="{{ Swagger::getUrl() }}" class="flex items-center justify-center gap-2">
-                                    <div class="flex items-center justify-center" style="min-width:60px;">
-                                        @include('core::components.swagger-icon')
-                                    </div>
-                                    <div class="text-sm w-full">Go to routes documentation</div>
-                                    @include('core::components.arrow-icon')
-                                </a>
                             </div>
                         </div>
                     </div>
 
                     <!-- modules -->
                     @foreach ($grouped_modules as $module => $data)
-                        <div class="module {{ ! $data['isEnabled'] ? 'disabled' : '' }} flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#a5ac56] dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#a5ac56]">
-                            @if(! $data['isEnabled'])
-                                @include('core::components.cancel-icon')
-                            @endif
-
-                            <div class="w-full flex flex-col h-full">
-                                <div class="flex items-center justify-between mb-2">
-                                    <h3 class="text-lg font-semibold text-black dark:text-white">{{ $module }}</h3>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ $data['version'] ?? 'N/A' }}</span>
-                                </div>
-
-                                @if(isset($data['description']))
-                                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{ $data['description'] }}</p>
-                                @endif
-
-                                @if(isset($data['routes']) && count($data['routes']) > 0)
-                                    <div class="mt-auto">
-                                        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Routes:</p>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach($data['routes'] as $route)
-                                                <span class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded">{{ $route }}</span>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
+                        <x-core::module :module="$module" :data="$data" />
                     @endforeach
                 </div>
             </main>

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Restructure Core module components and enhance documentation
+
+## [1.34.0] - 2026-01-21
+
 ### 🚀 Features
 
 - Introduce MoveEmbeddingTable command and ModelEmbedding model
