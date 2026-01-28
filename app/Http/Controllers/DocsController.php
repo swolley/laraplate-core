@@ -8,7 +8,6 @@ use ArrayAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Actions\Docs\MergeSwaggerDocsAction;
-use Modules\Core\Services\Docs\ModuleInfoService;
 use Override;
 use UnexpectedValueException;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
@@ -17,7 +16,6 @@ final class DocsController extends OpenApiJsonController
 {
     public function __construct(
         private readonly MergeSwaggerDocsAction $mergeSwaggerDocsAction,
-        private readonly ModuleInfoService $moduleInfoService,
     ) {}
 
     /**

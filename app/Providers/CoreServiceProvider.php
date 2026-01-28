@@ -117,6 +117,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         parent::register();
 
+        $this->app->register(FortifyServiceProvider::class);
+
         $this->registerCache();
 
         // Register search clients

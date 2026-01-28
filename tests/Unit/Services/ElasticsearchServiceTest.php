@@ -12,6 +12,9 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use ReflectionClass;
 use ReflectionMethod;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 it('has proper class structure', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
@@ -355,7 +358,27 @@ it('deletes document when present and returns true', function (): void {
 
 function makeClientWithResponses(array $responses): Client
 {
-    $http_client = new QueueHttpClient($responses);
+    /**
+     * Simple queue-based PSR-18 client that returns canned responses.
+     */
+    $http_client = new class implements ClientInterface
+    {
+        /**
+         * @var array<int,ResponseInterface>
+         */
+        public array $responses;
+
+        public function sendRequest(RequestInterface $request): ResponseInterface
+        {
+            if ($this->responses === []) {
+                throw new RuntimeException('No more queued responses for Elasticsearch mock client.');
+            }
+
+            return array_shift($this->responses);
+        }
+    };
+
+    $http_client->responses = $responses;
 
     return ClientBuilder::create()
         ->setHttpClient($http_client)
@@ -384,24 +407,4 @@ function resetElasticsearchSingleton(): void
     $instance_property = $reflection->getProperty('instance');
     $instance_property->setAccessible(true);
     $instance_property->setValue(null, null);
-}
-
-/**
- * Simple queue-based PSR-18 client that returns canned responses.
- */
-final class QueueHttpClient implements ClientInterface
-{
-    /**
-     * @param  array<int,ResponseInterface>  $responses
-     */
-    public function __construct(private array $responses) {}
-
-    public function sendRequest(RequestInterface $request): ResponseInterface
-    {
-        if ($this->responses === []) {
-            throw new RuntimeException('No more queued responses for Elasticsearch mock client.');
-        }
-
-        return array_shift($this->responses);
-    }
 }

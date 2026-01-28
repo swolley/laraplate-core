@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace Modules\Core\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
+use Modules\Core\Overrides\RouteServiceProvider as ServiceProvider;
 use Override;
 
 final class RouteServiceProvider extends ServiceProvider
 {
-    private string $name = 'Core';
+    protected string $name = 'Core';
 
     /**
      * Called before routes are registered.
@@ -50,31 +49,15 @@ final class RouteServiceProvider extends ServiceProvider
     }
 
     /**
-     * Define the routes for the application.
-     */
-    public function map(): void
-    {
-        $this->mapApiRoutes();
-        $this->mapWebRoutes();
-    }
-
-    private function getPrefix(): string
-    {
-        return Str::slug($this->name);
-    }
-
-    private function getModuleNamespace(): string
-    {
-        return str_replace('Providers', 'Http\Controllers', __NAMESPACE__);
-    }
-
-    /**
      * Define the "web" routes for the application.
      *
      * These routes all receive session state, CSRF protection, etc.
      */
-    private function mapWebRoutes(): void
+    #[Override]
+    protected function mapWebRoutes(): void
     {
+        parent::mapWebRoutes();
+
         $name_prefix = $this->getPrefix();
         Route::middleware('web')
             ->namespace($this->namespace)
@@ -84,11 +67,6 @@ final class RouteServiceProvider extends ServiceProvider
             ]);
 
         $route_prefix = 'app';
-        Route::middleware(['web'/* , 'verified' */])
-            ->namespace($this->namespace)
-            ->prefix($route_prefix)
-            ->name($name_prefix . '.')
-            ->group(module_path($this->name, '/routes/web.php'));
 
         Route::middleware('auth')
             ->prefix($route_prefix . '/auth')
@@ -111,7 +89,8 @@ final class RouteServiceProvider extends ServiceProvider
      *
      * These routes are typically stateless.
      */
-    private function mapApiRoutes(): void
+    #[Override]
+    protected function mapApiRoutes(): void
     {
         $name_prefix = $this->getPrefix();
         $route_prefix = 'api';
@@ -123,6 +102,5 @@ final class RouteServiceProvider extends ServiceProvider
                 module_path($this->name, '/routes/crud.php'),
                 module_path($this->name, '/routes/api.php'),
             ]);
-        // }
     }
 }
