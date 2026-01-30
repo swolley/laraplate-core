@@ -8,9 +8,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
@@ -18,6 +20,7 @@ use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
 use Spatie\Permission\PermissionRegistrar;
+use Throwable;
 
 final class CoreDatabaseSeeder extends Seeder
 {
@@ -45,6 +48,7 @@ final class CoreDatabaseSeeder extends Seeder
     {
         Model::unguarded(function (): void {
             $this->defaultSettings();
+            $this->defaultApprovalSettings();
             $this->defaultPermissions();
             $this->defaultRoles();
             $this->defaultUsers();
@@ -255,6 +259,14 @@ final class CoreDatabaseSeeder extends Seeder
                 'description' => 'Rimuove reset password tokens scaduti',
                 'is_active' => true,
             ],
+            [
+                'name' => 'checkPendingApprovals',
+                'command' => 'approvals:check-pending',
+                'parameters' => [],
+                'schedule' => '0 */4 * * *',
+                'description' => 'Controlla e notifica record in attesa di approvazione',
+                'is_active' => false,
+            ],
         ];
 
         $existing_crons = CronJob::withoutGlobalScopes()
@@ -283,5 +295,163 @@ final class CoreDatabaseSeeder extends Seeder
                 }
             }
         });
+    }
+
+    /**
+     * Create approval threshold settings for all models using HasApprovals trait.
+     * Auto-discovers models by scanning all module Model directories.
+     */
+    private function defaultApprovalSettings(): void
+    {
+        $this->command->info('  Seeding approval threshold settings...');
+
+        $models_with_approvals = $this->getModelsWithApprovals();
+
+        if ($models_with_approvals === []) {
+            $this->command->line('    - no models with HasApprovals found');
+
+            return;
+        }
+
+        $default_threshold = config('core.notifications.approvals.default_threshold_hours', 8);
+        $approval_settings = [];
+
+        foreach ($models_with_approvals as $table => $model_class) {
+            $approval_settings[] = [
+                'name' => "approval_threshold_{$table}",
+                'value' => $default_threshold,
+                'type' => SettingTypeEnum::INTEGER,
+                'group_name' => 'approvals',
+                'description' => "Hours before notification for pending {$table} approvals",
+                'is_active' => false,
+            ];
+        }
+
+        $existing_settings = Setting::withoutGlobalScopes()
+            ->whereIn('name', array_column($approval_settings, 'name'))
+            ->select(['name'])
+            ->pluck('name')
+            ->flip()
+            ->all();
+
+        $new_settings = array_filter(
+            $approval_settings,
+            fn ($setting) => ! isset($existing_settings[$setting['name']]),
+        );
+
+        if ($new_settings === []) {
+            $this->command->line('    - nothing to update');
+
+            return;
+        }
+
+        DB::transaction(function () use ($new_settings): void {
+            foreach ($new_settings as &$setting) {
+                if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
+                    $this->create(Setting::class, $setting);
+                    $this->command->line("    - {$setting['name']} <fg=green>created</>");
+                } else {
+                    $this->command->line("    - {$setting['name']} already exists");
+                }
+            }
+        });
+    }
+
+    /**
+     * Auto-discover all models that use the HasApprovals trait.
+     *
+     * @return array<string, class-string<Model>>
+     */
+    private function getModelsWithApprovals(): array
+    {
+        $result = [];
+        $modules_path = base_path('Modules');
+
+        if (! File::isDirectory($modules_path)) {
+            return $result;
+        }
+
+        $modules = File::directories($modules_path);
+
+        foreach ($modules as $module_path) {
+            $models_path = $module_path . '/app/Models';
+
+            if (! File::isDirectory($models_path)) {
+                continue;
+            }
+
+            $files = File::files($models_path);
+
+            foreach ($files as $file) {
+                if ($file->getExtension() !== 'php') {
+                    continue;
+                }
+
+                $class_name = $this->getClassNameFromFile($file->getPathname(), $module_path);
+
+                if ($class_name === null || ! class_exists($class_name)) {
+                    continue;
+                }
+
+                if ($this->usesHasApprovalsTrait($class_name)) {
+                    try {
+                        /** @var Model $instance */
+                        $instance = new $class_name();
+                        $result[$instance->getTable()] = $class_name;
+                    } catch (Throwable) {
+                        // Skip models that can't be instantiated
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Extract class name from file path.
+     */
+    private function getClassNameFromFile(string $file_path, string $module_path): ?string
+    {
+        $module_name = basename($module_path);
+        $relative_path = str_replace($module_path . '/app/', '', $file_path);
+        $relative_path = str_replace('.php', '', $relative_path);
+        $relative_path = str_replace('/', '\\', $relative_path);
+
+        return "Modules\\{$module_name}\\{$relative_path}";
+    }
+
+    /**
+     * Check if a class uses the HasApprovals trait.
+     */
+    private function usesHasApprovalsTrait(string $class_name): bool
+    {
+        try {
+            $reflection = new ReflectionClass($class_name);
+
+            // Check direct traits
+            $traits = $reflection->getTraitNames();
+
+            if (in_array(HasApprovals::class, $traits, true)) {
+                return true;
+            }
+
+            // Check parent classes
+            $parent = $reflection->getParentClass();
+
+            while ($parent !== false) {
+                $parent_traits = $parent->getTraitNames();
+
+                if (in_array(HasApprovals::class, $parent_traits, true)) {
+                    return true;
+                }
+
+                $parent = $parent->getParentClass();
+            }
+
+            return false;
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

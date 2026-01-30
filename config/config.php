@@ -55,4 +55,22 @@ return [
     'deepl_api_key' => env('DEEPL_API_KEY'),
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'translation_cache_enabled' => env('TRANSLATION_CACHE_ENABLED', true),
+
+    /**
+     * Notification settings for pending approvals.
+     * Sends notifications to admins when records are waiting for moderation.
+     */
+    'notifications' => [
+        'approvals' => [
+            // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+            'enabled' => env('APPROVAL_NOTIFICATIONS_ENABLED', true),
+            // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+            'channels' => explode(',', (string) env('APPROVAL_NOTIFICATION_CHANNELS', 'mail')),
+            // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+            'default_threshold_hours' => (int) env('APPROVAL_DEFAULT_THRESHOLD', 8),
+            'recipients' => [
+                'roles' => ['admin', 'superadmin'],
+            ],
+        ],
+    ],
 ];
