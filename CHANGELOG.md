@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- Standardize naming conventions for settings and improve table configurations
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies in composer.json
+
+## [1.36.0] - 2026-01-30
+
 ### 🚀 Features
 
 - Implement pending approval notifications and command
