@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Resources\Modifications\Tables;
 
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
+use Modules\Core\Helpers\HasApprovals;
 
 final class ModificationsTable
 {
@@ -15,7 +17,7 @@ final class ModificationsTable
 
     public static function configure(Table $table): Table
     {
-        return self::configureTable(
+        $table = self::configureTable(
             table: $table,
             columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
@@ -37,5 +39,11 @@ final class ModificationsTable
                 ]);
             },
         );
+
+        $models = models(filter: fn (string $model): bool => class_uses_trait($model, HasApprovals::class));
+
+        $table->groups(array_map(fn (string $model): Group => Group::make($model . '.name')->label($model), $models));
+
+        return $table;
     }
 }

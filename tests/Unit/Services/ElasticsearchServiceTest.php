@@ -10,11 +10,13 @@ use Modules\Core\Services\ElasticsearchService;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use ReflectionClass;
-use ReflectionMethod;
 use Tests\TestCase;
 
 uses(TestCase::class);
+
+beforeEach(function (): void {
+    resetElasticsearchSingleton();
+});
 
 it('has proper class structure', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
@@ -233,25 +235,6 @@ it('has bulk operation methods', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
     expect($reflection->hasMethod('bulkIndex'))->toBeTrue();
-});
-
-it('has all required CRUD methods', function (): void {
-    $reflection = new ReflectionClass(ElasticsearchService::class);
-
-    expect($reflection->hasMethod('createIndex'))->toBeTrue();
-    expect($reflection->hasMethod('deleteIndex'))->toBeTrue();
-    expect($reflection->hasMethod('getDocument'))->toBeTrue();
-    expect($reflection->hasMethod('deleteDocument'))->toBeTrue();
-});
-
-it('has bulk operation methods', function (): void {
-    $reflection = new ReflectionClass(ElasticsearchService::class);
-
-    expect($reflection->hasMethod('bulkIndex'))->toBeTrue();
-});
-
-beforeEach(function (): void {
-    resetElasticsearchSingleton();
 });
 
 it('creates index when missing', function (): void {

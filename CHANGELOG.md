@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Implement pending approval notifications and command
+
+### 🚜 Refactor
+
+- Update authentication method and clean up configuration files
+- Simplify DocsController and introduce RouteServiceProvider override
+- Replace PermissionChecker with AuthorizationService for permission handling
+- Enhance ModificationsTable configuration and clean up HasTable trait
+
+## [1.35.0] - 2026-01-22
+
 ### 🚜 Refactor
 
 - Restructure Core module components and enhance documentation

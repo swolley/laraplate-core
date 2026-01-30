@@ -21,12 +21,10 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
-// use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
-use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,10 +35,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
-use Modules\Cms\Casts\EntityType;
-use Modules\Cms\Helpers\HasDynamicContents;
-use Modules\Cms\Models\Entity;
-use Modules\Cms\Models\Preset;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasTranslations;
@@ -88,7 +82,6 @@ trait HasTable
         $has_activation = in_array(HasActivation::class, $traits, true);
         $has_locks = in_array(HasLocks::class, $traits, true);
         $has_sorts = in_array(SortableTrait::class, $traits, true) || in_array(BaseSortableTrait::class, $traits, true);
-        $has_dynamic_contents = in_array(HasDynamicContents::class, $traits, true);
         $has_searchable = in_array(Searchable::class, $traits, true);
         $has_translations = in_array(HasTranslations::class, $traits, true);
 
@@ -105,7 +98,6 @@ trait HasTable
             $has_validity,
             $has_locks,
             $has_sorts,
-            $has_dynamic_contents,
             $has_activation,
             $has_translations,
             $columns,
@@ -130,7 +122,6 @@ trait HasTable
             $has_soft_deletes,
             $has_validity,
             $has_locks,
-            $has_dynamic_contents,
             $has_activation,
             $has_translations,
             $filters,
@@ -141,15 +132,6 @@ trait HasTable
 
         if ($has_sorts) {
             $table->reorderable('order_column');
-        }
-
-        if ($has_dynamic_contents) {
-            $table->groups([
-                Group::make('entity.name')
-                    ->label('Entity'),
-                Group::make('preset.name')
-                    ->label('Preset'),
-            ]);
         }
 
         return $table
@@ -194,7 +176,6 @@ trait HasTable
         bool $hasValidity,
         bool $hasLocks,
         bool $hasSorts,
-        bool $hasDynamicContents,
         bool $hasActivation,
         bool $hasTranslations,
         ?callable $columns,
@@ -209,19 +190,6 @@ trait HasTable
         //         // TODO: create default columns from table
         //     }
         // }
-
-        if ($hasDynamicContents) {
-            $default_columns->push(
-                TextColumn::make('entity.name')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('preset.name')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            );
-        }
 
         if ($hasTranslations) {
             $flag_cdn_service = new FlagCDNService();
@@ -391,7 +359,8 @@ trait HasTable
                 $column->searchable(isIndividual: true);
             }
         });
-        $table->columns($default_columns->all());
+
+        $table->pushColumns($default_columns->all());
     }
 
     private static function configureActions(
@@ -575,7 +544,6 @@ trait HasTable
         bool $hasSoftDeletes,
         bool $hasValidity,
         bool $hasLocks,
-        bool $hasDynamicContents,
         bool $hasActivation,
         bool $hasTranslations,
         ?callable $filters,
@@ -584,33 +552,6 @@ trait HasTable
         User $user,
     ): void {
         $default_filters = collect([]);
-
-        if ($hasDynamicContents) {
-            $entity_type = EntityType::tryFrom($model_instance->getTable());
-
-            if ($entity_type) {
-                $default_filters->add(
-                    SelectFilter::make('preset')
-                        ->label('Preset')
-                        ->multiple()
-                        ->options(fn () => Preset::query()
-                            ->join('entities', 'presets.entity_id', '=', 'entities.id')
-                            ->where('presets.' . Preset::activationColumn(), true)
-                            ->whereHas('entity', fn (Builder $query) => $query->where([
-                                'entities.' . Entity::activationColumn() => true,
-                                'entities.type' => $entity_type,
-                            ]))
-                            ->orderBy('entities.name')
-                            ->orderBy('presets.name')
-                            ->get(['presets.id', 'presets.name', 'presets.entity_id', 'entities.name'])
-                            ->mapWithKeys(static fn (Preset $preset): array => [$preset->id => $preset->entity->name . ' - ' . $preset->name]))
-                        ->query(static fn (Builder $query, array $data): Builder => $query->when(
-                            $data['values'],
-                            static fn (Builder $query, $values): Builder => $query->whereIn('preset_id', $values),
-                        )),
-                );
-            }
-        }
 
         // FILTERS
         if ($hasSoftDeletes && self::checkPermissionCached($user, $permissionsPrefix . '.restore')) {
@@ -764,6 +705,6 @@ trait HasTable
             $filters($default_filters);
         }
 
-        $table->filters($default_filters->all()/* , layout: FiltersLayout::Modal */);
+        $table->pushFilters($default_filters->all()/* , layout: FiltersLayout::Modal */);
     }
 }
