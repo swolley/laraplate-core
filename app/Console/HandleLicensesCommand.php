@@ -119,7 +119,7 @@ final class HandleLicensesCommand extends Command
         }
 
         table(['License', 'Expiration', 'User'], $remapped);
-        $this->output->info('Current max sessions available: ' . (Setting::query()->where('name', 'maxConcurrentSessions')->first()?->value ?? 'unlimited'));
+        $this->output->info('Current max sessions available: ' . (Setting::query()->where('name', 'max_concurrent_sessions')->first()?->value ?? 'unlimited'));
     }
 
     private function renewLicenses(int $number, int $licensesCount, ?Carbon $validTo): void

@@ -9,7 +9,6 @@ use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
-use Modules\Core\Helpers\HasApprovals;
 
 final class ModificationsTable
 {
@@ -17,7 +16,7 @@ final class ModificationsTable
 
     public static function configure(Table $table): Table
     {
-        $table = self::configureTable(
+        return self::configureTable(
             table: $table,
             columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(...[
@@ -38,12 +37,10 @@ final class ModificationsTable
                         ->limit(50),
                 ]);
             },
-        );
-
-        $models = models(filter: fn (string $model): bool => class_uses_trait($model, HasApprovals::class));
-
-        $table->groups(array_map(fn (string $model): Group => Group::make($model . '.name')->label($model), $models));
-
-        return $table;
+        )
+            ->defaultGroup(
+                Group::make('modifiable_type')
+                    ->label('Modifiable Type'),
+            );
     }
 }

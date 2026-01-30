@@ -186,7 +186,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         $default_settings = [
             [
-                'name' => 'defaultLanguage',
+                'name' => 'default_language',
                 'value' => config('app.locale'),
                 'type' => SettingTypeEnum::STRING,
                 'group_name' => 'base',
@@ -200,7 +200,7 @@ final class CoreDatabaseSeeder extends Seeder
                 'description' => 'Paginazione default chiamate',
             ],
             [
-                'name' => 'maxConcurrentSessions',
+                'name' => 'max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
                 'type' => SettingTypeEnum::INTEGER,
                 'group_name' => 'base',
@@ -323,7 +323,6 @@ final class CoreDatabaseSeeder extends Seeder
                 'type' => SettingTypeEnum::INTEGER,
                 'group_name' => 'approvals',
                 'description' => "Hours before notification for pending {$table} approvals",
-                'is_active' => false,
             ];
         }
 

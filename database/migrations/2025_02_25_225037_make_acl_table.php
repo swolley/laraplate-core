@@ -17,16 +17,27 @@ return new class extends Migration
         Schema::create('acls', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('permission_id')->constrained('permissions')->onDelete('cascade')->comment('The permission id of the acl');
+            $table->string('description')->nullable()->comment('The description of the acl');
             $table->json('filters')->nullable()->comment('The filters of the acl');
             $table->json('sort')->nullable()->comment('The sort of the acl');
-            $table->string('description')->nullable()->comment('The description of the acl');
+            $table->boolean('unrestricted')
+                ->default(false)
+                ->comment('If true, this ACL is transparent and does not contribute filters to the query');
+            $table->unsignedSmallInteger('priority')
+                ->default(0)
+                ->comment('Higher priority ACLs are evaluated first (for conflict resolution)');
+            $table->boolean('is_active')
+                ->default(true)
+                ->comment('If false, this ACL is ignored (allows temporary disable)');
+
+            $table->index(['permission_id', 'deleted_at'], 'acls_permissions_IDX');
+            $table->index(['permission_id', 'is_active', 'deleted_at'], 'acls_active_IDX');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
             );
-
-            $table->index(['permission_id', 'deleted_at'], 'acls_permissions_IDX');
         });
     }
 

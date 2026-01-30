@@ -99,7 +99,7 @@ it('command shows max sessions setting', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('maxConcurrentSessions');
+    expect($source)->toContain('max_concurrent_sessions');
 });
 
 it('command handles license creation', function (): void {

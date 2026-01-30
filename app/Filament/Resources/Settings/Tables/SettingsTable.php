@@ -7,7 +7,9 @@ namespace Modules\Core\Filament\Resources\Settings\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
@@ -72,6 +74,14 @@ final class SettingsTable
                         ]),
                 ]);
             },
-        );
+        )
+            ->defaultGroup(
+                Group::make('group_name')->label('Group Name'),
+            )
+            ->defaultSort(function (Builder $query): Builder {
+                return $query
+                    ->orderBy('group_name')
+                    ->orderBy('name');
+            });
     }
 }
