@@ -246,7 +246,32 @@ it('can be found by name', function (): void {
 it('can be found by guard name', function (): void {
     $role = Role::factory()->create(['guard_name' => 'api']);
 
-    $foundRole = Role::where('guard_name', 'api')->first();
+    expect(Role::where('guard_name', 'api')->where('id', $role->id)->exists())->toBeTrue();
+});
 
-    expect($foundRole->id)->toBe($role->id);
+it('superadmin role cannot be given any permission', function (): void {
+    config(['permission.roles.superadmin' => 'superadmin']);
+    $superadmin_role = Role::factory()->create(['name' => 'superadmin']);
+    $permission = Permission::create(['name' => 'default.users_table.select', 'guard_name' => $superadmin_role->guard_name ?? 'web']);
+
+    expect(fn () => $superadmin_role->givePermissionTo($permission))
+        ->toThrow(ValidationException::class);
+});
+
+it('superadmin role can have zero permissions synced', function (): void {
+    config(['permission.roles.superadmin' => 'superadmin']);
+    $superadmin_role = Role::factory()->create(['name' => 'superadmin']);
+
+    $superadmin_role->syncPermissions([]);
+
+    expect($superadmin_role->permissions)->toHaveCount(0);
+});
+
+it('superadmin role syncPermissions rejects any permission', function (): void {
+    config(['permission.roles.superadmin' => 'superadmin']);
+    $superadmin_role = Role::factory()->create(['name' => 'superadmin']);
+    $permission = Permission::create(['name' => 'default.users_table.select', 'guard_name' => $superadmin_role->guard_name ?? 'web']);
+
+    expect(fn () => $superadmin_role->syncPermissions([$permission]))
+        ->toThrow(ValidationException::class);
 });

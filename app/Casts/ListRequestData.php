@@ -31,7 +31,7 @@ class ListRequestData extends SelectRequestData
 
     public protected(set) ?FiltersGroup $filters;
 
-    public array $group_by = [];
+    public protected(set) array $group_by = [];
 
     /**
      * @param  string|array<string>  $primaryKey
@@ -67,6 +67,32 @@ class ListRequestData extends SelectRequestData
     public function calculateTotalPages(int $totalRecords): int
     {
         return (int) ceil($totalRecords / $this->pagination);
+    }
+
+    /**
+     * Merge additional filters (e.g., ACL filters) with existing filters.
+     *
+     * If no existing filters, the new filters become the only filters.
+     * If existing filters exist, they are wrapped with the new filters using AND operator.
+     *
+     * This ensures mandatory filters (like ACL restrictions) cannot be bypassed.
+     *
+     * @param  FiltersGroup  $filters  The filters to merge (typically ACL filters)
+     */
+    public function mergeFilters(FiltersGroup $filters): void
+    {
+        if ($this->filters === null) {
+            $this->filters = $filters;
+
+            return;
+        }
+
+        // Wrap existing filters with new filters using AND
+        // Result: new_filters AND existing_filters
+        $this->filters = new FiltersGroup(
+            filters: [$filters, $this->filters],
+            operator: WhereClause::AND,
+        );
     }
 
     protected function extractPagination(array $validated): void

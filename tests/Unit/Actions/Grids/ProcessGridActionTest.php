@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\JsonResponse;
 use Modules\Core\Actions\Grids\ProcessGridAction;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -13,9 +14,9 @@ afterEach(function (): void {
 });
 
 it('processes grid with resolvers', function (): void {
-    Mockery::mock('alias:Modules\Core\Helpers\PermissionChecker')
-        ->shouldReceive('ensurePermissions')
-        ->andReturnTrue();
+    $authMock = Mockery::mock(AuthorizationService::class);
+    $authMock->shouldReceive('ensurePermission')
+        ->andReturn('connection.table.select');
 
     $request = new class
     {
@@ -42,6 +43,7 @@ it('processes grid with resolvers', function (): void {
     };
 
     $action = new ProcessGridAction(
+        auth: $authMock,
         entityResolver: fn () => $model,
         gridFactory: fn () => new class
         {

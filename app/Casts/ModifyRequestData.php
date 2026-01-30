@@ -9,7 +9,7 @@ use Modules\Core\Http\Requests\ModifyRequest;
 
 final class ModifyRequestData extends CrudRequestData
 {
-    public array $changes = [];
+    public protected(set) array $changes = [];
 
     public function __construct(ModifyRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
     {

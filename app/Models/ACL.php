@@ -17,6 +17,25 @@ use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Rules\QueryBuilder;
 
 /**
+ * ACL (Access Control List) model for row-level security.
+ *
+ * ACLs define filters that restrict which records a user can access
+ * when they have a specific permission. The system uses inheritance:
+ *
+ * - If a role has an ACL for a permission → use it (overrides parent)
+ * - If a role has NO ACL → inherit from parent role
+ * - If unrestricted=true → no filters applied (full access)
+ * - Multiple non-hierarchical roles → combine with OR (union)
+ *
+ * @property int $id
+ * @property int $permission_id
+ * @property FiltersGroup|null $filters
+ * @property Sort|null $sort
+ * @property string|null $description
+ * @property bool $unrestricted
+ * @property int $priority
+ * @property bool $enabled
+ *
  * @mixin IdeHelperACL
  */
 final class ACL extends Model
@@ -32,9 +51,12 @@ final class ACL extends Model
 
     protected $fillable = [
         'permission_id',
-        'filters',      // Stored as JSON
-        'sort',         // Optional: stored as JSON
+        'filters',       // Stored as JSON - query builder filters
+        'sort',          // Optional: stored as JSON
         'description',   // Optional: human readable description
+        'unrestricted',  // If true, no filters applied (full access)
+        'priority',      // Higher priority ACLs evaluated first
+        'enabled',       // If false, ACL is ignored
     ];
 
     /**
@@ -56,9 +78,28 @@ final class ACL extends Model
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'description' => ['string', 'max:255', 'nullable'],
+            'unrestricted' => ['boolean'],
+            'priority' => ['integer', 'min:0', 'max:65535'],
+            'enabled' => ['boolean'],
         ]);
 
         return $rules;
+    }
+
+    /**
+     * Check if this ACL grants unrestricted access.
+     */
+    public function isUnrestricted(): bool
+    {
+        return $this->unrestricted === true;
+    }
+
+    /**
+     * Check if this ACL has any filters defined.
+     */
+    public function hasFilters(): bool
+    {
+        return $this->filters !== null && $this->filters->filters !== [];
     }
 
     /**
@@ -66,9 +107,33 @@ final class ACL extends Model
      * @return Builder<static>
      */
     #[Scope]
-    protected function forPermission(Builder $query, $permission_id): Builder
+    protected function forPermission(Builder $query, int $permission_id): Builder
     {
         return $query->where('permission_id', $permission_id);
+    }
+
+    /**
+     * Scope to get only enabled ACLs.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function active(Builder $query): Builder
+    {
+        return $query->where('enabled', true);
+    }
+
+    /**
+     * Scope to order by priority (highest first).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function byPriority(Builder $query): Builder
+    {
+        return $query->orderByDesc('priority');
     }
 
     protected function casts(): array
@@ -76,6 +141,9 @@ final class ACL extends Model
         return [
             'filters' => FiltersGroup::class,
             'sort' => Sort::class,
+            'unrestricted' => 'boolean',
+            'priority' => 'integer',
+            'enabled' => 'boolean',
         ];
     }
 }

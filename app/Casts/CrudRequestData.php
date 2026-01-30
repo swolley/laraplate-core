@@ -11,12 +11,12 @@ use Modules\Core\Models\DynamicEntity;
 
 class CrudRequestData
 {
-    public ?string $connection;
+    public protected(set) ?string $connection;
 
     /**
      * @phpstan-ignore property.uninitializedReadonly
      */
-    public Model $model;
+    public protected(set) Model $model;
 
     public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey)
     {

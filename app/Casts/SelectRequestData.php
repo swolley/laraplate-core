@@ -12,12 +12,12 @@ class SelectRequestData extends CrudRequestData
     /**
      * @var array<int, Column>
      */
-    public array $columns;
+    public protected(set) array $columns;
 
     /**
      * @var array<int, string>
      */
-    public array $relations;
+    public protected(set) array $relations;
 
     /**
      * @param  string|array<string>  $primaryKey

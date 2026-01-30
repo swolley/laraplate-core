@@ -27,12 +27,11 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
-use Modules\Core\Crud\CrudHelper;
 use Modules\Core\Helpers\HasCrudOperations;
-use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Overtrue\LaravelVersionable\Versionable;
@@ -42,18 +41,46 @@ use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
+/**
+ * CRUD Service - orchestrates CRUD operations with authorization and query building.
+ *
+ * This service uses:
+ * - AuthorizationService: for permission checks and ACL filter injection
+ * - QueryBuilder: for preparing Eloquent queries from request data
+ *
+ * The flow for read operations (list, detail, history, tree):
+ * 1. ensurePermission() - verify user has permission for operation
+ * 2. injectAclFilters() - inject ACL filters into request data
+ * 3. prepareQuery() - build the query (filters now include ACLs)
+ * 4. Execute query and return result
+ */
 class CrudService
 {
     use HasCrudOperations;
 
+    public function __construct(
+        private readonly AuthorizationService $auth,
+        private readonly QueryBuilder $query_builder,
+    ) {}
+
     public function list(ListRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // 2. Inject ACL filters into request (filters become: ACL AND user_filters)
+        $this->auth->injectAclFilters($requestData, $permission_name);
+
+        // 3. Build query (now includes ACL filters)
         $query = $model::query();
-        $crud_helper = new CrudHelper();
-        $crud_helper->prepareQuery($query, $requestData);
+        $this->query_builder->prepareQuery($query, $requestData);
 
         $total_records = $query->count();
 
@@ -93,11 +120,19 @@ class CrudService
     public function detail(DetailRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // 2. Build query and apply ACL filters
         $query = $model::query();
-        $crud_helper = new CrudHelper();
-        $crud_helper->prepareQuery($query, $requestData);
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
 
         $data = $query->sole();
 
@@ -170,11 +205,19 @@ class CrudService
         $model = $requestData->model;
 
         throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $requestData->mainEntity));
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
 
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // 2. Build query and apply ACL filters
         $query = $model::query();
-        $crud_helper = new CrudHelper();
-        $crud_helper->prepareQuery($query, $requestData);
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
 
         $query->with('history', function (Builder $q) use ($requestData): void {
             $q->latest();
@@ -209,7 +252,14 @@ class CrudService
         $model = $requestData->model;
 
         throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $requestData->mainEntity));
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
+
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
 
         $tree_relation_type = [];
 
@@ -221,9 +271,10 @@ class CrudService
             $tree_relation_type = 'descendantsAndSelf';
         }
 
+        // 2. Build query and apply ACL filters
         $query = $model::with($tree_relation_type);
-        $crud_helper = new CrudHelper();
-        $crud_helper->prepareQuery($query, $requestData);
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
 
         $data = $query->sole();
 
@@ -244,7 +295,7 @@ class CrudService
     public function insert(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
         $discarded_values = $this->removeNonFillableProperties($model, $requestData->changes);
 
         $created = $model->create($requestData->changes);
@@ -265,7 +316,7 @@ class CrudService
     public function update(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
 
         throw_if($model->usesTimestamps() && ! isset($requestData->{Model::UPDATED_AT}), BadMethodCallException::class, Model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
         $key_value = $this->getModelKeyValue($requestData);
@@ -294,7 +345,7 @@ class CrudService
     public function delete(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
         $found_records = $model->query()->where($key_value)->lazy(100);
 
@@ -316,7 +367,7 @@ class CrudService
     public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
         $key = $requestData->primaryKey;
         $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
         $found_record = $model->query()->withTrashed()->where($key_value)->firstOrFail();
@@ -494,7 +545,7 @@ class CrudService
     private function doApproveOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
         /** @var string|array $key */
         $key = $model->getKeyName();
@@ -538,7 +589,7 @@ class CrudService
         $model = $requestData->model;
 
         throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
-        PermissionChecker::ensurePermissions($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
 
         /** @var Model&HasLocks $found_records */

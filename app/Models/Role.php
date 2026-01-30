@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use BackedEnum;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Database\Factories\RoleFactory;
 use Modules\Core\Helpers\HasValidations;
@@ -112,6 +114,41 @@ final class Role extends BaseRole
         return false;
     }
 
+    /**
+     * Whether this role is the superadmin role. Superadmin has a priori full access
+     * and must not have any permissions assigned.
+     */
+    public function isSuperAdminRole(): bool
+    {
+        return $this->name === config('permission.roles.superadmin');
+    }
+
+    /**
+     * @param  string|int|array|Permission|Collection|BackedEnum  $permissions
+     * @return $this
+     */
+    public function givePermissionTo(...$permissions): static
+    {
+        if ($this->isSuperAdminRole()) {
+            $this->rejectAnyPermissionForSuperAdmin($permissions);
+        }
+
+        return parent::givePermissionTo(...$permissions);
+    }
+
+    /**
+     * @param  string|int|array|Permission|Collection|BackedEnum  $permissions
+     * @return $this
+     */
+    public function syncPermissions(...$permissions): static
+    {
+        if ($this->isSuperAdminRole()) {
+            $this->rejectAnyPermissionForSuperAdmin($permissions);
+        }
+
+        return parent::syncPermissions(...$permissions);
+    }
+
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
@@ -155,5 +192,27 @@ final class Role extends BaseRole
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Superadmin role must not have any permission assigned (full access is a priori).
+     *
+     * @param  array<int, string|int|Permission|Collection|BackedEnum>  $permissions
+     *
+     * @throws ValidationException
+     */
+    private function rejectAnyPermissionForSuperAdmin(array $permissions): void
+    {
+        $to_check = collect($permissions)->flatten()->filter(fn ($p) => ! empty($p));
+
+        if ($to_check->isEmpty()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'permissions' => [
+                __('The superadmin role cannot be assigned any permissions; it has full access by design.'),
+            ],
+        ]);
     }
 }

@@ -8,9 +8,9 @@ use Modules\Core\Http\Requests\TreeRequest;
 
 final class TreeRequestData extends DetailRequestData
 {
-    public bool $parents;
+    public protected(set) bool $parents;
 
-    public bool $children;
+    public protected(set) bool $children;
 
     /**
      * @param  array{parents:bool,children:bool}  $validated

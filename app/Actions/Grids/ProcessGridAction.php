@@ -7,12 +7,13 @@ namespace Modules\Core\Actions\Grids;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Helpers\PermissionChecker;
 use Modules\Core\Models\DynamicEntity;
+use Modules\Core\Services\Authorization\AuthorizationService;
 
 final readonly class ProcessGridAction
 {
     public function __construct(
+        private AuthorizationService $auth,
         private ?Closure $entityResolver = null,
         private ?Closure $gridFactory = null,
     ) {}
@@ -24,7 +25,7 @@ final readonly class ProcessGridAction
         $actionValue = $this->extractActionValue($filters);
 
         $model = $this->resolveEntity($entity, $connection, $request);
-        PermissionChecker::ensurePermissions($request, $model->getTable(), $actionValue, $model->getConnectionName());
+        $this->auth->ensurePermission($request, $model->getTable(), $actionValue, $model->getConnectionName());
         $grid = $this->gridFactory instanceof Closure ? ($this->gridFactory)($model) : new Grid($model);
 
         return $grid->process($request);

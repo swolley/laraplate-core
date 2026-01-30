@@ -9,7 +9,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Helpers\PermissionChecker;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
@@ -19,6 +19,7 @@ use UnexpectedValueException;
 final readonly class GetGridConfigsAction
 {
     public function __construct(
+        private AuthorizationService $auth,
         private ?Closure $modelsProvider = null,
         private ?Closure $gridResolver = null,
     ) {}
@@ -78,7 +79,7 @@ final readonly class GetGridConfigsAction
         if (
             (in_array($entity, [null, '', '0'], true) || $instance::class === $entity::class)
             && Grid::useGridUtils($instance)
-            && PermissionChecker::ensurePermissions($request, $table, connection: $instance->getConnectionName())
+            && $this->auth->checkPermission($request, $table, connection: $instance->getConnectionName())
         ) {
             /** @var Grid $grid */
             $grid = $instance->getGrid();
