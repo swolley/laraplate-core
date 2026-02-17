@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Introduce SchemaInspector for optimized database schema inspection
+
+### ⚙️ Miscellaneous Tasks
+
+- Add livewire/livewire dependency to composer.json
+
+## [1.36.1] - 2026-01-30
+
 ### 🐛 Bug Fixes
 
 - Standardize naming conventions for settings and improve table configurations

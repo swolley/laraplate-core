@@ -40,6 +40,7 @@ use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
@@ -244,6 +245,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(Locked::class, static fn (): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');
+
+        $this->app->singleton(SchemaInspector::class, static fn (): SchemaInspector => SchemaInspector::getInstance());
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
 

@@ -7,12 +7,13 @@ namespace Modules\Core\Services;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Inspector\Entities\Table;
-use Modules\Core\Inspector\Inspect;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use UnexpectedValueException;
 
 /**
- * Singleton service that caches DynamicEntity instances and Inspect results in-memory during the request/command scope.
+ * Singleton service that caches DynamicEntity instances during the request/command scope.
+ * Schema inspection is delegated to SchemaInspector (shared in-memory cache).
  */
 final class DynamicEntityService
 {
@@ -22,11 +23,6 @@ final class DynamicEntityService
      * In-memory cache for resolved DynamicEntity instances.
      */
     private array $resolved_cache = [];
-
-    /**
-     * In-memory cache for Inspect::table() results.
-     */
-    private array $inspected_tables_cache = [];
 
     /**
      * Cached config value for dynamic entities.
@@ -85,27 +81,11 @@ final class DynamicEntityService
     }
 
     /**
-     * Get inspected table data with in-memory caching.
-     * This prevents redundant cache access when the same table is inspected multiple times.
+     * Get inspected table data via SchemaInspector (shared in-memory cache).
      */
     public function getInspectedTable(string $tableName, ?string $connection = null): ?Table
     {
-        $inspect_key = Inspect::keyName($tableName, $connection);
-
-        // Check in-memory cache first
-        if (isset($this->inspected_tables_cache[$inspect_key])) {
-            return $this->inspected_tables_cache[$inspect_key];
-        }
-
-        // Get from external cache or database
-        $inspected = Inspect::table($tableName, $connection);
-
-        // Store in memory
-        if ($inspected instanceof Table) {
-            $this->inspected_tables_cache[$inspect_key] = $inspected;
-        }
-
-        return $inspected;
+        return SchemaInspector::getInstance()->table($tableName, $connection);
     }
 
     public function clearCache(string $tableName, ?string $connection = null): void
@@ -114,14 +94,12 @@ final class DynamicEntityService
         unset($this->resolved_cache[$cache_key]);
         Cache::forget($cache_key);
 
-        // Also clear inspected table cache
-        $inspect_key = Inspect::keyName($tableName, $connection);
-        unset($this->inspected_tables_cache[$inspect_key]);
+        SchemaInspector::getInstance()->clearTable($tableName, $connection);
     }
 
     public function clearAllCaches(): void
     {
         $this->resolved_cache = [];
-        $this->inspected_tables_cache = [];
+        SchemaInspector::getInstance()->clearAll();
     }
 }

@@ -185,16 +185,20 @@ final class Inspect
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
-        return collect($keys)->map(fn ($foreignKey): ForeignKey => new ForeignKey(
-            $foreignKey['name'],
-            collect($foreignKey['columns']),
-            $foreignKey['foreign_schema'],
-            $foreignKey['foreign_table'],
-            collect($foreignKey['foreign_columns']),
-            $schema,
-            $connection,
-            $foreignKey['on_update'],
-            $foreignKey['on_delete'],
-        ));
+        return collect($keys)->map(function ($foreignKey) use ($schema, $connection): ForeignKey {
+            $name = $foreignKey['name'] ?? ($foreignKey['foreign_table'] . '_' . implode('_', $foreignKey['columns']));
+
+            return new ForeignKey(
+                (string) $name,
+                collect($foreignKey['columns']),
+                $foreignKey['foreign_schema'],
+                $foreignKey['foreign_table'],
+                collect($foreignKey['foreign_columns']),
+                $schema,
+                $connection,
+                $foreignKey['on_update'],
+                $foreignKey['on_delete'],
+            );
+        });
     }
 }

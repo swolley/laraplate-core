@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Inspector\SchemaInspector;
 use Override;
 
 final class CommandListenerProvider extends ServiceProvider
@@ -43,10 +44,11 @@ final class CommandListenerProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // clears the cache og the inspected entities
+        // Clear tag cache and in-memory SchemaInspector cache after migrations
         Event::listen(MigrationsEnded::class, function (): void {
             info('Cleaning Inspected entities');
             Cache::tags(Cache::getCacheTags('inspector'))->flush();
+            SchemaInspector::getInstance()->clearAll();
         });
     }
 

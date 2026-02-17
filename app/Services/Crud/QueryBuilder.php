@@ -20,7 +20,7 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
-use Modules\Core\Inspector\Inspect;
+use Modules\Core\Inspector\SchemaInspector;
 use ReflectionMethod;
 
 /**
@@ -485,7 +485,7 @@ final class QueryBuilder
             $existing_columns[] = $select_column instanceof Column ? $select_column->name : $select_column;
         }
 
-        foreach (Inspect::foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
+        foreach (SchemaInspector::getInstance()->foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
             foreach ($foreign->columns as $column) {
                 if (in_array($column, $existing_columns, true)) {
                     continue;

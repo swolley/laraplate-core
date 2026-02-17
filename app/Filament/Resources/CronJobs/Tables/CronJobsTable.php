@@ -31,6 +31,29 @@ final class CronJobsTable
                     TextColumn::make('schedule')
                         ->searchable()
                         ->grow(false)
+                        // ->formatStateUsing(static function (string $state): string {
+                        //     // Each part is padded with spaces for monospace alignment.
+                        //     // In HTML, use &nbsp; for each inner space, but beware that browsers will collapse whitespace unless all spaces are &nbsp;.
+                        //     // We generate a string with fixed 4-character blocks, but convert all spaces to &nbsp;.
+                        //     $parts = explode(' ', $state);
+                        //     $formatted = '';
+
+                        //     foreach ($parts as $i => $part) {
+                        //         // Pad left with regular spaces to length 4, then convert all spaces to &nbsp;
+                        //         $padded = mb_str_pad($part, 4, ' ', STR_PAD_LEFT);
+                        //         $html = str_replace(' ', '&nbsp;', $padded);
+                        //         $formatted .= $html;
+
+                        //         // Add a space between blocks (as &nbsp;), except after last
+                        //         if ($i < count($parts) - 1) {
+                        //             $formatted .= '&nbsp;';
+                        //         }
+                        //     }
+
+                        //     return '<span style="font-family: monospace;">' . $formatted . '</span>';
+                        // })
+                        // ->html()
+                        ->alignRight()
                         ->toggleable(),
                     IconColumn::make('without_overlapping')
                         ->boolean()

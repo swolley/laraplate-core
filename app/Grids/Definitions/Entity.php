@@ -23,7 +23,7 @@ use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Inspector\Inspect;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Traits\HasLocks;
 use UnexpectedValueException;
 
@@ -720,8 +720,9 @@ abstract class Entity
     protected function checkColumnsOrGetDefaults(Model $model, string $value_column, ?array $columns): array
     {
         if ($columns === null || ($columns === [$value_column] && $columns[0] === $model->getKeyName())) {
-            $indexes = Inspect::indexes($model->getTable())->toArray();
-            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn (array $idx) => $idx['columns'], $indexes))];
+            $connection = $model->getConnectionName();
+            $indexes = SchemaInspector::getInstance()->indexes($model->getTable(), $connection)->toArray();
+            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn ($idx) => $idx instanceof \Modules\Core\Inspector\Entities\Index ? $idx->columns->all() : $idx['columns'], $indexes))];
         }
 
         if (! in_array($value_column, $columns, true)) {
