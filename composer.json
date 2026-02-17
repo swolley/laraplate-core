@@ -9,7 +9,7 @@
     "core"
   ],
   "license": "MIT",
-  "type": "library",
+  "type": "laravel-module",
   "authors": [
     {
       "name": "Swolley",
