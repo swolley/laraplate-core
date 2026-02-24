@@ -18,19 +18,31 @@ final class ListModifications extends ListRecords
 
     protected static string $resource = ModificationResource::class;
 
+    /**
+     * Build tabs with badges from a single grouped query instead of N+1 count() queries.
+     */
     public function getTabs(): array
     {
         $model = self::getResource()::getModel();
 
+        $counts_by_type = $model::query()
+            ->selectRaw('modifiable_type as type, count(*) as count')
+            ->groupBy('modifiable_type')
+            ->pluck('count', 'type')
+            ->all();
+
+        $total = (int) array_sum($counts_by_type);
+
         $tabs = [
-            'all' => Tab::make('All')->badge($model::query()->count()),
+            'all' => Tab::make('All')->badge($total),
         ];
 
         $types = models(filter: fn (string $type): bool => class_uses_trait($type, HasApprovals::class));
 
         foreach ($types as $type) {
+            $count = (int) ($counts_by_type[$type] ?? 0);
             $tabs[$type] = Tab::make(Str::afterLast($type, '\\'))
-                ->badge($model::query()->where('modifiable_type', $type)->count())
+                ->badge($count)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('modifiable_type', $type));
         }
 

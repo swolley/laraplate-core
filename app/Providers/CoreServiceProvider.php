@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -173,7 +172,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 $crons = Cache::tags($cache_tags)->get($cache_key);
             } else {
                 try {
-                    if (Schema::hasTable($cache_key)) {
+                    if (SchemaInspector::getInstance()->hasTable($cache_key)) {
                         $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
                         Cache::tags($cache_tags)->put($cache_key, $crons);
                     }

@@ -9,6 +9,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Modules\Core\Helpers\HelpersCache;
 use Nwidart\Modules\Module;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -78,13 +79,20 @@ if (! function_exists('normalize_path')) {
 
 if (! function_exists('connections')) {
     /**
-     * get list of connections from models.
+     * Get list of connections from models. Results are memoized per $onlyActive key.
      *
      * @param  bool  $onlyActive  filter for only active modules
      * @return array<string>
      */
     function connections(bool $onlyActive = true): array
     {
+        $cache_key = $onlyActive ? 'active' : 'all';
+        $cached = HelpersCache::getConnections($cache_key);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $connections = [];
 
         if (! $onlyActive) {
@@ -96,17 +104,21 @@ if (! function_exists('connections')) {
                 }
             }
 
+            HelpersCache::setConnections($cache_key, $connections);
+
             return $connections;
         }
 
         foreach (models($onlyActive) as $model) {
-            $connection = new $model()->getConnection();
+            $connection = (new $model())->getConnection();
             $driver = $connection->getDriverName();
 
             if (! in_array($driver, $connections, true)) {
                 $connections[] = $driver;
             }
         }
+
+        HelpersCache::setConnections($cache_key, $connections);
 
         return $connections;
     }
@@ -197,7 +209,8 @@ if (! function_exists('migrations')) {
 
 if (! function_exists('models')) {
     /**
-     * list all Models.
+     * List all Models. Results are memoized per $onlyActive key.
+     * Module and custom filters are applied in-memory from the cached full list.
      *
      * @param  bool  $onlyActive  filter for only active modules
      * @param  string|null  $onlyModule  filter for specified module
@@ -206,50 +219,70 @@ if (! function_exists('models')) {
      */
     function models(bool $onlyActive = true, ?string $onlyModule = null, ?callable $filter = null): array
     {
-        $models = [];
-        $modules = modules(true, true, $onlyActive, $onlyModule);
+        $cache_key = $onlyActive ? 'active' : 'all';
+        $cached = HelpersCache::getModels($cache_key);
 
-        foreach ($modules as $m) {
-            $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
-            $modules_models_folder = config('modules.paths.generator.model.path');
-            $models_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Models' : $modules_models_folder);
-            $model_files = File::allFiles($models_path);
+        if ($cached === null) {
+            $cached = [];
+            $all_modules = modules(true, true, $onlyActive);
 
-            if ($model_files === []) {
-                continue;
+            foreach ($all_modules as $m) {
+                $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
+                $modules_models_folder = config('modules.paths.generator.model.path');
+                $models_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Models' : $modules_models_folder);
+                $model_files = File::allFiles($models_path);
+
+                if ($model_files === []) {
+                    continue;
+                }
+
+                if ($is_app) {
+                    $namespace = 'App\\Models\\';
+                } else {
+                    $module_name = basename($m);
+                    $namespace = sprintf('%s\\%s\\%s\\', config('modules.namespace'), $module_name, Str::replace(['app/', '/'], ['', '\\'], $modules_models_folder));
+                }
+
+                foreach ($model_files as $model_file) {
+                    if ($model_file->getExtension() !== 'php') {
+                        continue;
+                    }
+
+                    $class_subnamespace = $namespace . preg_replace(['/\.' . $model_file->getExtension() . '/', '/\//'], ['', '\\'], $model_file->getRelativePathName());
+
+                    if (! is_subclass_of($class_subnamespace, Model::class)) {
+                        continue;
+                    }
+
+                    if ((new ReflectionClass($class_subnamespace))->isAbstract()) {
+                        continue;
+                    }
+
+                    $cached[] = $class_subnamespace;
+                }
             }
 
-            if ($is_app) {
-                $namespace = 'App\\Models\\';
-            } else {
-                $module_name = basename($m);
-                $namespace = sprintf('%s\\%s\\%s\\', config('modules.namespace'), $module_name, Str::replace(['app/', '/'], ['', '\\'], $modules_models_folder));
-            }
-
-            foreach ($model_files as $model_file) {
-                if ($model_file->getExtension() !== 'php') {
-                    continue;
-                }
-
-                $class_subnamespace = $namespace . preg_replace(['/\.' . $model_file->getExtension() . '/', '/\//'], ['', '\\'], $model_file->getRelativePathName());
-
-                if (! is_subclass_of($class_subnamespace, Model::class)) {
-                    continue;
-                }
-
-                if (new ReflectionClass($class_subnamespace)->isAbstract()) {
-                    continue;
-                }
-
-                if ($filter && ! $filter($class_subnamespace)) {
-                    continue;
-                }
-
-                $models[] = $class_subnamespace;
-            }
+            HelpersCache::setModels($cache_key, $cached);
         }
 
-        return $models;
+        $result = $cached;
+
+        if (! in_array($onlyModule, [null, '', '0'], true)) {
+            $onlyModule = ucfirst($onlyModule);
+            $result = array_values(array_filter($result, static function (string $class) use ($onlyModule): bool {
+                if ($onlyModule === 'App') {
+                    return str_starts_with($class, 'App\\');
+                }
+
+                return str_starts_with($class, 'Modules\\' . $onlyModule . '\\');
+            }));
+        }
+
+        if ($filter !== null) {
+            $result = array_values(array_filter($result, $filter));
+        }
+
+        return $result;
     }
 }
 

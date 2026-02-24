@@ -127,6 +127,22 @@ final class SchemaInspector
     }
 
     /**
+     * Check if a table exists. Uses the memoized inspection result.
+     */
+    public function hasTable(string $name, ?string $connection = null): bool
+    {
+        return $this->table($name, $connection) instanceof Table;
+    }
+
+    /**
+     * Check if a column exists on a table. Uses the memoized inspection result.
+     */
+    public function hasColumn(string $column, string $table, ?string $connection = null): bool
+    {
+        return $this->column($column, $table, $connection) instanceof Column;
+    }
+
+    /**
      * Clear in-memory cache for a single table. Tag cache is not modified.
      */
     public function clearTable(string $table, ?string $connection = null): void

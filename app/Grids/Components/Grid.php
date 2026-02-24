@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Cache\HasCache;
@@ -37,6 +36,7 @@ use Modules\Core\Grids\Hooks\HasWriteHooks;
 use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Grids\Resources\ResponseBuilder;
 use Modules\Core\Grids\Traits\HasGridUtils;
+use Modules\Core\Inspector\SchemaInspector;
 use PHPUnit\Framework\Exception;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
@@ -713,7 +713,7 @@ final class Grid extends Entity
      */
     private function checkGridLayoutsTableExists(): bool
     {
-        $exists = Schema::hasTable(self::LAYOUTS_TABLE);
+        $exists = SchemaInspector::getInstance()->hasTable(self::LAYOUTS_TABLE);
 
         if (! $exists) {
             Log::warning('No ' . self::LAYOUTS_TABLE . ' table found');

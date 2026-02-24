@@ -44,7 +44,7 @@ it('returns indexes from memoized table', function (): void {
 
     $indexes = $inspector->indexes('users');
 
-    expect($indexes)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+    expect($indexes)->toBeInstanceOf(Illuminate\Support\Collection::class);
 });
 
 it('clearTable removes table from in-memory cache', function (): void {
@@ -82,4 +82,20 @@ it('reset clears the singleton instance', function (): void {
     $second = SchemaInspector::getInstance();
 
     expect($first)->not->toBe($second);
+});
+
+it('hasTable returns true for existing table', function (): void {
+    expect(SchemaInspector::getInstance()->hasTable('users'))->toBeTrue();
+});
+
+it('hasTable returns false for non-existing table', function (): void {
+    expect(SchemaInspector::getInstance()->hasTable('nonexistent_table_xyz'))->toBeFalse();
+});
+
+it('hasColumn returns true for existing column on table', function (): void {
+    expect(SchemaInspector::getInstance()->hasColumn('email', 'users'))->toBeTrue();
+});
+
+it('hasColumn returns false for non-existing column', function (): void {
+    expect(SchemaInspector::getInstance()->hasColumn('nonexistent_column', 'users'))->toBeFalse();
 });

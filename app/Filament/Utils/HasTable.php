@@ -29,25 +29,17 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Core\Events\TranslatedModelSaved;
-use Modules\Core\Helpers\HasActivation;
-use Modules\Core\Helpers\HasTranslations;
-use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\Helpers\SoftDeletes;
-use Modules\Core\Helpers\SortableTrait;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Inspector\ModelMetadataRegistry;
 use Modules\Core\Services\FlagCDNService;
 use PHPUnit\Event\InvalidArgumentException;
 use ReflectionClass;
-use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
 trait HasTable
 {
@@ -71,19 +63,17 @@ trait HasTable
         self::loadUserPermissionsForTable($user);
 
         $model = $table->getModel();
-        $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
-        $model_table = $model_instance->getTable();
-        $model_connection = $model_instance->getConnectionName() ?? 'default';
-        $permissions_prefix = sprintf('%s.%s', $model_connection, $model_table);
+        $meta = ModelMetadataRegistry::getInstance()->get($model);
+        $model_instance = (new ReflectionClass($model))->newInstanceWithoutConstructor();
+        $permissions_prefix = sprintf('%s.%s', $meta->connection ?? 'default', $meta->table);
 
-        $traits = class_uses_recursive($model);
-        $has_soft_deletes = in_array(SoftDeletes::class, $traits, true) || in_array(BaseSoftDeletes::class, $traits, true);
-        $has_validity = in_array(HasValidity::class, $traits, true);
-        $has_activation = in_array(HasActivation::class, $traits, true);
-        $has_locks = in_array(HasLocks::class, $traits, true);
-        $has_sorts = in_array(SortableTrait::class, $traits, true) || in_array(BaseSortableTrait::class, $traits, true);
-        $has_searchable = in_array(Searchable::class, $traits, true);
-        $has_translations = in_array(HasTranslations::class, $traits, true);
+        $has_soft_deletes = $meta->hasSoftDeletes;
+        $has_validity = $meta->hasValidity;
+        $has_activation = $meta->hasActivation;
+        $has_locks = $meta->hasLocks;
+        $has_sorts = $meta->hasSorts;
+        $has_searchable = $meta->hasSearchable;
+        $has_translations = $meta->hasTranslations;
 
         if ($has_soft_deletes) {
             $table->recordClasses(static fn ($record): array => $record->deleted_at ? [

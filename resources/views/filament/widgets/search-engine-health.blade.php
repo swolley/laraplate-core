@@ -3,6 +3,9 @@
         <x-slot name="heading">
             <x-filament::icon icon="heroicon-o-magnifying-glass" class="w-5 h-5 inline mr-2" />
             Search Engine
+            @isset($cache_minutes)
+                <span class="fi-section-header-description text-sm font-normal text-gray-500 dark:text-gray-400">(cached ~{{ $cache_minutes }} min)</span>
+            @endisset
         </x-slot>
 
         @isset($error)

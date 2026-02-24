@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
@@ -21,6 +20,7 @@ use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Inspector\Entities\Table;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Services\DynamicEntityService;
 use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
@@ -147,8 +147,11 @@ final class DynamicEntity extends Model
 
     private function verifyTableExistence(): void
     {
-        /** @phpstan-ignore staticMethod.notFound */
-        throw_unless(Schema::connection($this->connection)->hasTable($this->table), UnexpectedValueException::class, sprintf("Table '%s' doesn't exists on '%s' connection", $this->table, $this->connection));
+        throw_unless(
+            SchemaInspector::getInstance()->hasTable($this->table, $this->connection),
+            UnexpectedValueException::class,
+            sprintf("Table '%s' doesn't exists on '%s' connection", $this->table, $this->connection),
+        );
     }
 
     private function setTableConnectionInfo(string $tableName, ?string $connection = null): void

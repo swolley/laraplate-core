@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Widgets;
 
 use Exception;
-use Filament\Pages\Dashboard;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
@@ -14,6 +14,11 @@ use Modules\Core\Filament\Pages\CacheHealth;
 
 final class SearchEngineHealthTableWidget extends Widget
 {
+    /**
+     * Cache TTL in seconds. Shown in widget heading so users know data is refreshed about every this period.
+     */
+    private const CACHE_TTL_SECONDS = 300;
+
     protected string $view = 'core::filament.widgets.search-engine-health';
 
     protected int|string|array $columnSpan = 'full';
@@ -31,6 +36,20 @@ final class SearchEngineHealthTableWidget extends Widget
 
     protected function getViewData(): array
     {
+        $cache_key = 'filament_search_engine_health_widget';
+        $cache_ttl = self::CACHE_TTL_SECONDS;
+        $cached = Cache::remember($cache_key, $cache_ttl, fn (): array => $this->fetchSearchEngineData());
+
+        $cached['cache_minutes'] = (int) ceil($cache_ttl / 60);
+
+        return $cached;
+    }
+
+    /**
+     * @return array{driver: string|null, models: array<int, array>, error: string|null}
+     */
+    private function fetchSearchEngineData(): array
+    {
         $data = [
             'driver' => null,
             'models' => [],
@@ -41,7 +60,6 @@ final class SearchEngineHealthTableWidget extends Widget
             $engine = resolve(EngineManager::class)->engine();
             $data['driver'] = config('scout.driver', 'unknown');
 
-            // Get searchable models and their counts
             $models = models(filter: static fn (string|object $model): bool => class_uses_trait($model, Searchable::class));
             $modelData = [];
 

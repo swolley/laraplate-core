@@ -9,6 +9,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Grids\Components\Grid;
+use Modules\Core\Inspector\ModelMetadataRegistry;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit\Framework\ExpectationFailedException;
@@ -34,6 +35,7 @@ final readonly class GetGridConfigsAction
     public function __invoke(Request $request, ?string $entity = null): array
     {
         $models = $this->modelsProvider instanceof Closure ? ($this->modelsProvider)() : models();
+        $registry = ModelMetadataRegistry::getInstance();
         $grids = [];
 
         foreach ($models as $model) {
@@ -47,13 +49,18 @@ final readonly class GetGridConfigsAction
                 continue;
             }
 
+            $meta = $registry->get($model);
+
+            if (! $meta->hasGridUtils) {
+                continue;
+            }
+
             /** @var Model $instance */
-            $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
-            $table = $instance->getTable();
-            $grid = $this->getModelGridConfigs($entity, $instance, $table, $request);
+            $instance = (new ReflectionClass($model))->newInstanceWithoutConstructor();
+            $grid = $this->getModelGridConfigs($entity, $instance, $meta->table, $request);
 
             if ($grid !== null) {
-                $grids[$table] = $grid;
+                $grids[$meta->table] = $grid;
             }
         }
 
