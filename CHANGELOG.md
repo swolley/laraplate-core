@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Introduce ModelMetadata and HelpersCache for improved model inspection and caching
+
+## [1.37.0] - 2026-02-17
+
+### 🚀 Features
+
 - Introduce SchemaInspector for optimized database schema inspection
 
 ### ⚙️ Miscellaneous Tasks
