@@ -11,6 +11,7 @@ $translations = [
     'rowsForPage' => 'rows per page',
     'rowsOf' => 'rows of',
     'selected' => 'selected',
+    'overview' => '{1} Showing 1 result in :seconds s|[2,*] Showing :first to :last of :total results in :seconds s',
 ];
 
 if ($default_locale !== 'en') {

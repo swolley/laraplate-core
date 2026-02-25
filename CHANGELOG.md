@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add fetch duration measurement for table records and update pagination translations
+
+## [1.38.0] - 2026-02-24
+
+### 🚀 Features
+
 - Introduce ModelMetadata and HelpersCache for improved model inspection and caching
 
 ## [1.37.0] - 2026-02-17

@@ -11,6 +11,7 @@ $translations = [
     'rowsForPage' => 'vrstic na stran',
     'rowsOf' => 'vrstic od',
     'selected' => 'izbranih',
+    'overview' => '{1} Prikazano 1 rezultat v :seconds s|[2,*] Prikazano od :first do :last od :total rezultatov v :seconds s',
 ];
 
 if ($default_locale !== 'sl') {
