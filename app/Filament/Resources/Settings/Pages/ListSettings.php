@@ -19,19 +19,25 @@ final class ListSettings extends ListRecords
 
     public function getTabs(): array
     {
-        $groups = Setting::query()->select('group_name')->distinct()->pluck('group_name');
+        $counts_by_group = Setting::query()->select('group_name')->distinct()->pluck('group_name')->countBy()->toArray();
 
-        if ($groups->count() < 2) {
+        if (count($counts_by_group) < 2) {
             return [];
         }
 
+        $counts = array_merge(['all' => (int) array_sum($counts_by_group)], $counts_by_group);
+
         $tabs = [
-            'all' => Tab::make('All')->badge(Setting::query()->count()),
+            'all' => Tab::make('All')->badge($counts['all']),
         ];
 
-        foreach ($groups as $group) {
-            $tabs[$group] = Tab::make($group)
-                ->badge(Setting::query()->where('group_name', $group)->count())
+        foreach ($counts_by_group as $group => $count) {
+            if ($count === 0) {
+                continue;
+            }
+
+            $tabs[$group] = Tab::make(ucfirst($group))
+                ->badge($count)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('group_name', $group));
         }
 

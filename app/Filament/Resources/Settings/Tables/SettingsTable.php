@@ -75,9 +75,9 @@ final class SettingsTable
                 ]);
             },
         )
-            ->defaultGroup(
-                Group::make('group_name')->label('Group Name'),
-            )
+            // ->defaultGroup(
+            //     Group::make('group_name')->label('Group Name'),
+            // )
             ->defaultSort(function (Builder $query): Builder {
                 return $query
                     ->orderBy('group_name')

@@ -7,6 +7,8 @@ namespace Modules\Core\Filament\Resources\Modifications\Pages;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Utils\HasRecords;
@@ -23,26 +25,40 @@ final class ListModifications extends ListRecords
      */
     public function getTabs(): array
     {
+        /** @var class-string<Model> $model */
         $model = self::getResource()::getModel();
 
+        // $cache_key = 'filament_core_modifications_tabs_' . $model;
+
+        // $counts = Cache::remember($cache_key, config('core.filament.tabs_counts_ttl_seconds'), function () use ($model) {
         $counts_by_type = $model::query()
-            ->selectRaw('modifiable_type as type, count(*) as count')
+            ->selectRaw('modifiable_type, count(*) as count')
             ->groupBy('modifiable_type')
-            ->pluck('count', 'type')
+            ->pluck('count', 'modifiable_type')
             ->all();
 
-        $total = (int) array_sum($counts_by_type);
+        $counts = array_merge(['all' => (int) array_sum($counts_by_type)], $counts_by_type);
+        // });
+
+        if (count($counts) < 2) {
+            return [];
+        }
 
         $tabs = [
-            'all' => Tab::make('All')->badge($total),
+            'all' => Tab::make('All')->badge($counts['all']),
         ];
 
         $types = models(filter: fn (string $type): bool => class_uses_trait($type, HasApprovals::class));
 
         foreach ($types as $type) {
-            $count = (int) ($counts_by_type[$type] ?? 0);
+            $totals = (int) ($counts[$type] ?? 0);
+
+            if ($totals === 0) {
+                continue;
+            }
+
             $tabs[$type] = Tab::make(Str::afterLast($type, '\\'))
-                ->badge($count)
+                ->badge($totals)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('modifiable_type', $type));
         }
 

@@ -42,6 +42,10 @@ return [
 
     'editor' => env('APP_EDITOR', 'VSCode'),
 
+    'filament' => [
+        'tabs_counts_ttl_seconds' => env('FILAMENT_TABS_COUNTS_TTL_SECONDS', 60),
+    ],
+
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'translation_fallback_enabled' => env('TRANSLATION_FALLBACK_ENABLED', true),
 
