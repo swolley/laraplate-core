@@ -8,12 +8,19 @@
     "laraplate",
     "core"
   ],
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "type": "laravel-module",
   "authors": [
     {
       "name": "Swolley",
       "email": "myentity@inwind.it"
+    }
+  ],
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/swolley/license-compliance-checker.git",
+      "no-api": true
     }
   ],
   "require": {
@@ -52,6 +59,7 @@
     "spatie/fork": "^1.2"
   },
   "require-dev": {
+    "swolley/license-compliance-checker": "dev-master",
     "mtrajano/laravel-swagger": "^0.6.4",
     "laravel/pint": "^1.25",
     "nunomaduro/phpinsights": "^2.13",
@@ -87,18 +95,20 @@
     "test:unit": "pest --parallel --coverage --exactly=100",
     "test:types": "phpstan",
     "test:refactor": "rector",
+    "test:licenses": "@php vendor/bin/check-licenses",
     "test": [
       "@test:type-coverage",
       "@test:unit",
       "@test:lint",
       "@test:types",
-      "@test:refactor"
+      "@test:refactor",
+      "@test:licenses"
     ],
     "update:requirements": [
       "composer bump",
       "npx npm-check-updates -u"
     ],
-    "version": "v1.39.0",
+    "version": "./scripts/version.sh --nointeractive",
     "version:silent": "./scripts/version.sh --silent --nointeractive",
     "version:major": "./scripts/version.sh major",
     "version:minor": "./scripts/version.sh minor",

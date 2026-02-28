@@ -478,7 +478,7 @@ If you want to contribute to this project, follow these steps:
 
 ## License
 
-Core Module is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Core Module is open-sourced software licensed under the [GNU AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html).
 
 ## TODO and FIXME
 
