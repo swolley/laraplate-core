@@ -1,0 +1,81 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\MigrateUtils;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('[TRANSLATION_TABLE_NAME]', static function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('[MODEL_FK]')->nullable(false)->constrained('[MODEL_TABLE]', 'id', '[TRANSLATION_TABLE_NAME]_[MODEL_FK]_FK')->cascadeOnDelete()->comment('The [MODEL_SINGULAR] that the translation belongs to');
+            $table->string('locale', 10)->nullable(false)->index('[TRANSLATION_TABLE_NAME]_locale_IDX')->comment('The locale of the translation');
+[TRANSLATED_FIELDS]
+            MigrateUtils::timestamps($table);
+
+            $table->unique(['[MODEL_FK]', 'locale'], '[TRANSLATION_TABLE_NAME]_[MODEL_SINGULAR]_locale_UN');
+        });
+
+        // Move existing data to the translations table using the default app locale
+        $locale = config('app.locale');
+
+        DB::table('[MODEL_TABLE]')->orderBy('id')->chunk(500, static function ($rows) use ($locale): void {
+            $inserts = [];
+
+            foreach ($rows as $row) {
+                $inserts[] = [
+                    '[MODEL_FK]' => $row->id,
+                    'locale' => $locale,
+[INSERT_FIELDS]
+                    'created_at' => $row->created_at ?? now(),
+                    'updated_at' => $row->updated_at ?? now(),
+                ];
+            }
+
+            DB::table('[TRANSLATION_TABLE_NAME]')->insert($inserts);
+        });
+
+        // Drop translated columns from the original table
+        Schema::table('[MODEL_TABLE]', static function (Blueprint $table): void {
+[DROP_COLUMNS]
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        // Re-add translated columns to the original table
+        Schema::table('[MODEL_TABLE]', static function (Blueprint $table): void {
+[RESTORE_COLUMNS]
+        });
+
+        // Restore data from the translations table
+        $locale = config('app.locale');
+
+        DB::table('[TRANSLATION_TABLE_NAME]')
+            ->where('locale', $locale)
+            ->orderBy('[MODEL_FK]')
+            ->chunk(500, static function ($translations): void {
+                foreach ($translations as $translation) {
+                    DB::table('[MODEL_TABLE]')
+                        ->where('id', $translation->[MODEL_FK])
+                        ->update([
+[RESTORE_FIELDS]
+                        ]);
+                }
+            });
+
+        Schema::dropIfExists('[TRANSLATION_TABLE_NAME]');
+    }
+};
