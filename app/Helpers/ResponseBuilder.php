@@ -48,16 +48,12 @@ class ResponseBuilder
      */
     private array $headers = [];
 
-    private Carbon $startedAt;
-
     private ?Carbon $cachedAt = null;
 
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
-    public function __construct(private ?Request $request, ?Carbon $startedAt = null)
+    public function __construct(private ?Request $request, private readonly ?Carbon $startedAt = new Carbon())
     {
-        $this->startedAt = $startedAt ?? new Carbon();
-
         $this->preview = preview();
     }
 
@@ -428,14 +424,10 @@ class ResponseBuilder
 
     private function getResponseData(): array
     {
-        $endedAt = Carbon::now();
+        $endedAt = \Illuminate\Support\Facades\Date::now();
         $duration = $this->startedAt->diffInMilliseconds($endedAt);
 
-        if ($duration > 1000) {
-            $duration = round($duration / 1000, 2) . 's';
-        } else {
-            $duration = $duration . 'ms';
-        }
+        $duration = $duration > 1000 ? round($duration / 1000, 2) . 's' : $duration . 'ms';
 
         $payload = [
             'meta' => [

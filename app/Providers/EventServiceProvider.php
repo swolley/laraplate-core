@@ -18,6 +18,7 @@ final class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
+    #[Override]
     protected $listen = [
         \Modules\Core\Events\ModelRequiresIndexing::class => [
             \Modules\Core\Listeners\IndexModelFallbackListener::class, // Executes after AI listeners
@@ -32,6 +33,7 @@ final class EventServiceProvider extends ServiceProvider
      *
      * @var bool
      */
+    #[Override]
     protected static $shouldDiscoverEvents = true;
 
     #[Override]

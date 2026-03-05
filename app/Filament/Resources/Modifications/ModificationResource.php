@@ -17,16 +17,21 @@ use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Modifications\Schemas\ModificationForm;
 use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
 use Modules\Core\Models\Modification;
+use Override;
 use UnitEnum;
 
 final class ModificationResource extends Resource
 {
+    #[Override]
     protected static ?string $model = Modification::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHandThumbUp;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 6;
 
     public static function getSlug(?Panel $panel = null): string

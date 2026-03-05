@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Helpers\HasValidations;
+use Override;
 
 /**
  * @mixin IdeHelperUserGridConfig
@@ -24,6 +25,7 @@ final class UserGridConfig extends Model
     /**
      * The attributes that are mass assignable.
      */
+    #[Override]
     protected $fillable = [
         'user_id',
         'grid_name',

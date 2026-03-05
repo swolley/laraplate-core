@@ -10,6 +10,7 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
 use Modules\Core\Helpers\HasValidations;
+use Override;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
 /**
@@ -29,11 +30,13 @@ final class Permission extends ModelsPermission
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $fillable = [
         'name',
         'guard_name',
     ];
 
+    #[Override]
     protected $guarded = [
         'id',
         'connection_name',
@@ -46,10 +49,12 @@ final class Permission extends ModelsPermission
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $hidden = [
         'pivot',
     ];
 
+    #[Override]
     protected $attributes = [
         'guard_name' => 'web',
     ];

@@ -15,6 +15,7 @@ use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
+use Override;
 
 /**
  * @mixin IdeHelperCronJob
@@ -40,6 +41,7 @@ final class CronJob extends Model
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $fillable = [
         'name',
         'command',
@@ -48,6 +50,7 @@ final class CronJob extends Model
         'description',
     ];
 
+    #[Override]
     protected $attributes = [
         'parameters' => '{}',
     ];

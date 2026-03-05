@@ -17,6 +17,7 @@ use Modules\Core\Models\Modification;
 use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
+use Override;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 
@@ -27,6 +28,7 @@ final class PermissionsRefreshCommand extends Command
      *
      * @var string
      */
+    #[Override]
     protected $signature = 'permission:refresh { --p|pretend : prevent changes }';
 
     /**
@@ -34,6 +36,7 @@ final class PermissionsRefreshCommand extends Command
      *
      * @var string
      */
+    #[Override]
     protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

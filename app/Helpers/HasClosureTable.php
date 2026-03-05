@@ -257,7 +257,7 @@ trait HasClosureTable
         $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
 
         // Batch insert for better performance
-        if (! empty($rows)) {
+        if ($rows !== []) {
             DB::table($table_name)->insert($rows);
         }
 
@@ -393,7 +393,7 @@ trait HasClosureTable
         }
 
         // Batch insert all rows at once (more efficient than multiple inserts)
-        if (! empty($rows)) {
+        if ($rows !== []) {
             DB::table($closureTable)->insert($rows);
         }
 

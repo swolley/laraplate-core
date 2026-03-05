@@ -56,7 +56,7 @@ final readonly class GetGridConfigsAction
             }
 
             /** @var Model $instance */
-            $instance = (new ReflectionClass($model))->newInstanceWithoutConstructor();
+            $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
             $grid = $this->getModelGridConfigs($entity, $instance, $meta->table, $request);
 
             if ($grid !== null) {

@@ -16,8 +16,10 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
     use HasBenchmark;
     use SearchableCommandUtils;
 
+    #[Override]
     protected $signature = 'scout:delete-index {model : The model to delete the index for}';
 
+    #[Override]
     protected $description = 'Delete an index for a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]

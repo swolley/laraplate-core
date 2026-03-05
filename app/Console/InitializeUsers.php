@@ -11,11 +11,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
+use Override;
 
 final class InitializeUsers extends Command
 {
+    #[Override]
     protected $signature = 'auth:initialize-users';
 
+    #[Override]
     protected $description = 'Initialize users. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): void

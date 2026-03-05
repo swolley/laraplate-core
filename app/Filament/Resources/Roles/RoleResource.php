@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\Roles\Pages\ListRoles;
 use Modules\Core\Filament\Resources\Roles\Schemas\RoleForm;
 use Modules\Core\Filament\Resources\Roles\Tables\RolesTable;
 use Modules\Core\Models\Role;
+use Override;
 use UnitEnum;
 
 final class RoleResource extends Resource
 {
+    #[Override]
     protected static ?string $model = Role::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 2;
 
     public static function getSlug(?Panel $panel = null): string

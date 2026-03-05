@@ -18,6 +18,7 @@ use Modules\Core\Helpers\HasCommandUtils;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Throwable;
 
@@ -28,11 +29,13 @@ final class CreateUserCommand extends Command
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'auth:create-user';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Create new user <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

@@ -9,14 +9,17 @@ use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Override;
 
 final class SystemHealthWidget extends BaseWidget
 {
+    #[Override]
     protected static ?int $sort = 3;
 
+    #[Override]
     protected ?string $pollingInterval = null;
 
-    public function getColumns(): int|array|null
+    public function getColumns(): array
     {
         return [
             'md' => 2,
@@ -75,7 +78,7 @@ final class SystemHealthWidget extends BaseWidget
             $queue_driver = config('queue.default', 'sync');
             $queue_works = $queue_driver !== 'sync';
 
-            $stats[] = Stat::make('Queue', ucfirst($queue_driver))
+            $stats[] = Stat::make('Queue', ucfirst((string) $queue_driver))
                 ->description($queue_works ? 'Queue is active' : 'Queue is synchronous')
                 ->descriptionIcon($queue_works ? 'heroicon-o-queue-list' : 'heroicon-o-clock')
                 ->color($queue_works ? 'success' : 'gray');

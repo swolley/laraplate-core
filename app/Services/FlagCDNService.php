@@ -46,7 +46,7 @@ final readonly class FlagCDNService
 
                 return $flag_url;
             }
-        } catch (Exception $e) {
+        } catch (Exception) {
             // If download fails, fallback to flagcdn URL
             return $flagcdn_url;
         }
@@ -88,7 +88,7 @@ final readonly class FlagCDNService
 
                 return true;
             }
-        } catch (Exception $e) {
+        } catch (Exception) {
             return false;
         }
 

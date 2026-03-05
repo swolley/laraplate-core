@@ -721,8 +721,8 @@ abstract class Entity
     {
         if ($columns === null || ($columns === [$value_column] && $columns[0] === $model->getKeyName())) {
             $connection = $model->getConnectionName();
-            $indexes = SchemaInspector::getInstance()->indexes($model->getTable(), $connection)->toArray();
-            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn ($idx) => $idx instanceof \Modules\Core\Inspector\Entities\Index ? $idx->columns->all() : $idx['columns'], $indexes))];
+            $indexes = SchemaInspector::getInstance()->indexes($model->getTable(), $connection)->all();
+            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn (\Modules\Core\Inspector\Entities\Index $idx) => $idx instanceof \Modules\Core\Inspector\Entities\Index ? $idx->columns->all() : $idx['columns'], $indexes))];
         }
 
         if (! in_array($value_column, $columns, true)) {

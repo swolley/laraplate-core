@@ -7,14 +7,17 @@ namespace Modules\Core\Filament\Widgets;
 use Filament\Pages\Dashboard;
 use Filament\Widgets\Widget;
 use Modules\Core\Filament\Pages\Welcome;
+use Override;
 
 final class WelcomeLinkWidget extends Widget
 {
+    #[Override]
     protected string $view = 'core::filament.widgets.welcome-link';
 
+    #[Override]
     protected int|string|array $columnSpan = 1;
 
-    protected static bool $isHidden = true;
+    private static bool $isHidden = true;
 
     public static function canView(): bool
     {

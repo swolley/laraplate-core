@@ -39,6 +39,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     use HasBenchmark;
     use PromptsForMissingInput;
 
+    #[Override]
     protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     private bool $isNewClass = false;

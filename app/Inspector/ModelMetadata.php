@@ -60,7 +60,7 @@ final readonly class ModelMetadata
      */
     public static function fromClass(string $class): self
     {
-        $instance = (new ReflectionClass($class))->newInstanceWithoutConstructor();
+        $instance = new ReflectionClass($class)->newInstanceWithoutConstructor();
         $traits = class_uses_recursive($class);
 
         return new self(

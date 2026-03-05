@@ -7,9 +7,11 @@ namespace Modules\Core\Filament\Resources\ACLS\Pages;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
+use Override;
 
 final class EditACL extends EditRecord
 {
+    #[Override]
     protected static string $resource = ACLResource::class;
 
     protected function getHeaderActions(): array

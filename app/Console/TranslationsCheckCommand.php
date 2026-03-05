@@ -7,6 +7,7 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class TranslationsCheckCommand extends Command
@@ -16,6 +17,7 @@ final class TranslationsCheckCommand extends Command
      *
      * @var string
      */
+    #[Override]
     protected $signature = 'lang:check-translations';
 
     /**
@@ -23,6 +25,7 @@ final class TranslationsCheckCommand extends Command
      *
      * @var string
      */
+    #[Override]
     protected $description = 'Verify languages, labels coherence and sort all translations keys <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

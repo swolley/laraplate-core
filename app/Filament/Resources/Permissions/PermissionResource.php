@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\Permissions\Pages\ListPermissions;
 use Modules\Core\Filament\Resources\Permissions\Schemas\PermissionForm;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Models\Permission;
+use Override;
 use UnitEnum;
 
 final class PermissionResource extends Resource
 {
+    #[Override]
     protected static ?string $model = Permission::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 3;
 
     public static function getSlug(?Panel $panel = null): string

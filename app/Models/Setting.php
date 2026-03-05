@@ -15,6 +15,7 @@ use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
+use Override;
 
 /**
  * @mixin IdeHelperSetting
@@ -36,6 +37,7 @@ final class Setting extends Model
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $fillable = [
         'name',
         'value',
@@ -46,6 +48,7 @@ final class Setting extends Model
         'description',
     ];
 
+    #[Override]
     protected $attributes = [
         'encrypted' => false,
         'type' => 'string',

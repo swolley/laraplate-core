@@ -7,9 +7,11 @@ namespace Modules\Core\Filament\Resources\Licenses\Pages;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
+use Override;
 
 final class EditLicense extends EditRecord
 {
+    #[Override]
     protected static string $resource = LicenseResource::class;
 
     protected function getHeaderActions(): array

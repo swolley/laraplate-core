@@ -7,14 +7,17 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
+use Override;
 use ReflectionClass;
 
 final class AddRouteCommentsCommand extends Command
 {
     private const string ROUTE_COMMENT_MARKER = '@route-comment';
 
+    #[Override]
     protected $signature = 'route:add-comments';
 
+    #[Override]
     protected $description = 'Add route comments to controller methods <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): void
@@ -32,11 +35,11 @@ final class AddRouteCommentsCommand extends Command
                 continue;
             }
 
-            if (! Str::contains((string) $action, '@')) {
+            if (! Str::contains($action, '@')) {
                 continue;
             }
 
-            [$controller, $method] = explode('@', (string) $action);
+            [$controller, $method] = explode('@', $action);
 
             if (! class_exists($controller)) {
                 continue;

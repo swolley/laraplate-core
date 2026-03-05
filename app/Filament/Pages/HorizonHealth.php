@@ -14,14 +14,19 @@ use UnitEnum;
 
 final class HorizonHealth extends Page
 {
+    #[Override]
     protected static ?string $navigationLabel = 'Queues';
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Health';
 
+    #[Override]
     protected static ?string $slug = 'health/queues';
 
+    #[Override]
     protected string $view = 'core::filament.pages.horizon';
 
     #[Override]

@@ -78,10 +78,8 @@ final class SettingsTable
             // ->defaultGroup(
             //     Group::make('group_name')->label('Group Name'),
             // )
-            ->defaultSort(function (Builder $query): Builder {
-                return $query
-                    ->orderBy('group_name')
-                    ->orderBy('name');
-            });
+            ->defaultSort(fn (Builder $query): Builder => $query
+                ->orderBy('group_name')
+                ->orderBy('name'));
     }
 }

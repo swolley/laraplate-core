@@ -7,10 +7,12 @@ namespace Modules\Core\Filament\Resources\Roles\Pages;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Utils\HasRecords;
+use Override;
 
 final class ListRoles extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = RoleResource::class;
 }

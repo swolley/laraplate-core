@@ -81,7 +81,7 @@ class ListRequestData extends SelectRequestData
      */
     public function mergeFilters(FiltersGroup $filters): void
     {
-        if ($this->filters === null) {
+        if (! $this->filters instanceof FiltersGroup) {
             $this->filters = $filters;
 
             return;

@@ -39,7 +39,7 @@ final class IndexInSearchJob extends CommonSearchJob
 
         /** @phpstan-ignore method.notFound */
         $index_name = $this->model->searchableAs();
-        $document_id = $this->model->getKey();
+        $document_id = (string) $this->model->getKey();
 
         $this->logIndexingStart($document_id, $index_name, $driver);
 

@@ -33,10 +33,10 @@ use Modules\Core\Services\AclResolverService;
  * // Now requestData->filters includes ACL constraints
  * ```
  */
-final class AuthorizationService
+final readonly class AuthorizationService
 {
     public function __construct(
-        private readonly AclResolverService $acl_resolver,
+        private AclResolverService $acl_resolver,
     ) {}
 
     /**
@@ -62,7 +62,7 @@ final class AuthorizationService
 
         $user = $this->resolveUser($request);
 
-        if ($user === null) {
+        if (! $user instanceof User) {
             return false;
         }
 
@@ -70,7 +70,7 @@ final class AuthorizationService
             return true;
         }
 
-        return (bool) $user->hasPermissionTo($permission_name, $guard_name);
+        return $user->hasPermissionTo($permission_name, $guard_name);
     }
 
     /**
@@ -118,10 +118,6 @@ final class AuthorizationService
 
         $permission = Permission::findByName($permission_name);
 
-        if ($permission === null) {
-            return null;
-        }
-
         return $this->acl_resolver->getCombinedFilters($user, $permission);
     }
 
@@ -143,7 +139,7 @@ final class AuthorizationService
     {
         $acl_filters = $this->getAclFilters($permission_name);
 
-        if ($acl_filters === null) {
+        if (! $acl_filters instanceof FiltersGroup) {
             return;
         }
 
@@ -169,10 +165,6 @@ final class AuthorizationService
         }
 
         $permission = Permission::findByName($permission_name);
-
-        if ($permission === null) {
-            return true;
-        }
 
         return $this->acl_resolver->hasUnrestrictedAccess($user, $permission);
     }
@@ -203,7 +195,7 @@ final class AuthorizationService
     {
         $acl_filters = $this->getAclFilters($permission_name);
 
-        if ($acl_filters === null) {
+        if (! $acl_filters instanceof FiltersGroup) {
             return;
         }
 

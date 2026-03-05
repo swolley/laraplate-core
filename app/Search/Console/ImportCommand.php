@@ -16,6 +16,7 @@ final class ImportCommand extends BaseImportCommand
     use HasBenchmark;
     use SearchableCommandUtils;
 
+    #[Override]
     protected $description = 'Import the given model into the search index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]

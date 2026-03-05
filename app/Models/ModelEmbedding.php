@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Override;
 
 /**
  * @mixin IdeHelperModelEmbedding
@@ -18,6 +19,7 @@ final class ModelEmbedding extends Model
     /**
      * The attributes that are mass assignable.
      */
+    #[Override]
     protected $fillable = [
         'embedding',
     ];

@@ -30,7 +30,7 @@ final class FinalizeModelIndexingListener
         if ($indexing_event->allPreProcessingCompleted()) {
             // All completed, dispatch indexing
             if ($indexing_event->sync) {
-                (new IndexInSearchJob($indexing_event->model))->handle();
+                new IndexInSearchJob($indexing_event->model)->handle();
             } else {
                 dispatch(new IndexInSearchJob($indexing_event->model));
             }
@@ -43,7 +43,7 @@ final class FinalizeModelIndexingListener
         }
     }
 
-    private function getCacheKey($model): string
+    private function getCacheKey(\Illuminate\Database\Eloquent\Model $model): string
     {
         return "model_indexing:{$model->getTable()}:{$model->getKey()}";
     }

@@ -43,7 +43,7 @@ class CrudController extends Controller
         $requestData = $request->parsed();
 
         return $this->handleServiceCall(
-            fn () => $this->crudService->list($requestData),
+            fn (): CrudResult => $this->crudService->list($requestData),
             $request,
             $requestData->model,
         );
@@ -66,7 +66,7 @@ class CrudController extends Controller
         $requestData = $request->parsed();
 
         return $this->handleServiceCall(
-            fn () => $this->crudService->detail($requestData),
+            fn (): CrudResult => $this->crudService->detail($requestData),
             $request,
             $requestData->model,
         );
@@ -99,7 +99,7 @@ class CrudController extends Controller
         $requestData = $request->parsed();
 
         return $this->handleServiceCall(
-            fn () => $this->crudService->history($requestData),
+            fn (): CrudResult => $this->crudService->history($requestData),
             $request,
             $requestData->model,
         );
@@ -115,7 +115,7 @@ class CrudController extends Controller
         $requestData = $request->parsed();
 
         return $this->handleServiceCall(
-            fn () => $this->crudService->tree($requestData),
+            fn (): CrudResult => $this->crudService->tree($requestData),
             $request,
             $requestData->model,
         );
@@ -326,7 +326,7 @@ class CrudController extends Controller
         $builder = new ResponseBuilder($request);
         $builder->setData($result->data);
 
-        if ($result->meta) {
+        if ($result->meta instanceof \Modules\Core\Services\Crud\DTOs\CrudMeta) {
             if ($result->meta->totalRecords !== null) {
                 $builder->setTotalRecords($result->meta->totalRecords);
             }
@@ -363,7 +363,7 @@ class CrudController extends Controller
                 $builder->setTable($result->meta->table);
             }
 
-            if ($result->meta->cachedAt !== null) {
+            if ($result->meta->cachedAt instanceof \Illuminate\Support\Carbon) {
                 $builder->setCachedAt($result->meta->cachedAt);
             }
         }
@@ -389,7 +389,7 @@ class CrudController extends Controller
 
             // Handle cache for read operations
             if ($model && $shouldCache && $this->shouldCache($request)) {
-                return Cache::tryByRequest($model, $request, fn () => $this->buildResponse($result, $request));
+                return Cache::tryByRequest($model, $request, fn (): Response => $this->buildResponse($result, $request));
             }
 
             return $this->buildResponse($result, $request);

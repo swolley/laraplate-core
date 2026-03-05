@@ -43,9 +43,6 @@ final class ModelHasRoleObserver
         ]);
     }
 
-    /**
-     * @return object|null
-     */
     private function resolveModel(ModelHasRole $modelHasRole): ?object
     {
         $model_type = $modelHasRole->model_type;

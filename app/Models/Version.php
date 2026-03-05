@@ -24,6 +24,7 @@ final class Version extends OvertrueVersion
      *
      * @psalm-suppress NonInvariantPropertyType
      */
+    #[Override]
     protected $hidden = [
         'user_id',
         'connection_ref',

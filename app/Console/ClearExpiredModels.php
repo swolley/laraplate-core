@@ -6,17 +6,20 @@ namespace Modules\Core\Console;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Overrides\Command;
+use Override;
 
 final class ClearExpiredModels extends Command
 {
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'model:clear-expired';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Clear soft deleted models that have expired <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

@@ -99,9 +99,13 @@ trait HasBenchmark
     private static function getQueryCount(): int
     {
         return match (DB::connection()->getDriverName()) {
-            'mysql' => (int) DB::select("SHOW SESSION STATUS LIKE 'Questions'")[0]->Value,
-            'pgsql' => (int) DB::select('SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count')[0]->count,
-            'sqlite' => count(DB::getQueryLog()),  // it requires DB::enableQueryLog()
+            'mysql', 'sqlite' => count(DB::getQueryLog()), // Requires DB::enableQueryLog()
+            'pgsql' => (int) DB::select(
+                'SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count',
+            )[0]->count,
+            'oracle' => (int) DB::select(
+                "SELECT value AS count FROM v\$sesstat WHERE statistic# = (SELECT statistic# FROM v\$statname WHERE name = 'execute count') AND sid = (SELECT sid FROM v\$mystat WHERE ROWNUM = 1)",
+            )[0]->count ?? 0,
             default => 0,
         };
     }

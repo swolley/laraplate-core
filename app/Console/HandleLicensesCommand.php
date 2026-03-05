@@ -16,13 +16,16 @@ use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Throwable;
 
 final class HandleLicensesCommand extends Command
 {
+    #[Override]
     protected $signature = 'auth:licenses';
 
+    #[Override]
     protected $description = 'Renew, add or delete user licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle()

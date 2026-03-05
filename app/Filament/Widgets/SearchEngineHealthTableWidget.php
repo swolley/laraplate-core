@@ -11,18 +11,22 @@ use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
 use Modules\Core\Filament\Pages\CacheHealth;
+use Override;
 
 final class SearchEngineHealthTableWidget extends Widget
 {
     /**
      * Cache TTL in seconds. Shown in widget heading so users know data is refreshed about every this period.
      */
-    private const CACHE_TTL_SECONDS = 300;
+    private const int CACHE_TTL_SECONDS = 300;
 
+    #[Override]
     protected string $view = 'core::filament.widgets.search-engine-health';
 
+    #[Override]
     protected int|string|array $columnSpan = 'full';
 
+    #[Override]
     protected static ?int $sort = 51;
 
     public static function canView(): bool
@@ -31,7 +35,11 @@ final class SearchEngineHealthTableWidget extends Widget
         $url = request()->url();
         $cacheHealthUrl = CacheHealth::getUrl();
 
-        return Str::contains($url, $cacheHealthUrl) || Str::contains($url, '/health/cache');
+        if (Str::contains($url, $cacheHealthUrl)) {
+            return true;
+        }
+
+        return Str::contains($url, '/health/cache');
     }
 
     protected function getViewData(): array

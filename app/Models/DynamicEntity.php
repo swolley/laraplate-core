@@ -42,6 +42,7 @@ final class DynamicEntity extends Model
     /**
      * @var bool
      */
+    #[Override]
     public $timestamps = false;
 
     private array $dynamic_relations = [];
@@ -296,7 +297,6 @@ final class DynamicEntity extends Model
      */
     private function setReverseRelationInfo(string $relationName): void
     {
-        /** @var DynamicEntity $resolved_model */
         $resolved_model = self::resolve($relationName, $this->getConnectionName());
         $reverse_relations = $resolved_model->getDynamicRelations();
 

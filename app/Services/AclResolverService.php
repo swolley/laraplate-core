@@ -46,9 +46,9 @@ use Modules\Core\Models\User;
  */
 final class AclResolverService
 {
-    private const CACHE_PREFIX = 'acl:resolved:';
+    private const string CACHE_PREFIX = 'acl:resolved:';
 
-    private const CACHE_TTL = 3600; // 1 hour
+    private const int CACHE_TTL = 3600; // 1 hour
 
     /**
      * Get the effective ACLs for a user on a specific permission.
@@ -59,9 +59,7 @@ final class AclResolverService
     {
         $cache_key = self::CACHE_PREFIX . "user:{$user->id}:perm:{$permission->id}";
 
-        return Cache::remember($cache_key, self::CACHE_TTL, function () use ($user, $permission): Collection {
-            return $this->resolveAcls($user, $permission);
-        });
+        return Cache::remember($cache_key, self::CACHE_TTL, fn (): Collection => $this->resolveAcls($user, $permission));
     }
 
     /**
@@ -85,7 +83,7 @@ final class AclResolverService
         // Filter out unrestricted ACLs - they don't contribute to the query
         // Only ACLs with actual filters contribute
         $contributing_acls = $acls->filter(
-            fn (ACL $acl) => ! $acl->isUnrestricted() && $acl->hasFilters(),
+            fn (ACL $acl): bool => ! $acl->isUnrestricted() && $acl->hasFilters(),
         );
 
         // If no ACLs contribute filters, user sees everything
@@ -130,7 +128,7 @@ final class AclResolverService
 
         // User has unrestricted access if no ACL contributes filters
         $has_contributing_acls = $acls->contains(
-            fn (ACL $acl) => ! $acl->isUnrestricted() && $acl->hasFilters(),
+            fn (ACL $acl): bool => ! $acl->isUnrestricted() && $acl->hasFilters(),
         );
 
         return ! $has_contributing_acls;
@@ -152,11 +150,12 @@ final class AclResolverService
     /**
      * Clear cached ACLs for a permission.
      */
-    public function clearCacheForPermission(Permission $permission): void
+    public function clearCacheForPermission(): void
     {
         // This is more expensive - need to clear for all users
         // In production, consider using cache tags
-        Cache::flush(); // TODO: Use cache tags for more granular invalidation
+        Cache::flush();
+        // TODO: Use cache tags for more granular invalidation
     }
 
     /**
@@ -185,7 +184,7 @@ final class AclResolverService
         foreach ($roles as $role) {
             $acl = $this->resolveAclForRole($role, $permission);
 
-            if ($acl !== null) {
+            if ($acl instanceof ACL) {
                 $resolved_acls->push($acl);
             }
         }
@@ -207,7 +206,7 @@ final class AclResolverService
         // Look for ACL on this role's permission
         $acl = $this->findAclForRolePermission($role, $permission);
 
-        if ($acl !== null) {
+        if ($acl instanceof ACL) {
             return $acl;
         }
 
@@ -243,7 +242,7 @@ final class AclResolverService
         foreach ($ancestors as $ancestor) {
             $acl = $this->findAclForRolePermission($ancestor, $permission);
 
-            if ($acl !== null) {
+            if ($acl instanceof ACL) {
                 return $acl;
             }
         }

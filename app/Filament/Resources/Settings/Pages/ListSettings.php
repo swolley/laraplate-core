@@ -10,11 +10,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Setting;
+use Override;
 
 final class ListSettings extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = SettingResource::class;
 
     public function getTabs(): array
@@ -36,7 +38,7 @@ final class ListSettings extends ListRecords
                 continue;
             }
 
-            $tabs[$group] = Tab::make(ucfirst($group))
+            $tabs[$group] = Tab::make(ucfirst((string) $group))
                 ->badge($count)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('group_name', $group));
         }

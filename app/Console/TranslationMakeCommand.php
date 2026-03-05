@@ -10,6 +10,7 @@ use function Laravel\Prompts\select;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasTranslations;
+use Override;
 use ReflectionClass;
 use Throwable;
 
@@ -18,11 +19,13 @@ class TranslationMakeCommand extends Command
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'make:translation';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Make a translation model for a given model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

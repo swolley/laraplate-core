@@ -6,6 +6,7 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Modification as ApprovalModification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Override;
 
 /**
  * @mixin IdeHelperModification
@@ -19,6 +20,7 @@ final class Modification extends ApprovalModification
      *
      * @psalm-suppress NonInvariantPropertyType
      */
+    #[Override]
     protected $hidden = [
         'modifiable_id',
         'modifiable_type',

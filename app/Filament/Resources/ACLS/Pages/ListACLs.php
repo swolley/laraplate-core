@@ -7,10 +7,12 @@ namespace Modules\Core\Filament\Resources\ACLS\Pages;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 use Modules\Core\Filament\Utils\HasRecords;
+use Override;
 
 final class ListACLs extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = ACLResource::class;
 }

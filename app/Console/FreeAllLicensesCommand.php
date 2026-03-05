@@ -6,13 +6,16 @@ namespace Modules\Core\Console;
 
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Throwable;
 
 final class FreeAllLicensesCommand extends Command
 {
+    #[Override]
     protected $signature = 'auth:free-all-licenses';
 
+    #[Override]
     protected $description = 'Free all the assigned licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

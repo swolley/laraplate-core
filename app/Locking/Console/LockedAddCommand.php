@@ -9,13 +9,16 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 use Modules\Core\Overrides\Command;
+use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 class LockedAddCommand extends Command
 {
+    #[Override]
     public $signature = 'lock:locked-add {model} {--namespace=}';
 
+    #[Override]
     public $description = 'Add a migration to add locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     protected $operation = 'add';

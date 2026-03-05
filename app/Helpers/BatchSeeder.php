@@ -25,11 +25,11 @@ use Throwable;
 
 abstract class BatchSeeder extends Seeder
 {
-    private const MAX_RETRIES = 3;
+    private const int MAX_RETRIES = 3;
 
-    private const BATCHSIZE = 100;
+    private const int BATCHSIZE = 100;
 
-    private const RETRY_DELAY = 1; // seconds
+    private const int RETRY_DELAY = 1; // seconds
 
     /**
      * Put the logic of the seeder here.
@@ -129,7 +129,7 @@ abstract class BatchSeeder extends Seeder
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
-        $db_connection_name = (new $modelClass())->getConnectionName() ?? config('database.default');
+        $db_connection_name = new $modelClass()->getConnectionName() ?? config('database.default');
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');

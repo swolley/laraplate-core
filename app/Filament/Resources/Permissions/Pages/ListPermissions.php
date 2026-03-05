@@ -7,10 +7,12 @@ namespace Modules\Core\Filament\Resources\Permissions\Pages;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
 use Modules\Core\Filament\Utils\HasRecords;
+use Override;
 
 final class ListPermissions extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = PermissionResource::class;
 }

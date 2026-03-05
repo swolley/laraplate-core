@@ -19,7 +19,7 @@ final class IndexModelFallbackListener
         // AI didn't handle (disabled or module not configured)
         // Dispatch only indexing without embeddings
         if ($event->sync) {
-            (new IndexInSearchJob($event->model))->handle();
+            new IndexInSearchJob($event->model)->handle();
         } else {
             dispatch(new IndexInSearchJob($event->model));
         }

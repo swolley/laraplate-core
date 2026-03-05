@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Database\Factories\LicenseFactory;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasValidity;
+use Override;
 
 /**
  * @mixin IdeHelperLicense
@@ -26,13 +27,16 @@ final class License extends Model
     }
     use HasValidity;
 
+    #[Override]
     protected $keyType = 'string';
 
     /**
      * The attributes that are mass assignable.
      */
+    #[Override]
     protected $fillable = [];
 
+    #[Override]
     protected $casts = [
         'is_active' => 'boolean',
     ];

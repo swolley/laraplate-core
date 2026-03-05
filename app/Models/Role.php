@@ -44,6 +44,7 @@ final class Role extends BaseRole
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $fillable = [
         'name',
         'guard_name',
@@ -56,6 +57,7 @@ final class Role extends BaseRole
      * @psalm-suppress NonInvariantPropertyType
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $hidden = [
         'parent_id',
         'pivot',
@@ -203,7 +205,7 @@ final class Role extends BaseRole
      */
     private function rejectAnyPermissionForSuperAdmin(array $permissions): void
     {
-        $to_check = collect($permissions)->flatten()->filter(fn ($p) => ! empty($p));
+        $to_check = collect($permissions)->flatten()->reject(fn ($p): bool => empty($p));
 
         if ($to_check->isEmpty()) {
             return;

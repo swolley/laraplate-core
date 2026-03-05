@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\Licenses\Pages\ListLicenses;
 use Modules\Core\Filament\Resources\Licenses\Schemas\LicenseForm;
 use Modules\Core\Filament\Resources\Licenses\Tables\LicensesTable;
 use Modules\Core\Models\License;
+use Override;
 use UnitEnum;
 
 final class LicenseResource extends Resource
 {
+    #[Override]
     protected static ?string $model = License::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 6;
 
     public static function getSlug(?Panel $panel = null): string

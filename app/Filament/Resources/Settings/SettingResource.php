@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
 use Modules\Core\Filament\Resources\Settings\Schemas\SettingForm;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Models\Setting;
+use Override;
 use UnitEnum;
 
 final class SettingResource extends Resource
 {
+    #[Override]
     protected static ?string $model = Setting::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 7;
 
     public static function getSlug(?Panel $panel = null): string

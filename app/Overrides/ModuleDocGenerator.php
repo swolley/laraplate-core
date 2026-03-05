@@ -90,7 +90,7 @@ final class ModuleDocGenerator extends Generator
     {
         $action_instance = $this->getActionClassInstance();
 
-        if (! $action_instance) {
+        if (! $action_instance instanceof ReflectionMethod) {
             return [];
         }
 

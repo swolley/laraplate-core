@@ -18,7 +18,7 @@ class ModelRequiresIndexing
     /**
      * Array of pre-processing types that are required before indexing.
      * Each listener that dispatches a pre-processing job should add its type here.
-     * Example: ['embeddings', 'translation', 'images']
+     * Example: ['embeddings', 'translation', 'images'].
      */
     public array $required_pre_processing = [];
 
@@ -59,7 +59,7 @@ class ModelRequiresIndexing
 
     public function allPreProcessingCompleted(): bool
     {
-        if (empty($this->required_pre_processing)) {
+        if ($this->required_pre_processing === []) {
             return true; // No pre-processing required
         }
 

@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\CronJobs\Pages\ListCronJobs;
 use Modules\Core\Filament\Resources\CronJobs\Schemas\CronJobForm;
 use Modules\Core\Filament\Resources\CronJobs\Tables\CronJobsTable;
 use Modules\Core\Models\CronJob;
+use Override;
 use UnitEnum;
 
 final class CronJobResource extends Resource
 {
+    #[Override]
     protected static ?string $model = CronJob::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCommandLine;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 5;
 
     public static function getSlug(?Panel $panel = null): string

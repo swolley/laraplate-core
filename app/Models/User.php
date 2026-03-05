@@ -35,12 +35,12 @@ use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
+use Override;
 use Spatie\Permission\Traits\HasRoles;
 
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -69,6 +69,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      *
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $fillable = [
         'name',
         'username',
@@ -84,6 +85,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      *
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
+    #[Override]
     protected $hidden = [
         'password',
         'remember_token',

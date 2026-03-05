@@ -122,33 +122,31 @@ final class QueryBuilder
             }
         }
 
-        if ($request_data instanceof ListRequestData) {
-            if (isset($request_data->sort)) {
-                foreach ($request_data->sort as $column) {
-                    $property = (string) $column->property;
+        if ($request_data instanceof ListRequestData && isset($request_data->sort)) {
+            foreach ($request_data->sort as $column) {
+                $property = (string) $column->property;
 
-                    if (! Str::contains($property, '.')) {
-                        $query->orderBy($property, $column->direction->value);
+                if (! Str::contains($property, '.')) {
+                    $query->orderBy($property, $column->direction->value);
 
-                        continue;
-                    }
-
-                    if (Str::startsWith($property, $main_entity . '.')) {
-                        $query->orderBy($property, $column->direction->value);
-
-                        continue;
-                    }
-
-                    $index = str_replace($main_entity . '.', '', $property);
-                    $splitted = $this->splitColumnNameOnLastDot($index);
-
-                    if (! isset($splitted[1])) {
-                        continue;
-                    }
-
-                    $cloned_column = new Sort($splitted[1], $column->direction);
-                    $relations_sorts[$splitted[0]][] = $cloned_column;
+                    continue;
                 }
+
+                if (Str::startsWith($property, $main_entity . '.')) {
+                    $query->orderBy($property, $column->direction->value);
+
+                    continue;
+                }
+
+                $index = str_replace($main_entity . '.', '', $property);
+                $splitted = $this->splitColumnNameOnLastDot($index);
+
+                if (! isset($splitted[1])) {
+                    continue;
+                }
+
+                $cloned_column = new Sort($splitted[1], $column->direction);
+                $relations_sorts[$splitted[0]][] = $cloned_column;
             }
         }
 

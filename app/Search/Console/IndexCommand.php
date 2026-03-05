@@ -16,8 +16,10 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     use HasBenchmark;
     use SearchableCommandUtils;
 
+    #[Override]
     protected $signature = 'scout:index {model : The model to create an index for}';
 
+    #[Override]
     protected $description = 'Create an index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]

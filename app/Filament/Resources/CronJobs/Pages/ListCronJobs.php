@@ -7,10 +7,12 @@ namespace Modules\Core\Filament\Resources\CronJobs\Pages;
 use Filament\Resources\Pages\ListRecords;
 use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
 use Modules\Core\Filament\Utils\HasRecords;
+use Override;
 
 final class ListCronJobs extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = CronJobResource::class;
 }

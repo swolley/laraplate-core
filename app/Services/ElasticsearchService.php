@@ -98,7 +98,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error creating index: ' . $e->getMessage());
+            throw new ElasticsearchException('Error creating index: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -129,7 +129,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error deleting index: ' . $e->getMessage());
+            throw new ElasticsearchException('Error deleting index: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -195,7 +195,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error in bulk indexing: ' . $e->getMessage());
+            throw new ElasticsearchException('Error in bulk indexing: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -227,7 +227,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Search error: ' . $e->getMessage());
+            throw new ElasticsearchException('Search error: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -264,7 +264,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error retrieving document: ' . $e->getMessage());
+            throw new ElasticsearchException('Error retrieving document: ' . $e->getMessage(), $e->getCode(), $e);
         } catch (ServerResponseException $e) {
             Log::error('Elasticsearch get document error', [
                 'index' => $index,
@@ -272,7 +272,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error retrieving document: ' . $e->getMessage());
+            throw new ElasticsearchException('Error retrieving document: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -325,7 +325,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error deleting document: ' . $e->getMessage());
+            throw new ElasticsearchException('Error deleting document: ' . $e->getMessage(), $e->getCode(), $e);
         } catch (ServerResponseException $e) {
             Log::error('Elasticsearch delete document error', [
                 'index' => $index,
@@ -333,7 +333,7 @@ final class ElasticsearchService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new ElasticsearchException('Error deleting document: ' . $e->getMessage());
+            throw new ElasticsearchException('Error deleting document: ' . $e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -343,8 +343,7 @@ final class ElasticsearchService
     private function createClient(): Client
     {
         $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
-        
+
         return ClientBuilder::fromConfig($config);
-        
     }
 }

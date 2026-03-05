@@ -9,11 +9,14 @@ use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Laravel\Horizon\Contracts\JobRepository;
 use Laravel\Horizon\Contracts\MetricsRepository;
+use Override;
 
 final class HorizonStatsWidget extends BaseWidget
 {
+    #[Override]
     protected static ?int $sort = 2;
 
+    #[Override]
     protected ?string $pollingInterval = null;
 
     public static function canView(): bool
@@ -57,7 +60,7 @@ final class HorizonStatsWidget extends BaseWidget
                 ->description('Jobs per minute')
                 ->descriptionIcon('heroicon-o-arrow-trending-up')
                 ->color('primary');
-        } catch (Exception $e) {
+        } catch (Exception) {
             // Horizon might not be fully configured
             $stats[] = Stat::make('Horizon Status', 'Not Available')
                 ->description('Horizon is not properly configured')

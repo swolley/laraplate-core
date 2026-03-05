@@ -110,7 +110,7 @@ if (! function_exists('connections')) {
         }
 
         foreach (models($onlyActive) as $model) {
-            $connection = (new $model())->getConnection();
+            $connection = new $model()->getConnection();
             $driver = $connection->getDriverName();
 
             if (! in_array($driver, $connections, true)) {
@@ -254,7 +254,7 @@ if (! function_exists('models')) {
                         continue;
                     }
 
-                    if ((new ReflectionClass($class_subnamespace))->isAbstract()) {
+                    if (new ReflectionClass($class_subnamespace)->isAbstract()) {
                         continue;
                     }
 
@@ -279,7 +279,7 @@ if (! function_exists('models')) {
         }
 
         if ($filter !== null) {
-            $result = array_values(array_filter($result, $filter));
+            return array_values(array_filter($result, $filter));
         }
 
         return $result;

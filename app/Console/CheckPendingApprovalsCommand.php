@@ -6,6 +6,7 @@ namespace Modules\Core\Console;
 
 use Modules\Core\Overrides\Command;
 use Modules\Core\Services\ApprovalNotificationService;
+use Override;
 
 /**
  * Command to check for pending approvals and send notifications.
@@ -16,12 +17,14 @@ final class CheckPendingApprovalsCommand extends Command
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'approvals:check-pending
                             {--dry-run : Check without sending notifications}';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Check for pending approvals and notify admins <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

@@ -37,7 +37,6 @@ use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
-use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
@@ -308,8 +307,8 @@ class CrudService
 
         return new CrudResult(
             data: $created,
-            statusCode: Response::HTTP_CREATED,
             error: $error,
+            statusCode: Response::HTTP_CREATED,
         );
     }
 
@@ -456,54 +455,6 @@ class CrudService
         }
 
         return $key_value;
-    }
-
-    private function getElasticSearchQuery(SearchRequestData $filters, ?array $embeddings = null): array
-    {
-        $templateKey = 'elastic_template:' . md5(serialize([$filters->filters, $embeddings]));
-
-        return Cache::remember($templateKey, 3600, function () use ($filters, $embeddings): array {
-            $params = [
-                'body' => [
-                    'query' => [
-                        'bool' => [
-                            'must' => [],
-                            'should' => [],
-                            'minimum_should_match' => 1,
-                        ],
-                    ],
-                ],
-            ];
-
-            if ($embeddings !== null && $embeddings !== []) {
-                $params['body']['query']['bool']['should'][] = [
-                    'script_score' => [
-                        'query' => ['match_all' => new stdClass()],
-                        'script' => [
-                            'source' => "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                            'params' => ['query_vector' => $embeddings],
-                        ],
-                    ],
-                ];
-            }
-
-            if ($filters->filters instanceof FiltersGroup) {
-                $params['body']['query']['bool']['must'] = $this->translateFiltersToElasticsearch($filters->filters);
-            }
-
-            $params['body']['_source'] = ['includes' => $filters->fields ?? ['*']];
-            $params['body']['sort'] = ['_score' => ['order' => 'desc']];
-
-            if ($filters->mainEntity !== '' && $filters->mainEntity !== '0') {
-                $params['index'] = $filters->mainEntity;
-            }
-
-            if ($filters->take !== null && $filters->take !== 0) {
-                $params['size'] = $filters->take;
-            }
-
-            return $params;
-        });
     }
 
     private function translateFiltersToElasticsearch(FiltersGroup $filtersGroup): array
@@ -706,7 +657,7 @@ class CrudService
             $next_targets = [];
 
             foreach ($targets as $target) {
-                if (! $target instanceof Model || ! method_exists($target, $segment)) {
+                if (! method_exists($target, $segment)) {
                     continue;
                 }
 
@@ -731,9 +682,7 @@ class CrudService
         }
 
         foreach ($targets as $target) {
-            if ($target instanceof Model) {
-                $this->applyMethodsToTarget($target, $methods);
-            }
+            $this->applyMethodsToTarget($target, $methods);
         }
     }
 

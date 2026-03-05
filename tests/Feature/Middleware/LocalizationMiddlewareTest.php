@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
+use Symfony\Component\HttpFoundation\Response;
+use Tests\TestCase;
 
-test('middleware has correct class structure', function (): void {
+uses(TestCase::class, RefreshDatabase::class);
+
+it('has correct class structure', function (): void {
     $reflection = new ReflectionClass(LocalizationMiddleware::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Http\Middleware\LocalizationMiddleware');
@@ -12,70 +19,65 @@ test('middleware has correct class structure', function (): void {
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 
-test('middleware handle method has correct signature', function (): void {
+it('handle method has correct signature', function (): void {
     $reflection = new ReflectionMethod(LocalizationMiddleware::class, 'handle');
 
     expect($reflection->getNumberOfParameters())->toBe(2);
-    expect($reflection->getReturnType()->getName())->toBe('Symfony\Component\HttpFoundation\Response');
+    expect($reflection->getReturnType()->getName())->toBe(Response::class);
 });
 
-test('middleware uses correct imports', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
+it('sets locale from authenticated user lang', function (): void {
+    $user = Mockery::mock();
+    $user->lang = 'fr';
 
-    expect($source)->toContain('use Closure;');
-    expect($source)->toContain('use Illuminate\Http\Request;');
-    expect($source)->toContain('use Illuminate\Support\Facades\App;');
-    expect($source)->toContain('use Illuminate\Support\Str;');
-    expect($source)->toContain('use Symfony\Component\HttpFoundation\Response;');
+    $request = Request::create('/test');
+    $request->setUserResolver(fn () => $user);
+
+    App::setLocale('en');
+
+    $middleware = new LocalizationMiddleware();
+    $middleware->handle($request, fn () => new Response());
+
+    expect(App::getLocale())->toBe('fr');
 });
 
-test('middleware handles user locale setting', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
+it('does not change locale when user lang matches current locale', function (): void {
+    $user = Mockery::mock();
+    $user->lang = 'en';
 
-    expect($source)->toContain('$user = $request->user();');
-    expect($source)->toContain('$user->lang');
-    expect($source)->toContain('App::getLocale()');
-    expect($source)->toContain('App::setLocale($user->lang)');
+    $request = Request::create('/test');
+    $request->setUserResolver(fn () => $user);
+
+    App::setLocale('en');
+
+    $middleware = new LocalizationMiddleware();
+    $middleware->handle($request, fn () => new Response());
+
+    expect(App::getLocale())->toBe('en');
 });
 
-test('middleware handles preferred language', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
+it('sets locale from browser preferred language when no user', function (): void {
+    $request = Request::create('/test', 'GET', [], [], [], [
+        'HTTP_ACCEPT_LANGUAGE' => 'it_IT,it;q=0.9,en;q=0.8',
+    ]);
+    $request->setUserResolver(fn () => null);
 
-    expect($source)->toContain('getPreferredLanguage()');
-    expect($source)->toContain('Str::of($lang)->before(\'_\')->value()');
+    App::setLocale('en');
+
+    $middleware = new LocalizationMiddleware();
+    $middleware->handle($request, fn () => new Response());
+
+    expect(App::getLocale())->toBe('it');
 });
 
-test('middleware handles language validation', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
+it('returns response from next handler', function (): void {
+    $request = Request::create('/test');
+    $request->setUserResolver(fn () => null);
 
-    expect($source)->toContain('$lang !== null');
-    expect($source)->toContain('$lang !== \'\'');
-    expect($source)->toContain('$lang !== \'0\'');
-});
+    $expected_response = new Response('test content');
 
-test('middleware calls next handler', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
+    $middleware = new LocalizationMiddleware();
+    $response = $middleware->handle($request, fn () => $expected_response);
 
-    expect($source)->toContain('return $next($request);');
-});
-
-test('middleware has proper conditional logic', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('if ($user && $user->lang !== App::getLocale())');
-    expect($source)->toContain('elseif (! $user)');
-});
-
-test('middleware handles string manipulation', function (): void {
-    $reflection = new ReflectionClass(LocalizationMiddleware::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('Str::of($lang)->before(\'_\')');
-    expect($source)->toContain('->value()');
+    expect($response)->toBe($expected_response);
 });

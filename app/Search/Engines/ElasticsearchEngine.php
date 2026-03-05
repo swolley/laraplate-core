@@ -45,9 +45,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         try {
             $matched = $this->matchModelToCollectionName($name);
 
-            if ($matched === null) {
-                throw new Exception('Unable to resolve collection name for index creation.');
-            }
+            throw_if($matched === null, Exception::class, 'Unable to resolve collection name for index creation.');
 
             $model = $matched['model'];
             $collection = $matched['collection'];

@@ -64,7 +64,7 @@ trait HasTable
 
         $model = $table->getModel();
         $meta = ModelMetadataRegistry::getInstance()->get($model);
-        $model_instance = (new ReflectionClass($model))->newInstanceWithoutConstructor();
+        $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
         $permissions_prefix = sprintf('%s.%s', $meta->connection ?? 'default', $meta->table);
 
         $has_soft_deletes = $meta->hasSoftDeletes;
@@ -186,8 +186,7 @@ trait HasTable
 
             $default_columns->push(
                 ImageColumn::make('translations.locale')
-                    ->state(fn (Model $record) => collect($record->translations)->map(fn (Model $translation): string => sprintf(
-                        $flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp'))))
+                    ->state(fn (Model $record) => collect($record->translations)->map(fn (Model $translation): string => $flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
                     ->stacked()
                     ->limit(3)
                     ->limitedRemainingText()

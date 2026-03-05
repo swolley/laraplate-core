@@ -42,7 +42,7 @@ final class PendingApprovalsNotification extends Notification implements ShouldQ
         $total = $this->pending_by_entity->sum('count');
         $app_name = config('app.name');
 
-        $message = (new MailMessage())
+        $message = new MailMessage()
             ->subject("[{$app_name}] {$total} record(s) pending approval")
             ->greeting('Hello!')
             ->line("There are **{$total} records** waiting for moderation on {$app_name}.")

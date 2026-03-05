@@ -130,17 +130,13 @@ trait CommonEngineFunctions
         } elseif (is_string($name)) {
             $models = models(true, filter: fn (string $model): bool => class_uses_trait($model, Searchable::class) && new $model()->searchableAs() === $name);
 
-            if (count($models) > 1) {
-                throw new Exception('Multiple models found for collection name: ' . $name);
-            }
+            throw_if(count($models) > 1, Exception::class, 'Multiple models found for collection name: ' . $name);
 
             $model = head($models);
             $collection = $name;
         }
 
-        if ($collection === null) {
-            throw new Exception('Unable to resolve collection name for index creation.');
-        }
+        throw_if($collection === null, Exception::class, 'Unable to resolve collection name for index creation.');
 
         // Get mapping from the model if available; otherwise fail
         if ($model === null) {

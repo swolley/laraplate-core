@@ -7,14 +7,17 @@ namespace Modules\Core\Console;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class InspectorWarmCommand extends Command
 {
+    #[Override]
     protected $signature = 'inspector:warm
                             {tables?* : Optional table names to warm. If none given, all tables on the connection are warmed.}
                             {--connection= : Database connection name.}';
 
+    #[Override]
     protected $description = 'Warm the schema inspector cache for the given tables (or all tables) <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int
@@ -39,7 +42,8 @@ final class InspectorWarmCommand extends Command
 
         foreach ($tables as $table) {
             $inspected = $inspector->table((string) $table, $connection);
-            if ($inspected !== null) {
+
+            if ($inspected instanceof \Modules\Core\Inspector\Entities\Table) {
                 $warmed++;
             }
         }

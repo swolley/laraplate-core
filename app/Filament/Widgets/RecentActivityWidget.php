@@ -8,13 +8,17 @@ use App\Models\User;
 use Exception;
 use Filament\Widgets\Widget;
 use Modules\Cms\Models\Content;
+use Override;
 
 final class RecentActivityWidget extends Widget
 {
+    #[Override]
     protected string $view = 'core::filament.widgets.recent-activity';
 
+    #[Override]
     protected int|string|array $columnSpan = 'full';
 
+    #[Override]
     protected static ?int $sort = 50;
 
     private int $limit = 8;
@@ -33,7 +37,7 @@ final class RecentActivityWidget extends Widget
                 ->latest('updated_at')
                 ->limit($this->limit)
                 ->get(['id', 'presettable_id', 'updated_at'])
-                ->map(function ($content) {
+                ->map(function ($content): array {
                     // Try to get title from translation or use a fallback
                     $title = 'Untitled';
 
@@ -57,7 +61,7 @@ final class RecentActivityWidget extends Widget
                         'updated_at' => $content->updated_at?->diffForHumans(),
                     ];
                 })
-                ->toArray();
+                ->all();
         }
 
         // Recent users (last 5)
@@ -69,7 +73,7 @@ final class RecentActivityWidget extends Widget
             })
             ->limit($this->limit)
             ->get(['id', 'name', 'email', 'last_login_at'])
-            ->map(fn ($user) => [
+            ->map(fn ($user): array => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,

@@ -16,16 +16,21 @@ use Modules\Core\Filament\Resources\Users\Pages\EditUser;
 use Modules\Core\Filament\Resources\Users\Pages\ListUsers;
 use Modules\Core\Filament\Resources\Users\Schemas\UserForm;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
+use Override;
 use UnitEnum;
 
 final class UserResource extends Resource
 {
+    #[Override]
     protected static ?string $model = User::class;
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';
 
+    #[Override]
     protected static ?int $navigationSort = 1;
 
     public static function getSlug(?Panel $panel = null): string

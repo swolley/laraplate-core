@@ -10,8 +10,6 @@ use Carbon\CarbonImmutable;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Cache\CacheManager as BaseCacheManager;
 use Illuminate\Cache\MemoizedStore;
 use Illuminate\Cache\Repository as BaseRepository;
@@ -41,7 +39,6 @@ use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
-use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
@@ -61,19 +58,11 @@ use Typesense\Client as TypesenseClient;
  */
 final class CoreServiceProvider extends ModuleServiceProvider
 {
+    #[Override]
     protected string $name = 'Core';
 
+    #[Override]
     protected string $nameLower = 'core';
-
-    protected array $subscribe = [
-        LockedModelSubscriber::class,
-    ];
-
-    protected array $listen = [
-        Registered::class => [
-            SendEmailVerificationNotification::class,
-        ],
-    ];
 
     /**
      * Boot the application events.
@@ -84,9 +73,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        if (! is_subclass_of(user_class(), \Modules\Core\Models\User::class)) {
-            throw new Exception('User class is not ' . \Modules\Core\Models\User::class);
-        }
+        throw_unless(is_subclass_of(user_class(), \Modules\Core\Models\User::class), Exception::class, 'User class is not ' . \Modules\Core\Models\User::class);
 
         $this->registerAuths();
         $this->registerMiddlewares();

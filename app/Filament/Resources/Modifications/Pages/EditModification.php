@@ -7,9 +7,11 @@ namespace Modules\Core\Filament\Resources\Modifications\Pages;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
+use Override;
 
 final class EditModification extends EditRecord
 {
+    #[Override]
     protected static string $resource = ModificationResource::class;
 
     protected function getHeaderActions(): array

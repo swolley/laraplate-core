@@ -13,11 +13,13 @@ use Illuminate\Support\Str;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Helpers\HasApprovals;
+use Override;
 
 final class ListModifications extends ListRecords
 {
     use HasRecords;
 
+    #[Override]
     protected static string $resource = ModificationResource::class;
 
     /**

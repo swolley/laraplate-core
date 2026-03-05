@@ -6,12 +6,15 @@ namespace Modules\Core\Console;
 
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\Command;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class FreeExpiredLicensesCommand extends Command
 {
+    #[Override]
     protected $signature = 'auth:free-expired-licenses';
 
+    #[Override]
     protected $description = 'Free expired licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int

@@ -10,11 +10,14 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
+use Override;
 
 final class SearchReindexCommand extends Command
 {
+    #[Override]
     protected $signature = 'scout:reindex {model : The model to reindex}';
 
+    #[Override]
     protected $description = 'Reindex documents in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int

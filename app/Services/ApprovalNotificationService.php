@@ -133,7 +133,11 @@ final class ApprovalNotificationService
 
                 $class_name = $this->getClassNameFromFile($file->getPathname(), $module_path);
 
-                if ($class_name === null || ! class_exists($class_name)) {
+                if ($class_name === null) {
+                    continue;
+                }
+
+                if (! class_exists($class_name)) {
                     continue;
                 }
 
@@ -204,7 +208,7 @@ final class ApprovalNotificationService
     /**
      * Extract class name from file path.
      */
-    private function getClassNameFromFile(string $file_path, string $module_path): ?string
+    private function getClassNameFromFile(string $file_path, string $module_path): string
     {
         $module_name = basename($module_path);
         $relative_path = str_replace($module_path . '/app/', '', $file_path);

@@ -12,11 +12,14 @@ use Laravel\Prompts\Progress;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Traits\Searchable;
+use Override;
 
 final class SearchSyncCommand extends Command
 {
+    #[Override]
     protected $signature = 'scout:sync {model : The model to sync} {--id= : The ID of the document to sync} {--from= : The date to sync from}';
 
+    #[Override]
     protected $description = 'Sync documents modified after the last indexing in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int

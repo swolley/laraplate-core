@@ -10,6 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\ModelEmbedding;
+use Override;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 final class MoveEmbeddingTable extends Command
@@ -17,11 +18,13 @@ final class MoveEmbeddingTable extends Command
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'model:move-embedding-table';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Move the embedding table to the new connection. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

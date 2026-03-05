@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\HasOptimisticLocking;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Overrides\Command;
+use Override;
 use ReflectionClass;
 
 final class ModelLockingRefreshCommand extends Command
@@ -18,11 +19,13 @@ final class ModelLockingRefreshCommand extends Command
     /**
      * The name and signature of the console command.
      */
+    #[Override]
     protected $signature = 'lock:refresh { --quiet: prevent output }';
 
     /**
      * The console command description.
      */
+    #[Override]
     protected $description = 'Dynamically generate missing migrations for locking functionalities. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     private bool $quiet_mode = false;

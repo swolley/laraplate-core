@@ -317,13 +317,9 @@ trait HasTranslations
 
         $class_name = str_replace('\\Models\\', '\\Models\\Translations\\', $current_class) . 'Translation';
 
-        if (! class_exists($class_name)) {
-            throw new Exception('Translation model class not found: ' . $class_name);
-        }
+        throw_unless(class_exists($class_name), Exception::class, 'Translation model class not found: ' . $class_name);
 
-        if (! is_subclass_of($class_name, ITranslated::class)) {
-            throw new Exception('Translation model class does not implement ITranslated: ' . $class_name);
-        }
+        throw_unless(is_subclass_of($class_name, ITranslated::class), Exception::class, 'Translation model class does not implement ITranslated: ' . $class_name);
 
         return $class_name;
     }

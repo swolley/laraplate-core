@@ -8,9 +8,11 @@ use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
+use Override;
 
 final class CoreStatsWidget extends BaseWidget
 {
+    #[Override]
     protected ?string $pollingInterval = null;
 
     protected function getStats(): array

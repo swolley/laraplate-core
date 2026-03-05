@@ -13,14 +13,17 @@ use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
+use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class CheckIndexCommand extends Command
 {
     use SearchableCommandUtils;
 
+    #[Override]
     protected $signature = 'scout:check-index {model? : The model to check}';
 
+    #[Override]
     protected $description = 'Check indexes in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     /**

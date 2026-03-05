@@ -185,7 +185,7 @@ final class Inspect
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
-        return collect($keys)->map(function ($foreignKey) use ($schema, $connection): ForeignKey {
+        return collect($keys)->map(function (array $foreignKey) use ($schema, $connection): ForeignKey {
             $name = $foreignKey['name'] ?? ($foreignKey['foreign_table'] . '_' . implode('_', $foreignKey['columns']));
 
             return new ForeignKey(

@@ -9,18 +9,23 @@ use Deprecated;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
+use Override;
 use UnitEnum;
 
 final class CacheHealth extends Page
 {
     // protected string $view = 'core::filament.pages.cache';
 
+    #[Override]
     protected static ?string $navigationLabel = 'Caches';
 
+    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
+    #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Health';
 
+    #[Override]
     protected static ?string $slug = 'health/cache';
 
     // protected static ?int $navigationSort = 1;
