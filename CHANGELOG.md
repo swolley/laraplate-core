@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add make:model-translatable artisan command
+
+### 🚜 Refactor
+
+- Enhance tab functionality in ListModifications and ListSettings
+
+### ⚙️ Miscellaneous Tasks
+
+- Update license to AGPL-3.0 and enhance composer.json
+
+## [1.39.0] - 2026-02-25
+
+### 🚀 Features
+
 - Add fetch duration measurement for table records and update pagination translations
 
 ## [1.38.0] - 2026-02-24
