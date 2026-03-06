@@ -87,7 +87,10 @@ class ResponseBuilder
             $this->resourceResponse = new ResourceCollection($data);
 
             if (count($data) > 0) {
-                $this->setClass($data instanceof Collection ? $data->first() : $data[0]);
+                $first = $data instanceof Collection ? $data->first() : $data[0];
+                if (is_object($first)) {
+                    $this->setClass($first);
+                }
             }
         } elseif ($data instanceof Throwable) {
             report($data);
@@ -96,7 +99,7 @@ class ResponseBuilder
             $this->setClass($data);
             $this->setStatus(self::getHttpErrorStatus($data->getCode()));
         } else {
-            $this->resourceResponse = new JsonResource($data);
+            $this->resourceResponse = new JsonResource($data ?? []);
 
             if (is_object($data)) {
                 $this->setClass($data);
@@ -375,7 +378,7 @@ class ResponseBuilder
         $response = $data['payload']->toResponse($this->request);
         $response->setStatusCode($data['statusCode']);
 
-        foreach ($data['headers'] as $key => $value) {
+        foreach ($data['headers'] ?? [] as $key => $value) {
             $response->headers->set($key, $value);
         }
 

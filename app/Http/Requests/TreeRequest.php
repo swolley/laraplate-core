@@ -18,12 +18,15 @@ final class TreeRequest extends DetailRequest
      *
      * @psalm-suppress LessSpecificImplementedReturnType
      *
-     * @return array
+     * @return array<string, mixed>
      */
     #[Override]
-    public function rules()
+    public function rules(): array
     {
-        return parent::rules() + [
+        $pk_keys = is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey];
+        $rules = array_diff_key(parent::rules(), array_flip($pk_keys));
+
+        return $rules + [
             'parents' => 'boolean',
             'children' => 'boolean',
         ];

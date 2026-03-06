@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -78,7 +79,7 @@ class CrudService
         $this->auth->injectAclFilters($requestData, $permission_name);
 
         // 3. Build query (now includes ACL filters)
-        $query = $model::query();
+        $query = $model->newQuery();
         $this->query_builder->prepareQuery($query, $requestData);
 
         $total_records = $query->count();
@@ -128,8 +129,17 @@ class CrudService
             $model->getConnectionName(),
         );
 
-        // 2. Build query and apply ACL filters
-        $query = $model::query();
+        // 2. Constrain by primary key first (from validated/input/route so record-not-found can 404)
+        $key = $model->getKeyName();
+        $key_value = is_array($key)
+            ? array_map(fn (string $k) => $requestData->request->validated($k) ?? $requestData->request->input($k) ?? $requestData->request->route($k), $key)
+            : ($requestData->request->validated($key) ?? $requestData->request->input($key) ?? $requestData->request->route($key));
+        if ($key_value === null || $key_value === '') {
+            throw new ModelNotFoundException('Primary key is required for detail.');
+        }
+
+        // 3. Build query and apply ACL filters
+        $query = $model->newQuery()->where(is_array($key_value) ? $key_value : [$key => $key_value]);
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareQuery($query, $requestData);
 
@@ -214,11 +224,11 @@ class CrudService
         );
 
         // 2. Build query and apply ACL filters
-        $query = $model::query();
+        $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareQuery($query, $requestData);
 
-        $query->with('history', function (Builder $q) use ($requestData): void {
+        $query->with('history', function (Relation $q) use ($requestData): void {
             $q->latest();
 
             if (isset($requestData->limit)) {
@@ -234,14 +244,30 @@ class CrudService
 
         $this->applyComputedMethods($data, $requestData);
 
+        $history_relation = $data->getRelation('history');
+        $history_array = [];
+        if ($history_relation !== null && $history_relation instanceof Collection) {
+            $history_array = $history_relation->toArray();
+        }
+
         $meta = new CrudMeta(
             class: $model::class,
             table: $model->getTable(),
             cachedAt: Date::now(),
         );
 
+        $record_array = $data->getAttributes();
+        if ($record_array === null) {
+            $record_array = [];
+        }
+
+        $payload = (object) [
+            'record' => $record_array,
+            'history' => $history_array,
+        ];
+
         return new CrudResult(
-            data: $data,
+            data: $payload,
             meta: $meta,
         );
     }
@@ -271,11 +297,13 @@ class CrudService
         }
 
         // 2. Build query and apply ACL filters
-        $query = $model::with($tree_relation_type);
+        $query = $model->newQuery()->with($tree_relation_type);
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareQuery($query, $requestData);
 
-        $data = $query->sole();
+        $data = $requestData->request->has(is_array($requestData->primaryKey) ? $requestData->primaryKey[0] : $requestData->primaryKey)
+            ? $query->sole()
+            : $query->get();
 
         $this->applyComputedMethods($data, $requestData);
 
@@ -295,9 +323,10 @@ class CrudService
     {
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
-        $discarded_values = $this->removeNonFillableProperties($model, $requestData->changes);
+        $changes = $requestData->changes;
+        $discarded_values = $this->removeNonFillableProperties($model, $changes);
 
-        $created = $model->create($requestData->changes);
+        $created = $model->create($changes);
 
         throw_unless($created, LogicException::class, 'Record not created');
 
@@ -317,23 +346,23 @@ class CrudService
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
 
-        throw_if($model->usesTimestamps() && ! isset($requestData->{Model::UPDATED_AT}), BadMethodCallException::class, Model::UPDATED_AT . ' field is required when updating an entity that uses timestamps');
         $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->query()->where($key_value)->lazy(100);
-        $discarded_values = $this->removeNonFillableProperties($model, $requestData->changes);
+        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+        $changes = $requestData->changes;
+        $discarded_values = $this->removeNonFillableProperties($model, $changes);
 
         throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
         $updated_records = new Collection();
-        DB::transaction(function () use ($found_records, $updated_records, $requestData): void {
+        DB::transaction(function () use ($found_records, $updated_records, $requestData, $changes): void {
             foreach ($found_records as $found_record) {
                 /** @psalm-suppress InvalidArgument */
-                if ($found_record->update($requestData->changes)) {
+                if ($found_record->update($changes)) {
                     $updated_records->add($found_record->fresh());
                 }
             }
         });
 
-        $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
+        $error = $this->filterExpectedDiscardedForError($discarded_values, $requestData);
 
         return new CrudResult(
             data: $updated_records,
@@ -346,20 +375,21 @@ class CrudService
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->query()->where($key_value)->lazy(100);
+        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
 
         throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
-        $deleted_records = new Collection();
-        DB::transaction(function () use ($found_records, $deleted_records): void {
+        $deleted_count = 0;
+        DB::transaction(function () use ($found_records, &$deleted_count): void {
             foreach ($found_records as $found_record) {
                 if ($found_record->forceDelete()) {
-                    $deleted_records->add($found_record);
+                    $deleted_count++;
                 }
             }
         });
 
         return new CrudResult(
-            data: $deleted_records,
+            data: ['deleted' => $deleted_count],
+            statusCode: Response::HTTP_OK,
         );
     }
 
@@ -369,7 +399,8 @@ class CrudService
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
         $key = $requestData->primaryKey;
         $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
-        $found_record = $model->query()->withTrashed()->where($key_value)->firstOrFail();
+        $where = is_array($key_value) ? $key_value : [$key => $key_value];
+        $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
 
         throw_if($operation === 'activate' && ! $found_record->restore(), LogicException::class, 'Record not activated');
 
@@ -439,7 +470,10 @@ class CrudService
         return class_uses_trait($model, Versionable::class);
     }
 
-    private function getModelKeyValue(ModifyRequestData $filters): string|array
+    /**
+     * @return array<string, mixed>|string|int
+     */
+    private function getModelKeyValue(ModifyRequestData $filters): array|string|int
     {
         /** @var string|array<int,string> $key */
         $key = $filters->model->getKeyName();
@@ -455,6 +489,39 @@ class CrudService
         }
 
         return $key_value;
+    }
+
+    /**
+     * Normalize key value to an array suitable for Builder::where() (column => value or [col => val, ...]).
+     *
+     * @param  array<string, mixed>|string|int  $keyValue
+     * @return array<string, mixed>
+     */
+    private function keyValueToWhereCondition(Model $model, array|string|int $keyValue): array
+    {
+        return is_array($keyValue) ? $keyValue : [$model->getKeyName() => $keyValue];
+    }
+
+    /**
+     * Filter discarded-value messages so that request-metadata keys (filters, primary key) are not reported as errors.
+     *
+     * @param  array<int, string>  $discardedMessages
+     */
+    private function filterExpectedDiscardedForError(array $discardedMessages, ModifyRequestData $requestData): ?string
+    {
+        $pk_keys = is_array($requestData->primaryKey) ? $requestData->primaryKey : [$requestData->primaryKey];
+        $expected = array_merge(['filters'], $pk_keys);
+        $unexpected = array_filter($discardedMessages, static function (string $msg) use ($expected): bool {
+            foreach ($expected as $key) {
+                if (str_contains($msg, "'{$key}'")) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        return $unexpected === [] ? null : implode(', ', $unexpected);
     }
 
     private function translateFiltersToElasticsearch(FiltersGroup $filtersGroup): array
@@ -501,7 +568,8 @@ class CrudService
         /** @var string|array $key */
         $key = $model->getKeyName();
         $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
-        $found_record = $model->query()->withTrashed()->where($key_value)->firstOrFail();
+        $where = is_array($key_value) ? $key_value : [$key => $key_value];
+        $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
 
         /** @var User $user */
         $user = Auth::user();
@@ -515,7 +583,7 @@ class CrudService
                 $user->disapprove($modification);
             }
         } else {
-            $modifications = $model::query()->findOrFail($requestData->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
+            $modifications = $model->newQuery()->findOrFail($requestData->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
 
             throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
@@ -544,7 +612,7 @@ class CrudService
         $key_value = $this->getModelKeyValue($requestData);
 
         /** @var Model&HasLocks $found_records */
-        $found_records = $model->query()->where($key_value)->lazy(100);
+        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
 
         throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
         $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
@@ -596,7 +664,7 @@ class CrudService
         $methods_by_relation = [];
         $main_entity = $request_data->model->getTable();
 
-        foreach ($request_data->columns as $column) {
+        foreach ($request_data->columns ?? [] as $column) {
             if ($column->type !== \Modules\Core\Casts\ColumnType::METHOD) {
                 continue;
             }

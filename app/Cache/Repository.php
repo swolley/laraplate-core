@@ -76,7 +76,10 @@ final class Repository extends BaseRepository
      */
     public function tryByRequest(Model|string|array|null $entity, Request $request, Closure $callback, ?int $duration = null): mixed
     {
-        $tags = self::getCacheTags($entity);
+        $tags_input = $entity instanceof Model
+            ? $this->getTableName($entity)
+            : (is_array($entity) ? array_map(fn (Model|string $e): string => $e instanceof Model ? $this->getTableName($e) : $e, $entity) : ($entity ?? []));
+        $tags = self::getCacheTags(is_array($tags_input) ? $tags_input : (string) $tags_input);
 
         if ($entity) {
             $models = Arr::wrap($entity);
@@ -103,7 +106,9 @@ final class Repository extends BaseRepository
         $key = $this->getKeyFromRequest($request);
         $duration ??= config('cache.duration');
 
-        return $this->remember($key, function () use ($callback) {
+        $ttl = $duration ?: config('cache.duration');
+
+        return $this->remember($key, $ttl, function () use ($callback) {
             $data = $callback();
 
             if ($data instanceof ResponseBuilder) {
@@ -111,7 +116,7 @@ final class Repository extends BaseRepository
             }
 
             return $data;
-        }, $duration ?: config('cache.duration'));
+        });
     }
 
     /**

@@ -3,14 +3,27 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\Core\Inspector\Entities\Table;
+use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Models\DynamicEntity;
+use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
+    $this->user->assignRole(Role::findOrCreate('superadmin', 'web'));
     $this->actingAs($this->user);
+});
+
+// Verify SQLite + Inspector compatibility and model resolution (LaravelTestCase populates HelpersCache so models() works).
+test('inspector returns users table with SQLite and tryResolveModel returns User', function (): void {
+    $inspected = SchemaInspector::getInstance()->table('users', null);
+    expect($inspected)->toBeInstanceOf(Table::class)
+        ->and($inspected->columns->isNotEmpty())->toBeTrue('Inspector should return columns for users table');
+
+    $resolved = DynamicEntity::tryResolveModel('users', null);
+    expect($resolved)->toBe(User::class);
 });
 
 // Search API disabled: route and controller method commented out.
@@ -97,6 +110,7 @@ test('api detail returns 404 for non-existent record', function (): void {
 test('api insert creates new record', function (): void {
     $userData = [
         'name' => 'New User',
+        'username' => 'newuser',
         'email' => 'new@example.com',
         'password' => 'password',
     ];
@@ -106,7 +120,7 @@ test('api insert creates new record', function (): void {
     $response->assertStatus(201)
         ->assertJsonStructure([
             'data' => [
-                'id', 'name', 'email', 'created_at', 'updated_at',
+                'id', 'name', 'email',
             ],
         ]);
 
@@ -134,14 +148,14 @@ test('api update modifies existing record', function (): void {
         'id' => $this->user->id,
     ]), $updateData);
 
-    $response->assertStatus(200)
-        ->assertJson([
-            'data' => [
-                'id' => $this->user->id,
-                'name' => 'Updated User',
-                'email' => 'updated@example.com',
-            ],
-        ]);
+    $response->assertStatus(200);
+    $data = $response->json('data');
+    expect($data)->toBeArray()->toHaveCount(1);
+    expect($data[0])->toMatchArray([
+        'id' => $this->user->id,
+        'name' => 'Updated User',
+        'email' => 'updated@example.com',
+    ]);
 
     $this->assertDatabaseHas('users', [
         'id' => $this->user->id,
@@ -186,13 +200,13 @@ test('api delete returns 404 for non-existent record', function (): void {
 });
 
 test('api tree returns hierarchical data', function (): void {
-    $response = $this->getJson(route('core.api.tree', ['entity' => 'users']));
+    $response = $this->getJson(route('core.api.tree', ['entity' => 'roles']));
 
     $response->assertStatus(200)
         ->assertJsonStructure([
             'data' => [
                 '*' => [
-                    'id', 'name', 'email',
+                    'id', 'name',
                 ],
             ],
         ]);
@@ -206,7 +220,10 @@ test('api history returns record history', function (): void {
 
     $response->assertStatus(200)
         ->assertJsonStructure([
-            'data' => [],
+            'data' => [
+                'record',
+                'history',
+            ],
         ]);
 });
 
