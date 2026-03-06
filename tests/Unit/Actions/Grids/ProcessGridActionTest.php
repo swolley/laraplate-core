@@ -3,23 +3,33 @@
 declare(strict_types=1);
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Modules\Core\Actions\Grids\ProcessGridAction;
+use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
-use Tests\TestCase;
-
-uses(TestCase::class);
-
-afterEach(function (): void {
-    Mockery::close();
-});
+uses(Tests\LaravelTestCase::class);
 
 it('processes grid with resolvers', function (): void {
-    $authMock = Mockery::mock(AuthorizationService::class);
-    $authMock->shouldReceive('ensurePermission')
-        ->andReturn('connection.table.select');
+    $user = User::factory()->create();
+    $user->assignRole(Role::findOrCreate('superadmin', 'web'));
+    Auth::login($user);
 
-    $request = new class
+    $auth = $this->app->make(AuthorizationService::class);
+    $request = new class($user) extends Request
     {
+        public function __construct(
+            private User $authUser,
+        ) {
+            parent::__construct();
+        }
+
+        public function user($guard = null)
+        {
+            return $this->authUser;
+        }
+
         public function parsed(): array
         {
             return [
@@ -36,14 +46,14 @@ it('processes grid with resolvers', function (): void {
             return 'table';
         }
 
-        public function getConnectionName(): string
+        public function getConnectionName(): ?string
         {
             return 'connection';
         }
     };
 
     $action = new ProcessGridAction(
-        auth: $authMock,
+        auth: $auth,
         entityResolver: fn () => $model,
         gridFactory: fn () => new class
         {

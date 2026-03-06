@@ -66,7 +66,9 @@ class ListRequestData extends SelectRequestData
 
     public function calculateTotalPages(int $totalRecords): int
     {
-        return (int) ceil($totalRecords / $this->pagination);
+        $per_page = max(1, $this->pagination);
+
+        return (int) ceil($totalRecords / $per_page);
     }
 
     /**
@@ -180,7 +182,9 @@ class ListRequestData extends SelectRequestData
 
     private function getDefaultPagination(): int
     {
-        return (int) Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25;
+        $value = (int) (Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25);
+
+        return max(1, $value);
     }
 
     /**

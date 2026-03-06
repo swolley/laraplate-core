@@ -7,9 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Symfony\Component\HttpFoundation\Response;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 it('has correct class structure', function (): void {
     $reflection = new ReflectionClass(LocalizationMiddleware::class);

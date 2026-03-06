@@ -7,9 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Modules\Core\Actions\Users\ImpersonateUserAction;
 use Modules\Core\Events\UserImpersonated;
 use Modules\Core\Http\Resources\UserInfoResponse;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 it('impersonates and dispatches event', function (): void {
     Event::fake();

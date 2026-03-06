@@ -14,9 +14,7 @@ use Modules\Cms\Models\Pivot\Presettable;
 use Modules\Cms\Models\Preset;
 use Modules\Cms\Models\Tag;
 use Modules\Core\Helpers\LocaleContext;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     foreach ([EntityType::CONTENTS, EntityType::CONTRIBUTORS, EntityType::CATEGORIES] as $entityType) {

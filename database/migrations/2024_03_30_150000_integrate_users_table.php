@@ -43,6 +43,10 @@ return new class() extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
+            $driver = Schema::getConnection()->getDriverName();
+            if ($driver === 'sqlite') {
+                $table->dropUnique('users_username_UN');
+            }
             $table->dropColumn('username');
             $table->dropColumn('lang');
             $table->dropColumn('last_login_at');

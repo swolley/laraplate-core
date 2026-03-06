@@ -7,6 +7,7 @@ namespace Modules\Core\Http\Controllers;
 use BadMethodCallException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Query\RecordsNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -429,12 +430,12 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (ModelNotFoundException $ex) {
+        } catch (RecordsNotFoundException|ModelNotFoundException $ex) {
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
                     error: $ex->getMessage(),
-                    statusCode: Response::HTTP_NO_CONTENT,
+                    statusCode: Response::HTTP_NOT_FOUND,
                 ),
                 $request,
             );

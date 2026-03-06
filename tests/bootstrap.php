@@ -22,6 +22,22 @@ $container->singleton('config', static fn (): Illuminate\Config\Repository => ne
 
 $container->singleton('date', static fn (): Illuminate\Support\DateFactory => new Illuminate\Support\DateFactory());
 
+$container->singleton('app', static function () use ($container): object {
+    return new class($container) {
+        public function __construct(private readonly Illuminate\Container\Container $container) {}
+
+        public function getLocale(): string
+        {
+            return $this->container->make('config')->get('app.locale', 'en');
+        }
+
+        public function setLocale(string $locale): void
+        {
+            $this->container->make('config')->set('app.locale', $locale);
+        }
+    };
+});
+
 Illuminate\Support\Facades\Facade::setFacadeApplication($container);
 Illuminate\Container\Container::setInstance($container);
 
@@ -53,4 +69,19 @@ if (! function_exists('module_path')) {
     {
         return dirname(__DIR__) . '/' . ltrim($path, '/');
     }
+}
+
+if (! function_exists('fake')) {
+    /**
+     * Standalone stub: returns a Faker instance so factories can run without full Laravel app.
+     */
+    function fake(?string $locale = null): \Faker\Generator
+    {
+        return \Faker\Factory::create($locale ?? config('app.faker_locale', 'en_US'));
+    }
+}
+
+// So that factory classes (in namespace Modules\Core\Database\Factories) resolve fake() to global
+if (! function_exists('Modules\Core\Database\Factories\fake')) {
+    require_once __DIR__ . '/Fixtures/fake_factory_helper.php';
 }

@@ -49,12 +49,46 @@ final class DynamicEntity extends Model
 
     private array $dynamic_casts = [];
 
+    /** @var array<string, array<string, array<int, mixed>>> Rules built from schema inspection (e.g. ['always' => ['name' => ['required']]]) */
+    private array $inspected_rules = [];
+
     /**
+     * Returns a DynamicEntity for the table or a concrete Model (e.g. User) when one exists.
+     *
      * @throws Exception
      */
-    public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): self
+    public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
         return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
+    }
+
+    /**
+     * When fillable was not populated by inspect() (e.g. getInspectedTable returned null), derive from schema.
+     */
+    public function getFillable(): array
+    {
+        $fillable = parent::getFillable();
+
+        if ($fillable !== [] || $this->table === '' || $this->table === 'dynamic_entities') {
+            return $fillable;
+        }
+
+        $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
+
+        if (! $inspected instanceof Table) {
+            return $fillable;
+        }
+
+        $names = [];
+        foreach ($inspected->columns as $column) {
+            if (! $column->isAutoincrement()) {
+                $names[] = $column->name;
+            }
+        }
+
+        $this->fillable = array_merge($this->fillable, $names);
+
+        return $this->fillable;
     }
 
     /**
@@ -80,7 +114,8 @@ final class DynamicEntity extends Model
         $instance = new $found();
         $connection = $instance->getConnectionName();
 
-        return $connection === $requestConnection ? $found : null;
+        // When request does not specify a connection, accept the model (use default connection).
+        return $requestConnection === null || $connection === $requestConnection ? $found : null;
     }
 
     public function getDynamicRelations(): array
@@ -175,7 +210,7 @@ final class DynamicEntity extends Model
 
             if ($first_column) {
                 $this->primaryKey = $first_column->name;
-                $this->incrementing = $first_column->autoincrement;
+                $this->incrementing = $first_column->isAutoincrement();
                 $this->keyType = $first_column->type->value && ! Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
             }
         }
@@ -225,30 +260,33 @@ final class DynamicEntity extends Model
 
         $this->dynamic_casts[$column->name] = $column->type->value;
 
-        // validations
-        $rules = $this->getRules();
-        $rules[self::DEFAULT_RULE][$column->name] = [$is_date ? 'date' : $column->type->value];
+        // validations (persist in inspected_rules so getRules() can merge them)
+        if (! isset($this->inspected_rules[self::DEFAULT_RULE])) {
+            $this->inspected_rules[self::DEFAULT_RULE] = [];
+        }
+        $type_rule = $is_date ? 'date' : self::columnTypeToValidationRule($column->type->value);
+        $this->inspected_rules[self::DEFAULT_RULE][$column->name] = [$type_rule];
 
         $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
 
         if (! $column->isUnsigned()) {
-            $rules[self::DEFAULT_RULE][$column->name][] = 'min:0';
+            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'min:0';
         }
 
-        if (! $column->isNullable()) {
-            $rules[self::DEFAULT_RULE][$column->name][] = 'required';
+        if (! $column->isNullable() && ! $column->isAutoincrement()) {
+            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'required';
         }
 
         if ($column->getLength() && $column->type->value === 'string') {
-            $rules[self::DEFAULT_RULE][$column->name][] = 'max:' . $column->getLength();
+            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'max:' . $column->getLength();
         }
 
         if (array_key_exists($column->name, $remapped_fks)) {
-            $rules[self::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
+            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
         }
 
         if (in_array($column->name, $remapped_uids, true)) {
-            $rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void {
+            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void {
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');
                 }
@@ -258,6 +296,27 @@ final class DynamicEntity extends Model
         if (in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting) {
             $this->forceDeleting = false;
         }
+    }
+
+    public function getRules(): array
+    {
+        $rules = $this->getRulesTrait();
+
+        if ($this->inspected_rules !== []) {
+            $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE] ?? [], $this->inspected_rules[self::DEFAULT_RULE] ?? []);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Map Inspector/Doctrine column type to a Laravel validation rule (Laravel has no "unknown", "blob", etc.).
+     */
+    private static function columnTypeToValidationRule(string $typeValue): string
+    {
+        $laravel_rules = ['string', 'integer', 'numeric', 'boolean', 'array', 'date', 'json'];
+
+        return in_array($typeValue, $laravel_rules, true) ? $typeValue : 'string';
     }
 
     /**

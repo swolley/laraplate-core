@@ -5,12 +5,10 @@ declare(strict_types=1);
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Actions\Settings\GetTranslationsAction;
 use Modules\Core\Services\Translation\TranslationCatalogService;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 beforeEach(function (): void {
-    app()->setLocale('en');
+    config()->set('app.locale', 'en');
 });
 
 it('returns all translations', function (): void {

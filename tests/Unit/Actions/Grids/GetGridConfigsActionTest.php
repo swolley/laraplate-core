@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
-use Tests\TestCase;
-
-uses(TestCase::class);
+use Modules\Core\Services\Authorization\AuthorizationService;
+uses(Tests\LaravelTestCase::class);
 
 it('returns configs for models', function (): void {
+    $auth = $this->app->make(AuthorizationService::class);
     $action = new GetGridConfigsAction(
+        $auth,
         modelsProvider: fn () => ['ModelOne'],
         gridResolver: fn () => ['config' => true],
     );
@@ -19,7 +20,9 @@ it('returns configs for models', function (): void {
 });
 
 it('filters single entity', function (): void {
+    $auth = $this->app->make(AuthorizationService::class);
     $action = new GetGridConfigsAction(
+        $auth,
         modelsProvider: fn () => ['ModelOne'],
         gridResolver: fn ($model, $entity) => $entity === 'ModelOne' ? ['only' => true] : null,
     );

@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
-
-uses(Tests\TestCase::class)->in('Feature');
+use Modules\Core\Models\User;
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([

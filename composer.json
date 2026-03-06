@@ -59,6 +59,9 @@
     "spatie/fork": "^1.2"
   },
   "require-dev": {
+    "fakerphp/faker": "^1.23",
+    "nwidart/laravel-modules": "^12.0",
+    "orchestra/testbench": "^10.0",
     "swolley/license-compliance-checker": "dev-master",
     "mtrajano/laravel-swagger": "^0.6.4",
     "laravel/pint": "^1.25",
@@ -141,7 +144,8 @@
     "allow-plugins": {
       "php-http/discovery": true,
       "pestphp/pest-plugin": true,
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "wikimedia/composer-merge-plugin": true
     }
   }
 }

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasUniqueFactoryValues;
 use Override;
 
 /**
- * @extends Factory<User>
+ * @extends Factory<\Modules\Core\Models\User>
  */
 final class UserFactory extends Factory
 {
@@ -20,9 +19,9 @@ final class UserFactory extends Factory
     /**
      * The name of the factory's corresponding model.
      *
-     * @var class-string<User>
+     * @var class-string<\Modules\Core\Models\User>
      */
-    protected $model = User::class;
+    protected $model = \Modules\Core\Models\User::class;
 
     /**
      * Define the model's default state.

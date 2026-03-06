@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Actions\Settings\GetVersionInfoAction;
 use Modules\Core\Services\Docs\VersionService;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 it('returns version data', function (): void {
     $service = new class extends VersionService

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Inspector\Entities\Table;
@@ -13,6 +14,7 @@ use UnexpectedValueException;
 
 /**
  * Singleton service that caches DynamicEntity instances during the request/command scope.
+ * When a concrete model exists for the table (e.g. User for "users"), returns that instead.
  * Schema inspection is delegated to SchemaInspector (shared in-memory cache).
  */
 final class DynamicEntityService
@@ -20,7 +22,7 @@ final class DynamicEntityService
     private static ?self $instance = null;
 
     /**
-     * In-memory cache for resolved DynamicEntity instances.
+     * In-memory cache for resolved DynamicEntity instances (concrete models like User are not cached).
      */
     private array $resolved_cache = [];
 
@@ -41,7 +43,7 @@ final class DynamicEntityService
         self::$instance = null;
     }
 
-    public function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): DynamicEntity
+    public function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
         $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 

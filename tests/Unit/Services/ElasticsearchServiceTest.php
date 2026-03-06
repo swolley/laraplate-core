@@ -10,9 +10,7 @@ use Modules\Core\Services\ElasticsearchService;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 beforeEach(function (): void {
     resetElasticsearchSingleton();
@@ -286,7 +284,10 @@ it('bulk indexes documents and counts successes/failures', function (): void {
     ];
 
     $mock_client = makeClientWithResponses([
-        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode($bulk_response)),
+        new Response(200, [
+            Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME,
+            'Content-Type' => 'application/json',
+        ], json_encode($bulk_response)),
     ]);
 
     setElasticsearchInstance($mock_client);
@@ -307,7 +308,10 @@ it('bulk indexes documents and counts successes/failures', function (): void {
 it('searches and returns array payload', function (): void {
     $body = ['hits' => ['hits' => [['foo' => 'bar']]]];
     $mock_client = makeClientWithResponses([
-        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode($body)),
+        new Response(200, [
+            Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME,
+            'Content-Type' => 'application/json',
+        ], json_encode($body)),
     ]);
 
     setElasticsearchInstance($mock_client);

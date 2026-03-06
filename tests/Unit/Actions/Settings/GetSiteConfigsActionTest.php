@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Actions\Settings\GetSiteConfigsAction;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 it('builds settings array', function (): void {
     $settings = [

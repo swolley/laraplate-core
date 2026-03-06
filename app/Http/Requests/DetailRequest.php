@@ -10,6 +10,17 @@ use Override;
 class DetailRequest extends SelectRequest
 {
     #[Override]
+    public function rules(): array
+    {
+        $rules = parent::rules();
+        foreach (is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey] as $key) {
+            $rules[$key] = ['required'];
+        }
+
+        return $rules;
+    }
+
+    #[Override]
     public function parsed(): DetailRequestData
     {
         /** @phpstan-ignore method.notFound */
@@ -26,7 +37,6 @@ class DetailRequest extends SelectRequest
         ];
 
         foreach (is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey] as $key) {
-            $to_merge[$key] = ['required'];
             $to_merge['filters'][] = ['property' => $key, 'value' => $this->{$key}];
         }
 

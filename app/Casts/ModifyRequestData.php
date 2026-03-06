@@ -19,4 +19,16 @@ final class ModifyRequestData extends CrudRequestData
             $this->changes[Str::replaceFirst($this->mainEntity . '.', '', $property)] = $value;
         }
     }
+
+    /**
+     * Allow read access to primary key and other fields from changes or request (e.g. id from route/query).
+     */
+    public function __get(string $name): mixed
+    {
+        if (array_key_exists($name, $this->changes)) {
+            return $this->changes[$name];
+        }
+
+        return $this->request->input($name) ?? $this->request->route($name);
+    }
 }

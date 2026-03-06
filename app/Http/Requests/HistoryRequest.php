@@ -13,7 +13,7 @@ use Override;
 final class HistoryRequest extends DetailRequest
 {
     #[Override]
-    public function rules()
+    public function rules(): array
     {
         return parent::rules() + [
             'limit' => 'integer|min:1|nullable',

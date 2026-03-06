@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\PermissionsRefreshCommand;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 it('command exists and has correct signature', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);

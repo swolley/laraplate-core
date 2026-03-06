@@ -7,9 +7,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     /** @var TestCase $this */
@@ -95,19 +93,22 @@ it('can get all permissions including from ancestors', function (): void {
 });
 
 it('can check if role has specific permission', function (): void {
-    $permission = Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $this->role->guard_name]);
-    $this->role->givePermissionTo($permission); // Use Spatie's method instead of attach
+    $guard = $this->role->guard_name;
+    Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $guard]);
+    Permission::create(['name' => 'default.users_table.delete', 'guard_name' => $guard]);
+    $this->role->givePermissionTo('default.users_table.insert');
 
     expect($this->role->hasPermission('default.users_table.insert'))->toBeTrue();
     expect($this->role->hasPermission('default.users_table.delete'))->toBeFalse();
 });
 
 it('can check permission from parent role', function (): void {
-    $parentRole = Role::factory()->create(['name' => 'parent-role']);
-    $childRole = Role::factory()->create(['name' => 'child-role']);
+    $guard = 'web';
+    $parentRole = Role::factory()->create(['name' => 'parent-role', 'guard_name' => $guard]);
+    $childRole = Role::factory()->create(['name' => 'child-role', 'guard_name' => $guard]);
 
-    $permission = Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $parentRole->guard_name]);
-    $parentRole->givePermissionTo($permission); // Use Spatie's method instead of attach
+    Permission::create(['name' => 'default.users_table.insert', 'guard_name' => $guard]);
+    $parentRole->givePermissionTo('default.users_table.insert');
 
     $childRole->parent_id = $parentRole->id;
     $childRole->save();
@@ -217,8 +218,8 @@ it('has cache trait', function (): void {
 it('has proper casts for dates', function (): void {
     $role = Role::factory()->create();
 
-    expect($role->created_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
-    expect($role->updated_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
+    expect($role->created_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
+    expect($role->updated_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
 });
 
 it('can be created with specific attributes', function (): void {

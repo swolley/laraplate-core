@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
+use Modules\Core\Models\User;
 use Modules\Core\Models\Role;
 
 uses(Illuminate\Foundation\Testing\RefreshDatabase::class);

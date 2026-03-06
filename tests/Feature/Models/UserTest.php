@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
+uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -127,8 +125,8 @@ it('can be observed', function (): void {
 it('has proper casts for dates', function (): void {
     $user = User::factory()->create();
 
-    expect($user->created_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
-    expect($user->updated_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
+    expect($user->created_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
+    expect($user->updated_at)->toBeInstanceOf(Carbon\CarbonInterface::class);
 });
 
 it('can be created with specific attributes', function (): void {

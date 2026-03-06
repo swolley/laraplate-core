@@ -9,9 +9,7 @@ use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Socialite\Contracts\User as SocialUser;
 use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Events\SocialLoginCompleted;
-use Tests\TestCase;
-
-uses(TestCase::class);
+uses(Tests\LaravelTestCase::class);
 
 afterEach(function (): void {
     Mockery::close();

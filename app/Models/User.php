@@ -200,7 +200,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         // Note: name, email, password are defined in parent class, so attributes
         // would need to be added there or we use array-based rules for now
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
-            'lang' => ['nullable', 'in:' . implode(',', translations())],
+            'lang' => ['nullable', 'in:' . implode(',', config('app.available_locales', translations()))],
             'locked_at' => ['nullable', 'date'],
         ]);
 

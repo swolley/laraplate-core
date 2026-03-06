@@ -432,6 +432,8 @@ composer test:types         # Run PHPStan analysis
 composer test:refactor      # Run Rector refactoring
 ```
 
+**Test database:** By default tests use an in-memory SQLite database. The PHP extension `pdo_sqlite` is required (e.g. on Arch: `php-sqlite`). If it is not available, the suite falls back to MySQL: set `DB_HOST`, `DB_DATABASE` (e.g. `core_test`), `DB_USERNAME`, `DB_PASSWORD` and ensure the database exists.
+
 ### Code Quality Tools
 
 ```bash
