@@ -22,6 +22,7 @@ Homestead.json
 /.vagrant
 .phpunit.result.cache
 .testbench-modules
+/build
 
 /public/build
 /storage/pail
