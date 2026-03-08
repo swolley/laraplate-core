@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Actions\Settings\GetTranslationsAction;
 use Modules\Core\Services\Translation\TranslationCatalogService;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     config()->set('app.locale', 'en');

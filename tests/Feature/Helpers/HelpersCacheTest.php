@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Helpers\HelpersCache;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {

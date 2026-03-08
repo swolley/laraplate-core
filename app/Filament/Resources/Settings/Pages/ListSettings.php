@@ -6,6 +6,7 @@ namespace Modules\Core\Filament\Resources\Settings\Pages;
 
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Tables\Grouping\Group;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
@@ -38,10 +39,16 @@ final class ListSettings extends ListRecords
                 continue;
             }
 
-            $tabs[$group] = Tab::make(ucfirst((string) $group))
+            $label = ucfirst((string) $group);
+
+            $tabs[$group] = Tab::make($label)
                 ->badge($count)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('group_name', $group));
         }
+
+        $this->groups[] = Group::make('group_name')
+            ->label('Group')
+            ->getTitleFromRecordUsing(fn (Setting $record): string => ucfirst($record->group_name));
 
         return $tabs;
     }

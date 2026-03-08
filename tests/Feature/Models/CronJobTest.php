@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\CronJob;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {

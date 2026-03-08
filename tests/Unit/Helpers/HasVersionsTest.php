@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Bus;
 use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;
-uses(Tests\LaravelTestCase::class);
+
+uses(LaravelTestCase::class);
 
 it('exposes the versioning entrypoint', function (): void {
     $model = new VersionableStub();

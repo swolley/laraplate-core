@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Actions\Docs\MergeSwaggerDocsAction;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 it('merges app and module paths', function (): void {
     $tmpDir = sys_get_temp_dir() . '/swagger-' . bin2hex(random_bytes(5));

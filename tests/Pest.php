@@ -5,11 +5,11 @@ declare(strict_types=1);
 /*
 |--------------------------------------------------------------------------
 | Single test case (LaravelTestCase) so --parallel can run: each worker
-| resolves the app via Tests\CreatesApplication. Unit tests run with the
+| resolves the app via Modules\Core\Tests\CreatesApplication. Unit tests run with the
 | same bootstrap (slightly slower but parallel-safe).
 |--------------------------------------------------------------------------
 */
-uses(Tests\LaravelTestCase::class);
+uses(Modules\Core\Tests\LaravelTestCase::class);
 
 /*
 |--------------------------------------------------------------------------

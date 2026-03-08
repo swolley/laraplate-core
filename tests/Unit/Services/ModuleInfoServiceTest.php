@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Modules\Core\Services\Docs\ModuleInfoService;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 it('groups modules with models and controllers', function (): void {
     $service = new ModuleInfoService(

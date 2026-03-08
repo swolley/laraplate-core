@@ -8,7 +8,9 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();

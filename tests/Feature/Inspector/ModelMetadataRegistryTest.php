@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Inspector\ModelMetadata;
 use Modules\Core\Inspector\ModelMetadataRegistry;
+use Modules\Core\Models\User;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {

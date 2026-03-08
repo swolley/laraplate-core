@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests;
+namespace Modules\Core\Tests;
 
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +17,7 @@ use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Orchestra\Testbench\TestCase as Orchestra;
 use ReflectionClass;
+use Throwable;
 
 /**
  * Base test case for tests that need a full Laravel application (Auth, DB, modules).
@@ -31,19 +32,6 @@ abstract class LaravelTestCase extends Orchestra
      */
     private static ?string $testbenchModulesPath = null;
 
-    /**
-     * Get package providers required for the Core module (nwidart discovers Core via config).
-     *
-     * @param  \Illuminate\Foundation\Application  $app
-     * @return array<int, class-string<\Illuminate\Support\ServiceProvider>>
-     */
-    protected function getPackageProviders($app): array
-    {
-        return [
-            \Nwidart\Modules\LaravelModulesServiceProvider::class,
-        ];
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -55,124 +43,16 @@ abstract class LaravelTestCase extends Orchestra
     }
 
     /**
-     * Populate HelpersCache with Core models when empty (Testbench may not have Module::allEnabled() returning Core).
-     * Ensures tryResolveModel('users', null) etc. work in CRUD API tests.
+     * Get package providers required for the Core module (nwidart discovers Core via config).
+     *
+     * @param  \Illuminate\Foundation\Application  $app
+     * @return array<int, class-string<\Illuminate\Support\ServiceProvider>>
      */
-    private function ensureModelsCachePopulated(): void
+    protected function getPackageProviders($app): array
     {
-        if (HelpersCache::getModels('active') !== null) {
-            return;
-        }
-
-        $repo_root = realpath(dirname(__DIR__));
-        if ($repo_root === false) {
-            return;
-        }
-
-        $models_path = $repo_root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Models';
-        if (! is_dir($models_path)) {
-            return;
-        }
-
-        $namespace = 'Modules\\Core\\Models\\';
-        $cached = [];
-
-        foreach (File::allFiles($models_path) as $model_file) {
-            if ($model_file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $relative = str_replace(
-                ['/', '\\'],
-                '\\',
-                substr($model_file->getRelativePathname(), 0, -4)
-            );
-            $class = $namespace . $relative;
-
-            if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
-                continue;
-            }
-
-            try {
-                if ((new ReflectionClass($class))->isAbstract()) {
-                    continue;
-                }
-            } catch (\Throwable) {
-                continue;
-            }
-
-            $cached[] = $class;
-        }
-
-        if ($cached !== []) {
-            HelpersCache::setModels('active', $cached);
-        }
-    }
-
-    /**
-     * Ensure Core API and web routes are registered (Testbench may not run module RouteServiceProvider in time).
-     */
-    private function ensureCoreRoutesRegistered(): void
-    {
-        $router = $this->app->make('router');
-        if ($router->getRoutes()->getByName('core.api.list') !== null) {
-            return;
-        }
-
-        $router->aliasMiddleware('crud_api', EnsureCrudApiAreEnabled::class);
-
-        $path = realpath(dirname(__DIR__));
-        if ($path === false) {
-            return;
-        }
-
-        $router->prefix('api/v1')
-            ->middleware(['api', 'crud_api'])
-            ->name('core.api.')
-            ->group(function () use ($path): void {
-                require $path . '/routes/crud.php';
-                require $path . '/routes/api.php';
-            });
-        $router->getRoutes()->refreshNameLookups();
-    }
-
-    /**
-     * Override cache.store and cache manager so default driver returns Core Repository (has getCacheTags).
-     */
-    private function ensureTestCacheStore(): void
-    {
-        $app = $this->app;
-        $store = new ArrayStore;
-        $config = $app['config']->get('cache.stores.array', []);
-        $repository = new CoreCacheRepository($store, $config);
-        $repository->setEventDispatcher($app['events']);
-        $app->instance('cache.store', $repository);
-        $app->instance('cache', new class($app) extends \Illuminate\Cache\CacheManager {
-            public function store($name = null)
-            {
-                $name = $name ?? $this->getDefaultDriver();
-                if ($name === 'array' || $name === $this->getDefaultDriver()) {
-                    return $this->app['cache.store'];
-                }
-                return parent::store($name);
-            }
-        });
-    }
-
-    /**
-     * Path to test-only migrations (e.g. base users table) that must run before module migrations.
-     */
-    private static function testbenchMigrationsPath(): string
-    {
-        return __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
-    }
-
-    /**
-     * Absolute path to the Core module migrations (repo root database/migrations).
-     */
-    private static function moduleMigrationsPath(): string
-    {
-        return realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations') ?: dirname(__DIR__) . '/database/migrations';
+        return [
+            \Nwidart\Modules\LaravelModulesServiceProvider::class,
+        ];
     }
 
     /**
@@ -210,6 +90,7 @@ abstract class LaravelTestCase extends Orchestra
             // SQLite driver not available: use MySQL (set DB_* env or create database "core_test")
             $app['config']->set('database.default', 'mysql');
             $db_name = env('DB_DATABASE', 'core_test');
+
             if ($db_name === ':memory:') {
                 $db_name = 'core_test';
             }
@@ -230,6 +111,22 @@ abstract class LaravelTestCase extends Orchestra
     }
 
     /**
+     * Path to test-only migrations (e.g. base users table) that must run before module migrations.
+     */
+    private static function testbench_migrations_path(): string
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
+    }
+
+    /**
+     * Absolute path to the Core module migrations (repo root database/migrations).
+     */
+    private static function moduleMigrationsPath(): string
+    {
+        return realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations') ?: dirname(__DIR__) . '/database/migrations';
+    }
+
+    /**
      * Ensure .testbench-modules exists and Core symlinks to the repo root (so nwidart can load it).
      */
     private static function ensureTestbenchModulesPath(): string
@@ -246,6 +143,7 @@ abstract class LaravelTestCase extends Orchestra
         }
 
         $core_link = $modules_dir . DIRECTORY_SEPARATOR . 'Core';
+
         if (! file_exists($core_link) && $repo_root !== false) {
             symlink($repo_root, $core_link);
         }
@@ -280,5 +178,118 @@ abstract class LaravelTestCase extends Orchestra
         $app['config']->set('permission.teams', false);
         $app['config']->set('permission.cache.key', 'spatie.permission.cache');
         $app['config']->set('permission.cache.store', 'array');
+    }
+
+    /**
+     * Populate HelpersCache with Core models when empty (Testbench may not have Module::allEnabled() returning Core).
+     * Ensures tryResolveModel('users', null) etc. work in CRUD API tests.
+     */
+    private function ensureModelsCachePopulated(): void
+    {
+        if (HelpersCache::getModels('active') !== null) {
+            return;
+        }
+
+        $repo_root = realpath(dirname(__DIR__));
+
+        if ($repo_root === false) {
+            return;
+        }
+
+        $models_path = $repo_root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Models';
+
+        if (! is_dir($models_path)) {
+            return;
+        }
+
+        $namespace = 'Modules\\Core\\Models\\';
+        $cached = [];
+
+        foreach (File::allFiles($models_path) as $model_file) {
+            if ($model_file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relative = str_replace(
+                ['/', '\\'],
+                '\\',
+                mb_substr($model_file->getRelativePathname(), 0, -4),
+            );
+            $class = $namespace . $relative;
+
+            if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+                continue;
+            }
+
+            try {
+                if ((new ReflectionClass($class))->isAbstract()) {
+                    continue;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+
+            $cached[] = $class;
+        }
+
+        if ($cached !== []) {
+            HelpersCache::setModels('active', $cached);
+        }
+    }
+
+    /**
+     * Ensure Core API and web routes are registered (Testbench may not run module RouteServiceProvider in time).
+     */
+    private function ensureCoreRoutesRegistered(): void
+    {
+        $router = $this->app->make('router');
+
+        if ($router->getRoutes()->getByName('core.api.list') !== null) {
+            return;
+        }
+
+        $router->aliasMiddleware('crud_api', EnsureCrudApiAreEnabled::class);
+
+        $path = realpath(dirname(__DIR__));
+
+        if ($path === false) {
+            return;
+        }
+
+        $router->prefix('api/v1')
+            ->middleware(['api', 'crud_api'])
+            ->name('core.api.')
+            ->group(function () use ($path): void {
+                require $path . '/routes/crud.php';
+
+                require $path . '/routes/api.php';
+            });
+        $router->getRoutes()->refreshNameLookups();
+    }
+
+    /**
+     * Override cache.store and cache manager so default driver returns Core Repository (has getCacheTags).
+     */
+    private function ensureTestCacheStore(): void
+    {
+        $app = $this->app;
+        $store = new ArrayStore;
+        $config = $app['config']->get('cache.stores.array', []);
+        $repository = new CoreCacheRepository($store, $config);
+        $repository->setEventDispatcher($app['events']);
+        $app->instance('cache.store', $repository);
+        $app->instance('cache', new class($app) extends \Illuminate\Cache\CacheManager
+        {
+            public function store($name = null)
+            {
+                $name = $name ?? $this->getDefaultDriver();
+
+                if ($name === 'array' || $name === $this->getDefaultDriver()) {
+                    return $this->app['cache.store'];
+                }
+
+                return parent::store($name);
+            }
+        });
     }
 }

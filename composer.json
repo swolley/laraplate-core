@@ -136,8 +136,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Modules\\Core\\Tests\\": "tests/",
-      "Tests\\": "tests/"
+      "Modules\\Core\\Tests\\": "tests/"
     }
   },
   "config": {

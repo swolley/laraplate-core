@@ -10,12 +10,7 @@ use Carbon\CarbonImmutable;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
-use Illuminate\Cache\CacheManager as BaseCacheManager;
-use Illuminate\Cache\MemoizedStore;
-use Illuminate\Cache\Repository as BaseRepository;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Contracts\Cache\Repository as BaseContract;
-use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
@@ -29,8 +24,6 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Cache\CacheManager;
-use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -106,8 +99,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->register(FortifyServiceProvider::class);
 
-        $this->registerCache();
-
         // Register search clients
         $this->registerSearchClients();
 
@@ -153,18 +144,29 @@ final class CoreServiceProvider extends ModuleServiceProvider
             $schedule = $this->app->make(Schedule::class);
             $crons = [];
             $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
-            $cache_tags = Cache::getCacheTags();
 
-            if (Cache::tags($cache_tags)->has($cache_key)) {
-                $crons = Cache::tags($cache_tags)->get($cache_key);
-            } else {
-                try {
-                    if (SchemaInspector::getInstance()->hasTable($cache_key)) {
-                        $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
+            /** @var Illuminate\Cache\Repository $cache * */
+            $cache = Cache::store();
+
+            if ($cache->supportsTags() && method_exists($cache, 'getCacheTags')) {
+                $cache_tags = $cache->getCacheTags();
+
+                if (Cache::tags($cache_tags)->has($cache_key)) {
+                    $crons = Cache::tags($cache_tags)->get($cache_key) ?? [];
+                } else {
+                    $crons = $this->loadCronJobsFromDatabase($cache_key);
+
+                    if ($crons !== []) {
                         Cache::tags($cache_tags)->put($cache_key, $crons);
                     }
-                } catch (Exception $e) {
-                    report($e);
+                }
+            } elseif (Cache::has($cache_key)) {
+                $crons = Cache::get($cache_key) ?? [];
+            } else {
+                $crons = $this->loadCronJobsFromDatabase($cache_key);
+
+                if ($crons !== []) {
+                    Cache::put($cache_key, $crons);
                 }
             }
 
@@ -172,6 +174,26 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
             }
         });
+    }
+
+    /**
+     * Load cron jobs from the database for the given table name.
+     *
+     * @return array<int, array{command: string, schedule: string}>
+     */
+    private function loadCronJobsFromDatabase(string $cache_key): array
+    {
+        try {
+            if (! SchemaInspector::getInstance()->hasTable($cache_key)) {
+                return [];
+            }
+
+            return CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
+        } catch (Exception $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**
@@ -289,76 +311,5 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
         $router->aliasMiddleware('crud_api', EnsureCrudApiAreEnabled::class);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws ContainerExceptionInterface
-     * @throws NotFoundExceptionInterface
-     */
-    private function registerCache(): void
-    {
-        // Override the CacheManager to return our custom Repository
-        $this->app->extend('cache', static fn ($cacheManager, Application $app): BaseCacheManager => new CacheManager($app));
-
-        // Override the cache.store binding to ensure it uses our Repository
-        $this->app->extend('cache.store', static function ($service, Application $app): Repository {
-            // Get the underlying store
-            /** @var Store $store */
-            $store = $app->get(\Illuminate\Contracts\Cache\Factory::class)->driver()->getStore();
-
-            // Get the cache configuration
-            $config = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.stores.' . $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.default'));
-
-            // Create our custom Repository
-            $repository = new Repository($store, $config);
-
-            // Set the event dispatcher
-            $repository->setEventDispatcher($app->get(\Illuminate\Contracts\Events\Dispatcher::class));
-
-            return $repository;
-        });
-
-        // Override the cache.memo binding to use our Repository
-        $this->app->extend('cache.memo', static function ($service, Application $app): Repository {
-            $driver = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.default');
-
-            if (! $app->bound($bindingKey = 'cache.__memoized:' . $driver)) {
-                $store = $app->get(\Illuminate\Contracts\Cache\Factory::class)->driver($driver)->getStore();
-                $config = $app->get(\Illuminate\Contracts\Config\Repository::class)->get('cache.stores.' . $driver);
-
-                $repository = new Repository(
-                    new MemoizedStore($driver, $store),
-                    $config,
-                );
-                $repository->setEventDispatcher($app->get(\Illuminate\Contracts\Events\Dispatcher::class));
-
-                $app->scoped($bindingKey, static fn (): Repository => $repository);
-            }
-
-            return $app->make($bindingKey);
-        });
-
-        // Bind interfaces to the correct service
-        $this->app->bind(BaseRepository::class, static fn ($app): Repository => $app['cache.store']);
-        $this->app->bind(BaseContract::class, static fn ($app): Repository => $app['cache.store']);
-        $this->app->bind(Repository::class, static fn ($app): Repository => $app['cache.store']);
-
-        // Register macros
-        Cache::macro('memo', static fn (): Repository => resolve('cache.memo'));
-        Cache::macro('tryByRequest', static fn (...$args): mixed => resolve(BaseRepository::class)->tryByRequest(...$args));
-        Cache::macro('clearByEntity', static function ($entity): void {
-            resolve(BaseRepository::class)->clearByEntity($entity);
-        });
-        Cache::macro('clearByRequest', static function ($request, $entity = null): void {
-            resolve(BaseRepository::class)->clearByRequest($request, $entity);
-        });
-        Cache::macro('clearByUser', static function ($request, $entity = null): void {
-            resolve(BaseRepository::class)->clearByUser($request->user(), $entity);
-        });
-        Cache::macro('clearByGroup', static function ($role, $entity = null): void {
-            resolve(BaseRepository::class)->clearByGroup($role, $entity);
-        });
-        Cache::macro('getCacheTags', static fn (...$args): array => resolve(BaseRepository::class)->getCacheTags(...$args));
     }
 }

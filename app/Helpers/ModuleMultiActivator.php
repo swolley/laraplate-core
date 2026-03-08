@@ -10,56 +10,64 @@ use Nwidart\Modules\Contracts\ActivatorInterface;
 use Nwidart\Modules\Module;
 use Override;
 
-final readonly class ModuleMultiActivator implements ActivatorInterface
+final class ModuleMultiActivator implements ActivatorInterface
 {
-    private ActivatorInterface $activator;
+    private ?ActivatorInterface $activator = null;
 
-    public function __construct(Container $app)
-    {
-        $this->activator = ModuleDatabaseActivator::checkSettingTable()
-            ? new ModuleDatabaseActivator($app)
-            : new FileActivator($app);
-    }
+    public function __construct(
+        private readonly Container $app,
+    ) {}
 
     #[Override]
     public function enable(Module $module): void
     {
-        $this->activator->enable($module);
+        $this->getActivator()->enable($module);
     }
 
     #[Override]
     public function disable(Module $module): void
     {
-        $this->activator->disable($module);
+        $this->getActivator()->disable($module);
     }
 
     #[Override]
-    public function hasStatus(Module $module, bool $status): bool
+    public function hasStatus(Module|string $module, bool $status): bool
     {
-        return $this->activator->hasStatus($module, $status);
+        return $this->getActivator()->hasStatus($module, $status);
     }
 
     #[Override]
     public function setActive(Module $module, bool $active): void
     {
-        $this->activator->setActive($module, $active);
+        $this->getActivator()->setActive($module, $active);
     }
 
     #[Override]
     public function setActiveByName(string $name, bool $active): void
     {
-        $this->activator->setActiveByName($name, $active);
+        $this->getActivator()->setActiveByName($name, $active);
     }
 
     #[Override]
     public function delete(Module $module): void
     {
-        $this->activator->delete($module);
+        $this->getActivator()->delete($module);
     }
 
     #[Override]
     public function reset(): void
     {
-        $this->activator->reset();
+        $this->getActivator()->reset();
+    }
+
+    private function getActivator(): ActivatorInterface
+    {
+        if ($this->activator === null) {
+            $this->activator = ModuleDatabaseActivator::checkSettingTable()
+                ? new ModuleDatabaseActivator($this->app)
+                : new FileActivator($this->app);
+        }
+
+        return $this->activator;
     }
 }

@@ -6,6 +6,7 @@ namespace Modules\Core\Filament\Resources\Modifications\Pages;
 
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Tables\Grouping\Group;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -59,10 +60,16 @@ final class ListModifications extends ListRecords
                 continue;
             }
 
-            $tabs[$type] = Tab::make(Str::afterLast($type, '\\'))
+            $label = Str::afterLast($type, '\\');
+
+            $tabs[$type] = Tab::make($label)
                 ->badge($totals)
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('modifiable_type', $type));
         }
+
+        $this->groups[] = Group::make('modifiable_type')
+            ->label('Model')
+            ->getTitleFromRecordUsing(fn (Model $record): string => ucfirst($record->modifiable_type));
 
         return $tabs;
     }

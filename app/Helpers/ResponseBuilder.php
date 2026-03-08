@@ -88,6 +88,7 @@ class ResponseBuilder
 
             if (count($data) > 0) {
                 $first = $data instanceof Collection ? $data->first() : $data[0];
+
                 if (is_object($first)) {
                     $this->setClass($first);
                 }

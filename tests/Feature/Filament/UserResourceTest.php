@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Models\User;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
 
 uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 

@@ -12,35 +12,38 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasTranslations;
+use Override;
 use ReflectionClass;
 use Throwable;
 
 class MakeModelTranslatableCommand extends Command
 {
-    protected $signature = 'make:model-translatable';
-
-    protected $description = 'Make an existing model translatable with HasTranslations trait, translation table and data migration <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
-
     /**
      * Column type names considered translatable (string-like and JSON types across DB drivers).
      */
-    private const TRANSLATABLE_TYPE_NAMES = [
+    private const array TRANSLATABLE_TYPE_NAMES = [
         'varchar', 'char', 'character', 'character varying', 'bpchar',
         'text', 'tinytext', 'mediumtext', 'longtext',
         'json', 'jsonb',
     ];
 
-    private const JSON_TYPE_NAMES = ['json', 'jsonb'];
+    private const array JSON_TYPE_NAMES = ['json', 'jsonb'];
 
     /**
      * Columns to never propose as translatable.
      */
-    private const EXCLUDED_COLUMNS = [
+    private const array EXCLUDED_COLUMNS = [
         'id', 'created_at', 'updated_at', 'deleted_at',
         'locale', 'password', 'remember_token',
         'is_deleted', 'is_locked', 'locked_at', 'locked_by',
         'email_verified_at',
     ];
+
+    #[Override]
+    protected $signature = 'make:model-translatable';
+
+    #[Override]
+    protected $description = 'Make an existing model translatable with HasTranslations trait, translation table and data migration <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     public function handle(): int
     {
@@ -77,7 +80,7 @@ class MakeModelTranslatableCommand extends Command
         $raw_columns = Schema::getColumns($table_name);
         $translatable = array_values(array_filter(
             $raw_columns,
-            fn (array $col): bool => $this->isTranslatableColumn($col),
+            $this->isTranslatableColumn(...),
         ));
 
         if ($translatable === []) {
@@ -173,7 +176,6 @@ class MakeModelTranslatableCommand extends Command
         $this->createTranslatableMigration(
             $table_name,
             $translation_table,
-            $translation_class_name,
             $model_fk,
             $model_singular,
             $selected_columns,
@@ -195,7 +197,7 @@ class MakeModelTranslatableCommand extends Command
             return false;
         }
 
-        if (str_ends_with($column['name'], '_id')) {
+        if (str_ends_with((string) $column['name'], '_id')) {
             return false;
         }
 
@@ -219,10 +221,10 @@ class MakeModelTranslatableCommand extends Command
         $stub = file_get_contents(module_path('Core', 'stubs/translation.stub'));
 
         $translation_namespace = Str::beforeLast($translation_full_name, '\\');
-        $fillable_names = array_map(fn ($col) => $col['name'], $selected_columns);
+        $fillable_names = array_map(fn (array $col) => $col['name'], $selected_columns);
 
         $fillable_str = implode(",\n        ", array_map(
-            fn ($name) => "'{$name}'",
+            fn ($name): string => "'{$name}'",
             $fillable_names,
         ));
 
@@ -239,7 +241,7 @@ class MakeModelTranslatableCommand extends Command
         }
 
         $casts_str = implode(",\n            ", array_map(
-            fn ($field, $type) => "'{$field}' => '{$type}'",
+            fn ($field, $type): string => "'{$field}' => '{$type}'",
             array_keys($casts),
             $casts,
         ));
@@ -254,7 +256,7 @@ class MakeModelTranslatableCommand extends Command
             : [];
         $translation_hidden = array_intersect($model_hidden, $fillable_names);
         $hidden_str = implode(",\n        ", array_map(
-            fn ($h) => "'{$h}'",
+            fn ($h): string => "'{$h}'",
             $translation_hidden,
         ));
 
@@ -312,7 +314,6 @@ class MakeModelTranslatableCommand extends Command
     private function createTranslatableMigration(
         string $table_name,
         string $translation_table,
-        string $translation_class_name,
         string $model_fk,
         string $model_singular,
         array $selected_columns,
@@ -326,28 +327,28 @@ class MakeModelTranslatableCommand extends Command
         $i7 = str_repeat(' ', 28);
 
         $translated_fields = implode("\n", array_map(
-            fn ($col) => $i3 . $this->columnToBlueprintCode($col),
+            fn (array $col): string => $i3 . $this->columnToBlueprintCode($col),
             $selected_columns,
         ));
 
         $insert_fields = implode("\n", array_map(
-            fn ($col) => "{$i5}'{$col['name']}' => \$row->{$col['name']},",
+            fn (array $col): string => "{$i5}'{$col['name']}' => \$row->{$col['name']},",
             $selected_columns,
         ));
 
         $col_names_list = implode("\n", array_map(
-            fn ($col) => "{$i4}'{$col['name']}',",
+            fn (array $col): string => "{$i4}'{$col['name']}',",
             $selected_columns,
         ));
         $drop_columns = "{$i3}\$table->dropColumn([\n{$col_names_list}\n{$i3}]);";
 
         $restore_columns = implode("\n", array_map(
-            fn ($col) => $i3 . $this->columnToBlueprintCode($col),
+            fn (array $col): string => $i3 . $this->columnToBlueprintCode($col),
             $selected_columns,
         ));
 
         $restore_fields = implode("\n", array_map(
-            fn ($col) => "{$i7}'{$col['name']}' => \$translation->{$col['name']},",
+            fn (array $col): string => "{$i7}'{$col['name']}' => \$translation->{$col['name']},",
             $selected_columns,
         ));
 
@@ -392,7 +393,7 @@ class MakeModelTranslatableCommand extends Command
             $class_pos = false;
 
             foreach (["\nfinal class ", "\nabstract class ", "\nclass "] as $prefix) {
-                $pos = strpos($content, $prefix);
+                $pos = mb_strpos($content, $prefix);
 
                 if ($pos !== false) {
                     $class_pos = $pos;
@@ -401,7 +402,7 @@ class MakeModelTranslatableCommand extends Command
                 }
             }
 
-            if (! empty($matches[0]) && $class_pos !== false) {
+            if (isset($matches[0]) && $matches[0] !== [] && $class_pos !== false) {
                 $last_import = null;
 
                 foreach ($matches[0] as $match) {
@@ -411,23 +412,21 @@ class MakeModelTranslatableCommand extends Command
                 }
 
                 if ($last_import !== null) {
-                    $insert_pos = $last_import[1] + strlen($last_import[0]);
-                    $content = substr($content, 0, $insert_pos)
+                    $insert_pos = $last_import[1] + mb_strlen($last_import[0]);
+                    $content = mb_substr($content, 0, $insert_pos)
                         . "\n" . $import_line
-                        . substr($content, $insert_pos);
+                        . mb_substr($content, $insert_pos);
                 }
             }
         }
 
         $trait_usage = 'use HasTranslations;';
 
-        if (! str_contains($content, $trait_usage)) {
-            if (preg_match('/(class\s+\w+[^{]*\{\s*\n)/', $content, $matches, PREG_OFFSET_CAPTURE)) {
-                $insert_pos = $matches[1][1] + strlen($matches[1][0]);
-                $content = substr($content, 0, $insert_pos)
-                    . "    {$trait_usage}\n"
-                    . substr($content, $insert_pos);
-            }
+        if (! str_contains($content, $trait_usage) && preg_match('/(class\s+\w+[^{]*\{\s*\n)/', $content, $matches, PREG_OFFSET_CAPTURE)) {
+            $insert_pos = $matches[1][1] + mb_strlen($matches[1][0]);
+            $content = mb_substr($content, 0, $insert_pos)
+                . "    {$trait_usage}\n"
+                . mb_substr($content, $insert_pos);
         }
 
         $content = $this->removeFieldsFromModel($content, $field_names);
@@ -447,7 +446,7 @@ class MakeModelTranslatableCommand extends Command
         $result = [];
 
         foreach ($lines as $line) {
-            $trimmed = trim($line);
+            $trimmed = mb_trim($line);
 
             if ($context === 'normal') {
                 if (str_contains($line, '$fillable') && str_contains($line, '=')) {
@@ -462,8 +461,8 @@ class MakeModelTranslatableCommand extends Command
             }
 
             if ($context !== 'normal') {
-                $open = substr_count($line, '[') + substr_count($line, '{');
-                $close = substr_count($line, ']') + substr_count($line, '}');
+                $open = mb_substr_count($line, '[') + mb_substr_count($line, '{');
+                $close = mb_substr_count($line, ']') + mb_substr_count($line, '}');
                 $depth += $open - $close;
 
                 if ($open > 0 || $close > 0) {
@@ -475,7 +474,7 @@ class MakeModelTranslatableCommand extends Command
 
             if ($context !== 'normal') {
                 foreach ($field_names as $name) {
-                    if (preg_match("/'" . preg_quote($name, '/') . "'/", $trimmed)) {
+                    if (preg_match("/'" . preg_quote((string) $name, '/') . "'/", $trimmed)) {
                         $should_skip = true;
 
                         break;
@@ -517,7 +516,7 @@ class MakeModelTranslatableCommand extends Command
 
         if (
             in_array($method, ['string', 'char'], true)
-            && preg_match('/\((\d+)\)/', $full_type, $matches)
+            && preg_match('/\((\d+)\)/', (string) $full_type, $matches)
         ) {
             $length = (int) $matches[1];
 
@@ -527,8 +526,7 @@ class MakeModelTranslatableCommand extends Command
         }
 
         $code .= ')->nullable(' . ($nullable ? 'true' : 'false') . ')';
-        $code .= "->comment('The translated {$name}');";
 
-        return $code;
+        return $code . "->comment('The translated {$name}');";
     }
 }

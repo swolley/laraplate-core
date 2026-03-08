@@ -44,6 +44,7 @@ return new class() extends Migration
     {
         Schema::table('users', function (Blueprint $table): void {
             $driver = Schema::getConnection()->getDriverName();
+
             if ($driver === 'sqlite') {
                 $table->dropUnique('users_username_UN');
             }

@@ -23,7 +23,8 @@ $container->singleton('config', static fn (): Illuminate\Config\Repository => ne
 $container->singleton('date', static fn (): Illuminate\Support\DateFactory => new Illuminate\Support\DateFactory());
 
 $container->singleton('app', static function () use ($container): object {
-    return new class($container) {
+    return new class($container)
+    {
         public function __construct(private readonly Illuminate\Container\Container $container) {}
 
         public function getLocale(): string
@@ -49,7 +50,7 @@ spl_autoload_register(static function (string $class): void {
 
     foreach ($map as $prefix => $base_dir) {
         if (str_starts_with($class, $prefix)) {
-            $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
+            $relative = str_replace('\\', '/', mb_substr($class, mb_strlen($prefix)));
             $file = $base_dir . $relative . '.php';
 
             if (file_exists($file)) {
@@ -67,7 +68,7 @@ if (! function_exists('module_path')) {
      */
     function module_path(string $module, string $path = ''): string
     {
-        return dirname(__DIR__) . '/' . ltrim($path, '/');
+        return dirname(__DIR__) . '/' . mb_ltrim($path, '/');
     }
 }
 
@@ -75,9 +76,9 @@ if (! function_exists('fake')) {
     /**
      * Standalone stub: returns a Faker instance so factories can run without full Laravel app.
      */
-    function fake(?string $locale = null): \Faker\Generator
+    function fake(?string $locale = null): Faker\Generator
     {
-        return \Faker\Factory::create($locale ?? config('app.faker_locale', 'en_US'));
+        return Faker\Factory::create($locale ?? config('app.faker_locale', 'en_US'));
     }
 }
 

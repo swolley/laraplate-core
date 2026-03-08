@@ -26,7 +26,14 @@ final class Inspect
     public static function table(string $name, ?string $schema = null): ?Table
     {
         $key_name = self::keyName($name, $schema);
-        $inspected_data = Cache::tags(Cache::getCacheTags(['inspector', $schema ?? 'default']))->get($key_name);
+        $cache = Cache::store();
+
+        /** @var Illuminate\Support\Facades\Cache $cache * */
+        $use_tags = $cache->supportsTags() && method_exists($cache, 'getCacheTags');
+
+        $inspected_data = $use_tags
+            ? Cache::tags(Cache::getCacheTags(['inspector', $schema ?? 'default']))->get($key_name)
+            : Cache::get(self::cacheKeyWithoutTags($key_name));
 
         if ($inspected_data) {
             return $inspected_data;
@@ -55,7 +62,11 @@ final class Inspect
             $schema,
         );
 
-        Cache::tags(Cache::getCacheTags(['inspector', $schema]))->forever($key_name, $inspected_data);
+        if ($use_tags) {
+            Cache::tags(Cache::getCacheTags(['inspector', $schema]))->forever($key_name, $inspected_data);
+        } else {
+            Cache::forever(self::cacheKeyWithoutTags($key_name), $inspected_data);
+        }
 
         return $inspected_data;
     }
@@ -133,6 +144,11 @@ final class Inspect
         $foreigns = self::foreignKeys($table, $schema);
 
         return Arr::first($foreigns, fn ($foreign): bool => $foreign['name'] === $name);
+    }
+
+    private static function cacheKeyWithoutTags(string $key_name): string
+    {
+        return 'inspector:' . $key_name;
     }
 
     private static function getAttributesForColumn(array $column): Collection

@@ -79,7 +79,7 @@ final class Repository extends BaseRepository
         $tags_input = $entity instanceof Model
             ? $this->getTableName($entity)
             : (is_array($entity) ? array_map(fn (Model|string $e): string => $e instanceof Model ? $this->getTableName($e) : $e, $entity) : ($entity ?? []));
-        $tags = self::getCacheTags(is_array($tags_input) ? $tags_input : (string) $tags_input);
+        $tags = self::getCacheTags(is_array($tags_input) ? $tags_input : $tags_input);
 
         if ($entity) {
             $models = Arr::wrap($entity);

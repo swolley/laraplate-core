@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Inspector\Inspect;
 use Modules\Core\Inspector\SchemaInspector;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {

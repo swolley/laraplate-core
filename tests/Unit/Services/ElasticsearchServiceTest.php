@@ -7,10 +7,12 @@ use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Response\Elasticsearch;
 use GuzzleHttp\Psr7\Response;
 use Modules\Core\Services\ElasticsearchService;
+use Modules\Core\Tests\LaravelTestCase;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-uses(Tests\LaravelTestCase::class);
+
+uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     resetElasticsearchSingleton();

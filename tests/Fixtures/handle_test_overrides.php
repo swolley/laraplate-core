@@ -3,14 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Namespace-local function overrides for testing handle().
- *
- * Unqualified function calls inside Modules\Core\Console resolve here
- * BEFORE falling back to global scope, allowing per-test control
- * without monkey-patching or uopz.
+ * Namespace-local function overrides for testing.
  */
 
-namespace Modules\Core\Console;
+namespace Modules\Core\Tests\Fixtures;
 
 class HandleTestContext
 {

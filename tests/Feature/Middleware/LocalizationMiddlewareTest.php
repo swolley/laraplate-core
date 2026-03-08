@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Symfony\Component\HttpFoundation\Response;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 it('has correct class structure', function (): void {

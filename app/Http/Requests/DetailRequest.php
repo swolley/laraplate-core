@@ -13,6 +13,7 @@ class DetailRequest extends SelectRequest
     public function rules(): array
     {
         $rules = parent::rules();
+
         foreach (is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey] as $key) {
             $rules[$key] = ['required'];
         }

@@ -10,12 +10,14 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-uses(Tests\LaravelTestCase::class);
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $admin = User::factory()->create([

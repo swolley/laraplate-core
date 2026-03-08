@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+
 uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
 
 it('prevents assigning another role to a user who already has superadmin role', function (): void {

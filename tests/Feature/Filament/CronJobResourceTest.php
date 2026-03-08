@@ -6,7 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     /** @var TestCase $this */

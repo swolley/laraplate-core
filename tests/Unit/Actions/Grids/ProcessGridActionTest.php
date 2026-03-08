@@ -9,7 +9,9 @@ use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 it('processes grid with resolvers', function (): void {
     $user = User::factory()->create();

@@ -19,10 +19,10 @@ use Override;
 
 /**
  * ACL (Access Control List) model for row-level security.
- * 
+ *
  * ACLs define filters that restrict which records a user can access
  * when they have a specific permission. The system uses inheritance:
- * 
+ *
  * - If a role has an ACL for a permission → use it (overrides parent)
  * - If a role has NO ACL → inherit from parent role
  * - If unrestricted=true → no filters applied (full access)

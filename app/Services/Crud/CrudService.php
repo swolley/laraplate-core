@@ -134,9 +134,8 @@ class CrudService
         $key_value = is_array($key)
             ? array_map(fn (string $k) => $requestData->request->validated($k) ?? $requestData->request->input($k) ?? $requestData->request->route($k), $key)
             : ($requestData->request->validated($key) ?? $requestData->request->input($key) ?? $requestData->request->route($key));
-        if ($key_value === null || $key_value === '') {
-            throw new ModelNotFoundException('Primary key is required for detail.');
-        }
+
+        throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
 
         // 3. Build query and apply ACL filters
         $query = $model->newQuery()->where(is_array($key_value) ? $key_value : [$key => $key_value]);
@@ -246,6 +245,7 @@ class CrudService
 
         $history_relation = $data->getRelation('history');
         $history_array = [];
+
         if ($history_relation !== null && $history_relation instanceof Collection) {
             $history_array = $history_relation->toArray();
         }
@@ -257,6 +257,7 @@ class CrudService
         );
 
         $record_array = $data->getAttributes();
+
         if ($record_array === null) {
             $record_array = [];
         }
@@ -353,7 +354,7 @@ class CrudService
 
         throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
         $updated_records = new Collection();
-        DB::transaction(function () use ($found_records, $updated_records, $requestData, $changes): void {
+        DB::transaction(function () use ($found_records, $updated_records, $changes): void {
             foreach ($found_records as $found_record) {
                 /** @psalm-suppress InvalidArgument */
                 if ($found_record->update($changes)) {
@@ -511,15 +512,7 @@ class CrudService
     {
         $pk_keys = is_array($requestData->primaryKey) ? $requestData->primaryKey : [$requestData->primaryKey];
         $expected = array_merge(['filters'], $pk_keys);
-        $unexpected = array_filter($discardedMessages, static function (string $msg) use ($expected): bool {
-            foreach ($expected as $key) {
-                if (str_contains($msg, "'{$key}'")) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
+        $unexpected = array_filter($discardedMessages, static fn (string $msg): bool => array_all($expected, fn ($key): bool => ! str_contains($msg, "'{$key}'")));
 
         return $unexpected === [] ? null : implode(', ', $unexpected);
     }

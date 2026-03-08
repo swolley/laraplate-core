@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Fixtures;
+namespace Modules\Core\Tests\Fixtures;
 
 /**
  * Minimal class without $hidden property anywhere in the hierarchy.

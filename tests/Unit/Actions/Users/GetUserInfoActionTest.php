@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Illuminate\Foundation\Auth\User;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Http\Resources\UserInfoResponse;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 afterEach(function (): void {
     Mockery::close();

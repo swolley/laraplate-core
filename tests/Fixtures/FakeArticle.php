@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Fixtures;
+namespace Modules\Core\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasTranslations;

@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\Prompt;
 use Laravel\Prompts\SelectPrompt;
 use Modules\Core\Console\HandleTestContext;
 use Modules\Core\Console\MakeModelTranslatableCommand;
+use Modules\Core\Tests\Fixtures\BareClass;
+use Modules\Core\Tests\Fixtures\FakeArticle;
+use Modules\Core\Tests\Fixtures\FakeModulePost;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-use Modules\Fake\Models\FakeModulePost;
-use Tests\Fixtures\BareClass;
-use Tests\Fixtures\FakeArticle;
 
 require_once dirname(__DIR__, 2) . '/Fixtures/handle_test_overrides.php';
 
@@ -26,7 +27,7 @@ require_once dirname(__DIR__, 2) . '/Fixtures/handle_test_overrides.php';
 
 function stubPath(string $relative): string
 {
-    return dirname(__DIR__, 3) . '/' . ltrim($relative, '/');
+    return dirname(__DIR__, 3) . '/' . mb_ltrim($relative, '/');
 }
 
 /**
@@ -397,9 +398,9 @@ PHP;
 PHP;
         $result = $this->method->invoke($this->command, $content, ['title']);
 
-        expect(substr_count($result, "'title'"))->toBe(0);
+        expect(mb_substr_count($result, "'title'"))->toBe(0);
         expect($result)->toContain("'slug'");
-        expect(substr_count($result, "'is_active'"))->toBe(2);
+        expect(mb_substr_count($result, "'is_active'"))->toBe(2);
     });
 
     it('handles empty fillable array', function (): void {
@@ -468,14 +469,14 @@ describe('migration stub', function (): void {
 
     it('drops columns from original table in up()', function (): void {
         $stub = file_get_contents(stubPath('stubs/make_model_translatable_migration.stub'));
-        $up = substr($stub, 0, strpos($stub, 'public function down'));
+        $up = mb_substr($stub, 0, mb_strpos($stub, 'public function down'));
 
         expect($up)->toContain('[DROP_COLUMNS]');
     });
 
     it('restores columns and data in down()', function (): void {
         $stub = file_get_contents(stubPath('stubs/make_model_translatable_migration.stub'));
-        $down = substr($stub, strpos($stub, 'public function down'));
+        $down = mb_substr($stub, mb_strpos($stub, 'public function down'));
 
         expect($down)
             ->toContain('[RESTORE_COLUMNS]')
@@ -616,7 +617,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -633,7 +634,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -643,7 +644,7 @@ describe('createTranslationModel', function (): void {
 
         $content = file_get_contents($this->tmp_dir . 'FakeArticleTranslation.php');
 
-        expect($content)->toContain('namespace Tests\\Fixtures\\Translations;');
+        expect($content)->toContain('namespace Modules\\Core\\Tests\\Fixtures\\Translations;');
     });
 
     it('generated model contains fillable attributes', function (): void {
@@ -651,7 +652,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -674,7 +675,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -692,7 +693,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -712,7 +713,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -733,7 +734,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -744,9 +745,9 @@ describe('createTranslationModel', function (): void {
         $content = file_get_contents($this->tmp_dir . 'FakeArticleTranslation.php');
 
         expect($content)->toContain("'body',");
-        $hidden_start = strpos($content, '$hidden');
-        $hidden_end = strpos($content, '];', $hidden_start);
-        $hidden_block = substr($content, $hidden_start, $hidden_end - $hidden_start);
+        $hidden_start = mb_strpos($content, '$hidden');
+        $hidden_end = mb_strpos($content, '];', $hidden_start);
+        $hidden_block = mb_substr($content, $hidden_start, $hidden_end - $hidden_start);
 
         expect($hidden_block)->toContain("'body'");
     });
@@ -758,7 +759,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -783,7 +784,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             FakeArticle::class,
             'FakeArticle',
-            'Tests\\Fixtures\\Translations\\FakeArticleTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -799,9 +800,9 @@ describe('createTranslationModel', function (): void {
     it('handles model without explicit hidden property', function (): void {
         $result = $this->method->invoke(
             $this->command,
-            \Illuminate\Database\Eloquent\Model::class,
+            Model::class,
             'Model',
-            'Illuminate\\Database\\Eloquent\\Translations\\ModelTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\ModelTranslation',
             'ModelTranslation',
             'model_id',
             'model',
@@ -812,9 +813,9 @@ describe('createTranslationModel', function (): void {
         expect($result)->toBe(Command::SUCCESS);
 
         $content = file_get_contents($this->tmp_dir . 'ModelTranslation.php');
-        $hidden_start = strpos($content, '$hidden');
-        $hidden_end = strpos($content, '];', $hidden_start);
-        $hidden_block = substr($content, $hidden_start, $hidden_end - $hidden_start);
+        $hidden_start = mb_strpos($content, '$hidden');
+        $hidden_end = mb_strpos($content, '];', $hidden_start);
+        $hidden_block = mb_substr($content, $hidden_start, $hidden_end - $hidden_start);
 
         expect($hidden_block)->not->toContain("'title'");
     });
@@ -824,7 +825,7 @@ describe('createTranslationModel', function (): void {
             $this->command,
             BareClass::class,
             'BareClass',
-            'Tests\\Fixtures\\Translations\\BareClassTranslation',
+            'Modules\\Core\\Tests\\Fixtures\\Translations\\BareClassTranslation',
             'BareClassTranslation',
             'bare_item_id',
             'bare_item',
@@ -835,9 +836,9 @@ describe('createTranslationModel', function (): void {
         expect($result)->toBe(Command::SUCCESS);
 
         $content = file_get_contents($this->tmp_dir . 'BareClassTranslation.php');
-        $hidden_start = strpos($content, '$hidden');
-        $hidden_end = strpos($content, '];', $hidden_start);
-        $hidden_block = substr($content, $hidden_start, $hidden_end - $hidden_start);
+        $hidden_start = mb_strpos($content, '$hidden');
+        $hidden_end = mb_strpos($content, '];', $hidden_start);
+        $hidden_block = mb_substr($content, $hidden_start, $hidden_end - $hidden_start);
 
         expect($hidden_block)->not->toContain("'title'");
     });
@@ -1000,7 +1001,7 @@ describe('createTranslatableMigration', function (): void {
 
         $file = glob($this->tmp_dir . '*.php')[0];
         $content = file_get_contents($file);
-        $down = substr($content, strpos($content, 'function down'));
+        $down = mb_substr($content, mb_strpos($content, 'function down'));
 
         expect($down)
             ->toContain("'title' => \$translation->title")
@@ -1081,9 +1082,9 @@ describe('addTraitToModel', function (): void {
         $this->method->invoke($this->command, FakeArticle::class, ['title', 'body']);
 
         $content = file_get_contents($this->fixture_path);
-        $fillable_start = strpos($content, '$fillable');
-        $fillable_end = strpos($content, '];', $fillable_start);
-        $fillable_block = substr($content, $fillable_start, $fillable_end - $fillable_start);
+        $fillable_start = mb_strpos($content, '$fillable');
+        $fillable_end = mb_strpos($content, '];', $fillable_start);
+        $fillable_block = mb_substr($content, $fillable_start, $fillable_end - $fillable_start);
 
         expect($fillable_block)->not->toContain("'title'");
         expect($fillable_block)->not->toContain("'body'");
@@ -1102,9 +1103,9 @@ describe('addTraitToModel', function (): void {
         $this->method->invoke($this->command, FakeArticle::class, ['title', 'body']);
 
         $content = file_get_contents($this->fixture_path);
-        $casts_start = strpos($content, 'function casts');
-        $casts_end = strpos($content, '}', strpos($content, 'return [', $casts_start));
-        $casts_block = substr($content, $casts_start, $casts_end - $casts_start);
+        $casts_start = mb_strpos($content, 'function casts');
+        $casts_end = mb_strpos($content, '}', mb_strpos($content, 'return [', $casts_start));
+        $casts_block = mb_substr($content, $casts_start, $casts_end - $casts_start);
 
         expect($casts_block)->not->toContain("'title'");
         expect($casts_block)->not->toContain("'body'");
@@ -1124,8 +1125,8 @@ describe('addTraitToModel', function (): void {
 
         $content = file_get_contents($this->fixture_path);
 
-        expect(substr_count($content, 'use Modules\\Core\\Helpers\\HasTranslations;'))->toBe(1);
-        expect(substr_count($content, 'use HasTranslations;'))->toBe(1);
+        expect(mb_substr_count($content, 'use Modules\\Core\\Helpers\\HasTranslations;'))->toBe(1);
+        expect(mb_substr_count($content, 'use HasTranslations;'))->toBe(1);
     });
 
     it('produces valid PHP after modification', function (): void {
@@ -1137,7 +1138,7 @@ describe('addTraitToModel', function (): void {
     });
 
     it('warns and returns early when file path cannot be determined', function (): void {
-        $this->method->invoke($this->command, \stdClass::class, ['title']);
+        $this->method->invoke($this->command, stdClass::class, ['title']);
 
         $content = file_get_contents($this->fixture_path);
 
@@ -1209,9 +1210,15 @@ describe('handle', function (): void {
 
         $schema = new class
         {
-            public function hasTable(string $t): bool { return false; }
+            public function hasTable(string $t): bool
+            {
+                return false;
+            }
 
-            public function getColumns(string $t): array { return []; }
+            public function getColumns(string $t): array
+            {
+                return [];
+            }
         };
         Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
 
@@ -1226,7 +1233,10 @@ describe('handle', function (): void {
 
         $schema = new class
         {
-            public function hasTable(string $t): bool { return true; }
+            public function hasTable(string $t): bool
+            {
+                return true;
+            }
 
             public function getColumns(string $t): array
             {
@@ -1250,7 +1260,10 @@ describe('handle', function (): void {
 
         $schema = new class
         {
-            public function hasTable(string $t): bool { return true; }
+            public function hasTable(string $t): bool
+            {
+                return true;
+            }
 
             public function getColumns(string $t): array
             {
@@ -1276,7 +1289,10 @@ describe('handle', function (): void {
         {
             private array $existing = ['articles'];
 
-            public function hasTable(string $t): bool { return in_array($t, $this->existing, true); }
+            public function hasTable(string $t): bool
+            {
+                return in_array($t, $this->existing, true);
+            }
 
             public function getColumns(string $t): array
             {
@@ -1313,7 +1329,10 @@ describe('handle', function (): void {
         {
             private array $existing = ['posts'];
 
-            public function hasTable(string $t): bool { return in_array($t, $this->existing, true); }
+            public function hasTable(string $t): bool
+            {
+                return in_array($t, $this->existing, true);
+            }
 
             public function getColumns(string $t): array
             {
@@ -1369,7 +1388,10 @@ describe('handle', function (): void {
         {
             private array $existing = ['articles'];
 
-            public function hasTable(string $t): bool { return in_array($t, $this->existing, true); }
+            public function hasTable(string $t): bool
+            {
+                return in_array($t, $this->existing, true);
+            }
 
             public function getColumns(string $t): array
             {

@@ -49,7 +49,9 @@ final class DynamicEntity extends Model
 
     private array $dynamic_casts = [];
 
-    /** @var array<string, array<string, array<int, mixed>>> Rules built from schema inspection (e.g. ['always' => ['name' => ['required']]]) */
+    /**
+     * @var array<string, array<string, array<int, mixed>>> Rules built from schema inspection (e.g. ['always' => ['name' => ['required']]])
+     */
     private array $inspected_rules = [];
 
     /**
@@ -60,35 +62,6 @@ final class DynamicEntity extends Model
     public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
     {
         return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
-    }
-
-    /**
-     * When fillable was not populated by inspect() (e.g. getInspectedTable returned null), derive from schema.
-     */
-    public function getFillable(): array
-    {
-        $fillable = parent::getFillable();
-
-        if ($fillable !== [] || $this->table === '' || $this->table === 'dynamic_entities') {
-            return $fillable;
-        }
-
-        $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
-
-        if (! $inspected instanceof Table) {
-            return $fillable;
-        }
-
-        $names = [];
-        foreach ($inspected->columns as $column) {
-            if (! $column->isAutoincrement()) {
-                $names[] = $column->name;
-            }
-        }
-
-        $this->fillable = array_merge($this->fillable, $names);
-
-        return $this->fillable;
     }
 
     /**
@@ -116,6 +89,36 @@ final class DynamicEntity extends Model
 
         // When request does not specify a connection, accept the model (use default connection).
         return $requestConnection === null || $connection === $requestConnection ? $found : null;
+    }
+
+    /**
+     * When fillable was not populated by inspect() (e.g. getInspectedTable returned null), derive from schema.
+     */
+    public function getFillable(): array
+    {
+        $fillable = parent::getFillable();
+
+        if ($fillable !== [] || $this->table === '' || $this->table === 'dynamic_entities') {
+            return $fillable;
+        }
+
+        $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
+
+        if (! $inspected instanceof Table) {
+            return $fillable;
+        }
+
+        $names = [];
+
+        foreach ($inspected->columns as $column) {
+            if (! $column->isAutoincrement()) {
+                $names[] = $column->name;
+            }
+        }
+
+        $this->fillable = array_merge($this->fillable, $names);
+
+        return $this->fillable;
     }
 
     public function getDynamicRelations(): array
@@ -159,6 +162,17 @@ final class DynamicEntity extends Model
         return array_filter($serialized, static fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
+    public function getRules(): array
+    {
+        $rules = $this->getRulesTrait();
+
+        if ($this->inspected_rules !== []) {
+            $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE] ?? [], $this->inspected_rules[self::DEFAULT_RULE] ?? []);
+        }
+
+        return $rules;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -179,6 +193,16 @@ final class DynamicEntity extends Model
         throw_if(count($found) > 1, Exception::class, sprintf("Too many models found for '%s'", $modelName));
 
         return count($found) === 1 ? head($found) : null;
+    }
+
+    /**
+     * Map Inspector/Doctrine column type to a Laravel validation rule (Laravel has no "unknown", "blob", etc.).
+     */
+    private function columnTypeToValidationRule(string $typeValue): string
+    {
+        $laravel_rules = ['string', 'integer', 'numeric', 'boolean', 'array', 'date', 'json'];
+
+        return in_array($typeValue, $laravel_rules, true) ? $typeValue : 'string';
     }
 
     private function verifyTableExistence(): void
@@ -264,7 +288,7 @@ final class DynamicEntity extends Model
         if (! isset($this->inspected_rules[self::DEFAULT_RULE])) {
             $this->inspected_rules[self::DEFAULT_RULE] = [];
         }
-        $type_rule = $is_date ? 'date' : self::columnTypeToValidationRule($column->type->value);
+        $type_rule = $is_date ? 'date' : $this->columnTypeToValidationRule($column->type->value);
         $this->inspected_rules[self::DEFAULT_RULE][$column->name] = [$type_rule];
 
         $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
@@ -296,27 +320,6 @@ final class DynamicEntity extends Model
         if (in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting) {
             $this->forceDeleting = false;
         }
-    }
-
-    public function getRules(): array
-    {
-        $rules = $this->getRulesTrait();
-
-        if ($this->inspected_rules !== []) {
-            $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE] ?? [], $this->inspected_rules[self::DEFAULT_RULE] ?? []);
-        }
-
-        return $rules;
-    }
-
-    /**
-     * Map Inspector/Doctrine column type to a Laravel validation rule (Laravel has no "unknown", "blob", etc.).
-     */
-    private static function columnTypeToValidationRule(string $typeValue): string
-    {
-        $laravel_rules = ['string', 'integer', 'numeric', 'boolean', 'array', 'date', 'json'];
-
-        return in_array($typeValue, $laravel_rules, true) ? $typeValue : 'string';
     }
 
     /**

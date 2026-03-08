@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Fake\Models;
+namespace Modules\Core\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
 

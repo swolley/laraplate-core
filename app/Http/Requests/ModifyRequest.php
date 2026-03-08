@@ -14,7 +14,9 @@ use Override;
 
 final class ModifyRequest extends CrudRequest implements IParsableRequest
 {
-    /** @var array<string, mixed> */
+    /**
+     * @var array<string, mixed>
+     */
     private array $mergeRules = [];
 
     #[Override]
@@ -37,8 +39,10 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
         // Ensure primary key (e.g. id) from route/query is in request for update/delete so validated() and ModifyRequestData have it
         $pk = is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey];
+
         foreach ($pk as $key) {
             $value = $this->route($key) ?? $this->input($key);
+
             if ($value !== null && $value !== '') {
                 $this->merge([$key => $value]);
             }
@@ -81,17 +85,19 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
             foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
                 $rule_key = $attribute;
+
                 // For update/delete skip merging model rules for primary key so we don't validate "exists" (service returns 404 when not found)
                 if (($is_update || $is_delete) && in_array($rule_key, $pk_keys, true)) {
                     continue;
                 }
                 $existing = $to_merge[$rule_key] ?? [];
-                $normalized = self::normalizeRules($rule);
+                $normalized = $this->normalizeRules($rule);
+
                 // For update/delete, only validate non-PK fields when present (avoid requiring password/username on partial update)
                 if (($is_update || $is_delete) && ! in_array($rule_key, $pk_keys, true)) {
-                    $normalized = self::mergeRulesUnique(['sometimes', ... $normalized]);
+                    $normalized = $this->mergeRulesUnique(['sometimes', ...$normalized]);
                 }
-                $to_merge[$rule_key] = self::mergeRulesUnique([... (array) $existing, ... $normalized]);
+                $to_merge[$rule_key] = $this->mergeRulesUnique([...(array) $existing, ...$normalized]);
 
                 $to_merge['filters'][] = ['property' => $rule_key, 'value' => $this->input($rule_key) ?? $this->input(sprintf('%s.%s', $main_entity, $rule_key))];
             }
@@ -107,9 +113,9 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
      * @param  array<int, mixed>  $rules
      * @return array<int, string|object>
      */
-    private static function mergeRulesUnique(array $rules): array
+    private function mergeRulesUnique(array $rules): array
     {
-        $all_scalar = ! array_filter($rules, fn ($r) => ! is_scalar($r));
+        $all_scalar = ! array_filter($rules, fn ($r): bool => ! is_scalar($r));
 
         return array_values($all_scalar ? array_unique($rules) : $rules);
     }
@@ -120,7 +126,7 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
      * @param  array<int, mixed>|string|mixed  $rule
      * @return array<int, string|object>
      */
-    private static function normalizeRules(array|string $rule): array
+    private function normalizeRules(array|string $rule): array
     {
         $rules = is_array($rule) ? $rule : [$rule];
         $result = [];
@@ -128,7 +134,8 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
         foreach ($rules as $r) {
             if (is_string($r) && str_contains($r, '|')) {
                 foreach (explode('|', $r) as $part) {
-                    $part = trim($part);
+                    $part = mb_trim($part);
+
                     if ($part !== '') {
                         $result[] = $part;
                     }

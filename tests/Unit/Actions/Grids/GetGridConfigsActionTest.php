@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Services\Authorization\AuthorizationService;
-uses(Tests\LaravelTestCase::class);
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 it('returns configs for models', function (): void {
     $auth = $this->app->make(AuthorizationService::class);
