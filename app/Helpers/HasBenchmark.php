@@ -129,7 +129,14 @@ trait HasBenchmark
     {
         // Convert memory usage to a more readable format
         $unit = ['b', 'K', 'M', 'G', 'T', 'P'];
-        $usage = round($memoryUsage / 1024 ** $i = floor(log($memoryUsage, 1024)), 2) . $unit[$i];
+
+        if ($memoryUsage <= 0) {
+            $usage = '0b';
+        } else {
+            $i = (int) floor(log($memoryUsage, 1024));
+            $i = max(0, min($i, count($unit) - 1));
+            $usage = round($memoryUsage / (1024 ** $i), 2) . $unit[$i];
+        }
 
         // Format boot time
         $formattedBootTime = self::formatTime($bootTime);

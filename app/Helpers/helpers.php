@@ -29,7 +29,17 @@ if (! function_exists('modules')) {
     function modules(bool $showMainApp = false, bool $fullpath = false, bool $onlyActive = true, ?string $onlyModule = null, ?bool $prioritySort = false, ?callable $filter = null): array
     {
         $module_class = Nwidart\Modules\Facades\Module::class;
-        $modules = class_exists($module_class) ? ($onlyActive ? $module_class::allEnabled() : $module_class::all()) : [];
+        $modules = [];
+
+        if (class_exists($module_class)) {
+            try {
+                $modules = $onlyActive ? $module_class::allEnabled() : $module_class::all();
+            } catch (\Throwable) {
+                // If the modules system is not bootstrapped (for example in some
+                // isolated unit tests), gracefully fall back to an empty list.
+                $modules = [];
+            }
+        }
         $remapped_modules = [];
 
         foreach ($modules as $module => $class) {

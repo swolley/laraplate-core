@@ -156,11 +156,17 @@ final class Version extends OvertrueVersion
     {
         $serialized = parent::toArray();
 
-        // mask hashed values from json_encode
-        foreach ($serialized['versionable_data'] as &$value) {
-            if (gettype($value) === 'string' && mb_strlen($value) === 60 && preg_match('/^\$2y\$/', $value)) {
-                $value = '[hidden]';
+        // mask hashed values from json_encode (guard against null/non-iterable)
+        $data = $serialized['versionable_data'] ?? null;
+
+        if (is_array($data)) {
+            foreach ($data as &$value) {
+                if (gettype($value) === 'string' && mb_strlen($value) === 60 && preg_match('/^\$2y\$/', $value)) {
+                    $value = '[hidden]';
+                }
             }
+
+            $serialized['versionable_data'] = $data;
         }
 
         return $serialized;

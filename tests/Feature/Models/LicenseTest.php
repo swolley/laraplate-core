@@ -5,8 +5,9 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
 
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->license = License::factory()->create();

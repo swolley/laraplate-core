@@ -6,8 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
+use Modules\Core\Tests\LaravelTestCase;
 
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     // Permissions are generated automatically, so we create one manually for testing

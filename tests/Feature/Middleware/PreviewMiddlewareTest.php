@@ -2,7 +2,31 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
+
+test('middleware calls next when request has no preview parameter', function (): void {
+    $request = Request::create('/test');
+    $next = fn ($req) => response('ok');
+    $middleware = new PreviewMiddleware;
+
+    $response = $middleware->handle($request, $next);
+
+    expect($response->getContent())->toBe('ok');
+});
+
+test('middleware calls next when request has preview parameter', function (): void {
+    $request = Request::create('/test', 'GET', ['preview' => 'true']);
+    $next = fn ($req) => response('ok');
+    $middleware = new PreviewMiddleware;
+
+    $response = $middleware->handle($request, $next);
+
+    expect($response->getContent())->toBe('ok');
+});
 
 test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(PreviewMiddleware::class);

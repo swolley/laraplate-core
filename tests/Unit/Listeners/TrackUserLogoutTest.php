@@ -2,7 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\Events\Logout;
 use Modules\Core\Listeners\TrackUserLogout;
+use Modules\Core\Models\License;
+use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
@@ -55,4 +61,28 @@ it('listener has proper type annotation', function (): void {
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('/** @var Model $user */');
+});
+
+it('listener handle deletes user license on logout when user has license', function (): void {
+    $user = User::factory()->create();
+    $license = License::factory()->create();
+    $user->license()->associate($license);
+    $user->save();
+
+    expect($license->exists)->toBeTrue();
+
+    $event = new Logout('web', $user);
+    (new TrackUserLogout())->handle($event);
+
+    expect(License::find($license->id))->toBeNull();
+});
+
+it('listener handle does nothing when user has no license', function (): void {
+    $user = User::factory()->create();
+    expect($user->license)->toBeNull();
+
+    $event = new Logout('web', $user);
+    (new TrackUserLogout())->handle($event);
+
+    expect(User::find($user->id))->not->toBeNull();
 });

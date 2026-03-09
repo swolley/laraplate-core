@@ -156,7 +156,7 @@ final class HandleLicensesCommand extends Command
 
     private function addLicenses(int $number, ?Carbon $validTo): void
     {
-        $query = License::query()->expired()->take($number);
+        $query = License::expired()->take($number);
         $expired = $query->count();
 
         if ($expired && confirm(sprintf('Found %d expired licenses. Would you renew them, before creating new ones?', $expired))) {

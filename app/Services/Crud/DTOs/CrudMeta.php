@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Crud\DTOs;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 /**
  * Metadata for CRUD operation results.
@@ -24,6 +24,6 @@ readonly class CrudMeta
         public ?int $to = null,
         public ?string $class = null,
         public ?string $table = null,
-        public ?Carbon $cachedAt = null,
+        public ?CarbonInterface $cachedAt = null,
     ) {}
 }

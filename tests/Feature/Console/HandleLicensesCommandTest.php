@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\HandleLicensesCommand;
+use Modules\Core\Tests\LaravelTestCase;
 
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 it('command exists and has correct signature', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);

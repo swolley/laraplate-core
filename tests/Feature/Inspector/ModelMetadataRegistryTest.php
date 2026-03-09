@@ -6,8 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Inspector\ModelMetadata;
 use Modules\Core\Inspector\ModelMetadataRegistry;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
 
-uses(Tests\LaravelTestCase::class, RefreshDatabase::class);
+uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     ModelMetadataRegistry::reset();

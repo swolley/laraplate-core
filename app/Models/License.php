@@ -78,4 +78,11 @@ final class License extends Model
     {
         $query->has('user');
     }
+
+    #[Scope]
+    protected function expired(Builder $query): void
+    {
+        $query->whereNotNull('valid_to')
+            ->where('valid_to', '<', today());
+    }
 }

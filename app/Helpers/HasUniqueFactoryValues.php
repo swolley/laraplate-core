@@ -7,6 +7,7 @@ namespace Modules\Core\Helpers;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Throwable;
 
 trait HasUniqueFactoryValues
 {
@@ -43,10 +44,18 @@ trait HasUniqueFactoryValues
             array_push($attempting_values, ...$this->generateFallbackValues($available, $fakerCall));
             $attempts += $available;
 
-            // If model and column are provided, verify database uniqueness
+            // If model and column are provided, verify database uniqueness (skip when DB not ready, e.g. test bootstrap)
             if ($modelClass && $column) {
-                $already_existing_values = $modelClass::query()->whereIn($column, $attempting_values)->select($column)->pluck($column)->unique()->toArray();
-                $attempting_values = array_diff($attempting_values, $already_existing_values);
+                try {
+                    $resolver = $modelClass::getConnectionResolver();
+                    if ($resolver === null) {
+                        break;
+                    }
+                    $already_existing_values = $modelClass::query()->whereIn($column, $attempting_values)->select($column)->pluck($column)->unique()->toArray();
+                    $attempting_values = array_diff($attempting_values, $already_existing_values);
+                } catch (Throwable) {
+                    break;
+                }
 
                 if (count($attempting_values) > 0) {
                     break;

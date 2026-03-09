@@ -449,6 +449,8 @@ class CrudController extends Controller
                 $request,
             );
         } catch (Throwable $ex) {
+            report($ex);
+
             return $this->buildResponse(
                 new CrudResult(
                     data: null,

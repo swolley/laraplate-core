@@ -2,7 +2,41 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
+
+test('middleware transforms request input true string to boolean', function (): void {
+    $request = Request::create('/test', 'GET', ['flag' => 'true']);
+    $next = fn ($req) => response($req->query('flag'));
+    $middleware = new ConvertStringToBoolean;
+
+    $response = $middleware->handle($request, $next);
+
+    expect($response->getContent())->toBe('1');
+});
+
+test('middleware transforms request input FALSE string to boolean', function (): void {
+    $request = Request::create('/test', 'GET', ['flag' => 'FALSE']);
+    $next = fn ($req) => response($req->query('flag') ? 'yes' : 'no');
+    $middleware = new ConvertStringToBoolean;
+
+    $response = $middleware->handle($request, $next);
+
+    expect($response->getContent())->toBe('no');
+});
+
+test('middleware leaves non boolean strings unchanged', function (): void {
+    $request = Request::create('/test', 'GET', ['name' => 'hello']);
+    $next = fn ($req) => response($req->query('name'));
+    $middleware = new ConvertStringToBoolean;
+
+    $response = $middleware->handle($request, $next);
+
+    expect($response->getContent())->toBe('hello');
+});
 
 test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(ConvertStringToBoolean::class);

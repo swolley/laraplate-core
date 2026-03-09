@@ -262,7 +262,7 @@ class CrudService
             $record_array = [];
         }
 
-        $payload = (object) [
+        $payload = [
             'record' => $record_array,
             'history' => $history_array,
         ];

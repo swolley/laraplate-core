@@ -83,7 +83,7 @@ test('impersonate requires authentication', function (): void {
         'user_id' => $targetUser->id,
     ]);
 
-    $response->assertStatus(403);
+    $response->assertStatus(401);
 });
 
 test('impersonate requires admin role', function (): void {
@@ -100,7 +100,7 @@ test('impersonate requires admin role', function (): void {
 test('leave impersonate requires authentication', function (): void {
     $response = $this->postJson(route('core.auth.leaveImpersonate'));
 
-    $response->assertStatus(403);
+    $response->assertStatus(401);
 });
 
 test('leave impersonate works when authenticated', function (): void {
