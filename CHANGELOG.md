@@ -6,11 +6,37 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add support for Yajra Laravel OCI8 extension
+
+### 🐛 Bug Fixes
+
+- *(crud)* Update 404, delete response, tree without id, and response builder guards
+- *(core)* Harden benchmark and crud meta types
+
+### 🚜 Refactor
+
+- Streamline cache management and enhance model translatability
+- Enhance command registration and improve test structure
+
+### 🧪 Testing
+
+- *(filament)* Refactor resource tests to config-only, no fake routes
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove composer.lock and update .gitignore
+- Sync working tree - casts, controller, requests, models, tests, config
+
+## [1.40.0] - 2026-03-05
+
+### 🚀 Features
+
 - Add make:model-translatable artisan command
 
 ### 🚜 Refactor
 
 - Enhance tab functionality in ListModifications and ListSettings
+- Update PHPUnit configuration and enhance command descriptions
 
 ### ⚙️ Miscellaneous Tasks
 
