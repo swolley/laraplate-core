@@ -8,22 +8,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Tests\Fixtures;
 
-class HandleTestContext
-{
-    /** @var list<class-string> */
-    public static array $models = [];
-
-    public static bool $uses_trait = false;
-
-    public static string $app_base = '';
-
-    public static string $db_base = '';
-
-    public static string $module_base = '';
-
-    /** @var array<string, mixed> */
-    public static array $config = [];
-}
+use Modules\Core\Console\HandleTestContext;
 
 function models(bool $onlyActive = true): array
 {

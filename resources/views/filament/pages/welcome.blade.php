@@ -9,7 +9,7 @@
 
         <header class="grid items-center gap-2 py-10 max-w-md mx-auto">
             <div class="flex justify-center w-auto text-[#a5ac56] gap-2">
-                <img src="{{ config('app.logo') }}" />
+                <img class="w-90 h-90" src="{{ config('app.logo') }}" />
             </div>
         </header>
 

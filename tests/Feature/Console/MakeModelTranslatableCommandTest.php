@@ -9,11 +9,11 @@ use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\Prompt;
 use Laravel\Prompts\SelectPrompt;
-use Modules\Core\Console\HandleTestContext;
 use Modules\Core\Console\MakeModelTranslatableCommand;
 use Modules\Core\Tests\Fixtures\BareClass;
 use Modules\Core\Tests\Fixtures\FakeArticle;
 use Modules\Core\Tests\Fixtures\FakeModulePost;
+use Modules\Core\Tests\Fixtures\HandleTestContext;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 

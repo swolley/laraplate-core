@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests;
-
-use Modules\Core\Tests\LaravelTestCase;
+namespace Modules\Core\Tests;
 
 /**
  * Used by the parallel test runner to resolve the Laravel application in each worker process.

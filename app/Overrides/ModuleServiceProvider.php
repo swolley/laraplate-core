@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Overrides;
 
 use Exception;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Str;
 use Nwidart\Modules\Facades\Module;
@@ -100,10 +101,24 @@ class ModuleServiceProvider extends ServiceProvider
         $modules_namespace = config('modules.namespace');
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
-        return array_map(
-            fn ($file): string => sprintf('%s\\%s\\%s\\%s', $modules_namespace, $this->name, Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath), basename($file, '.php')),
+        $classes = array_map(
+            fn ($file): string => sprintf(
+                '%s\\%s\\%s\\%s',
+                $modules_namespace,
+                $this->name,
+                Str::replace(['app/', '/'], ['', '\\'], $commandsSubpath),
+                basename($file, '.php'),
+            ),
             $files,
         );
+
+        // Only return real console commands. This prevents helper or test-only
+        // classes under the Console namespace from being registered and causing
+        // type errors when Artisan boots.
+        return array_values(array_filter(
+            $classes,
+            static fn (string $class): bool => is_subclass_of($class, Command::class),
+        ));
     }
 
     /**
