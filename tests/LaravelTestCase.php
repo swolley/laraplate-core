@@ -35,12 +35,46 @@ abstract class LaravelTestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+        $this->ensureCoolsamModulesResourceAlias();
+        $this->ensureAuthConfigForSpatiePermission();
         $this->loadMigrationsFrom(self::testbenchMigrationsPath());
         $this->loadMigrationsFrom(self::moduleMigrationsPath());
         $this->ensureTestCacheStore();
         $this->ensureCoreRoutesRegistered();
         $this->ensureModelsCachePopulated();
     }
+
+    /**
+     * Ensure auth guards and providers are set so Spatie Permission's getModelForGuard() resolves to User::class.
+     * Must run after app boot so we override any config loaded from config/auth.php.
+     */
+    private function ensureAuthConfigForSpatiePermission(): void
+    {
+        config([
+            'auth.defaults.guard' => 'web',
+            'auth.guards.web' => ['driver' => 'session', 'provider' => 'users'],
+            'auth.guards.api' => ['driver' => 'token', 'provider' => 'users'],
+            'auth.providers.users' => ['driver' => 'eloquent', 'model' => User::class],
+        ]);
+    }
+
+    /**
+     * Ensure Coolsam\Modules\Resource resolves in tests even when the Coolsam package is not installed.
+     * In the real app this class is provided by the main repository; for Core tests we can safely alias it to Filament's base Resource.
+     */
+    private function ensureCoolsamModulesResourceAlias(): void
+    {
+        if (class_exists(\Coolsam\Modules\Resource::class)) {
+            return;
+        }
+
+        if (! class_exists(\Filament\Resources\Resource::class)) {
+            return;
+        }
+
+        class_alias(\Filament\Resources\Resource::class, \Coolsam\Modules\Resource::class);
+    }
+
 
     /**
      * Get package providers required for the Core module (nwidart discovers Core via config).
@@ -52,6 +86,7 @@ abstract class LaravelTestCase extends Orchestra
     {
         return [
             \Nwidart\Modules\LaravelModulesServiceProvider::class,
+            \Laravel\Socialite\SocialiteServiceProvider::class,
         ];
     }
 
@@ -65,7 +100,11 @@ abstract class LaravelTestCase extends Orchestra
     {
         $path = self::ensureTestbenchModulesPath();
         $app['config']->set('modules.paths.modules', $path);
-        $app['config']->set('auth.providers.users.model', User::class);
+        $app['config']->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
+        $app['config']->set('auth.defaults.guard', 'web');
+        $app['config']->set('auth.guards.web', ['driver' => 'session', 'provider' => 'users']);
+        $app['config']->set('auth.guards.api', ['driver' => 'token', 'provider' => 'users']);
+        $app['config']->set('auth.providers.users', ['driver' => 'eloquent', 'model' => User::class]);
         $app['config']->set('app.available_locales', ['en', 'it', 'de', 'es', 'sl']);
         $app['config']->set('core.expose_crud_api', true);
         $app['config']->set('crud.dynamic_entities', true);
@@ -113,7 +152,7 @@ abstract class LaravelTestCase extends Orchestra
     /**
      * Path to test-only migrations (e.g. base users table) that must run before module migrations.
      */
-    private static function testbench_migrations_path(): string
+    private static function testbenchMigrationsPath(): string
     {
         return __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
     }
@@ -264,6 +303,15 @@ abstract class LaravelTestCase extends Orchestra
 
                 require $path . '/routes/api.php';
             });
+
+        // Auth routes (userInfo, impersonate, leaveImpersonate, maintainSession) for UserControllerTest
+        $router->middleware(['web', 'auth'])
+            ->prefix('app/auth')
+            ->name('core.')
+            ->group(function () use ($path): void {
+                require $path . '/routes/auth.php';
+            });
+
         $router->getRoutes()->refreshNameLookups();
     }
 
