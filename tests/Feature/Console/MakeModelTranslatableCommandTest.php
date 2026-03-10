@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\Prompt;
@@ -1183,6 +1184,8 @@ describe('handle', function (): void {
         if ($container->bound('db.schema')) {
             $container->forgetInstance('db.schema');
         }
+
+        Schema::clearResolvedInstance();
     });
 
     it('returns FAILURE when no models are available', function (): void {

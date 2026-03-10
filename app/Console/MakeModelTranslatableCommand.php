@@ -152,12 +152,14 @@ class MakeModelTranslatableCommand extends Command
             return Command::SUCCESS;
         }
 
-        $is_module_model = Str::startsWith($model_full_name, 'Modules\\');
+        $models_subpath = config('modules.paths.generator.model.path', 'Models');
+        $migrations_subpath = config('modules.paths.generator.migration.path', 'database/migrations');
+
+        $is_module_model = Str::startsWith($model_full_name, 'Modules\\')
+            && ($models_subpath !== 'Models' || $migrations_subpath !== 'database/migrations');
 
         if ($is_module_model) {
             $module = Str::of($model_full_name)->after('Modules\\')->before('\\')->toString();
-            $models_subpath = config('modules.paths.generator.model.path', 'Models');
-            $migrations_subpath = config('modules.paths.generator.migration.path', 'database/migrations');
 
             $new_class_path = module_path($module, $models_subpath . '/Translations/');
             $new_migration_path = module_path($module, $migrations_subpath . '/');

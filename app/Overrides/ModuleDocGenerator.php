@@ -97,13 +97,13 @@ final class ModuleDocGenerator extends Generator
         $parameters = $action_instance->getParameters();
 
         foreach ($parameters as $parameter) {
-            $class = $parameter->getClass();
+            $type = $parameter->getType();
 
-            if (! $class) {
+            if (! $type instanceof \ReflectionNamedType || $type->isBuiltin()) {
                 continue;
             }
 
-            $class_name = $class->getName();
+            $class_name = $type->getName();
 
             if (is_subclass_of($class_name, FormRequest::class)) {
                 $reflection = new ReflectionClass($class_name);
