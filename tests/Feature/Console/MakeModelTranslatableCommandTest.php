@@ -1419,10 +1419,10 @@ describe('handle', function (): void {
 
         expect($result)->toBe(Command::SUCCESS);
 
-        $model_files = glob($tmp . '/app/Models/Translations/FakeArticleTranslation.php');
-        expect($model_files)->toHaveCount(1);
+        $model_path = HandleTestContext::$app_base . '/Models/Translations/FakeArticleTranslation.php';
+        expect(file_exists($model_path))->toBeTrue();
 
-        $model_content = file_get_contents($model_files[0]);
+        $model_content = file_get_contents($model_path);
         expect($model_content)
             ->toContain('FakeArticleTranslation')
             ->toContain('implements ITranslated');

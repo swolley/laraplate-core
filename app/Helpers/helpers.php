@@ -63,7 +63,22 @@ if (! function_exists('modules')) {
 
         if ($showMainApp && (in_array($onlyModule, [null, '', '0', 'App'], true))) {
             if ($fullpath) {
-                $remapped_modules['App'] = app_path();
+                $app_path = null;
+
+                try {
+                    $app_instance = app();
+
+                    if (is_object($app_instance) && method_exists($app_instance, 'path')) {
+                        /** @var string $resolved */
+                        $resolved = $app_instance->path();
+                        $app_path = $resolved;
+                    }
+                } catch (\Throwable) {
+                    $app_path = null;
+                }
+
+                // Fallback for minimal or non-Laravel environments (e.g. isolated tests)
+                $remapped_modules['App'] = $app_path ?? dirname(__DIR__, 2);
             } else {
                 array_unshift($remapped_modules, 'App');
             }
@@ -240,6 +255,13 @@ if (! function_exists('models')) {
                 $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
                 $modules_models_folder = config('modules.paths.generator.model.path');
                 $models_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Models' : $modules_models_folder);
+
+                // In minimal or non-Laravel environments the filesystem component may not be bound.
+                // In that case we gracefully skip automatic model discovery.
+                if (! app()->bound('files')) {
+                    continue;
+                }
+
                 $model_files = File::allFiles($models_path);
 
                 if ($model_files === []) {

@@ -36,6 +36,16 @@ $container->singleton('app', static function () use ($container): object {
         {
             $this->container->make('config')->set('app.locale', $locale);
         }
+
+        /**
+         * Minimal stub for app()->path($path) used by app_path() helper.
+         */
+        public function path(string $path = ''): string
+        {
+            $base = dirname(__DIR__);
+
+            return $path === '' ? $base : $base . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR);
+        }
     };
 });
 

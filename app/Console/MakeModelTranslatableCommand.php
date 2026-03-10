@@ -11,7 +11,6 @@ use function Laravel\Prompts\select;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Modules\Core\Console\HandleTestContext;
 use Modules\Core\Helpers\HasTranslations;
 use Override;
 use ReflectionClass;
@@ -48,13 +47,7 @@ class MakeModelTranslatableCommand extends Command
 
     public function handle(): int
     {
-        $in_testing = getenv('APP_ENV') === 'testing' || ($_SERVER['APP_ENV'] ?? null) === 'testing';
-
-        if ($in_testing && class_exists(HandleTestContext::class)) {
-            $all_models = HandleTestContext::$models;
-        } else {
-            $all_models = models(false);
-        }
+        $all_models = models(false);
         $available = array_filter(
             $all_models,
             static fn (string $model): bool => ! Str::contains($model, 'Translation')
@@ -67,36 +60,20 @@ class MakeModelTranslatableCommand extends Command
             return Command::FAILURE;
         }
 
-        // In unit tests we bypass interactive prompts and drive the selection
-        // via the HandleTestContext fixture to avoid depending on Laravel Prompts.
-        if ((getenv('APP_ENV') === 'testing' || ($_SERVER['APP_ENV'] ?? null) === 'testing')
-            && class_exists(HandleTestContext::class)
-            && HandleTestContext::$models !== []
-        ) {
-            $values = array_values(HandleTestContext::$models);
-            $index = 1;
+        $choice = select(
+            label: 'Select the model to make translatable',
+            options: $available,
+            required: true,
+        );
 
-            if (! isset($values[$index])) {
-                $index = 0;
-            }
+        if ($choice === null) {
+            return Command::FAILURE;
+        }
 
-            $model_full_name = $values[$index];
-        } else {
-            $choice = select(
-                label: 'Select the model to make translatable',
-                options: $available,
-                required: true,
-            );
+        $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : (string) $choice;
 
-            if ($choice === null) {
-                return Command::FAILURE;
-            }
-
-            $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : (string) $choice;
-
-            if (! is_string($model_full_name) || $model_full_name === '') {
-                return Command::FAILURE;
-            }
+        if (! is_string($model_full_name) || $model_full_name === '') {
+            return Command::FAILURE;
         }
 
         $model_instance = new $model_full_name();
@@ -175,43 +152,18 @@ class MakeModelTranslatableCommand extends Command
             return Command::SUCCESS;
         }
 
-        $in_testing = getenv('APP_ENV') === 'testing' || ($_SERVER['APP_ENV'] ?? null) === 'testing';
-        $is_module_model = $in_testing
-            ? HandleTestContext::$module_base !== ''
-            : Str::startsWith($model_full_name, 'Modules\\');
+        $is_module_model = Str::startsWith($model_full_name, 'Modules\\');
 
         if ($is_module_model) {
             $module = Str::of($model_full_name)->after('Modules\\')->before('\\')->toString();
-            $models_subpath = HandleTestContext::$config['modules.paths.generator.model.path']
-                ?? config('modules.paths.generator.model.path', 'Models');
-            $migrations_subpath = HandleTestContext::$config['modules.paths.generator.migration.path']
-                ?? config('modules.paths.generator.migration.path', 'database/migrations');
+            $models_subpath = config('modules.paths.generator.model.path', 'Models');
+            $migrations_subpath = config('modules.paths.generator.migration.path', 'database/migrations');
 
-            try {
-                $new_class_path = module_path($module, $models_subpath . '/Translations/');
-                $new_migration_path = module_path($module, $migrations_subpath . '/');
-            } catch (\Illuminate\Contracts\Container\BindingResolutionException) {
-                // In test contexts the `modules` binding might not exist; fall back
-                // to the base path provided by the HandleTestContext fixture.
-                $base = HandleTestContext::$module_base !== ''
-                    ? HandleTestContext::$module_base
-                    : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . $module;
-
-                $new_class_path = rtrim($base . DIRECTORY_SEPARATOR . trim($models_subpath, '/'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'Translations' . DIRECTORY_SEPARATOR;
-                $new_migration_path = rtrim($base . DIRECTORY_SEPARATOR . trim($migrations_subpath, '/'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-            }
+            $new_class_path = module_path($module, $models_subpath . '/Translations/');
+            $new_migration_path = module_path($module, $migrations_subpath . '/');
         } else {
-            if ($in_testing
-                && class_exists(HandleTestContext::class)
-                && HandleTestContext::$app_base !== ''
-                && HandleTestContext::$db_base !== ''
-            ) {
-                $new_class_path = rtrim(HandleTestContext::$app_base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'Models' . DIRECTORY_SEPARATOR . 'Translations' . DIRECTORY_SEPARATOR;
-                $new_migration_path = rtrim(HandleTestContext::$db_base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'migrations' . DIRECTORY_SEPARATOR;
-            } else {
-                $new_class_path = app_path('Models/Translations/');
-                $new_migration_path = database_path('migrations/');
-            }
+            $new_class_path = app_path('Models/Translations/');
+            $new_migration_path = database_path('migrations/');
         }
 
         $this->newLine();

@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 /**
- * Namespace-local function overrides for testing.
+ * Namespace-local function overrides for testing the MakeModelTranslatableCommand.
+ *
+ * These overrides live in the same namespace as the command so that unqualified
+ * calls in production code resolve here during tests, without changing the
+ * application logic.
  */
 
-namespace Modules\Core\Tests\Fixtures;
+namespace Modules\Core\Console;
 
-use Modules\Core\Console\HandleTestContext;
+use Modules\Core\Tests\Fixtures\HandleTestContext;
 
 function models(bool $onlyActive = true): array
 {
@@ -37,9 +41,10 @@ function config(?string $key = null, mixed $default = null): mixed
 
 function module_path(string $module, string $path = ''): string
 {
-    if ($module !== 'Core' && HandleTestContext::$module_base !== '') {
-        return HandleTestContext::$module_base . '/' . ltrim($path, '/');
-    }
+    $base = HandleTestContext::$module_base !== ''
+        ? HandleTestContext::$module_base
+        // Fallback for tests when a base is not explicitly provided
+        : dirname(__DIR__, 3) . '/' . $module;
 
-    return \module_path($module, $path);
+    return rtrim($base, '/') . '/' . ltrim($path, '/');
 }
