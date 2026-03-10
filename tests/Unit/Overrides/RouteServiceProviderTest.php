@@ -14,11 +14,9 @@ it('getPrefix returns slug of module name for Core', function (): void {
 
     $ref = new \ReflectionClass($provider);
     $prop = $ref->getProperty('name');
-    $prop->setAccessible(true);
     expect($prop->getValue($provider))->toBe('Core');
 
     $method = $ref->getMethod('getPrefix');
-    $method->setAccessible(true);
     $prefix = $method->invoke($provider);
 
     expect($prefix)->toBe(Str::slug('Core'));
@@ -28,7 +26,6 @@ it('getModuleNamespace returns namespace derived from Providers replacement', fu
     $provider = new CoreRouteServiceProvider(app());
 
     $method = (new \ReflectionClass($provider))->getMethod('getModuleNamespace');
-    $method->setAccessible(true);
     $namespace = $method->invoke($provider);
 
     expect($namespace)->toBeString();

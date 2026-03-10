@@ -59,7 +59,6 @@ it('requiresApprovalWhen returns true when fillable except description is modifi
     $setting = Setting::factory()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
-    $method->setAccessible(true);
 
     $result = $method->invoke($setting, ['name' => 'bar']);
     expect($result)->toBeTrue();
@@ -69,7 +68,6 @@ it('requiresApprovalWhen returns false when only description is modified', funct
     $setting = Setting::factory()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
-    $method->setAccessible(true);
 
     $result = $method->invoke($setting, ['description' => 'New description']);
     expect($result)->toBeFalse();

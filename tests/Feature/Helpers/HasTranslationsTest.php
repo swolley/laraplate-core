@@ -45,7 +45,6 @@ describe('initializeHasTranslations', function (): void {
 
         $reflection = new ReflectionClass($model);
         $property = $reflection->getProperty('with');
-        $property->setAccessible(true);
 
         expect($property->getValue($model))->toContain('translation');
     });
@@ -525,7 +524,6 @@ describe('pending_translations', function (): void {
         // Pending translations should be cleared
         $reflection = new ReflectionClass($model);
         $property = $reflection->getProperty('pending_translations');
-        $property->setAccessible(true);
 
         expect($property->getValue($model))->toBe([]);
     });
@@ -536,7 +534,6 @@ describe('getTranslationModelClass', function (): void {
         $model = FakeTranslatableModel::query()->create([]);
         $reflection = new ReflectionClass($model);
         $method = $reflection->getMethod('getTranslationModelClass');
-        $method->setAccessible(true);
 
         $translationClass = $method->invoke(null);
 

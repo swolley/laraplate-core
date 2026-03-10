@@ -380,11 +380,9 @@ function setElasticsearchInstance(Client $client): ElasticsearchService
     $instance = $reflection->newInstanceWithoutConstructor();
 
     $client_property = $reflection->getProperty('client');
-    $client_property->setAccessible(true);
     $client_property->setValue($instance, $client);
 
     $instance_property = $reflection->getProperty('instance');
-    $instance_property->setAccessible(true);
     $instance_property->setValue(null, $instance);
 
     return $instance;
@@ -394,6 +392,5 @@ function resetElasticsearchSingleton(): void
 {
     $reflection = new ReflectionClass(ElasticsearchService::class);
     $instance_property = $reflection->getProperty('instance');
-    $instance_property->setAccessible(true);
     $instance_property->setValue(null, null);
 }

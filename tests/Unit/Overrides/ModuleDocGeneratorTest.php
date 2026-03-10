@@ -13,7 +13,6 @@ it('constructor accepts config module and route filter', function (): void {
 
     $ref = new \ReflectionClass($generator);
     $prop = $ref->getProperty('module');
-    $prop->setAccessible(true);
     expect($prop->getValue($generator))->toBe('Modules\Core');
 });
 
@@ -22,7 +21,6 @@ it('getAppRoutes returns array', function (): void {
     $generator = new ModuleDocGenerator($config, 'Modules\Core', null);
 
     $method = (new \ReflectionClass($generator))->getMethod('getAppRoutes');
-    $method->setAccessible(true);
     $routes = $method->invoke($generator);
 
     expect($routes)->toBeArray();
