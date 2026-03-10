@@ -55,7 +55,6 @@ it('clearTable removes table from in-memory cache', function (): void {
 
     $reflection = new ReflectionClass($inspector);
     $tablesProp = $reflection->getProperty('tables');
-    $tablesProp->setAccessible(true);
     $tables = $tablesProp->getValue($inspector);
     $key = Inspect::keyName('users', null);
 
@@ -70,7 +69,6 @@ it('clearAll removes all tables from in-memory cache', function (): void {
 
     $reflection = new ReflectionClass($inspector);
     $tablesProp = $reflection->getProperty('tables');
-    $tablesProp->setAccessible(true);
     $tables = $tablesProp->getValue($inspector);
 
     expect($tables)->toBeEmpty();

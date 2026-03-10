@@ -25,7 +25,6 @@ it('adds withoutTrashed macro when extend is invoked', function (): void {
     $builder = Setting::query();
     $ref = new \ReflectionClass($scope);
     $method = $ref->getMethod('addWithoutTrashed');
-    $method->setAccessible(true);
     $method->invoke($scope, $builder);
 
     expect($builder->getMacro('withoutTrashed'))->not->toBeNull();
@@ -36,7 +35,6 @@ it('adds onlyTrashed macro when extend is invoked', function (): void {
     $builder = Setting::query();
     $ref = new \ReflectionClass($scope);
     $method = $ref->getMethod('addOnlyTrashed');
-    $method->setAccessible(true);
     $method->invoke($scope, $builder);
 
     expect($builder->getMacro('onlyTrashed'))->not->toBeNull();

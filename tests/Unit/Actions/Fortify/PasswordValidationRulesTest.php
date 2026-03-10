@@ -14,7 +14,6 @@ it('returns password validation rules via reflection', function (): void {
     };
 
     $method = new ReflectionMethod($instance, 'passwordRules');
-    $method->setAccessible(true);
     $rules = $method->invoke($instance);
 
     expect($rules)->toContain('required')

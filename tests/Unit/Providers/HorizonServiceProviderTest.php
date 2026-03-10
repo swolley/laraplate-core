@@ -17,7 +17,6 @@ beforeEach(function (): void {
 it('defines viewHorizon gate when gate is called', function (): void {
     $ref = new ReflectionClass($this->provider);
     $method = $ref->getMethod('gate');
-    $method->setAccessible(true);
     $method->invoke($this->provider);
 
     expect(Gate::has('viewHorizon'))->toBeTrue();
@@ -34,7 +33,6 @@ it('viewHorizon allows superadmin when user is App\Models\User', function (): vo
 
     $ref = new ReflectionClass($this->provider);
     $method = $ref->getMethod('gate');
-    $method->setAccessible(true);
     $method->invoke($this->provider);
 
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeTrue();
@@ -43,7 +41,6 @@ it('viewHorizon allows superadmin when user is App\Models\User', function (): vo
 it('viewHorizon denies null user', function (): void {
     $ref = new ReflectionClass($this->provider);
     $method = $ref->getMethod('gate');
-    $method->setAccessible(true);
     $method->invoke($this->provider);
 
     expect(Gate::forUser(null)->allows('viewHorizon'))->toBeFalse();
@@ -54,7 +51,6 @@ it('viewHorizon denies non superadmin user', function (): void {
 
     $ref = new ReflectionClass($this->provider);
     $method = $ref->getMethod('gate');
-    $method->setAccessible(true);
     $method->invoke($this->provider);
 
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeFalse();

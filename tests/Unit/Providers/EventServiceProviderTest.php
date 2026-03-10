@@ -15,7 +15,6 @@ beforeEach(function (): void {
 it('has listen array for model indexing events', function (): void {
     $ref = new ReflectionClass($this->provider);
     $prop = $ref->getProperty('listen');
-    $prop->setAccessible(true);
     $listen = $prop->getValue($this->provider);
 
     expect($listen)->toHaveKey(\Modules\Core\Events\ModelRequiresIndexing::class);
