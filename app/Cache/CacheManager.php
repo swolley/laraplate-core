@@ -21,7 +21,7 @@ final class CacheManager extends BaseCacheManager
      *
      * @param  string|null  $name
      */
-    public function store($name = null): RepositoryContract
+    public function store(?string $name = null): RepositoryContract
     {
         $name ??= $this->getDefaultDriver();
 

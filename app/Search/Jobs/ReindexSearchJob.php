@@ -103,7 +103,7 @@ final class ReindexSearchJob extends CommonSearchJob
     private function individualReindex(object $model_instance): void
     {
         $count = 0;
-        $model_instance::chunk($this->batch_size, function ($models) use (&$count): void {
+        $model_instance::chunk($this->batch_size, function (iterable $models) use (&$count): void {
             foreach ($models as $model) {
                 $model->searchable();
                 $count++;

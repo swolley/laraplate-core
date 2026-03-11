@@ -74,6 +74,7 @@ final class LocaleScope implements Scope
             }
 
             // Carica traduzione
+            /** @var \Illuminate\Database\Query\Builder $query */
             $builder->with(['translation' => function ($query) use ($locale, $default_locale, $fallback_enabled): void {
                 if ($fallback_enabled) {
                     $query->where(function ($q) use ($locale, $default_locale): void {
@@ -101,9 +102,11 @@ final class LocaleScope implements Scope
         string $default_locale,
         bool $fallback_enabled,
     ): void {
+    		/** @var \Illuminate\Database\Query\Builder $query */
         $builder->with(['translation' => function ($query) use ($current_locale, $default_locale, $fallback_enabled): void {
             if ($fallback_enabled) {
                 // Carica traduzione corrente, se non esiste usa quella di default
+                /** @var \Illuminate\Database\Query\Builder $q */
                 $query->where(function ($q) use ($current_locale, $default_locale): void {
                     $q->where('locale', $current_locale)
                         ->orWhere('locale', $default_locale);

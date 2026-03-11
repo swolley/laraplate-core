@@ -32,7 +32,10 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->instance(LogoutResponse::class, new class() implements LogoutResponse
         {
-            public function toResponse($request)
+        		/**
+			 * @param \Illuminate\Http\Request $request
+			 */
+            public function toResponse($request): mixed
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -49,7 +52,10 @@ final class FortifyServiceProvider extends ServiceProvider
 
         $this->app->instance(LoginResponse::class, new class() implements LoginResponse
         {
-            public function toResponse($request)
+        		/**
+			 * @param \Illuminate\Http\Request $request
+			 */
+            public function toResponse($request): mixed
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -66,7 +72,7 @@ final class FortifyServiceProvider extends ServiceProvider
 
         $this->app->instance(RegisterResponse::class, new class() implements RegisterResponse
         {
-            public function toResponse($request)
+            public function toResponse($request): mixed
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -81,6 +87,9 @@ final class FortifyServiceProvider extends ServiceProvider
             }
         });
 
+		/**
+		 * @param \Illuminate\Contracts\Foundation\Application $app
+		 */
         $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),

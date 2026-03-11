@@ -13,7 +13,7 @@ final class EnsureIsLocal
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
         abort_unless(App::isLocal(), 401, 'Unauthorized');
 

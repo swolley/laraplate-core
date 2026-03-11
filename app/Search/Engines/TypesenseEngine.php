@@ -38,7 +38,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = [], bool $force = false): void
+    public function createIndex(string $name, array $options = [], bool $force = false): void
     {
         try {
             $matched = $this->matchModelToCollectionName($name);
@@ -85,7 +85,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     #[Override]
-    public function search(Builder $builder)
+    public function search(Builder $builder): mixed
     {
         // Check if it's a vector search.
         if ($this->isVectorSearch($builder)) {
@@ -108,7 +108,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
                     $filterStrings[] = sprintf('%s:>=%s && %s:<=%s', $field, $value[0], $field, $value[1]);
                 } else {
                     // IN filter
-                    $values = implode(',', array_map(static fn ($val) => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+                    $values = implode(',', array_map(static fn (mixed $val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
                     $filterStrings[] = sprintf('%s:[%s]', $field, $values);
                 }
             } else {
@@ -407,7 +407,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         // Build vector query for Typesense
         // Typesense expects vector_query in format: "field_name:([vector_values])"
-        $vectorString = implode(',', array_map(static fn ($v): string => (string) $v, $vector));
+        $vectorString = implode(',', array_map(static fn (float|int|string $v): string => (string) $v, $vector));
 
         $searchParams = [
             'q' => $builder->query ?: '*',
@@ -450,7 +450,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     private function buildFilter(string $fieldName, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(static fn ($val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+            $values = implode(',', array_map(static fn (mixed $val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
 
             return sprintf('%s:[%s]', $fieldName, $values);
         }

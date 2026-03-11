@@ -27,7 +27,7 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
      * @param  array<string,mixed>  $options  Index options
      * @param  bool  $force  Force index creation even if it already exists
      */
-    public function createIndex($name, array $options = [], bool $force = false): void;
+    public function createIndex(string $name, array $options = [], bool $force = false): void;
 
     public function health(): array;
 

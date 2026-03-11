@@ -51,7 +51,7 @@ final readonly class TranslationCatalogService
     {
         $languages = $this->languagesProvider instanceof Closure ? ($this->languagesProvider)() : translations(true, true);
 
-        usort($languages, function ($a, $b) use ($defaultLocale): int {
+        usort($languages, function (string $a, string $b) use ($defaultLocale): int {
             if (Str::endsWith($a, DIRECTORY_SEPARATOR . $defaultLocale)) {
                 return -1;
             }

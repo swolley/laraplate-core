@@ -20,7 +20,7 @@ final class ImportCommand extends BaseImportCommand
     protected $description = 'Import the given model into the search index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function handle(Dispatcher $events)
+    public function handle(Dispatcher $events): int
     {
         if (in_array($this->getModelClass(), ['', '0'], true) || $this->getModelClass() === false) {
             return Command::INVALID;

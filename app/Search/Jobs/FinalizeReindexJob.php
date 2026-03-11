@@ -24,11 +24,11 @@ final class FinalizeReindexJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public $tries = 1; // Non vogliamo retry automatici per questo job
+    public int $tries = 1; // Non vogliamo retry automatici per questo job
 
-    public $timeout = 300; // 5 minuti per finalizzare
+    public int $timeout = 300; // 5 minuti per finalizzare
 
-    public $maxExceptionsThenWait = 60;
+    public int $maxExceptionsThenWait = 60;
 
     public function __construct(
         private readonly string $index_name,

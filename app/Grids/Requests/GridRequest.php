@@ -30,7 +30,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
      */
     private array $realFunnelRequests = [];
 
-    public function rules()
+    public function rules(): array
     {
         /** @phpstan-ignore method.notFound */
         $url = $this->url();
@@ -83,7 +83,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
     }
 
     #[Override]
-    public function validated($key = null, $default = null)
+    public function validated(?string $key = null, mixed $default = null): mixed
     {
         $validated = $this->realMainRequest->validated($key, $default);
         $funnels = $this->input('funnels');

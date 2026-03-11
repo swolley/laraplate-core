@@ -115,7 +115,7 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
      */
     private function mergeRulesUnique(array $rules): array
     {
-        $all_scalar = ! array_filter($rules, fn ($r): bool => ! is_scalar($r));
+        $all_scalar = ! array_filter($rules, fn (mixed $r): bool => ! is_scalar($r));
 
         return array_values($all_scalar ? array_unique($rules) : $rules);
     }

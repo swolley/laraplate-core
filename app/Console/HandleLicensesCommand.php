@@ -28,7 +28,7 @@ final class HandleLicensesCommand extends Command
     #[Override]
     protected $description = 'Renew, add or delete user licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
-    public function handle()
+    public function handle(): int
     {
         try {
             return DB::transaction(function (): int {
@@ -46,7 +46,7 @@ final class HandleLicensesCommand extends Command
                     $this->output->info('Current licenses status');
                     table(
                         ['Status', 'Expiration', 'Licenses Qt.'],
-                        $licenses_groups->map(static fn ($data): array => [
+                        $licenses_groups->map(static fn (object $data): array => [
                             $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
@@ -191,13 +191,13 @@ final class HandleLicensesCommand extends Command
         Log::info($message);
     }
 
-    private function validationCallback(string $attribute, string $value, array $validations)
+    private function validationCallback(string $attribute, string $value, array $validations): ?string
     {
         if (! array_key_exists($attribute, $validations)) {
             return null;
         }
 
-        $validator = Validator::make([$attribute => $value], array_filter($validations, fn ($k): bool => $k === $attribute, ARRAY_FILTER_USE_KEY))->stopOnFirstFailure(true);
+        $validator = Validator::make([$attribute => $value], array_filter($validations, fn (string|int $k): bool => $k === $attribute, ARRAY_FILTER_USE_KEY))->stopOnFirstFailure(true);
 
         if (! $validator->passes()) {
             return $validator->messages()->first();

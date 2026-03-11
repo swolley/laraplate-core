@@ -45,6 +45,10 @@ class ServiceProvider extends BaseServiceProvider
     }
 
     #[Override]
+    /**
+     * @param string $path
+     * @param string $key
+     */
     protected function mergeConfigFrom($path, $key): void
     {
         if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {

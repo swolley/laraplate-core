@@ -22,7 +22,7 @@ final class DocsController extends OpenApiJsonController
      * @route-comment
      * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
      */
-    public function mergeDocs(Request $request, string $version = 'v1')
+    public function mergeDocs(Request $request, string $version = 'v1'): mixed
     {
         return Cache::tags(Cache::getCacheTags('docs'))->rememberForever(
             $request->route()->getName() . $version,

@@ -134,7 +134,7 @@ test('subscriber helper method handles array parameters', function (): void {
     $reflection = new ReflectionClass(LockedModelSubscriber::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('if (is_array($params) && $params !== [])');
+    expect($source)->toContain('if (is_array($params) && $params !== [] && $params[0] instanceof Model)');
     expect($source)->toContain('return $params[0];');
     expect($source)->toContain('return null;');
 });

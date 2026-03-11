@@ -40,7 +40,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = [], bool $force = false): void
+    public function createIndex(string $name, array $options = [], bool $force = false): void
     {
         try {
             $matched = $this->matchModelToCollectionName($name);
@@ -90,7 +90,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     #[Override]
-    public function search(Builder $builder)
+    public function search(Builder $builder): mixed
     {
         // Check if it's a vector search.
         if ($this->isVectorSearch($builder)) {

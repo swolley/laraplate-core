@@ -18,7 +18,7 @@ final class FlushCommand extends BaseFlushCommand
     protected $description = 'Flush all of the model\'s records from the index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function handle()
+    public function handle(): int
     {
         if (in_array($this->getModelClass(), ['', '0'], true) || $this->getModelClass() === false) {
             return self::INVALID;

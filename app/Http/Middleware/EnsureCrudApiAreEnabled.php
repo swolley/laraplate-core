@@ -12,7 +12,7 @@ final class EnsureCrudApiAreEnabled
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
         abort_unless(config('core.expose_crud_api'), 403, 'Forbidden');
 

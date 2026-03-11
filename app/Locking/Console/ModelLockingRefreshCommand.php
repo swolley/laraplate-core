@@ -84,7 +84,7 @@ final class ModelLockingRefreshCommand extends Command
      */
     private function checkIfBlacklisted(string $model): bool
     {
-        return array_any($this->models_blacklist, fn ($blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
+        return array_any($this->models_blacklist, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
     }
 
     /**

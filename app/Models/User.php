@@ -211,6 +211,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'required',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 }),
@@ -231,6 +232,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'nullable',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
@@ -239,6 +241,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'nullable',
                 'email',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('users')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),

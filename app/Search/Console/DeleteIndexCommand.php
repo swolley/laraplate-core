@@ -23,7 +23,7 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
     protected $description = 'Delete an index for a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function handle(EngineManager $manager)
+    public function handle(EngineManager $manager): int
     {
         $model = $this->getModelClass();
 

@@ -31,7 +31,7 @@ final class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(120); // 120 version jobs per minute (2 per second)
         });
 
-        RateLimiter::for('translations', static function ($job) {
+        RateLimiter::for('translations', static function (object $job): \Illuminate\Cache\RateLimiting\Limit {
             return Limit::perMinute(30); // 30 job al minuto
         });
 

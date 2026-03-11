@@ -27,7 +27,7 @@ final class TreeCollection extends Collection
      */
     private static function buildTree(Collection $grouped, int|string|null $parentId): Collection
     {
-        return ($grouped[$parentId] ?? collect())->map(function ($item) use ($grouped) {
+        return ($grouped[$parentId] ?? collect())->map(function (object $item) use ($grouped): object {
             $item->children = self::buildTree($grouped, $item->id)->values();
 
             if (isset($item->articles_count)) {
@@ -43,7 +43,7 @@ final class TreeCollection extends Collection
      */
     private static function buildPaths(Collection $items, string $prefix, string $separator, string $field): Collection
     {
-        return $items->map(function ($item) use ($prefix, $separator, $field) {
+        return $items->map(function (object $item) use ($prefix, $separator, $field): object {
             $current = $prefix === '' ? $item->{$field} : $prefix . $separator . $item->{$field};
             $item->path = $current;
 

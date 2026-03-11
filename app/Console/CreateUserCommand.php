@@ -70,7 +70,7 @@ final class CreateUserCommand extends Command
                                 if (is_string($validations[$attribute]) && preg_match('/in:([^|]*)/', $validations[$attribute], $matches)) {
                                     $options = explode(',', $matches[1]);
                                 } elseif (is_array($validations[$attribute])) {
-                                    $found = array_filter($validations[$attribute], static fn ($v): bool => is_string($v) && Str::contains($v, 'in:'));
+                                    $found = array_filter($validations[$attribute], static fn (string|array $v): bool => is_string($v) && Str::contains($v, 'in:'));
 
                                     if ($found !== []) {
                                         preg_match('/in:([^|]*)/', (string) head($found), $matches);
@@ -80,7 +80,7 @@ final class CreateUserCommand extends Command
                             }
 
                             if ($options !== null) {
-                                $answer = search(ucfirst($attribute), fn ($value): array => array_filter($options, fn ($o): bool => str_starts_with($o, $value)));
+                                $answer = search(ucfirst($attribute), fn (string $value): array => array_filter($options, fn (string $o): bool => str_starts_with($o, $value)));
                             } else {
                                 $answer = text(ucfirst($attribute), $suggestion, required: true, validate: fn (string $value) => $this->validationCallback($attribute, $value, $validations));
                             }
@@ -120,8 +120,8 @@ final class CreateUserCommand extends Command
                         'name' => $user->name,
                         'email' => $user->email,
                         'password' => $password,
-                        'roles' => $all_roles->filter(fn ($name, $id): bool => in_array($id, $roles, true))->pluck('name')->implode(', '),
-                        'permissions' => $all_permissions->filter(fn ($name, $id): bool => in_array($id, $permissions, true))->pluck('name')->implode(', '),
+                        'roles' => $all_roles->filter(fn (mixed $name, int|string $id): bool => in_array($id, $roles, true))->pluck('name')->implode(', '),
+                        'permissions' => $all_permissions->filter(fn (mixed $name, int|string $id): bool => in_array($id, $permissions, true))->pluck('name')->implode(', '),
                     ];
 
                     gc_collect_cycles();

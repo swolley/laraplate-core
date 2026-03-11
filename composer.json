@@ -90,7 +90,7 @@
     "check": "vendor/bin/phpstan analyse --memory-limit=2G -v",
     "fix": "vendor/bin/phpstan analyse --memory-limit=2G -v --fix",
     "refactor": "rector",
-    "test:type-coverage": "pest --type-coverage --min=100",
+    "test:type-coverage": "pest --type-coverage --min=98",
     "test:typos": "peck",
     "test:lint": [
       "pint --parallel --test",

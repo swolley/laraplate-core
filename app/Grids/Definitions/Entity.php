@@ -197,7 +197,7 @@ abstract class Entity
      */
     final public function getFields(?FieldType $type = null): Collection
     {
-        return $type instanceof FieldType ? $this->fields->filter(fn ($field): bool => $type === $field->getFieldType()) : $this->fields;
+        return $type instanceof FieldType ? $this->fields->filter(fn (Field $field): bool => $type === $field->getFieldType()) : $this->fields;
     }
 
     /**
@@ -207,10 +207,10 @@ abstract class Entity
      */
     final public function getAllFields(?FieldType $type = null): Collection
     {
-        $fields = (clone $this->getFields($type))->keyBy(fn ($f): string => $f->getFullName());
+        $fields = (clone $this->getFields($type))->keyBy(fn (Field $f): string => $f->getFullName());
 
         foreach ($this->getRelations() as $relation) {
-            $fields = $fields->merge($relation->getAllFields($type)->keyBy(fn ($f): string => $f->getFullName()));
+            $fields = $fields->merge($relation->getAllFields($type)->keyBy(fn (Field $f): string => $f->getFullName()));
         }
 
         return $fields;
@@ -221,10 +221,10 @@ abstract class Entity
      */
     final public function getAllQueryFields(): Collection
     {
-        $fields = (clone $this->getFields())->filter(fn ($field): bool => $field->getFieldType() !== FieldType::APPEND && $field->getFieldType() !== FieldType::METHOD)->keyBy(fn ($f): string => $f->getFullName());
+        $fields = (clone $this->getFields())->filter(fn (Field $field): bool => $field->getFieldType() !== FieldType::APPEND && $field->getFieldType() !== FieldType::METHOD)->keyBy(fn (Field $f): string => $f->getFullName());
 
         foreach ($this->getRelations() as $relation) {
-            $fields = $fields->merge($relation->getAllQueryFields()->keyBy(fn ($f): string => $f->getFullName()));
+            $fields = $fields->merge($relation->getAllQueryFields()->keyBy(fn (Field $f): string => $f->getFullName()));
         }
 
         return $fields;
@@ -680,7 +680,7 @@ abstract class Entity
         $this->fields = new Collection();
         $this->addFields($fields);
         $fields_keys = $this->getFields()->keys()->all();
-        $filtered = $fields->reject(fn ($field, $key): bool => in_array($key, $fields_keys, true));
+        $filtered = $fields->reject(fn (Field $field, string $key): bool => in_array($key, $fields_keys, true));
 
         foreach ($this->getRelations() as $relation) {
             $relation->setFields($filtered);
@@ -751,7 +751,7 @@ abstract class Entity
      */
     protected function getDefaultSorts(array $columns, Model $model): array
     {
-        return array_map(fn ($c): array => ['property' => $c, 'direction' => 'asc'], array_filter($columns, fn ($c): bool => $c !== $model->getKeyName()));
+        return array_map(fn (string $c): array => ['property' => $c, 'direction' => 'asc'], array_filter($columns, fn (string $c): bool => $c !== $model->getKeyName()));
     }
 
     protected function setDataIntoResponse(ResponseBuilder $responseBuilder, Collection $data, int $totalRecords): void

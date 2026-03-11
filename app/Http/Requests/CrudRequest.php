@@ -33,7 +33,7 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
 
     protected Model $model;
 
-    public function rules()
+    public function rules(): array
     {
         return [
             'connection' => ['string', 'sometimes'],

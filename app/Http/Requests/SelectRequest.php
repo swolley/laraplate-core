@@ -15,7 +15,7 @@ use Override;
 abstract class SelectRequest extends CrudRequest
 {
     #[Override]
-    public function rules()
+    public function rules(): array
     {
         return parent::rules() + [
             'columns.*' => [new QueryColumn()],

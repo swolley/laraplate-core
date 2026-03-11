@@ -42,7 +42,7 @@ final class Inspect
         /** @phpstan-ignore staticMethod.notFound */
         $connection = Schema::connection($schema);
         $tables = $connection->getTables();
-        $table = Arr::first($tables, fn ($table): bool => $table['name'] === $name);
+        $table = Arr::first($tables, fn (array $table): bool => $table['name'] === $name);
 
         if (! $table) {
             return null;
@@ -121,7 +121,7 @@ final class Inspect
     {
         $columns = self::columns($table, $schema);
 
-        return Arr::first($columns, fn ($column): bool => $column['name'] === $name);
+        return Arr::first($columns, fn (Column $column): bool => $column->name === $name);
     }
 
     /**
@@ -132,7 +132,7 @@ final class Inspect
     {
         $indexes = self::indexes($table, $schema);
 
-        return Arr::first($indexes, fn ($index): bool => $index['name'] === $name);
+        return Arr::first($indexes, fn (Index $index): bool => $index->name === $name);
     }
 
     /**
@@ -143,7 +143,7 @@ final class Inspect
     {
         $foreigns = self::foreignKeys($table, $schema);
 
-        return Arr::first($foreigns, fn ($foreign): bool => $foreign['name'] === $name);
+        return Arr::first($foreigns, fn (ForeignKey $foreign): bool => $foreign->name === $name);
     }
 
     private static function cacheKeyWithoutTags(string $key_name): string

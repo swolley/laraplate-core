@@ -21,7 +21,7 @@ class LockedAddCommand extends Command
     #[Override]
     public $description = 'Add a migration to add locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
-    protected $operation = 'add';
+    protected string $operation = 'add';
 
     public function __construct(protected Filesystem $files)
     {
@@ -52,12 +52,13 @@ class LockedAddCommand extends Command
         }
 
         $instance = new ReflectionClass($className)->newInstanceWithoutConstructor();
+        assert($instance instanceof Model);
         $table = $instance->getTable();
         $fileContents = $this->getStubContents($this->getStubPath(), [
             'ModelTable' => $table,
         ]);
 
-        $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($table);
+        $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($instance);
         $path = App::databasePath('migrations/' . $filePath);
 
         if (! $this->files->exists($path)) {
@@ -77,11 +78,11 @@ class LockedAddCommand extends Command
     /**
      * Replace the stub variables(key) with the desire value.
      *
-     * @param  array  $stubVariables
+     * @param  array<string, string>  $stubVariables
      */
-    public function getStubContents($stub, $stubVariables = []): mixed
+    public function getStubContents(string $stub, array $stubVariables = []): string
     {
-        $contents = file_get_contents($stub);
+        $contents = (string) file_get_contents($stub);
 
         foreach ($stubVariables as $search => $replace) {
             $contents = str_replace('$' . $search . '$', $replace, $contents);

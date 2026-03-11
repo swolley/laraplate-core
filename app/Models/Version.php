@@ -37,7 +37,7 @@ final class Version extends OvertrueVersion
      * @psalm-suppress MoreSpecificReturnType
      */
     #[Override]
-    public static function createForModel(Model $model, $replacements = [], $time = null): self
+    public static function createForModel(Model $model, array $replacements = [], mixed $time = null): self
     {
         // parent logic because it's not possible to bypass the save action
 

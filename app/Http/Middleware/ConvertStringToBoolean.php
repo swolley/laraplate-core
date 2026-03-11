@@ -10,7 +10,11 @@ use Override;
 final class ConvertStringToBoolean extends TransformsRequest
 {
     #[Override]
-    protected function transform($key, $value)
+	/**
+	 * @param string $key
+	 * @param mixed $value
+	 */
+    protected function transform($key, $value): mixed
     {
         if ($value === 'true' || $value === 'TRUE') {
             return true;

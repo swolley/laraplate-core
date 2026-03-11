@@ -13,7 +13,7 @@ final class EnsureIsSuperAdmin
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
         abort_if(! Auth::check() || Auth::user()->isSuperAdmin(), 401, 'Unauthorized');
 

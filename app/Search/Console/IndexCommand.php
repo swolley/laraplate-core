@@ -23,7 +23,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     protected $description = 'Create an index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function handle(EngineManager $manager)
+    public function handle(EngineManager $manager): int
     {
         $model = $this->getModelClass();
 
@@ -41,7 +41,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     }
 
     #[Override]
-    protected function createIndex(Engine $engine, $name, $options): void
+    protected function createIndex(Engine $engine, string $name, mixed $options): void
     {
         $model = $this->argument('model');
         $options = new $model()->getSearchMapping();

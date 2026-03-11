@@ -84,7 +84,7 @@ abstract class ListEntity extends Entity
      */
     final public function getLabelField(): array|Field|null
     {
-        $fields = $this->getFields()->filter(fn ($field): bool => in_array($field->getName(), $this->labelFieldsName, true));
+        $fields = $this->getFields()->filter(fn (Field $field): bool => in_array($field->getName(), $this->labelFieldsName, true));
 
         return $fields->count() === 1 ? $fields->first() : $fields->all();
     }
@@ -100,7 +100,7 @@ abstract class ListEntity extends Entity
         $value_field = $this->getValueField();
         $label_field = $this->getLabelField();
 
-        return $this->getFields()->filter(fn ($field, $key): bool => $key !== $label_field->getName() && $key !== $value_field->getName());
+        return $this->getFields()->filter(fn (Field $field, string $key): bool => $key !== $label_field->getName() && $key !== $value_field->getName());
     }
 
     /**

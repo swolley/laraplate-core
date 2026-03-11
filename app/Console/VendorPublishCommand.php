@@ -38,6 +38,10 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
     }
 
     #[Override]
+    /**
+     * @param string $from
+     * @param string $to
+     */
     protected function publishFile($from, $to): void
     {
         $found = false;

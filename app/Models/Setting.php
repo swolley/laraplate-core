@@ -72,6 +72,7 @@ final class Setting extends Model
                 'required',
                 'string',
                 'max:50',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('settings')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 }),
@@ -82,6 +83,7 @@ final class Setting extends Model
                 'sometimes',
                 'string',
                 'max:50',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('settings')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
@@ -96,7 +98,7 @@ final class Setting extends Model
         return SettingFactory::new();
     }
 
-    protected function setTypeAttribute($value): void
+    protected function setTypeAttribute(mixed $value): void
     {
         $this->attributes['type'] = ($value instanceof SettingTypeEnum ? $value : (SettingTypeEnum::tryFrom($value)) ?? SettingTypeEnum::STRING);
     }
@@ -113,7 +115,7 @@ final class Setting extends Model
         ];
     }
 
-    protected function requiresApprovalWhen($modifications): bool
+    protected function requiresApprovalWhen(array $modifications): bool
     {
         return array_intersect(
             array_filter($this->getFillable(), static fn (string $field): bool => $field !== 'description'),

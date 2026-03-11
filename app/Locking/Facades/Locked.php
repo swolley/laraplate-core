@@ -13,7 +13,7 @@ use Override;
 final class Locked extends Facade
 {
     #[Override]
-    protected static function getFacadeAccessor()
+    protected static function getFacadeAccessor(): string
     {
         return \Modules\Core\Locking\Locked::class;
     }

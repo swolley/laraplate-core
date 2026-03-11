@@ -7,7 +7,9 @@ namespace Modules\Core\Grids\Components;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Grids\Components\Field;
 use Modules\Core\Grids\Definitions\ListEntity;
+use Modules\Core\Grids\Definitions\Relation as GridRelation;
 use Override;
 
 final class Funnel extends ListEntity
@@ -47,7 +49,7 @@ final class Funnel extends ListEntity
         // if (is_array($this->getLabelField())) array_push($columns, ...array_map(fn ($field) => $field->getName(), $this->getLabelField()));
         // else $columns[] = $this->getLabelField()->getName();
         // $columns = array_unique($columns);
-        $columns = $this->getAllFields()->map(fn ($field): string => $field->getName())->all();
+        $columns = $this->getAllFields()->map(fn (Field $field): string => $field->getName())->all();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $funnels_data['sort'] ?? $this->getDefaultSorts($columns, $model));
@@ -60,7 +62,7 @@ final class Funnel extends ListEntity
 
         if ($inversed_relationships !== []) {
             // deep relation
-            $imploded_inversed_relation = implode('.', array_map(fn ($r) => $r->getName(), $inversed_relationships));
+            $imploded_inversed_relation = implode('.', array_map(fn (GridRelation $r) => $r->getName(), $inversed_relationships));
             $query->with([$imploded_inversed_relation => function (Builder|Relation $q) use ($last_relation, $columns_filters, $name): void {
                 $this->getLastWithCountRelationQuery($q, $last_relation, $columns_filters, $name);
             }]);
@@ -101,7 +103,7 @@ final class Funnel extends ListEntity
             // columns filters
             $this->prepareFunnelFilterProperties($columns_filters, $grouped_filters);
             // other funnels filters
-            $this->prepareFunnelFilterProperties(array_filter($this->requestData->funnelsFilters, fn ($f): bool => $f !== $current_funnel, ARRAY_FILTER_USE_KEY), $grouped_filters);
+            $this->prepareFunnelFilterProperties(array_filter($this->requestData->funnelsFilters, fn (string $f): bool => $f !== $current_funnel, ARRAY_FILTER_USE_KEY), $grouped_filters);
 
             foreach ($grouped_filters as $path => $entity_filters) {
                 if (count(explode('.', $path)) === 1) {

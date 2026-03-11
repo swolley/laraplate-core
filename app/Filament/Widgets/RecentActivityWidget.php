@@ -33,11 +33,11 @@ final class RecentActivityWidget extends Widget
         // Recent contents (last 10)
         if (class_exists(Content::class)) {
             $data['recent_contents'] = Content::query()
-                ->with('translations', fn ($query) => $query->select(['title', 'locale', 'content_id']))
+                ->with('translations', fn (\Illuminate\Database\Eloquent\Builder $query) => $query->select(['title', 'locale', 'content_id']))
                 ->latest('updated_at')
                 ->limit($this->limit)
                 ->get(['id', 'presettable_id', 'updated_at'])
-                ->map(function ($content): array {
+                ->map(function (object $content): array {
                     // Try to get title from translation or use a fallback
                     $title = 'Untitled';
 
@@ -68,12 +68,12 @@ final class RecentActivityWidget extends Widget
         $data['recent_users'] = User::query()
             ->latest('last_login_at')
             ->whereNotNull('last_login_at')
-            ->whereDoesntHave('roles', function ($query): void {
+            ->whereDoesntHave('roles', function (\Illuminate\Database\Eloquent\Builder $query): void {
                 $query->where('name', config('permission.roles.superadmin'));
             })
             ->limit($this->limit)
             ->get(['id', 'name', 'email', 'last_login_at'])
-            ->map(fn ($user): array => [
+            ->map(fn (object $user): array => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,

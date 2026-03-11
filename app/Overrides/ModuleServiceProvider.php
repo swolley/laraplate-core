@@ -102,7 +102,7 @@ class ModuleServiceProvider extends ServiceProvider
         $files = glob(module_path($this->name, $commandsSubpath . DIRECTORY_SEPARATOR . '*.php'));
 
         $classes = array_map(
-            fn ($file): string => sprintf(
+            fn (string $file): string => sprintf(
                 '%s\\%s\\%s\\%s',
                 $modules_namespace,
                 $this->name,

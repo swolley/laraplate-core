@@ -74,7 +74,7 @@ final class PendingApprovalsNotification extends Notification implements ShouldQ
         $app_name = config('app.name');
 
         $details = $this->pending_by_entity
-            ->map(fn ($item): string => "• *{$item['entity']}*: {$item['count']} pending")
+            ->map(fn (array $item): string => "• *{$item['entity']}*: {$item['count']} pending")
             ->implode("\n");
 
         // Return array format for Slack webhook

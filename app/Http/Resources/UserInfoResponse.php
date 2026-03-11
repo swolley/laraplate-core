@@ -14,7 +14,7 @@ final class UserInfoResponse extends JsonResource
      * Transform the resource into an array.
      */
     #[Override]
-    public function toArray($request): array
+    public function toArray(\Illuminate\Http\Request $request): array
     {
         if ($this->resource) {
             $permissions = [];
@@ -27,7 +27,7 @@ final class UserInfoResponse extends JsonResource
                 }
             }
 
-            $roles = $this->resource->roles->map(static fn ($role) => $role->name);
+            $roles = $this->resource->roles->map(static fn (object $role) => $role->name);
 
             return [
                 'id' => $this->resource->id,

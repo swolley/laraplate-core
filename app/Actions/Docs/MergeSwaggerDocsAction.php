@@ -28,7 +28,7 @@ final readonly class MergeSwaggerDocsAction
         foreach ($files as $file) {
             $shortName = str_replace($assetsPath . DIRECTORY_SEPARATOR, '', $file);
             $json = json_decode($this->filesystem->get($file), true);
-            $json['paths'] = array_filter($json['paths'], function ($path) use ($version): bool {
+            $json['paths'] = array_filter($json['paths'], function (string $path) use ($version): bool {
                 if (Str::contains($path, $version)) {
                     return true;
                 }

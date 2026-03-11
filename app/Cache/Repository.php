@@ -40,6 +40,10 @@ final class Repository extends BaseRepository
     }
 
     #[Override]
+    /**
+     * @param string $key
+     * @param int|array|null $ttl
+     */
     public function remember($key, $ttl, Closure $callback): mixed
     {
         $ttl ??= $this->getDuration();

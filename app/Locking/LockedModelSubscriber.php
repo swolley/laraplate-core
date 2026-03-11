@@ -25,10 +25,7 @@ final class LockedModelSubscriber
         ];
     }
 
-    /**
-     * @phpstan-ignore-next-line
-     */
-    public function saving(string $event, $entity): bool
+    public function saving(string $event, object|array $entity): bool
     {
         if (new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
@@ -53,10 +50,7 @@ final class LockedModelSubscriber
         return true;
     }
 
-    /**
-     * @phpstan-ignore-next-line
-     */
-    public function deleting(string $event, $entity): bool
+    public function deleting(string $event, object|array $entity): bool
     {
         if (new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
@@ -77,10 +71,7 @@ final class LockedModelSubscriber
         throw new LockedModelException('This model is locked');
     }
 
-    /**
-     * @phpstan-ignore-next-line
-     */
-    public function replicating(string $event, $entity): bool
+    public function replicating(string $event, object|array $entity): bool
     {
         $locked = new Locked();
 
@@ -123,10 +114,14 @@ final class LockedModelSubscriber
         throw new LockedModelException('This model is locked');
     }
 
-    private function getModelFromPassedParams($params): ?Model
+    private function getModelFromPassedParams(object|array $params): ?Model
     {
-        if (is_array($params) && $params !== []) {
+        if (is_array($params) && $params !== [] && $params[0] instanceof Model) {
             return $params[0];
+        }
+
+        if (is_object($params) && $params instanceof Model) {
+            return $params;
         }
 
         return null;

@@ -19,7 +19,7 @@ final class CreateNewUser implements CreatesNewUsers
      * {@inheritdoc}
      */
     #[Override]
-    public function create(array $input)
+    public function create(array $input): \Illuminate\Database\Eloquent\Model
     {
         $user_class = user_class();
         Validator::make($input, [

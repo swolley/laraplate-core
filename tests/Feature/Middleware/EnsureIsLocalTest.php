@@ -43,7 +43,7 @@ test('middleware handle method has correct signature', function (): void {
     $reflection = new ReflectionMethod(EnsureIsLocal::class, 'handle');
 
     expect($reflection->getNumberOfParameters())->toBe(2);
-    expect($reflection->getReturnType())->toBeNull();
+    expect($reflection->getReturnType()->getName())->toBe('mixed');
 });
 
 test('middleware uses correct imports', function (): void {

@@ -23,7 +23,7 @@ final readonly class Table
         public string $schema,
         public ?string $connection = null,
     ) {
-        $primaryKey = $indexes->filter(static fn ($index) => $index->attributes->contains('primary'));
+        $primaryKey = $indexes->filter(static fn (Index $index) => $index->attributes->contains('primary'));
 
         $this->primaryKey = $primaryKey->isNotEmpty() ? $primaryKey->first() : null;
     }
@@ -33,6 +33,6 @@ final readonly class Table
      */
     public function getPrimaryKeyColumns(): Collection
     {
-        return $this->columns->filter(fn ($c) => $this->primaryKey->columns->contains($c->name));
+        return $this->columns->filter(fn (Column $c) => $this->primaryKey->columns->contains($c->name));
     }
 }

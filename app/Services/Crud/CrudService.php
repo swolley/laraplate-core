@@ -399,7 +399,7 @@ class CrudService
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
         $key = $requestData->primaryKey;
-        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
+        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn (int|string $k) => $requestData->{$k}, $key);
         $where = is_array($key_value) ? $key_value : [$key => $key_value];
         $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
 
@@ -512,7 +512,7 @@ class CrudService
     {
         $pk_keys = is_array($requestData->primaryKey) ? $requestData->primaryKey : [$requestData->primaryKey];
         $expected = array_merge(['filters'], $pk_keys);
-        $unexpected = array_filter($discardedMessages, static fn (string $msg): bool => array_all($expected, fn ($key): bool => ! str_contains($msg, "'{$key}'")));
+        $unexpected = array_filter($discardedMessages, static fn (string $msg): bool => array_all($expected, fn (string|int $key): bool => ! str_contains($msg, "'{$key}'")));
 
         return $unexpected === [] ? null : implode(', ', $unexpected);
     }
@@ -560,7 +560,7 @@ class CrudService
 
         /** @var string|array $key */
         $key = $model->getKeyName();
-        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn ($k) => $requestData->{$k}, $key);
+        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn (int|string $k) => $requestData->{$k}, $key);
         $where = is_array($key_value) ? $key_value : [$key => $key_value];
         $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
 

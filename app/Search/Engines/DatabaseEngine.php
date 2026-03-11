@@ -21,7 +21,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return true;
     }
 
-    public function createIndex($name, array $options = []): void
+    public function createIndex(string $name, array $options = []): void
     {
         parent::createIndex($name, $options);
     }
@@ -64,7 +64,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return $this->getDatabaseDriver() !== 'sqlite'; // SQLite has limitations
     }
 
-    public function search(Builder $builder)
+    public function search(Builder $builder): mixed
     {
         if ($this->isVectorSearch($builder)) {
             return $this->performVectorSearch($builder);
@@ -131,7 +131,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->get()
-            ->map(function ($embedding) use ($queryVector): array {
+            ->map(function (object $embedding) use ($queryVector): array {
                 $similarity = $this->calculateCosineSimilarity($queryVector, $embedding->embedding);
 
                 return [
@@ -140,7 +140,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                     'embedding' => $embedding->embedding,
                 ];
             })
-            ->filter(static fn ($item): bool => $item['similarity_score'] > 0.7)
+            ->filter(static fn (array $item): bool => $item['similarity_score'] > 0.7)
             ->sortByDesc('similarity_score')
             ->take($builder->limit ?? 10)
             ->values()

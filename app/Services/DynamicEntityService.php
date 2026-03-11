@@ -43,7 +43,7 @@ final class DynamicEntityService
         self::$instance = null;
     }
 
-    public function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
+    public function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): Model
     {
         $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 

@@ -31,7 +31,7 @@ final readonly class ProcessGridAction
         return $grid->process($request);
     }
 
-    private function resolveEntity(string $entity, ?string $connection, object $request)
+    private function resolveEntity(string $entity, ?string $connection, object $request): mixed
     {
         if ($this->entityResolver instanceof Closure) {
             return ($this->entityResolver)($entity, $connection, $request);

@@ -36,7 +36,7 @@ final class Locked
         }
     }
 
-    public function canBeUnlocked($model): bool
+    public function canBeUnlocked(object $model): bool
     {
         $modelClass = $model::class;
         $canBeUnlocked = $this->classesThatCanBeUnlocked();
@@ -45,7 +45,7 @@ final class Locked
         return $unlockAllowed || in_array($modelClass, $canBeUnlocked, true);
     }
 
-    public function cannotBeUnlocked($model): bool
+    public function cannotBeUnlocked(object $model): bool
     {
         return ! $this->canBeUnlocked($model);
     }

@@ -59,7 +59,7 @@ final class DynamicEntity extends Model
      *
      * @throws Exception
      */
-    public static function resolve(string $tableName, ?string $connection = null, $attributes = [], ?Request $request = null): Model
+    public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): Model
     {
         return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
     }
@@ -159,7 +159,7 @@ final class DynamicEntity extends Model
         $serialized = $this->toArray();
 
         // removing hashed values from json_encode
-        return array_filter($serialized, static fn ($v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
+        return array_filter($serialized, static fn (mixed $v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
     public function getRules(): array
@@ -188,7 +188,7 @@ final class DynamicEntity extends Model
      */
     private static function findModel(array $models, string $modelName): ?string
     {
-        $found = array_filter($models, fn ($c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
+        $found = array_filter($models, fn (string $c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
 
         throw_if(count($found) > 1, Exception::class, sprintf("Too many models found for '%s'", $modelName));
 
@@ -310,6 +310,7 @@ final class DynamicEntity extends Model
         }
 
         if (in_array($column->name, $remapped_uids, true)) {
+        		/** @var \Illuminate\Database\Query\Builder $query */
             $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void {
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');

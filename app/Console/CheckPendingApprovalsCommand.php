@@ -50,7 +50,7 @@ final class CheckPendingApprovalsCommand extends Command
 
         $this->table(
             ['Entity', 'Table', 'Pending Count', 'Oldest'],
-            $pending->map(fn ($item): array => [
+            $pending->map(fn (array $item): array => [
                 $item['entity'],
                 $item['table'],
                 $item['count'],

@@ -196,6 +196,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     #[Override]
+    /**
+     * @param string $name
+     */
     protected function qualifyClass($name): array|string
     {
         $name = mb_ltrim($name, '\\/');
@@ -214,6 +217,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     #[Override]
+    /**
+     * @param array|string $name
+     */
     protected function getPath($name): string
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
@@ -238,9 +244,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $this->availableClasses = $this->possibleModels();
 
         $prompted = collect($this->getDefinition()->getArguments())
-            ->filter(fn ($argument): bool => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
-            ->filter(fn ($argument): bool => $argument->getName() !== 'command')
-            ->each(function ($argument) use ($input): void {
+            ->filter(fn (\Symfony\Component\Console\Input\InputArgument $argument): bool => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
+            ->filter(fn (\Symfony\Component\Console\Input\InputArgument $argument): bool => $argument->getName() !== 'command')
+            ->each(function (\Symfony\Component\Console\Input\InputArgument $argument) use ($input): void {
                 $question = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst($argument->getDescription()) . '?';
                 $arg_name = $argument->getName();
 
@@ -285,7 +291,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 default: $this->isNewClass ? ['migration'] : [],
             ),
         )
-            ->map(static fn ($option): int|string => match ($option) {
+            ->map(static fn (string $option): int|string => match ($option) {
                 'resource controller' => 'resource',
                 'form requests' => 'requests',
                 default => $option,
@@ -904,7 +910,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     {
         return suggest(
             $question,
-            fn ($value): array => array_filter($choices, fn (string $name) => Str::contains($name, $value, ignoreCase: true)),
+            fn (string $value): array => array_filter($choices, fn (string $name): bool => Str::contains($name, $value, ignoreCase: true)),
             required: true,
         );
     }

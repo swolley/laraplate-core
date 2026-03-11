@@ -164,6 +164,7 @@ final class Role extends BaseRole
                 'required',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('roles')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 }),
@@ -174,6 +175,7 @@ final class Role extends BaseRole
                 'sometimes',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('roles')->where(function ($query): void {
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
@@ -205,7 +207,7 @@ final class Role extends BaseRole
      */
     private function rejectAnyPermissionForSuperAdmin(array $permissions): void
     {
-        $to_check = collect($permissions)->flatten()->reject(fn ($p): bool => empty($p));
+        $to_check = collect($permissions)->flatten()->reject(fn (mixed $p): bool => empty($p));
 
         if ($to_check->isEmpty()) {
             return;

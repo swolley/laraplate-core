@@ -15,7 +15,7 @@ use ReflectionMethod;
 
 final class ModuleDocGenerator extends Generator
 {
-    public function __construct($config, private readonly string $module, $routeFilter = null)
+    public function __construct(mixed $config, private readonly string $module, mixed $routeFilter = null)
     {
         parent::__construct($config, $routeFilter);
     }

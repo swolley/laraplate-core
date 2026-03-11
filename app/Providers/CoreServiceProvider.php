@@ -211,14 +211,14 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function registerSearchClients(): void
     {
         // Register Elasticsearch client
-        $this->app->singleton(static function ($app): ElasticsearchClient {
+        $this->app->singleton(static function (\Illuminate\Contracts\Foundation\Application $app): ElasticsearchClient {
             $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
 
             return ClientBuilder::fromConfig($config);
         });
 
         // Register Typesense client
-        $this->app->singleton(static function ($app): TypesenseClient {
+        $this->app->singleton(static function (\Illuminate\Contracts\Foundation\Application $app): TypesenseClient {
             $config = config('scout.typesense.client-settings');
 
             return new TypesenseClient($config);
@@ -233,7 +233,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function registerSearchEngines(): void
     {
         // Extend Laravel Scout with custom engines
-        $this->app->make(EngineManager::class)->extend('elasticsearch', static function ($app) {
+        $this->app->make(EngineManager::class)->extend('elasticsearch', static function (\Illuminate\Contracts\Foundation\Application $app) {
             $config = config('search.engines.elasticsearch');
 
             // Get the Elasticsearch client from the container
@@ -246,7 +246,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ]);
         });
 
-        $this->app->make(EngineManager::class)->extend('typesense', static function ($app) {
+        $this->app->make(EngineManager::class)->extend('typesense', static function (\Illuminate\Contracts\Foundation\Application $app) {
             $config = config('search.engines.typesense');
 
             // Get the Typesense client from the container

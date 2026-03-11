@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Grids\Definitions\ListEntity;
+use Modules\Core\Grids\Components\Field;
 use Override;
 
 final class Option extends ListEntity
@@ -44,7 +45,7 @@ final class Option extends ListEntity
         $columns = $this->getAllQueryFields();
         $this->getAllFields()->diff($columns);
         $this->getAllFields()->diff($columns);
-        $columns = $columns->map(fn ($field): string => $field->getName())->all();
+        $columns = $columns->map(fn (Field $field): string => $field->getName())->all();
 
         $query = $model::query()->select($columns);
         $this->addSortsIntoQuery($query, $option_data['sort'] ?? $this->getDefaultSorts($columns, $model));

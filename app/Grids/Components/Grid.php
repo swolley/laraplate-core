@@ -285,7 +285,7 @@ final class Grid extends Entity
 
                 $necessary_fields = array_filter($necessary_fields, fn (\Modules\Core\Grids\Components\Field|string $name): bool => ! $this->hasField($name), ARRAY_FILTER_USE_KEY);
                 $this->initFieldsByConfigs($necessary_fields);
-                $necessary_fields = array_map(fn ($generator) => $generator($this->getModel()), $necessary_fields);
+                $necessary_fields = array_map(fn (callable $generator) => $generator($this->getModel()), $necessary_fields);
                 $this->addFields($necessary_fields);
 
                 if ($options) {
@@ -501,7 +501,7 @@ final class Grid extends Entity
      */
     private function prepareFields(): void
     {
-        $fields = array_map(fn ($generator) => $generator($this->getModel()), $this->prepareFieldsCallbacks);
+        $fields = array_map(fn (callable $generator) => $generator($this->getModel()), $this->prepareFieldsCallbacks);
         $this->setFields($fields);
         $this->prepareNecessaryFields();
     }
@@ -732,7 +732,7 @@ final class Grid extends Entity
             return new Collection();
         }
 
-        return DB::table(self::LAYOUTS_TABLE)->where(function ($query): void {
+        return DB::table(self::LAYOUTS_TABLE)->where(function (\Illuminate\Database\Query\Builder $query): void {
             $user = Auth::user();
 
             if ($user) {
@@ -745,7 +745,7 @@ final class Grid extends Entity
 
     private function getEntityFilters(string $entity, array $filters): array
     {
-        return array_filter($filters, fn ($c): int|false => preg_match('/^' . preg_quote($entity, '/') . "\.[a-zA-Z0-9_]+$/", (string) $c), ARRAY_FILTER_USE_KEY);
+        return array_filter($filters, fn (string $c): int|false => preg_match('/^' . preg_quote($entity, '/') . "\.[a-zA-Z0-9_]+$/", $c), ARRAY_FILTER_USE_KEY);
     }
 
     /**
@@ -822,8 +822,8 @@ final class Grid extends Entity
             ];
 
             $real_relation_name = preg_replace('/^' . lcfirst($this->getModelName()) . "\./", '', $relation);
-            $query->with($real_relation_name, function ($q) use ($relation_filters, $relation_info, $all_fields): void {
-                $relation_columns = $relation_info->getFields()->map(fn ($f): string => $f->getName())->all();
+            $query->with($real_relation_name, function (Builder|Relation $q) use ($relation_filters, $relation_info, $all_fields): void {
+                $relation_columns = $relation_info->getFields()->map(fn (Field $f): string => $f->getName())->all();
                 $q->select(empty($relation_columns) ? ['*'] : array_values($relation_columns));
 
                 if (! in_array($relation_info->info->getOwnerKey(), $q->getQuery()->getQuery()->columns, true)) {
@@ -1014,7 +1014,7 @@ final class Grid extends Entity
 
         throw_if($this->getModel()->incrementing && $primary_value !== null && $primary_value !== [], UnexpectedValueException::class, 'Cannot assign a value to the primary key because is an autoincrement field');
         $full_primary_key = $this->getFullPrimaryKey();
-        $data = array_filter($this->requestData->request->all(), fn ($k): bool => (is_array($full_primary_key) ? ! in_array($k, $full_primary_key, true) : $k !== $full_primary_key) && $k !== 'action', ARRAY_FILTER_USE_KEY);
+        $data = array_filter($this->requestData->request->all(), fn (string|int $k): bool => (is_array($full_primary_key) ? ! in_array($k, $full_primary_key, true) : $k !== $full_primary_key) && $k !== 'action', ARRAY_FILTER_USE_KEY);
         // $validator = Validator::make($data, $this->getAllFields()->getRules);
         // $validated = $validator->stopOnFirstFailure(false)->validate();
 

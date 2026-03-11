@@ -33,7 +33,7 @@ final class BulkIndexSearchJob extends CommonSearchJob
         // Validate that all models are of the same class
         $model_class = $models->first()::class;
 
-        throw_unless($models->every(fn ($model): bool => $model instanceof $model_class), InvalidArgumentException::class, 'All models must be of the same class');
+        throw_unless($models->every(fn (object $model): bool => $model instanceof $model_class), InvalidArgumentException::class, 'All models must be of the same class');
 
         // Validate that the model implements Searchable
         throw_if(! $this->force && ! in_array(Searchable::class, class_uses_recursive($model_class), true), InvalidArgumentException::class, sprintf('Model %s does not use the Searchable trait', $model_class));

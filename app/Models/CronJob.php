@@ -70,6 +70,7 @@ final class CronJob extends Model
                 'required',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at')),
             ],
         ]);
@@ -78,6 +79,7 @@ final class CronJob extends Model
                 'sometimes',
                 'string',
                 'max:255',
+                /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
             ],
         ]);
