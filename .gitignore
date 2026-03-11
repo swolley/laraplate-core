@@ -23,6 +23,7 @@ Homestead.json
 .phpunit.result.cache
 .testbench-modules
 /build
+/coverage-html
 
 /public/build
 /storage/pail
