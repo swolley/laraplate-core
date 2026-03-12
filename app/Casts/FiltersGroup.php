@@ -10,7 +10,7 @@ final readonly class FiltersGroup
         /**
          * @var array<Filter|FiltersGroup>
          */
-        public array $filters,
+        public array $filters = [],
         public WhereClause $operator = WhereClause::AND,
     ) {}
 }

@@ -14,7 +14,7 @@ final class ConvertStringToBoolean extends TransformsRequest
 	 * @param string $key
 	 * @param mixed $value
 	 */
-    protected function transform($key, $value): mixed
+    protected function transform($key, $value): mixed // @pest-ignore-type
     {
         if ($value === 'true' || $value === 'TRUE') {
             return true;

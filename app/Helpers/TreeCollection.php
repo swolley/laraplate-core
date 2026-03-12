@@ -8,11 +8,13 @@ use Illuminate\Support\Collection;
 
 final class TreeCollection extends Collection
 {
+    private const ROOT_KEY = '__root__';
+
     public function tree(): Collection
     {
-        $grouped = $this->groupBy('parent_id');
+        $grouped = $this->groupBy(fn (object $item): int|string => $item->parent_id ?? self::ROOT_KEY);
 
-        return self::buildTree($grouped, null);
+        return self::buildTree($grouped, self::ROOT_KEY);
     }
 
     public function withPaths(string $separator = ' > ', string $field = 'name'): Collection
@@ -25,7 +27,7 @@ final class TreeCollection extends Collection
      *
      * @param  Collection<int, Collection>  $grouped
      */
-    private static function buildTree(Collection $grouped, int|string|null $parentId): Collection
+    private static function buildTree(Collection $grouped, int|string $parentId): Collection
     {
         return ($grouped[$parentId] ?? collect())->map(function (object $item) use ($grouped): object {
             $item->children = self::buildTree($grouped, $item->id)->values();

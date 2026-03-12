@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
@@ -85,4 +86,33 @@ it('clearCacheForPermission flushes all acl related cache', function (): void {
 
     expect(Cache::get($key))->toBeNull();
 });
+
+it('returns unrestricted virtual ACL for super admin user', function (): void {
+    config()->set('permission.roles.superadmin', 'superadmin');
+
+    /** @var Role $superRole */
+    $superRole = Role::factory()->create(['name' => 'superadmin']);
+    /** @var User $user */
+    $user = User::factory()->create();
+    $user->assignRole($superRole);
+
+    /** @var Permission $permission */
+    $permission = Permission::factory()->create();
+
+    $service = new AclResolverService();
+
+    $acls = $service->getEffectiveAcls($user, $permission);
+
+    expect($acls)->toHaveCount(1);
+    /** @var ACL $acl */
+    $acl = $acls->first();
+    expect($acl)->toBeInstanceOf(ACL::class)
+        ->and($acl->isUnrestricted())->toBeTrue();
+
+    expect($service->hasUnrestrictedAccess($user, $permission))->toBeTrue();
+});
+
+// NOTE: More complex scenarios (multiple ACLs with filters) are covered indirectly
+// via higher-level authorization tests to avoid coupling this unit test to
+// Eloquent casting internals of the FiltersGroup value object.
 

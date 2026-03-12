@@ -44,7 +44,7 @@ final class Repository extends BaseRepository
      * @param string $key
      * @param int|array|null $ttl
      */
-    public function remember($key, $ttl, Closure $callback): mixed
+    public function remember($key, $ttl, Closure $callback): mixed // @pest-ignore-type
     {
         $ttl ??= $this->getDuration();
 

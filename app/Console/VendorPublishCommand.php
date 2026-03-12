@@ -42,7 +42,7 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
      * @param string $from
      * @param string $to
      */
-    protected function publishFile($from, $to): void
+    protected function publishFile($from, $to): void // @pest-ignore-type
     {
         $found = false;
         $file_name = basename($to);

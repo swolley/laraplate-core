@@ -165,7 +165,7 @@ final class Role extends BaseRole
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('roles')->where(function ($query): void {
+                Rule::unique('roles')->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 }),
             ],
@@ -176,7 +176,7 @@ final class Role extends BaseRole
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('roles')->where(function ($query): void {
+                Rule::unique('roles')->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],

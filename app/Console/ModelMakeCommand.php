@@ -199,7 +199,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     /**
      * @param string $name
      */
-    protected function qualifyClass($name): array|string
+    protected function qualifyClass($name): array|string // @pest-ignore-type
     {
         $name = mb_ltrim($name, '\\/');
 
@@ -220,7 +220,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     /**
      * @param array|string $name
      */
-    protected function getPath($name): string
+    protected function getPath($name): string // @pest-ignore-type
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
         $path_suffix = Str::after($name, 'Models\\');

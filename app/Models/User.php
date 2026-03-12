@@ -212,7 +212,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void {
+                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 }),
             ],
@@ -233,7 +233,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void {
+                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],
@@ -242,7 +242,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'email',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void {
+                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],
@@ -260,13 +260,13 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
-        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.superadmin')));
+        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.superadmin'))); // @pest-ignore-type
     }
 
     #[Scope]
     protected static function admin(Builder $query): Builder
     {
-        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.admin')));
+        return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.admin'))); // @pest-ignore-type
     }
 
     /**

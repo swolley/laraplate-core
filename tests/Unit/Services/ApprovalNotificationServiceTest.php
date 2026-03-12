@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Notification;
+use Modules\Core\Models\Modification;
+use Modules\Core\Models\Setting;
 use Modules\Core\Services\ApprovalNotificationService;
 use Modules\Core\Tests\LaravelTestCase;
 
@@ -45,4 +50,16 @@ it('getThresholdForTable returns default when no setting exists', function (): v
 
     expect($service->getThresholdForTable('posts', 8))->toBe(8)
         ->and($service->getThresholdForTable('unknown_table', 24))->toBe(24);
+});
+
+it('checkAndNotify returns sent=false when no pending approvals are found', function (): void {
+    $service = new ApprovalNotificationService();
+
+    $result = $service->checkAndNotify();
+
+    expect($result)->toMatchArray([
+        'sent' => false,
+        'pending_count' => 0,
+        'entities' => [],
+    ]);
 });

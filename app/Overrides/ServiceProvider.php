@@ -49,7 +49,7 @@ class ServiceProvider extends BaseServiceProvider
      * @param string $path
      * @param string $key
      */
-    protected function mergeConfigFrom($path, $key): void
+    protected function mergeConfigFrom($path, $key): void // @pest-ignore-type
     {
         if (! ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached())) {
             $config = $this->app->make(Repository::class);

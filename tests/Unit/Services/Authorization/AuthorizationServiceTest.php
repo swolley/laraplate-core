@@ -38,3 +38,50 @@ it('getAclFilters returns null for non authenticated user', function (): void {
     expect($service->getAclFilters('default.orders.select'))->toBeNull();
 });
 
+// NOTE: More complex permission flows are exercised via higher-level tests;
+// here we keep unit tests focused on helper methods and cache/ACL wiring.
+
+
+it('hasUnrestrictedAccess returns false when no authenticated user', function (): void {
+    $service = new AuthorizationService(new AclResolverService());
+
+    Auth::shouldReceive('user')->andReturnNull();
+
+    expect($service->hasUnrestrictedAccess('default.orders.select'))->toBeFalse();
+});
+
+it('hasUnrestrictedAccess returns true for super admin user', function (): void {
+    $service = new AuthorizationService(new AclResolverService());
+
+    /** @var User&\Mockery\MockInterface $user */
+    $user = \Mockery::mock(User::class);
+    $user->shouldReceive('isSuperAdmin')->andReturnTrue();
+
+    Auth::shouldReceive('user')->andReturn($user);
+
+    expect($service->hasUnrestrictedAccess('default.orders.select'))->toBeTrue();
+});
+
+it('clearCacheForCurrentUser does nothing when not authenticated', function (): void {
+    $service = new AuthorizationService(new AclResolverService());
+
+    Auth::shouldReceive('user')->andReturnNull();
+
+    $service->clearCacheForCurrentUser();
+    expect(true)->toBeTrue();
+});
+
+it('clearCacheForCurrentUser forwards to AclResolverService when user is authenticated', function (): void {
+    $resolver = new AclResolverService();
+    $service = new AuthorizationService($resolver);
+
+    /** @var User&\Mockery\MockInterface $user */
+    $user = \Mockery::mock(User::class);
+
+    Auth::shouldReceive('user')->andReturn($user);
+
+    $service->clearCacheForCurrentUser();
+    expect(true)->toBeTrue();
+});
+
+

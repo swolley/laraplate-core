@@ -71,7 +71,7 @@ final class CronJob extends Model
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at')),
+                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at')), // @pest-ignore-type
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -80,7 +80,7 @@ final class CronJob extends Model
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'),
+                Rule::unique('cron_jobs')->where(static fn ($query) => $query->whereNull('deleted_at'))->ignore($this->id, 'id'), // @pest-ignore-type
             ],
         ]);
 

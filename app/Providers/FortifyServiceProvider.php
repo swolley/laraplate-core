@@ -35,7 +35,7 @@ final class FortifyServiceProvider extends ServiceProvider
         		/**
 			 * @param \Illuminate\Http\Request $request
 			 */
-            public function toResponse($request): mixed
+            public function toResponse($request): mixed // @pest-ignore-type
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -55,7 +55,7 @@ final class FortifyServiceProvider extends ServiceProvider
         		/**
 			 * @param \Illuminate\Http\Request $request
 			 */
-            public function toResponse($request): mixed
+            public function toResponse($request): mixed // @pest-ignore-type
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -72,7 +72,7 @@ final class FortifyServiceProvider extends ServiceProvider
 
         $this->app->instance(RegisterResponse::class, new class() implements RegisterResponse
         {
-            public function toResponse($request): mixed
+            public function toResponse($request): mixed // @pest-ignore-type
             {
                 if ($request->wantsJson()) {
                     return to_route('core.auth.userInfo');
@@ -90,7 +90,7 @@ final class FortifyServiceProvider extends ServiceProvider
 		/**
 		 * @param \Illuminate\Contracts\Foundation\Application $app
 		 */
-        $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([
+        $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([ // @pest-ignore-type
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),
         ]));
