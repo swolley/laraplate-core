@@ -1,0 +1,126 @@
+---
+description: Laraplate/Core module-specific architecture and conventions
+globs: ["**/Modules/Core/**", "**/module.json", "**/module.php"]
+alwaysApply: false
+---
+
+# Laraplate Core – Module Specific Rules
+
+Questo file definisce le regole **specifiche per il modulo Core** all'interno di Laraplate.
+Non descrive l'intera applicazione, ma si concentra su:
+- come il Core estende Laravel
+- come gli altri moduli devono interagire con il Core
+- cosa è lecito o meno mettere dentro il Core.
+
+Per le linee guida generali di Laravel, moduli, Filament, testing, CI/CD, ecc. fare riferimento a:
+- `laravel-boost.mdc`
+- `01-php-laravel-standards.mdc`
+- `02-architecture-patterns.mdc`
+- `03-performance-optimization.mdc`
+- `04-error-handling-security.mdc`
+- `05-testing-development.mdc`.
+
+## Ruolo del modulo Core
+
+- **Estensione di Laravel**: il modulo Core rappresenta l'insieme di funzionalità che trasformano Laraplate in un'estensione di Laravel.
+- **Agnostico al progetto**: il Core non contiene logica di dominio specifica di un singolo progetto/applicazione.
+- **Contratto per gli altri moduli**: espone servizi, helper, middleware, eventi e contratti che gli altri moduli possono (e dovrebbero) riutilizzare.
+
+### Cosa vive nel Core
+
+- Autenticazione e autorizzazione di base:
+  - gestione utenti, ruoli, permessi
+  - integrazione con policies e guard.
+- Servizi e helper “framework-like”:
+  - configurazioni centrali, impostazioni e versioni,
+  - servizi di versioning, audit/log, notifiche di sistema,
+  - servizi di ricerca astratti (es. interfacce per search engines).
+- Infrastruttura tecnica condivisa:
+  - sistemi di locking e concorrenza,
+  - dynamic entities e CRUD generici,
+  - componenti per griglie, funnel, filtraggio e pagination generica,
+  - integrazioni base (cache manager, ispezione schema DB, ecc.).
+- Contratti e interfacce comuni:
+  - interfacce per servizi che i moduli possono implementare/estendere,
+  - eventi e listener condivisi legati a funzionalità “core”.
+
+### Cosa **non** dovrebbe vivere nel Core
+
+- Logica di dominio specifica (es. contenuti editoriali, prodotti, ordini, ecc.).
+- Regole di business legate a un particolare progetto/cliente.
+- Funzionalità di presentazione specifiche di un modulo (UI/UX particolari, Filament resources non generiche, viste Blade non riutilizzabili).
+
+Se una funzionalità:
+- è generica, riutilizzabile, e potrebbe servire a più progetti diversi → candidata per il Core;
+- è legata a un dominio o caso d'uso specifico → deve restare nel modulo di dominio (es. `Cms`, `Ecommerce`, ecc.).
+
+## Relazione tra Core e altri moduli
+
+- Gli altri moduli dovrebbero:
+  - riutilizzare i servizi e gli helper esposti dal Core,
+  - evitare di duplicare concetti già presenti (ruoli, impostazioni, locking, search, ecc.),
+  - dipendere dal Core per le funzionalità infrastrutturali (autenticazione base, autorizzazione, impostazioni, versioning, ecc.).
+- I moduli **non** dovrebbero:
+  - modificare direttamente il comportamento interno del Core senza passare per estensioni/supporti previsti (eventi, configurazioni, contratti),
+  - introdurre dipendenze cicliche (es. Core → Cms → Core).
+
+### Esempi di utilizzo corretto
+
+- Un modulo `Cms`:
+  - usa il sistema di permessi/ruoli definito in Core,
+  - registra i propri dynamic entities sfruttando le API del Core,
+  - usa i servizi di search astratti definiti in Core, aggiungendo solo mapping/indici specifici.
+- Un modulo `Ecommerce` ipotetico:
+  - usa il sistema di versionamento/cron job del Core,
+  - si integra con il sistema di notifiche e locking del Core.
+
+## Struttura modulare e file critici del Core
+
+Nel modulo Core la struttura tipica (semplificata) è:
+
+```
+Modules/Core/
+├── app/
+│   ├── Console/
+│   ├── Grids/
+│   ├── Http/
+│   ├── Models/
+│   ├── Providers/
+│   ├── Search/
+│   ├── Services/
+│   └── ...
+├── config/
+├── database/
+├── resources/
+├── routes/
+└── module.json
+```
+
+- I provider del Core registrano:
+  - servizi core nel service container,
+  - event listener, observer, middleware,
+  - configurazioni e route legate a funzionalità infrastrutturali.
+- I modelli del Core rappresentano entità infrastrutturali (es. `User`, `Role`, `CronJob`, `Setting`, `Version`, `DynamicEntity`, ecc.) che gli altri moduli possono usare/estendere.
+
+## Testing nel modulo Core
+
+- I test del Core fungono da **contratto** per gli altri moduli:
+  - eventuali modifiche breaking nel Core dovrebbero riflettersi in test aggiornati e, se necessario, in documentazione per chi sviluppa altri moduli.
+- Posizione:
+  - usare `Modules/Core/tests` con struttura chiara `Unit/` e `Feature/`,
+  - preferire test di feature per i flussi “framework-like” (auth base, CRUD dinamici, locking, search).
+- Per le linee guida comuni di testing e tooling:
+  - vedi `05-testing-development.mdc` e `laravel-boost.mdc`.
+
+## Riferimenti incrociati
+
+- Per tutto ciò che riguarda:
+  - qualità del codice, static analysis, CI/CD → vedi `laravel-boost.mdc`;
+  - standard PHP/Laravel (tipi, naming, stile) → vedi `01-php-laravel-standards.mdc`;
+  - pattern architetturali e servizi → vedi `02-architecture-patterns.mdc`;
+  - performance, caching, code optimization → vedi `03-performance-optimization.mdc`;
+  - error handling, logging, security → vedi `04-error-handling-security.mdc`;
+  - strategia di testing → vedi `05-testing-development.mdc`.
+
+Questo file deve restare focalizzato sul **ruolo del Core** e sulla sua relazione con gli altri moduli: se una regola è generale per l'intera app, deve vivere nelle regole di root o negli altri file `.mdc` condivisi.
+
