@@ -112,7 +112,7 @@
       "composer bump",
       "npx npm-check-updates -u"
     ],
-    "version": "v1.41.0",
+    "version": "v1.41.1",
     "version:silent": "./scripts/version.sh --silent --nointeractive",
     "version:major": "./scripts/version.sh major",
     "version:minor": "./scripts/version.sh minor",

@@ -8,12 +8,15 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Permission;
 
 final class PermissionsTable
 {
     use HasTable;
+
+    private const FILTER_OPTIONS_TTL_SECONDS = 300; // 5 minutes
 
     public static function configure(Table $table): Table
     {
@@ -39,17 +42,36 @@ final class PermissionsTable
             filters: static function (Collection $default_filters): void {
                 $default_filters->unshift(...[
                     SelectFilter::make('guard_name')
-                        ->options(Permission::query()->distinct('guard_name')->pluck('guard_name'))
+                        ->options(static fn (): array => self::cachedDistinctOptions('guard_name'))
                         ->multiple()
                         ->preload(),
                     SelectFilter::make('connection_name')
-                        ->options(Permission::query()->distinct('connection_name')->pluck('connection_name'))
+                        ->options(static fn (): array => self::cachedDistinctOptions('connection_name'))
                         ->preload(),
                     SelectFilter::make('table_name')
-                        ->options(Permission::query()->distinct('table_name')->pluck('table_name'))
+                        ->options(static fn (): array => self::cachedDistinctOptions('table_name'))
                         ->preload(),
                 ]);
             },
+        )
+            ->defaultSort('name');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function cachedDistinctOptions(string $column): array
+    {
+        $ttl = config('core.filament.tabs_counts_ttl_seconds', self::FILTER_OPTIONS_TTL_SECONDS);
+
+        return Cache::remember(
+            "filament_permissions_distinct_{$column}",
+            $ttl,
+            static fn (): array => Permission::query()
+                ->distinct($column)
+                ->orderBy($column)
+                ->pluck($column, $column)
+                ->all(),
         );
     }
 }

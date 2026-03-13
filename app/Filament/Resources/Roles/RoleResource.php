@@ -45,7 +45,9 @@ final class RoleResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return RolesTable::configure($table);
+        return RolesTable::configure($table)
+            ->modifyQueryUsing(fn ($query) => $query->with('permissions'))
+            ->defaultSort('name');
     }
 
     public static function getRelations(): array

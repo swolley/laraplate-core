@@ -6,6 +6,33 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add core module rules for Cursor configuration
+- Enhance table configurations and caching mechanisms across resources
+
+### 🐛 Bug Fixes
+
+- FreeAllLicenses, FreeExpiredLicenses and InitializeUsers command tests
+- Improve cache invalidation logic and enhance validation handling
+
+### 🚜 Refactor
+
+- *(tests)* Remove unnecessary setAccessible calls in reflection tests
+
+### 🧪 Testing
+
+- Add unit tests for Auth, Services (AclResolver, ApprovalNotification, Authorization, Crud, DynamicEntity, Versioning)
+- Add helper and search tests; type coverage 100%; fix TreeCollection null key
+- Improve code coverage for classes near 100%
+
+### ⚙️ Miscellaneous Tasks
+
+- Type coverage al 98% e fix compatibilità override Laravel
+- Update composer.json dependencies and improve command class type hints
+
+## [1.41.0] - 2026-03-09
+
+### 🚀 Features
+
 - Add support for Yajra Laravel OCI8 extension
 
 ### 🐛 Bug Fixes

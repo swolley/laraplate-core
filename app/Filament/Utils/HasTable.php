@@ -186,33 +186,20 @@ trait HasTable
 
             $default_columns->push(
                 ImageColumn::make('translations.locale')
-                    ->state(fn (Model $record) => collect($record->translations)->map(fn (Model $translation): string => $flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
+                    ->state(function (Model $record) use ($flag_cdn_service): array {
+                        return collect($record->translations)
+                            ->map(fn (Model $translation): string => url($flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
+                            ->filter()
+                            ->values()
+                            ->all();
+                    })
                     ->stacked()
                     ->limit(3)
                     ->limitedRemainingText()
                     ->extraImgAttributes(['loading' => 'lazy'])
                     ->toggleable(isToggledHiddenByDefault: false)
-                    ->extraImgAttributes(['loading' => 'lazy']),
-                // TextColumn::make('translations.locale')
-                //     ->searchable()
-                //     ->toggleable(isToggledHiddenByDefault: false)
-                //     ->grow(false)
-                //     ->formatStateUsing(fn ($locales): string => collect($locales)->map(fn (string $locale): string => sprintf(
-                //         '<picture>
-                //             <source type="image/webp" srcset="%s, %s 2x, %s 3x">
-                //             <source type="image/png" srcset="%s, %s 2x, %s 3x">
-                //             <img src="%s" width="40" height="30" alt="%s" loading="lazy">
-                //         </picture>',
-                //         $flag_cdn_service->getUrl($locale, 40, 30, 'webp'),
-                //         $flag_cdn_service->getUrl($locale, 80, 60, 'webp'),
-                //         $flag_cdn_service->getUrl($locale, 120, 90, 'webp'),
-                //         $flag_cdn_service->getUrl($locale, 40, 30, 'png'),
-                //         $flag_cdn_service->getUrl($locale, 80, 60, 'png'),
-                //         $flag_cdn_service->getUrl($locale, 120, 90, 'png'),
-                //         $flag_cdn_service->getUrl($locale, 40, 30, 'png'),
-                //         $locale,
-                //     ))->join('&nbsp;'))
-                //     ->html(),
+                    ->checkFileExistence(false)
+                    ->imageHeight('1rem'),
             );
         }
 

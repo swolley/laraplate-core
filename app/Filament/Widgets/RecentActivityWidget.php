@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\Widgets;
 use App\Models\User;
 use Exception;
 use Filament\Widgets\Widget;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Modules\Cms\Models\Content;
 use Override;
 
@@ -33,7 +34,7 @@ final class RecentActivityWidget extends Widget
         // Recent contents (last 10)
         if (class_exists(Content::class)) {
             $data['recent_contents'] = Content::query()
-                ->with('translations', fn (\Illuminate\Database\Eloquent\Builder $query) => $query->select(['title', 'locale', 'content_id']))
+                ->with(['translations' => fn (Relation $query) => $query->select(['title', 'locale', 'content_id'])])
                 ->latest('updated_at')
                 ->limit($this->limit)
                 ->get(['id', 'presettable_id', 'updated_at'])

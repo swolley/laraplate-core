@@ -11,6 +11,7 @@ use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
 
@@ -61,7 +62,7 @@ final class SettingsTable
                             'datetime' => 'DateTime',
                         ]),
                     SelectFilter::make('group_name')
-                        ->options(static fn () => Setting::query()->distinct()->pluck('group_name', 'group_name')->toArray()),
+                        ->options(static fn (): array => self::cachedGroupNameOptions()),
                     SelectFilter::make('is_public')
                         ->options([
                             '1' => 'Public',
@@ -81,5 +82,24 @@ final class SettingsTable
             ->defaultSort(fn (Builder $query): Builder => $query
                 ->orderBy('group_name')
                 ->orderBy('name'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function cachedGroupNameOptions(): array
+    {
+        $ttl = config('core.filament.tabs_counts_ttl_seconds', 300);
+
+        return Cache::remember(
+            'filament_settings_distinct_group_name',
+            $ttl,
+            static fn (): array => Setting::query()
+                ->select('group_name')
+                ->distinct()
+                ->orderBy('group_name')
+                ->pluck('group_name', 'group_name')
+                ->toArray(),
+        );
     }
 }

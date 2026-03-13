@@ -51,7 +51,9 @@ final class ACLResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ACLsTable::configure($table);
+        return ACLsTable::configure($table)
+            ->modifyQueryUsing(fn ($query) => $query->with('permission'))
+            ->defaultSort('sort');
     }
 
     public static function getRelations(): array

@@ -45,7 +45,9 @@ final class UserResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return UsersTable::configure($table);
+        return UsersTable::configure($table)
+            ->modifyQueryUsing(fn ($query) => $query->with('roles'))
+            ->defaultSort('name');
     }
 
     public static function getRelations(): array
