@@ -110,6 +110,11 @@ trait HasValidations
                 }
 
                 $attributes = array_merge($attributes, $components);
+
+                if (isset($this->attributes['shared_components'])) {
+                    $shared = json_decode((string) $this->attributes['shared_components'], true);
+                    $attributes = array_merge($attributes, $shared ?? []);
+                }
             }
 
             Validator::make($attributes, $rules)->validate();

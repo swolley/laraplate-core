@@ -34,11 +34,15 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     /**
+     * @param  string|Model&Searchable|class-string<Model>  $name
+     * @param  array<string,mixed>  $options  Index options
+     * @param  bool  $force  Force index creation even if it already exists
+     *
      * @throws Exception
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex(string $name, array $options = [], bool $force = false): void
+    public function createIndex($name, array $options = [], bool $force = false): void // phpstan-ignore parameterType
     {
         try {
             $matched = $this->matchModelToCollectionName($name);
