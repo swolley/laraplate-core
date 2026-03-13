@@ -114,6 +114,49 @@ it('can have user assigned later', function (): void {
     expect($license->fresh()->user->id)->toBe($user->id);
 });
 
+it('free scope filters licenses without user', function (): void {
+    $free_license = License::factory()->create();
+    $occupied_license = License::factory()->create();
+    User::factory()->create(['license_id' => $occupied_license->id]);
+
+    $free_ids = License::query()->free()->pluck('id')->toArray();
+
+    expect($free_ids)->toContain($free_license->id)
+        ->and($free_ids)->not->toContain($occupied_license->id);
+});
+
+it('occupied scope filters licenses with user', function (): void {
+    $free_license = License::factory()->create();
+    $occupied_license = License::factory()->create();
+    User::factory()->create(['license_id' => $occupied_license->id]);
+
+    $occupied_ids = License::query()->occupied()->pluck('id')->toArray();
+
+    expect($occupied_ids)->toContain($occupied_license->id)
+        ->and($occupied_ids)->not->toContain($free_license->id);
+});
+
+it('expired scope filters licenses with past valid_to', function (): void {
+    $expired_license = License::factory()->create(['valid_to' => today()->subDay()]);
+    $active_license = License::factory()->create(['valid_to' => today()->addDay()]);
+    $no_expiry = License::factory()->create(['valid_to' => null]);
+
+    $expired_ids = License::query()->expired()->pluck('id')->toArray();
+
+    expect($expired_ids)->toContain($expired_license->id)
+        ->and($expired_ids)->not->toContain($active_license->id)
+        ->and($expired_ids)->not->toContain($no_expiry->id);
+});
+
+it('getRules returns rules with valid_from and valid_to', function (): void {
+    $license = new License;
+    $rules = $license->getRules();
+
+    expect($rules)->toHaveKey(License::DEFAULT_RULE)
+        ->and($rules[License::DEFAULT_RULE])->toHaveKey('valid_from')
+        ->and($rules[License::DEFAULT_RULE])->toHaveKey('valid_to');
+});
+
 it('has proper timestamps', function (): void {
     $license = License::factory()->create();
 

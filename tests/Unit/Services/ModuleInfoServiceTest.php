@@ -7,6 +7,21 @@ use Modules\Core\Tests\LaravelTestCase;
 
 uses(LaravelTestCase::class);
 
+it('isModuleEnabled falls back to Module facade when no closure provided', function (): void {
+    $service = new ModuleInfoService(
+        modulesProvider: static fn () => ['Core'],
+        modelsProvider: static fn () => [],
+        controllersProvider: static fn () => [],
+        composerReader: static fn (string $path) => json_encode(['version' => '1.0.0']),
+        moduleEnabled: null,
+    );
+
+    $grouped = $service->groupedModules();
+
+    expect($grouped['Core'])->toHaveKey('isEnabled')
+        ->and($grouped['Core']['isEnabled'])->toBeBool();
+});
+
 it('groups modules with models and controllers', function (): void {
     $service = new ModuleInfoService(
         modulesProvider: static fn () => ['App', 'Core'],

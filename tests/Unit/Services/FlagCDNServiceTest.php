@@ -18,6 +18,7 @@ it('getFlagsDirectory returns public flags path', function (): void {
 
 it('getUrl returns local url when flag file already exists', function (): void {
     $flags_dir = public_path('flags');
+
     if (! is_dir($flags_dir)) {
         mkdir($flags_dir, 0755, true);
     }
@@ -57,6 +58,7 @@ it('getUrl returns flagcdn url when download fails', function (): void {
 
 it('download returns false when file already exists', function (): void {
     $flags_dir = public_path('flags');
+
     if (! is_dir($flags_dir)) {
         mkdir($flags_dir, 0755, true);
     }
@@ -90,6 +92,68 @@ it('download returns false when download fails', function (): void {
     ]);
 
     $result = $this->service->download('en', 40, 30, 'png');
+
+    expect($result)->toBeFalse();
+});
+
+it('getUrl creates flags directory when it does not exist', function (): void {
+    $flags_dir = public_path('flags');
+
+    if (is_dir($flags_dir)) {
+        array_map('unlink', glob("{$flags_dir}/*") ?: []);
+        rmdir($flags_dir);
+    }
+
+    Http::fake([
+        'https://flagcdn.com/40x30/fr.png' => Http::response('binary', 200),
+    ]);
+
+    try {
+        $url = $this->service->getUrl('fr', 40, 30, 'png');
+        expect($url)->toBe('/flags/fr_40x30.png')
+            ->and(is_dir($flags_dir))->toBeTrue();
+    } finally {
+        @unlink("{$flags_dir}/fr_40x30.png");
+    }
+});
+
+it('getUrl returns flagcdn url when Http throws exception', function (): void {
+    Http::fake([
+        'https://flagcdn.com/40x30/xx.png' => fn () => throw new Exception('timeout'),
+    ]);
+
+    $url = $this->service->getUrl('xx', 40, 30, 'png');
+
+    expect($url)->toBe('https://flagcdn.com/40x30/xx.png');
+});
+
+it('download creates flags directory when it does not exist', function (): void {
+    $flags_dir = public_path('flags');
+
+    if (is_dir($flags_dir)) {
+        array_map('unlink', glob("{$flags_dir}/*") ?: []);
+        rmdir($flags_dir);
+    }
+
+    Http::fake([
+        'https://flagcdn.com/40x30/de.png' => Http::response('binary', 200),
+    ]);
+
+    try {
+        $result = $this->service->download('de', 40, 30, 'png');
+        expect($result)->toBeTrue()
+            ->and(is_dir($flags_dir))->toBeTrue();
+    } finally {
+        @unlink("{$flags_dir}/de_40x30.png");
+    }
+});
+
+it('download returns false when Http throws exception', function (): void {
+    Http::fake([
+        'https://flagcdn.com/40x30/yy.png' => fn () => throw new Exception('connection error'),
+    ]);
+
+    $result = $this->service->download('yy', 40, 30, 'png');
 
     expect($result)->toBeFalse();
 });

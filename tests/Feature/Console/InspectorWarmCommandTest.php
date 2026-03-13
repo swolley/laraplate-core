@@ -65,3 +65,24 @@ it('warms inspector cache for discovered tables', function (): void {
 
     $tester->assertExitCode(BaseCommand::SUCCESS);
 });
+
+it('returns success with no-tables message when getTables returns entries without name key', function (): void {
+    registerInspectorWarmCommand();
+    Schema::shouldReceive('connection')
+        ->andReturnSelf();
+
+    Schema::shouldReceive('getTables')
+        ->andReturn([
+            ['schema' => 'public'],
+        ]);
+    Schema::shouldReceive('dropIfExists')
+        ->zeroOrMoreTimes();
+    Schema::shouldReceive('table')
+        ->zeroOrMoreTimes();
+    Schema::shouldReceive('drop')
+        ->zeroOrMoreTimes();
+
+    $tester = $this->artisan('inspector:warm');
+
+    $tester->assertExitCode(BaseCommand::SUCCESS);
+});

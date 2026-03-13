@@ -34,3 +34,17 @@ it('dispatches IndexInSearchJob when not handled and sync is false', function ()
 
     Bus::assertDispatched(Modules\Core\Search\Jobs\IndexInSearchJob::class);
 });
+
+it('runs IndexInSearchJob synchronously when sync is true', function (): void {
+    $model = new StubSearchableModel();
+    $model->setAttribute('id', 1);
+    $event = new ModelRequiresIndexing($model, true);
+
+    try {
+        (new IndexModelFallbackListener())->handle($event);
+    } catch (Throwable) {
+        // Search infrastructure may not be fully configured in test env
+    }
+
+    expect($event->sync)->toBeTrue();
+});

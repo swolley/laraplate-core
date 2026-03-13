@@ -23,7 +23,7 @@ it('applies scope with is_deleted false', function (): void {
 it('adds withoutTrashed macro when extend is invoked', function (): void {
     $scope = new CustomSoftDeletingScope();
     $builder = Setting::query();
-    $ref = new \ReflectionClass($scope);
+    $ref = new ReflectionClass($scope);
     $method = $ref->getMethod('addWithoutTrashed');
     $method->invoke($scope, $builder);
 
@@ -33,9 +33,39 @@ it('adds withoutTrashed macro when extend is invoked', function (): void {
 it('adds onlyTrashed macro when extend is invoked', function (): void {
     $scope = new CustomSoftDeletingScope();
     $builder = Setting::query();
-    $ref = new \ReflectionClass($scope);
+    $ref = new ReflectionClass($scope);
     $method = $ref->getMethod('addOnlyTrashed');
     $method->invoke($scope, $builder);
 
     expect($builder->getMacro('onlyTrashed'))->not->toBeNull();
+});
+
+it('withoutTrashed macro adds is_deleted false condition', function (): void {
+    $scope = new CustomSoftDeletingScope();
+    $builder = Setting::query();
+
+    $ref = new ReflectionClass($scope);
+    $method = $ref->getMethod('addWithoutTrashed');
+    $method->invoke($scope, $builder);
+
+    $result = $builder->withoutTrashed();
+
+    $sql = $result->toSql();
+    expect($sql)->toContain('is_deleted')
+        ->and($result->getBindings())->toContain(false);
+});
+
+it('onlyTrashed macro adds is_deleted true condition', function (): void {
+    $scope = new CustomSoftDeletingScope();
+    $builder = Setting::query();
+
+    $ref = new ReflectionClass($scope);
+    $method = $ref->getMethod('addOnlyTrashed');
+    $method->invoke($scope, $builder);
+
+    $result = $builder->onlyTrashed();
+
+    $sql = $result->toSql();
+    expect($sql)->toContain('is_deleted')
+        ->and($result->getBindings())->toContain(true);
 });

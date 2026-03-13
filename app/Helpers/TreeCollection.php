@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 
 final class TreeCollection extends Collection
 {
-    private const ROOT_KEY = '__root__';
+    private const string ROOT_KEY = '__root__';
 
     public function tree(): Collection
     {

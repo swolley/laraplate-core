@@ -11,7 +11,8 @@ uses(LaravelTestCase::class);
 it('constructs without starting benchmark when running unit tests', function (): void {
     app()->instance('runningUnitTests', true);
 
-    $command = new class() extends Command {
+    $command = new class() extends Command
+    {
         public function handle(): int
         {
             return 0;
@@ -24,12 +25,14 @@ it('constructs without starting benchmark when running unit tests', function ():
 
 it('constructs without starting benchmark when not in console', function (): void {
     $app = app();
+
     if (method_exists($app, 'runningInConsole')) {
-        $app = \Mockery::mock($app)->makePartial();
+        $app = Mockery::mock($app)->makePartial();
         $app->shouldReceive('runningInConsole')->andReturn(false);
     }
 
-    $command = new class() extends Command {
+    $command = new class extends Command
+    {
         public function handle(): int
         {
             return 0;
@@ -37,4 +40,36 @@ it('constructs without starting benchmark when not in console', function (): voi
     };
 
     expect($command)->toBeInstanceOf(Command::class);
+});
+
+it('destructor does nothing when benchmarkStartTime is null', function (): void {
+    $command = new class extends Command
+    {
+        public function handle(): int
+        {
+            return 0;
+        }
+    };
+
+    $ref = new ReflectionProperty(Command::class, 'benchmarkStartTime');
+    expect($ref->getValue($command))->toBeNull();
+
+    $command->__destruct();
+
+    expect(true)->toBeTrue();
+});
+
+it('isLaunchedManually can be invoked via reflection', function (): void {
+    $command = new class extends Command
+    {
+        public function handle(): int
+        {
+            return 0;
+        }
+    };
+
+    $ref = new ReflectionMethod(Command::class, 'isLaunchedManually');
+    $result = $ref->invoke($command);
+
+    expect($result)->toBeBool();
 });

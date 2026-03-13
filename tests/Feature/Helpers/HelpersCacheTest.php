@@ -106,3 +106,27 @@ it('HelpersCache::clearModels only clears model cache', function (): void {
     expect(HelpersCache::getModels('active'))->toBeNull();
     expect(HelpersCache::getConnections('active'))->not->toBeNull();
 });
+
+it('HelpersCache has private constructor', function (): void {
+    $ref = new ReflectionClass(HelpersCache::class);
+    $constructor = $ref->getConstructor();
+
+    expect($constructor)->not->toBeNull()
+        ->and($constructor->isPrivate())->toBeTrue();
+
+    $constructor->setAccessible(true);
+    $instance = $ref->newInstanceWithoutConstructor();
+    $constructor->invoke($instance);
+
+    expect($instance)->toBeInstanceOf(HelpersCache::class);
+});
+
+it('HelpersCache::clearConnections only clears connection cache', function (): void {
+    models();
+    connections();
+
+    HelpersCache::clearConnections();
+
+    expect(HelpersCache::getConnections('active'))->toBeNull();
+    expect(HelpersCache::getModels('active'))->not->toBeNull();
+});

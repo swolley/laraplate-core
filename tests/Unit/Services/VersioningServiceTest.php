@@ -32,6 +32,24 @@ it('creates a version with basic attributes and no extras', function (): void {
         ->and($version->contents)->toHaveKey('foo', 'bar');
 });
 
+it('sets version strategy from string', function (): void {
+    config()->set('versionable.version_model', Version::class);
+
+    $service = new VersioningService();
+
+    $version = $service->createVersion(
+        FakeVersionedModel::class,
+        1,
+        null,
+        'fake_table',
+        ['id' => 1, 'foo' => 'bar'],
+        [],
+        versionStrategy: 'SNAPSHOT',
+    );
+
+    expect($version)->toBeInstanceOf(Version::class);
+});
+
 it('sets user id and encrypts selected fields and trims older versions', function (): void {
     config()->set('versionable.version_model', Version::class);
 
@@ -137,5 +155,3 @@ class FakeVersionedModel extends Model
         };
     }
 }
-
-

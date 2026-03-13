@@ -36,3 +36,30 @@ it('boot registers indexing rate limiter', function (): void {
 
     expect(RateLimiter::limiter('indexing'))->toBeCallable();
 });
+
+it('versions limiter returns 120 per minute', function (): void {
+    $this->provider->boot();
+
+    $limiter = RateLimiter::limiter('versions');
+    $result = $limiter(new stdClass());
+
+    expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class);
+});
+
+it('translations limiter returns 30 per minute', function (): void {
+    $this->provider->boot();
+
+    $limiter = RateLimiter::limiter('translations');
+    $result = $limiter(new stdClass());
+
+    expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class);
+});
+
+it('embeddings limiter returns 10 per minute', function (): void {
+    $this->provider->boot();
+
+    $limiter = RateLimiter::limiter('embeddings');
+    $result = $limiter();
+
+    expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class);
+});

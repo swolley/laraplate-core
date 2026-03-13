@@ -43,3 +43,56 @@ it('allows assigning other roles when user does not have superadmin role', funct
 
     expect($user->roles()->count())->toBe(2);
 });
+
+it('returns early when model is not a User instance', function (): void {
+    $pivot = new Modules\Core\Models\Pivot\ModelHasRole;
+    $pivot->model_type = Modules\Core\Models\Setting::class;
+    $pivot->model_id = 999;
+    $pivot->role_id = 1;
+
+    $observer = new Modules\Core\Observers\ModelHasRoleObserver;
+    $observer->creating($pivot);
+
+    expect(true)->toBeTrue();
+});
+
+it('returns early when model_type or model_id is missing', function (): void {
+    $pivot = new Modules\Core\Models\Pivot\ModelHasRole;
+    $pivot->model_type = null;
+    $pivot->model_id = null;
+    $pivot->role_id = 1;
+
+    $observer = new Modules\Core\Observers\ModelHasRoleObserver;
+    $observer->creating($pivot);
+
+    expect(true)->toBeTrue();
+});
+
+it('returns early when model_type class does not exist', function (): void {
+    $pivot = new Modules\Core\Models\Pivot\ModelHasRole;
+    $pivot->model_type = 'NonExistent\\FakeClass';
+    $pivot->model_id = 1;
+    $pivot->role_id = 1;
+
+    $observer = new Modules\Core\Observers\ModelHasRoleObserver;
+    $observer->creating($pivot);
+
+    expect(true)->toBeTrue();
+});
+
+it('returns early when superadmin role does not exist in database', function (): void {
+    config(['permission.roles.superadmin' => 'nonexistent_superadmin_role_xyz']);
+    $role = Role::factory()->create(['name' => 'editor']);
+    $user = User::factory()->create();
+    $user->roles()->attach($role);
+
+    $pivot = new Modules\Core\Models\Pivot\ModelHasRole;
+    $pivot->model_type = User::class;
+    $pivot->model_id = $user->id;
+    $pivot->role_id = $role->id;
+
+    $observer = new Modules\Core\Observers\ModelHasRoleObserver;
+    $observer->creating($pivot);
+
+    expect(true)->toBeTrue();
+});

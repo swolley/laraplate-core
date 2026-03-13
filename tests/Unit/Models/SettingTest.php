@@ -72,3 +72,53 @@ it('requiresApprovalWhen returns false when only description is modified', funct
     $result = $method->invoke($setting, ['description' => 'New description']);
     expect($result)->toBeFalse();
 });
+
+it('getRules create rule contains unique constraint closure', function (): void {
+    $setting = new Setting;
+    $rules = $setting->getRules();
+
+    $create_name_rules = $rules['create']['name'];
+    $has_unique = false;
+
+    foreach ($create_name_rules as $rule) {
+        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
+            $has_unique = true;
+        }
+    }
+
+    expect($has_unique)->toBeTrue();
+});
+
+it('getRules update rule contains unique constraint with ignore', function (): void {
+    $setting = Setting::factory()->create();
+    $rules = $setting->getRules();
+
+    $update_name_rules = $rules['update']['name'];
+    $has_unique = false;
+
+    foreach ($update_name_rules as $rule) {
+        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
+            $has_unique = true;
+        }
+    }
+
+    expect($has_unique)->toBeTrue();
+});
+
+it('casts returns expected keys', function (): void {
+    $setting = new Setting;
+    $casts = (new ReflectionMethod(Setting::class, 'casts'))->invoke($setting);
+
+    expect($casts)->toHaveKey('value')
+        ->and($casts)->toHaveKey('encrypted')
+        ->and($casts)->toHaveKey('choices')
+        ->and($casts)->toHaveKey('type')
+        ->and($casts['type'])->toBe(SettingTypeEnum::class);
+});
+
+it('newFactory returns SettingFactory instance', function (): void {
+    $method = new ReflectionMethod(Setting::class, 'newFactory');
+    $factory = $method->invoke(null);
+
+    expect($factory)->toBeInstanceOf(Modules\Core\Database\Factories\SettingFactory::class);
+});

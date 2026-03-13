@@ -8,9 +8,9 @@ use Modules\Core\Console\FreeExpiredLicensesCommand;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Symfony\Component\Console\Command\Command as BaseCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-use Symfony\Component\Console\Command\Command as BaseCommand;
 
 uses(LaravelTestCase::class, RefreshDatabase::class);
 
@@ -44,3 +44,12 @@ it('frees licenses whose validity has expired', function (): void {
         ->and($expiredUser->license_id)->toBeNull();
 });
 
+it('returns failure when user class is not User or subclass', function (): void {
+    config(['auth.providers.users.model' => Illuminate\Database\Eloquent\Model::class]);
+
+    $command = app(FreeExpiredLicensesCommand::class);
+    $command->setOutput(new OutputStyle(new ArrayInput([]), new BufferedOutput()));
+    $exit_code = $command->handle();
+
+    expect($exit_code)->toBe(BaseCommand::FAILURE);
+});

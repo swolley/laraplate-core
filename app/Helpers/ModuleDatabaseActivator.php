@@ -21,7 +21,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     /**
      * Table name for Setting model (used in checkSettingTable without loading Eloquent).
      */
-    private const SETTING_TABLE = 'settings';
+    private const string SETTING_TABLE = 'settings';
 
     public static string $RECORD_NAME = 'backendModules';
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\UserInfoResponse;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
@@ -40,4 +41,39 @@ it('includes canImpersonate in array', function (): void {
     $array = $resource->toArray(new Request);
 
     expect($array)->toHaveKey('canImpersonate');
+});
+
+it('transforms superadmin user with all permissions grouped by guard', function (): void {
+    config(['permission.roles.superadmin' => 'superadmin']);
+
+    $role = Role::factory()->create(['name' => 'superadmin']);
+    Permission::factory()->create(['name' => 'posts.articles.edit', 'guard_name' => 'web']);
+
+    $user = User::factory()->create();
+    $user->roles()->attach($role);
+    $user->load('roles');
+
+    $resource = new UserInfoResponse($user);
+    $array = $resource->toArray(new Request);
+
+    expect($array['permissions'])->toBeArray()
+        ->and($array['permissions'])->not->toBeEmpty();
+});
+
+it('groups multiple permissions under same guard', function (): void {
+    $role = Role::factory()->create(['name' => 'editor']);
+    $perm1 = Permission::factory()->create(['name' => 'posts.articles.edit', 'guard_name' => 'web']);
+    $perm2 = Permission::factory()->create(['name' => 'posts.articles.view', 'guard_name' => 'web']);
+    $role->givePermissionTo($perm1, $perm2);
+
+    $user = User::factory()->create();
+    $user->roles()->attach($role);
+    $user->load('roles', 'permissions');
+
+    $resource = new UserInfoResponse($user);
+    $array = $resource->toArray(new Request);
+
+    $all_perms = collect($array['permissions'])->flatten()->toArray();
+    expect($all_perms)->toContain('posts.articles.edit')
+        ->and($all_perms)->toContain('posts.articles.view');
 });
