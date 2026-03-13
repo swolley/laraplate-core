@@ -15,5 +15,5 @@ final class OptimisticLockRemoveCommand extends OptimisticLockAddCommand
     public $description = 'Add a migration to remove optimistic locking columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    protected $operation = 'remove';
+    protected string $operation = 'remove';
 }

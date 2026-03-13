@@ -12,6 +12,7 @@ use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Events\SocialLoginCompleted;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\HandleSocialLoginActionTestUserDouble;
 use Symfony\Component\HttpFoundation\Response;
 
 uses(LaravelTestCase::class);
@@ -200,18 +201,3 @@ it('redirect returns redirect response from socialite driver', function (): void
 
     expect($response)->toBe($redirectResponse);
 });
-
-/**
- * Stub used to cover the path where userUpserter is null.
- * user_class() is set to this class; query() returns the mock builder that updateOrCreate().
- */
-class HandleSocialLoginActionTestUserDouble
-{
-    /** @var mixed */
-    public static $queryBuilder;
-
-    public static function query(): mixed
-    {
-        return self::$queryBuilder;
-    }
-}

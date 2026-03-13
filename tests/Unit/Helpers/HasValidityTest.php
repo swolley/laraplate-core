@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\ValidityStubModel;
 
 uses(LaravelTestCase::class);
 
@@ -70,17 +71,3 @@ it('unpublish clears valid_from and valid_to in memory and persists when saved',
     expect($model->valid_from)->toBeNull()
         ->and($model->valid_to)->toBeNull();
 });
-
-class ValidityStubModel extends Model
-{
-    use HasValidity;
-
-    protected $table = 'validity_stub';
-
-    protected $fillable = ['name', 'valid_from', 'valid_to'];
-
-    protected $casts = [
-        'valid_from' => 'datetime',
-        'valid_to' => 'datetime',
-    ];
-}

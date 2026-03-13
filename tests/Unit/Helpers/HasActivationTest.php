@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\ActivationStubModel;
 
 uses(LaravelTestCase::class);
 
@@ -66,14 +67,3 @@ it('initialization adds is_active to fillable and hidden when missing', function
     expect($model->getFillable())->toContain('is_active')
         ->and($model->getHidden())->toContain('is_active');
 });
-
-class ActivationStubModel extends Model
-{
-    use HasActivation;
-
-    protected $table = 'activation_stub';
-
-    protected $fillable = ['name', 'is_active'];
-
-    protected $casts = ['is_active' => 'boolean'];
-}

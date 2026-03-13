@@ -32,7 +32,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         }
 
         $this->addArgument('name');
-        $this->input->setArgument('name', /* new $model()->indexableAs() */ $model);
+        $this->input->setArgument('name', $model);
         $this->addOption('key');
 
         parent::handle($manager);
@@ -40,8 +40,11 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         return Command::SUCCESS;
     }
 
+    /**
+     * @param  string  $name
+     */
     #[Override]
-    protected function createIndex(Engine $engine, string $name, mixed $options): void
+    protected function createIndex(Engine $engine, $name, $options): void // phpstan-ignore parameterType
     {
         $model = $this->argument('model');
         $options = new $model()->getSearchMapping();

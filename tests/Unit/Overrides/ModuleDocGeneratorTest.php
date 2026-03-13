@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Modules\Core\Overrides\ModuleDocGenerator;
 use Modules\Core\Overrides\ModuleDocRoute;
+use Modules\Core\Tests\Stubs\DummyFormRequest;
 use Modules\Core\Tests\TestCase;
 
 uses(TestCase::class);
@@ -107,14 +107,6 @@ it('iterateCombinations clones routes and replaces parameters', function (): voi
     expect($module_routes)->toHaveCount(4);
     expect($module_routes[0])->toBeInstanceOf(ModuleDocRoute::class);
 });
-
-class DummyFormRequest extends FormRequest
-{
-    public function rules(): array
-    {
-        return ['name' => 'required|string'];
-    }
-}
 
 it('getFormRules returns rules from non-abstract FormRequest parameter', function (): void {
     $config = ['ignoredRoutes' => []];

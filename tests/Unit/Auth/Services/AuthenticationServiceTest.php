@@ -7,57 +7,11 @@ use Illuminate\Http\Request;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Auth\Services\AuthenticationService;
 use Modules\Core\Tests\TestCase;
+use Modules\Core\Tests\Stubs\FakeAuthUser;
+use Modules\Core\Tests\Stubs\FakeDisabledProvider;
+use Modules\Core\Tests\Stubs\FakeEnabledProvider;
 
 uses(TestCase::class);
-
-class FakeAuthUser extends BaseUser
-{
-    protected $fillable = ['name', 'email'];
-}
-
-class FakeEnabledProvider implements IAuthenticationProvider
-{
-    public bool $handleCalled = false;
-
-    public function __construct(private readonly string $name) {}
-
-    public function canHandle(Request $request): bool
-    {
-        return $request->attributes->get('provider') === $this->name;
-    }
-
-    public function authenticate(Request $request): array
-    {
-        $this->handleCalled = true;
-
-        $user = new FakeAuthUser(['name' => 'John', 'email' => 'john@example.com']);
-
-        return [
-            'success' => true,
-            'user' => $user,
-            'error' => null,
-            'license' => null,
-        ];
-    }
-
-    public function isEnabled(): bool
-    {
-        return true;
-    }
-
-    public function getProviderName(): string
-    {
-        return $this->name;
-    }
-}
-
-class FakeDisabledProvider extends FakeEnabledProvider
-{
-    public function isEnabled(): bool
-    {
-        return false;
-    }
-}
 
 it('returns first successful authentication result from enabled providers', function (): void {
     $request = new Request();
