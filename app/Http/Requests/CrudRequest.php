@@ -28,10 +28,12 @@ use Override;
  */
 abstract class CrudRequest extends FormRequest implements IParsableRequest
 {
-    /** @var string|array<int,string> */
-    protected string|array $primaryKey;
+    /**
+     * @var string|array<int,string>
+     */
+    protected string|array $primaryKey = 'id';
 
-    protected Model $model;
+    protected ?Model $model = null;
 
     public function rules(): array
     {

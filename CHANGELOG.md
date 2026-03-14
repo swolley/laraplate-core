@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Enhance caching logic and improve type hints across commands and requests
+
+## [1.41.1] - 2026-03-13
+
 ### 🚀 Features
 
 - Add core module rules for Cursor configuration

@@ -12,6 +12,7 @@ use Mtrajano\LaravelSwagger\Generator;
 use Override;
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionNamedType;
 
 final class ModuleDocGenerator extends Generator
 {
@@ -99,7 +100,7 @@ final class ModuleDocGenerator extends Generator
         foreach ($parameters as $parameter) {
             $type = $parameter->getType();
 
-            if (! $type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+            if (! $type instanceof ReflectionNamedType || $type->isBuiltin()) {
                 continue;
             }
 
@@ -189,7 +190,7 @@ final class ModuleDocGenerator extends Generator
         $route_name = $route->getName();
         $route_uri = $route->uri();
 
-        if ($route_name === '' || Str::startsWith($route_uri, ['_', '/_'])) {
+        if ($route_name === '' || Str::startsWith($route_uri, ['_', '/_']) || Str::endsWith($route_uri, ['.map', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot', '.otf', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot', '.otf'])) {
             return true;
         }
 

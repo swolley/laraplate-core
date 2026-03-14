@@ -34,7 +34,7 @@ if (! function_exists('modules')) {
         if (class_exists($module_class)) {
             try {
                 $modules = $onlyActive ? $module_class::allEnabled() : $module_class::all();
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // If the modules system is not bootstrapped (for example in some
                 // isolated unit tests), gracefully fall back to an empty list.
                 $modules = [];
@@ -73,7 +73,7 @@ if (! function_exists('modules')) {
                         $resolved = $app_instance->path();
                         $app_path = $resolved;
                     }
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     $app_path = null;
                 }
 
@@ -388,7 +388,9 @@ if (! function_exists('routes')) {
 
             $exploded = explode('\\', (string) $reference);
 
-            if (($exploded[0] !== 'Modules' && (in_array($onlyModule, [null, '', '0', 'App'], true))) || (in_array($exploded[1], $modules, true) && (in_array($onlyModule, [null, '', '0'], true) || $exploded[1] === $onlyModule))) {
+            if (
+                ($exploded[0] !== 'Modules' && (in_array($onlyModule, [null, '', '0', 'App'], true)))
+                || (isset($exploded[1]) && in_array($exploded[1], $modules, true) && (in_array($onlyModule, [null, '', '0'], true) || $exploded[1] === $onlyModule))) {
                 $routes[] = $route;
             }
         }

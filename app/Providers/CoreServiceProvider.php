@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
@@ -45,6 +46,7 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Typesense\Client as TypesenseClient;
+use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 /**
  * @property Application $app
@@ -97,6 +99,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         parent::register();
 
+        $this->app->bind(OpenApiJsonController::class, DocsController::class);
+
         $this->app->register(FortifyServiceProvider::class);
 
         // Register search clients
@@ -107,6 +111,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $oci8_provider = 'Yajra\\Oci8\\Oci8ServiceProvider';
         $oci8_validation_provider = 'Yajra\\Oci8\\Oci8ValidationServiceProvider';
+
         if (extension_loaded('oci8')
             && class_exists($oci8_provider)
             && class_exists($oci8_validation_provider)) {

@@ -51,7 +51,13 @@ final class TranslationsCheckCommand extends Command
 
         $this->output->writeln('');
 
-        Cache::tags(Cache::getCacheTags('translations'))->flush();
+        if (Cache::supportsTags()) {
+            $repository = Cache::getFacadeRoot()->store();
+
+            if (method_exists($repository, 'getCacheTags')) {
+                Cache::tags($repository->getCacheTags('translations'))->flush();
+            }
+        }
 
         return BaseCommand::SUCCESS;
     }

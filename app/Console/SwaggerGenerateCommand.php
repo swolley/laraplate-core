@@ -53,7 +53,13 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $this->moduleHandle($module_name);
         }
 
-        Cache::tags(Cache::getCacheTags('docs'))->flush();
+        if (Cache::supportsTags()) {
+            $repository = Cache::getFacadeRoot()->store();
+
+            if (method_exists($repository, 'getCacheTags')) {
+                Cache::tags($repository->getCacheTags('docs'))->flush();
+            }
+        }
 
         return Command::SUCCESS;
     }
