@@ -82,13 +82,13 @@ final class CreateUserCommand extends Command
                             if ($options !== null) {
                                 $answer = search(ucfirst($attribute), fn (string $value): array => array_filter($options, fn (string $o): bool => str_starts_with($o, $value)));
                             } else {
-                                $answer = text(ucfirst($attribute), $suggestion, required: true, validate: fn (string $value) => $this->validationCallback($attribute, $value, $validations));
+                                $answer = text(ucfirst($attribute), $suggestion, required: true, validate: fn (string $value): ?string => $this->validationCallback($attribute, $value, $validations));
                             }
                         } else {
-                            $answer = password(ucfirst($attribute), 'Type a password or let blank to randomly generate it', false, fn (string $value) => $value === '' ? null : $this->validationCallback($attribute, $value, $validations));
+                            $answer = password(ucfirst($attribute), 'Type a password or let blank to randomly generate it', false, fn (string $value): ?string => $value === '' ? null : $this->validationCallback($attribute, $value, $validations));
 
                             if ($answer !== '') {
-                                password('Confirm ' . $attribute, required: true, validate: fn (string $value) => $this->validationCallback($attribute, $value, ['password' => 'in:' . $answer]));
+                                password('Confirm ' . $attribute, required: true, validate: fn (string $value): ?string => $this->validationCallback($attribute, $value, ['password' => 'in:' . $answer]));
                             } else {
                                 $answer = Str::password();
                             }

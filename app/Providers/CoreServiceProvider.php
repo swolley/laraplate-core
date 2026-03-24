@@ -109,8 +109,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Registration of custom search engines
         $this->registerSearchEngines();
 
-        $oci8_provider = 'Yajra\\Oci8\\Oci8ServiceProvider';
-        $oci8_validation_provider = 'Yajra\\Oci8\\Oci8ValidationServiceProvider';
+        $oci8_provider = \Yajra\Oci8\Oci8ServiceProvider::class;
+        $oci8_validation_provider = \Yajra\Oci8\Oci8ValidationServiceProvider::class;
 
         if (extension_loaded('oci8')
             && class_exists($oci8_provider)

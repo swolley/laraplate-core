@@ -40,7 +40,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex(string $name, array $options = [], bool $force = false): void
+    public function createIndex($name, array $options = [], bool $force = false): void // @pest-ignore-type
     {
         try {
             $matched = $this->matchModelToCollectionName($name);

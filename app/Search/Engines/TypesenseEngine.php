@@ -42,7 +42,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = [], bool $force = false): void // phpstan-ignore parameterType
+    public function createIndex($name, array $options = [], bool $force = false): void // @pest-ignore-type
     {
         try {
             $matched = $this->matchModelToCollectionName($name);

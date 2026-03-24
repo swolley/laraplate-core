@@ -182,7 +182,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     /**
      * Ensures the backendModules row exists (query builder only, no Eloquent).
      */
-    private static function ensureBackendModulesRecord(): void
+    private function ensureBackendModulesRecord(): void
     {
         $exists = DB::table(self::SETTING_TABLE)
             ->where('name', self::$RECORD_NAME)
@@ -233,7 +233,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             ->value('value');
 
         if ($raw === null) {
-            self::ensureBackendModulesRecord();
+            $this->ensureBackendModulesRecord();
 
             return self::getAllModulesNames();
         }

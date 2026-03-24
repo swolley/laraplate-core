@@ -120,7 +120,7 @@ final class LockedModelSubscriber
             return $params[0];
         }
 
-        if (is_object($params) && $params instanceof Model) {
+        if ($params instanceof Model) {
             return $params;
         }
 

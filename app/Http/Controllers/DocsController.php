@@ -47,7 +47,7 @@ final class DocsController extends OpenApiJsonController
             : Cache::rememberForever($cache_key, $getMergedJson);
 
         try {
-            $file = collect(config('swagger-ui.files'))->filter(function ($values) use ($filename, $request): bool {
+            $file = collect(config('swagger-ui.files'))->filter(function (array $values) use ($filename, $request): bool {
                 $path = implode('/', array_slice($request->segments(), 0, -1));
 
                 return isset($values['versions'][$filename]) && $path === mb_ltrim($values['path'], '/');

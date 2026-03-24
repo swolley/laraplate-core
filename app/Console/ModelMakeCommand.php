@@ -291,7 +291,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 default: $this->isNewClass ? ['migration'] : [],
             ),
         )
-            ->map(static fn (string $option): int|string => match ($option) {
+            ->map(static fn (string $option): string => match ($option) {
                 'resource controller' => 'resource',
                 'form requests' => 'requests',
                 default => $option,

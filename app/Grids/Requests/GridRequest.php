@@ -87,7 +87,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
      * @param  mixed|null  $default
      */
     #[Override]
-    public function validated($key = null, $default = null) // phpstan-ignore parameter.type.notFound
+    public function validated($key = null, $default = null) // @pest-ignore-type
     {
         $validated = $this->realMainRequest->validated($key, $default);
         $funnels = $this->input('funnels');

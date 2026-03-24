@@ -44,7 +44,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
      * @param  string  $name
      */
     #[Override]
-    protected function createIndex(Engine $engine, $name, $options): void // phpstan-ignore parameterType
+    protected function createIndex(Engine $engine, $name, $options): void // @pest-ignore-type
     {
         $model = $this->argument('model');
         $options = new $model()->getSearchMapping();

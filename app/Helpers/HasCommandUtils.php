@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Validator;
 
 trait HasCommandUtils
 {
-    private function validationCallback(string $attribute, string $value, array $validations)
+    private function validationCallback(string $attribute, string $value, array $validations): ?string
     {
         if (! array_key_exists($attribute, $validations)) {
             return null;

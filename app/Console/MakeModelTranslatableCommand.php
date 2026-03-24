@@ -70,7 +70,7 @@ class MakeModelTranslatableCommand extends Command
             return Command::FAILURE;
         }
 
-        $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : (string) $choice;
+        $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : $choice;
 
         if (! is_string($model_full_name) || $model_full_name === '') {
             return Command::FAILURE;
@@ -191,7 +191,6 @@ class MakeModelTranslatableCommand extends Command
         $this->createTranslatableMigration(
             $table_name,
             $translation_table,
-            $translation_full_name,
             $model_fk,
             $model_singular,
             $selected_columns,
@@ -331,7 +330,6 @@ class MakeModelTranslatableCommand extends Command
     private function createTranslatableMigration(
         string $table_name,
         string $translation_table,
-        string $translation_model,
         string $model_fk,
         string $model_singular,
         array $selected_columns,

@@ -62,7 +62,7 @@ final class Funnel extends ListEntity
 
         if ($inversed_relationships !== []) {
             // deep relation
-            $imploded_inversed_relation = implode('.', array_map(fn (GridRelation $r) => $r->getName(), $inversed_relationships));
+            $imploded_inversed_relation = implode('.', array_map(fn (GridRelation $r): string => $r->getName(), $inversed_relationships));
             $query->with([$imploded_inversed_relation => function (Builder|Relation $q) use ($last_relation, $columns_filters, $name): void {
                 $this->getLastWithCountRelationQuery($q, $last_relation, $columns_filters, $name);
             }]);

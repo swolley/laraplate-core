@@ -186,13 +186,11 @@ trait HasTable
 
             $default_columns->push(
                 ImageColumn::make('translations.locale')
-                    ->state(function (Model $record) use ($flag_cdn_service): array {
-                        return collect($record->translations)
-                            ->map(fn (Model $translation): string => url($flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
-                            ->filter()
-                            ->values()
-                            ->all();
-                    })
+                    ->state(fn(Model $record): array => collect($record->translations)
+                        ->map(fn (Model $translation): string => url($flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
+                        ->filter()
+                        ->values()
+                        ->all())
                     ->stacked()
                     ->limit(3)
                     ->limitedRemainingText()
