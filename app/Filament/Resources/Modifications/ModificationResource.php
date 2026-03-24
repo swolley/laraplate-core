@@ -6,12 +6,13 @@ namespace Modules\Core\Filament\Resources\Modifications;
 
 use BackedEnum;
 use Coolsam\Modules\Resource;
-// use Filament\Resources\Resource;
 use Filament\Panel;
+// use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-// use Modules\Core\Filament\Resources\Modifications\Pages\CreateModification;
 use Filament\Tables\Table;
+// use Modules\Core\Filament\Resources\Modifications\Pages\CreateModification;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Modifications\Pages\EditModification;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Modifications\Schemas\ModificationForm;
@@ -47,7 +48,7 @@ final class ModificationResource extends Resource
     public static function table(Table $table): Table
     {
         return ModificationsTable::configure($table)
-            ->modifyQueryUsing(fn ($query) => $query->with('modifier'));
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('modifier'));
     }
 
     public static function getRelations(): array

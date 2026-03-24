@@ -10,6 +10,7 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\ACLS\Pages\CreateACL;
 use Modules\Core\Filament\Resources\ACLS\Pages\EditACL;
 use Modules\Core\Filament\Resources\ACLS\Pages\ListACLs;
@@ -52,7 +53,7 @@ final class ACLResource extends Resource
     public static function table(Table $table): Table
     {
         return ACLsTable::configure($table)
-            ->modifyQueryUsing(fn ($query) => $query->with('permission'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('permission'))
             ->defaultSort('sort');
     }
 

@@ -112,7 +112,7 @@
       "composer bump",
       "npx npm-check-updates -u"
     ],
-    "version": "v1.41.2",
+    "version": "v1.41.3",
     "version:silent": "./scripts/version.sh --silent --nointeractive",
     "version:major": "./scripts/version.sh major",
     "version:minor": "./scripts/version.sh minor",
@@ -150,7 +150,8 @@
     "allow-plugins": {
       "php-http/discovery": true,
       "pestphp/pest-plugin": true,
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "wikimedia/composer-merge-plugin": true
     }
   }
 }

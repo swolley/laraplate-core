@@ -10,6 +10,7 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Roles\Pages\CreateRole;
 use Modules\Core\Filament\Resources\Roles\Pages\EditRole;
 use Modules\Core\Filament\Resources\Roles\Pages\ListRoles;
@@ -46,7 +47,7 @@ final class RoleResource extends Resource
     public static function table(Table $table): Table
     {
         return RolesTable::configure($table)
-            ->modifyQueryUsing(fn ($query) => $query->with('permissions'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('permissions'))
             ->defaultSort('name');
     }
 

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
-use Modules\Core\Casts\Sort;
+use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
@@ -31,11 +31,12 @@ use Override;
  * @property int $id
  * @property int $permission_id
  * @property FiltersGroup|null $filters
- * @property Sort|null $sort
+ * @property array<string, mixed>|null $sort
  * @property string|null $description
  * @property bool $unrestricted
  * @property int $priority
- * @property bool $enabled
+ * @property bool $is_active
+ *
  * @mixin IdeHelperACL
  */
 final class ACL extends Model
@@ -58,7 +59,7 @@ final class ACL extends Model
         'description',   // Optional: human readable description
         'unrestricted',  // If true, no filters applied (full access)
         'priority',      // Higher priority ACLs evaluated first
-        'enabled',       // If false, ACL is ignored
+        'is_active',     // If false, ACL is ignored (DB column name)
     ];
 
     /**
@@ -82,7 +83,7 @@ final class ACL extends Model
             'description' => ['string', 'max:255', 'nullable'],
             'unrestricted' => ['boolean'],
             'priority' => ['integer', 'min:0', 'max:65535'],
-            'enabled' => ['boolean'],
+            'is_active' => ['boolean'],
         ]);
 
         return $rules;
@@ -123,7 +124,7 @@ final class ACL extends Model
     #[Scope]
     protected function active(Builder $query): Builder
     {
-        return $query->where('enabled', true);
+        return $query->where('is_active', true);
     }
 
     /**
@@ -141,11 +142,11 @@ final class ACL extends Model
     protected function casts(): array
     {
         return [
-            'filters' => FiltersGroup::class,
-            'sort' => Sort::class,
+            'filters' => FiltersGroupCast::class,
+            'sort' => 'array',
             'unrestricted' => 'boolean',
             'priority' => 'integer',
-            'enabled' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 }

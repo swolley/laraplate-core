@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Improve type hints and streamline code across various components
+
+### ⚙️ Miscellaneous Tasks
+
+- *(core)* Align ACL model, expand tests, and harden services
+
+## [1.41.2] - 2026-03-14
+
+### 🚜 Refactor
+
 - Enhance caching logic and improve type hints across commands and requests
 
 ## [1.41.1] - 2026-03-13

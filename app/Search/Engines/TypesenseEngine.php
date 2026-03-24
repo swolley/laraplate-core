@@ -34,7 +34,6 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     }
 
     /**
-     * @param  string|Model&Searchable|class-string<Model>  $name
      * @param  array<string,mixed>  $options  Index options
      * @param  bool  $force  Force index creation even if it already exists
      *
@@ -42,7 +41,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      * @throws \Http\Client\Exception
      */
     #[Override]
-    public function createIndex($name, array $options = [], bool $force = false): void // @pest-ignore-type
+    public function createIndex(mixed $name, array $options = [], bool $force = false): void
     {
         try {
             $matched = $this->matchModelToCollectionName($name);

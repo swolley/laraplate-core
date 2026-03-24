@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
@@ -23,6 +24,7 @@ beforeEach(function (): void {
 it('getEffectiveAcls caches the resolved ACLs per user and permission', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
+
     /** @var Permission $permission */
     $permission = Permission::factory()->create();
 
@@ -91,7 +93,8 @@ it('returns unrestricted virtual ACL for super admin user', function (): void {
     config()->set('permission.roles.superadmin', 'superadmin');
 
     /** @var Role $superRole */
-    $superRole = Role::factory()->create(['name' => 'superadmin']);
+    $superRole = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
+
     /** @var User $user */
     $user = User::factory()->create();
     $user->assignRole($superRole);
@@ -104,6 +107,7 @@ it('returns unrestricted virtual ACL for super admin user', function (): void {
     $acls = $service->getEffectiveAcls($user, $permission);
 
     expect($acls)->toHaveCount(1);
+
     /** @var ACL $acl */
     $acl = $acls->first();
     expect($acl)->toBeInstanceOf(ACL::class)
@@ -112,7 +116,161 @@ it('returns unrestricted virtual ACL for super admin user', function (): void {
     expect($service->hasUnrestrictedAccess($user, $permission))->toBeTrue();
 });
 
-// NOTE: More complex scenarios (multiple ACLs with filters) are covered indirectly
-// via higher-level authorization tests to avoid coupling this unit test to
-// Eloquent casting internals of the FiltersGroup value object.
+it('getEffectiveAcls is empty when the user has no roles', function (): void {
+    $user = User::factory()->create();
+    $permission = Permission::create([
+        'name' => 'default.acl_norole_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
 
+    $service = new AclResolverService();
+
+    expect($service->getEffectiveAcls($user, $permission))->toBeEmpty();
+});
+
+it('getCombinedFilters returns stored filters when a role has an active ACL for the permission', function (): void {
+    $permission = Permission::create([
+        'name' => 'default.acl_filters_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
+
+    $role = Role::factory()->create(['name' => 'acl_editor_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($permission);
+
+    $filter_group = new FiltersGroup([
+        new Filter('status', 'published', FilterOperator::EQUALS),
+    ]);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $filter_group,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $user = User::factory()->create();
+    $user->assignRole($role);
+
+    $service = new AclResolverService();
+    $combined = $service->getCombinedFilters($user, $permission);
+
+    expect($combined)->toBeInstanceOf(FiltersGroup::class)
+        ->and($combined->operator)->toBe(WhereClause::AND)
+        ->and($combined->filters)->toHaveCount(1)
+        ->and($combined->filters[0])->toBeInstanceOf(Filter::class)
+        ->and($combined->filters[0]->property)->toBe('status')
+        ->and($combined->filters[0]->value)->toBe('published');
+
+    expect($service->hasUnrestrictedAccess($user, $permission))->toBeFalse();
+});
+
+it('getCombinedFilters wraps multiple contributing ACLs with OR', function (): void {
+    $permission = Permission::create([
+        'name' => 'default.acl_or_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
+
+    $filter_group = new FiltersGroup([
+        new Filter('region', 'it', FilterOperator::EQUALS),
+    ]);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $filter_group,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $role_a = Role::factory()->create(['name' => 'acl_ra_' . uniqid(), 'guard_name' => 'web']);
+    $role_b = Role::factory()->create(['name' => 'acl_rb_' . uniqid(), 'guard_name' => 'web']);
+    $role_a->givePermissionTo($permission);
+    $role_b->givePermissionTo($permission);
+
+    $user = User::factory()->create();
+    $user->assignRole([$role_a, $role_b]);
+
+    $service = new AclResolverService();
+    $combined = $service->getCombinedFilters($user, $permission);
+
+    expect($combined)->toBeInstanceOf(FiltersGroup::class)
+        ->and($combined->operator)->toBe(WhereClause::OR)
+        ->and($combined->filters)->toHaveCount(2);
+});
+
+it('inherits ACL filters from an ancestor role when the direct role has no ACL row', function (): void {
+    $permission = Permission::create([
+        'name' => 'default.acl_inherit_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
+
+    $parent = Role::factory()->create(['name' => 'acl_parent_' . uniqid(), 'guard_name' => 'web']);
+    $parent->givePermissionTo($permission);
+
+    $child = Role::factory()->create(['name' => 'acl_child_' . uniqid(), 'guard_name' => 'web']);
+    $child->forceFill(['parent_id' => $parent->id])->saveQuietly();
+
+    $filter_group = new FiltersGroup([
+        new Filter('tenant_id', 42, FilterOperator::EQUALS),
+    ]);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $filter_group,
+        'unrestricted' => false,
+        'priority' => 5,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $user = User::factory()->create();
+    $user->assignRole($child);
+
+    expect($child->hasPermission($permission->name))->toBeTrue();
+
+    $service = new AclResolverService();
+    $combined = $service->getCombinedFilters($user, $permission);
+
+    expect($combined)->toBeInstanceOf(FiltersGroup::class)
+        ->and($combined->filters[0])->toBeInstanceOf(Filter::class)
+        ->and($combined->filters[0]->property)->toBe('tenant_id')
+        ->and($combined->filters[0]->value)->toBe(42);
+});
+
+it('treats unrestricted ACL rows as non contributing for combined filters', function (): void {
+    $permission = Permission::create([
+        'name' => 'default.acl_unres_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
+
+    $role = Role::factory()->create(['name' => 'acl_unres_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($permission);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => null,
+        'unrestricted' => true,
+        'priority' => 1,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $user = User::factory()->create();
+    $user->assignRole($role);
+
+    $service = new AclResolverService();
+
+    expect($service->getCombinedFilters($user, $permission))->toBeNull()
+        ->and($service->hasUnrestrictedAccess($user, $permission))->toBeTrue();
+});

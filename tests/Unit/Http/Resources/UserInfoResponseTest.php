@@ -23,7 +23,7 @@ it('transforms null resource to anonymous array', function (): void {
 
 it('transforms user resource to array with permissions and groups', function (): void {
     $user = User::factory()->create();
-    $role = Role::factory()->create(['name' => 'editor']);
+    $role = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);
     $user->roles()->attach($role);
 
     $resource = new UserInfoResponse($user);
@@ -46,7 +46,7 @@ it('includes canImpersonate in array', function (): void {
 it('transforms superadmin user with all permissions grouped by guard', function (): void {
     config(['permission.roles.superadmin' => 'superadmin']);
 
-    $role = Role::factory()->create(['name' => 'superadmin']);
+    $role = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
     Permission::factory()->create(['name' => 'posts.articles.edit', 'guard_name' => 'web']);
 
     $user = User::factory()->create();
@@ -61,7 +61,7 @@ it('transforms superadmin user with all permissions grouped by guard', function 
 });
 
 it('groups multiple permissions under same guard', function (): void {
-    $role = Role::factory()->create(['name' => 'editor']);
+    $role = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);
     $perm1 = Permission::factory()->create(['name' => 'posts.articles.edit', 'guard_name' => 'web']);
     $perm2 = Permission::factory()->create(['name' => 'posts.articles.view', 'guard_name' => 'web']);
     $role->givePermissionTo($perm1, $perm2);
@@ -76,4 +76,24 @@ it('groups multiple permissions under same guard', function (): void {
     $all_perms = collect($array['permissions'])->flatten()->toArray();
     expect($all_perms)->toContain('posts.articles.edit')
         ->and($all_perms)->toContain('posts.articles.view');
+});
+
+it('groups permissions under separate keys per guard for superadmin', function (): void {
+    config(['permission.roles.superadmin' => 'superadmin']);
+
+    $role = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
+    Permission::factory()->create(['name' => 'default.webperm.select', 'guard_name' => 'web']);
+    Permission::factory()->create(['name' => 'default.apiperm.select', 'guard_name' => 'api']);
+
+    $user = User::factory()->create();
+    $user->roles()->attach($role);
+    $user->load('roles');
+
+    $resource = new UserInfoResponse($user);
+    $array = $resource->toArray(new Request);
+
+    expect($array['permissions'])->toHaveKey('web')
+        ->and($array['permissions'])->toHaveKey('api')
+        ->and($array['permissions']['web'])->toContain('default.webperm.select')
+        ->and($array['permissions']['api'])->toContain('default.apiperm.select');
 });

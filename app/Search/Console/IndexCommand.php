@@ -40,11 +40,8 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         return Command::SUCCESS;
     }
 
-    /**
-     * @param  string  $name
-     */
     #[Override]
-    protected function createIndex(Engine $engine, $name, $options): void // @pest-ignore-type
+    protected function createIndex(Engine $engine, mixed $name, mixed $options): void
     {
         $model = $this->argument('model');
         $options = new $model()->getSearchMapping();

@@ -82,12 +82,8 @@ final class GridRequest extends FormRequest implements IParsableRequest
         }
     }
 
-    /**
-     * @param  string|null  $key
-     * @param  mixed|null  $default
-     */
     #[Override]
-    public function validated($key = null, $default = null) // @pest-ignore-type
+    public function validated(mixed $key = null, mixed $default = null): mixed
     {
         $validated = $this->realMainRequest->validated($key, $default);
         $funnels = $this->input('funnels');

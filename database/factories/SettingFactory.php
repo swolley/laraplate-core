@@ -53,4 +53,16 @@ final class SettingFactory extends Factory
             'description' => fake()->text(),
         ];
     }
+
+    /**
+     * Skip validation and bypass laravel-approval save interception so the model is written to the database.
+     * Use in tests (and console seeders) where a real row is required.
+     */
+    public function persistedWithoutApprovalCapture(): static
+    {
+        return $this->afterMaking(function (Setting $model): void {
+            $model->setSkipValidation(true);
+            $model->setForcedApprovalUpdate(true);
+        });
+    }
 }
