@@ -1207,6 +1207,16 @@ describe('handle', function (): void {
         expect($this->command->handle())->toBe(Command::FAILURE);
     });
 
+    it('returns FAILURE when selected index does not resolve to a valid model', function (): void {
+        HandleTestContext::$models = ['Dummy', FakeArticle::class];
+        HandleTestContext::$uses_trait = false;
+
+        SelectPrompt::fallbackWhen(true);
+        SelectPrompt::fallbackUsing(fn () => 999);
+
+        expect($this->command->handle())->toBe(Command::FAILURE);
+    });
+
     it('returns FAILURE when table does not exist', function (): void {
         HandleTestContext::$models = ['Dummy', FakeArticle::class];
         HandleTestContext::$uses_trait = false;

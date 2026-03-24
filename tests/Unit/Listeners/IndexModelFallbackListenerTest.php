@@ -14,7 +14,7 @@ uses(LaravelTestCase::class);
 it('does nothing when event is already handled', function (): void {
     Bus::fake();
 
-    $setting = Setting::factory()->create();
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
     $event = new ModelRequiresIndexing($setting, false);
     $event->markAsHandled();
 

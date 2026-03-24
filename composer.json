@@ -150,7 +150,8 @@
     "allow-plugins": {
       "php-http/discovery": true,
       "pestphp/pest-plugin": true,
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "wikimedia/composer-merge-plugin": true
     }
   }
 }

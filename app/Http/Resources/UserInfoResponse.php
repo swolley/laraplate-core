@@ -20,10 +20,12 @@ final class UserInfoResponse extends JsonResource
             $permissions = [];
 
             foreach ($this->resource->isSuperAdmin() ? Permission::all() : $this->resource->getAllPermissions() as $permission) {
-                if (! isset($permissions[$permission->guard])) {
-                    $permissions[$permission->guard] = [$permission->name];
+                $guard_key = $permission->guard_name;
+
+                if (! isset($permissions[$guard_key])) {
+                    $permissions[$guard_key] = [$permission->name];
                 } else {
-                    $permissions[$permission->guard][] = $permission->name;
+                    $permissions[$guard_key][] = $permission->name;
                 }
             }
 

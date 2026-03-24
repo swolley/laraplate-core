@@ -50,3 +50,46 @@ it('getInspectedTable delegates to SchemaInspector and returns null for unknown 
 
     expect($table)->toBeNull();
 });
+
+it('resolve throws when dynamic entities are disabled and no concrete model is found', function (): void {
+    config()->set('crud.dynamic_entities', false);
+    $service = DynamicEntityService::getInstance();
+
+    expect(fn () => $service->resolve('table_that_does_not_exist_' . bin2hex(random_bytes(4))))
+        ->toThrow(UnexpectedValueException::class);
+});
+
+it('resolve returns concrete model when table maps to existing model', function (): void {
+    config()->set('crud.dynamic_entities', false);
+    $service = DynamicEntityService::getInstance();
+
+    $model = $service->resolve('settings', attributes: ['name' => 'my_setting']);
+
+    expect($model)->toBeInstanceOf(Modules\Core\Models\Setting::class)
+        ->and($model->name)->toBe('my_setting');
+});
+
+it('resolve uses dynamic entity cache and returns cloned model instances', function (): void {
+    config()->set('crud.dynamic_entities', true);
+    $service = DynamicEntityService::getInstance();
+    $table = 'tmp_dynamic_entities_' . bin2hex(random_bytes(4));
+
+    Illuminate\Support\Facades\Schema::create($table, function (Illuminate\Database\Schema\Blueprint $blueprint): void {
+        $blueprint->uuid('id')->primary();
+        $blueprint->string('name')->nullable();
+    });
+
+    try {
+        $first = $service->resolve($table);
+        $second = $service->resolve($table);
+
+        expect($first)->toBeInstanceOf(Modules\Core\Models\DynamicEntity::class)
+            ->and($second)->toBeInstanceOf(Modules\Core\Models\DynamicEntity::class)
+            ->and($first)->not->toBe($second)
+            ->and($first->getTable())->toBe($table)
+            ->and($second->getTable())->toBe($table);
+    } finally {
+        $service->clearCache($table);
+        Illuminate\Support\Facades\Schema::dropIfExists($table);
+    }
+});

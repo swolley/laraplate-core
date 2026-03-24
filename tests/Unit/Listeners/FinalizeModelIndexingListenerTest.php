@@ -12,7 +12,7 @@ use Modules\Core\Tests\LaravelTestCase;
 uses(LaravelTestCase::class);
 
 it('returns early when no indexing event in cache', function (): void {
-    $setting = Setting::factory()->create();
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
     $event = new ModelPreProcessingCompleted($setting, 'embeddings');
 
     (new FinalizeModelIndexingListener())->handle($event);
@@ -22,7 +22,7 @@ it('returns early when no indexing event in cache', function (): void {
 });
 
 it('updates cache when not all pre-processing completed', function (): void {
-    $setting = Setting::factory()->create();
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
     $indexing_event = new ModelRequiresIndexing($setting, false);
     $indexing_event->addRequiredPreProcessing('embeddings');
     $indexing_event->addRequiredPreProcessing('translation');

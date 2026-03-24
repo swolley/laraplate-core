@@ -258,7 +258,7 @@ final class AclResolverService
         $acl = new ACL();
         $acl->permission_id = $permission->id;
         $acl->unrestricted = true;
-        $acl->enabled = true;
+        $acl->is_active = true;
         $acl->priority = PHP_INT_MAX;
 
         return $acl;

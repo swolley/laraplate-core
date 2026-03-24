@@ -9,14 +9,16 @@ use Modules\Core\Tests\LaravelTestCase;
 uses(LaravelTestCase::class);
 
 it('creates setting via factory with default attributes', function (): void {
-    $setting = Setting::factory()->create([
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'test_setting',
         'type' => SettingTypeEnum::STRING,
         'group_name' => 'base',
         'encrypted' => false,
     ]);
 
-    expect($setting->name)->toBe('test_setting')
+    expect($setting->exists)->toBeTrue()
+        ->and($setting->id)->not->toBeNull()
+        ->and($setting->name)->toBe('test_setting')
         ->and($setting->type)->toBe(SettingTypeEnum::STRING)
         ->and($setting->group_name)->toBe('base')
         ->and($setting->encrypted)->toBeFalse();
@@ -56,7 +58,7 @@ it('type mutator falls back to string for invalid value', function (): void {
 });
 
 it('requiresApprovalWhen returns true when fillable except description is modified', function (): void {
-    $setting = Setting::factory()->create(['name' => 'foo']);
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
 
@@ -65,7 +67,7 @@ it('requiresApprovalWhen returns true when fillable except description is modifi
 });
 
 it('requiresApprovalWhen returns false when only description is modified', function (): void {
-    $setting = Setting::factory()->create(['name' => 'foo']);
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
 
@@ -90,7 +92,7 @@ it('getRules create rule contains unique constraint closure', function (): void 
 });
 
 it('getRules update rule contains unique constraint with ignore', function (): void {
-    $setting = Setting::factory()->create();
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
     $rules = $setting->getRules();
 
     $update_name_rules = $rules['update']['name'];

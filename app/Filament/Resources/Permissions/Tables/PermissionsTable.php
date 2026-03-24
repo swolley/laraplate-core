@@ -16,7 +16,7 @@ final class PermissionsTable
 {
     use HasTable;
 
-    private const FILTER_OPTIONS_TTL_SECONDS = 300; // 5 minutes
+    private const int FILTER_OPTIONS_TTL_SECONDS = 300; // 5 minutes
 
     public static function configure(Table $table): Table
     {

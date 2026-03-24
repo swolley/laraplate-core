@@ -208,12 +208,18 @@ final class ApprovalNotificationService
     /**
      * Extract class name from file path.
      */
-    private function getClassNameFromFile(string $file_path, string $module_path): string
+    private function getClassNameFromFile(string $file_path, string $module_path): ?string
     {
         $module_name = basename($module_path);
-        $relative_path = str_replace($module_path . '/app/', '', $file_path);
+        $prefix = $module_path . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR;
+
+        if (! str_starts_with($file_path, $prefix)) {
+            return null;
+        }
+
+        $relative_path = mb_substr($file_path, mb_strlen($prefix));
         $relative_path = str_replace('.php', '', $relative_path);
-        $relative_path = str_replace('/', '\\', $relative_path);
+        $relative_path = str_replace(['/', '\\'], '\\', $relative_path);
 
         return "Modules\\{$module_name}\\{$relative_path}";
     }

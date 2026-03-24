@@ -44,7 +44,7 @@ it('boot registers Setting saved listener that flushes cache tags', function ():
 
     $this->provider->boot();
 
-    $setting = Setting::factory()->create();
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
 
     $event_name = 'eloquent.saved: ' . Setting::class;
     $listeners = Event::getRawListeners()[$event_name] ?? [];

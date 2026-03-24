@@ -11,6 +11,7 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Users\Pages\CreateUser;
 use Modules\Core\Filament\Resources\Users\Pages\EditUser;
 use Modules\Core\Filament\Resources\Users\Pages\ListUsers;
@@ -46,7 +47,7 @@ final class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return UsersTable::configure($table)
-            ->modifyQueryUsing(fn ($query) => $query->with('roles'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('roles'))
             ->defaultSort('name');
     }
 
