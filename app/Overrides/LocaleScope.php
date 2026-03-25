@@ -102,7 +102,7 @@ final class LocaleScope implements Scope
         string $default_locale,
         bool $fallback_enabled,
     ): void {
-    		/** @var \Illuminate\Database\Query\Builder $query */
+        /** @var \Illuminate\Database\Query\Builder $query */
         $builder->with(['translation' => function ($query) use ($current_locale, $default_locale, $fallback_enabled): void { // @pest-ignore-type
             if ($fallback_enabled) {
                 // Carica traduzione corrente, se non esiste usa quella di default

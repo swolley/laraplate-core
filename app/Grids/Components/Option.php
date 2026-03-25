@@ -8,7 +8,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Grids\Definitions\ListEntity;
-use Modules\Core\Grids\Components\Field;
 use Override;
 
 final class Option extends ListEntity

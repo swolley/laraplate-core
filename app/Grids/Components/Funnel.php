@@ -7,7 +7,6 @@ namespace Modules\Core\Grids\Components;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Log;
-use Modules\Core\Grids\Components\Field;
 use Modules\Core\Grids\Definitions\ListEntity;
 use Modules\Core\Grids\Definitions\Relation as GridRelation;
 use Override;
@@ -98,7 +97,7 @@ final class Funnel extends ListEntity
     private function getLastWithCountRelationQuery(Builder|Relation $query, string $relation_name, array $columns_filters, string $current_funnel): void
     {
         $query->withCount($relation_name . ' as total');
-        $query->withCount([$relation_name . ' as count' => function (Builder|\Modules\Core\Grids\Definitions\Relation $q) use ($columns_filters, $current_funnel): void {
+        $query->withCount([$relation_name . ' as count' => function (Builder|GridRelation $q) use ($columns_filters, $current_funnel): void {
             $grouped_filters = [];
             // columns filters
             $this->prepareFunnelFilterProperties($columns_filters, $grouped_filters);
@@ -111,7 +110,7 @@ final class Funnel extends ListEntity
                         self::applyCorrectWhereMethod($q, $filter['property'], $filter['operator'], $filter['value']);
                     }
                 } else {
-                    $q->whereHas($path, function (Builder|\Modules\Core\Grids\Definitions\Relation $q2) use ($entity_filters): void {
+                    $q->whereHas($path, function (Builder|GridRelation $q2) use ($entity_filters): void {
                         foreach ($entity_filters as $filter) {
                             self::applyCorrectWhereMethod($q2, $filter['property'], $filter['operator'], $filter['value']);
                         }

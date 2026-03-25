@@ -46,8 +46,8 @@ class ServiceProvider extends BaseServiceProvider
 
     #[Override]
     /**
-     * @param string $path
-     * @param string $key
+     * @param  string  $path
+     * @param  string  $key
      */
     protected function mergeConfigFrom($path, $key): void // @pest-ignore-type
     {

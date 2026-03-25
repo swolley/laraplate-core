@@ -197,7 +197,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     #[Override]
     /**
-     * @param string $name
+     * @param  string  $name
      */
     protected function qualifyClass($name): array|string // @pest-ignore-type
     {
@@ -218,7 +218,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     #[Override]
     /**
-     * @param array|string $name
+     * @param  array|string  $name
      */
     protected function getPath($name): string // @pest-ignore-type
     {

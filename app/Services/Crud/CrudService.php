@@ -138,7 +138,9 @@ class CrudService
         throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
 
         // 3. Build query and apply ACL filters
-        $query = $model->newQuery()->where(is_array($key_value) ? $key_value : [$key => $key_value]);
+        $query = is_array($key)
+            ? $model->newQuery()->where(array_combine($key, $key_value))
+            : $model->newQuery()->where([$key => $key_value]);
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareQuery($query, $requestData);
 
@@ -257,10 +259,6 @@ class CrudService
         );
 
         $record_array = $data->getAttributes();
-
-        if ($record_array === null) {
-            $record_array = [];
-        }
 
         $payload = [
             'record' => $record_array,

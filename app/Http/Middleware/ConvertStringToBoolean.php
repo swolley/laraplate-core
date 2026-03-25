@@ -10,10 +10,9 @@ use Override;
 final class ConvertStringToBoolean extends TransformsRequest
 {
     #[Override]
-	/**
-	 * @param string $key
-	 * @param mixed $value
-	 */
+    /**
+     * @param  string  $key
+     */
     protected function transform($key, $value): mixed // @pest-ignore-type
     {
         if ($value === 'true' || $value === 'TRUE') {

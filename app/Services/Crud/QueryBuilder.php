@@ -127,6 +127,15 @@ final class QueryBuilder
                 $property = (string) $column->property;
 
                 if (! Str::contains($property, '.')) {
+                    if (method_exists($main_model, $property)) {
+                        $relation_method = new ReflectionMethod($main_model, $property);
+                        $return_type = $relation_method->getReturnType();
+
+                        if ($return_type !== null && is_a($return_type->__toString(), Relation::class, true)) {
+                            continue;
+                        }
+                    }
+
                     $query->orderBy($property, $column->direction->value);
 
                     continue;

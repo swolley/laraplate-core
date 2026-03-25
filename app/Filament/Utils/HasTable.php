@@ -186,7 +186,7 @@ trait HasTable
 
             $default_columns->push(
                 ImageColumn::make('translations.locale')
-                    ->state(fn(Model $record): array => collect($record->translations)
+                    ->state(fn (Model $record): array => collect($record->translations)
                         ->map(fn (Model $translation): string => url($flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
                         ->filter()
                         ->values()

@@ -32,9 +32,9 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->instance(LogoutResponse::class, new class() implements LogoutResponse
         {
-        		/**
-			 * @param \Illuminate\Http\Request $request
-			 */
+            /**
+             * @param  Request  $request
+             */
             public function toResponse($request): mixed // @pest-ignore-type
             {
                 if ($request->wantsJson()) {
@@ -52,9 +52,9 @@ final class FortifyServiceProvider extends ServiceProvider
 
         $this->app->instance(LoginResponse::class, new class() implements LoginResponse
         {
-        		/**
-			 * @param \Illuminate\Http\Request $request
-			 */
+            /**
+             * @param  Request  $request
+             */
             public function toResponse($request): mixed // @pest-ignore-type
             {
                 if ($request->wantsJson()) {
@@ -87,9 +87,9 @@ final class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-		/**
-		 * @param \Illuminate\Contracts\Foundation\Application $app
-		 */
+        /**
+         * @param  \Illuminate\Contracts\Foundation\Application  $app
+         */
         $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([ // @pest-ignore-type
             $app->make(FortifyCredentialsProvider::class),
             $app->make(SocialiteProvider::class),

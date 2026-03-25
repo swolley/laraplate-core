@@ -48,6 +48,7 @@ trait HasUniqueFactoryValues
             if ($modelClass && $column) {
                 try {
                     $resolver = $modelClass::getConnectionResolver();
+
                     if ($resolver === null) {
                         break;
                     }

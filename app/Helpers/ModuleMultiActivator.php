@@ -62,7 +62,7 @@ final class ModuleMultiActivator implements ActivatorInterface
 
     private function getActivator(): ActivatorInterface
     {
-        if (!$this->activator instanceof \Nwidart\Modules\Contracts\ActivatorInterface) {
+        if (! $this->activator instanceof ActivatorInterface) {
             $this->activator = ModuleDatabaseActivator::checkSettingTable()
                 ? new ModuleDatabaseActivator($this->app)
                 : new FileActivator($this->app);

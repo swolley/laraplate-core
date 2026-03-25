@@ -99,9 +99,11 @@ final class ModuleDocGenerator extends Generator
 
         foreach ($parameters as $parameter) {
             $type = $parameter->getType();
+
             if (! $type instanceof ReflectionNamedType) {
                 continue;
             }
+
             if ($type->isBuiltin()) {
                 continue;
             }

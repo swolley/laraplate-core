@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Modules\Core\Grids\Components\Field;
 
-/** @phpstan-type FormatterCallable callable(mixed, Model):void|null */
+/**
+ * @phpstan-type FormatterCallable callable(mixed, Model):void|null
+ */
 trait HasFormatters
 {
     /**

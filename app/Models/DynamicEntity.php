@@ -310,7 +310,7 @@ final class DynamicEntity extends Model
         }
 
         if (in_array($column->name, $remapped_uids, true)) {
-        		/** @var \Illuminate\Database\Query\Builder $query */
+            /** @var \Illuminate\Database\Query\Builder $query */
             $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void { // @pest-ignore-type
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');
