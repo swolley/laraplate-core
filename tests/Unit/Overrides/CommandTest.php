@@ -43,6 +43,8 @@ it('constructs without starting benchmark when not in console', function (): voi
 });
 
 it('destructor does nothing when benchmarkStartTime is null', function (): void {
+    app()->instance('runningUnitTests', true);
+
     $command = new class extends Command
     {
         public function handle(): int

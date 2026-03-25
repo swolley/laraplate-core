@@ -6,6 +6,7 @@ use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Response\Elasticsearch;
 use GuzzleHttp\Psr7\Response;
+use Modules\Core\Search\Exceptions\ElasticsearchException;
 use Modules\Core\Services\ElasticsearchService;
 use Modules\Core\Tests\LaravelTestCase;
 use Psr\Http\Client\ClientInterface;
@@ -277,6 +278,18 @@ it('deletes index gracefully if missing', function (): void {
     expect($service->deleteIndex('missing-index'))->toBeTrue();
 });
 
+it('deletes index when present', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteIndex('existing-index'))->toBeTrue();
+});
+
 it('bulk indexes documents and counts successes/failures', function (): void {
     $bulk_response = [
         'items' => [
@@ -307,6 +320,19 @@ it('bulk indexes documents and counts successes/failures', function (): void {
     ]);
 });
 
+it('bulkIndex returns zeros for empty documents', function (): void {
+    $mock_client = makeClientWithResponses([]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->bulkIndex('idx', []))->toMatchArray([
+        'indexed' => 0,
+        'failed' => 0,
+        'errors' => [],
+    ]);
+});
+
 it('searches and returns array payload', function (): void {
     $body = ['hits' => ['hits' => [['foo' => 'bar']]]];
     $mock_client = makeClientWithResponses([
@@ -322,6 +348,17 @@ it('searches and returns array payload', function (): void {
     expect($service->search('idx', ['match_all' => (object) []]))->toBe($body);
 });
 
+it('throws ElasticsearchException when search fails', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->search('idx', ['match_all' => (object) []]);
+})->throws(ElasticsearchException::class);
+
 it('returns null when document is not found', function (): void {
     $mock_client = makeClientWithResponses([
         new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
@@ -333,6 +370,17 @@ it('returns null when document is not found', function (): void {
     expect($service->getDocument('idx', 'missing'))->toBeNull();
 });
 
+it('throws ElasticsearchException when getDocument fails with non-404', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->getDocument('idx', '1');
+})->throws(ElasticsearchException::class);
+
 it('deletes document when present and returns true', function (): void {
     $mock_client = makeClientWithResponses([
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
@@ -343,6 +391,67 @@ it('deletes document when present and returns true', function (): void {
     $service = ElasticsearchService::getInstance();
 
     expect($service->deleteDocument('idx', '1'))->toBeTrue();
+});
+
+it('deleteDocument returns true when document does not exist', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteDocument('idx', 999))->toBeTrue();
+});
+
+it('deleteDocument passes refresh=true when requested', function (): void {
+    $capture = new class
+    {
+        /**
+         * @var array<int, array{method: string, uri: string}>
+         */
+        public array $items = [];
+    };
+
+    $http_client = new class($capture) implements ClientInterface
+    {
+        public function __construct(
+            private readonly object $capture,
+        ) {}
+
+        public function sendRequest(RequestInterface $request): ResponseInterface
+        {
+            $this->capture->items[] = [
+                'method' => $request->getMethod(),
+                'uri' => (string) $request->getUri(),
+            ];
+
+            $path = (string) $request->getUri();
+
+            if (str_contains($path, '/_doc/1') && str_contains($path, '_source')) {
+                return new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]);
+            }
+
+            if (str_contains($path, '/_doc/1')) {
+                return new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['deleted' => true]));
+            }
+
+            return new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true]));
+        }
+    };
+
+    $client = ClientBuilder::create()
+        ->setHttpClient($http_client)
+        ->build();
+
+    setElasticsearchInstance($client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteDocument('idx', 1, refresh: true))->toBeTrue();
+
+    $delete_request = collect($capture->items)->first(fn (array $r): bool => $r['method'] === 'DELETE' && str_contains($r['uri'], '/_doc/1'));
+    expect($delete_request)->not->toBeNull();
+    expect((string) $delete_request['uri'])->toContain('refresh=true');
 });
 
 function makeClientWithResponses(array $responses): Client

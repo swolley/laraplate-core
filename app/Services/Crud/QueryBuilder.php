@@ -152,6 +152,12 @@ final class QueryBuilder
 
         if ($request_data instanceof ListRequestData && isset($request_data->filters)) {
             $this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations']);
+
+            $relations_filters = $this->extractRelationFilters($main_model, $request_data->filters);
+
+            if ($relations_filters !== []) {
+                $normalized_relations = array_values(array_unique(array_merge($normalized_relations, array_keys($relations_filters))));
+            }
         }
 
         if ($normalized_relations !== []) {
@@ -169,6 +175,115 @@ final class QueryBuilder
     public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = []): void
     {
         $this->recursivelyApplyFilters($query, $filters, $relation_columns);
+    }
+
+    /**
+     * Extract relation-only filters from a mixed FiltersGroup.
+     *
+     * This is used to constrain eager-loaded relations so that the returned related
+     * records match the same relation filters used for `whereHas`.
+     *
+     * @return array<string, FiltersGroup>
+     */
+    private function extractRelationFilters(Model $main_model, FiltersGroup $filters): array
+    {
+        $relations = [];
+
+        $collect_relations = function (FiltersGroup $group) use (&$relations, $main_model, &$collect_relations): void {
+            foreach ($group->filters as $subfilter) {
+                if ($subfilter instanceof FiltersGroup) {
+                    $collect_relations($subfilter);
+
+                    continue;
+                }
+
+                $path_length = mb_substr_count($subfilter->property, '.');
+
+                if ($path_length < 1) {
+                    continue;
+                }
+
+                $splitted = $this->splitProperty($main_model, $subfilter->property);
+
+                if ($splitted['relation'] === '') {
+                    continue;
+                }
+
+                $relation_path = (string) $splitted['relation'];
+                $relations[] = $relation_path;
+
+                // Also constrain parent relations for nested filters.
+                // Example: roles.permissions -> roles
+                while (Str::contains($relation_path, '.')) {
+                    $relation_path = (string) Str::beforeLast($relation_path, '.');
+                    $relations[] = $relation_path;
+                }
+            }
+        };
+
+        $collect_relations($filters);
+
+        $relations = array_values(array_unique($relations));
+
+        $result = [];
+
+        foreach ($relations as $relation) {
+            $relation_filters = $this->extractFiltersForRelation($main_model, $filters, $relation);
+
+            if ($relation_filters instanceof FiltersGroup) {
+                $result[$relation] = $relation_filters;
+            }
+        }
+
+        return $result;
+    }
+
+    private function extractFiltersForRelation(Model $main_model, FiltersGroup $filters, string $relation): ?FiltersGroup
+    {
+        $kept = [];
+        $relation_prefix = $relation . '.';
+
+        foreach ($filters->filters as $subfilter) {
+            if ($subfilter instanceof FiltersGroup) {
+                $nested = $this->extractFiltersForRelation($main_model, $subfilter, $relation);
+
+                if ($nested instanceof FiltersGroup && $nested->filters !== []) {
+                    $kept[] = $nested;
+                }
+
+                continue;
+            }
+
+            $path_length = mb_substr_count($subfilter->property, '.');
+
+            if ($path_length < 1) {
+                continue;
+            }
+
+            $splitted = $this->splitProperty($main_model, $subfilter->property);
+
+            if ($splitted['relation'] === $relation) {
+                $kept[] = new Filter($splitted['field'] ?? $subfilter->property, $subfilter->value, $subfilter->operator);
+
+                continue;
+            }
+
+            if (! Str::startsWith($splitted['relation'], $relation_prefix)) {
+                continue;
+            }
+
+            // Nested relation filter, propagate it to the parent eager load too.
+            // Example: "roles.permissions.name" becomes "permissions.name" for the "roles" relation callback.
+            $nested_relation = Str::after($splitted['relation'], $relation_prefix);
+            $nested_property = $nested_relation === '' ? (string) $splitted['field'] : $nested_relation . '.' . (string) $splitted['field'];
+            $kept[] = new Filter($nested_property, $subfilter->value, $subfilter->operator);
+        }
+
+        if ($kept === []) {
+            return null;
+        }
+
+        return new FiltersGroup($kept, $filters->operator);
     }
 
     /**
@@ -285,7 +400,7 @@ final class QueryBuilder
     /**
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function applyFilter(Builder $query, Filter $filter, string &$method, array &$relation_columns): void
+    private function applyFilter(Builder|Relation $query, Filter $filter, string $method, array &$relation_columns): void
     {
         $path_length = mb_substr_count($filter->property, '.');
 
@@ -318,8 +433,8 @@ final class QueryBuilder
             if ($splitted['relation'] !== '') {
                 $has_method = $method . 'Has';
 
-                if (method_exists($query, $has_method)) {
-                    $query->{$has_method}($splitted['relation'], function (Builder $q) use ($filter, &$method, $splitted, &$relation_columns): void {
+                if (is_callable([$query, $has_method])) {
+                    $query->{$has_method}($splitted['relation'], function (Builder $q) use ($filter, $splitted, &$relation_columns): void {
                         $q->withoutGlobalScope('global_ordered');
 
                         if ($splitted['field'] === 'deleted_at') {
@@ -332,7 +447,9 @@ final class QueryBuilder
                         }
 
                         $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
-                        $this->applyFilter($q, $cloned_filter, $method, $relation_columns);
+                        // Inside relation subquery we must not propagate `orWhere`,
+                        // otherwise the relation constraints can be bypassed.
+                        $this->applyFilter($q, $cloned_filter, 'where', $relation_columns);
                     });
                 }
 
@@ -341,8 +458,9 @@ final class QueryBuilder
         }
 
         if ($filter->value === null) {
-            $method .= $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
-            $query->{$method}($filter->property);
+            $null_method = $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
+            $final_method = $method . $null_method;
+            $query->{$final_method}($filter->property);
 
             return;
         }
@@ -362,13 +480,13 @@ final class QueryBuilder
         }
 
         if (in_array($filter->operator, [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
-            $method .= Str::studly($filter->operator->value);
-            $query->{$method}($filter->property, $filter->value);
+            $final_method = $method . Str::studly($filter->operator->value);
+            $query->{$final_method}($filter->property, $filter->value);
 
             return;
         }
 
-        if ($method !== '' && method_exists($query, $method)) {
+        if ($method !== '' && is_callable([$query, $method])) {
             $query->{$method}($filter->property, $filter->operator->value, $filter->value);
         }
     }
@@ -379,16 +497,22 @@ final class QueryBuilder
     private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
     {
         $iterable = is_array($filters) && Arr::isList($filters) ? $filters : $filters->filters;
-        $method = $filters->operator === WhereClause::AND ? 'where' : 'orWhere';
+        $operator = $filters instanceof FiltersGroup ? $filters->operator : WhereClause::AND;
+        $is_or = $operator === WhereClause::OR;
+        $first = true;
 
-        foreach ($iterable as &$subfilter) {
+        foreach ($iterable as $subfilter) {
+            $method = $is_or && $first ? 'where' : ($is_or ? 'orWhere' : 'where');
+
             if (isset($subfilter->filters)) {
-                if ($method !== '' && method_exists($query, $method)) {
+                if ($method !== '' && is_callable([$query, $method])) {
                     $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
             } else {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
+
+            $first = false;
         }
     }
 
@@ -451,7 +575,7 @@ final class QueryBuilder
             $subrelation = preg_replace('/^' . $escaped . '\./', '', $aggregate_relation);
 
             foreach ($aggregates_cols as $col) {
-                $method = 'with' . ucfirst((string) $col->type->value);
+                $method = $this->resolveAggregateMethod($col->type);
 
                 if ($col->type === ColumnType::COUNT) {
                     $query->{$method}([$subrelation]);
@@ -530,6 +654,10 @@ final class QueryBuilder
         $this->applyAggregatesToQuery($query, $relations_aggregates, $relation);
 
         if (isset($relations_filters[$relation])) {
+            if (! array_key_exists($relation, $relations_columns)) {
+                $relations_columns[$relation] = [];
+            }
+
             $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns[$relation]);
         }
 
@@ -551,8 +679,8 @@ final class QueryBuilder
     private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
     {
         $relations = $this->normalizeRelations($relations);
-        $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
         $this->cleanRelations($relations);
+        $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
 
         foreach ($relations_aggregates as $relation => $aggregates_cols) {
             if (Str::contains($relation, '.')) {
@@ -560,7 +688,7 @@ final class QueryBuilder
             }
 
             foreach ($aggregates_cols as $col) {
-                $method = 'with' . ucfirst((string) $col->type->value);
+                $method = $this->resolveAggregateMethod($col->type);
 
                 if ($col->type === ColumnType::COUNT) {
                     $query->{$method}([$relation]);
@@ -584,6 +712,15 @@ final class QueryBuilder
         }
 
         $query->with($withs);
+    }
+
+    private function resolveAggregateMethod(ColumnType $column_type): string
+    {
+        if ($column_type === ColumnType::AVG) {
+            return 'withAvg';
+        }
+
+        return 'with' . ucfirst((string) $column_type->value);
     }
 
     /**

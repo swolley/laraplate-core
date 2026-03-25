@@ -15,6 +15,7 @@ use Modules\Core\Helpers\HasTranslations;
 use Override;
 use ReflectionClass;
 use Throwable;
+use TypeError;
 
 class MakeModelTranslatableCommand extends Command
 {
@@ -327,14 +328,48 @@ class MakeModelTranslatableCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * Create translatable migration file.
+     *
+     * Supports both call signatures:
+     * - New: (table, translation_table, model_fk, model_singular, selected_columns, migration_path)
+     * - Legacy: (table, translation_table, translation_class, model_fk, model_singular, selected_columns, migration_path)
+     *
+     * @param  array<int, array<string, mixed>>|string  $selected_columns_or_model_singular
+     * @param  array<int, array<string, mixed>>|string  $migration_path_or_selected_columns
+     */
     private function createTranslatableMigration(
         string $table_name,
         string $translation_table,
-        string $model_fk,
-        string $model_singular,
-        array $selected_columns,
-        string $migration_path,
+        string $model_fk_or_translation_class,
+        string $model_singular_or_model_fk,
+        array|string $selected_columns_or_model_singular,
+        array|string $migration_path_or_selected_columns,
+        ?string $legacy_migration_path = null,
     ): void {
+        $model_fk = $model_fk_or_translation_class;
+        $model_singular = $model_singular_or_model_fk;
+        $selected_columns = [];
+        $migration_path = '';
+
+        if (is_array($selected_columns_or_model_singular) && is_string($migration_path_or_selected_columns)) {
+            // New signature
+            $selected_columns = $selected_columns_or_model_singular;
+            $migration_path = $migration_path_or_selected_columns;
+        } elseif (
+            is_string($selected_columns_or_model_singular)
+            && is_array($migration_path_or_selected_columns)
+            && is_string($legacy_migration_path)
+        ) {
+            // Legacy signature
+            $model_fk = $model_singular_or_model_fk;
+            $model_singular = $selected_columns_or_model_singular;
+            $selected_columns = $migration_path_or_selected_columns;
+            $migration_path = $legacy_migration_path;
+        } else {
+            throw new TypeError('Invalid arguments for createTranslatableMigration');
+        }
+
         $stub_path = dirname(__DIR__, 2) . '/stubs/make_model_translatable_migration.stub';
         $stub = file_get_contents($stub_path);
 

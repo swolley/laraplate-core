@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
@@ -63,6 +64,144 @@ it('checkAndNotify returns sent=false when no pending approvals are found', func
         'pending_count' => 0,
         'entities' => [],
     ]);
+});
+
+it('getPendingApprovalsByEntity returns entities over threshold and sorts by count', function (): void {
+    Config::set('core.notifications.approvals.default_threshold_hours', 8);
+
+    $service = new ApprovalNotificationService();
+
+    $models_cache = [
+        'settings' => Setting::class,
+        'users' => User::class,
+    ];
+
+    $cache = new ReflectionProperty($service, 'models_cache');
+    $cache->setAccessible(true);
+    $cache->setValue($service, $models_cache);
+
+    $old = now()->subHours(9);
+    $recent = now()->subHours(2);
+
+    // Settings: 2 old pending modifications (counted), 1 recent (ignored)
+    Modification::query()->create([
+        'modifiable_type' => Setting::class,
+        'modifiable_id' => 1,
+        'active' => true,
+        'is_update' => true,
+        'modifications' => ['name' => ['original' => 'a', 'modified' => 'b']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('a'),
+        'created_at' => $old,
+        'updated_at' => $old,
+    ]);
+
+    Modification::query()->create([
+        'modifiable_type' => Setting::class,
+        'modifiable_id' => 2,
+        'active' => true,
+        'is_update' => true,
+        'modifications' => ['name' => ['original' => 'c', 'modified' => 'd']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('b'),
+        'created_at' => $old->copy()->addMinute(),
+        'updated_at' => $old->copy()->addMinute(),
+    ]);
+
+    Modification::query()->create([
+        'modifiable_type' => Setting::class,
+        'modifiable_id' => 3,
+        'active' => true,
+        'is_update' => true,
+        'modifications' => ['name' => ['original' => 'e', 'modified' => 'f']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('c'),
+        'created_at' => $recent,
+        'updated_at' => $recent,
+    ]);
+
+    // Users: 1 old pending modification (counted), 1 inactive old (ignored)
+    Modification::query()->create([
+        'modifiable_type' => User::class,
+        'modifiable_id' => 1,
+        'active' => true,
+        'is_update' => true,
+        'modifications' => ['email' => ['original' => 'a', 'modified' => 'b']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('d'),
+        'created_at' => $old,
+        'updated_at' => $old,
+    ]);
+
+    Modification::query()->create([
+        'modifiable_type' => User::class,
+        'modifiable_id' => 2,
+        'active' => false,
+        'is_update' => true,
+        'modifications' => ['email' => ['original' => 'x', 'modified' => 'y']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('e'),
+        'created_at' => $old,
+        'updated_at' => $old,
+    ]);
+
+    $pending = $service->getPendingApprovalsByEntity();
+
+    expect($pending)->toHaveCount(2);
+    expect($pending->first()['entity'])->toBe('Setting');
+    expect($pending->first()['count'])->toBe(2);
+    expect($pending->first()['oldest_at'])->toBe($old->toIso8601String());
+
+    expect($pending->last()['entity'])->toBe('User');
+    expect($pending->last()['count'])->toBe(1);
+});
+
+it('checkAndNotify sends notification when pending approvals exist', function (): void {
+    Notification::fake();
+    Config::set('core.notifications.approvals.default_threshold_hours', 1);
+    Config::set('core.notifications.approvals.recipients.roles', ['approval_admin']);
+
+    /** @var Role $role */
+    $role = Role::factory()->create(['name' => 'approval_admin', 'guard_name' => 'web']);
+    $user = User::factory()->create(['email' => 'approver_' . uniqid() . '@example.com']);
+    $user->assignRole($role);
+
+    $service = new ApprovalNotificationService();
+
+    $models_cache = [
+        'settings' => Setting::class,
+    ];
+    $cache = new ReflectionProperty($service, 'models_cache');
+    $cache->setAccessible(true);
+    $cache->setValue($service, $models_cache);
+
+    $old = now()->subHours(2);
+
+    Modification::query()->create([
+        'modifiable_type' => Setting::class,
+        'modifiable_id' => 1,
+        'active' => true,
+        'is_update' => true,
+        'modifications' => ['name' => ['original' => 'a', 'modified' => 'b']],
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('z'),
+        'created_at' => $old,
+        'updated_at' => $old,
+    ]);
+
+    $result = $service->checkAndNotify();
+
+    expect($result['sent'])->toBeTrue();
+    expect($result['pending_count'])->toBe(1);
+    expect($result['entities'])->toMatchArray(['Setting' => 1]);
+
+    Notification::assertSentTo($user, PendingApprovalsNotification::class);
 });
 
 it('getThresholdForTable returns the stored setting value', function (): void {
