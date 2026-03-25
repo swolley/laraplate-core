@@ -343,7 +343,7 @@ final class QueryBuilder
                     } elseif ($column->type->isAggregateColumn()) {
                         $cloned_column = new Column($splitted[1], $column->type);
 
-                        if (! array_key_exists($index, $columns['aggregates'])) {
+                        if (! array_key_exists($splitted[0], $columns['aggregates'])) {
                             $columns['aggregates'][$splitted[0]] = [$cloned_column];
                         } else {
                             $columns['aggregates'][$splitted[0]][] = $cloned_column;

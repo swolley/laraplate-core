@@ -276,8 +276,12 @@ final readonly class AuthorizationService
     {
         $user = $request->user();
 
-        if ($user !== null) {
+        if ($user instanceof User) {
             return $user;
+        }
+
+        if ($user !== null) {
+            return null;
         }
 
         // Try to get anonymous user

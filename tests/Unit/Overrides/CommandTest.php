@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Console\Command as BaseCommand;
+use Illuminate\Foundation\Application;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Tests\LaravelTestCase;
 
@@ -74,4 +75,30 @@ it('isLaunchedManually can be invoked via reflection', function (): void {
     $result = $ref->invoke($command);
 
     expect($result)->toBeBool();
+});
+
+it('isLaunchedManually returns false when the application is not running in console', function (): void {
+    app()->instance('runningUnitTests', true);
+
+    $original_app = Application::getInstance();
+    $mocked_app = Mockery::mock($original_app)->makePartial();
+    $mocked_app->shouldReceive('runningInConsole')->andReturn(false);
+
+    Application::setInstance($mocked_app);
+
+    try {
+        $command = new class extends Command
+        {
+            public function handle(): int
+            {
+                return 0;
+            }
+        };
+
+        $method = new ReflectionMethod(Command::class, 'isLaunchedManually');
+
+        expect($method->invoke($command))->toBeFalse();
+    } finally {
+        Application::setInstance($original_app);
+    }
 });

@@ -104,3 +104,11 @@ it('casts returns expected keys', function (): void {
         ->and($casts)->toHaveKey('updated_at')
         ->and($casts['created_at'])->toBe('immutable_datetime');
 });
+
+it('getRules unique name callbacks apply deleted_at scope on create and update', function (): void {
+    $role = Role::factory()->create(['name' => 'scoped_role']);
+    $rules = $role->getRules();
+
+    expect_unique_rules_apply_deleted_at_scope($rules['create']['name']);
+    expect_unique_rules_apply_deleted_at_scope($rules['update']['name']);
+});

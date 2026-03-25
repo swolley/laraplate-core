@@ -66,3 +66,21 @@ function assertModelNotExists(string $modelClass, array $attributes): void
 {
     expect($modelClass::where($attributes)->exists())->toBeFalse();
 }
+
+/**
+ * Invoke Unique rule query callbacks that scope non-trashed rows (deleted_at null).
+ */
+function expect_unique_rules_apply_deleted_at_scope(iterable $rules): void
+{
+    foreach ($rules as $rule) {
+        if (! $rule instanceof Illuminate\Validation\Rules\Unique) {
+            continue;
+        }
+
+        foreach ($rule->queryCallbacks() as $callback) {
+            $query = Mockery::mock(Illuminate\Database\Query\Builder::class);
+            $query->shouldReceive('where')->once()->with('deleted_at', null);
+            $callback($query);
+        }
+    }
+}

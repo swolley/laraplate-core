@@ -274,3 +274,39 @@ it('treats unrestricted ACL rows as non contributing for combined filters', func
     expect($service->getCombinedFilters($user, $permission))->toBeNull()
         ->and($service->hasUnrestrictedAccess($user, $permission))->toBeTrue();
 });
+
+it('ignores roles that lack the permission when resolving effective ACLs', function (): void {
+    $permission = Permission::create([
+        'name' => 'default.acl_skip_role_' . uniqid() . '.select',
+        'guard_name' => 'web',
+    ]);
+
+    $role_with_acl = Role::factory()->create(['name' => 'acl_has_' . uniqid(), 'guard_name' => 'web']);
+    $role_with_acl->givePermissionTo($permission);
+
+    $filter_group = new FiltersGroup([
+        new Filter('region', 'eu', FilterOperator::EQUALS),
+    ]);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $filter_group,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $role_without_permission = Role::factory()->create(['name' => 'acl_noperm_' . uniqid(), 'guard_name' => 'web']);
+
+    $user = User::factory()->create();
+    $user->assignRole([$role_without_permission, $role_with_acl]);
+
+    $service = new AclResolverService();
+    $acls = $service->getEffectiveAcls($user, $permission);
+
+    expect($acls)->toHaveCount(1)
+        ->and($acls->first()->filters)->toEqual($filter_group);
+});

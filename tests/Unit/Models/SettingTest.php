@@ -124,3 +124,11 @@ it('newFactory returns SettingFactory instance', function (): void {
 
     expect($factory)->toBeInstanceOf(Modules\Core\Database\Factories\SettingFactory::class);
 });
+
+it('getRules unique name callbacks apply deleted_at scope on create and update', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
+    $rules = $setting->getRules();
+
+    expect_unique_rules_apply_deleted_at_scope((new Setting)->getRules()['create']['name']);
+    expect_unique_rules_apply_deleted_at_scope($rules['update']['name']);
+});

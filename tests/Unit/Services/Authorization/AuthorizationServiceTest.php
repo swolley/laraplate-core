@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -431,4 +432,174 @@ it('applyAclFiltersToQuery applies null, in, between and comparison operators', 
 
     $bindings = $query->getBindings();
     expect($bindings)->toContain(1)->toContain(2)->toContain('2020-01-01 00:00:00')->toContain('2020-01-02 00:00:00');
+});
+
+it('checkPermission is true for super admin without evaluating the specific permission', function (): void {
+    config()->set('permission.roles.superadmin', 'superadmin');
+
+    $entity = 'authz_sa_perm_' . uniqid();
+    $permission_name = 'default.' . $entity . '.select';
+
+    Permission::create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+
+    /** @var Role $super_role */
+    $super_role = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
+    $user = User::factory()->create();
+    $user->assignRole($super_role);
+
+    $service = new AuthorizationService(new AclResolverService());
+    $request = Request::create('/');
+    $request->setUserResolver(static fn (): User => $user);
+
+    expect($service->checkPermission($request, $entity, 'select'))->toBeTrue();
+});
+
+it('checkPermission returns false when the request user is not a Core User model', function (): void {
+    $guard = new class
+    {
+        public string $name = 'web';
+    };
+
+    Auth::shouldReceive('guard')->andReturn($guard);
+
+    /** @var Authenticatable&Mockery\MockInterface $authenticatable */
+    $authenticatable = Mockery::mock(Authenticatable::class);
+
+    $request = Request::create('/');
+    $request->setUserResolver(static fn (): Authenticatable => $authenticatable);
+
+    $service = new AuthorizationService(new AclResolverService());
+
+    expect($service->checkPermission($request, 'orders', 'select'))->toBeFalse();
+});
+
+it('checkPermission returns false when there is no request user and anonymous user does not exist', function (): void {
+    Cache::forget('anonymous_user');
+
+    $entity = 'authz_no_anon_' . uniqid();
+    $permission_name = 'default.' . $entity . '.select';
+
+    Permission::create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+
+    $service = new AuthorizationService(new AclResolverService());
+    $request = Request::create('/');
+
+    expect($service->checkPermission($request, $entity, 'select'))->toBeFalse();
+});
+
+it('applyAclFiltersToQuery returns early when getAclFilters yields no filter group', function (): void {
+    config()->set('permission.roles.superadmin', 'superadmin');
+
+    $entity = 'authz_apply_skip_' . uniqid();
+    $permission_name = 'default.' . $entity . '.select';
+
+    Permission::create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+
+    /** @var Role $super_role */
+    $super_role = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
+    $user = User::factory()->create();
+    $user->assignRole($super_role);
+    Auth::login($user);
+
+    $service = new AuthorizationService(new AclResolverService());
+
+    $query = User::query();
+    $sql_before = $query->toSql();
+
+    $service->applyAclFiltersToQuery($query, $permission_name);
+
+    expect($query->toSql())->toBe($sql_before);
+});
+
+it('applyAclFiltersToQuery applies nested filter groups recursively', function (): void {
+    $entity = 'authz_nested_' . uniqid();
+    $permission_name = 'default.' . $entity . '.select';
+
+    $permission = Permission::create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+
+    /** @var Role $role */
+    $role = Role::factory()->create(['name' => 'role_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($permission);
+
+    $nested = new FiltersGroup([
+        new Filter('users.id', 99, FilterOperator::EQUALS),
+    ], WhereClause::AND);
+
+    $acl_filters = new FiltersGroup([$nested], WhereClause::AND);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $acl_filters,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $user = User::factory()->create();
+    $user->assignRole($role);
+    Auth::login($user);
+
+    $service = new AuthorizationService(new AclResolverService());
+
+    $query = User::query();
+    $service->applyAclFiltersToQuery($query, $permission_name);
+
+    expect($query->toSql())->toContain('"id" = ?');
+    expect($query->getBindings())->toContain(99);
+});
+
+it('applyAclFiltersToQuery uses orWhereNull when OR group contains an equals-null filter', function (): void {
+    $entity = 'authz_or_null_' . uniqid();
+    $permission_name = 'default.' . $entity . '.select';
+
+    $permission = Permission::create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+
+    /** @var Role $role */
+    $role = Role::factory()->create(['name' => 'role_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($permission);
+
+    $acl_filters = new FiltersGroup([
+        new Filter('users.id', 1, FilterOperator::EQUALS),
+        new Filter('users.email', null, FilterOperator::EQUALS),
+    ], WhereClause::OR);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $acl_filters,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $user = User::factory()->create();
+    $user->assignRole($role);
+    Auth::login($user);
+
+    $service = new AuthorizationService(new AclResolverService());
+
+    $query = User::query();
+    $service->applyAclFiltersToQuery($query, $permission_name);
+
+    expect($query->toSql())->toContain('email" is null');
 });
