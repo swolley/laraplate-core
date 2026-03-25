@@ -28,7 +28,7 @@ it('viewSwaggerUI gate denies when user is null', function (): void {
 it('viewSwaggerUI gate denies when user email is not in allowed list', function (): void {
     $this->provider->boot();
 
-    $user = \Modules\Core\Models\User::factory()->create(['email' => 'any@example.com']);
+    $user = Modules\Core\Models\User::factory()->create(['email' => 'any@example.com']);
 
     expect(Gate::forUser($user)->allows('viewSwaggerUI'))->toBeFalse();
 });

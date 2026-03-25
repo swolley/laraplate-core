@@ -5,8 +5,8 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Http\Middleware\EnsureIsSuperAdmin;
-use Modules\Core\Models\User;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
 
 uses(LaravelTestCase::class);
@@ -35,7 +35,7 @@ test('middleware aborts when user is not authenticated', function (): void {
     $middleware = new EnsureIsSuperAdmin;
 
     $middleware->handle($request, $next);
-})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class, 'Unauthorized');
+})->throws(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Unauthorized');
 
 test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(EnsureIsSuperAdmin::class);

@@ -32,6 +32,7 @@ it('registers elasticsearch singleton and alias on register when config exists',
 
 it('boot runs without throwing when config was merged', function (): void {
     $config_dir = app()->configPath();
+
     if (! is_file($config_dir . DIRECTORY_SEPARATOR . 'elastic.php')) {
         expect(true)->toBeTrue();
 

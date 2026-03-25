@@ -12,8 +12,8 @@ uses(LaravelTestCase::class, RefreshDatabase::class);
 
 function registerInitializeUsersCommand(): void
 {
-    /** @var \Illuminate\Contracts\Console\Kernel $kernel */
-    $kernel = app(\Illuminate\Contracts\Console\Kernel::class);
+    /** @var Illuminate\Contracts\Console\Kernel $kernel */
+    $kernel = app(Illuminate\Contracts\Console\Kernel::class);
 
     foreach ($kernel->all() as $name => $command) {
         if ($name === 'auth:initialize-users') {
@@ -66,4 +66,3 @@ it('creates root, admin and anonymous users when they do not exist', function ()
     $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'root']);
     $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'anonymous']);
 });
-

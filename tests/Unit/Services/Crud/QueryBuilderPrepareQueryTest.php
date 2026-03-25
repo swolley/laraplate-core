@@ -577,3 +577,15 @@ it('prepareQuery ignores blacklisted relations from request payload', function (
     expect($withs)->toHaveKey('roles');
     expect($withs)->not->toHaveKey('children');
 });
+
+it('prepareQuery ignores relation sort without field segment', function (): void {
+    $query = User::query();
+    $request_data = qb_make_list_request_data(
+        columns: [new Column('users.username', ColumnType::COLUMN)],
+        sort: [new Sort('roles', SortDirection::ASC)],
+    );
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    expect($query->getQuery()->orders ?? [])->toBe([]);
+});

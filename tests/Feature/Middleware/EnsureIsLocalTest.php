@@ -29,7 +29,7 @@ test('middleware aborts with 401 when app is not local', function (): void {
     $middleware = new EnsureIsLocal;
 
     $middleware->handle($request, $next);
-})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class, 'Unauthorized');
+})->throws(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Unauthorized');
 
 test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(EnsureIsLocal::class);

@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use Filament\Schemas\Schema;
-use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
 

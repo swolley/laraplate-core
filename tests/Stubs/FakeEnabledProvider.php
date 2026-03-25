@@ -15,7 +15,7 @@ class FakeEnabledProvider implements IAuthenticationProvider
 
     public function canHandle(Request $request): bool
     {
-        return $request->attributes->get('provider') === $this->name;
+        return $this->name === $request->attributes->get('provider');
     }
 
     public function authenticate(Request $request): array
@@ -42,4 +42,3 @@ class FakeEnabledProvider implements IAuthenticationProvider
         return $this->name;
     }
 }
-

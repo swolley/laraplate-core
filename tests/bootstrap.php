@@ -44,7 +44,7 @@ $container->singleton('app', static function () use ($container): object {
         {
             $base = dirname(__DIR__);
 
-            return $path === '' ? $base : $base . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR);
+            return $path === '' ? $base : $base . DIRECTORY_SEPARATOR . mb_ltrim($path, DIRECTORY_SEPARATOR);
         }
     };
 });

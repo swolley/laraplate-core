@@ -43,6 +43,20 @@ it('has private constructor for singleton', function (): void {
     expect($constructor->isPrivate())->toBeTrue();
 });
 
+it('builds singleton instance using configured client', function (): void {
+    resetElasticsearchSingleton();
+    config()->set('elastic.client.default', 'default');
+    config()->set('elastic.client.connections.default', [
+        'hosts' => ['http://127.0.0.1:9200'],
+    ]);
+
+    $first = ElasticsearchService::getInstance();
+    $second = ElasticsearchService::getInstance();
+
+    expect($first)->toBeInstanceOf(ElasticsearchService::class);
+    expect($first)->toBe($second);
+});
+
 it('has createIndex method with correct signature', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
     $method = $reflection->getMethod('createIndex');
@@ -250,6 +264,22 @@ it('creates index when missing', function (): void {
     expect($service->createIndex('my-index'))->toBeTrue();
 });
 
+it('creates index with settings and mappings when missing', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->createIndex(
+        'my-index',
+        ['number_of_shards' => 1],
+        ['properties' => ['foo' => ['type' => 'keyword']]],
+    ))->toBeTrue();
+});
+
 it('updates mappings and settings when index exists', function (): void {
     $mock_client = makeClientWithResponses([
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
@@ -266,6 +296,29 @@ it('updates mappings and settings when index exists', function (): void {
         ['properties' => ['foo' => ['type' => 'keyword']]],
     ))->toBeTrue();
 });
+
+it('returns true when index exists and no updates are provided', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->createIndex('my-index'))->toBeTrue();
+});
+
+it('throws ElasticsearchException when createIndex fails', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->createIndex('my-index');
+})->throws(ElasticsearchException::class);
 
 it('deletes index gracefully if missing', function (): void {
     $mock_client = makeClientWithResponses([
@@ -289,6 +342,18 @@ it('deletes index when present', function (): void {
 
     expect($service->deleteIndex('existing-index'))->toBeTrue();
 });
+
+it('throws ElasticsearchException when deleteIndex fails', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->deleteIndex('existing-index');
+})->throws(ElasticsearchException::class);
 
 it('bulk indexes documents and counts successes/failures', function (): void {
     $bulk_response = [
@@ -320,6 +385,24 @@ it('bulk indexes documents and counts successes/failures', function (): void {
     ]);
 });
 
+it('bulkIndex returns zero counters when items are missing in response', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [
+            Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME,
+            'Content-Type' => 'application/json',
+        ], json_encode(['took' => 1])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->bulkIndex('idx', [1 => ['foo' => 'bar']]))->toMatchArray([
+        'indexed' => 0,
+        'failed' => 0,
+        'errors' => [],
+    ]);
+});
+
 it('bulkIndex returns zeros for empty documents', function (): void {
     $mock_client = makeClientWithResponses([]);
 
@@ -332,6 +415,17 @@ it('bulkIndex returns zeros for empty documents', function (): void {
         'errors' => [],
     ]);
 });
+
+it('throws ElasticsearchException when bulkIndex fails', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->bulkIndex('idx', [1 => ['foo' => 'bar']]);
+})->throws(ElasticsearchException::class);
 
 it('searches and returns array payload', function (): void {
     $body = ['hits' => ['hits' => [['foo' => 'bar']]]];
@@ -370,6 +464,32 @@ it('returns null when document is not found', function (): void {
     expect($service->getDocument('idx', 'missing'))->toBeNull();
 });
 
+it('returns document payload when present', function (): void {
+    $body = ['_id' => '1', '_source' => ['foo' => 'bar']];
+    $mock_client = makeClientWithResponses([
+        new Response(200, [
+            Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME,
+            'Content-Type' => 'application/json',
+        ], json_encode($body)),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->getDocument('idx', '1'))->toBe($body);
+});
+
+it('throws ElasticsearchException when getDocument fails with client non-404', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(400, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'bad request'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->getDocument('idx', '1');
+})->throws(ElasticsearchException::class);
+
 it('throws ElasticsearchException when getDocument fails with non-404', function (): void {
     $mock_client = makeClientWithResponses([
         new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
@@ -403,6 +523,42 @@ it('deleteDocument returns true when document does not exist', function (): void
 
     expect($service->deleteDocument('idx', 999))->toBeTrue();
 });
+
+it('deleteDocument returns false when delete endpoint replies 404 after exists check', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    expect($service->deleteDocument('idx', 999))->toBeFalse();
+});
+
+it('throws ElasticsearchException when deleteDocument fails with client non-404', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(400, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'bad request'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->deleteDocument('idx', '1');
+})->throws(ElasticsearchException::class);
+
+it('throws ElasticsearchException when deleteDocument fails with server error', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+    $service = ElasticsearchService::getInstance();
+
+    $service->deleteDocument('idx', '1');
+})->throws(ElasticsearchException::class);
 
 it('deleteDocument passes refresh=true when requested', function (): void {
     $capture = new class

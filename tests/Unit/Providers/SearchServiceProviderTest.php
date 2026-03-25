@@ -20,6 +20,6 @@ it('registers ISearchEngine singleton and search alias', function (): void {
 });
 
 it('binds Scout engine implementations', function (): void {
-    expect($this->provider->bindings)->toHaveKey(\Elastic\ScoutDriverPlus\Engine::class);
-    expect($this->provider->bindings)->toHaveKey(\Laravel\Scout\Engines\TypesenseEngine::class);
+    expect($this->provider->bindings)->toHaveKey(Elastic\ScoutDriverPlus\Engine::class);
+    expect($this->provider->bindings)->toHaveKey(Laravel\Scout\Engines\TypesenseEngine::class);
 });

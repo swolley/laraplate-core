@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Collection;
 use Modules\Core\Helpers\TreeCollection;
 use Modules\Core\Tests\TestCase;
 
@@ -51,4 +50,3 @@ it('builds path strings for each node', function (): void {
     expect($root->path)->toBe('Root')
         ->and($child->path)->toBe('Root / Child');
 });
-

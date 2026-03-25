@@ -10,7 +10,6 @@ namespace Modules\Core\Tests\Stubs;
  */
 class HandleSocialLoginActionTestUserDouble
 {
-    /** @var mixed */
     public static $queryBuilder;
 
     public static function query(): mixed
@@ -18,4 +17,3 @@ class HandleSocialLoginActionTestUserDouble
         return self::$queryBuilder;
     }
 }
-

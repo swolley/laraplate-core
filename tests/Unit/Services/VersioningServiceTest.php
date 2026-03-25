@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\Version;
 use Modules\Core\Services\VersioningService;
 use Modules\Core\Tests\LaravelTestCase;

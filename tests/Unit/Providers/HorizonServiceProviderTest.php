@@ -23,8 +23,8 @@ it('defines viewHorizon gate when gate is called', function (): void {
 });
 
 it('viewHorizon allows superadmin when user is App\Models\User', function (): void {
-    if (! class_exists(\App\Models\User::class)) {
-        class_alias(User::class, \App\Models\User::class);
+    if (! class_exists(App\Models\User::class)) {
+        class_alias(User::class, App\Models\User::class);
     }
 
     $user = User::factory()->create();

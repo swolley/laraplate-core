@@ -537,7 +537,7 @@ describe('getTranslationModelClass', function (): void {
 
         $translationClass = $method->invoke(null);
 
-        expect($translationClass)->toBe(\Modules\Core\Tests\Fixtures\FakeTranslatableModelTranslation::class);
+        expect($translationClass)->toBe(Modules\Core\Tests\Fixtures\FakeTranslatableModelTranslation::class);
     });
 });
 

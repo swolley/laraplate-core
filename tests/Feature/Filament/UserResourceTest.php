@@ -31,8 +31,8 @@ it('defines Filament pages for users', function (): void {
 
 it('user resource has required form fields', function (): void {
     test()->markTestSkipped(
-        'UserForm uses relationship() and other features that require Schema to be bound to a Livewire component; ' .
-        'form structure is exercised at app level with full Filament panel wiring.'
+        'UserForm uses relationship() and other features that require Schema to be bound to a Livewire component; '
+        . 'form structure is exercised at app level with full Filament panel wiring.',
     );
 });
 

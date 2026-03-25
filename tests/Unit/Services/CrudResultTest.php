@@ -38,4 +38,3 @@ it('can represent an error result without data', function (): void {
         ->and($result->error)->toBe('Something went wrong')
         ->and($result->statusCode)->toBe(500);
 });
-

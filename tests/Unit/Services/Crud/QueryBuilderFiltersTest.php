@@ -607,3 +607,15 @@ it('applies nested OR combining NOT LIKE on permissions BETWEEN on roles.id and 
     expect($query->pluck('id')->all())->toEqualCanonicalizing([$user_not_like->id, $user_between->id, $user_ge->id]);
     expect($query->pluck('id')->all())->not->toContain($user_none->id);
 });
+
+it('keeps query unchanged when OR filter group is empty', function (): void {
+    $u1 = User::factory()->create();
+    $u2 = User::factory()->create();
+
+    $filters = new FiltersGroup([], WhereClause::OR);
+
+    $query = User::query()->whereKey([$u1->id, $u2->id]);
+    (new QueryBuilder())->applyFilters($query, $filters);
+
+    expect($query->pluck('id')->all())->toEqualCanonicalizing([$u1->id, $u2->id]);
+});

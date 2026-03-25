@@ -96,4 +96,3 @@ it('serializes and unserializes response data', function (): void {
     expect(fn () => $builder->serialize())
         ->not->toThrow(Throwable::class);
 });
-

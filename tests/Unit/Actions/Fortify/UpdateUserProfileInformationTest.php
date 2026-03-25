@@ -36,7 +36,7 @@ it('nulls email_verified_at and updates when email changed for MustVerifyEmail u
         'email_verified_at' => now(),
     ]);
 
-    $user = \Mockery::mock($user)->makePartial();
+    $user = Mockery::mock($user)->makePartial();
     $user->shouldReceive('sendEmailVerificationNotification')->once();
 
     $action = new UpdateUserProfileInformation();

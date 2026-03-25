@@ -36,4 +36,3 @@ it('reports default locale and fallback flag', function (): void {
 
     expect(LocaleContext::isFallbackEnabled())->toBeTrue();
 });
-

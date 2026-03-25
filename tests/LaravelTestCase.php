@@ -37,44 +37,12 @@ abstract class LaravelTestCase extends Orchestra
         parent::setUp();
         $this->ensureCoolsamModulesResourceAlias();
         $this->ensureAuthConfigForSpatiePermission();
-        $this->loadMigrationsFrom(self::testbenchMigrationsPath());
+        $this->loadMigrationsFrom(self::testbench_migrations_path());
         $this->loadMigrationsFrom(self::moduleMigrationsPath());
         $this->ensureTestCacheStore();
         $this->ensureCoreRoutesRegistered();
         $this->ensureModelsCachePopulated();
     }
-
-    /**
-     * Ensure auth guards and providers are set so Spatie Permission's getModelForGuard() resolves to User::class.
-     * Must run after app boot so we override any config loaded from config/auth.php.
-     */
-    private function ensureAuthConfigForSpatiePermission(): void
-    {
-        config([
-            'auth.defaults.guard' => 'web',
-            'auth.guards.web' => ['driver' => 'session', 'provider' => 'users'],
-            'auth.guards.api' => ['driver' => 'token', 'provider' => 'users'],
-            'auth.providers.users' => ['driver' => 'eloquent', 'model' => User::class],
-        ]);
-    }
-
-    /**
-     * Ensure Coolsam\Modules\Resource resolves in tests even when the Coolsam package is not installed.
-     * In the real app this class is provided by the main repository; for Core tests we can safely alias it to Filament's base Resource.
-     */
-    private function ensureCoolsamModulesResourceAlias(): void
-    {
-        if (class_exists(\Coolsam\Modules\Resource::class)) {
-            return;
-        }
-
-        if (! class_exists(\Filament\Resources\Resource::class)) {
-            return;
-        }
-
-        class_alias(\Filament\Resources\Resource::class, \Coolsam\Modules\Resource::class);
-    }
-
 
     /**
      * Get package providers required for the Core module (nwidart discovers Core via config).
@@ -152,7 +120,7 @@ abstract class LaravelTestCase extends Orchestra
     /**
      * Path to test-only migrations (e.g. base users table) that must run before module migrations.
      */
-    private static function testbenchMigrationsPath(): string
+    private static function testbench_migrations_path(): string
     {
         return __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
     }
@@ -217,6 +185,37 @@ abstract class LaravelTestCase extends Orchestra
         $app['config']->set('permission.teams', false);
         $app['config']->set('permission.cache.key', 'spatie.permission.cache');
         $app['config']->set('permission.cache.store', 'array');
+    }
+
+    /**
+     * Ensure auth guards and providers are set so Spatie Permission's getModelForGuard() resolves to User::class.
+     * Must run after app boot so we override any config loaded from config/auth.php.
+     */
+    private function ensureAuthConfigForSpatiePermission(): void
+    {
+        config([
+            'auth.defaults.guard' => 'web',
+            'auth.guards.web' => ['driver' => 'session', 'provider' => 'users'],
+            'auth.guards.api' => ['driver' => 'token', 'provider' => 'users'],
+            'auth.providers.users' => ['driver' => 'eloquent', 'model' => User::class],
+        ]);
+    }
+
+    /**
+     * Ensure Coolsam\Modules\Resource resolves in tests even when the Coolsam package is not installed.
+     * In the real app this class is provided by the main repository; for Core tests we can safely alias it to Filament's base Resource.
+     */
+    private function ensureCoolsamModulesResourceAlias(): void
+    {
+        if (class_exists(\Coolsam\Modules\Resource::class)) {
+            return;
+        }
+
+        if (! class_exists(\Filament\Resources\Resource::class)) {
+            return;
+        }
+
+        class_alias(\Filament\Resources\Resource::class, \Coolsam\Modules\Resource::class);
     }
 
     /**

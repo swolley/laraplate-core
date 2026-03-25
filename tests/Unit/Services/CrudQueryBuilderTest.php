@@ -2,15 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
-use Modules\Core\Casts\FiltersGroup;
-use Modules\Core\Casts\ListRequestData;
-use Modules\Core\Casts\Sort;
-use Modules\Core\Casts\WhereClause;
-use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\LaravelTestCase;
 
@@ -60,4 +53,3 @@ it('cleans reserved recursive relations from relations list', function (): void 
     sort($relations);
     expect(array_values($relations))->toBe(['posts', 'user']);
 });
-

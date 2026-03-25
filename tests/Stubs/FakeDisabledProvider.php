@@ -11,4 +11,3 @@ class FakeDisabledProvider extends FakeEnabledProvider
         return false;
     }
 }
-

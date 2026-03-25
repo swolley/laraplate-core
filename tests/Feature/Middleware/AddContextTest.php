@@ -10,7 +10,7 @@ use Modules\Core\Tests\LaravelTestCase;
 uses(LaravelTestCase::class);
 
 it('adds context and calls next', function (): void {
-    Context::shouldReceive('add')->once()->with(\Mockery::on(function (array $data): bool {
+    Context::shouldReceive('add')->once()->with(Mockery::on(function (array $data): bool {
         return isset($data['scope'], $data['locale'], $data['url'])
             && $data['scope'] === 'web';
     }));

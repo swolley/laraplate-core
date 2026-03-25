@@ -22,4 +22,3 @@ it('authorize returns false when not authenticated', function (): void {
 
     expect($request->authorize())->toBeFalse();
 });
-

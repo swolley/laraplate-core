@@ -20,11 +20,11 @@ it('registerAuths runs without throwing', function (): void {
 
 it('configureDates uses CarbonImmutable', function (): void {
     $this->provider->register();
-    $ref = new \ReflectionClass($this->provider);
+    $ref = new ReflectionClass($this->provider);
     $method = $ref->getMethod('configureDates');
     $method->invoke($this->provider);
 
     expect(Date::getTestNow())->toBeNull();
     $instance = Date::now();
-    expect($instance)->toBeInstanceOf(\Carbon\CarbonImmutable::class);
+    expect($instance)->toBeInstanceOf(Carbon\CarbonImmutable::class);
 });

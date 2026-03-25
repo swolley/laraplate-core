@@ -70,9 +70,7 @@ it('listener handle updates last_login_at and logs when user does not use Impers
             return null;
         }
 
-        public function setRememberToken($value): void
-        {
-        }
+        public function setRememberToken($value): void {}
 
         public function getRememberTokenName(): ?string
         {

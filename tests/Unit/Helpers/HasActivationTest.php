@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\ActivationStubModel;
 

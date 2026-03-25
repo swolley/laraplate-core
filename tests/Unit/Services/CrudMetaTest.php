@@ -49,6 +49,5 @@ it('defaults all metadata properties to null when not provided', function (): vo
         ->and($meta->class)->toBeNull()
         ->and($meta->table)->toBeNull()
         ->and($meta->cachedAt)->toBeNull();
-}
+},
 );
-

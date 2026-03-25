@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Str;
-use Modules\Core\Overrides\RouteServiceProvider;
 use Modules\Core\Providers\RouteServiceProvider as CoreRouteServiceProvider;
 use Modules\Core\Tests\LaravelTestCase;
 
@@ -12,7 +11,7 @@ uses(LaravelTestCase::class);
 it('getPrefix returns slug of module name for Core', function (): void {
     $provider = new CoreRouteServiceProvider(app());
 
-    $ref = new \ReflectionClass($provider);
+    $ref = new ReflectionClass($provider);
     $prop = $ref->getProperty('name');
     expect($prop->getValue($provider))->toBe('Core');
 
@@ -25,7 +24,7 @@ it('getPrefix returns slug of module name for Core', function (): void {
 it('getModuleNamespace returns namespace derived from Providers replacement', function (): void {
     $provider = new CoreRouteServiceProvider(app());
 
-    $method = (new \ReflectionClass($provider))->getMethod('getModuleNamespace');
+    $method = (new ReflectionClass($provider))->getMethod('getModuleNamespace');
     $namespace = $method->invoke($provider);
 
     expect($namespace)->toBeString();

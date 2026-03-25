@@ -10,4 +10,3 @@ class FakeAuthUser extends BaseUser
 {
     protected $fillable = ['name', 'email'];
 }
-

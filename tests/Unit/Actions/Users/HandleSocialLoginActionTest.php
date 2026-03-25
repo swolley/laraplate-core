@@ -73,7 +73,7 @@ it('uses updateOrCreate and logs in when userUpserter is null', function (): voi
                 && ($attrs['social_service'] ?? null) === 'github'
                 && ($attrs['social_token'] ?? null) === 'token'
                 && ($attrs['social_refresh_token'] ?? null) === 'refresh'
-                && ($attrs['social_token_secret'] ?? null) === 'secret')
+                && ($attrs['social_token_secret'] ?? null) === 'secret'),
         )
         ->andReturn($userFromDb);
 

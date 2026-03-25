@@ -29,13 +29,12 @@ it('throws when model does not use Searchable', function (): void {
         protected $table = 'users';
     };
     expect(fn () => new IndexInSearchJob($plain))
-        ->toThrow(\InvalidArgumentException::class, 'does not implement the Searchable trait');
+        ->toThrow(InvalidArgumentException::class, 'does not implement the Searchable trait');
 });
 
 it('returns middleware with RateLimited', function (): void {
     $job = new IndexInSearchJob(new StubSearchableModel());
     $middleware = $job->middleware();
     expect($middleware)->toHaveCount(1);
-    expect($middleware[0])->toBeInstanceOf(\Illuminate\Queue\Middleware\RateLimited::class);
+    expect($middleware[0])->toBeInstanceOf(Illuminate\Queue\Middleware\RateLimited::class);
 });
-

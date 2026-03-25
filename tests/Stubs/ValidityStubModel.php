@@ -20,4 +20,3 @@ class ValidityStubModel extends Model
         'valid_to' => 'datetime',
     ];
 }
-

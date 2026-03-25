@@ -13,4 +13,3 @@ class DummyFormRequest extends FormRequest
         return ['name' => 'required|string'];
     }
 }
-
