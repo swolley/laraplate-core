@@ -47,7 +47,7 @@ if (! function_exists('modules')) {
                 continue;
             }
 
-            $remapped_modules[ucfirst($module)] = $class;
+            $remapped_modules[$class->getName()] = $class;
         }
 
         if (! in_array($onlyModule, [null, '', '0'], true)) {

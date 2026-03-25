@@ -64,7 +64,7 @@
 		@if ($data['authors'] && $data['authors'] !== [])
 			<p class="mt-4 text-sm/relaxed text-gray-600 dark:text-gray-300">
 				@foreach ($data['authors'] as $author)
-					<span class="author">
+					<span class="author text-xs text-gray-500 dark:text-gray-400">
 						<span>{{ $author['name'] }}</span>
 						@if ($author['email'])
 							<a href="mailto:{{ $author['email'] }}">({{ $author['email'] }})</a>

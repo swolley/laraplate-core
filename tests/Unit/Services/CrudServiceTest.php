@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
@@ -17,6 +16,8 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
+use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelChild;
+use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelParent;
 use Modules\Core\Tests\LaravelTestCase;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
@@ -300,27 +301,3 @@ it('throws when resolveMethodValue targets missing or invalid methods', function
     expect(fn () => $method->invoke($service, $model, 'requiresArgument'))
         ->toThrow(UnexpectedValueException::class);
 });
-
-final class CrudServiceTestSingleRelChild extends Model
-{
-    protected $table = 'crud_single_rel_child';
-
-    protected $guarded = [];
-
-    public function childLabel(): string
-    {
-        return 'single';
-    }
-}
-
-final class CrudServiceTestSingleRelParent extends Model
-{
-    protected $table = 'crud_single_rel_parent';
-
-    protected $guarded = [];
-
-    public function childRecord(): HasOne
-    {
-        return $this->hasOne(CrudServiceTestSingleRelChild::class, 'parent_id', 'id');
-    }
-}

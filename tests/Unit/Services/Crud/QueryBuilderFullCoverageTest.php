@@ -18,6 +18,7 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
+use Modules\Core\Tests\Fixtures\QueryBuilderCoverageOwner;
 use Modules\Core\Tests\LaravelTestCase;
 
 uses(LaravelTestCase::class);
@@ -392,33 +393,3 @@ it('covers QueryBuilder private helpers via reflection for remaining branches', 
     ], WhereClause::AND);
     expect($extract_for_relation->invoke($qb, $user_for_filter, $only_main_filter, 'roles'))->toBeNull();
 });
-
-final class QueryBuilderCoverageOwner extends Model
-{
-    protected $table = 'users';
-
-    protected $guarded = [];
-
-    public function getNickAttribute(): string
-    {
-        return (string) $this->username;
-    }
-
-    public function license(): BelongsTo
-    {
-        return $this->belongsTo(License::class, 'license_id');
-    }
-
-    /**
-     * @return array<string, array{columns?: array<int, string>, relations?: array<int, string>}>
-     */
-    public function crudComputedDependencies(): array
-    {
-        return [
-            'nick' => [
-                'columns' => ['username'],
-                'relations' => ['license'],
-            ],
-        ];
-    }
-}
