@@ -97,3 +97,30 @@ it('hasColumn returns true for existing column on table', function (): void {
 it('hasColumn returns false for non-existing column', function (): void {
     expect(SchemaInspector::getInstance()->hasColumn('nonexistent_column', 'users'))->toBeFalse();
 });
+
+it('index returns null for unknown index name', function (): void {
+    $index = SchemaInspector::getInstance()->index('nonexistent_index_name', 'users');
+
+    expect($index)->toBeNull();
+});
+
+it('foreignKey returns null for unknown foreign key name', function (): void {
+    $foreign_key = SchemaInspector::getInstance()->foreignKey('nonexistent_fk_name', 'users');
+
+    expect($foreign_key)->toBeNull();
+});
+
+it('index resolves an existing index when present on table', function (): void {
+    $inspector = SchemaInspector::getInstance();
+    $indexes = $inspector->indexes('users');
+
+    if ($indexes->isEmpty()) {
+        test()->markTestSkipped('No indexes available on users table in current test database.');
+    }
+
+    $first_index = $indexes->first();
+    $resolved_index = $inspector->index($first_index->name, 'users');
+
+    expect($resolved_index)->toBeInstanceOf(Modules\Core\Inspector\Entities\Index::class)
+        ->and($resolved_index->name)->toBe($first_index->name);
+});

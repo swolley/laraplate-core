@@ -61,7 +61,7 @@ final class Version extends OvertrueVersion
         }
 
         if (self::isDynamicEntity($model)) {
-            $version->connection_ref = $model->getConnection();
+            $version->connection_ref = $model->getConnectionName();
             $version->table_ref = $model->getTable();
         }
 

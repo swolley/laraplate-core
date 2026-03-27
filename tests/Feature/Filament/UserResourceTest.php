@@ -13,7 +13,7 @@ uses(LaravelTestCase::class, RefreshDatabase::class);
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!FilamentAdminPass',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);

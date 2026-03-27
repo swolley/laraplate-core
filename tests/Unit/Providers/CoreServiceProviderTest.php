@@ -2,9 +2,29 @@
 
 declare(strict_types=1);
 
+use Elastic\Elasticsearch\Client as ElasticsearchClient;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\Rules\Password;
+use Laravel\Scout\EngineManager;
+use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Http\Controllers\DocsController;
+use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Locking\Locked;
+use Modules\Core\Models\CronJob;
 use Modules\Core\Providers\CoreServiceProvider;
+use Modules\Core\Providers\FortifyServiceProvider;
+use Modules\Core\Providers\RouteServiceProvider;
+use Modules\Core\Search\Engines\ElasticsearchEngine;
+use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\UserForcedSuperRole;
+use Typesense\Client as TypesenseClient;
+use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
 uses(LaravelTestCase::class);
 
@@ -19,12 +39,377 @@ it('registerAuths runs without throwing', function (): void {
 });
 
 it('configureDates uses CarbonImmutable', function (): void {
-    $this->provider->register();
-    $ref = new ReflectionClass($this->provider);
-    $method = $ref->getMethod('configureDates');
-    $method->invoke($this->provider);
+    invokePrivate($this->provider, 'configureDates');
 
     expect(Date::getTestNow())->toBeNull();
     $instance = Date::now();
     expect($instance)->toBeInstanceOf(Carbon\CarbonImmutable::class);
 });
+
+it('boot configures password defaults', function (): void {
+    config(['auth.providers.users.model' => UserForcedSuperRole::class]);
+    $this->provider->boot();
+
+    $rule = Password::default();
+
+    expect($rule)->toBeInstanceOf(Password::class);
+});
+
+it('configureModels enables strict attribute checks outside production', function (): void {
+    app()['config']->set('app.env', 'testing');
+
+    invokePrivate($this->provider, 'configureModels');
+
+    expect(Model::preventsSilentlyDiscardingAttributes())->toBeTrue()
+        ->and(Model::preventsAccessingMissingAttributes())->toBeTrue();
+});
+
+it('registerSearchClients binds elasticsearch and typesense clients', function (): void {
+    config([
+        'elastic.client.default' => 'default',
+        'elastic.client.connections.default' => ['hosts' => ['http://localhost:9200']],
+        'scout.typesense.client-settings' => [
+            'api_key' => 'xyz',
+            'nodes' => [['host' => 'localhost', 'port' => '8108', 'protocol' => 'http']],
+            'connection_timeout_seconds' => 2,
+        ],
+    ]);
+
+    invokePrivate($this->provider, 'registerSearchClients');
+
+    expect(app()->make(ElasticsearchClient::class))->toBeInstanceOf(ElasticsearchClient::class)
+        ->and(app()->make(TypesenseClient::class))->toBeInstanceOf(TypesenseClient::class);
+});
+
+it('register wires docs binding and fortify provider', function (): void {
+    config([
+        'elastic.client.default' => 'default',
+        'elastic.client.connections.default' => ['hosts' => ['http://localhost:9200']],
+        'scout.typesense.client-settings' => [
+            'api_key' => 'xyz',
+            'nodes' => [['host' => 'localhost', 'port' => '8108', 'protocol' => 'http']],
+            'connection_timeout_seconds' => 2,
+        ],
+    ]);
+    app()['env'] = 'testing';
+
+    $this->provider->register();
+
+    expect(app()->bound(OpenApiJsonController::class))->toBeTrue()
+        ->and(app()->make(OpenApiJsonController::class))->toBeInstanceOf(DocsController::class)
+        ->and(app()->getProvider(FortifyServiceProvider::class))->not->toBeNull()
+        ->and(app()->make(ElasticsearchClient::class))->toBeInstanceOf(ElasticsearchClient::class)
+        ->and(app()->make(TypesenseClient::class))->toBeInstanceOf(TypesenseClient::class)
+        ->and(app()->getProvider(RouteServiceProvider::class))->not->toBeNull();
+});
+
+it('registerSearchEngines registers custom engines and core aliases', function (): void {
+    $manager = new class()
+    {
+        public array $resolved = [];
+
+        public function extend(string $name, callable $callback): void
+        {
+            $this->resolved[$name] = $callback(app());
+        }
+    };
+
+    app()->instance(EngineManager::class, $manager);
+    app()->instance(ElasticsearchClient::class, new class() {});
+    app()->instance(TypesenseClient::class, new class() {});
+    app()->bind(ElasticsearchEngine::class, static fn () => new class() {});
+    app()->bind(TypesenseEngine::class, static fn () => new class() {});
+    config([
+        'search.engines.elasticsearch' => ['index' => 'test'],
+        'search.engines.typesense' => ['index' => 'test'],
+        'scout.typesense.max_total_results' => 1234,
+    ]);
+
+    invokePrivate($this->provider, 'registerSearchEngines');
+
+    expect(array_keys($manager->resolved))->toEqualCanonicalizing(['elasticsearch', 'typesense'])
+        ->and(app()->bound(Locked::class))->toBeTrue()
+        ->and(app()->bound('locked'))->toBeTrue()
+        ->and(app()->bound(SchemaInspector::class))->toBeTrue()
+        ->and(app()->getAlias(SoftDeletes::class))->toBe(BaseSoftDeletes::class);
+});
+
+it('registerSearchEngines registers ide helper provider in local env', function (): void {
+    app()['env'] = 'local';
+
+    $manager = new class()
+    {
+        public function extend(string $name, callable $callback): void
+        {
+            $callback(app());
+        }
+    };
+
+    app()->instance(EngineManager::class, $manager);
+    app()->instance(ElasticsearchClient::class, new class() {});
+    app()->instance(TypesenseClient::class, new class() {});
+    app()->bind(ElasticsearchEngine::class, static fn () => new class() {});
+    app()->bind(TypesenseEngine::class, static fn () => new class() {});
+    config([
+        'search.engines.elasticsearch' => ['index' => 'test'],
+        'search.engines.typesense' => ['index' => 'test'],
+    ]);
+
+    invokePrivate($this->provider, 'registerSearchEngines');
+
+    expect(app()->getProvider(Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class))->not->toBeNull();
+});
+
+it('registerCommands discovers command folders without errors', function (): void {
+    config(['modules.paths.generator.command.path' => 'Console']);
+
+    invokePrivate($this->provider, 'registerCommands');
+
+    expect(true)->toBeTrue();
+});
+
+it('loadCronJobsFromDatabase returns empty array when cron table is missing', function (): void {
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', ['table_that_does_not_exist']);
+
+    expect($result)->toBeArray()->toBeEmpty();
+});
+
+it('loadCronJobsFromDatabase returns active cron rows when table exists', function (): void {
+    $cron = CronJob::factory()->create([
+        'command' => 'inspire',
+        'schedule' => '* * * * *',
+        'is_active' => true,
+    ]);
+
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', [$cron->getTable()]);
+
+    expect($result)->toBeArray()
+        ->and($result[0]['command'])->toBe('inspire')
+        ->and((string) $result[0]['schedule'])->toBe('* * * * *');
+});
+
+it('loadCronJobsFromDatabase returns empty array on exceptions', function (): void {
+    Schema::drop('cron_jobs');
+
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', ['users']);
+
+    expect($result)->toBeArray()->toBeEmpty();
+});
+
+it('registerCommandSchedules reads cached cron jobs without database calls', function (): void {
+    $cache_key = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+    Cache::put($cache_key, []);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+    runLastBootedCallback();
+
+    expect(true)->toBeTrue();
+});
+
+it('registerCommandSchedules uses tagged cache hit and schedules cached commands', function (): void {
+    $cache_key = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+    $cached_crons = [['command' => 'inspire', 'schedule' => '* * * * *']];
+
+    $tagged_cache = new class($cached_crons, $cache_key)
+    {
+        public function __construct(private array $crons, private string $key) {}
+
+        public function has(string $key): bool
+        {
+            return $key === $this->key;
+        }
+
+        public function get(string $key): array
+        {
+            return $key === $this->key ? $this->crons : [];
+        }
+
+        public function put(string $key, array $value): void {}
+    };
+
+    $cache_store = new class()
+    {
+        public function supportsTags(): bool
+        {
+            return true;
+        }
+
+        public function getCacheTags(): array
+        {
+            return ['core'];
+        }
+    };
+
+    Cache::shouldReceive('store')->atLeast()->once()->andReturn($cache_store);
+    Cache::shouldReceive('tags')->with(['core'])->andReturn($tagged_cache);
+
+    $schedule = app()->make(Illuminate\Console\Scheduling\Schedule::class);
+    $initial_count = count($schedule->events());
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+    runLastBootedCallback();
+
+    expect(count($schedule->events()))->toBeGreaterThan($initial_count);
+});
+
+it('registerCommandSchedules stores loaded crons into tagged cache on miss', function (): void {
+    $cron = CronJob::factory()->create([
+        'command' => 'inspire',
+        'schedule' => '* * * * *',
+        'is_active' => true,
+    ]);
+    $cache_key = $cron->getTable();
+    $put_called = false;
+
+    $tagged_cache = new class($cache_key, $put_called)
+    {
+        public function __construct(private string $key, public bool &$put_called) {}
+
+        public function has(string $key): bool
+        {
+            return false;
+        }
+
+        public function get(string $key): array
+        {
+            return [];
+        }
+
+        public function put(string $key, array $value): void
+        {
+            if ($key === $this->key && $value !== []) {
+                $this->put_called = true;
+            }
+        }
+    };
+
+    $cache_store = new class()
+    {
+        public function supportsTags(): bool
+        {
+            return true;
+        }
+
+        public function getCacheTags(): array
+        {
+            return ['core'];
+        }
+    };
+
+    Cache::shouldReceive('store')->atLeast()->once()->andReturn($cache_store);
+    Cache::shouldReceive('tags')->with(['core'])->andReturn($tagged_cache);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+    runLastBootedCallback();
+
+    expect($put_called)->toBeTrue();
+});
+
+it('registerCommandSchedules stores loaded crons into default cache when tags unsupported', function (): void {
+    $cron = CronJob::factory()->create([
+        'command' => 'inspire',
+        'schedule' => '* * * * *',
+        'is_active' => true,
+    ]);
+    $cache_key = $cron->getTable();
+    $put_called = false;
+
+    $cache_store = new class()
+    {
+        public function supportsTags(): bool
+        {
+            return false;
+        }
+    };
+
+    Cache::shouldReceive('store')->atLeast()->once()->andReturn($cache_store);
+    Cache::shouldReceive('has')->with($cache_key)->atLeast()->once()->andReturnFalse();
+    Cache::shouldReceive('put')->withArgs(function (string $key, array $value) use ($cache_key, &$put_called): bool {
+        $ok = $key === $cache_key && $value !== [];
+
+        if ($ok) {
+            $put_called = true;
+        }
+
+        return $ok;
+    })->atLeast()->once();
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+    runLastBootedCallback();
+
+    expect($put_called)->toBeTrue();
+});
+
+it('registerCommandSchedules reads crons from default cache when tags unsupported and key exists', function (): void {
+    $cache_key = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+    $cached_crons = [['command' => 'inspire', 'schedule' => '* * * * *']];
+
+    $cache_store = new class()
+    {
+        public function supportsTags(): bool
+        {
+            return false;
+        }
+    };
+
+    Cache::shouldReceive('store')->atLeast()->once()->andReturn($cache_store);
+    Cache::shouldReceive('has')->with($cache_key)->atLeast()->once()->andReturnTrue();
+    Cache::shouldReceive('get')->with($cache_key)->atLeast()->once()->andReturn($cached_crons);
+
+    $schedule = app()->make(Illuminate\Console\Scheduling\Schedule::class);
+    $initial_count = count($schedule->events());
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+    runLastBootedCallback();
+
+    expect(count($schedule->events()))->toBeGreaterThan($initial_count);
+});
+
+it('configureUrls forces https in production when enabled', function (): void {
+    URL::shouldReceive('forceScheme')->once()->with('https');
+    config(['core.force_https' => true]);
+    $fake_app = new class()
+    {
+        public function isProduction(): bool
+        {
+            return true;
+        }
+    };
+    $provider_reflection = new ReflectionClass($this->provider);
+    $app_property = $provider_reflection->getProperty('app');
+    $app_property->setAccessible(true);
+    $app_property->setValue($this->provider, $fake_app);
+
+    invokePrivate($this->provider, 'configureUrls');
+
+    expect(true)->toBeTrue();
+});
+
+function invokePrivate(object $instance, string $method, array $args = []): mixed
+{
+    $ref = new ReflectionClass($instance);
+    $m = $ref->getMethod($method);
+
+    return $m->invokeArgs($instance, $args);
+}
+
+function runLastBootedCallback(): void
+{
+    $app_reflection = new ReflectionClass(app());
+    $callbacks = $app_reflection->getProperty('bootedCallbacks');
+    $callbacks->setAccessible(true);
+    $callbacks_list = $callbacks->getValue(app());
+    $callback = end($callbacks_list);
+
+    if (! $callback instanceof Closure) {
+        return;
+    }
+
+    $ref = new ReflectionFunction($callback);
+
+    if ($ref->getNumberOfParameters() > 0) {
+        $callback(app());
+    } else {
+        $callback();
+    }
+}
