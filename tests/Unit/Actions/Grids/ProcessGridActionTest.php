@@ -71,3 +71,62 @@ it('processes grid with resolvers', function (): void {
     expect($response->getStatusCode())->toBe(200);
     expect($response->getData(true))->toBe(['ok' => true]);
 });
+
+it('extractActionValue handles object and default branches', function (): void {
+    $auth = $this->app->make(AuthorizationService::class);
+    $action = new ProcessGridAction($auth);
+    $method = new ReflectionMethod(ProcessGridAction::class, 'extractActionValue');
+    $method->setAccessible(true);
+
+    $from_object = $method->invoke($action, (object) ['action' => (object) ['value' => 'update']]);
+    $from_default = $method->invoke($action, ['something' => 'else']);
+
+    expect($from_object)->toBe('update')
+        ->and($from_default)->toBe('select');
+});
+
+it('uses DynamicEntity resolver branch when no custom resolver is provided', function (): void {
+    $user = User::factory()->create();
+    $user->assignRole(Role::findOrCreate('superadmin', 'web'));
+    Auth::login($user);
+
+    $auth = $this->app->make(AuthorizationService::class);
+    $request = new class($user) extends Request
+    {
+        public function __construct(
+            private User $authUser,
+        ) {
+            parent::__construct();
+        }
+
+        public function user($guard = null)
+        {
+            return $this->authUser;
+        }
+
+        public function parsed(): array
+        {
+            return [
+                'connection' => null,
+                'action' => (object) ['value' => 'select'],
+            ];
+        }
+    };
+
+    $action = new ProcessGridAction(
+        auth: $auth,
+        entityResolver: null,
+        gridFactory: fn () => new class
+        {
+            public function process(): JsonResponse
+            {
+                return response()->json(['resolved' => true]);
+            }
+        },
+    );
+
+    $response = $action($request, 'setting');
+
+    expect($response->getStatusCode())->toBe(200)
+        ->and($response->getData(true))->toBe(['resolved' => true]);
+});

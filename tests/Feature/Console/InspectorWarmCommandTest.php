@@ -3,12 +3,39 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Schema\Builder as SchemaBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\InspectorWarmCommand;
 use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 uses(LaravelTestCase::class);
+
+/**
+ * Stub schema builder to avoid Mockery duplicate-class issues and to drive Schema::connection()->getTables().
+ *
+ * @param  array<int, array<string, mixed>>  $rows
+ */
+function inspector_warm_schema_builder_stub(array $rows): SchemaBuilder
+{
+    return new class(app('db')->connection(), $rows) extends SchemaBuilder
+    {
+        /**
+         * @param  array<int, array<string, mixed>>  $table_rows
+         */
+        public function __construct(Connection $connection, private array $table_rows)
+        {
+            parent::__construct($connection);
+        }
+
+        public function getTables($schema = null): array
+        {
+            return $this->table_rows;
+        }
+    };
+}
 
 function registerInspectorWarmCommand(): void
 {
@@ -27,11 +54,13 @@ function registerInspectorWarmCommand(): void
 
 it('returns success and prints message when no tables to warm', function (): void {
     registerInspectorWarmCommand();
-    Schema::shouldReceive('connection')
-        ->andReturnSelf();
 
-    Schema::shouldReceive('getTables')
-        ->andReturn([]);
+    $schema_builder = inspector_warm_schema_builder_stub([]);
+
+    $connection = Mockery::mock(Connection::class);
+    $connection->shouldReceive('getSchemaBuilder')->andReturn($schema_builder);
+
+    DB::shouldReceive('connection')->withAnyArgs()->andReturn($connection);
     Schema::shouldReceive('dropIfExists')
         ->zeroOrMoreTimes();
     Schema::shouldReceive('table')
@@ -39,21 +68,23 @@ it('returns success and prints message when no tables to warm', function (): voi
     Schema::shouldReceive('drop')
         ->zeroOrMoreTimes();
 
-    $tester = $this->artisan('inspector:warm');
-
-    $tester->assertExitCode(BaseCommand::SUCCESS);
+    $this->artisan('inspector:warm')
+        ->expectsOutputToContain('No tables to warm.')
+        ->assertExitCode(BaseCommand::SUCCESS);
 });
 
 it('warms inspector cache for discovered tables', function (): void {
     registerInspectorWarmCommand();
-    Schema::shouldReceive('connection')
-        ->andReturnSelf();
 
-    Schema::shouldReceive('getTables')
-        ->andReturn([
-            ['name' => 'users'],
-            ['name' => 'posts'],
-        ]);
+    $schema_builder = inspector_warm_schema_builder_stub([
+        ['name' => 'users'],
+        ['name' => 'posts'],
+    ]);
+
+    $connection = Mockery::mock(Connection::class);
+    $connection->shouldReceive('getSchemaBuilder')->andReturn($schema_builder);
+
+    DB::shouldReceive('connection')->withAnyArgs()->andReturn($connection);
     Schema::shouldReceive('dropIfExists')
         ->zeroOrMoreTimes();
     Schema::shouldReceive('table')
@@ -68,13 +99,15 @@ it('warms inspector cache for discovered tables', function (): void {
 
 it('returns success with no-tables message when getTables returns entries without name key', function (): void {
     registerInspectorWarmCommand();
-    Schema::shouldReceive('connection')
-        ->andReturnSelf();
 
-    Schema::shouldReceive('getTables')
-        ->andReturn([
-            ['schema' => 'public'],
-        ]);
+    $schema_builder = inspector_warm_schema_builder_stub([
+        ['schema' => 'public'],
+    ]);
+
+    $connection = Mockery::mock(Connection::class);
+    $connection->shouldReceive('getSchemaBuilder')->andReturn($schema_builder);
+
+    DB::shouldReceive('connection')->withAnyArgs()->andReturn($connection);
     Schema::shouldReceive('dropIfExists')
         ->zeroOrMoreTimes();
     Schema::shouldReceive('table')

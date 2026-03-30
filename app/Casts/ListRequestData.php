@@ -46,7 +46,7 @@ class ListRequestData extends SelectRequestData
             $this->limit = (int) ($validated['limit'] ?? $this->pagination);
         }
 
-        $this->count = isset($validated['count']) ? (int) $validated['count'] : false;
+        $this->count = isset($validated['count']) ? (bool) $validated['count'] : false;
         $this->sort = $this->conformSorts($validated['sort'] ?? []);
         $this->relations = $this->conformRelations($validated['relations'] ?? []);
 

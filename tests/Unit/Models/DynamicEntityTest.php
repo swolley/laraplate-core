@@ -6,7 +6,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Inspector\Entities\Column;
+use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Services\DynamicEntityService;
 use Modules\Core\Tests\LaravelTestCase;
@@ -71,6 +73,32 @@ it('getFillable returns early when fillable already populated', function (): voi
     $fillable->setValue($entity, ['existing']);
 
     expect($entity->getFillable())->toBe(['existing']);
+});
+
+it('getFillable derives names from inspected columns excluding autoincrement', function (): void {
+    $entity = new DynamicEntity();
+    $entity->setTable('derived_fillable_table');
+    $entity->setConnection(config('database.default'));
+
+    $columns = collect([
+        new Column('id', collect(['autoincrement']), null, 'integer'),
+        new Column('title', collect([]), null, 'string'),
+        new Column('description', collect(['nullable']), null, 'text'),
+    ]);
+    $table = new Modules\Core\Inspector\Entities\Table('derived_fillable_table', $columns, collect([]), collect([]), 'main', config('database.default'));
+
+    $inspector = SchemaInspector::getInstance();
+    $tables = new ReflectionProperty($inspector, 'tables');
+    $tables->setAccessible(true);
+    $cache = $tables->getValue($inspector);
+    $cache[Modules\Core\Inspector\Inspect::keyName('derived_fillable_table', config('database.default'))] = $table;
+    $tables->setValue($inspector, $cache);
+
+    $fillable = $entity->getFillable();
+
+    expect($fillable)->toContain('title')
+        ->and($fillable)->toContain('description')
+        ->and($fillable)->not->toContain('id');
 });
 
 it('getRules merges inspected rules into default operation', function (): void {
@@ -210,4 +238,109 @@ it('setColumnInfo adds unique rule for single column unique indexes', function (
     $has_unique = collect($slug_rules)->contains(fn ($r): bool => is_object($r) && $r instanceof Illuminate\Validation\Rules\Unique);
 
     expect($has_unique)->toBeTrue();
+});
+
+it('setTableConnectionInfo sets connection only when value is meaningful', function (): void {
+    $entity = new DynamicEntity();
+    $method = new ReflectionMethod(DynamicEntity::class, 'setTableConnectionInfo');
+    $method->setAccessible(true);
+
+    $method->invoke($entity, 'alpha_table', 'sqlite');
+    expect($entity->getConnectionName())->toBe('sqlite');
+
+    $method->invoke($entity, 'beta_table', '');
+    expect($entity->getConnectionName())->toBe('sqlite');
+});
+
+it('setColumnInfo adds max length and soft-delete unique callback behavior', function (): void {
+    $entity = new DynamicEntity();
+    $entity->setTable('dyn_soft_delete_rules');
+
+    $force_deleting = new ReflectionProperty($entity, 'forceDeleting');
+    $force_deleting->setAccessible(true);
+    $force_deleting->setValue($entity, true);
+
+    $method = new ReflectionMethod(DynamicEntity::class, 'setColumnInfo');
+    $method->setAccessible(true);
+
+    $deleted_column = new Column('deleted_at', collect(['nullable']), null, 'datetime');
+    $indexes = collect([new Index('deleted_at_unique', collect(['deleted_at']), collect(['unique']))]);
+    $method->invoke($entity, $deleted_column, collect([]), $indexes);
+
+    $rules = $entity->getRules();
+    $deleted_rules = $rules[DynamicEntity::DEFAULT_RULE]['deleted_at'] ?? [];
+
+    expect($deleted_rules)->toContain('date');
+
+    $unique_rule = collect($deleted_rules)->first(fn (mixed $r): bool => $r instanceof Illuminate\Validation\Rules\Unique);
+    expect($unique_rule)->toBeInstanceOf(Illuminate\Validation\Rules\Unique::class);
+
+    $query = Mockery::mock(Illuminate\Database\Query\Builder::class);
+    $query->shouldReceive('whereNull')->once()->with('deleted_at')->andReturnSelf();
+
+    foreach ($unique_rule->queryCallbacks() as $callback) {
+        $callback($query);
+    }
+
+    expect($force_deleting->getValue($entity))->toBeFalse();
+});
+
+it('setReverseRelationsInfo returns immediately when relations are missing', function (): void {
+    $entity = new DynamicEntity();
+    $method = new ReflectionMethod(DynamicEntity::class, 'setReverseRelationsInfo');
+    $method->setAccessible(true);
+
+    $request = Request::create('/test', 'GET');
+    $method->invoke($entity, $request);
+
+    expect($entity->getDynamicRelations())->toBe([]);
+});
+
+it('setReverseRelationInfo adds belongsToMany relation for matching reverse entry', function (): void {
+    $entity = new DynamicEntity();
+    $method = new ReflectionMethod(DynamicEntity::class, 'setReverseRelationInfo');
+    $method->setAccessible(true);
+
+    $target = 'dyn_target_' . bin2hex(random_bytes(4));
+    $source = 'dyn_source_' . bin2hex(random_bytes(4));
+
+    try {
+        config()->set('crud.dynamic_entities', true);
+        $entity->setTable($target);
+        $entity->setConnection(config('database.default'));
+
+        $relation_data = new ForeignKey(
+            'fk_demo',
+            collect(['target_id']),
+            'main',
+            $target,
+            collect(['id']),
+            'main',
+            config('database.default'),
+        );
+        $source_entity = new DynamicEntity();
+        $source_entity->setTable($source);
+        $source_entity->setConnection(config('database.default'));
+        $dynamic_relations = new ReflectionProperty(DynamicEntity::class, 'dynamic_relations');
+        $dynamic_relations->setAccessible(true);
+        $dynamic_relations->setValue($source_entity, [$target => $relation_data]);
+
+        $service = DynamicEntityService::getInstance();
+        $resolved_cache = new ReflectionProperty($service, 'resolved_cache');
+        $resolved_cache->setAccessible(true);
+        $cache = $resolved_cache->getValue($service);
+        $cache_key = sprintf('dynamic_entities.%s.%s', config('database.default'), $source);
+        $cache[$cache_key] = $source_entity;
+        $resolved_cache->setValue($service, $cache);
+
+        $method->invoke($entity, $source);
+        $relations = $entity->getDynamicRelations();
+
+        expect($relations)->toHaveKey($source)
+            ->and($relations[$source]['type'])->toBe('belongsToMany')
+            ->and($relations[$source]['foreignKey'])->toBeInstanceOf(ForeignKey::class);
+    } finally {
+        DynamicEntityService::getInstance()->clearCache($source);
+        DynamicEntityService::getInstance()->clearCache($target);
+    }
 });

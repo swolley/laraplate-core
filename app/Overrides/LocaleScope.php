@@ -22,23 +22,11 @@ final class LocaleScope implements Scope
         $current_locale = LocaleContext::get();
         $fallback_enabled = LocaleContext::isFallbackEnabled();
 
-        // Se la lingua corrente è quella di default, filtra solo per quella
-        if ($current_locale === $default_locale) {
-            $builder->whereHas('translations', function (Builder $query) use ($default_locale): void {
-                $query->where('locale', $default_locale);
-            });
-        } elseif ($fallback_enabled) {
-            // Se fallback è abilitato: mostra contenuti con traduzione corrente O di default
-            $builder->whereHas('translations', function (Builder $query) use ($current_locale, $default_locale): void {
-                $query->where('locale', $current_locale)
-                    ->orWhere('locale', $default_locale);
-            });
-        } else {
-            // Se fallback è disabilitato: mostra SOLO contenuti con traduzione nella lingua corrente
-            $builder->whereHas('translations', function (Builder $query) use ($current_locale): void {
-                $query->where('locale', $current_locale);
-            });
-        }
+        $use_fallback = $fallback_enabled && $current_locale !== $default_locale;
+
+        $builder->whereHas('translations', function (Builder $query) use ($current_locale, $default_locale, $use_fallback): void {
+            $this->applyLocaleConstraint($query, $current_locale, $default_locale, $use_fallback);
+        });
 
         // Eager load traduzione corrente (con fallback se abilitato)
         $this->eagerLoadTranslation($builder, $current_locale, $default_locale, $fallback_enabled);
@@ -117,5 +105,21 @@ final class LocaleScope implements Scope
                 $query->where('locale', $current_locale);
             }
         }]);
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyLocaleConstraint(Builder $query, string $current_locale, string $default_locale, bool $use_fallback): void
+    {
+        if (! $use_fallback) {
+            $target_locale = $current_locale === $default_locale ? $default_locale : $current_locale;
+            $query->where('locale', $target_locale);
+
+            return;
+        }
+
+        $query->where('locale', $current_locale)
+            ->orWhere('locale', $default_locale);
     }
 }

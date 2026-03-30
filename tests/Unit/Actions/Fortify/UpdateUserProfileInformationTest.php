@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
+use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
 
@@ -89,4 +90,123 @@ it('throws validation exception when name exceeds max length', function (): void
         'name' => str_repeat('a', 256),
         'email' => $user->email,
     ]))->toThrow(ValidationException::class);
+});
+
+it('removes password_confirmation and current_password before force fill', function (): void {
+    $user = Mockery::mock(User::factory()->create([
+        'name' => 'Old Name',
+        'email' => 'old-pass@example.com',
+    ]))->makePartial();
+    $user->shouldReceive('save')->once()->andReturnTrue();
+    $user->shouldReceive('forceFill')
+        ->once()
+        ->with(Mockery::on(function (array $payload): bool {
+            return ! array_key_exists('password_confirmation', $payload)
+                && ! array_key_exists('current_password', $payload);
+        }))
+        ->andReturnSelf();
+
+    $action = new UpdateUserProfileInformation();
+    $action->update($user, [
+        'id' => $user->id,
+        'name' => 'New Name',
+        'email' => 'old-pass@example.com',
+    ]);
+});
+
+it('uses validation rules from HasValidations trait when available', function (): void {
+    $user = new class extends User
+    {
+        use HasValidations;
+
+        public function getOperationRules(?string $operation = null): array
+        {
+            expect($operation)->toBe('update');
+
+            return [
+                'name' => ['required', 'string'],
+                'email' => ['required', 'email'],
+            ];
+        }
+
+        public function save(array $options = []): bool
+        {
+            return true;
+        }
+    };
+    $user->id = 'fake-id';
+    $user->name = 'Initial Name';
+    $user->email = 'initial@example.com';
+
+    $action = new UpdateUserProfileInformation();
+    $action->update($user, [
+        'name' => 'Updated Name',
+        'email' => 'initial@example.com',
+    ]);
+
+    expect($user->name)->toBe('Updated Name');
+});
+
+it('uses fallback rules when user does not use HasValidations trait', function (): void {
+    $user = new class extends Illuminate\Database\Eloquent\Model implements Illuminate\Contracts\Auth\Authenticatable, Illuminate\Contracts\Auth\MustVerifyEmail
+    {
+        use Illuminate\Auth\Authenticatable;
+
+        public bool $saved = false;
+
+        public bool $verification_sent = false;
+
+        protected $table = 'users';
+
+        public function forceFill(array $attributes): static
+        {
+            foreach ($attributes as $key => $value) {
+                $this->setAttribute($key, $value);
+            }
+
+            return $this;
+        }
+
+        public function save(array $options = []): bool
+        {
+            $this->saved = true;
+
+            return true;
+        }
+
+        public function sendEmailVerificationNotification(): void
+        {
+            $this->verification_sent = true;
+        }
+
+        public function hasVerifiedEmail(): bool
+        {
+            return $this->email_verified_at !== null;
+        }
+
+        public function markEmailAsVerified(): bool
+        {
+            $this->email_verified_at = now();
+
+            return true;
+        }
+
+        public function getEmailForVerification(): string
+        {
+            return (string) $this->email;
+        }
+    };
+    $user->id = 999999;
+    $user->name = 'Fallback User';
+    $user->email = 'fallback.old@example.test';
+
+    $action = new UpdateUserProfileInformation();
+    $action->update($user, [
+        'name' => 'Fallback Updated',
+        'email' => 'fallback.new@example.test',
+    ]);
+
+    expect($user->saved)->toBeTrue()
+        ->and($user->verification_sent)->toBeTrue()
+        ->and($user->email_verified_at)->toBeNull();
 });

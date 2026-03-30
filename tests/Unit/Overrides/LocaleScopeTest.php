@@ -252,3 +252,149 @@ it('apply invokes whereHas closure for current locale only when fallback is disa
     expect($relation_for_where_has->toSql())->toContain('locale')
         ->and($relation_for_eager->toSql())->toContain('locale');
 });
+
+it('apply invokes whereHas closure for default locale branch', function (): void {
+    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    LocaleContext::set('en');
+
+    $nested = Mockery::mock(Illuminate\Database\Query\Builder::class);
+    $nested->shouldReceive('where')->once()->with('locale', 'en')->andReturnSelf();
+    $nested->shouldReceive('orWhere')->once()->with('locale', 'en')->andReturnSelf();
+
+    $relation_query = Mockery::mock(Illuminate\Database\Eloquent\Builder::class);
+    $relation_query->shouldReceive('where')->once()->with('locale', 'en')->andReturnSelf();
+    $relation_query->shouldReceive('where')->once()->with(Mockery::on(function ($arg) use ($nested): bool {
+        if (! $arg instanceof Closure) {
+            return false;
+        }
+        $arg($nested);
+
+        return true;
+    }))->andReturnSelf();
+    $relation_query->shouldReceive('orderByRaw')->once()->andReturnSelf();
+
+    $builder = Mockery::mock(Illuminate\Database\Eloquent\Builder::class);
+    $builder->shouldReceive('whereHas')->once()->with('translations', Mockery::on(function (callable $callback) use ($relation_query): bool {
+        $callback($relation_query);
+
+        return true;
+    }))->andReturnSelf();
+    $builder->shouldReceive('with')->once()->with(Mockery::on(function (array $with) use ($relation_query): bool {
+        $closure = $with['translation'] ?? null;
+
+        if (! $closure instanceof Closure) {
+            return false;
+        }
+        $closure($relation_query);
+
+        return true;
+    }))->andReturnSelf();
+
+    $this->scope->apply($builder, new FakeTranslatableModel());
+
+    expect(true)->toBeTrue();
+});
+
+it('apply returns only default locale records when current locale equals default', function (): void {
+    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    LocaleContext::set('en');
+
+    $with_en = FakeTranslatableModel::query()->create([]);
+    $with_it_only = FakeTranslatableModel::query()->create([]);
+
+    $with_en->setTranslation('en', ['title' => 'Hello'])->save();
+    $with_it_only->setTranslation('it', ['title' => 'Ciao'])->save();
+
+    $ids = FakeTranslatableModel::query()->pluck('id')->all();
+
+    expect($ids)->toContain($with_en->id)
+        ->and($ids)->not->toContain($with_it_only->id);
+});
+
+it('apply fallback returns rows with current or default locale', function (): void {
+    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    LocaleContext::set('it');
+
+    $with_en = FakeTranslatableModel::query()->create([]);
+    $with_it = FakeTranslatableModel::query()->create([]);
+    $with_de = FakeTranslatableModel::query()->create([]);
+
+    $with_en->setTranslation('en', ['title' => 'Hello'])->save();
+    $with_it->setTranslation('it', ['title' => 'Ciao'])->save();
+    $with_de->setTranslation('de', ['title' => 'Hallo'])->save();
+
+    $ids = FakeTranslatableModel::query()->pluck('id')->all();
+
+    expect($ids)->toContain($with_it->id)
+        ->and($ids)->not->toContain($with_de->id);
+});
+
+it('apply without fallback returns only current locale rows', function (): void {
+    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    LocaleContext::set('it');
+
+    $with_en = FakeTranslatableModel::query()->create([]);
+    $with_it = FakeTranslatableModel::query()->create([]);
+
+    $with_en->setTranslation('en', ['title' => 'Hello'])->save();
+    $with_it->setTranslation('it', ['title' => 'Ciao'])->save();
+
+    $ids = FakeTranslatableModel::query()->pluck('id')->all();
+
+    expect($ids)->toContain($with_it->id)
+        ->and($ids)->not->toContain($with_en->id);
+});
+
+it('forLocale fallback eager-load orders current locale first', function (): void {
+    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+
+    $model = new FakeTranslatableModel();
+    $builder = $model->newQuery();
+    $this->scope->extend($builder);
+
+    $result = $builder->forLocale('it', true);
+    $eager_loads = $result->getEagerLoads();
+    $translation_loader = $eager_loads['translation'];
+
+    $nested = Mockery::mock(Illuminate\Database\Query\Builder::class);
+    $nested->shouldReceive('where')->once()->with('locale', 'it')->andReturnSelf();
+    $nested->shouldReceive('orWhere')->once()->with('locale', 'en')->andReturnSelf();
+
+    $query = Mockery::mock(Illuminate\Database\Query\Builder::class);
+    $query->shouldReceive('where')->once()->with(Mockery::on(function ($arg) use ($nested): bool {
+        if (! $arg instanceof Closure) {
+            return false;
+        }
+        $arg($nested);
+
+        return true;
+    }))->andReturnSelf();
+    $query->shouldReceive('orderByRaw')->once()->with('CASE WHEN locale = ? THEN 0 ELSE 1 END', ['it'])->andReturnSelf();
+
+    $translation_loader($query);
+
+    expect(true)->toBeTrue();
+});
+
+it('applyLocaleConstraint uses fallback branch with where and orWhere', function (): void {
+    $query = Mockery::mock(Illuminate\Database\Eloquent\Builder::class);
+    $query->shouldReceive('where')->once()->with('locale', 'it')->andReturnSelf();
+    $query->shouldReceive('orWhere')->once()->with('locale', 'en')->andReturnSelf();
+
+    $method = new ReflectionMethod(LocaleScope::class, 'applyLocaleConstraint');
+    $method->setAccessible(true);
+    $method->invoke($this->scope, $query, 'it', 'en', true);
+
+    expect(true)->toBeTrue();
+});
+
+it('applyLocaleConstraint uses single where when fallback is disabled', function (): void {
+    $query = Mockery::mock(Illuminate\Database\Eloquent\Builder::class);
+    $query->shouldReceive('where')->once()->with('locale', 'it')->andReturnSelf();
+
+    $method = new ReflectionMethod(LocaleScope::class, 'applyLocaleConstraint');
+    $method->setAccessible(true);
+    $method->invoke($this->scope, $query, 'it', 'en', false);
+
+    expect(true)->toBeTrue();
+});

@@ -62,6 +62,8 @@ trait HasUniqueFactoryValues
                     break;
                 }
                 throw_if($attempts >= $maxAttempts, Exception::class, 'Failed to generate a unique value after ' . $maxAttempts . ' attempts');
+            } else {
+                break;
             }
         }
 

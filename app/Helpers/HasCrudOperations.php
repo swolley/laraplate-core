@@ -111,7 +111,7 @@ trait HasCrudOperations
             'crud:%s:%s:%s',
             $model->getTable(),
             md5(json_encode($params)),
-            auth()->id ?? 'guest',
+            auth()->id() !== null ? (string) auth()->id() : 'guest',
         );
     }
 

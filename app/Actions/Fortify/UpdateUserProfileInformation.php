@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
 use Modules\Core\Helpers\HasValidations;
 
@@ -38,8 +39,8 @@ final class UpdateUserProfileInformation implements UpdatesUserProfileInformatio
         }
 
         $rules = array_merge($rules, [
-            'password' => ['sometimes|password|confirmed'],
-            'current_password' => ['current_password:web|required_with:password|exclude_without:password'],
+            'password' => ['sometimes', 'confirmed', Password::default()],
+            'current_password' => ['current_password:web', 'required_with:password', 'exclude_without:password'],
         ]);
 
         $validated = Validator::make($input, $rules)->validate();

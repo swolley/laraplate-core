@@ -134,10 +134,7 @@ final class DynamicEntity extends Model
         // Use service to get inspected table with in-memory caching
         $inspected = DynamicEntityService::getInstance()->getInspectedTable($this->getTable(), $this->getConnectionName());
 
-        if (! $inspected instanceof Table) {
-            return;
-        }
-
+        /** @var Table $inspected */
         $primary_key = $inspected->primaryKey;
 
         if ($primary_key instanceof Index) {
@@ -299,10 +296,6 @@ final class DynamicEntity extends Model
 
         if (! $column->isNullable() && ! $column->isAutoincrement()) {
             $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'required';
-        }
-
-        if ($column->getLength() && $column->type->value === 'string') {
-            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'max:' . $column->getLength();
         }
 
         if (array_key_exists($column->name, $remapped_fks)) {

@@ -867,6 +867,19 @@ describe('createTranslatableMigration', function (): void {
         rmdir($this->tmp_dir);
     });
 
+    it('throws TypeError when migration arguments do not match new or legacy signature', function (): void {
+        expect(fn () => $this->method->invoke(
+            $this->command,
+            'articles',
+            'article_translations',
+            'FakeArticleTranslation',
+            'article_id',
+            'not-array',
+            'not-array-either',
+            null,
+        ))->toThrow(TypeError::class, 'Invalid arguments for createTranslatableMigration');
+    });
+
     it('creates a migration file with correct name pattern', function (): void {
         $this->method->invoke(
             $this->command,
@@ -1163,6 +1176,8 @@ describe('handle', function (): void {
     });
 
     afterEach(function (): void {
+        Prompt::interactive(true);
+
         // Reset Prompt fallback state
         $fallbackProp = new ReflectionProperty(Prompt::class, 'shouldFallback');
         $fallbackProp->setValue(null, false);
