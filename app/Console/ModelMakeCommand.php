@@ -174,7 +174,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
             $info = $this->type;
 
-            if (class_uses_trait($name, CreatesMatchingTest::class) && $this->handleTestCreation($path)) {
+            if (class_exists($name) && class_uses_trait($name, CreatesMatchingTest::class) && $this->handleTestCreation($path)) {
                 $info .= ' and test';
             }
 
@@ -414,6 +414,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
      */
     private function getClassFields(string $className): array
     {
+        if (! class_exists($className)) {
+            return [];
+        }
+
         $ref = new ReflectionClass($className);
         $temp_instance = $ref->newInstance();
         $already_existent_fields = [];
