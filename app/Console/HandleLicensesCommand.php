@@ -50,7 +50,7 @@ final class HandleLicensesCommand extends Command
                             $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
-                        ]),
+                        ])->values()->toArray(),
                     );
                 }
 
@@ -143,7 +143,7 @@ final class HandleLicensesCommand extends Command
             $this->output->info($message);
             Log::info($message);
         } elseif ($licensesCount < $number) {
-            $difference = $licensesCount - $number;
+            $difference = $number - $licensesCount;
 
             if (confirm(sprintf('%d licenses found. Do you confirm %d licenses creation?', $licensesCount, $difference))) {
                 License::factory()->count($difference)->create();

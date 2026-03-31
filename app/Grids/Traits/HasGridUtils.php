@@ -95,15 +95,11 @@ trait HasGridUtils
         $relationships = array_filter($model::getRelationships(), function ($r): bool {
             $model = $r->getModel();
 
-            if (static::class instanceof $model) {
-                $r->setModel(static::class);
-            }
-
             if (static::class === $r->getModel()) {
                 return true;
             }
 
-            return static::class instanceof $model;
+            return is_a(static::class, $model, true);
         });
 
         if ($relationships === []) {
@@ -118,7 +114,7 @@ trait HasGridUtils
     public static function getRelationshipByLocalForeignKey(string $foreignKey): ?RelationInfo
     {
         foreach (static::getRelationships() as $relation) {
-            if (str_starts_with($relation->getType(), 'belong')) {
+            if (str_starts_with(mb_strtolower($relation->getType()), 'belong')) {
                 return $relation;
             }
         }

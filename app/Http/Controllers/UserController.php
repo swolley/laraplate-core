@@ -47,7 +47,7 @@ final class UserController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [auth])
+     * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [web, auth])
      */
     public function userInfo(Request $request): \Illuminate\Http\JsonResponse
     {
@@ -69,7 +69,7 @@ final class UserController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [auth, can:impersonate])
+     * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [web, auth, can:impersonate])
      */
     public function impersonate(ImpersonationRequest $request): \Illuminate\Http\JsonResponse
     {
@@ -86,7 +86,7 @@ final class UserController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [auth, can:impersonate])
+     * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [web, auth, can:impersonate])
      */
     public function leaveImpersonate(Request $request): \Illuminate\Http\JsonResponse
     {
@@ -110,7 +110,7 @@ final class UserController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [auth])
+     * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [web, auth])
      */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {

@@ -8,6 +8,7 @@ use App\Models\User;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Models\License;
@@ -42,10 +43,7 @@ final class SocialiteProvider implements IAuthenticationProvider
                 ];
             }
 
-            /** @var User $user */
-            $user = User::query()->updateOrCreate([
-                'social_id' => $socialUser->getId(),
-            ], [
+            $defaults = [
                 'name' => $socialUser->getName(),
                 'username' => $socialUser->getNickname(),
                 'email' => $socialUser->getEmail(),
@@ -53,7 +51,16 @@ final class SocialiteProvider implements IAuthenticationProvider
                 'social_token' => $socialUser->token,
                 'social_refresh_token' => $socialUser->refreshToken,
                 'social_token_secret' => $socialUser->tokenSecret,
-            ]);
+            ];
+
+            if (! User::query()->where('social_id', $socialUser->getId())->exists()) {
+                $defaults['password'] = Str::random(40);
+            }
+
+            /** @var User $user */
+            $user = User::query()->updateOrCreate([
+                'social_id' => $socialUser->getId(),
+            ], $defaults);
 
             // Verifica licenza
             $error = $this->checkLicense($user);

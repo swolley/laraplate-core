@@ -23,10 +23,12 @@ beforeEach(function (): void {
         class_alias(User::class, App\Models\User::class);
     }
 
-    $this->admin = User::factory()->create([
+    /** @var App\Models\User $admin */
+    $admin = App\Models\User::query()->create(User::factory()->raw([
         'email' => 'admin@example.com',
         'password' => 'Aa1!FilamentAdminPass',
-    ]);
+    ]));
+    $this->admin = $admin;
 
     $adminRole = Role::factory()->create(['name' => 'admin']);
     $this->admin->roles()->attach($adminRole);

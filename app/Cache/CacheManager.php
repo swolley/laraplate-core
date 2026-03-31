@@ -19,7 +19,7 @@ final class CacheManager extends BaseCacheManager
     /**
      * Get a cache store instance by name. Returns the Core Repository for the default driver so that getCacheTags() and tag support are available.
      */
-    public function store(?string $name = null): RepositoryContract
+    public function store($name = null): RepositoryContract
     {
         $name ??= $this->getDefaultDriver();
 
