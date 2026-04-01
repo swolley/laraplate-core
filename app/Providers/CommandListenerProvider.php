@@ -47,7 +47,7 @@ final class CommandListenerProvider extends ServiceProvider
     public function boot(): void
     {
         // Clear tag cache and in-memory SchemaInspector cache after migrations
-        Event::listen(MigrationsEnded::class, function (): void {
+        Event::listen(MigrationsEnded::class, static function (): void {
             info('Cleaning Inspected entities and helpers cache');
             Cache::tags(Cache::getCacheTags('inspector'))->flush();
             SchemaInspector::getInstance()->clearAll();

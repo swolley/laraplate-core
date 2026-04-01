@@ -42,14 +42,14 @@ final class EventServiceProvider extends ServiceProvider
         Event::listen([
             'eloquent.saved: ' . CronJob::class,
             'eloquent.deleted: ' . CronJob::class,
-        ], function (CronJob $cronJob): void {
+        ], static function (CronJob $cronJob): void {
             Cache::forget($cronJob->getTable());
         });
 
         Event::listen([
             'eloquent.saved: ' . Setting::class,
             'eloquent.deleted: ' . Setting::class,
-        ], function (Setting $setting): void {
+        ], static function (Setting $setting): void {
             Cache::tags(Cache::getCacheTags($setting->getTable()))->flush();
         });
     }

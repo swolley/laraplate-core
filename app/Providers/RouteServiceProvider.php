@@ -35,7 +35,7 @@ final class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(30); // 30 job al minuto
         });
 
-        RateLimiter::for('embeddings', function () {
+        RateLimiter::for('embeddings', static function () {
             return Limit::perMinute(10); // 10 embedding jobs per minute (0.16 per second)
         });
 

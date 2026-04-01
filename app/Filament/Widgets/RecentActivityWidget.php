@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\Widgets;
 use App\Models\User;
 use Exception;
 use Filament\Widgets\Widget;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Modules\Cms\Models\Content;
 use Override;
@@ -69,12 +70,12 @@ final class RecentActivityWidget extends Widget
         $data['recent_users'] = User::query()
             ->latest('last_login_at')
             ->whereNotNull('last_login_at')
-            ->whereDoesntHave('roles', function (\Illuminate\Database\Eloquent\Builder $query): void {
+            ->whereDoesntHave('roles', static function (Builder $query): void {
                 $query->where('name', config('permission.roles.superadmin'));
             })
             ->limit($this->limit)
             ->get(['id', 'name', 'email', 'last_login_at'])
-            ->map(fn (object $user): array => [
+            ->map(static fn (object $user): array => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,

@@ -33,12 +33,12 @@ final class SearchServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Register Elasticsearch client
-        // $this->app->singleton(ElasticsearchClient::class, function ($app) {
+        // $this->app->singleton(ElasticsearchClient::class, static function ($app) {
         //     return ElasticsearchService::getInstance()->getClient();
         // });
 
         // // Register Typesense client
-        // $this->app->singleton('typesense', function (array $app): TypesenseClient {
+        // $this->app->singleton('typesense', static function (array $app): TypesenseClient {
         //     $config = $app['config']['scout.typesense.client-settings'];
 
         //     return new TypesenseClient($config);

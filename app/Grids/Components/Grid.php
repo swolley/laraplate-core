@@ -283,7 +283,7 @@ final class Grid extends Entity
                     $this->addNecessaryFields($necessary_fields);
                 }
 
-                $necessary_fields = array_filter($necessary_fields, fn (\Modules\Core\Grids\Components\Field|string $name): bool => ! $this->hasField($name), ARRAY_FILTER_USE_KEY);
+                $necessary_fields = array_filter($necessary_fields, fn (Field|string $name): bool => ! $this->hasField($name), ARRAY_FILTER_USE_KEY);
                 $this->initFieldsByConfigs($necessary_fields);
                 $necessary_fields = array_map(fn (callable $generator) => $generator($this->getModel()), $necessary_fields);
                 $this->addFields($necessary_fields);

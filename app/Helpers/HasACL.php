@@ -25,6 +25,8 @@ trait HasACL
 
     protected static function bootHasACL(): void
     {
-        static::addGlobalScope('acl', function (Builder $builder): void {});
+        static::addGlobalScope('acl', static function (Builder $builder): void {
+            // TODO: Implement ACL scope
+        });
     }
 }

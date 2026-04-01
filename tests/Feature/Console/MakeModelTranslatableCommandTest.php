@@ -616,6 +616,7 @@ describe('createTranslationModel', function (): void {
     it('creates translation model file', function (): void {
         $result = $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -633,6 +634,7 @@ describe('createTranslationModel', function (): void {
     it('generated model contains correct namespace', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -651,6 +653,7 @@ describe('createTranslationModel', function (): void {
     it('generated model contains fillable attributes', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -674,6 +677,7 @@ describe('createTranslationModel', function (): void {
     it('generated model casts json columns to array', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -692,6 +696,7 @@ describe('createTranslationModel', function (): void {
     it('generated model implements ITranslated', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -712,6 +717,7 @@ describe('createTranslationModel', function (): void {
     it('generated model has correct BelongsTo relation', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -733,6 +739,7 @@ describe('createTranslationModel', function (): void {
     it('generated model carries over hidden attributes from source model', function (): void {
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -758,6 +765,7 @@ describe('createTranslationModel', function (): void {
 
         $result = $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -783,6 +791,7 @@ describe('createTranslationModel', function (): void {
 
         $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             FakeArticle::class,
             'FakeArticle',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\FakeArticleTranslation',
@@ -801,6 +810,7 @@ describe('createTranslationModel', function (): void {
     it('handles model without explicit hidden property', function (): void {
         $result = $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             Model::class,
             'Model',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\ModelTranslation',
@@ -824,6 +834,7 @@ describe('createTranslationModel', function (): void {
     it('defaults to empty hidden when class has no hidden property at all', function (): void {
         $result = $this->method->invoke(
             $this->command,
+            'fake_articles_translations',
             BareClass::class,
             'BareClass',
             'Modules\\Core\\Tests\\Fixtures\\Translations\\BareClassTranslation',
@@ -871,7 +882,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -879,7 +890,7 @@ describe('createTranslatableMigration', function (): void {
             $this->tmp_dir,
         );
 
-        $files = glob($this->tmp_dir . '*_create_article_translations_table.php');
+        $files = glob($this->tmp_dir . '*_create_articles_translations_table.php');
 
         expect($files)->toHaveCount(1);
     });
@@ -888,7 +899,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -900,15 +911,15 @@ describe('createTranslatableMigration', function (): void {
         $content = file_get_contents($file);
 
         expect($content)
-            ->toContain("Schema::create('article_translations'")
-            ->toContain("Schema::dropIfExists('article_translations')");
+            ->toContain("Schema::create('articles_translations'")
+            ->toContain("Schema::dropIfExists('articles_translations')");
     });
 
     it('migration contains foreign key definition', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -929,7 +940,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -950,7 +961,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -971,7 +982,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -992,7 +1003,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -1014,7 +1025,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -1032,7 +1043,7 @@ describe('createTranslatableMigration', function (): void {
         $this->method->invoke(
             $this->command,
             'articles',
-            'article_translations',
+            'articles_translations',
             'FakeArticleTranslation',
             'article_id',
             'article',
@@ -1376,7 +1387,7 @@ describe('handle', function (): void {
         $model_files = glob($tmp . '/models/Translations/FakeModulePostTranslation.php');
         expect($model_files)->not->toBeEmpty();
 
-        $migration_files = glob($tmp . '/migrations/*_create_post_translations_table.php');
+        $migration_files = glob($tmp . '/migrations/*_create_posts_translations_table.php');
         expect($migration_files)->not->toBeEmpty();
 
         // Cleanup
@@ -1440,12 +1451,12 @@ describe('handle', function (): void {
             ->toContain('FakeArticleTranslation')
             ->toContain('implements ITranslated');
 
-        $migration_files = glob($tmp . '/database/migrations/*_create_article_translations_table.php');
+        $migration_files = glob($tmp . '/database/migrations/*_create_articles_translations_table.php');
         expect($migration_files)->toHaveCount(1);
 
         $migration_content = file_get_contents($migration_files[0]);
         expect($migration_content)
-            ->toContain("Schema::create('article_translations'")
+            ->toContain("Schema::create('articles_translations'")
             ->toContain("'title'")
             ->toContain("'body'");
 

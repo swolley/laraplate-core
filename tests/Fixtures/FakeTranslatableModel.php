@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Tests\Fixtures;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
+use Modules\Core\Tests\Fixtures\FakeTranslatableModelFactory;
 
 class FakeTranslatableModel extends Model
 {
+    use HasFactory;
     use HasTranslations;
 
     protected $table = 'fake_translatable_models';
@@ -32,6 +35,11 @@ class FakeTranslatableModel extends Model
     protected static function getTranslationModelClass(): string
     {
         return FakeTranslatableModelTranslation::class;
+    }
+
+    protected static function newFactory(): FakeTranslatableModelFactory
+    {
+        return FakeTranslatableModelFactory::new();
     }
 }
 

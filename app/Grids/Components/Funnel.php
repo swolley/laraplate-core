@@ -105,6 +105,7 @@ final class Funnel extends ListEntity
             $this->prepareFunnelFilterProperties(array_filter($this->requestData->funnelsFilters, fn (string $f): bool => $f !== $current_funnel, ARRAY_FILTER_USE_KEY), $grouped_filters);
 
             foreach ($grouped_filters as $path => $entity_filters) {
+                // FIXME: $path should be a string
                 if (count(explode('.', $path)) === 1) {
                     foreach ($entity_filters as $filter) {
                         self::applyCorrectWhereMethod($q, $filter['property'], $filter['operator'], $filter['value']);

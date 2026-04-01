@@ -7,11 +7,15 @@ namespace [TRANSLATION_NAMESPACE];
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Override;
 use [MODEL_FULL_NAME];
 
 final class [TRANSLATION_CLASS_NAME] extends Model
 {
     use HasFactory;
+
+    #[Override]
+    protected $table = [TRANSLATION_TABLE_NAME];
 
     /**
      * The attributes that are mass assignable.

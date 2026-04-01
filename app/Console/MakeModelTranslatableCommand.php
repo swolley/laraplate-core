@@ -131,7 +131,7 @@ class MakeModelTranslatableCommand extends Command
         );
         $model_singular = Str::singular($table_name);
         $model_fk = $model_singular . '_id';
-        $translation_table = $model_singular . '_translations';
+        $translation_table = $table_name . '_translations';
 
         if (Schema::hasTable($translation_table)) {
             $this->error("Translation table '{$translation_table}' already exists.");
@@ -173,6 +173,7 @@ class MakeModelTranslatableCommand extends Command
         $this->info('Creating translation model...');
 
         $result = $this->createTranslationModel(
+            $table_name,
             $model_full_name,
             $model_class_name,
             $translation_full_name,
@@ -190,7 +191,7 @@ class MakeModelTranslatableCommand extends Command
         $this->info('Creating migration...');
 
         $this->createTranslatableMigration(
-            $table_name,
+            $translation_table,
             $translation_table,
             $model_fk,
             $model_singular,
@@ -225,6 +226,7 @@ class MakeModelTranslatableCommand extends Command
     }
 
     private function createTranslationModel(
+        string $table_name,
         string $model_full_name,
         string $model_class_name,
         string $translation_full_name,
@@ -283,6 +285,7 @@ class MakeModelTranslatableCommand extends Command
 
         $stub = str_replace('[TRANSLATION_NAMESPACE]', $translation_namespace, $stub);
         $stub = str_replace('[TRANSLATION_CLASS_NAME]', $translation_class_name, $stub);
+        $stub = str_replace('[TRANSLATION_TABLE_NAME]', $table_name, $stub);
         $stub = str_replace('[MODEL_FULL_NAME]', $model_full_name, $stub);
         $stub = str_replace('[MODEL_CLASS_NAME]', $model_class_name, $stub);
         $stub = str_replace('[MODEL_RELATION]', $model_singular, $stub);
