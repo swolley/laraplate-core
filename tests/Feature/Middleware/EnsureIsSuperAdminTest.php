@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Core\Http\Middleware\EnsureIsSuperAdmin;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 test('middleware passes when user is authenticated and is not super admin', function (): void {
     $user = User::factory()->create();

@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 test('middleware calls next when request has no preview parameter', function (): void {
     $request = Request::create('/test');

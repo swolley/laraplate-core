@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use function class_uses_trait;
+use function config;
+use function models;
+
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Overrides\Command;
 use Override;

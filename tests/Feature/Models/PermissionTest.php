@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     // Permissions are generated automatically, so we create one manually for testing

@@ -4,17 +4,13 @@ declare(strict_types=1);
 
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Spatie\Permission\Guard;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();

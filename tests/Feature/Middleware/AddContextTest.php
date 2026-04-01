@@ -5,9 +5,6 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Modules\Core\Http\Middleware\AddContext;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 it('adds context and calls next', function (): void {
     Context::shouldReceive('add')->once()->with(Mockery::on(function (array $data): bool {

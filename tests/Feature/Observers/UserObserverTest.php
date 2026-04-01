@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 it('created sends verification email when config enabled and user unverified', function (): void {
     Notification::fake();

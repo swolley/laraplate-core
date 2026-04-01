@@ -35,6 +35,10 @@ trait HasBenchmark
      */
     protected function startBenchmark(?string $table = null): void
     {
+        if (! self::databaseIsAvailable()) {
+            return;
+        }
+
         if (! $this->bootTime) {
             $this->bootTime = defined('LARAVEL_START') && LARAVEL_START ? microtime(true) - LARAVEL_START : 0;
         }
@@ -75,7 +79,9 @@ trait HasBenchmark
             $rowDiff = 0;
         }
 
-        DB::flushQueryLog();
+        if (self::databaseIsAvailable()) {
+            DB::flushQueryLog();
+        }
 
         $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime);
     }
@@ -92,8 +98,24 @@ trait HasBenchmark
     protected function endBenchmark(): void
     {
         $this->stepBenchmark();
+
         // $this->cancelBenchmark();
-        DB::disableQueryLog();
+        if (self::databaseIsAvailable()) {
+            DB::disableQueryLog();
+        }
+    }
+
+    private static function databaseIsAvailable(): bool
+    {
+        if (! function_exists('app')) {
+            return false;
+        }
+
+        try {
+            return app()->bound('db');
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private static function getQueryCount(): int

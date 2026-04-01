@@ -9,7 +9,6 @@ use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\Paginator;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Modules\Core\Filament\Utils\HasForm;
@@ -17,9 +16,6 @@ use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 final class HasFormHarness
 {

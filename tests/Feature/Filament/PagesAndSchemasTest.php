@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Filament\Actions\DeleteAction;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Resources\Roles\Pages\EditRole;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
@@ -14,9 +13,6 @@ use Modules\Core\Filament\Resources\Users\UserResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([

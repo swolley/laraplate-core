@@ -8,10 +8,7 @@ use Illuminate\Database\Schema\Builder as SchemaBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\InspectorWarmCommand;
-use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\Console\Command\Command as BaseCommand;
-
-uses(LaravelTestCase::class);
 
 /**
  * Stub schema builder to avoid Mockery duplicate-class issues and to drive Schema::connection()->getTables().
@@ -117,5 +114,25 @@ it('returns success with no-tables message when getTables returns entries withou
 
     $tester = $this->artisan('inspector:warm');
 
+    $tester->assertExitCode(BaseCommand::SUCCESS);
+});
+
+it('uses provided connection option when warming inspector cache', function (): void {
+    registerInspectorWarmCommand();
+
+    $schema_builder = inspector_warm_schema_builder_stub([
+        ['name' => 'users'],
+    ]);
+
+    $connection = Mockery::mock(Connection::class);
+    $connection->shouldReceive('getSchemaBuilder')->atLeast()->once()->andReturn($schema_builder);
+
+    DB::shouldReceive('connection')->with('inspector_secondary')->atLeast()->once()->andReturn($connection);
+    DB::shouldReceive('connection')->withAnyArgs()->zeroOrMoreTimes()->andReturn($connection);
+    Schema::shouldReceive('dropIfExists')->zeroOrMoreTimes();
+    Schema::shouldReceive('table')->zeroOrMoreTimes();
+    Schema::shouldReceive('drop')->zeroOrMoreTimes();
+
+    $tester = $this->artisan('inspector:warm', ['--connection' => 'inspector_secondary']);
     $tester->assertExitCode(BaseCommand::SUCCESS);
 });

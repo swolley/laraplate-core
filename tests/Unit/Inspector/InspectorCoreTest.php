@@ -169,6 +169,76 @@ it('inspect caches using no-tags cache path', function (): void {
     }
 });
 
+it('inspect caches using tags when taggable store is available', function (): void {
+    $table = 'inspect_cache_tags_' . bin2hex(random_bytes(4));
+    Schema::create($table, function (Blueprint $blueprint): void {
+        $blueprint->id();
+    });
+
+    $tagged_cache = Mockery::mock();
+    $tagged_cache->shouldReceive('get')->atLeast()->once()->andReturnNull();
+    $tagged_cache->shouldReceive('forever')->atLeast()->once()->andReturnTrue();
+
+    Cache::shouldReceive('store')->atLeast()->once()->andReturn(new class
+    {
+        public function supportsTags(): bool
+        {
+            return true;
+        }
+
+        /**
+         * @param  array<int, string>  $tags
+         * @return array<int, string>
+         */
+        public function getCacheTags(array $tags): array
+        {
+            return $tags;
+        }
+    });
+    Cache::shouldReceive('getCacheTags')->atLeast()->once()->andReturnUsing(static fn (array $tags): array => $tags);
+    Cache::shouldReceive('tags')->atLeast()->once()->andReturn($tagged_cache);
+
+    try {
+        expect(Inspect::table($table, config('database.default')))->not->toBeNull();
+    } finally {
+        Schema::dropIfExists($table);
+    }
+});
+
+it('parseForeignKeys builds fallback names and keeps composite metadata', function (): void {
+    config()->set('database.connections.inspector_fk_external', [
+        'driver' => 'sqlite',
+        'database' => 'external_schema',
+        'prefix' => '',
+    ]);
+
+    $method = new ReflectionMethod(Inspect::class, 'parseForeignKeys');
+    $method->setAccessible(true);
+
+    /** @var Illuminate\Support\Collection<int, ForeignKey> $fks */
+    $fks = $method->invoke(
+        null,
+        [[
+            'columns' => ['user_id', 'tenant_id'],
+            'foreign_schema' => 'external_schema',
+            'foreign_table' => 'users',
+            'foreign_columns' => ['id', 'tenant_id'],
+            'on_update' => 'cascade',
+            'on_delete' => 'restrict',
+        ]],
+        'local_schema',
+        'sqlite',
+    );
+
+    $first = $fks->first();
+    expect($first)->toBeInstanceOf(ForeignKey::class)
+        ->and($first->name)->toBe('users_user_id_tenant_id')
+        ->and($first->isComposite())->toBeTrue()
+        ->and($first->foreignConnection)->toBe('inspector_fk_external')
+        ->and($first->onUpdate)->toBe('cascade')
+        ->and($first->onDelete)->toBe('restrict');
+});
+
 it('doctrine type enum maps from string and doctrine type instances', function (): void {
     expect(DoctrineTypeEnum::fromString('integer'))->toBe(DoctrineTypeEnum::INTEGER)
         ->and(DoctrineTypeEnum::fromString('something_else'))->toBe(DoctrineTypeEnum::UNKNOWN)

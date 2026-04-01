@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
 use Modules\Core\Filament\Widgets\RecentActivityWidget;
@@ -13,9 +12,6 @@ use Modules\Core\Filament\Widgets\WelcomeLinkWidget;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     if (! class_exists(App\Models\User::class)) {

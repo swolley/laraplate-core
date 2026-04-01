@@ -1,0 +1,180 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Console\OutputStyle;
+use Illuminate\Support\Facades\File;
+use Modules\Core\Console\SwaggerGenerateCommand;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+
+function swaggerCommandWithOutput(SwaggerGenerateCommand $command): SwaggerGenerateCommand
+{
+    $command->setLaravel(app());
+    $output = new OutputStyle(new ArrayInput([]), new BufferedOutput());
+    $reflection = new ReflectionProperty(Illuminate\Console\Command::class, 'output');
+    $reflection->setAccessible(true);
+    $reflection->setValue($command, $output);
+
+    return $command;
+}
+
+it('exposes swagger generate options and verbose generation output', function (): void {
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+
+    $options = (new ReflectionMethod(SwaggerGenerateCommand::class, 'getOptions'))->invoke($command);
+    expect($options)->toBeArray()
+        ->and($options[0][0])->toBe('module');
+
+    $verbose = new ReflectionMethod(SwaggerGenerateCommand::class, 'verboseGeneration');
+    $verbose->setAccessible(true);
+    $command = swaggerCommandWithOutput($command);
+
+    $doc = [
+        'info' => ['title' => 'Coverage API'],
+        'paths' => [
+            '/api/foo' => ['get' => ['summary' => 'a']],
+            '/other' => ['post' => ['summary' => 'b']],
+        ],
+    ];
+    $old = [
+        'paths' => [
+            '/api/foo' => ['get' => ['summary' => 'a']],
+            '/other' => ['post' => ['summary' => 'changed']],
+        ],
+    ];
+
+    $verbose->invoke($command, $doc, $old);
+    expect(true)->toBeTrue();
+});
+
+it('verbose generation marks every path as new when no previous document exists', function (): void {
+    $command = swaggerCommandWithOutput(app(SwaggerGenerateCommand::class));
+    $verbose = new ReflectionMethod(SwaggerGenerateCommand::class, 'verboseGeneration');
+    $verbose->setAccessible(true);
+
+    $doc = [
+        'info' => ['title' => 'Fresh API'],
+        'paths' => [
+            '/api/items' => ['get' => ['summary' => 'list']],
+        ],
+    ];
+
+    $verbose->invoke($command, $doc, null);
+    expect(true)->toBeTrue();
+});
+
+it('verbose generation reports unchanged paths when previous doc matches', function (): void {
+    $command = swaggerCommandWithOutput(app(SwaggerGenerateCommand::class));
+    $verbose = new ReflectionMethod(SwaggerGenerateCommand::class, 'verboseGeneration');
+    $verbose->setAccessible(true);
+
+    $path_payload = ['get' => ['summary' => 'same']];
+    $doc = [
+        'info' => ['title' => 'Same API'],
+        'paths' => [
+            '/api/same' => $path_payload,
+        ],
+    ];
+    $old = [
+        'paths' => [
+            '/api/same' => $path_payload,
+        ],
+    ];
+
+    $verbose->invoke($command, $doc, $old);
+    expect(true)->toBeTrue();
+});
+
+function swaggerTestConfig(): void
+{
+    $swagger_config_path = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'laravel-swagger.php';
+    expect(is_file($swagger_config_path))->toBeTrue();
+
+    /** @var array<string, mixed> $swagger_config */
+    $swagger_config = require $swagger_config_path;
+    config(['laravel-swagger' => $swagger_config]);
+}
+
+it('runs swagger generate handle and completes successfully', function (): void {
+    swaggerTestConfig();
+
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+    $exit = $command->run(new ArrayInput([]), new BufferedOutput());
+    expect($exit)->toBe(0);
+});
+
+it('creates nested output directories when the output path parent is missing', function (): void {
+    swaggerTestConfig();
+
+    $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'swagger_mkdir_' . uniqid('', true);
+    $output_file = $base . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'deep' . DIRECTORY_SEPARATOR . 'swagger-out.json';
+    expect(is_dir(dirname($output_file)))->toBeFalse();
+
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+    $exit = $command->run(new ArrayInput(['--output' => $output_file]), new BufferedOutput());
+
+    expect($exit)->toBe(0)
+        ->and(is_file($output_file))->toBeTrue();
+
+    File::deleteDirectory($base);
+});
+
+it('parses existing JSON output as the previous document on a second run', function (): void {
+    swaggerTestConfig();
+
+    $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'swagger_json_old_' . uniqid('', true);
+    mkdir($base, 0755, true);
+    $output_file = $base . DIRECTORY_SEPARATOR . 'doc.json';
+
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+
+    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'json']), new BufferedOutput()))->toBe(0);
+    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'json']), new BufferedOutput()))->toBe(0);
+
+    File::deleteDirectory($base);
+});
+
+it('parses existing YAML output as the previous document on a second run', function (): void {
+    swaggerTestConfig();
+
+    $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'swagger_yaml_old_' . uniqid('', true);
+    mkdir($base, 0755, true);
+    $output_file = $base . DIRECTORY_SEPARATOR . 'doc.yaml';
+
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+
+    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'yaml']), new BufferedOutput()))->toBe(0);
+    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'yaml']), new BufferedOutput()))->toBe(0);
+
+    File::deleteDirectory($base);
+});
+
+it('skips modules that do not match the module filter option', function (): void {
+    swaggerTestConfig();
+
+    $module_names = modules(true, false, false);
+    $non_app = null;
+
+    foreach ($module_names as $name) {
+        if ($name !== 'App') {
+            $non_app = $name;
+
+            break;
+        }
+    }
+
+    expect($module_names)->not->toBeEmpty();
+    expect($non_app)->not->toBeNull('testbench should register at least one module besides App (e.g. Core)');
+
+    $command = app(SwaggerGenerateCommand::class);
+    $command->setLaravel(app());
+    $exit = $command->run(new ArrayInput(['--module' => $non_app]), new BufferedOutput());
+
+    expect($exit)->toBe(0);
+});

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
@@ -12,9 +11,6 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     if (! class_exists(App\Models\User::class)) {

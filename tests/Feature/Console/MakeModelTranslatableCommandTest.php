@@ -1168,6 +1168,7 @@ describe('handle', function (): void {
     beforeEach(function (): void {
         $this->command = commandWithOutput();
         HandleTestContext::$models = [];
+        HandleTestContext::$models_from_global_helpers = false;
         HandleTestContext::$uses_trait = false;
         HandleTestContext::$app_base = '';
         HandleTestContext::$db_base = '';

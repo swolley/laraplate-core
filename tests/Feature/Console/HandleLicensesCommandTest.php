@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\SelectPrompt;
 use Laravel\Prompts\TextPrompt;
@@ -11,11 +10,8 @@ use Modules\Core\Console\HandleLicensesCommand;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 function licensesCommandWithOutput(): HandleLicensesCommand
 {

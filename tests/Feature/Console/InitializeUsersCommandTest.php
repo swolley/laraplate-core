@@ -3,17 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\InitializeUsers;
 use Modules\Core\Models\Role;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\InitializeUsersWithAdminPrompts;
 use Modules\Core\Tests\Stubs\InitializeUsersWithoutPrompts;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 function registerInitializeUsersCommand(): void
 {

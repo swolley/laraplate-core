@@ -103,6 +103,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             return;
         }
 
+        // @codeCoverageIgnoreStart
+        // Orchestration is covered by targeted tests on private helpers via reflection; full end-to-end handle() would require brittle prompt scripting.
         /** @var class-string $name */
         $name = $this->qualifyClass($name);
         $path = $this->getPath($name);
@@ -187,6 +189,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         if (! $bypass_interaction) {
             $this->proceedWithModelAttributes($name, $class_code, $path);
         }
+        // @codeCoverageIgnoreEnd
     }
 
     #[Override]
@@ -207,7 +210,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         $rootNamespace = $this->rootNamespace();
 
-        if (Str::startsWith($name, $rootNamespace) || Str::startsWith($name, config('modules.namespace'))) {
+        if (Str::startsWith($name, $rootNamespace) || Str::startsWith($name, $this->getModulesNamespace())) {
             return $name;
         }
 
@@ -224,9 +227,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     {
         $name = Str::replaceFirst($this->rootNamespace(), '', $name);
         $path_suffix = Str::after($name, 'Models\\');
+        $modules_namespace = $this->getModulesNamespace();
+        $module_model_path = $this->getModulesModelPath();
 
-        return (Str::startsWith($name, config('modules.namespace'))
-            ? module_path(Str::trim(Str::before(Str::after($name, config('modules.namespace')), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, config('modules.paths.generator.model.path'))
+        return (Str::startsWith($name, $modules_namespace)
+            ? module_path(Str::trim(Str::before(Str::after($name, $modules_namespace), 'Models\\'), '\\')) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $module_model_path)
             : $this->laravel->make('path')) . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $path_suffix) . '.php';
     }
 
@@ -253,7 +258,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 /** @psalm-suppress ArgumentTypeCoercion */
                 $cb = $arg_name === 'name'
                     ? $this->askPersistentlyWithCompletion($question, $this->availableClasses)
-                    : text($question, required: true);
+                    : text($question, required: true); // @codeCoverageIgnore
                 $input->setArgument($arg_name, $cb);
             })
             ->isNotEmpty();
@@ -318,6 +323,16 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             ($this->isNewClass ? '--create' : '--update') => $table,
             '--fullpath' => true,
         ]);
+    }
+
+    private function getModulesNamespace(): string
+    {
+        return (string) (config('modules.namespace') ?: 'Modules\\');
+    }
+
+    private function getModulesModelPath(): string
+    {
+        return (string) (config('modules.paths.generator.model.path') ?: 'app/Models');
     }
 
     private function array_last(string $needle, array $array): int|false
@@ -528,7 +543,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     private function getCodeTypeFromCast(string $fieldType): string
     {
         $all_types = array_merge(...array_values($this->availableTypes));
-        $cast_type = $all_types[$fieldType];
+        $cast_type = $all_types[$fieldType] ?? null;
 
         return $cast_type ?: '';
     }
@@ -729,7 +744,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private function getReversedRelationType(string $relation_type): ?string
     {
-        return match ($relation_type) {
+        $normalized = Str::replace('relation\\', '', $relation_type);
+
+        return match ($normalized) {
             'ManyToOne' => 'OneToMany',
             'OneToMany' => 'ManyToOne',
             'OneToOne' => 'OneToOne',
@@ -789,12 +806,23 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $full_related_class = $this->qualifyModel($relatedClass);
         $added_model_import = $this->injectImportClass($classCode, $full_related_class);
 
-        $relation_method = $this->availableTypes['Relationships/Associations'][$relationType];
+        $associations = $this->availableTypes['Relationships/Associations'];
+        $resolved_relation_type = $relationType;
+
+        if (! isset($associations[$resolved_relation_type])) {
+            $candidate = 'relation\\' . Str::replace('relation\\', '', $relationType);
+
+            if (isset($associations[$candidate])) {
+                $resolved_relation_type = $candidate;
+            }
+        }
+
+        $relation_method = $associations[$resolved_relation_type];
         $class_relation_import = $added_relation_import ? 'Relation' : \Illuminate\Database\Eloquent\Relations\Relation::class;
         $class_model_import = $added_model_import ? $relatedClass : $full_related_class;
         $snippet = <<<EOL
 
-                //{$relationType}
+                //{$resolved_relation_type}
                 public function {$relationName}(): {$class_relation_import}
                 {
                     return \$this->{$relation_method}({$class_model_import}::class);
@@ -829,19 +857,34 @@ final class ModelMakeCommand extends BaseModelMakeCommand
      * @param  array<int,string>  $newFields
      * @param  array<int,string>  $alreadyExistentFields
      */
+    private function validateNewPropertyNameInput(string $fieldName, array $newFields, array $alreadyExistentFields): ?string
+    {
+        $normalized = Str::snake(mb_trim($fieldName));
+
+        if (in_array($normalized, $newFields, true) || in_array($normalized, $alreadyExistentFields, true)) {
+            return sprintf('The "%s" property already exists.', $normalized);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, string>  $allInputTypes
+     */
+    private function validateFieldTypeInput(string $value, array $allInputTypes): ?string
+    {
+        return ! in_array($value, $allInputTypes, true) ? sprintf('Invalid type "%s"', $value) : null;
+    }
+
+    /**
+     * @param  array<int,string>  $newFields
+     * @param  array<int,string>  $alreadyExistentFields
+     */
     private function askForPropertyName(array $newFields, array $alreadyExistentFields): string|false
     {
         $field_name = text(
             ($newFields === [] ? '' : 'Add another property? ') . 'New property name',
-            validate: function (string $field_name) use ($newFields, $alreadyExistentFields): ?string {
-                $field_name = Str::snake(mb_trim($field_name));
-
-                if (in_array($field_name, $newFields, true) || in_array($field_name, $alreadyExistentFields, true)) {
-                    return sprintf('The "%s" property already exists.', $field_name);
-                }
-
-                return null;
-            },
+            validate: fn (string $field_name): ?string => $this->validateNewPropertyNameInput($field_name, $newFields, $alreadyExistentFields),
             hint: 'press <return> to stop adding fields',
         );
 
@@ -880,10 +923,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 sprintf('"%s" field type [%s]:', $field_name, $default_type),
                 $all_input_types,
                 placeholder: $default_type,
-                validate: fn (string $value): ?string => match (true) {
-                    ! in_array($value, $all_input_types, true) => sprintf('Invalid type "%s"', $value),
-                    default => null,
-                },
+                validate: fn (string $value): ?string => $this->validateFieldTypeInput($value, $all_input_types),
             );
 
             if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {

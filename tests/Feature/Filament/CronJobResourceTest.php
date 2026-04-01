@@ -3,13 +3,9 @@
 declare(strict_types=1);
 
 use Filament\Schemas\Schema;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([

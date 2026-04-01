@@ -2,11 +2,39 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Console\PermissionsRefreshCommand;
-use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Helpers\HelpersCache;
+use Modules\Core\Models\Permission;
+use Modules\Core\Models\User;
+use Modules\Core\Models\Version;
+use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
+use Symfony\Component\Console\Application as SymfonyConsoleApplication;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
-uses(LaravelTestCase::class, RefreshDatabase::class);
+afterEach(function (): void {
+    HelpersCache::clearModels();
+});
+
+/**
+ * @param  array<string, bool|string>  $options
+ */
+function runPermissionsRefreshForCoverage(array $options = []): string
+{
+    $command = app(PermissionsRefreshCommand::class);
+    $command->setLaravel(app());
+    $command->setApplication(new SymfonyConsoleApplication('coverage', '1.0.0'));
+    $command->mergeApplicationDefinition();
+    $input = new ArrayInput(
+        array_merge(['command' => $command->getName()], $options),
+        $command->getDefinition(),
+    );
+    $output = new BufferedOutput();
+    $command->run($input, $output);
+
+    return $output->fetch();
+}
 
 it('command exists and has correct signature', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
@@ -186,4 +214,135 @@ it('command handles output messages', function (): void {
     expect($source)->toContain('Created');
     expect($source)->toContain('Deleted');
     expect($source)->toContain('Restored');
+});
+
+it('runs in pretend mode with merged quiet option', function (): void {
+    HelpersCache::clearModels();
+    HelpersCache::setModels('active', [User::class, Version::class]);
+
+    $command = app(PermissionsRefreshCommand::class);
+    $command->setLaravel(app());
+    $command->setApplication(new SymfonyConsoleApplication('coverage', '1.0.0'));
+    $command->mergeApplicationDefinition();
+
+    $input = new ArrayInput([
+        'command' => $command->getName(),
+        '--pretend' => true,
+        '--quiet' => true,
+    ], $command->getDefinition());
+
+    $exit = $command->run($input, new BufferedOutput());
+    expect($exit)->toBe(0);
+
+    HelpersCache::clearModels();
+});
+
+it('detects blacklisted models via checkIfBlacklisted helper', function (): void {
+    $command = app(PermissionsRefreshCommand::class);
+    $command->setLaravel(app());
+    $method = new ReflectionMethod(PermissionsRefreshCommand::class, 'checkIfBlacklisted');
+    $method->setAccessible(true);
+
+    expect($method->invoke($command, Version::class))->toBeTrue()
+        ->and($method->invoke($command, User::class))->toBeFalse();
+});
+
+it('runs permission refresh in pretend mode with output enabled', function (): void {
+    HelpersCache::clearModels();
+    HelpersCache::setModels('active', [User::class]);
+
+    $command = app(PermissionsRefreshCommand::class);
+    $command->setLaravel(app());
+    $command->setApplication(new SymfonyConsoleApplication('coverage', '1.0.0'));
+    $command->mergeApplicationDefinition();
+
+    $output = new BufferedOutput();
+    $input = new ArrayInput([
+        'command' => $command->getName(),
+        '--pretend' => true,
+    ], $command->getDefinition());
+
+    $exit = $command->run($input, $output);
+    expect($exit)->toBe(0)
+        ->and($output->fetch())->not->toBe('');
+
+    HelpersCache::clearModels();
+});
+
+it('skips non-string and missing model entries and prints bypass for blacklisted classes', function (): void {
+    HelpersCache::setModels('active', [
+        404,
+        'Definitely\\Not\\A\\LoadedModelClass',
+        Version::class,
+        PermissionsRefreshPlainModel::class,
+    ]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect($output)->toContain(sprintf("Bypassing '%s' class", Version::class));
+});
+
+it('removes delete approve and publish permissions when the model does not support those features', function (): void {
+    $delete_name = 'default.perm_refresh_plain.delete';
+    $approve_name = 'default.perm_refresh_plain.approve';
+    $publish_name = 'default.perm_refresh_plain.publish';
+
+    Permission::query()->whereIn('name', [$delete_name, $approve_name, $publish_name])->delete();
+
+    Permission::create(['name' => $delete_name, 'guard_name' => 'web']);
+    Permission::create(['name' => $approve_name, 'guard_name' => 'web']);
+    Permission::create(['name' => $publish_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $delete_name)->count())->toBe(0);
+    expect(Permission::query()->where('name', $approve_name)->count())->toBe(0);
+    expect(Permission::query()->where('name', $publish_name)->count())->toBe(0);
+    expect($output)->toContain("Deleted '{$delete_name}' permission");
+    expect($output)->toContain("Deleted '{$approve_name}' permission");
+});
+
+it('drops permissions that no longer match any inspected model', function (): void {
+    $orphan_name = 'default.zz_' . bin2hex(random_bytes(4)) . '.select';
+
+    Permission::create(['name' => $orphan_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $orphan_name)->count())->toBe(0);
+    expect($output)->toContain("Deleted '{$orphan_name}' permission");
+});
+
+it('reports no changes when a second run finds the permission set already in sync', function (): void {
+    HelpersCache::setModels('active', [User::class]);
+
+    runPermissionsRefreshForCoverage([]);
+    HelpersCache::setModels('active', [User::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect($output)->toContain('No changes needed');
+});
+
+it('creates impersonate permission for the configured user model when missing', function (): void {
+    $user_class = user_class();
+    $reflection = new ReflectionClass($user_class);
+    $instance = $reflection->newInstanceWithoutConstructor();
+    $connection = $instance->getConnectionName() ?? 'default';
+    $table = $instance->getTable();
+    $impersonate_name = sprintf('%s.%s.%s', $connection, $table, ActionEnum::IMPERSONATE->value);
+
+    Permission::query()->where('name', $impersonate_name)->delete();
+
+    HelpersCache::setModels('active', [User::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $impersonate_name)->exists())->toBeTrue();
+    expect($output)->toContain($impersonate_name);
+    expect($output)->toContain("Created '{$impersonate_name}' permission");
 });
