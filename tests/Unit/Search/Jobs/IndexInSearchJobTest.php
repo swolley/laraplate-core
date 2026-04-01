@@ -4,87 +4,20 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
-use Laravel\Scout\Searchable;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Tests\Fixtures\StubSearchableModel;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithTimestamp;
+use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithoutTimestamp;
 
 uses(LaravelTestCase::class);
-
-final class IndexInSearchEngineFake
-{
-    public bool $updated = false;
-
-    public bool $throw_on_update = false;
-
-    public function update(Model $model): void
-    {
-        if ($this->throw_on_update) {
-            throw new RuntimeException('forced update failure');
-        }
-
-        $this->updated = true;
-    }
-}
-
-class IndexInSearchModelWithoutTimestamp extends Model
-{
-    use Searchable;
-
-    public bool $unsearchable_called = false;
-
-    public bool $should_be_searchable = true;
-
-    public IndexInSearchEngineFake $engine;
-
-    protected $table = 'settings';
-
-    protected $guarded = [];
-
-    public function __construct(array $attributes = [])
-    {
-        parent::__construct($attributes);
-        $this->engine = new IndexInSearchEngineFake();
-        $this->setAttribute($this->getKeyName(), 1);
-    }
-
-    public function searchableAs(): string
-    {
-        return 'settings';
-    }
-
-    public function searchableUsing(): IndexInSearchEngineFake
-    {
-        return $this->engine;
-    }
-
-    public function shouldBeSearchable(): bool
-    {
-        return $this->should_be_searchable;
-    }
-
-    public function unsearchable(): void
-    {
-        $this->unsearchable_called = true;
-    }
-}
-
-final class IndexInSearchModelWithTimestamp extends IndexInSearchModelWithoutTimestamp
-{
-    public bool $timestamp_updated = false;
-
-    public function updateSearchIndexTimestamp(): void
-    {
-        $this->timestamp_updated = true;
-    }
-}
 
 beforeEach(function (): void {
     config(['scout.queue.queue' => 'indexing', 'scout.queue.tries' => 3, 'scout.queue.timeout' => 120, 'scout.queue.backoff' => [30, 60, 180]]);
 });
 
 it('accepts model that uses Searchable trait', function (): void {
-    $model = new StubSearchableModel();
+    $model = new StubSearchableModel;
     $job = new IndexInSearchJob($model);
     expect($job)->toBeInstanceOf(IndexInSearchJob::class)
         ->and($job->queue)->toBe('indexing')
@@ -103,7 +36,7 @@ it('throws when model does not use Searchable', function (): void {
 });
 
 it('returns middleware with RateLimited', function (): void {
-    $job = new IndexInSearchJob(new StubSearchableModel());
+    $job = new IndexInSearchJob(new StubSearchableModel);
     $middleware = $job->middleware();
     expect($middleware)->toHaveCount(1);
     expect($middleware[0])->toBeInstanceOf(Illuminate\Queue\Middleware\RateLimited::class);
@@ -111,7 +44,7 @@ it('returns middleware with RateLimited', function (): void {
 
 it('deletes document when model should not be searchable', function (): void {
     config(['scout.driver' => 'typesense']);
-    $model = new IndexInSearchModelWithoutTimestamp();
+    $model = new IndexInSearchModelWithoutTimestamp;
     $model->should_be_searchable = false;
     Log::spy();
     $job = new IndexInSearchJob($model);
@@ -125,7 +58,7 @@ it('deletes document when model should not be searchable', function (): void {
 
 it('updates document and timestamp when indexing succeeds', function (): void {
     config(['scout.driver' => 'typesense']);
-    $model = new IndexInSearchModelWithTimestamp();
+    $model = new IndexInSearchModelWithTimestamp;
     Log::spy();
     $job = new IndexInSearchJob($model);
 
@@ -138,7 +71,7 @@ it('updates document and timestamp when indexing succeeds', function (): void {
 
 it('updates document without timestamp method when indexing succeeds', function (): void {
     config(['scout.driver' => 'typesense']);
-    $model = new IndexInSearchModelWithoutTimestamp();
+    $model = new IndexInSearchModelWithoutTimestamp;
     Log::spy();
     $job = new IndexInSearchJob($model);
 
@@ -150,7 +83,7 @@ it('updates document without timestamp method when indexing succeeds', function 
 
 it('releases job on indexing exception when tries remain', function (): void {
     config(['scout.driver' => 'typesense', 'scout.queue.backoff' => [30, 60, 180], 'scout.queue.tries' => 3]);
-    $model = new IndexInSearchModelWithoutTimestamp();
+    $model = new IndexInSearchModelWithoutTimestamp;
     $model->engine->throw_on_update = true;
     Log::spy();
     $job = (new IndexInSearchJob($model))->withFakeQueueInteractions();
@@ -165,7 +98,7 @@ it('releases job on indexing exception when tries remain', function (): void {
 
 it('fails job on indexing exception when no tries remain', function (): void {
     config(['scout.driver' => 'typesense', 'scout.queue.backoff' => [30, 60, 180], 'scout.queue.tries' => 3]);
-    $model = new IndexInSearchModelWithoutTimestamp();
+    $model = new IndexInSearchModelWithoutTimestamp;
     $model->engine->throw_on_update = true;
     Log::spy();
     $job = (new IndexInSearchJob($model))->withFakeQueueInteractions();

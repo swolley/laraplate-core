@@ -13,38 +13,12 @@ use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Auth\ProviderUserAliasStub;
 
 uses(LaravelTestCase::class);
 
-class ProviderUserAliasStub extends User
-{
-    use MustVerifyEmail;
-
-    protected $table = 'users';
-
-    protected $fillable = [
-        'name',
-        'username',
-        'email',
-        'email_verified_at',
-        'password',
-        'lang',
-        'social_id',
-        'social_service',
-        'social_token',
-        'social_refresh_token',
-        'social_token_secret',
-        'license_id',
-    ];
-}
-
 if (! class_exists(App\Models\User::class, false)) {
     class_alias(ProviderUserAliasStub::class, App\Models\User::class);
-}
-
-final class FortifyMustVerifyUserStub extends User
-{
-    use MustVerifyEmail;
 }
 
 beforeEach(function (): void {

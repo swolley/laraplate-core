@@ -5,6 +5,9 @@ declare(strict_types=1);
 /*
 |--------------------------------------------------------------------------
 | Default: lightweight PHPUnit TestCase for Unit tests (no app/DB bootstrap).
+| TestCase loads tests/minimal-test-environment.php in setUp() (config(), fake(), …).
+| phpunit.xml uses vendor/autoload.php only, like other Laraplate modules.
+|
 | Feature tests use LaravelTestCase via ->in(__DIR__.'/Feature'). Unit files that
 | need the app declare uses(Modules\Core\Tests\LaravelTestCase::class).
 |

@@ -2,7 +2,15 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+/**
+ * Lightweight bindings for unit tests that use Modules\Core\Tests\TestCase (no Orchestra).
+ * Composer autoload must already be loaded (phpunit.xml bootstrap = vendor/autoload.php).
+ */
+if (defined('CORE_MINIMAL_TEST_ENV_LOADED')) {
+    return;
+}
+
+define('CORE_MINIMAL_TEST_ENV_LOADED', true);
 
 /*
 |--------------------------------------------------------------------------

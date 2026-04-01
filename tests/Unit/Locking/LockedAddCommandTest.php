@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Locking\Console\LockedAddCommand;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Locking\LockedAddCommandTestDouble;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 uses(LaravelTestCase::class);
@@ -12,44 +13,6 @@ uses(LaravelTestCase::class);
 function locking_stub_path(): string
 {
     return dirname(__DIR__, 3) . '/app/Locking/Stubs/add_locked_column_to_table.stub';
-}
-
-final class LockedAddCommandTestDouble extends LockedAddCommand
-{
-    public string $argModel = 'MissingModel';
-
-    public ?string $argNamespace = null;
-
-    public array $errors = [];
-
-    public array $infos = [];
-
-    public ?string $stubPath = null;
-
-    public function argument($key = null): mixed
-    {
-        return $this->argModel;
-    }
-
-    public function option($key = null): mixed
-    {
-        return $this->argNamespace;
-    }
-
-    public function error($string, $verbosity = null): void
-    {
-        $this->errors[] = (string) $string;
-    }
-
-    public function info($string, $verbosity = null): void
-    {
-        $this->infos[] = (string) $string;
-    }
-
-    public function getStubPath(): string
-    {
-        return $this->stubPath ?? parent::getStubPath();
-    }
 }
 
 it('locked add command returns invalid when model class does not exist', function (): void {
@@ -110,7 +73,7 @@ it('locked add command helper methods build migration path and stub contents', f
     $command = new LockedAddCommandTestDouble($files);
     $command->stubPath = locking_stub_path();
 
-    $model = new Modules\Core\Models\Setting();
+    $model = new Modules\Core\Models\Setting;
     $path = $command->generateMigrationPath($model);
     $stub = $command->getStubPath();
     $contents = $command->getStubContents($stub, ['ModelTable' => 'settings']);

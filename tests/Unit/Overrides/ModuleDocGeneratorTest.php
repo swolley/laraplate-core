@@ -10,11 +10,11 @@ namespace Modules\Core\Overrides {
 }
 
 namespace {
-    use Illuminate\Foundation\Http\FormRequest;
     use Illuminate\Routing\Route;
     use Modules\Core\Overrides\ModuleDocGenerator;
     use Modules\Core\Overrides\ModuleDocRoute;
     use Modules\Core\Tests\Stubs\DummyFormRequest;
+    use Modules\Core\Tests\Stubs\Overrides\AbstractModuleDocFormRequest;
     use Modules\Core\Tests\TestCase;
 
     uses(TestCase::class);
@@ -271,17 +271,4 @@ namespace {
 
         expect($rules)->toBe([]);
     });
-
-    abstract class AbstractModuleDocFormRequest extends FormRequest
-    {
-        public function authorize(): bool
-        {
-            return true;
-        }
-
-        public function rules(): array
-        {
-            return ['id' => 'required'];
-        }
-    }
 }

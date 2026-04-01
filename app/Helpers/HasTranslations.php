@@ -557,6 +557,22 @@ trait HasTranslations
     }
 
     /**
+     * Bridge for models (e.g. Content) that use Laravel Attribute accessors for translatable containers.
+     */
+    protected function translationsGet(string $key): mixed
+    {
+        return $this->getTranslatableFieldValue($key);
+    }
+
+    /**
+     * Bridge for models (e.g. Content) that use Laravel Attribute mutators for translatable containers.
+     */
+    protected function translationsSet(string $key, mixed $value): void
+    {
+        $this->setTranslatableFieldValue($key, $value);
+    }
+
+    /**
      * Get the current locale for setter operations.
      * This is a helper method used internally by the trait.
      */

@@ -2,29 +2,15 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Locking\LockableTestModel;
 
 uses(LaravelTestCase::class);
-
-final class LockableTestModel extends Model
-{
-    use HasLocks;
-
-    public $timestamps = false;
-
-    protected $table = 'lockable_test_models';
-
-    protected $guarded = [];
-
-    protected $hidden = [];
-}
 
 beforeEach(function (): void {
     Schema::dropIfExists('lockable_test_models');
@@ -38,7 +24,7 @@ beforeEach(function (): void {
 });
 
 it('initializes guarded and hidden lock columns', function (): void {
-    $model = new LockableTestModel();
+    $model = new LockableTestModel;
 
     expect($model->getGuarded())->toContain('is_locked')
         ->and($model->getHidden())->toContain('is_locked')
@@ -49,7 +35,7 @@ it('initializes guarded and hidden lock columns', function (): void {
 it('applies saving hooks for lock_version and removes virtual is_locked attribute', function (): void {
     request()->merge(['lock_version' => 7]);
 
-    $model = new LockableTestModel();
+    $model = new LockableTestModel;
     $model->name = 'first';
     $model->is_locked = true;
     $model->save();

@@ -2,66 +2,16 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Modules\Core\Grids\Components\Field;
-use Modules\Core\Grids\Definitions\HasPath;
-use Modules\Core\Grids\Definitions\HasValidations;
 use Modules\Core\Grids\Definitions\PivotRelationInfo;
 use Modules\Core\Grids\Definitions\RelationInfo;
-use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Grids\DefinitionsModelStub;
+use Modules\Core\Tests\Stubs\Grids\HasPathHarness;
+use Modules\Core\Tests\Stubs\Grids\HasValidationsHarness;
 
 uses(LaravelTestCase::class);
-
-final class DefinitionsModelStub extends Model
-{
-    use HasGridUtils;
-
-    protected $table = 'users';
-
-    protected $fillable = ['name'];
-
-    public function getRules(): array
-    {
-        return [
-            'name' => ['required'],
-        ];
-    }
-
-    protected function casts(): array
-    {
-        return [];
-    }
-}
-
-final class HasPathHarness
-{
-    use HasPath;
-
-    public function __construct(string $path, string $name)
-    {
-        $this->path = $path;
-        $this->name = $name;
-    }
-
-    /**
-     * @return array{0:string,1:string}
-     */
-    public static function split(string $fullpath): array
-    {
-        $method = new ReflectionMethod(self::class, 'splitPath');
-        $method->setAccessible(true);
-
-        /** @var array{0:string,1:string} $result */
-        return $method->invoke(null, $fullpath);
-    }
-}
-
-final class HasValidationsHarness
-{
-    use HasValidations;
-}
 
 it('covers HasPath getter methods and split helper', function (): void {
     $harness = new HasPathHarness('users.profile', 'email');

@@ -2,33 +2,23 @@
 
 declare(strict_types=1);
 
+use Illuminate\Console\Command as IlluminateCommand;
 use Illuminate\Console\OutputStyle;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\ClearExpiredModels;
 use Modules\Core\Helpers\HelpersCache;
+use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Models\ClearExpiredModelsNoSoftStub;
+use Modules\Core\Tests\Stubs\Models\ClearExpiredModelsSoftStub;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
-final class ClearExpiredModelsSoftStub extends Model
-{
-    use SoftDeletes;
-
-    protected $table = 'clear_expired_soft_stubs';
-
-    protected $guarded = [];
-}
-
-final class ClearExpiredModelsNoSoftStub extends Model
-{
-    protected $table = 'clear_expired_no_soft_stubs';
-}
+uses(LaravelTestCase::class);
 
 function clearExpiredModelsCommandWithOutput(ClearExpiredModels $command): ClearExpiredModels
 {
     $output = new OutputStyle(new ArrayInput([]), new BufferedOutput());
-    $output_reflection = new ReflectionProperty(Illuminate\Console\Command::class, 'output');
+    $output_reflection = new ReflectionProperty(IlluminateCommand::class, 'output');
     $output_reflection->setValue($command, $output);
 
     return $command;
@@ -57,7 +47,7 @@ it('clears expired soft-deleted rows when configured and skips when disabled', f
     ]);
 
     config(['core.soft_deletes_expiration_days' => 5]);
-    $command = clearExpiredModelsCommandWithOutput(new ClearExpiredModels());
+    $command = clearExpiredModelsCommandWithOutput(new ClearExpiredModels);
     $command->handle();
 
     expect(ClearExpiredModelsSoftStub::withTrashed()->whereKey(1)->exists())->toBeFalse()

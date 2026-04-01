@@ -419,6 +419,8 @@ The Core Module provides several useful scripts for development and maintenance:
 
 ### Code Quality and Testing
 
+Run commands from the **Core module root** after `composer install`. Tests use `phpunit.xml` with `bootstrap="vendor/autoload.php"` (same idea as other Laraplate modules), so a local `vendor/` directory is required when working in the submodule.
+
 ```bash
 # Run all tests and quality checks
 composer test

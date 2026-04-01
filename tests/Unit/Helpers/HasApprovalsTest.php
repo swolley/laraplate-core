@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Approval\Models\Modification;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
 uses(LaravelTestCase::class);
 
@@ -25,15 +25,6 @@ beforeEach(function (): void {
 afterEach(function (): void {
     Schema::dropIfExists('has_approvals_stub');
 });
-
-final class HasApprovalsStubModel extends Model
-{
-    use HasApprovals;
-
-    protected $table = 'has_approvals_stub';
-
-    protected $fillable = ['name'];
-}
 
 it('initializes preview visibility when preview mode is on', function (): void {
     session(['preview' => true]);

@@ -4,41 +4,14 @@ declare(strict_types=1);
 
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
-use Modules\Core\Helpers\HasCommandModelResolution;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Console\HasCommandModelResolutionOptionOnlyTestCommand;
+use Modules\Core\Tests\Stubs\Console\HasCommandModelResolutionTestCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
 uses(LaravelTestCase::class);
-
-final class HasCommandModelResolutionTestCommand extends Command
-{
-    use HasCommandModelResolution;
-
-    protected $signature = 'test:resolve {model?} {--model=}';
-
-    protected $description = 'test';
-
-    public function resolveModel(string $optionName = 'model', ?string $namespace = null, bool $required = true): string|false
-    {
-        return $this->getModelClass($optionName, $namespace, $required);
-    }
-}
-
-final class HasCommandModelResolutionOptionOnlyTestCommand extends Command
-{
-    use HasCommandModelResolution;
-
-    protected $signature = 'test:resolve-option {--entity=}';
-
-    protected $description = 'test';
-
-    public function resolveModel(string $optionName = 'entity', ?string $namespace = null, bool $required = true): string|false
-    {
-        return $this->getModelClass($optionName, $namespace, $required);
-    }
-}
 
 function bind_command_input(Command $command, array $args): void
 {

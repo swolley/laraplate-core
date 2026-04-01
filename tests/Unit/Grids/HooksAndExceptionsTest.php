@@ -3,15 +3,8 @@
 declare(strict_types=1);
 
 use Modules\Core\Grids\Exceptions\ConcurrencyException;
-use Modules\Core\Grids\Hooks\HasReadHooks;
-use Modules\Core\Grids\Hooks\HasWriteHooks;
+use Modules\Core\Tests\Stubs\HooksHarness;
 use Symfony\Component\HttpFoundation\Response;
-
-final class HooksHarness
-{
-    use HasReadHooks;
-    use HasWriteHooks;
-}
 
 it('stores and returns read hooks', function (): void {
     $harness = new HooksHarness();

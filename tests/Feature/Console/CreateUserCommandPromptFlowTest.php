@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Console\Command as IlluminateCommand;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\DB;
 use Laravel\Prompts\ConfirmPrompt;
@@ -13,34 +14,17 @@ use Modules\Core\Console\CreateUserCommand;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Console\CreateUserPromptFlowStub;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
-final class CreateUserPromptFlowStub extends User
-{
-    protected $table = 'users';
-
-    protected $fillable = ['name', 'username', 'email', 'lang', 'password'];
-
-    /**
-     * @return array<string,mixed>
-     */
-    public function getOperationRules(?string $operation = null): array
-    {
-        return [
-            'name' => ['required', 'string'],
-            'username' => ['required', 'string'],
-            'email' => ['required', 'email'],
-            'lang' => 'in:active,inactive',
-            'password' => ['nullable'],
-        ];
-    }
-}
+uses(LaravelTestCase::class);
 
 function createUserCommandWithOutput(CreateUserCommand $command): CreateUserCommand
 {
     $output = new OutputStyle(new ArrayInput([]), new BufferedOutput());
-    $output_reflection = new ReflectionProperty(Illuminate\Console\Command::class, 'output');
+    $output_reflection = new ReflectionProperty(IlluminateCommand::class, 'output');
     $output_reflection->setValue($command, $output);
 
     return $command;
@@ -101,7 +85,7 @@ it('covers CreateUserCommand success and failure branches', function (): void {
         };
     });
 
-    $create_command = createUserCommandWithOutput(new CreateUserCommand());
+    $create_command = createUserCommandWithOutput(new CreateUserCommand);
     expect($create_command->handle())->toBe(0);
 
     $user = User::query()->where('email', 'console@example.test')->first();
@@ -140,7 +124,7 @@ it('covers CreateUserCommand in-string options and random password branch', func
     ConfirmPrompt::fallbackWhen(true);
     ConfirmPrompt::fallbackUsing(static fn (): bool => false);
 
-    $command = createUserCommandWithOutput(new CreateUserCommand());
+    $command = createUserCommandWithOutput(new CreateUserCommand);
     expect($command->handle())->toBe(0);
 
     $created = CreateUserPromptFlowStub::query()->where('name', 'secondary_name')->first();

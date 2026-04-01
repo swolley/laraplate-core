@@ -2,27 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Console\Command;
-use Modules\Core\Helpers\HasCommandUtils;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Console\HasCommandUtilsTestCommand;
 
 uses(LaravelTestCase::class);
-
-final class HasCommandUtilsTestCommand extends Command
-{
-    use HasCommandUtils;
-
-    protected $signature = 'test:utils';
-
-    protected $description = 'test';
-
-    public function testValidationCallback(string $attribute, string $value, array $validations): ?string
-    {
-        $method = new ReflectionMethod($this, 'validationCallback');
-
-        return $method->invoke($this, $attribute, $value, $validations);
-    }
-}
 
 it('returns null when attribute is not in validations', function (): void {
     $command = new HasCommandUtilsTestCommand;

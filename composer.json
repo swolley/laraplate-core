@@ -2,7 +2,7 @@
   "name": "swolley/laraplate-core",
   "vendor": "swolley",
   "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
-  "version": "v1.40.0",
+  "version": "v1.41.5",
   "keywords": [
     "laravel",
     "laraplate",
@@ -113,7 +113,7 @@
       "composer bump",
       "npx npm-check-updates -u"
     ],
-    "version": "v1.41.5",
+    "version": "./scripts/version.sh --nointeractive",
     "version:silent": "./scripts/version.sh --silent --nointeractive",
     "version:major": "./scripts/version.sh major",
     "version:minor": "./scripts/version.sh minor",

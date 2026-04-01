@@ -9,65 +9,10 @@ use Modules\Core\Grids\Components\Option;
 use Modules\Core\Grids\Definitions\FieldType;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Grids\FieldModelStub;
+use Modules\Core\Tests\Stubs\Grids\FieldModelWithoutAppendAccessorStub;
 
 uses(LaravelTestCase::class);
-
-final class FieldModelStub extends Model
-{
-    use HasGridUtils;
-
-    protected $table = 'users';
-
-    protected $fillable = ['name', 'email'];
-
-    protected $hidden = ['password'];
-
-    protected $appends = ['computed_name'];
-
-    public function getComputedNameAttribute(): string
-    {
-        return 'computed';
-    }
-
-    public function setComputedNameAttribute(string $value): void
-    {
-        $this->attributes['computed_name'] = $value;
-    }
-
-    public function getRules(): array
-    {
-        return [
-            'email' => ['required', 'email'],
-            'name' => 'required|string',
-        ];
-    }
-
-    protected function casts(): array
-    {
-        return [];
-    }
-}
-
-final class FieldModelWithoutAppendAccessorStub extends Model
-{
-    use HasGridUtils;
-
-    protected $table = 'users';
-
-    protected $fillable = ['name'];
-
-    protected $appends = ['missing_accessor'];
-
-    public function getRules(): array
-    {
-        return [];
-    }
-
-    protected function casts(): array
-    {
-        return [];
-    }
-}
 
 it('builds full alias and full query alias', function (): void {
     $field = new Field('users', 'email', 'mail', FieldType::COLUMN, new FieldModelStub());

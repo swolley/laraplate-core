@@ -11,74 +11,13 @@ use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
-use Modules\Core\Filament\Utils\HasForm;
-use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
+use Modules\Core\Tests\Stubs\Filament\HasFormHarness;
+use Modules\Core\Tests\Stubs\Filament\HasRecordsHarness;
 
-final class HasFormHarness
-{
-    use HasForm;
-
-    public static bool $loaded_permissions = false;
-
-    public static function run(Schema $schema): void
-    {
-        self::configureForm($schema);
-    }
-
-    public static function loadUserPermissionsForTable(User $user): void
-    {
-        self::$loaded_permissions = $user->exists;
-    }
-}
-
-final class HasRecordsResourceHarness
-{
-    public static function getModel(): string
-    {
-        return Setting::class;
-    }
-}
-
-class HasRecordsParentHarness
-{
-    public function __construct(protected Table $table) {}
-
-    /**
-     * @return Collection<int, int>|Paginator|CursorPaginator
-     */
-    public function getTableRecords(): Collection|Paginator|CursorPaginator
-    {
-        return collect([1, 2, 3]);
-    }
-
-    protected static function getResource(): string
-    {
-        return HasRecordsResourceHarness::class;
-    }
-
-    protected function makeTable(): Table
-    {
-        return $this->table;
-    }
-}
-
-final class HasRecordsHarness extends HasRecordsParentHarness
-{
-    use HasRecords;
-
-    public function callHeaderActions(): array
-    {
-        return $this->getHeaderActions();
-    }
-
-    public function callMakeTable(): Table
-    {
-        return $this->makeTable();
-    }
-}
+uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
@@ -138,7 +77,7 @@ it('applies configured groups while building the table', function (): void {
     $table = Table::make($livewire);
     $harness = new HasRecordsHarness($table);
 
-    $groups_property = new ReflectionProperty(HasRecordsHarness::class, 'groups');
+    $groups_property = new \ReflectionProperty(HasRecordsHarness::class, 'groups');
     $groups_property->setAccessible(true);
     $groups_property->setValue($harness, [Group::make('group_name')]);
 
