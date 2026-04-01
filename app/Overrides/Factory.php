@@ -13,6 +13,7 @@ use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasTranslationsFactory;
 use Modules\Core\Helpers\HasUniqueFactoryValues;
 use Override;
+use RuntimeException;
 use Throwable;
 
 abstract class Factory extends BaseFactory
@@ -41,31 +42,29 @@ abstract class Factory extends BaseFactory
             ->afterCreating(function (Model $model): void {
                 $this->beforeFactoryCreating($model);
 
-                if (! $this->usesTranslations()) {
+                if ($this->usesTranslations()) {
                     $this->afterFactoryCreating($model);
 
-                    return;
-                }
+                    $default_locale = config('app.locale');
 
-                $default_locale = config('app.locale');
+                    if (! $model->translations()->where('locale', $default_locale)->exists()) {
+                        $default_translation_data = $this->translatedFieldsArray($model);
 
-                if (! $model->translations()->where('locale', $default_locale)->exists()) {
-                    $default_translation_data = $this->translatedFieldsArray($model);
+                        if ($default_translation_data === []) {
+                            $this->afterFactoryCreating($model);
 
-                    if ($default_translation_data === []) {
-                        $this->afterFactoryCreating($model);
+                            return;
+                        }
 
-                        return;
+                        $model->setTranslation($default_locale, $default_translation_data);
                     }
 
-                    $model->setTranslation($default_locale, $default_translation_data);
-                }
-
-                try {
+                    // try {
                     $this->createTranslations($model, fn (string $locale): array => $this->translationOverrides($model, $locale));
-                } catch (Throwable) {
+                    // } catch (Throwable) {
                     // Factories should not fail hard if translations duplication is optional for a given model.
                     // Concrete factories can still create translations explicitly when required for a test.
+                    // }
                 }
 
                 $this->afterFactoryCreating($model);
@@ -110,6 +109,8 @@ abstract class Factory extends BaseFactory
      */
     protected function translatedFieldsArray(Model $model): array
     {
+        throw_if($this->usesTranslations(), new RuntimeException('Method translatedFieldsArray() must be implemented in child factories that use HasTranslations trait.'));
+
         return [];
     }
 
