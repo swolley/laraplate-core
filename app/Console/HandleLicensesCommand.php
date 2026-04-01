@@ -10,6 +10,7 @@ use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
 
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -50,7 +51,7 @@ final class HandleLicensesCommand extends Command
                             $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
-                        ]),
+                        ])->values()->toArray(),
                     );
                 }
 
@@ -125,7 +126,7 @@ final class HandleLicensesCommand extends Command
         $this->output->info('Current max sessions available: ' . (Setting::query()->where('name', 'max_concurrent_sessions')->first()?->value ?? 'unlimited'));
     }
 
-    private function renewLicenses(int $number, int $licensesCount, ?Carbon $validTo): void
+    private function renewLicenses(int $number, int $licensesCount, ?CarbonInterface $validTo): void
     {
         $updated = License::query()->take($number)->update([
             'valid_from' => today(),
@@ -143,7 +144,7 @@ final class HandleLicensesCommand extends Command
             $this->output->info($message);
             Log::info($message);
         } elseif ($licensesCount < $number) {
-            $difference = $licensesCount - $number;
+            $difference = $number - $licensesCount;
 
             if (confirm(sprintf('%d licenses found. Do you confirm %d licenses creation?', $licensesCount, $difference))) {
                 License::factory()->count($difference)->create();
@@ -154,7 +155,7 @@ final class HandleLicensesCommand extends Command
         }
     }
 
-    private function addLicenses(int $number, ?Carbon $validTo): void
+    private function addLicenses(int $number, ?CarbonInterface $validTo): void
     {
         $query = License::expired()->take($number);
         $expired = $query->count();
@@ -179,7 +180,7 @@ final class HandleLicensesCommand extends Command
         }
     }
 
-    private function closeLicenses(int $number, ?Carbon $validTo): void
+    private function closeLicenses(int $number, ?CarbonInterface $validTo): void
     {
         $query = License::query()->take($number);
         $closed = $query->count();

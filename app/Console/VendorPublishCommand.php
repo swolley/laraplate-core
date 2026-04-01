@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use function config;
+use function module_path;
+use function modules;
+
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
 use Illuminate\Support\Str;
@@ -49,18 +53,24 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
         $migrations_subpath = config('modules.paths.generator.migration.path');
         $configs_subpath = config('modules.paths.generator.config.path');
 
-        if (Str::contains($from, $migrations_subpath)) {
+        if (Str::contains($from, $migrations_subpath, true)) {
             $found = $this->moduleMigrationExists($file_name);
-        } elseif (Str::endsWith($from, $configs_subpath . DIRECTORY_SEPARATOR . $file_name) || Str::endsWith($from, $configs_subpath . DIRECTORY_SEPARATOR . 'config.php')) {
-            $found = $this->moduleConfigExists($file_name);
+        } else {
+            $from_normalized = mb_strtolower(str_replace('\\', '/', $from));
+            $config_file_suffix = mb_strtolower(str_replace('\\', '/', $configs_subpath . '/' . $file_name));
+            $config_php_suffix = mb_strtolower(str_replace('\\', '/', $configs_subpath . '/config.php'));
 
-            if ($this->option('force') && $found) {
-                /** @psalm-suppress UnresolvableInclude */
-                $merged = array_merge(require $from, require $found);
-                file_put_contents($to, $merged);
-                $this->status($found, $to, 'file');
+            if (str_ends_with($from_normalized, $config_file_suffix) || str_ends_with($from_normalized, $config_php_suffix)) {
+                $found = $this->moduleConfigExists($file_name);
 
-                return;
+                if ($this->option('force') && $found) {
+                    /** @psalm-suppress UnresolvableInclude */
+                    $merged = array_merge(require $from, require $found);
+                    file_put_contents($to, $merged);
+                    $this->status($found, $to, 'file');
+
+                    return;
+                }
             }
         }
 

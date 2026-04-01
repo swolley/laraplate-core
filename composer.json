@@ -90,12 +90,13 @@
     "check": "vendor/bin/phpstan analyse --memory-limit=2G -v",
     "fix": "vendor/bin/phpstan analyse --memory-limit=2G -v --fix",
     "refactor": "rector",
-    "test:type-coverage": "XDEBUG_MODE=off php -d opcache.jit=0 -d opcache.jit_buffer_size=0 vendor/bin/pest --type-coverage --min=100",
+    "test:type-coverage": "XDEBUG_MODE=off php -d opcache.jit=0 -d opcache.jit_buffer_size=0 vendor/bin/pest --parallel --type-coverage --min=100",
     "test:typos": "peck",
     "test:lint": [
       "pint --parallel --test",
       "rector --dry-run"
     ],
+    "test:pest": "XDEBUG_MODE=off vendor/bin/pest --parallel",
     "test:unit": "pest --parallel --coverage --exactly=100",
     "test:types": "phpstan",
     "test:refactor": "rector",

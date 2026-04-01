@@ -16,11 +16,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Grids\Components\Field;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Inspector\SchemaInspector;
@@ -167,7 +167,10 @@ abstract class Entity
         }
 
         $prefix = $this instanceof Grid || $this instanceof Relation ? $this->getPath() : lcfirst($this->getModelName());
-        $fieldpath = preg_replace('/^' . $prefix . "\./", '', (string) (is_string($field) ? preg_replace("/\.\w+$/", '', $field) : $field->getPath()));
+        $fieldpath = $this->stripEntityPrefix(
+            (string) $prefix,
+            is_string($field) ? (string) preg_replace("/\.\w+$/", '', $field) : $field->getPath(),
+        );
 
         if ((string) $fieldpath === '') {
             return null;
@@ -175,7 +178,7 @@ abstract class Entity
 
         $exploded_fieldpath = explode('.', (string) $fieldpath);
 
-        if ($exploded_fieldpath[0] === lcfirst($this->getName())) {
+        if ($exploded_fieldpath[0] === $this->getCurrentEntityName()) {
             array_shift($exploded_fieldpath);
         }
 
@@ -330,8 +333,11 @@ abstract class Entity
      */
     final public function getRelationDeeply(Relation|string $relation): ?Relation
     {
-        $subfix = mb_strlen($this->getPath()) !== 0 ? preg_replace('/^' . $this->getPath() . "\./", '', $relation) : preg_replace('/^' . lcfirst($this->getModelName()) . './', '', $relation);
-        $exploded = explode('.', (string) $subfix);
+        $relation_name = is_string($relation) ? $relation : $relation->getFullName();
+        $subfix = mb_strlen($this->getPath()) !== 0
+            ? $this->stripEntityPrefix($this->getPath(), $relation_name)
+            : $this->stripEntityPrefix(lcfirst($this->getModelName()), $relation_name);
+        $exploded = explode('.', $subfix);
         $first = array_shift($exploded);
         $thisrelation = $this->getRelation($first);
 
@@ -439,21 +445,14 @@ abstract class Entity
         return false;
     }
 
-    final public function addRelationDeeply(array $relationList): static
+    final public function addRelationDeeply(array $relationList): Relation|static
     {
         $parent = $this;
 
         /** @var RelationInfo $relation */
         foreach ($relationList as $relation) {
             assertInstanceOf(RelationInfo::class, $relation);
-            $subrelation = $parent->getRelation($relation->getName());
-
-            if (! ($subrelation instanceof Relation)) {
-                $subrelation = new Relation($parent->getFullName(), $relation);
-                $parent->addRelation($subrelation);
-            }
-
-            $parent = $subrelation;
+            $parent = $this->resolveOrCreateSubrelation($parent, $relation);
         }
 
         return $parent;
@@ -591,9 +590,11 @@ abstract class Entity
 
     // region [REQUEST]
 
-    protected function parseRequest(GridRequest $request): void
+    protected function parseRequest(IParsableRequest $request): void
     {
-        $this->requestData = $request->parsed();
+        $parsed = $request->parsed();
+        assertInstanceOf(GridRequestData::class, $parsed);
+        $this->requestData = $parsed;
 
         // Log::debug($this->requestData->jsonSerialize());
     }
@@ -810,5 +811,38 @@ abstract class Entity
         $parent = $this->addRelationDeeply($relationList);
 
         return $parent->addField($field);
+    }
+
+    private function stripEntityPrefix(string $prefix, string $value): string
+    {
+        return (string) preg_replace('/^' . preg_quote($prefix, '/') . '\./', '', $value);
+    }
+
+    private function getCurrentEntityName(): string
+    {
+        return isset($this->name) ? lcfirst($this->name) : lcfirst($this->getModelName());
+    }
+
+    private function resolveOrCreateSubrelation(self|Relation $parent, RelationInfo $relation): Relation
+    {
+        $subrelation = $parent->getRelation($relation->getName());
+
+        if ($subrelation instanceof Relation) {
+            return $subrelation;
+        }
+
+        $subrelation = new Relation($this->resolveParentFullName($parent), $relation);
+        $parent->addRelation($subrelation);
+
+        return $subrelation;
+    }
+
+    private function resolveParentFullName(self|Relation $parent): string
+    {
+        if ($parent instanceof Relation) {
+            return $parent->getFullName();
+        }
+
+        return isset($parent->name) ? $parent->getFullName() : lcfirst($parent->getModelName());
     }
 }

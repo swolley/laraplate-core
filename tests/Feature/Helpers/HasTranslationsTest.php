@@ -3,13 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     Schema::create('fake_translatable_models', function (Blueprint $table): void {

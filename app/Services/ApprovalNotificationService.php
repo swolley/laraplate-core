@@ -47,10 +47,10 @@ final class ApprovalNotificationService
         $total_pending = $pending_by_entity->sum('count');
         $entities = $pending_by_entity->pluck('count', 'entity')->all();
 
-        $this->sendNotifications($pending_by_entity);
+        $sent = $this->sendNotifications($pending_by_entity);
 
         return [
-            'sent' => true,
+            'sent' => $sent,
             'pending_count' => $total_pending,
             'entities' => $entities,
         ];
@@ -176,17 +176,19 @@ final class ApprovalNotificationService
      *
      * @param  Collection<int, array{entity: string, table: string, count: int, oldest_at: string|null}>  $pending_by_entity
      */
-    private function sendNotifications(Collection $pending_by_entity): void
+    private function sendNotifications(Collection $pending_by_entity): bool
     {
         $recipients = $this->getNotificationRecipients();
 
         if ($recipients->isEmpty()) {
-            return;
+            return false;
         }
 
         $notification = new PendingApprovalsNotification($pending_by_entity);
 
         Notification::send($recipients, $notification);
+
+        return true;
     }
 
     /**

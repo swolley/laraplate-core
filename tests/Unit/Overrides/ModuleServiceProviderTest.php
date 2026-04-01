@@ -166,6 +166,20 @@ it('register throws when name is not Core and Core module not found', function (
         ->toThrow(Exception::class, 'Core is required and must be enabled');
 });
 
+it('register for core registers event and route service providers', function (): void {
+    $provider = new class(app()) extends ModuleServiceProvider
+    {
+        public string $name = 'Core';
+
+        public string $nameLower = 'core';
+    };
+
+    $provider->register();
+
+    expect(app()->getProvider(Modules\Core\Providers\EventServiceProvider::class))->not->toBeNull()
+        ->and(app()->getProvider(Modules\Core\Providers\RouteServiceProvider::class))->not->toBeNull();
+});
+
 it('registerTranslations loads from resource path when directory exists', function (): void {
     $lang_path = resource_path('lang/modules/core');
     $created = false;

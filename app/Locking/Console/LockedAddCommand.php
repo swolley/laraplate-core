@@ -33,8 +33,8 @@ class LockedAddCommand extends Command
         $model = $this->argument('model');
 
         // $namespace = config('locked.default_namespace');
-        if (Str::contains('\\', $model)) {
-            $namespace = Str::replaceMatches('\\\w+$', '', $model);
+        if (Str::contains($model, '\\')) {
+            $namespace = Str::replaceMatches('/\\\\\w+$/', '', $model);
         } else {
             $namespace = 'App\\Models';
         }

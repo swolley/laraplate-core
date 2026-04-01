@@ -3,18 +3,14 @@
 declare(strict_types=1);
 
 use Filament\Schemas\Schema;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!FilamentAdminPass',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);

@@ -18,7 +18,7 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\Fixtures\QueryBuilderCoverageOwner;
+use Modules\Core\Tests\Fixtures\QueryBuilderOwner;
 use Modules\Core\Tests\LaravelTestCase;
 
 uses(LaravelTestCase::class);
@@ -129,7 +129,7 @@ it('extractRelationFilters walks nested filter groups and skips main-entity-only
     expect($query->getEagerLoads())->toHaveKey('roles');
 });
 
-it('prepareQuery covers sort branches for main column orderBy, relation method skip, and single-segment relation path', function (): void {
+it('prepareQuery applies sort branches for main column orderBy, relation method skip, and single-segment relation path', function (): void {
     $query = User::query();
     $request_data = qb_fullcov_list_data(
         columns: [new Column('users.id', ColumnType::COLUMN)],
@@ -196,7 +196,7 @@ it('prepareQuery owner relation uses crudComputedDependencies merge and nested w
 
         public function owner(): BelongsTo
         {
-            return $this->belongsTo(QueryBuilderCoverageOwner::class, 'owner_id');
+            return $this->belongsTo(QueryBuilderOwner::class, 'owner_id');
         }
     };
 
@@ -252,7 +252,7 @@ it('prepareQuery drops owner relation column list when append has no crudCompute
 
         public function owner(): BelongsTo
         {
-            return $this->belongsTo(QueryBuilderCoverageOwner::class, 'owner_id');
+            return $this->belongsTo(QueryBuilderOwner::class, 'owner_id');
         }
     };
 
@@ -334,7 +334,7 @@ it('resolveComputedDependencies forces select-all when a dependency key is missi
     expect($selected)->toContain('qb_cov_dep.*');
 });
 
-it('covers QueryBuilder private helpers via reflection for remaining branches', function (): void {
+it('exercises QueryBuilder private helpers via reflection for remaining branches', function (): void {
     $qb = new QueryBuilder();
     $ref = new ReflectionClass($qb);
 

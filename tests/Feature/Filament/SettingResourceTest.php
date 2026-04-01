@@ -6,14 +6,11 @@ use Filament\Schemas\Schema;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
         'email' => 'admin@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!FilamentAdminPass',
     ]);
 
     $adminRole = Role::factory()->create(['name' => 'admin']);

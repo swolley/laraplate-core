@@ -214,7 +214,7 @@ trait HasClosureTable
 
     public function moveTo(self $newParent): bool
     {
-        if ($this->isDescendantOf($newParent)) {
+        if ($newParent->isDescendantOf($this)) {
             return false;
         }
 

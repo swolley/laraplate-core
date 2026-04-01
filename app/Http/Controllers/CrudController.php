@@ -36,8 +36,7 @@ class CrudController extends Controller
 
     /**
      * @route-comment
-     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: ['GET', 'POST', 'HEAD'], middleware: ['api', 'crud_api'])
-     * Route(path: 'app/crud/select/{entity}', name: 'core.crud.list', methods: [GET, POST, HEAD], middleware: [web])
+     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api, crud_api])
      */
     final public function list(ListRequest $request): Response
     {
@@ -60,7 +59,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/detail/{entity}', name: 'core.api.detail', methods: [GET, HEAD], middleware: [api, crud_api])
-     * Route(path: 'app/crud/detail/{entity}', name: 'core.crud.detail', methods: [GET, HEAD], middleware: [web])
      */
     final public function detail(DetailRequest $request): Response
     {
@@ -93,7 +91,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/history/{entity}', name: 'core.api.history', methods: [GET, HEAD], middleware: [api, crud_api])
-     * Route(path: 'app/crud/history/{entity}', name: 'core.crud.history', methods: [GET, HEAD], middleware: [web])
      */
     final public function history(HistoryRequest $request): Response
     {
@@ -109,7 +106,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/tree/{entity}', name: 'core.api.tree', methods: [GET, HEAD], middleware: [api, crud_api])
-     * Route(path: 'app/crud/tree/{entity}', name: 'core.crud.tree', methods: [GET, HEAD], middleware: [web])
      */
     final public function tree(TreeRequest $request): Response
     {
@@ -125,7 +121,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api, crud_api])
-     * Route(path: 'app/crud/insert/{entity}', name: 'core.crud.insert', methods: [POST], middleware: [web])
      */
     final public function insert(ModifyRequest $request): Response
     {
@@ -146,7 +141,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/update/{entity}', name: 'core.api.replace', methods: [PATCH, PUT], middleware: [api, crud_api])
-     * Route(path: 'app/crud/update/{entity}', name: 'core.crud.replace', methods: [PATCH, PUT], middleware: [web])
      */
     final public function update(ModifyRequest $request): Response
     {
@@ -167,7 +161,6 @@ class CrudController extends Controller
     /**
      * @route-comment
      * Route(path: 'api/v1/delete/{entity}', name: 'core.api.delete', methods: [DELETE, POST], middleware: [api, crud_api])
-     * Route(path: 'app/crud/delete/{entity}', name: 'core.crud.delete', methods: [DELETE, POST], middleware: [web])
      */
     final public function delete(ModifyRequest $request): Response
     {

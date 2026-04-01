@@ -6,6 +6,7 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Console\Command as BaseCommand;
 use Modules\Core\Helpers\HasBenchmark;
+use Throwable;
 
 class Command extends BaseCommand
 {
@@ -29,7 +30,15 @@ class Command extends BaseCommand
 
     private function isRunningUnitTests(): bool
     {
-        return app()->bound('runningUnitTests') && app()->runningUnitTests();
+        if (! function_exists('app')) {
+            return false;
+        }
+
+        try {
+            return app()->runningUnitTests();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function isRunningInConsole(): bool

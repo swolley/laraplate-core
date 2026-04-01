@@ -30,3 +30,26 @@ it('getModuleNamespace returns namespace derived from Providers replacement', fu
     expect($namespace)->toBeString();
     expect($namespace)->not->toContain('Providers');
 });
+
+it('mapApiRoutes registers default api v1 group without throwing', function (): void {
+    $provider = new class(app()) extends Modules\Core\Overrides\RouteServiceProvider
+    {
+        protected string $name = 'Core';
+
+        public function publicMapApiRoutes(): void
+        {
+            $this->mapApiRoutes();
+        }
+    };
+
+    expect(fn () => $provider->publicMapApiRoutes())->not->toThrow(Throwable::class);
+});
+
+it('map calls both api and web route mapping without throwing', function (): void {
+    $provider = new class(app()) extends Modules\Core\Overrides\RouteServiceProvider
+    {
+        protected string $name = 'Core';
+    };
+
+    expect(fn () => $provider->map())->not->toThrow(Throwable::class);
+});

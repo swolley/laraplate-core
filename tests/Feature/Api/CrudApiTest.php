@@ -2,15 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\Rules\Password;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -110,11 +107,13 @@ test('api detail returns 404 for non-existent record', function (): void {
 });
 
 test('api insert creates new record', function (): void {
+    Password::defaults(static fn () => Password::min(8)->letters()->mixedCase()->numbers()->symbols());
+
     $userData = [
         'name' => 'New User',
         'username' => 'newuser',
         'email' => 'new@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!VeryUniqueTestPass',
     ];
 
     $response = $this->postJson(route('core.api.insert', ['entity' => 'users']), $userData);
@@ -137,6 +136,26 @@ test('api insert validates required fields', function (): void {
 
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['name', 'email', 'password']);
+});
+
+test('api insert rejects weak password and does not create record', function (): void {
+    Password::defaults(static fn () => Password::min(8)->letters()->mixedCase()->numbers()->symbols());
+
+    $userData = [
+        'name' => 'Weak Password User',
+        'username' => 'weakpassworduser',
+        'email' => 'weak@example.com',
+        'password' => 'password',
+    ];
+
+    $response = $this->postJson(route('core.api.insert', ['entity' => 'users']), $userData);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['password']);
+
+    $this->assertDatabaseMissing('users', [
+        'email' => 'weak@example.com',
+    ]);
 });
 
 test('api update modifies existing record', function (): void {

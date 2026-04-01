@@ -5,9 +5,6 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Modules\Core\Http\Middleware\EnsureIsLocal;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 test('middleware passes when app is local', function (): void {
     App::partialMock()->shouldReceive('isLocal')->andReturn(true);

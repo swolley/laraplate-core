@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 test('middleware transforms request input true string to boolean', function (): void {
     $request = Request::create('/test', 'GET', ['flag' => 'true']);

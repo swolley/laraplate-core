@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| Single test case (LaravelTestCase) so --parallel can run: each worker
-| resolves the app via Modules\Core\Tests\CreatesApplication. Unit tests run with the
-| same bootstrap (slightly slower but parallel-safe).
+| Default: lightweight PHPUnit TestCase for Unit tests (no app/DB bootstrap).
+| Feature tests use LaravelTestCase via ->in(__DIR__.'/Feature'). Unit files that
+| need the app declare uses(Modules\Core\Tests\LaravelTestCase::class).
+|
+| Note: A global uses(LaravelTestCase::class) alone does not attach the case to each
+| test file in this setup; Feature must use ->in(...) or per-file uses().
+|
+| Speed: prefer `composer run test:pest` or `vendor/bin/pest --parallel` during development.
+| `composer test` runs type coverage, coverage, PHPStan, Pint, etc., and is slower by design.
 |--------------------------------------------------------------------------
 */
-uses(Modules\Core\Tests\LaravelTestCase::class);
+uses(Modules\Core\Tests\TestCase::class);
+
+uses(Modules\Core\Tests\LaravelTestCase::class)->in(__DIR__ . '/Feature');
 
 /*
 |--------------------------------------------------------------------------

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\License;
 
-final class QueryBuilderCoverageOwner extends Model
+final class QueryBuilderOwner extends Model
 {
     protected $table = 'users';
 

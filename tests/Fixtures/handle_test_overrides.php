@@ -16,11 +16,19 @@ use Modules\Core\Tests\Fixtures\HandleTestContext;
 
 function models(bool $onlyActive = true): array
 {
+    if (HandleTestContext::$models_from_global_helpers) {
+        return \models($onlyActive);
+    }
+
     return HandleTestContext::$models;
 }
 
 function class_uses_trait(string|object $class, string $uses, bool $recursive = true): bool
 {
+    if (HandleTestContext::$models_from_global_helpers) {
+        return \class_uses_trait($class, $uses, $recursive);
+    }
+
     return HandleTestContext::$uses_trait;
 }
 

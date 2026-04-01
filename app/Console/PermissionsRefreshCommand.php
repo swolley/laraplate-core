@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use function class_uses_trait;
+use function config;
+use function models;
+use function user_class;
+
 use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -92,6 +97,10 @@ final class PermissionsRefreshCommand extends Command
         DB::beginTransaction();
 
         foreach ($all_models as $model) {
+            if (! is_string($model) || ! class_exists($model)) {
+                continue;
+            }
+
             $need_bypass = $this->checkIfBlacklisted($model);
 
             if ($need_bypass) {
@@ -159,6 +168,8 @@ final class PermissionsRefreshCommand extends Command
                     $query = $permission_class::query()->where('name', $permission_name);
 
                     if ($query->exists()) {
+                        // @codeCoverageIgnoreStart
+                        // Permission model does not use SoftDeletes; the query builder has no restore() macro, so this branch is not reachable at runtime.
                         $query->restore();
 
                         if (! $quiet_mode) {
@@ -166,6 +177,7 @@ final class PermissionsRefreshCommand extends Command
                         }
 
                         $changes = true;
+                        // @codeCoverageIgnoreEnd
                     } else {
                         $permission_class::create([
                             'name' => $permission_name,

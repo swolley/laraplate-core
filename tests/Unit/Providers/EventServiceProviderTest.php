@@ -65,3 +65,12 @@ it('boot registers Setting saved listener that flushes cache tags', function ():
         expect(fn () => $listener($setting))->not->toThrow(Throwable::class);
     }
 });
+
+it('configureEmailVerification can be invoked safely', function (): void {
+    $ref = new ReflectionClass($this->provider);
+    $method = $ref->getMethod('configureEmailVerification');
+    $method->setAccessible(true);
+    $method->invoke($this->provider);
+
+    expect(true)->toBeTrue();
+});

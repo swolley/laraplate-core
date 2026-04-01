@@ -67,10 +67,6 @@ class MakeModelTranslatableCommand extends Command
             required: true,
         );
 
-        if ($choice === null) {
-            return Command::FAILURE;
-        }
-
         $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : $choice;
 
         if (! is_string($model_full_name) || $model_full_name === '') {
@@ -457,7 +453,7 @@ class MakeModelTranslatableCommand extends Command
                 }
             }
 
-            if (isset($matches[0]) && $matches[0] !== [] && $class_pos !== false) {
+            if ($matches[0] !== [] && $class_pos !== false) {
                 $last_import = null;
 
                 foreach ($matches[0] as $match) {

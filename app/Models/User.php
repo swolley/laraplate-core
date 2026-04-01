@@ -111,7 +111,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     public function isGuest(): bool
     {
-        return ! property_exists($this, 'email') || $this->email === null;
+        return $this->getAttribute('email') === null;
     }
 
     public function isSuperAdmin(): bool

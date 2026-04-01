@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
-final class TreeCollection extends Collection
+final class TreeCollection extends EloquentCollection
 {
     private const string ROOT_KEY = '__root__';
 
@@ -14,7 +15,9 @@ final class TreeCollection extends Collection
     {
         $grouped = $this->groupBy(fn (object $item): int|string => $item->parent_id ?? self::ROOT_KEY);
 
-        return self::buildTree($grouped, self::ROOT_KEY);
+        $built = self::buildTree($grouped, self::ROOT_KEY);
+
+        return new self($built->all());
     }
 
     public function withPaths(string $separator = ' > ', string $field = 'name'): Collection

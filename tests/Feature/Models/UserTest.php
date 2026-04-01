@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
+use Spatie\Permission\Guard;
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -29,7 +26,7 @@ it('has fillable attributes', function (): void {
         'name' => 'Test User',
         'username' => 'testuser',
         'email' => 'test@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!TestUserPass',
         'lang' => 'en',
     ];
 
@@ -142,7 +139,7 @@ it('can be created with specific attributes', function (): void {
         'name' => 'John Doe',
         'username' => 'johndoe',
         'email' => 'john@example.com',
-        'password' => 'password',
+        'password' => 'Aa1!TestUserPass',
         'lang' => 'it',
     ];
 
@@ -241,11 +238,12 @@ it('canImpersonate returns true for superadmin', function (): void {
 it('canImpersonate returns true when user has impersonate permission via role', function (): void {
     config(['permission.roles.superadmin' => 'superadmin']);
     $user = User::factory()->create();
+    $guard_name = Guard::getDefaultName(User::class);
     $perm_name = ($user->getConnectionName() ?? 'default') . $user->getTable() . '.impersonate';
-    $permission = new Permission(['name' => $perm_name, 'guard_name' => 'web']);
+    $permission = new Permission(['name' => $perm_name, 'guard_name' => $guard_name]);
     $permission->setSkipValidation(true);
     $permission->save();
-    $role = Role::factory()->create(['name' => 'impersonator']);
+    $role = Role::factory()->create(['name' => 'impersonator', 'guard_name' => $guard_name]);
     $role->givePermissionTo($permission);
     $user->assignRole($role);
 

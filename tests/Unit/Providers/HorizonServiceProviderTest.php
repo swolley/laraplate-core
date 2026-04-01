@@ -27,7 +27,8 @@ it('viewHorizon allows superadmin when user is App\Models\User', function (): vo
         class_alias(User::class, App\Models\User::class);
     }
 
-    $user = User::factory()->create();
+    /** @var App\Models\User $user */
+    $user = App\Models\User::query()->create(User::factory()->raw());
     $role = Role::factory()->create(['name' => 'superadmin']);
     $user->roles()->attach($role);
 

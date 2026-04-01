@@ -3,16 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Console\FreeExpiredLicensesCommand;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 it('frees licenses whose validity has expired', function (): void {
     /** @var class-string<User> $userClass */

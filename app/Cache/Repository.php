@@ -272,10 +272,10 @@ final class Repository extends BaseRepository
             $group_method = 'groups';
         } elseif (method_exists($user, 'user_groups')) {
             $group_method = 'user_groups';
-        } elseif (method_exists($user, 'roles')) {
-            $group_method = 'roles';
         } elseif (method_exists($user, 'user_roles')) {
             $group_method = 'user_roles';
+        } elseif (method_exists($user, 'roles')) {
+            $group_method = 'roles';
         }
 
         if ($group_method) {

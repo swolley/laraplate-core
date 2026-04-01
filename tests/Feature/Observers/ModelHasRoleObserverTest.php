@@ -2,16 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Observers\ModelHasRoleObserver;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\UserForcedSuperRole;
-
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 it('prevents assigning another role to a user who already has superadmin role', function (): void {
     config(['permission.roles.superadmin' => 'superadmin']);
