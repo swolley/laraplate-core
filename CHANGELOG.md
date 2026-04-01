@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Improve translation handling in Factory class
+
+## [1.41.4] - 2026-04-01
+
 ### 🚀 Features
 
 - *(core)* Harden query builder behavior and expand test coverage
