@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Harden query builder behavior and expand test coverage
+
+### 🐛 Bug Fixes
+
+- *(crud)* Correct composite PK in detail and skip relation methods in sort
+
+### 🚜 Refactor
+
+- Update module remapping and enhance author display in views
+- Update translation handling in MakeModelTranslatableCommand and related tests
+
+### 🧪 Testing
+
+- *(core)* Expand Crud, QueryBuilder, and service coverage
+- Expand coverage for models, observers, and services
+- Expand coverage and stabilize password-related fixtures
+- Expand unit and feature coverage across Core module
+- Expand coverage and stabilize core command behaviors
+- Expand ModelMakeCommand coverage and stabilize runtime branches
+- *(core)* Reorganize suites and improve console command coverage
+
+## [1.41.3] - 2026-03-24
+
 ### 🚜 Refactor
 
 - Improve type hints and streamline code across various components
