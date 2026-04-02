@@ -7,17 +7,12 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Contracts\HasTable as HasTableContract;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
-use Illuminate\Contracts\Pagination\CursorPaginator;
-use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Filament\HasFormHarness;
 use Modules\Core\Tests\Stubs\Filament\HasRecordsHarness;
-
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->admin = User::factory()->create([
@@ -77,7 +72,7 @@ it('applies configured groups while building the table', function (): void {
     $table = Table::make($livewire);
     $harness = new HasRecordsHarness($table);
 
-    $groups_property = new \ReflectionProperty(HasRecordsHarness::class, 'groups');
+    $groups_property = new ReflectionProperty(HasRecordsHarness::class, 'groups');
     $groups_property->setAccessible(true);
     $groups_property->setValue($harness, [Group::make('group_name')]);
 

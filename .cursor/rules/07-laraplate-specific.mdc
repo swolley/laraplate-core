@@ -8,11 +8,13 @@ alwaysApply: false
 
 Questo file definisce le regole **specifiche per il modulo Core** all'interno di Laraplate.
 Non descrive l'intera applicazione, ma si concentra su:
+
 - come il Core estende Laravel
 - come gli altri moduli devono interagire con il Core
 - cosa è lecito o meno mettere dentro il Core.
 
 Per le linee guida generali di Laravel, moduli, Filament, testing, CI/CD, ecc. fare riferimento a:
+
 - `laravel-boost.mdc`
 - `01-php-laravel-standards.mdc`
 - `02-architecture-patterns.mdc`
@@ -51,6 +53,7 @@ Per le linee guida generali di Laravel, moduli, Filament, testing, CI/CD, ecc. f
 - Funzionalità di presentazione specifiche di un modulo (UI/UX particolari, Filament resources non generiche, viste Blade non riutilizzabili).
 
 Se una funzionalità:
+
 - è generica, riutilizzabile, e potrebbe servire a più progetti diversi → candidata per il Core;
 - è legata a un dominio o caso d'uso specifico → deve restare nel modulo di dominio (es. `Cms`, `Ecommerce`, ecc.).
 
@@ -63,6 +66,7 @@ Se una funzionalità:
 - I moduli **non** dovrebbero:
   - modificare direttamente il comportamento interno del Core senza passare per estensioni/supporti previsti (eventi, configurazioni, contratti),
   - introdurre dipendenze cicliche (es. Core → Cms → Core).
+- Il modulo Core non deve avere riferimenti ad altri moduli perché rappresenta solo le funzioni Core
 
 ### Esempi di utilizzo corretto
 
@@ -123,4 +127,3 @@ Modules/Core/
   - strategia di testing → vedi `05-testing-development.mdc`.
 
 Questo file deve restare focalizzato sul **ruolo del Core** e sulla sua relazione con gli altri moduli: se una regola è generale per l'intera app, deve vivere nelle regole di root o negli altri file `.mdc` condivisi.
-

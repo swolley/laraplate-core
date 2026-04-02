@@ -6,15 +6,14 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Database\Eloquent\Factories\Factory as BaseFactory;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Cms\Helpers\HasDynamicContentFactory;
-use Modules\Cms\Helpers\HasDynamicContents;
 use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Helpers\HasDynamicContentFactory;
+use Modules\Core\Helpers\HasDynamicContents;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasTranslationsFactory;
 use Modules\Core\Helpers\HasUniqueFactoryValues;
 use Override;
 use RuntimeException;
-use Throwable;
 
 abstract class Factory extends BaseFactory
 {

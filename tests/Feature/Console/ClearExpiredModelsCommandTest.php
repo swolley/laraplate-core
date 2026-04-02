@@ -7,13 +7,10 @@ use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\ClearExpiredModels;
 use Modules\Core\Helpers\HelpersCache;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Models\ClearExpiredModelsNoSoftStub;
 use Modules\Core\Tests\Stubs\Models\ClearExpiredModelsSoftStub;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-uses(LaravelTestCase::class);
 
 function clearExpiredModelsCommandWithOutput(ClearExpiredModels $command): ClearExpiredModels
 {

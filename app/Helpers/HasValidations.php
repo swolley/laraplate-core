@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\UnauthorizedException;
-use Modules\Cms\Helpers\HasDynamicContents;
 use Modules\Core\Casts\CrudExecutor;
 
 /**

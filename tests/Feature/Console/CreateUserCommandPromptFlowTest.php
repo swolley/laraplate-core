@@ -14,12 +14,9 @@ use Modules\Core\Console\CreateUserCommand;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Console\CreateUserPromptFlowStub;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-uses(LaravelTestCase::class);
 
 function createUserCommandWithOutput(CreateUserCommand $command): CreateUserCommand
 {

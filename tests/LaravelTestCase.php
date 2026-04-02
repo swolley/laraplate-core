@@ -78,6 +78,8 @@ abstract class LaravelTestCase extends Orchestra
         $app['config']->set('crud.dynamic_entities', true);
         $app['config']->set('cache.duration', 3600);
 
+        self::registerLaravelSwaggerTestConfig($app);
+
         self::mergePermissionConfig($app);
         $app['config']->set('versionable.version_model', Version::class);
         $app['config']->set('versionable.user_model', User::class);
@@ -120,6 +122,22 @@ abstract class LaravelTestCase extends Orchestra
     /**
      * Path to test-only migrations (e.g. base users table) that must run before module migrations.
      */
+    /**
+     * Load this package's laravel-swagger config so console tests and module-scoped runs see a full config array.
+     */
+    private static function registerLaravelSwaggerTestConfig($app): void
+    {
+        $swagger_config_path = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'laravel-swagger.php';
+
+        if (! is_file($swagger_config_path)) {
+            return;
+        }
+
+        /** @var array<string, mixed> $swagger_config */
+        $swagger_config = require $swagger_config_path;
+        $app['config']->set('laravel-swagger', $swagger_config);
+    }
+
     private static function testbench_migrations_path(): string
     {
         return __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';

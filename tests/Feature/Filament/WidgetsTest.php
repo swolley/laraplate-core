@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\QueryException;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
-use Modules\Core\Filament\Widgets\RecentActivityWidget;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
 use Modules\Core\Filament\Widgets\SystemHealthWidget;
 use Modules\Core\Filament\Widgets\WelcomeLinkWidget;
@@ -49,16 +48,6 @@ it('builds core stats widget data', function (): void {
 
 it('returns horizon canView based on service provider availability', function (): void {
     expect(HorizonStatsWidget::canView())->toBe(class_exists(Laravel\Horizon\HorizonServiceProvider::class));
-});
-
-it('returns recent activity view data payload', function (): void {
-    $widget = new RecentActivityWidget();
-    $method = new ReflectionMethod(RecentActivityWidget::class, 'getViewData');
-    $method->setAccessible(true);
-    $data = $method->invoke($widget);
-
-    expect($data)->toHaveKeys(['recent_contents', 'recent_users'])
-        ->and($data['recent_users'])->toBeArray();
 });
 
 it('returns search engine health canView on cache-health route', function (): void {
