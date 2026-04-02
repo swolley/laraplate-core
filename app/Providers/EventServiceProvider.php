@@ -8,7 +8,10 @@ use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvi
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Models\CronJob;
+use Modules\Core\Models\Pivot\Fieldable;
+use Modules\Core\Models\Preset;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\DynamicContentsService;
 use Override;
 
 final class EventServiceProvider extends ServiceProvider
@@ -52,6 +55,21 @@ final class EventServiceProvider extends ServiceProvider
         ], static function (Setting $setting): void {
             Cache::tags(Cache::getCacheTags($setting->getTable()))->flush();
         });
+
+        Event::listen([
+            'eloquent.saved: ' . Preset::class,
+            'eloquent.deleted: ' . Preset::class,
+            'eloquent.forceDeleted: ' . Preset::class,
+        ], function (): void {
+            $this->clearPresetCache();
+        });
+
+        Event::listen([
+            'eloquent.saved: ' . Fieldable::class,
+            'eloquent.deleted: ' . Fieldable::class,
+        ], function (): void {
+            $this->clearPresetCache();
+        });
     }
 
     /**
@@ -61,5 +79,12 @@ final class EventServiceProvider extends ServiceProvider
     protected function configureEmailVerification(): void
     {
         //
+    }
+
+    private function clearPresetCache(): void
+    {
+        Cache::forget(new Preset()->getCacheKey());
+        DynamicContentsService::getInstance()->clearPresetsCache();
+        DynamicContentsService::getInstance()->clearPresettablesCache();
     }
 }

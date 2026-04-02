@@ -4,64 +4,17 @@ declare(strict_types=1);
 
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
-use Illuminate\Database\Eloquent\Model;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\Prompt;
 use Laravel\Prompts\SuggestPrompt;
 use Laravel\Prompts\TextPrompt;
 use Modules\Core\Console\ModelMakeCommand;
+use Modules\Core\Tests\Stubs\Console\ModelMakeCoverageFieldsStub;
+use Modules\Core\Tests\Stubs\Console\ModelMakeMigrationSpyCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
-use Symfony\Component\Console\Command\Command as SymfonyCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-if (! class_exists('ModelMakeCoverageFieldsStub')) {
-    class ModelMakeCoverageFieldsStub extends Model
-    {
-        protected $fillable = ['name'];
-
-        protected $hidden = ['secret'];
-
-        protected $attributes = ['status' => 'draft'];
-
-        protected $appends = ['full_name'];
-
-        protected function casts(): array
-        {
-            return ['meta' => 'array'];
-        }
-    }
-}
-
-if (! class_exists('ModelMakeMigrationSpyCommand')) {
-    class ModelMakeMigrationSpyCommand extends SymfonyCommand
-    {
-        public static array $lastArguments = [];
-
-        protected function configure(): void
-        {
-            $this->setName('make:migration');
-            $this->addArgument('name');
-            $this->addOption('create');
-            $this->addOption('update');
-            $this->addOption('fullpath');
-        }
-
-        protected function execute(Symfony\Component\Console\Input\InputInterface $input, Symfony\Component\Console\Output\OutputInterface $output): int
-        {
-            self::$lastArguments = [
-                'name' => (string) $input->getArgument('name'),
-                'create' => $input->getOption('create'),
-                'update' => $input->getOption('update'),
-                'fullpath' => (bool) $input->getOption('fullpath'),
-            ];
-
-            return 0;
-        }
-    }
-}
-
 
 afterEach(function (): void {
     Prompt::interactive(true);
@@ -1034,7 +987,7 @@ it('returns early from handleAskInverseRelation when user declines or inverse na
 
     $decline_output = new class(new ArrayInput([]), new BufferedOutput()) extends OutputStyle
     {
-        #[\Override]
+        #[Override]
         public function confirm(string $question, bool $default = true): bool
         {
             return false;
@@ -1043,7 +996,7 @@ it('returns early from handleAskInverseRelation when user declines or inverse na
     $output_property->setValue($command, $decline_output);
     $input_property->setValue($command, new ArrayInput([]));
     expect(fn () => $method->invoke($command, 'App\\Models\\Post', 'User', 'App\\Models\\User', 'relation\\ManyToOne'))
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 
     $non_interactive_input = new ArrayInput([]);
     $non_interactive_input->setInteractive(false);
@@ -1051,10 +1004,10 @@ it('returns early from handleAskInverseRelation when user declines or inverse na
     $output_property->setValue($command, $standard_output);
     $input_property->setValue($command, $non_interactive_input);
     expect(fn () => $method->invoke($command, 'App\\Models\\', 'User', 'App\\Models\\User', 'relation\\ManyToOne'))
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 
     expect(fn () => $method->invoke($command, 'App\\Models\\Post', 'User', 'App\\Models\\User', 'relation\\UnmappedRelation'))
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 });
 
 it('throws when relationship field is missing related class in proceedWithModelAttributes', function (): void {
@@ -1101,7 +1054,7 @@ PHP;
     });
 
     expect(fn () => $method->invoke($command, $class_fqcn, $class_code, $tmp_path))
-        ->toThrow(\InvalidArgumentException::class, 'Missing related class attribute');
+        ->toThrow(InvalidArgumentException::class, 'Missing related class attribute');
 
     @unlink($tmp_path);
 });

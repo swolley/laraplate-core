@@ -37,6 +37,7 @@ use Modules\Core\Models\CronJob;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Services\DynamicContentsService;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -102,6 +103,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->bind(OpenApiJsonController::class, DocsController::class);
 
         $this->app->register(FortifyServiceProvider::class);
+
+        $this->app->singleton(DynamicContentsService::class, DynamicContentsService::getInstance(...));
 
         // Register search clients
         $this->registerSearchClients();
