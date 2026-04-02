@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Introduce dynamic content management and field types
+
+### ⚙️ Miscellaneous Tasks
+
+- Update bootstrap path in phpunit.xml and enhance README for testing instructions
+
+## [1.41.5] - 2026-04-01
+
 ### 🚜 Refactor
 
 - Improve translation handling in Factory class
