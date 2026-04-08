@@ -61,7 +61,7 @@ trait HasDynamicContents
     /**
      * Fetch available presets for a given entity type.
      *
-     * @return Collection<int, Preset>
+     * @return Collection<int,Preset>
      */
     public static function fetchAvailablePresets(IDynamicEntityTypable $type): Collection
     {
@@ -71,7 +71,7 @@ trait HasDynamicContents
     /**
      * Fetch available presettables for a given entity type.
      *
-     * @return Collection<int, Presettable>
+     * @return Collection<int,Presettable>
      */
     public static function fetchAvailablePresettables(IDynamicEntityTypable $type): Collection
     {

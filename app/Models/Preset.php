@@ -75,7 +75,7 @@ final class Preset extends Model
      */
     public function entity(): BelongsTo
     {
-        return $this->belongsTo(Entity::class);
+        return $this->belongsTo(str_replace('Preset', 'Entity', self::class));
     }
 
     /**
