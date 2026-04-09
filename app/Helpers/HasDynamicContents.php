@@ -51,7 +51,7 @@ trait HasDynamicContents
     /**
      * Fetch available entities for a given type.
      *
-     * @return Collection<int, Entity>
+     * @return Collection<int,Entity>
      */
     public static function fetchAvailableEntities(IDynamicEntityTypable $type): Collection
     {

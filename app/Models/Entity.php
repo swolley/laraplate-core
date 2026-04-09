@@ -67,7 +67,9 @@ abstract class Entity extends Model
      */
     final public function presets(): HasMany
     {
-        return $this->hasMany(Preset::class);
+        $preset_class = str_replace('Entity', 'Preset', self::class);
+
+        return $this->hasMany($preset_class);
     }
 
     public function getRules(): array
