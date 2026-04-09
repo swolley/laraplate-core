@@ -14,6 +14,28 @@ use Nwidart\Modules\Module;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
+if (! function_exists('class_module')) {
+    /**
+     * Get the module of a class.
+     *
+     * @param  class-string  $class  The class to get the module of
+     */
+    function class_module(string $class): string
+    {
+        $exploded = explode('\\', $class);
+
+        if (head($exploded) === 'Modules' && count($exploded) > 1) {
+            $module_class = Nwidart\Modules\Facades\Module::class;
+
+            if ($module_class::has($exploded[1])) {
+                return $exploded[1];
+            }
+        }
+
+        return 'App';
+    }
+}
+
 if (! function_exists('modules')) {
     /**
      * get list of available modules.

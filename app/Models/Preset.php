@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
@@ -30,7 +29,7 @@ use Override;
  * @property int|string|null $entity_id
  * @property int|string|null $template_id
  */
-final class Preset extends Model
+abstract class Preset extends Model
 {
     use HasActivation {
         HasActivation::casts as private activationCasts;
@@ -48,14 +47,14 @@ final class Preset extends Model
      * The attributes that are mass assignable.
      */
     #[Override]
-    protected $fillable = [
+    final protected $fillable = [
         'entity_id',
         'name',
         'template_id',
     ];
 
     #[Override]
-    protected $hidden = [
+    final protected $hidden = [
         'entity_id',
         'template_id',
         'created_at',
@@ -63,9 +62,16 @@ final class Preset extends Model
     ];
 
     /**
+     * Get the model class for the related content.
+     *
+     * @return class-string<Model>
+     */
+    abstract protected static function getRelatedContentModelClass(): string;
+
+    /**
      * @return BelongsTo<Template>
      */
-    public function template(): BelongsTo
+    final public function template(): BelongsTo
     {
         return $this->belongsTo(Template::class);
     }
@@ -73,28 +79,15 @@ final class Preset extends Model
     /**
      * @return BelongsTo<Entity>
      */
-    public function entity(): BelongsTo
+    final public function entity(): BelongsTo
     {
         return $this->belongsTo(str_replace('Preset', 'Entity', self::class));
     }
 
     /**
-     * @return HasManyThrough<Content>
-     */
-    public function contents(): HasManyThrough
-    {
-        return $this->hasManyThrough(
-            Content::class,
-            Presettable::class,
-            'preset_id',      // foreign key on presettables pointing to presets
-            'presettable_id', // foreign key on contents pointing to presettables
-        );
-    }
-
-    /**
      * @return BelongsToMany<Field,Preset,Fieldable,'pivot'>
      */
-    public function fields(): BelongsToMany
+    final public function fields(): BelongsToMany
     {
         return $this->belongsToMany(Field::class, 'fieldables')->using(Fieldable::class)->withTimestamps()->withPivot(['id', 'order_column', 'is_required', 'default']);
     }
@@ -104,7 +97,7 @@ final class Preset extends Model
      * Call this after modifying the fields relationship (attach/detach/sync)
      * since BelongsToMany bulk operations don't fire pivot model events.
      */
-    public function createFieldsVersion(): Presettable
+    final public function createFieldsVersion(): Presettable
     {
         return resolve(PresetVersioningService::class)->createVersion($this);
     }
@@ -112,7 +105,7 @@ final class Preset extends Model
     /**
      * Get the current active presettable for this preset.
      */
-    public function activePresettable(): ?Presettable
+    final public function activePresettable(): ?Presettable
     {
         return Presettable::query()
             ->where('preset_id', $this->id)
@@ -122,7 +115,7 @@ final class Preset extends Model
             ->first();
     }
 
-    public function getRules(): array
+    final public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
@@ -144,15 +137,17 @@ final class Preset extends Model
      * Migrate all contents to the latest presettable version.
      * This reassigns every content's presettable_id to the current active version.
      */
-    public function migrateContentsToLastVersion(): void
+    final public function migrateRelatedModelsToLastVersion(): int
     {
         $active = $this->activePresettable();
 
         if (! $active instanceof Presettable) {
-            return;
+            return 0;
         }
 
-        Content::query()
+        $related_model_class = $this->getRelatedContentModelClass();
+
+        return $related_model_class::query()
             ->whereIn('presettable_id', function (QueryBuilder $query): void {
                 $query->select('id')
                     ->from('presettables')
@@ -168,7 +163,7 @@ final class Preset extends Model
      * @param  Builder<static>  $query
      */
     #[Scope]
-    protected function forActiveEntityOfType(Builder $query, IDynamicEntityTypable $entity_type): void
+    final protected function forActiveEntityOfType(Builder $query, IDynamicEntityTypable $entity_type): void
     {
         $query->where($query->qualifyColumn(self::activationColumn()), true)
             ->whereHas('entity', function (Builder $entity_query) use ($entity_type): void {
@@ -177,7 +172,7 @@ final class Preset extends Model
             });
     }
 
-    protected function casts(): array
+    final protected function casts(): array
     {
         return array_merge($this->activationCasts(), [
             'template_id' => 'integer',

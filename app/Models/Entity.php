@@ -61,23 +61,29 @@ abstract class Entity extends Model
     ];
 
     /**
+     * Get the entity type enum class.
+     *
+     * @return class-string<IDynamicEntityTypable>
+     */
+    abstract protected static function getEntityTypeEnumClass(): string;
+
+    /**
      * The presets that belong to the entity.
      *
      * @return HasMany<Preset>
      */
     final public function presets(): HasMany
     {
-        $preset_class = str_replace('Entity', 'Preset', self::class);
-
-        return $this->hasMany($preset_class);
+        return $this->hasMany(str_replace('Entity', 'Preset', self::class));
     }
 
-    public function getRules(): array
+    final public function getRules(): array
     {
         $rules = $this->getRulesTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'is_active' => 'boolean',
             'slug' => 'sometimes|nullable|string|max:255',
+            'type' => ['required', static::getEntityTypeEnumClass()::validationRule()],
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255', 'unique:entities,name'],
@@ -95,6 +101,15 @@ abstract class Entity extends Model
         return null;
     }
 
+    /**
+     * @return Builder<static>
+     */
+    #[Override]
+    public function newBaseQueryBuilder()
+    {
+        return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), self::getEntityTypeEnumClass()::values());
+    }
+
     protected static function newFactory(): EntityFactory
     {
         return EntityFactory::new();
@@ -108,11 +123,12 @@ abstract class Entity extends Model
         });
     }
 
-    protected function casts(): array
+    final protected function casts(): array
     {
         return array_merge($this->activationCasts(), [
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
+            'type' => static::getEntityTypeEnumClass(),
         ]);
     }
 }
