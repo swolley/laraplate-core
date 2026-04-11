@@ -6,14 +6,11 @@ namespace Modules\Core\Models;
 
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Scope;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
 
@@ -36,16 +33,10 @@ use Override;
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
- *
  * @mixin IdeHelperACL
  */
 final class ACL extends Model
 {
-    use HasFactory;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
 
     #[Override]
@@ -74,8 +65,8 @@ final class ACL extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'permission_id' => ['required', 'exists:permissions,id'],
             'filters' => [new QueryBuilder()],
             'sort.*.property' => ['string'],

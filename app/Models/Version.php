@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Date;
@@ -17,7 +18,7 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 final class Version extends OvertrueVersion
 {
-    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+    use HasFactory;
 
     /**
      * @var array<int,string>

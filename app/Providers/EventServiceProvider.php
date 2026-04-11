@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Event;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Preset;
-use Modules\Core\Models\Setting;
 use Modules\Core\Services\DynamicContentsService;
 use Override;
 
@@ -47,13 +46,6 @@ final class EventServiceProvider extends ServiceProvider
             'eloquent.deleted: ' . CronJob::class,
         ], static function (CronJob $cronJob): void {
             Cache::forget($cronJob->getTable());
-        });
-
-        Event::listen([
-            'eloquent.saved: ' . Setting::class,
-            'eloquent.deleted: ' . Setting::class,
-        ], static function (Setting $setting): void {
-            Cache::tags(Cache::getCacheTags($setting->getTable()))->flush();
         });
 
         Event::listen([

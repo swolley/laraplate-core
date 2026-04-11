@@ -25,7 +25,7 @@ trait HasValidations
 {
     public const DEFAULT_RULE = 'always';
 
-    private $rules = [
+    protected $rules = [
         'create' => [],
         'update' => [],
         // 'always' => [],
@@ -34,7 +34,7 @@ trait HasValidations
     /**
      * Flag per saltare le validazioni.
      */
-    private bool $skip_validation = false;
+    protected bool $skip_validation = false;
 
     /**
      * Imposta il flag per saltare le validazioni.

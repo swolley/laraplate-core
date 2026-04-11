@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Modules\Core\Helpers\HasActivation;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
@@ -26,12 +23,7 @@ final class CronJob extends Model
     use HasActivation {
         HasActivation::casts as private activationCasts;
     }
-    use HasFactory;
     use HasLocks;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
     // endregion
 
@@ -57,8 +49,8 @@ final class CronJob extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'command' => ['required', 'string', 'max:255'],
             'parameters' => ['required', 'json'],
             'schedule' => ['required', new CronExpressionRule()],

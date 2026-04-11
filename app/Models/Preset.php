@@ -6,8 +6,6 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -15,11 +13,10 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasApprovals;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Pivot\Presettable;
+use Modules\Core\Overrides\Model;
 use Modules\Core\Services\PresetVersioningService;
 use Override;
 
@@ -36,11 +33,6 @@ abstract class Preset extends Model
     }
     use HasApprovals;
     use HasCache;
-    use HasFactory;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
 
     /**
@@ -81,7 +73,7 @@ abstract class Preset extends Model
      */
     final public function entity(): BelongsTo
     {
-        return $this->belongsTo(str_replace('Preset', 'Entity', self::class));
+        return $this->belongsTo(str_replace('Preset', 'Entity', static::class));
     }
 
     /**
@@ -117,8 +109,8 @@ abstract class Preset extends Model
 
     final public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'is_active' => 'boolean',
             'template_id' => ['sometimes', 'exists:templates,id'],
             'entity_id' => ['required', 'exists:entities,id'],

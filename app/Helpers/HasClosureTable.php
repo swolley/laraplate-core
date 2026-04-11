@@ -47,7 +47,7 @@ trait HasClosureTable
         $modelTable = $this->getModelTable();
 
         return $this->belongsToMany(
-            self::class,
+            static::class,
             $closureTable,
             'descendant_id',
             'ancestor_id',
@@ -69,7 +69,7 @@ trait HasClosureTable
         $modelTable = $this->getModelTable();
 
         return $this->belongsToMany(
-            self::class,
+            static::class,
             $closureTable,
             'ancestor_id',
             'descendant_id',

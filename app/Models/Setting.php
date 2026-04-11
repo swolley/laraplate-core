@@ -4,31 +4,26 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
 use Modules\Core\Helpers\HasApprovals;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\Observers\SettingObserver;
+use Modules\Core\Overrides\Model;
 use Override;
 
 /**
  * @mixin IdeHelperSetting
  */
+#[ObservedBy(SettingObserver::class)]
 final class Setting extends Model
 {
     use HasApprovals;
     use HasCache;
-    use HasFactory;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
 
     /**
@@ -57,8 +52,8 @@ final class Setting extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'encrypted' => ['boolean', 'required'],
             'choices' => ['sometimes', 'nullable'],
             'choices.*' => ['filled'],

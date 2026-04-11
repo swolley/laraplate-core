@@ -13,9 +13,11 @@ use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
@@ -207,6 +209,20 @@ final class CoreDatabaseSeeder extends Seeder
                 'description' => 'Numero massimo sessioni simultanee',
             ],
         ];
+
+        $versioned_models = models(filter: fn (string $model) => class_uses_trait($model, HasVersions::class));
+
+        foreach ($versioned_models as $model) {
+            $table = (new ReflectionClass($model))->newInstanceWithoutConstructor()->getTable();
+            $default_settings[] = [
+                'name' => "version_strategy_{$table}",
+                'value' => VersionStrategy::DIFF,
+                'type' => SettingTypeEnum::STRING,
+                'group_name' => 'versioning',
+                'description' => "Version strategy for {$table}",
+                'choices' => [null, ...VersionStrategy::cases()],
+            ];
+        }
 
         $existing_settings = Setting::withoutGlobalScopes()
             ->whereIn('name', array_column($default_settings, 'name'))

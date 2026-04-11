@@ -41,7 +41,6 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail

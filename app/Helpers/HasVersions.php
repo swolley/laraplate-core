@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use function property_exists;
+
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Events\ModelVersioningRequested;
 use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Models\Setting;
 use Modules\Core\Services\VersioningService;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
@@ -35,7 +39,7 @@ trait HasVersions
 
     protected ?User $_modifier;
 
-    protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+    // protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
     protected array $dontVersionable = ['created_at', 'updated_at'/* , 'deleted_at' */, 'last_login_at'];
 
@@ -45,12 +49,18 @@ trait HasVersions
 
     public function shouldBeVersioning(): bool
     {
+        $version_strategy = $this->getVersionStrategy();
+
+        if ($version_strategy === false) {
+            return false;
+        }
+
         // xxx: fix break change
         if (method_exists($this, 'shouldVersioning')) {
             return call_user_func([$this, 'shouldVersioning']);
         }
 
-        $versionableAttributes = $this->getVersionableAttributes($this->getVersionStrategy());
+        $versionableAttributes = $this->getVersionableAttributes($version_strategy);
 
         // no need to count already existent versions
         return Arr::hasAny($this->getDirty(), array_keys($versionableAttributes));
@@ -89,10 +99,16 @@ trait HasVersions
             return null;
         }
 
-        if ($this->asyncVersioning) {
-            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $this->versionStrategy, $time));
+        $version_strategy = $this->getVersionStrategy();
 
-            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $this->versionStrategy, time: $time))->afterCommit();
+        if ($version_strategy === false) {
+            return null;
+        }
+
+        if ($this->asyncVersioning) {
+            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $version_strategy, $time));
+
+            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $version_strategy, time: $time))->afterCommit();
 
             return null;
         }
@@ -107,7 +123,7 @@ trait HasVersions
             userId: $this->getVersionUserId(),
             keepVersionsCount: (int) $this->getKeepVersionsCount(),
             encryptedVersionable: $this->encryptedVersionable,
-            versionStrategy: $this->versionStrategy,
+            versionStrategy: $version_strategy,
             time: $time,
         );
     }
@@ -210,6 +226,17 @@ trait HasVersions
                 return $this->_modifier;
             },
         );
+    }
+
+    private function getVersionStrategy(): VersionStrategy|false
+    {
+        if (property_exists($this, 'versionStrategy')) {
+            return $this->versionStrategy instanceof VersionStrategy ? $this->versionStrategy : VersionStrategy::from($this->versionStrategy);
+        }
+
+        $settings_name = "version_strategy_{$this->getTable()}";
+
+        return Cache::rememberForever('version_strategies', fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
     }
 
     private function getUser(int $userId): ?User

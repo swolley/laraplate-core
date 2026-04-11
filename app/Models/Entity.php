@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
@@ -14,8 +12,8 @@ use Modules\Core\Database\Factories\EntityFactory;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasPath;
 use Modules\Core\Helpers\HasSlug;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Overrides\Model;
 use Override;
 
 /**
@@ -31,13 +29,9 @@ abstract class Entity extends Model
         HasActivation::casts as private activationCasts;
     }
     use HasCache;
-    use HasFactory;
     use HasLocks;
     use HasPath;
     use HasSlug;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
     // endregion
 
     #[Override]
@@ -74,13 +68,13 @@ abstract class Entity extends Model
      */
     final public function presets(): HasMany
     {
-        return $this->hasMany(str_replace('Entity', 'Preset', self::class));
+        return $this->hasMany(str_replace('Entity', 'Preset', static::class));
     }
 
     final public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'is_active' => 'boolean',
             'slug' => 'sometimes|nullable|string|max:255',
             'type' => ['required', static::getEntityTypeEnumClass()::validationRule()],
@@ -107,12 +101,15 @@ abstract class Entity extends Model
     #[Override]
     public function newBaseQueryBuilder()
     {
-        return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), self::getEntityTypeEnumClass()::values());
+        return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), static::getEntityTypeEnumClass()::values());
     }
 
     protected static function newFactory(): EntityFactory
     {
-        return EntityFactory::new();
+        $factory = EntityFactory::new();
+        $factory->model = static::class;
+
+        return $factory;
     }
 
     #[Override]

@@ -311,7 +311,7 @@ trait HasTranslations
         // If this is a child class (e.g., Article extends Content), use the parent class
         $parent_class = get_parent_class($current_class);
 
-        if ($parent_class && $parent_class !== Model::class) {
+        if ($parent_class && ! is_a($parent_class, Model::class, true)) {
             $current_class = $parent_class;
         }
 

@@ -7,12 +7,10 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Database\Factories\LicenseFactory;
-use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Overrides\Model;
 use Override;
 
 /**
@@ -20,11 +18,7 @@ use Override;
  */
 final class License extends Model
 {
-    use HasFactory;
     use HasUuids;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
     use HasValidity;
 
     #[Override]
@@ -53,8 +47,8 @@ final class License extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],
         ]);

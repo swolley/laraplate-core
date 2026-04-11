@@ -10,6 +10,7 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
 use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasVersions;
 use Override;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
@@ -23,6 +24,7 @@ final class Permission extends ModelsPermission
     use HasValidations {
         getRules as private getRulesTrait;
     }
+    use HasVersions;
 
     /**
      * @var array<int,string>

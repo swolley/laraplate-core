@@ -5,22 +5,20 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
 use Modules\Core\Helpers\HasActivation;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldObserver;
+use Modules\Core\Overrides\Model;
 use Override;
 
 /**
  * @property-read object $options
+ * @mixin IdeHelperField
  */
 #[ObservedBy(FieldObserver::class)]
 final class Field extends Model
@@ -29,11 +27,6 @@ final class Field extends Model
     use HasActivation {
         HasActivation::casts as private activationCasts;
     }
-    use HasFactory;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
     // endregion
 
@@ -100,8 +93,8 @@ final class Field extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'is_active' => 'boolean',
             'type' => ['required', 'string', Rule::enum(FieldType::class)],
         ]);

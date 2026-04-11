@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Exception;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -14,13 +12,12 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Overrides\Model;
 use Modules\Core\Services\DynamicEntityService;
 use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
@@ -31,12 +28,7 @@ use UnexpectedValueException;
  */
 final class DynamicEntity extends Model
 {
-    use HasFactory;
     use HasGridUtils;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
-    use HasVersions;
     use SoftDeletes;
 
     /**
@@ -161,10 +153,10 @@ final class DynamicEntity extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
+        $rules = parent::getRules();
 
         if ($this->inspected_rules !== []) {
-            $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE] ?? [], $this->inspected_rules[self::DEFAULT_RULE] ?? []);
+            $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE] ?? [], $this->inspected_rules[Model::DEFAULT_RULE] ?? []);
         }
 
         return $rules;
@@ -282,29 +274,29 @@ final class DynamicEntity extends Model
         $this->dynamic_casts[$column->name] = $column->type->value;
 
         // validations (persist in inspected_rules so getRules() can merge them)
-        if (! isset($this->inspected_rules[self::DEFAULT_RULE])) {
-            $this->inspected_rules[self::DEFAULT_RULE] = [];
+        if (! isset($this->inspected_rules[Model::DEFAULT_RULE])) {
+            $this->inspected_rules[Model::DEFAULT_RULE] = [];
         }
         $type_rule = $is_date ? 'date' : $this->columnTypeToValidationRule($column->type->value);
-        $this->inspected_rules[self::DEFAULT_RULE][$column->name] = [$type_rule];
+        $this->inspected_rules[Model::DEFAULT_RULE][$column->name] = [$type_rule];
 
         $soft_delete = in_array($column->name, ['deleted', 'deleted_at', 'deletedAt'], true) && $this->forceDeleting;
 
         if (! $column->isUnsigned()) {
-            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'min:0';
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = 'min:0';
         }
 
         if (! $column->isNullable() && ! $column->isAutoincrement()) {
-            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = 'required';
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = 'required';
         }
 
         if (array_key_exists($column->name, $remapped_fks)) {
-            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
         }
 
         if (in_array($column->name, $remapped_uids, true)) {
             /** @var \Illuminate\Database\Query\Builder $query */
-            $this->inspected_rules[self::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void { // @pest-ignore-type
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void { // @pest-ignore-type
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');
                 }

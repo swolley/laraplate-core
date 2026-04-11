@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Cache\HasCache;
-use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Overrides\Model;
 use Override;
 
 /**
@@ -17,10 +15,6 @@ use Override;
 final class UserGridConfig extends Model
 {
     use HasCache;
-    use HasFactory;
-    use HasValidations {
-        getRules as private getRulesTrait;
-    }
 
     /**
      * The attributes that are mass assignable.
@@ -46,8 +40,8 @@ final class UserGridConfig extends Model
 
     public function getRules(): array
     {
-        $rules = $this->getRulesTrait();
-        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+        $rules = parent::getRules();
+        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'user_id' => ['integer', 'exists:users,id'],
             'grid_name' => ['required', 'max:255'],
             'layout_name' => ['required', 'max:255'],
