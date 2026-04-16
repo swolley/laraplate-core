@@ -26,6 +26,7 @@ return new class() extends Migration
             if (Fortify::confirmsTwoFactorAuthentication()) {
                 $table->timestamp('two_factor_confirmed_at')->after('two_factor_recovery_codes')->nullable()->comment('The two factor confirmed date of the user');
             }
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

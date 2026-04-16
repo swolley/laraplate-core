@@ -13,7 +13,6 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasApprovals;
-use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Overrides\Model;
@@ -33,7 +32,6 @@ abstract class Preset extends Model
     }
     use HasApprovals;
     use HasCache;
-    use SoftDeletes;
 
     /**
      * The attributes that are mass assignable.

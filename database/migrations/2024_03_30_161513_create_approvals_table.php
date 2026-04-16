@@ -20,6 +20,7 @@ return new class() extends Migration
             $table->unsignedBigInteger('approver_id')->comment('The id of the approver');
             $table->string('approver_type')->comment('The type of the approver');
             $table->text('reason')->nullable()->comment('The reason for the approval');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

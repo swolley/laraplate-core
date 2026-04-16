@@ -9,10 +9,19 @@ use Modules\Core\Models\Setting;
 
 final class SettingObserver
 {
-    public function updated(Setting $setting): void
+    public function saving(Setting $setting): void
     {
-        if ($setting->group_name === 'versioning') {
+        if ($setting->value === '') {
+            $setting->value = null;
+        }
+    }
+
+    public function saved(Setting $setting): void
+    {
+        if ($setting->group_name === 'versioning' && $setting->getOriginal('group_name') === 'versioning') {
             Cache::forget('version_strategies');
+        } elseif ($setting->group_name === 'soft_deletes' && $setting->getOriginal('group_name') === 'soft_deletes') {
+            Cache::forget('soft_deletes_flags');
         }
     }
 }

@@ -22,6 +22,7 @@ return new class extends Migration
             $table->boolean('is_slug')->default(false)->nullable(false)->comment('Whether the field takes part in the slug');
             $table->boolean('is_active')->default(true)->nullable(false)->index('fields_is_active_IDX')->comment('Whether the field is active');
             $table->boolean('is_translatable')->default(false)->nullable(false)->comment('Whether the field is translatable');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

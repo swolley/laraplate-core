@@ -30,6 +30,7 @@ return new class extends Migration
             } else {
                 $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
             }
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

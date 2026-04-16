@@ -22,6 +22,7 @@ return new class() extends Migration
             $table->string('schedule')->nullable(false)->comment('The schedule of the cron job');
             $table->boolean('is_active')->nullable(false)->index('cron_jobs_is_active_IDX')->comment('Is the cron job active');
             $table->string('description')->nullable()->comment('The description of the cron job');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

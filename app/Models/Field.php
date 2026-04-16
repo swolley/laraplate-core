@@ -10,7 +10,6 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
 use Modules\Core\Helpers\HasActivation;
-use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;
@@ -18,6 +17,7 @@ use Override;
 
 /**
  * @property-read object $options
+ *
  * @mixin IdeHelperField
  */
 #[ObservedBy(FieldObserver::class)]
@@ -27,7 +27,6 @@ final class Field extends Model
     use HasActivation {
         HasActivation::casts as private activationCasts;
     }
-    use SoftDeletes;
     // endregion
 
     /**

@@ -28,6 +28,8 @@ final class UserGridConfig extends Model
         'config',
     ];
 
+    private bool $softDeletesEnabled = false;
+
     /**
      * The user that belongs to the user grid config.
      *

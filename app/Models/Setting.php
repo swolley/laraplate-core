@@ -11,7 +11,6 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
 use Modules\Core\Helpers\HasApprovals;
-use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Observers\SettingObserver;
 use Modules\Core\Overrides\Model;
 use Override;
@@ -24,7 +23,6 @@ final class Setting extends Model
 {
     use HasApprovals;
     use HasCache;
-    use SoftDeletes;
 
     /**
      * @var array<int,string>

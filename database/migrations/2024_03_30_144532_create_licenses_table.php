@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('licenses', function (Blueprint $table): void {
             $table->uuid('id')->primary(true)->nullable(false)->comment('The unique identifier for the license');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,

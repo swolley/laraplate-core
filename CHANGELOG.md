@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Introduce ReadonlyModel trait and ReadOnlyModelException
+
+### 🧪 Testing
+
+- Add unit tests for version strategy and dynamic contents cache management
+
+## [1.43.0] - 2026-04-16
+
+### 🚀 Features
+
 - Add CreateEntityCommand for dynamic entity creation
 - Enhance CoreServiceProvider and EventServiceProvider for dynamic content management
 - Enhance Entity and Preset models with abstract methods for dynamic content management

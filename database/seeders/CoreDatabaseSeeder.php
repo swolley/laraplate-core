@@ -14,6 +14,7 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
@@ -213,14 +214,37 @@ final class CoreDatabaseSeeder extends Seeder
         $versioned_models = models(filter: fn (string $model) => class_uses_trait($model, HasVersions::class));
 
         foreach ($versioned_models as $model) {
-            $table = (new ReflectionClass($model))->newInstanceWithoutConstructor()->getTable();
+            $reflected = new ReflectionClass($model);
+            $table = $reflected->newInstanceWithoutConstructor()->getTable();
+
+            if ($reflected->hasProperty('versionStrategy') && $reflected->getProperty('versionStrategy')->getValue() === false) {
+                continue;
+            }
+
             $default_settings[] = [
                 'name' => "version_strategy_{$table}",
                 'value' => VersionStrategy::DIFF,
-                'type' => SettingTypeEnum::STRING,
+                'type' => SettingTypeEnum::JSON,
                 'group_name' => 'versioning',
                 'description' => "Version strategy for {$table}",
-                'choices' => [null, ...VersionStrategy::cases()],
+                'choices' => [false, ...VersionStrategy::cases()],
+            ];
+        }
+
+        $soft_deletes_models = models(filter: fn (string $model) => class_uses_trait($model, SoftDeletes::class));
+
+        foreach ($soft_deletes_models as $model) {
+            $reflected = new ReflectionClass($model);
+            $table = $reflected->newInstanceWithoutConstructor()->getTable();
+
+            if ($reflected->hasProperty('softDeletesEnabled') && $reflected->getProperty('softDeletesEnabled')->getValue() === false) {
+                continue;
+            }
+
+            $default_settings[] = [
+                'name' => "soft_deletes_{$table}",
+                'value' => true,
+                'type' => SettingTypeEnum::BOOLEAN,
             ];
         }
 

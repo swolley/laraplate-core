@@ -35,6 +35,8 @@ final class License extends Model
         'is_active' => 'boolean',
     ];
 
+    private bool $softDeletesEnabled = false;
+
     /**
      * The user that belongs to the license.
      *

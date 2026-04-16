@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Exception;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -29,7 +28,6 @@ use UnexpectedValueException;
 final class DynamicEntity extends Model
 {
     use HasGridUtils;
-    use SoftDeletes;
 
     /**
      * @var bool

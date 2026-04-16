@@ -8,10 +8,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model as BaseModel;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Helpers\SoftDeletes;
 
 abstract class Model extends BaseModel
 {
     use HasFactory;
     use HasValidations;
     use HasVersions;
+    use SoftDeletes;
 }

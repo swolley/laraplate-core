@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
-use Modules\Core\Helpers\SoftDeletes;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
@@ -33,12 +32,11 @@ use Override;
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
+ *
  * @mixin IdeHelperACL
  */
 final class ACL extends Model
 {
-    use SoftDeletes;
-
     #[Override]
     protected $table = 'acls';
 
