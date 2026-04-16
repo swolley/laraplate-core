@@ -8,17 +8,22 @@ use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
-// use Modules\Core\Services\ElasticsearchService;
+use Modules\Core\Search\Contracts\IQueryIntentParser;
+use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\Contracts\ISearchEngine;
-// use Elastic\Elasticsearch\Client as ElasticsearchClient;
+use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
-
-// use Typesense\Client as TypesenseClient;
+use Modules\Core\Search\Services\FallbackSearchPlanner;
+use Modules\Core\Search\Services\HeuristicReranker;
+use Modules\Core\Search\Services\SimpleQueryIntentParser;
 
 /**
- * Extended search service provider
- * Adds support for vector search and custom features on top of Laravel Scout.
+ * Extended search service provider.
+ *
+ * Adds support for vector search, ensemble retrieval, reranking,
+ * and custom features on top of Laravel Scout.
+ * Registers fallback implementations that the AI module can override.
  */
 final class SearchServiceProvider extends ServiceProvider
 {
@@ -32,22 +37,12 @@ final class SearchServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Register Elasticsearch client
-        // $this->app->singleton(ElasticsearchClient::class, static function ($app) {
-        //     return ElasticsearchService::getInstance()->getClient();
-        // });
-
-        // // Register Typesense client
-        // $this->app->singleton('typesense', static function (array $app): TypesenseClient {
-        //     $config = $app['config']['scout.typesense.client-settings'];
-
-        //     return new TypesenseClient($config);
-        // });
-
-        // Register the search engine interface for backward compatibility
         $this->app->singleton(ISearchEngine::class, static fn (\Illuminate\Contracts\Foundation\Application $app) => $app->make(EngineManager::class)->engine());
 
-        // Create an alias for easier access
         $this->app->alias(ISearchEngine::class, 'search');
+
+        $this->app->singletonIf(IReranker::class, HeuristicReranker::class);
+        $this->app->singletonIf(ISearchPlanner::class, FallbackSearchPlanner::class);
+        $this->app->singletonIf(IQueryIntentParser::class, SimpleQueryIntentParser::class);
     }
 }

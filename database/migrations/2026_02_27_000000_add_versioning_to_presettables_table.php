@@ -9,23 +9,27 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Presettable row versioning and trigger refresh.
+     *
+     * Drivers match {@see createTriggers()}: mysql, mariadb, pgsql, sqlite, sqlsrv, oracle.
+     * The same structural steps run on every driver so local (PostgreSQL) and office (MySQL)
+     * databases stay equivalent.
+     *
+     * Unique / FK: InnoDB reuses the unique index behind the `presettables_preset_FK` foreign
+     * key; drop the FK before replacing `presettables_preset_UN`, then recreate the FK after
+     * `presettables_version_UN` exists (left-prefix index on entity_id, preset_id).
+     *
+     * `fields_snapshot`: MySQL/MariaDB reject a literal DEFAULT on JSON; PostgreSQL could use
+     * one, but nullable JSON → {@see populateExistingSnapshots()} → NOT NULL keeps one path for
+     * all grammars.
+     */
     public function up(): void
     {
         $this->dropOldTriggers();
-
-        Schema::table('presettables', static function (Blueprint $table): void {
-            $table->dropUnique('presettables_preset_UN');
-
-            $table->unsignedInteger('version')->default(1)->after('entity_id')
-                ->comment('Incremental version number scoped to preset+entity');
-            $table->json('fields_snapshot')->default('[]')->after('version')
-                ->comment('Frozen snapshot of the fields configuration at this version');
-            $table->timestamp('created_at')->nullable()->useCurrent()->after('fields_snapshot');
-
-            $table->unique(['entity_id', 'preset_id', 'version'], 'presettables_version_UN');
-        });
-
+        $this->upgradePresettablesSchemaForVersioning();
         $this->populateExistingSnapshots();
+        $this->applyFieldsSnapshotNotNullConstraint();
         $this->createTriggers();
     }
 
@@ -34,12 +38,58 @@ return new class extends Migration
         $this->dropTriggers();
 
         Schema::table('presettables', static function (Blueprint $table): void {
+            $table->dropForeign('presettables_preset_FK');
             $table->dropUnique('presettables_version_UN');
             $table->dropColumn(['version', 'fields_snapshot', 'created_at']);
             $table->unique(['entity_id', 'preset_id'], 'presettables_preset_UN');
+
+            $table->foreign(['entity_id', 'preset_id'], 'presettables_preset_FK')
+                ->references(['entity_id', 'id'])
+                ->on('presets')
+                ->cascadeOnDelete();
         });
 
         $this->restoreOldTriggers();
+    }
+
+    /**
+     * Replace the old unique, add versioning columns, new composite unique, and restore the FK.
+     */
+    private function upgradePresettablesSchemaForVersioning(): void
+    {
+        Schema::table('presettables', static function (Blueprint $table): void {
+            $table->dropForeign('presettables_preset_FK');
+            $table->dropUnique('presettables_preset_UN');
+
+            $table->unsignedInteger('version')->default(1)->after('entity_id')
+                ->comment('Incremental version number scoped to preset+entity');
+            $table->json('fields_snapshot')->nullable()->after('version')
+                ->comment('Frozen snapshot of the fields configuration at this version');
+            $table->timestamp('created_at')->nullable()->useCurrent()->after('fields_snapshot');
+
+            $table->unique(['entity_id', 'preset_id', 'version'], 'presettables_version_UN');
+
+            $table->foreign(['entity_id', 'preset_id'], 'presettables_preset_FK')
+                ->references(['entity_id', 'id'])
+                ->on('presets')
+                ->cascadeOnDelete();
+        });
+    }
+
+    /**
+     * Enforce NOT NULL on fields_snapshot after backfill (same on MySQL, PostgreSQL, SQLite, etc.).
+     */
+    private function applyFieldsSnapshotNotNullConstraint(): void
+    {
+        if (DB::table('presettables')->whereNull('fields_snapshot')->exists()) {
+            throw new RuntimeException(
+                'Cannot enforce NOT NULL on presettables.fields_snapshot: null values remain after backfill.'
+            );
+        }
+
+        Schema::table('presettables', static function (Blueprint $table): void {
+            $table->json('fields_snapshot')->nullable(false)->change();
+        });
     }
 
     /**

@@ -75,7 +75,8 @@ final class EventServiceProvider extends ServiceProvider
 
     private function clearPresetCache(): void
     {
-        Cache::forget(new Preset()->getCacheKey());
+        Cache::forget('presets');
+        Cache::memo()->forget('presets');
         DynamicContentsService::getInstance()->clearPresetsCache();
         DynamicContentsService::getInstance()->clearPresettablesCache();
     }

@@ -164,6 +164,7 @@ final class DynamicContentsService
     public function clearEntitiesCache(): void
     {
         $this->entities_cache = null;
+        self::forgetMemoCacheKey('entities');
     }
 
     /**
@@ -173,6 +174,7 @@ final class DynamicContentsService
     public function clearPresetsCache(): void
     {
         $this->presets_cache = null;
+        self::forgetMemoCacheKey('presets');
     }
 
     /**
@@ -182,6 +184,7 @@ final class DynamicContentsService
     public function clearPresettablesCache(): void
     {
         $this->presettables_cache = null;
+        self::forgetMemoCacheKey(self::presettablesMemoCacheKey());
     }
 
     /**
@@ -192,5 +195,22 @@ final class DynamicContentsService
         $this->entities_cache = null;
         $this->presets_cache = null;
         $this->presettables_cache = null;
+        self::forgetMemoCacheKey('entities');
+        self::forgetMemoCacheKey('presets');
+        self::forgetMemoCacheKey(self::presettablesMemoCacheKey());
+    }
+
+    /**
+     * Laravel's memoized cache layer keeps values in process memory; `cache:clear` only flushes
+     * the underlying store, so stale memo entries must be forgotten explicitly.
+     */
+    private static function forgetMemoCacheKey(string $key): void
+    {
+        Cache::memo()->forget($key);
+    }
+
+    private static function presettablesMemoCacheKey(): string
+    {
+        return (new ReflectionClass(Presettable::class))->newInstanceWithoutConstructor()->getTable();
     }
 }

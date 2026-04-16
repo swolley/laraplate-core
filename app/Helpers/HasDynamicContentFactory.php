@@ -21,7 +21,19 @@ trait HasDynamicContentFactory
 
         $entity_type = $model_name::getEntityType();
 
-        $presettable = $model_name::fetchAvailablePresettables($entity_type)->random();
+        $presettables = $model_name::fetchAvailablePresettables($entity_type);
+
+        throw_unless(
+            $presettables->isNotEmpty(),
+            RuntimeException::class,
+            sprintf(
+                'No presettables available for model [%s] and entity type [%s]. Ensure CMS/Core seeders created presettables for this type.',
+                $model_name,
+                $entity_type->toScalar(),
+            ),
+        );
+
+        $presettable = $presettables->random();
 
         return [
             'entity_id' => $presettable->entity_id,

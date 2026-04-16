@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add CreateEntityCommand for dynamic entity creation
+- Enhance CoreServiceProvider and EventServiceProvider for dynamic content management
+- Enhance Entity and Preset models with abstract methods for dynamic content management
+- Implement search service enhancements with dynamic query handling
+
+### 🐛 Bug Fixes
+
+- Correct return type annotations in HasDynamicContents trait
+
+### 🚜 Refactor
+
+- Update return type annotation and improve dynamic class resolution in Entity model
+- Standardize model rules and enhance dynamic class resolution
+
+## [1.42.0] - 2026-04-02
+
+### 🚀 Features
+
 - Introduce dynamic content management and field types
 
 ### ⚙️ Miscellaneous Tasks

@@ -33,6 +33,7 @@ trait HasVersions
 {
     use Versionable {
         Versionable::shouldBeVersioning as private internalShouldBeVersioning;
+        Versionable::createInitialVersion as private internalCreateInitialVersion;
     }
 
     protected ?User $_creator;
@@ -131,8 +132,14 @@ trait HasVersions
     /**
      * @param  Model&HasVersions  $model
      */
-    public function createInitialVersion(Model $model): Version
+    public function createInitialVersion(Model $model): Version|null
     {
+        $version_strategy = $this->getVersionStrategy();
+
+        if ($version_strategy === false) {
+            return null;
+        }
+
         // if ($model->has('versions')) {
         //     return $model->firstVersion()->first();
         // }
@@ -228,7 +235,7 @@ trait HasVersions
         );
     }
 
-    private function getVersionStrategy(): VersionStrategy|false
+    public function getVersionStrategy(): VersionStrategy|false
     {
         if (property_exists($this, 'versionStrategy')) {
             return $this->versionStrategy instanceof VersionStrategy ? $this->versionStrategy : VersionStrategy::from($this->versionStrategy);
