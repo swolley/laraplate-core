@@ -44,8 +44,6 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $this->cacheKey = $this->config('cache-key', 'modules_db_activator_statuses');
         $this->cacheLifetime = (int) $this->config('cache-lifetime', 3600);
         $this->modulesStatuses = $this->getModulesStatuses();
-
-        self::checkSettingTable();
     }
 
     /**
@@ -58,12 +56,17 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         try {
             $cache_key = 'modules_db_activator_checked';
 
-            if (Cache::has($cache_key)) {
-                return Cache::get($cache_key);
-            }
-
             if (! app()->bound('db')) {
                 return false;
+            }
+
+            // Cached "table exists" can be stale after migrate:fresh / drop-all; always verify.
+            if (Cache::get($cache_key) === true && Schema::hasTable(self::SETTING_TABLE)) {
+                return true;
+            }
+
+            if (Cache::has($cache_key)) {
+                Cache::forget($cache_key);
             }
 
             if (! Schema::hasTable(self::SETTING_TABLE)) {
@@ -227,6 +230,10 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     private function readSettings(): array
     {
+        if (! Schema::hasTable(self::SETTING_TABLE)) {
+            return self::getAllModulesNames();
+        }
+
         $raw = DB::table(self::SETTING_TABLE)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')

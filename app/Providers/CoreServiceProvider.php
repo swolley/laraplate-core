@@ -106,6 +106,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(DynamicContentsService::class, DynamicContentsService::getInstance(...));
 
+        $this->app->register(GeocodingServiceProvider::class);
+
         // Register search clients
         $this->registerSearchClients();
 
