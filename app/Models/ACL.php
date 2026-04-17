@@ -32,7 +32,6 @@ use Override;
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
- *
  * @mixin IdeHelperACL
  */
 final class ACL extends Model

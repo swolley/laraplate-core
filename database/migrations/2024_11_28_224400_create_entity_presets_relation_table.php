@@ -28,11 +28,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('preset_id')->nullable(false)->comment('The preset that the entity preset relation belongs to');
             $table->unsignedBigInteger('entity_id')->nullable(false)->comment('The entity that the entity preset relation belongs to');
-            $table->unsignedInteger('version')->default(1)->after('entity_id')
+            $table->unsignedInteger('version')->default(1)
                 ->comment('Incremental version number scoped to preset+entity');
-            $table->json('fields_snapshot')->nullable()->after('version')
+            $table->json('fields_snapshot')->nullable()
                 ->comment('Frozen snapshot of the fields configuration at this version');
-            $table->timestamp('created_at')->nullable()->useCurrent()->after('fields_snapshot');
+            $table->timestamp('created_at')->nullable()->useCurrent();
 
             MigrateUtils::timestamps(
                 $table,

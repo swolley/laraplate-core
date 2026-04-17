@@ -17,7 +17,6 @@ use Override;
 
 /**
  * @property-read object $options
- *
  * @mixin IdeHelperField
  */
 #[ObservedBy(FieldObserver::class)]
