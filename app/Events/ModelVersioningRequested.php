@@ -26,5 +26,6 @@ final readonly class ModelVersioningRequested implements ShouldDispatchAfterComm
         public array $encryptedVersionable,
         public VersionStrategy|string|null $versionStrategy,
         public mixed $time = null,
+        public bool $purgeOldVersionsAfterCreate = false,
     ) {}
 }

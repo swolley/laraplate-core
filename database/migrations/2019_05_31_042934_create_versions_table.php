@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
+use Overtrue\LaravelVersionable\VersionStrategy;
 
 return new class() extends Migration
 {
@@ -30,6 +31,10 @@ return new class() extends Migration
                 ->nullable()
                 ->comment('Original model attributes before the change');
             $table->json('contents')->nullable()->comment('The changed model attributes');
+            $table->enum(
+                'version_strategy',
+                array_map(static fn (VersionStrategy $case): string => $case->value, VersionStrategy::cases()),
+            )->comment('Strategy used when this row was created');
 
             MigrateUtils::timestamps(
                 $table,

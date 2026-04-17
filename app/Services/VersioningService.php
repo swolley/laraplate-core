@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Version;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
@@ -27,6 +28,7 @@ final class VersioningService
         array $encryptedVersionable = [],
         VersionStrategy|string|null $versionStrategy = null,
         mixed $time = null,
+        bool $purgeOldVersionsAfterCreate = false,
     ): ?Version {
         /** @var Model&object $model */
         $model = resolve($modelClass);
@@ -74,6 +76,10 @@ final class VersioningService
             $version->save();
         }
 
+        if ($purgeOldVersionsAfterCreate) {
+            $this->purgeAllVersionRowsExcept($model, $version);
+        }
+
         if ($keepVersionsCount > 0) {
             $model->versions()
                 ->latest()
@@ -83,5 +89,32 @@ final class VersioningService
         }
 
         return $version;
+    }
+
+    /**
+     * @param  Model&object  $model
+     */
+    private function purgeAllVersionRowsExcept(Model $model, Version $keepVersion): void
+    {
+        /** @var class-string<Version> $versionModelClass */
+        $versionModelClass = config('versionable.version_model');
+        $keyName = (new $versionModelClass)->getKeyName();
+
+        $query = $versionModelClass::query()
+            ->withTrashed()
+            ->where('versionable_type', $model->getMorphClass())
+            ->where('versionable_id', $model->getKey())
+            ->where($keyName, '!=', $keepVersion->getKey());
+
+        if (class_exists(DynamicEntity::class) && $model instanceof DynamicEntity) {
+            $query->where('connection_ref', $model->getConnectionName())
+                ->where('table_ref', $model->getTable());
+        } else {
+            $query->whereNull('connection_ref')->whereNull('table_ref');
+        }
+
+        $query->get()->each(static function (Version $row): void {
+            $row->forceDelete();
+        });
     }
 }

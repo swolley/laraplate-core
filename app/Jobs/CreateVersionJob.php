@@ -38,6 +38,7 @@ final class CreateVersionJob implements ShouldQueue
         private readonly array $encryptedVersionable = [],
         private readonly VersionStrategy|string|null $versionStrategy = null,
         private readonly mixed $time = null,
+        private readonly bool $purgeOldVersionsAfterCreate = false,
     ) {
         $this->onQueue('versions');
     }
@@ -63,6 +64,7 @@ final class CreateVersionJob implements ShouldQueue
             encryptedVersionable: $this->encryptedVersionable,
             versionStrategy: $this->versionStrategy,
             time: $this->time,
+            purgeOldVersionsAfterCreate: $this->purgeOldVersionsAfterCreate,
         );
     }
 }

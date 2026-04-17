@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Introduce CompactVersions command for version management
+
+### 🚜 Refactor
+
+- Remove unnecessary comments in ACL and Field models, and clean up migration for entity presets relation table
+
+## [1.44.0] - 2026-04-16
+
+### 🚀 Features
+
 - Introduce ReadonlyModel trait and ReadOnlyModelException
 
 ### 🧪 Testing

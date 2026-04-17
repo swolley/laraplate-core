@@ -90,26 +90,28 @@ trait HasVersions
     }
 
     /**
+     * @param  array<string, mixed>  $replacements
      * @param  string|DateTimeInterface|null  $time
+     * @param  bool  $purgeOldVersionsAfterCreate  When true, removes all other version rows for this record after the new version is stored (used with snapshot checkpoints).
      *
      * @throws \Carbon\Exceptions\InvalidFormatException
      */
-    public function createVersion(array $replacements = [], $time = null): ?Version
+    public function createVersion(array $replacements = [], $time = null, bool $force = false, ?VersionStrategy $strategyForThisVersion = null, bool $purgeOldVersionsAfterCreate = false): ?Version
     {
-        if (! $this->shouldBeVersioning() && $replacements === []) {
+        if ($this->getVersionStrategy() === false) {
             return null;
         }
 
-        $version_strategy = $this->getVersionStrategy();
+        $effective_strategy = $strategyForThisVersion ?? $this->getVersionStrategy();
 
-        if ($version_strategy === false) {
+        if (! $force && ! $this->shouldBeVersioning() && $replacements === []) {
             return null;
         }
 
         if ($this->asyncVersioning) {
-            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $version_strategy, $time));
+            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $effective_strategy, $time, $purgeOldVersionsAfterCreate));
 
-            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $version_strategy, time: $time))->afterCommit();
+            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $effective_strategy, time: $time, purgeOldVersionsAfterCreate: $purgeOldVersionsAfterCreate))->afterCommit();
 
             return null;
         }
@@ -124,15 +126,37 @@ trait HasVersions
             userId: $this->getVersionUserId(),
             keepVersionsCount: (int) $this->getKeepVersionsCount(),
             encryptedVersionable: $this->encryptedVersionable,
-            versionStrategy: $version_strategy,
+            versionStrategy: $effective_strategy,
             time: $time,
+            purgeOldVersionsAfterCreate: $purgeOldVersionsAfterCreate,
         );
+    }
+
+    /**
+     * Persist a full SNAPSHOT of the current database row as a new version row (even when there are no dirty attributes).
+     * Use for checkpoints when the model normally uses DIFF, or on a schedule.
+     *
+     * @param  array<string, mixed>  $replacements
+     * @param  string|DateTimeInterface|null  $time
+     * @param  bool  $purgeOldVersions  When true, deletes every other version row for this record after the snapshot is stored (full history compaction).
+     *
+     * @throws \Carbon\Exceptions\InvalidFormatException
+     */
+    public function createSnapshotVersion(array $replacements = [], mixed $time = null, bool $purgeOldVersions = false): ?Version
+    {
+        if ($this->getVersionStrategy() === false) {
+            return null;
+        }
+
+        $this->refresh();
+
+        return $this->createVersion($replacements, $time, true, VersionStrategy::SNAPSHOT, $purgeOldVersions);
     }
 
     /**
      * @param  Model&HasVersions  $model
      */
-    public function createInitialVersion(Model $model): Version|null
+    public function createInitialVersion(Model $model): ?Version
     {
         $version_strategy = $this->getVersionStrategy();
 
@@ -158,6 +182,7 @@ trait HasVersions
             $refreshedModel,
             $attributes,
             $refreshedModel->updated_at,
+            VersionStrategy::SNAPSHOT,
         );
     }
 
@@ -171,6 +196,25 @@ trait HasVersions
 
         // return auth()->id();
         return null;
+    }
+
+    public function getVersionStrategy(): VersionStrategy|false
+    {
+        if (property_exists($this, 'versionStrategy')) {
+            $configured = $this->versionStrategy;
+
+            return $configured instanceof VersionStrategy ? $configured : VersionStrategy::from((string) $configured);
+        }
+
+        $settings_name = "version_strategy_{$this->getTable()}";
+
+        $raw = Cache::rememberForever('version_strategies', fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
+
+        if ($raw === false) {
+            return false;
+        }
+
+        return $raw instanceof VersionStrategy ? $raw : VersionStrategy::from((string) $raw);
     }
 
     protected static function bootHasVersions(): void
@@ -233,17 +277,6 @@ trait HasVersions
                 return $this->_modifier;
             },
         );
-    }
-
-    public function getVersionStrategy(): VersionStrategy|false
-    {
-        if (property_exists($this, 'versionStrategy')) {
-            return $this->versionStrategy instanceof VersionStrategy ? $this->versionStrategy : VersionStrategy::from($this->versionStrategy);
-        }
-
-        $settings_name = "version_strategy_{$this->getTable()}";
-
-        return Cache::rememberForever('version_strategies', fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
     }
 
     private function getUser(int $userId): ?User

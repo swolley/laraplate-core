@@ -14,6 +14,8 @@ use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
 /**
+ * @property VersionStrategy $version_strategy
+ *
  * @mixin IdeHelperVersion
  */
 final class Version extends OvertrueVersion
@@ -35,10 +37,12 @@ final class Version extends OvertrueVersion
     ];
 
     /**
+     * @param  array<string, mixed>  $replacements
+     *
      * @psalm-suppress MoreSpecificReturnType
      */
     #[Override]
-    public static function createForModel(Model $model, array $replacements = [], mixed $time = null): self
+    public static function createForModel(Model $model, array $replacements = [], mixed $time = null, ?VersionStrategy $strategyUsed = null): self
     {
         // parent logic because it's not possible to bypass the save action
 
@@ -46,15 +50,18 @@ final class Version extends OvertrueVersion
         $versionConnection = $model->getConnectionName();
         $userForeignKeyName = $model->getUserForeignKeyName();
 
+        $strategy = $strategyUsed ?? self::resolveStrategyFromModel($model);
+
         $version = new $versionClass();
         $version->setConnection($versionConnection);
 
         $version->versionable_id = $model->getKey();
         $version->versionable_type = $model->getMorphClass();
         $version->{$userForeignKeyName} = $model->getVersionUserId();
-        $version->contents = $model->getVersionableAttributes($model->getVersionStrategy(), $replacements);
+        $version->version_strategy = $strategy;
+        $version->contents = $model->getVersionableAttributes($strategy, $replacements);
         $version->original_contents = method_exists($model, 'getOriginalVersionableAttributes')
-            ? $model->getOriginalVersionableAttributes($model->getVersionStrategy(), $replacements)
+            ? $model->getOriginalVersionableAttributes($strategy, $replacements)
             : [];
 
         if ($time) {
@@ -72,6 +79,38 @@ final class Version extends OvertrueVersion
         return $version;
     }
 
+    /**
+     * Strategy used when this version row was written; used so revert can follow per-step semantics
+     * even if the versionable model later changes global strategy.
+     */
+    public function getStoredVersionStrategy(): VersionStrategy
+    {
+        return $this->version_strategy instanceof VersionStrategy
+            ? $this->version_strategy
+            : VersionStrategy::DIFF;
+    }
+
+    /**
+     * Strategy to apply for replay when reverting toward this version (falls back to the versionable's current strategy).
+     */
+    public function resolveReplayVersionStrategy(Model $versionable): VersionStrategy
+    {
+        if ($this->version_strategy instanceof VersionStrategy) {
+            return $this->version_strategy;
+        }
+
+        if (method_exists($versionable, 'getVersionStrategy')) {
+            /** @var VersionStrategy|false $current */
+            $current = $versionable->getVersionStrategy();
+
+            if ($current instanceof VersionStrategy) {
+                return $current;
+            }
+        }
+
+        return VersionStrategy::DIFF;
+    }
+
     #[Override]
     public function revertWithoutSaving(): ?Model
     {
@@ -83,7 +122,7 @@ final class Version extends OvertrueVersion
 
         $original = $versionable->getRawOriginal();
 
-        switch ($versionable->getVersionStrategy()) {
+        switch ($this->resolveReplayVersionStrategy($versionable)) {
             case VersionStrategy::DIFF:
                 // v1 + ... + vN
                 /** @var OvertrueVersion $version */
@@ -183,9 +222,30 @@ final class Version extends OvertrueVersion
         return [
             'contents' => 'json',
             'original_contents' => 'json',
+            'version_strategy' => VersionStrategy::class,
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    private static function resolveStrategyFromModel(Model $model): VersionStrategy
+    {
+        if (! method_exists($model, 'getVersionStrategy')) {
+            return VersionStrategy::DIFF;
+        }
+
+        /** @var VersionStrategy|false|string $strategy */
+        $strategy = $model->getVersionStrategy();
+
+        if ($strategy instanceof VersionStrategy) {
+            return $strategy;
+        }
+
+        if ($strategy === false) {
+            return VersionStrategy::DIFF;
+        }
+
+        return VersionStrategy::from((string) $strategy);
     }
 
     private static function isDynamicEntity(Model $model): bool
