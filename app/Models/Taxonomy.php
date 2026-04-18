@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Cms\Models;
+namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -85,11 +85,12 @@ abstract class Taxonomy extends Model implements Sortable
 
     final public function getRules(): array
     {
+        $table = $this->getTable();
         $rules = parent::getRules();
         $dynamic_fields = $this->getRulesDynamicContents();
         $default_rule = Model::DEFAULT_RULE;
         $rules[$default_rule] = array_merge($rules[$default_rule], $dynamic_fields, [
-            'parent_id' => 'sometimes|nullable|exists:categories,id',
+            'parent_id' => "sometimes|nullable|exists:{$table},id",
         ]);
         $rules['create'] = array_merge($rules['create'], [
             // 'name' => 'required|string|max:255', // Validated in translation
