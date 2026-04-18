@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Update Taxonomy model namespace and enhance validation rules
+
+## [1.46.0] - 2026-04-18
+
 ### 🚀 Features
 
 - Implement geocoding services and models for location management
