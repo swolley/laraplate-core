@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Implement geocoding services and models for location management
+- Add Taxonomy model for hierarchical content management
+
+## [1.45.0] - 2026-04-17
+
+### 🚀 Features
+
 - Introduce CompactVersions command for version management
 
 ### 🚜 Refactor
