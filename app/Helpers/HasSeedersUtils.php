@@ -60,12 +60,15 @@ trait HasSeedersUtils
                     if ($return_type === BelongsToMany::class) {
                         /**
                          * @var BelongsToMany<Model> $relation
-                         * @var Collection<int,Model> $value
                          */
+                        $relation_ids = ($value instanceof Collection ? $value : collect(is_array($value) ? $value : [$value]))
+                            ->map(fn (mixed $item): int|string => $item instanceof Model ? $item->getKey() : $item)
+                            ->values();
+
                         if (isset($pivotValues[$method])) {
-                            $relation->syncWithPivotValues($value->pluck('id'), $pivotValues[$method], false);
+                            $relation->syncWithPivotValues($relation_ids, $pivotValues[$method], false);
                         } else {
-                            $relation->syncWithoutDetaching($value->pluck('id'));
+                            $relation->syncWithoutDetaching($relation_ids);
                         }
                     } else {
                         /**

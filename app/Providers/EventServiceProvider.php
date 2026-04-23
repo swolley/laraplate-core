@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Modules\Core\Models\Entity;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Preset;
@@ -44,23 +46,14 @@ final class EventServiceProvider extends ServiceProvider
         Event::listen([
             'eloquent.saved: ' . CronJob::class,
             'eloquent.deleted: ' . CronJob::class,
-        ], static function (CronJob $cronJob): void {
-            Cache::forget($cronJob->getTable());
-        });
-
-        Event::listen([
-            'eloquent.saved: ' . Preset::class,
-            'eloquent.deleted: ' . Preset::class,
-            'eloquent.forceDeleted: ' . Preset::class,
-        ], function (): void {
-            $this->clearPresetCache();
-        });
-
-        Event::listen([
-            'eloquent.saved: ' . Fieldable::class,
-            'eloquent.deleted: ' . Fieldable::class,
-        ], function (): void {
-            $this->clearPresetCache();
+        ], function (Model $model): void {
+            if ($model instanceof CronJob) {
+                Cache::forget($model->getTable());
+            } else if ($model instanceof Fieldable || $model instanceof Preset) {
+                $this->clearPresetCache();
+            } else if ($model instanceof Entity) {
+                $this->clearEntityCache($model);
+            }
         });
     }
 
@@ -71,6 +64,13 @@ final class EventServiceProvider extends ServiceProvider
     protected function configureEmailVerification(): void
     {
         //
+    }
+
+    private function clearEntityCache(Entity $model): void
+    {
+        Cache::forget($model->getCacheKey());
+        DynamicContentsService::getInstance()->clearEntitiesCache();
+        $this->clearPresetCache();
     }
 
     private function clearPresetCache(): void

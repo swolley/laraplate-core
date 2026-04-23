@@ -42,6 +42,7 @@ abstract class Taxonomy extends Model implements Sortable
         HasTranslatedDynamicContents::getRules as private getRulesDynamicContents;
         HasTranslatedDynamicContents::toArray as private translatedDynamicContentsToArray;
         HasTranslatedDynamicContents::casts as private translatedDynamicContentsCasts;
+        HasTranslatedDynamicContents::getTranslationModelClass as private getTranslationModelClassDynamicContents;
     }
     use HasValidity;
     use SortableTrait {
@@ -84,7 +85,7 @@ abstract class Taxonomy extends Model implements Sortable
 
     abstract protected static function getEntityType(): IDynamicEntityTypable;
 
-    final public function getRules(): array
+    public function getRules(): array
     {
         $table = $this->getTable();
         $rules = parent::getRules();
@@ -254,7 +255,7 @@ abstract class Taxonomy extends Model implements Sortable
         return $segments->join($separator);
     }
 
-    final protected static function getTranslationModelClass(): string
+    protected static function getTranslationModelClass(): string
     {
         return TaxonomyTranslation::class;
     }

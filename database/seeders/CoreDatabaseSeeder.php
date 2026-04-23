@@ -215,9 +215,10 @@ final class CoreDatabaseSeeder extends Seeder
 
         foreach ($versioned_models as $model) {
             $reflected = new ReflectionClass($model);
-            $table = $reflected->newInstanceWithoutConstructor()->getTable();
+            $instance = $reflected->newInstanceWithoutConstructor();
+            $table = $instance->getTable();
 
-            if ($reflected->hasProperty('versionStrategy') && $reflected->getProperty('versionStrategy')->getValue() === false) {
+            if ($reflected->hasProperty('versionStrategy') && $reflected->getProperty('versionStrategy')->getValue($instance) === false) {
                 continue;
             }
 
@@ -235,9 +236,10 @@ final class CoreDatabaseSeeder extends Seeder
 
         foreach ($soft_deletes_models as $model) {
             $reflected = new ReflectionClass($model);
-            $table = $reflected->newInstanceWithoutConstructor()->getTable();
+            $instance = $reflected->newInstanceWithoutConstructor();
+            $table = $instance->getTable();
 
-            if ($reflected->hasProperty('softDeletesEnabled') && $reflected->getProperty('softDeletesEnabled')->getValue() === false) {
+            if ($reflected->hasProperty('softDeletesEnabled') && $reflected->getProperty('softDeletesEnabled')->getValue($instance) === false) {
                 continue;
             }
 
@@ -245,6 +247,8 @@ final class CoreDatabaseSeeder extends Seeder
                 'name' => "soft_deletes_{$table}",
                 'value' => true,
                 'type' => SettingTypeEnum::BOOLEAN,
+                'group_name' => 'soft_deletes',
+                'description' => "Soft deletes status for {$table}",
             ];
         }
 

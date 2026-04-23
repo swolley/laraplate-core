@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- Enhance model caching and relationship handling
+
+## [1.47.0] - 2026-04-23
+
 ### 🚀 Features
 
 - Add migrations for teams fields, user grid configs, presettables, and fieldables

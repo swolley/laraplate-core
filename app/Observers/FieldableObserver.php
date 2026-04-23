@@ -24,7 +24,7 @@ final readonly class FieldableObserver
 
     private function createVersionForPreset(Fieldable $fieldable): void
     {
-        $preset = Preset::query()->find($fieldable->preset_id);
+        $preset = $fieldable->preset; // ?? Preset::query()->find($fieldable->preset_id);
 
         if (! $preset) {
             return;
