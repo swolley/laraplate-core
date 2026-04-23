@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Add migrations for teams fields, user grid configs, presettables, and fieldables
+- Implement Taxonomy and TaxonomyTranslation models with migrations
+
+## [1.46.1] - 2026-04-18
+
 ### 🚜 Refactor
 
 - Update Taxonomy model namespace and enhance validation rules
