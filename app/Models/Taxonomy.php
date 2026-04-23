@@ -16,6 +16,7 @@ use Modules\Core\Helpers\HasTranslatedDynamicContents;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Translations\TaxonomyTranslation;
 use Modules\Core\Overrides\Model;
 use Override;
 use Spatie\EloquentSortable\Sortable;
@@ -251,5 +252,10 @@ abstract class Taxonomy extends Model implements Sortable
         }
 
         return $segments->join($separator);
+    }
+
+    final protected static function getTranslationModelClass(): string
+    {
+        return TaxonomyTranslation::class;
     }
 }
