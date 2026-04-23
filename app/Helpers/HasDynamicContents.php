@@ -209,7 +209,8 @@ trait HasDynamicContents
      */
     public function presettable(): BelongsTo
     {
-        $relation = $this->belongsTo(Presettable::class);
+        $presettable_class = self::getModuleModelClass(Presettable::class);
+        $relation = $this->belongsTo($presettable_class);
         $relation->withTrashed();
 
         return $relation;
@@ -504,6 +505,17 @@ trait HasDynamicContents
     {
         // This method will be overridden by HasTranslatedDynamicContents
         return null;
+    }
+
+    private static function getModuleModelClass(string $class): string
+    {
+        $module = class_module(self::class);
+
+        if ($module !== 'App') {
+            return str_replace('Core', $module, $class);
+        }
+
+        return str_replace('Modules\\Core', $module, $class);
     }
 
     /**

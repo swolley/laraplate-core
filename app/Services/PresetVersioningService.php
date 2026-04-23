@@ -18,15 +18,24 @@ final class PresetVersioningService
      */
     public function createVersion(Preset $preset): Presettable
     {
-        return DB::transaction(function () use ($preset): Presettable {
-            Presettable::query()
+        $preset_class = $preset::class;
+        $module = class_module($preset_class);
+
+        if ($module !== 'App') {
+            $presettable_class = str_replace('Core', $module, Presettable::class);
+        } else {
+            $presettable_class = str_replace('Modules\\Core', $module, Presettable::class);
+        }
+
+        return DB::transaction(function () use ($preset, $presettable_class): Presettable {
+            $presettable_class::query()
                 ->where('preset_id', $preset->id)
                 ->where('entity_id', $preset->entity_id)
                 ->whereNull('deleted_at')
                 ->update(['deleted_at' => now()]);
 
             /** @var Presettable $presettable */
-            $presettable = Presettable::query()->forceCreate([
+            $presettable = $presettable_class::query()->forceCreate([
                 'preset_id' => $preset->id,
                 'entity_id' => $preset->entity_id,
                 'fields_snapshot' => $this->captureFieldsSnapshot($preset),

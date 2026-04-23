@@ -19,8 +19,8 @@ final class CoreStatsWidget extends BaseWidget
     {
         $data = DB::table('licenses')->select([
             DB::raw('count(*) as total'),
-            DB::raw('sum(case when valid_to >= now() or valid_to is null then 1 else 0 end) as active'),
-            DB::raw('sum(case when users.id is not null then 1 else 0 end) as occupied'),
+            DB::raw('coalesce(sum(case when valid_to >= now() or valid_to is null then 1 else 0 end), 0) as active'),
+            DB::raw('coalesce(sum(case when users.id is not null then 1 else 0 end), 0) as occupied'),
         ])
             ->leftJoin('users', 'licenses.id', '=', 'users.license_id')
             ->first();

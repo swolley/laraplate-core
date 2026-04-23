@@ -41,6 +41,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -98,6 +99,12 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         'created_at',
         'email_verified_at',
     ];
+
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+        $this->dontVersionable = array_merge($this->dontVersionable ?? [], ['password', 'remember_token']);
+    }
 
     public function canAccessPanel(Panel $panel): bool
     {

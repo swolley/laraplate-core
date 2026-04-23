@@ -127,6 +127,9 @@ final class CoreDatabaseSeeder extends Seeder
                 $this->command->line("    - {$role['name']} <fg=green>created</>");
             }
         });
+
+        // Reload keyed roles so defaultUsers() sees IDs created in this transaction.
+        $this->groups = $role_class::query()->withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
     }
 
     private function defaultUsers(): void
@@ -175,10 +178,14 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($user_class, $new_users): void {
+        DB::transaction(function () use ($user_class, $new_users, $superadmin): void {
             foreach ($new_users as &$user) {
                 $this->create($user_class, $user);
                 $this->command->line("    - {$user['username']} <fg=green>created</>");
+
+                if ($user['username'] === $superadmin) {
+                    $this->command->line("      with password: {$user['password']}");
+                }
             }
         });
     }

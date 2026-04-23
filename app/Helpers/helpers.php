@@ -20,8 +20,9 @@ if (! function_exists('class_module')) {
      *
      * @param  class-string  $class  The class to get the module of
      */
-    function class_module(string $class): string
+    function class_module(string|object $class): string
     {
+        $class = is_string($class) ? $class : $class::class;
         $exploded = explode('\\', $class);
 
         if (head($exploded) === 'Modules' && count($exploded) > 1) {

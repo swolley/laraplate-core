@@ -56,7 +56,7 @@ abstract class Preset extends Model
      *
      * @return class-string<Model>
      */
-    abstract protected static function getRelatedContentModelClass(): string;
+    abstract protected static function getRelatedModelClass(): string;
 
     /**
      * @return BelongsTo<Template>
@@ -97,7 +97,9 @@ abstract class Preset extends Model
      */
     final public function activePresettable(): ?Presettable
     {
-        return Presettable::query()
+        $presettable_class = self::getModuleModelClass(Presettable::class);
+
+        return $presettable_class::query()
             ->where('preset_id', $this->id)
             ->where('entity_id', $this->entity_id)
             ->whereNull('deleted_at')
@@ -135,7 +137,7 @@ abstract class Preset extends Model
             return 0;
         }
 
-        $related_model_class = $this->getRelatedContentModelClass();
+        $related_model_class = $this->getRelatedModelClass();
 
         return $related_model_class::query()
             ->whereIn('presettable_id', function (QueryBuilder $query): void {
@@ -169,5 +171,16 @@ abstract class Preset extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ]);
+    }
+
+    private static function getModuleModelClass(string $class): string
+    {
+        $module = class_module(self::class);
+
+        if ($module !== 'App') {
+            return str_replace('Core', $module, $class);
+        }
+
+        return str_replace('Modules\\Core', $module, $class);
     }
 }

@@ -80,12 +80,13 @@ final class DynamicContentsService
         }
 
         // Load from external cache or database, then store in memory
-        $entity_model = new Entity();
+        $entity_class = self::getModuleModelClass(Entity::class);
+        $entity_model = new $entity_class();
         $cache_key = $entity_model->getCacheKey();
 
         $this->entities_cache = Cache::memo()->rememberForever(
             $cache_key,
-            static fn (): Collection => Entity::query()
+            fn (): Collection => $entity_class::query()
                 ->withoutGlobalScopes()
                 ->orderBy('is_default', 'desc')
                 ->orderBy('name', 'asc')
@@ -109,12 +110,13 @@ final class DynamicContentsService
         }
 
         // Load from external cache or database, then store in memory
-        $preset_model = new Preset();
+        $preset_class = self::getModuleModelClass(Preset::class);
+        $preset_model = new $preset_class();
         $cache_key = $preset_model->getCacheKey();
 
         $this->presets_cache = Cache::memo()->rememberForever(
             $cache_key,
-            static fn (): Collection => Preset::query()
+            fn (): Collection => $preset_class::query()
                 ->withoutGlobalScopes()
                 ->with(['fields', 'entity'])
                 ->orderBy('is_default', 'desc')
@@ -138,13 +140,15 @@ final class DynamicContentsService
             return $this->presettables_cache->filter(fn (Presettable $presettable): bool => $presettable->entity?->type === $type);
         }
 
+        $presettable_class = self::getModuleModelClass(Presettable::class);
+
         // Load from external cache or database, then store in memory
         // Use class name to get table name without instantiating model (avoids database access during boot)
-        $cache_key = new ReflectionClass(Presettable::class)->newInstanceWithoutConstructor()->getTable();
+        $cache_key = new ReflectionClass($presettable_class)->newInstanceWithoutConstructor()->getTable();
 
         $this->presettables_cache = Cache::memo()->rememberForever(
             $cache_key,
-            static fn (): Collection => Presettable::query()
+            fn (): Collection => $presettable_class::query()
                 ->join('presets', 'presettables.preset_id', '=', 'presets.id')
                 ->join('entities', 'presets.entity_id', '=', 'entities.id')
                 ->whereNull('presettables.deleted_at')
@@ -200,6 +204,17 @@ final class DynamicContentsService
         self::forgetMemoCacheKey(self::presettablesMemoCacheKey());
     }
 
+    private static function getModuleModelClass(string $class): string
+    {
+        $module = class_module(self::class);
+
+        if ($module !== 'App') {
+            return str_replace('Core', $module, $class);
+        }
+
+        return str_replace('Modules\\Core', $module, $class);
+    }
+
     /**
      * Laravel's memoized cache layer keeps values in process memory; `cache:clear` only flushes
      * the underlying store, so stale memo entries must be forgotten explicitly.
@@ -211,6 +226,8 @@ final class DynamicContentsService
 
     private static function presettablesMemoCacheKey(): string
     {
-        return (new ReflectionClass(Presettable::class))->newInstanceWithoutConstructor()->getTable();
+        $presettable_class = self::getModuleModelClass(Presettable::class);
+
+        return (new ReflectionClass($presettable_class))->newInstanceWithoutConstructor()->getTable();
     }
 }

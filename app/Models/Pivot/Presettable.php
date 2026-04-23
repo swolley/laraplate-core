@@ -17,30 +17,31 @@ use Override;
 /**
  * @property int $version
  * @property array<int, array{field_id: int, name: string, type: string, options: mixed, is_translatable: bool, is_slug: bool, pivot: array{is_required: bool, order_column: int, default: mixed}}> $fields_snapshot
+ *
  * @mixin IdeHelperPresettable
  */
-final class Presettable extends Pivot
+abstract class Presettable extends Pivot
 {
     use HasFactory, SoftDeletes;
 
     #[Override]
-    public $incrementing = true;
+    final public $incrementing = true;
 
     #[Override]
-    public $timestamps = false;
+    final public $timestamps = false;
 
     #[Override]
-    protected $table = 'presettables';
+    final protected $table = 'presettables';
 
     #[Override]
-    protected $fillable = [
+    final protected $fillable = [
         'preset_id',
         'entity_id',
         'fields_snapshot',
     ];
 
     #[Override]
-    protected $with = [
+    final protected $with = [
         'preset',
         'entity',
     ];
@@ -48,18 +49,12 @@ final class Presettable extends Pivot
     /**
      * @return BelongsTo<Preset>
      */
-    public function preset(): BelongsTo
-    {
-        return $this->belongsTo(Preset::class);
-    }
+    abstract public function preset(): BelongsTo;
 
     /**
      * @return BelongsTo<Entity>
      */
-    public function entity(): BelongsTo
-    {
-        return $this->belongsTo(Entity::class);
-    }
+    abstract public function entity(): BelongsTo;
 
     /**
      * Hydrate Field model instances from the frozen snapshot.
@@ -68,7 +63,7 @@ final class Presettable extends Pivot
      *
      * @return Collection<int, Field>
      */
-    public function getFieldsFromSnapshot(): Collection
+    final public function getFieldsFromSnapshot(): Collection
     {
         $fields = collect($this->fields_snapshot ?? [])
             ->map(static function (array $data): Field {
@@ -103,7 +98,7 @@ final class Presettable extends Pivot
         return new Collection($fields->all());
     }
 
-    protected static function boot(): void
+    final protected static function boot(): void
     {
         parent::boot();
 
@@ -116,7 +111,7 @@ final class Presettable extends Pivot
         });
     }
 
-    protected function casts(): array
+    final protected function casts(): array
     {
         return [
             'version' => 'integer',
