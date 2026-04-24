@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- Enhance dynamic model class resolution and caching in DynamicContentsService
+
+### 🚜 Refactor
+
+- Improve model class handling and caching mechanisms
+
+## [1.47.1] - 2026-04-23
+
 ### 🚜 Refactor
 
 - Enhance model caching and relationship handling

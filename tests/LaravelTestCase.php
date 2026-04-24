@@ -173,6 +173,13 @@ abstract class LaravelTestCase extends Orchestra
             symlink($repo_root, $core_link);
         }
 
+        $cms_repo = dirname((string) $repo_root) . DIRECTORY_SEPARATOR . 'Cms';
+        $cms_link = $modules_dir . DIRECTORY_SEPARATOR . 'Cms';
+
+        if (is_dir($cms_repo) && ! file_exists($cms_link)) {
+            symlink($cms_repo, $cms_link);
+        }
+
         self::$testbenchModulesPath = $modules_dir;
 
         return self::$testbenchModulesPath;

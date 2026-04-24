@@ -7,11 +7,13 @@ namespace Modules\Core\Services;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 use ReflectionClass;
+use UnexpectedValueException;
 
 /**
  * Singleton service that caches dynamic contents data in-memory during the request/command scope.
@@ -79,11 +81,14 @@ final class DynamicContentsService
             return $this->entities_cache->where('type', $type);
         }
 
-        // Load from external cache or database, then store in memory
-        $entity_class = self::getModuleModelClass(Entity::class);
+        $type_module = class_module($type);
+        $entity_module = class_module(Entity::class);
+        $entity_class = Str::replace("\\{$entity_module}\\", "\\{$type_module}\\", Entity::class);
+
         $entity_model = new $entity_class();
         $cache_key = $entity_model->getCacheKey();
 
+        // Load from external cache or database, then store in memory
         $this->entities_cache = Cache::memo()->rememberForever(
             $cache_key,
             fn (): Collection => $entity_class::query()
@@ -110,7 +115,7 @@ final class DynamicContentsService
         }
 
         // Load from external cache or database, then store in memory
-        $preset_class = self::getModuleModelClass(Preset::class);
+        $preset_class = self::getModuleModelClass($type::class, Preset::class);
         $preset_model = new $preset_class();
         $cache_key = $preset_model->getCacheKey();
 
@@ -140,7 +145,7 @@ final class DynamicContentsService
             return $this->presettables_cache->filter(fn (Presettable $presettable): bool => $presettable->entity?->type === $type);
         }
 
-        $presettable_class = self::getModuleModelClass(Presettable::class);
+        $presettable_class = self::getModuleModelClass($type::class, Presettable::class);
 
         // Load from external cache or database, then store in memory
         // Use class name to get table name without instantiating model (avoids database access during boot)
@@ -188,7 +193,7 @@ final class DynamicContentsService
     public function clearPresettablesCache(): void
     {
         $this->presettables_cache = null;
-        self::forgetMemoCacheKey(self::presettablesMemoCacheKey());
+        self::forgetMemoCacheKey('presettables');
     }
 
     /**
@@ -201,18 +206,32 @@ final class DynamicContentsService
         $this->presettables_cache = null;
         self::forgetMemoCacheKey('entities');
         self::forgetMemoCacheKey('presets');
-        self::forgetMemoCacheKey(self::presettablesMemoCacheKey());
+        self::forgetMemoCacheKey('presettables');
     }
 
-    private static function getModuleModelClass(string $class): string
+    /**
+     * Get the module model class for a given local and target class.
+     *
+     * @param  class-string  $local_class  The local class
+     * @param  class-string  $target_class  The target class
+     * @return class-string  The module model class
+     */
+    private static function getModuleModelClass(string $local_class, string $target_class): string
     {
-        $module = class_module(self::class);
+        $from_module = class_module($local_class);
+        $to_module = class_module($target_class);
+        $search_prefix = $to_module === 'App'
+            ? $to_module . '\\'
+            : 'Modules\\' . $to_module . '\\';
+        $replace_prefix = $from_module === 'App'
+            ? $from_module . '\\'
+            : 'Modules\\' . $from_module . '\\';
+        $pattern = '#^' . preg_quote($search_prefix, '#') . '#';
+        $replaced = (string) preg_replace($pattern, $replace_prefix, $target_class, 1);
 
-        if ($module !== 'App') {
-            return str_replace('Core', $module, $class);
-        }
+        throw_if(! class_exists($replaced), UnexpectedValueException::class, "Target class not found: {$replaced}");
 
-        return str_replace('Modules\\Core', $module, $class);
+        return $replaced;
     }
 
     /**
@@ -222,12 +241,5 @@ final class DynamicContentsService
     private static function forgetMemoCacheKey(string $key): void
     {
         Cache::memo()->forget($key);
-    }
-
-    private static function presettablesMemoCacheKey(): string
-    {
-        $presettable_class = self::getModuleModelClass(Presettable::class);
-
-        return (new ReflectionClass($presettable_class))->newInstanceWithoutConstructor()->getTable();
     }
 }
