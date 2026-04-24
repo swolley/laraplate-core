@@ -152,7 +152,11 @@ abstract class LaravelTestCase extends Orchestra
     }
 
     /**
-     * Ensure .testbench-modules exists and Core symlinks to the repo root (so nwidart can load it).
+     * Ensure a fake modules directory exists so nwidart discovers Core (and optional Cms) during tests.
+     *
+     * The directory must live next to the Core module (e.g. Modules/.testbench-modules), not inside
+     * Modules/Core, otherwise the Core symlink points into its own subtree and creates an infinite
+     * .testbench-modules/Core/.testbench-modules/... path for tools that resolve symlinks.
      */
     private static function ensureTestbenchModulesPath(): string
     {
@@ -160,8 +164,13 @@ abstract class LaravelTestCase extends Orchestra
             return self::$testbenchModulesPath;
         }
 
-        $repo_root = realpath(dirname(__DIR__));
-        $modules_dir = $repo_root . DIRECTORY_SEPARATOR . '.testbench-modules';
+        $module_root = realpath(dirname(__DIR__));
+
+        if ($module_root === false) {
+            throw new \RuntimeException('Could not resolve Core module root for testbench modules path.');
+        }
+
+        $modules_dir = dirname($module_root) . DIRECTORY_SEPARATOR . '.testbench-modules';
 
         if (! is_dir($modules_dir)) {
             mkdir($modules_dir, 0755, true);
@@ -169,11 +178,11 @@ abstract class LaravelTestCase extends Orchestra
 
         $core_link = $modules_dir . DIRECTORY_SEPARATOR . 'Core';
 
-        if (! file_exists($core_link) && $repo_root !== false) {
-            symlink($repo_root, $core_link);
+        if (! file_exists($core_link)) {
+            symlink($module_root, $core_link);
         }
 
-        $cms_repo = dirname((string) $repo_root) . DIRECTORY_SEPARATOR . 'Cms';
+        $cms_repo = dirname($module_root) . DIRECTORY_SEPARATOR . 'Cms';
         $cms_link = $modules_dir . DIRECTORY_SEPARATOR . 'Cms';
 
         if (is_dir($cms_repo) && ! file_exists($cms_link)) {

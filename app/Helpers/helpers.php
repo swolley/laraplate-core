@@ -79,7 +79,7 @@ if (! function_exists('modules')) {
         }
 
         if ($prioritySort === true) {
-            uasort($remapped_modules, static fn (Module $a, Module $b): int => $b->getPriority() <=> $a->getPriority());
+            uasort($remapped_modules, static fn (Module $a, Module $b): int => $a->getPriority() <=> $b->getPriority());
         }
 
         $remapped_modules = $fullpath ? array_map(fn (Module $m): string => $m->getPath(), $remapped_modules) : array_keys($remapped_modules);

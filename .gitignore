@@ -21,7 +21,6 @@ Homestead.yaml
 Homestead.json
 /.vagrant
 .phpunit.result.cache
-.testbench-modules
 /build
 /coverage-html
 

@@ -113,13 +113,29 @@ trait HasDynamicContentFactory
             return [$field->name => $value];
         })->toArray();
 
-        $model->components = $components_array;
+        // Separate fields by translatability using live preset data (not snapshot-dependent).
+        // Non-translatable fields are written directly to the shared_components JSON attribute,
+        // bypassing setAttribute → isDynamicField → getFieldsFromSnapshot() which would fail
+        // when fields_snapshot is not yet populated, causing raw attributes to land in the INSERT.
+        $shared = json_decode((string) ($model->attributes['shared_components'] ?? '{}'), true) ?? [];
+        $translatable = [];
 
         foreach ($model->presettable->preset->fields as $field) {
-            if (! ($field->is_translatable ?? false)) {
-                $model->{$field->name} = $components_array[$field->name] ?? $field->pivot->default;
+            $value = $components_array[$field->name] ?? $field->pivot->default;
+            if ($field->is_translatable ?? false) {
+                $translatable[$field->name] = $value;
+            } else {
+                $shared[$field->name] = $value;
             }
         }
+
+        if ($translatable !== []) {
+            $model->components = $translatable;
+        }
+
+        // setAttribute routes 'shared_components' to parent::setAttribute (not translatable,
+        // not a dynamic field) which applies the json cast and stores in $this->attributes safely.
+        $model->setAttribute('shared_components', $shared);
 
         if (
             class_uses_trait($model, HasSlug::class)

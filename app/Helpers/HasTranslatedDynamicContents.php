@@ -273,7 +273,10 @@ trait HasTranslatedDynamicContents
     }
 
     /**
-     * Override isFieldTranslatable to check field model.
+     * Override isFieldTranslatable to check the frozen fields snapshot first, falling back
+     * to a live query only when the field is not found in the snapshot (e.g. snapshot not
+     * yet populated). Using the snapshot keeps this consistent with isDynamicField() and
+     * avoids an extra DB round-trip per field on every attribute access.
      */
     protected function isFieldTranslatable(string $field): ?bool
     {
@@ -283,14 +286,17 @@ trait HasTranslatedDynamicContents
             return null;
         }
 
+        $field_from_snapshot = $presettable->getFieldsFromSnapshot()->firstWhere('name', $field);
+
+        if ($field_from_snapshot !== null) {
+            return (bool) $field_from_snapshot->is_translatable;
+        }
+
+        // Fallback to live query when field is absent from the snapshot
         $preset = $presettable->getRelationValue('preset');
         $field_model = $preset?->fields()->where('name', $field)->first();
 
-        if (! $field_model) {
-            return null;
-        }
-
-        return $field_model->is_translatable ?? false;
+        return $field_model !== null ? ($field_model->is_translatable ?? false) : null;
     }
 
     /**

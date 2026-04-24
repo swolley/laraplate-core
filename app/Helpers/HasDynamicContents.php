@@ -373,16 +373,18 @@ trait HasDynamicContents
     {
         return new Attribute(
             get: function () {
-                if (! $this->relationLoaded('presettable') && $this->presettable_id) {
-                    $this->load('presettable');
-
+                // If the presettable relation is already loaded (the most common case, since it
+                // is always eager-loaded via $this->with), use it directly to avoid unnecessary
+                // service/cache lookups. The previous path through fetchAvailablePresets() was
+                // unreliable in forked processes where the memoized cache can be contaminated.
+                if ($this->relationLoaded('presettable')) {
                     return $this->getRelationValue('presettable')?->getRelationValue('entity')?->name;
                 }
 
                 if ($this->presettable_id) {
-                    $entity_type = static::getEntityType();
+                    $this->load('presettable');
 
-                    return static::fetchAvailablePresets($entity_type::tryFrom($this->getTable()))->firstWhere('id', $this->presettable_id)?->entity?->name;
+                    return $this->getRelationValue('presettable')?->getRelationValue('entity')?->name;
                 }
 
                 $this->setDefaultPresettable();
@@ -440,13 +442,20 @@ trait HasDynamicContents
      */
     protected function mergeComponentsValues(array $components, ?bool $only_translatable = null): array
     {
-        return $this->fields()
+        $fields = $this->fields();
+
+        // When the fields snapshot is not yet populated, return the input as-is to avoid
+        // silently discarding component data during factory or early-lifecycle operations.
+        if ($fields->isEmpty()) {
+            return $components;
+        }
+
+        return $fields
             ->filter(function (Field $field) use ($only_translatable): bool {
                 if ($only_translatable === null) {
                     return true;
                 }
 
-                // Check if field is translatable
                 $is_translatable = $this->isFieldTranslatable($field->name);
 
                 return $only_translatable ? ($is_translatable === true) : ($is_translatable !== true);

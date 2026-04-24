@@ -122,6 +122,18 @@ final class BenchmarkHarness extends Command
         $this->stepBenchmark();
     }
 
+    public function testQueryCountAccuracy(int $count): void
+    {
+        DB::flushQueryLog();
+        $this->startBenchmark();
+
+        for ($i = 0; $i < $count; $i++) {
+            DB::select('select 1');
+        }
+
+        $this->endBenchmark();
+    }
+
     public function testGetQueryCountReturnsZeroForUnsupportedDriver(): void
     {
         $connection = Mockery::mock(Connection::class);

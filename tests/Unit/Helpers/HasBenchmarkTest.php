@@ -138,6 +138,20 @@ it('uses pgsql and oracle branches in getQueryCount', function (): void {
     $cmd->testGetQueryCountUsesOracleBranch();
 });
 
+it('reports the exact sql query count in the benchmark output', function (): void {
+    Log::spy();
+
+    $cmd = new BenchmarkHarness;
+    $cmd->setLaravel($this->app);
+    prepare_benchmark_command($cmd);
+
+    $cmd->testQueryCountAccuracy(3);
+
+    Log::shouldHaveReceived('debug')
+        ->once()
+        ->withArgs(fn (string $message): bool => str_contains($message, 'SQL 3'));
+});
+
 it('writes benchmark output when used from a seeder with command set', function (): void {
     Log::spy();
 
