@@ -25,8 +25,6 @@ return new class() extends Migration
 
             $uuid ? $table->uuidMorphs('versionable', 'versionable_morph_idx') : $table->morphs('versionable', 'versionable_morph_idx');
 
-            // TODO: serve aggiungere un indice su versionable_type e versionable_id?
-
             $table->json('original_contents')
                 ->nullable()
                 ->comment('Original model attributes before the change');
