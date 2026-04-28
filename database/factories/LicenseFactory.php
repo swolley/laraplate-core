@@ -30,7 +30,7 @@ final class LicenseFactory extends Factory
     public function definition(): array
     {
         return [
-            'id' => uuid_create(),
+            'uuid' => fake()->unique()->uuid(),
             'valid_from' => today(),
             'valid_to' => null,
         ];

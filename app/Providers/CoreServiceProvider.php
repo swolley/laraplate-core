@@ -34,6 +34,7 @@ use Modules\Core\Http\Middleware\PreviewMiddleware;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
+use Modules\Core\Models\License;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
@@ -299,6 +300,12 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Model::shouldBeStrict();
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
         Model::preventAccessingMissingAttributes(! $this->app->isProduction());
+
+        License::creating(function (License $license): void {
+            if ($license->uuid === null || $license->uuid === '') {
+                $license->uuid = (string) Str::uuid();
+            }
+        });
     }
 
     /**

@@ -15,7 +15,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('licenses', function (Blueprint $table): void {
-            $table->uuid('id')->primary(true)->nullable(false)->comment('The unique identifier for the license');
+            $table->id();
+            $table->uuid('uuid')->unique()->comment('Public license reference shown to customers');
+            $table->boolean('is_deleted')->default(false)->comment('Soft delete flag (see SoftDeletes trait scope)');
 
             MigrateUtils::timestamps(
                 $table,

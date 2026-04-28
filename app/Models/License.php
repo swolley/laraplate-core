@@ -6,8 +6,8 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Validation\Rule;
 use Modules\Core\Database\Factories\LicenseFactory;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Overrides\Model;
@@ -18,17 +18,17 @@ use Override;
  */
 final class License extends Model
 {
-    use HasUuids;
     use HasValidity;
-
-    #[Override]
-    protected $keyType = 'string';
 
     /**
      * The attributes that are mass assignable.
+     *
+     * @var list<string>
      */
     #[Override]
-    protected $fillable = [];
+    protected $fillable = [
+        'uuid',
+    ];
 
     #[Override]
     protected $casts = [
@@ -51,6 +51,7 @@ final class License extends Model
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
+            'uuid' => ['required', 'uuid', Rule::unique('licenses', 'uuid')->ignore($this->getKey())],
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],
         ]);

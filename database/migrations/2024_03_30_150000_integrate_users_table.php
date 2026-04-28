@@ -19,7 +19,7 @@ return new class() extends Migration
             $table->string('username')->unique('users_username_UN')->nullable(false)->comment('The username of the user');
             $table->string('lang')->nullable(true)->comment('The language of the user');
             $table->datetime('last_login_at')->nullable(true)->comment('The last login date of the user');
-            $table->uuid('license_id')->nullable(true)->comment('The license id of the user');
+            $table->foreignId('license_id')->nullable()->comment('The license assigned to the user');
             $table->text('two_factor_secret')->after('password')->nullable()->comment('The two factor secret of the user');
             $table->text('two_factor_recovery_codes')->nullable()->comment('The two factor recovery codes of the user');
 

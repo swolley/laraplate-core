@@ -8,19 +8,17 @@ it('license model has correct structure', function (): void {
     $reflection = new ReflectionClass(License::class);
     $source = file_get_contents($reflection->getFileName());
 
-    // Test fillable attributes
+    // Test fillable attributes (uuid; HasValidity appends valid_from / valid_to at runtime)
     expect($source)->toContain('protected $fillable');
-    expect($source)->toContain('[]');
+    expect($source)->toContain('\'uuid\'');
 });
 
 it('license model uses correct traits', function (): void {
-    $reflection = new ReflectionClass(License::class);
-    $traits = $reflection->getTraitNames();
+    $traits = class_uses_recursive(License::class);
 
-    expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
-    expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Concerns\\HasUuids');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidations');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidity');
+    expect($traits)->toHaveKey('Illuminate\\Database\\Eloquent\\Factories\\HasFactory')
+        ->and($traits)->toHaveKey('Modules\\Core\\Helpers\\HasValidations')
+        ->and($traits)->toHaveKey('Modules\\Core\\Helpers\\HasValidity');
 });
 
 it('license model has required methods', function (): void {

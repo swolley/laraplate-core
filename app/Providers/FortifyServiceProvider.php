@@ -123,6 +123,7 @@ final class FortifyServiceProvider extends ServiceProvider
             if ($result['success']) {
                 if (config('auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
+                    session()->put('license_uuid', $result['license']->uuid);
                 }
 
                 return $result['user'];

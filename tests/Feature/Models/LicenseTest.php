@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Str;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\LaravelTestCase;
+
+uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->license = License::factory()->create();
@@ -14,9 +18,9 @@ it('can be created with factory', function (): void {
     expect($this->license->id)->not->toBeNull();
 });
 
-it('uses uuid as primary key', function (): void {
-    expect($this->license->getKeyType())->toBe('string');
-    expect($this->license->getKey())->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
+it('uses auto-increment primary key and a distinct public uuid', function (): void {
+    expect($this->license->id)->toBeInt()->toBeGreaterThan(0);
+    expect($this->license->uuid)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
 });
 
 it('has one user relationship', function (): void {
@@ -58,6 +62,7 @@ it('has validations trait', function (): void {
 
 it('can be created with specific attributes', function (): void {
     $licenseData = [
+        'uuid' => (string) Str::uuid(),
         'valid_from' => now(),
         'valid_to' => now()->addYear(),
     ];
@@ -90,10 +95,10 @@ it('can be found by id', function (): void {
 //     expect($inactiveLicenses->first()->id)->toBe($inactiveLicense->id);
 // });
 
-it('has proper uuid format', function (): void {
+it('has proper public uuid format', function (): void {
     $license = License::factory()->create();
 
-    expect($license->id)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
+    expect($license->uuid)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
 });
 
 it('can be created without user initially', function (): void {
@@ -164,9 +169,10 @@ it('can be serialized to array', function (): void {
     $license = License::factory()->create();
     $licenseArray = $license->toArray();
 
-    expect($licenseArray)->toHaveKey('id');
-    expect($licenseArray)->toHaveKey('valid_from');
-    expect($licenseArray)->toHaveKey('valid_to');
-    expect($licenseArray)->toHaveKey('created_at');
-    expect($licenseArray)->toHaveKey('updated_at');
+    expect($licenseArray)->toHaveKey('id')
+        ->and($licenseArray)->toHaveKey('uuid')
+        ->and($licenseArray)->toHaveKey('valid_from')
+        ->and($licenseArray)->toHaveKey('valid_to')
+        ->and($licenseArray)->toHaveKey('created_at')
+        ->and($licenseArray)->toHaveKey('updated_at');
 });

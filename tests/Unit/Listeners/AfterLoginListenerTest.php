@@ -185,7 +185,7 @@ it('checkUserLicense associates first free license when conditions are met', fun
 
     AfterLoginListener::checkUserLicense($user);
 
-    expect($user->license_id)->toBe((string) $license->id);
+    expect($user->license_id)->toBe($license->id);
 });
 
 it('handle logs impersonation context for impersonated users', function (): void {
