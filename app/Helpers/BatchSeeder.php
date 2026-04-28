@@ -11,16 +11,19 @@ use Illuminate\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 use Laravel\Prompts\Progress;
+use Modules\Core\Concurrency\BatchTask;
+use Modules\Core\Concurrency\ErrorPolicy;
+use Modules\Core\Concurrency\Exceptions\BatchExecutionFailedException;
+use Modules\Core\Concurrency\ParallelTaskRunner;
+use Modules\Core\Concurrency\Reporters\ProgressBarReporter;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Search\Traits\Searchable;
 use ReflectionClass;
-use RuntimeException;
 use Throwable;
 
 abstract class BatchSeeder extends Seeder
@@ -55,7 +58,21 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Create the data in batches.
+     * Hook executed once inside each forked child process before the batch task runs.
+     *
+     * The default implementation only reconnects to the database (PDO links
+     * inherited from the parent are not safe to reuse after a fork). Override
+     * in your seeder if you need additional resets, e.g. cache, queue, or
+     * search engine clients. Avoid destructive operations like Cache::flush()
+     * which would truncate shared stores (Redis FLUSHDB).
+     */
+    protected function bootstrapChildProcess(): void
+    {
+        DB::reconnect();
+    }
+
+    /**
+     * Create the data in batches sequentially.
      *
      * @param  class-string<Model>  $modelClass  The model class to create the data for
      * @param  int  $totalCount  The total number of data to create
@@ -103,11 +120,9 @@ abstract class BatchSeeder extends Seeder
             $batch++;
         }
 
-        // Show final message in hint before finishing
         if ($created > 0) {
             $progress->label("Successfully created {$created} {$entity_name} records in " . microtime(true) - $start_time . ' seconds');
             $progress->render();
-            // Small pause to ensure the hint is visible
             Sleep::usleep(250_000);
         }
 
@@ -117,15 +132,19 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Create the data in parallel batches using fork processes with file communication.
+     * Create the data in parallel batches using the ParallelTaskRunner worker pool.
      *
      * @param  class-string<Model>  $modelClass  The model class to create the data for
      * @param  int  $totalCount  The total number of data to create
      * @param  int|null  $batchSize  The size of the batch to create
-     * @param  int  $maxParallelCount  The maximum number of parallel processes
+     * @param  int  $maxParallelCount  The maximum number of concurrent worker processes
      */
-    final protected function createInParallelBatches(string $modelClass, int $totalCount, ?int $batchSize = null, int $maxParallelCount = 10): int
-    {
+    final protected function createInParallelBatches(
+        string $modelClass,
+        int $totalCount,
+        ?int $batchSize = null,
+        int $maxParallelCount = 10,
+    ): int {
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
@@ -137,430 +156,93 @@ abstract class BatchSeeder extends Seeder
             return 0;
         }
 
-        $safe_max_parallel_count = $this->getMaxParallelCount($maxParallelCount);
-        $db_safe_parallel_count = $this->getMaxDbParallelCount($db_connection_name, $safe_max_parallel_count);
-
-        if ($safe_max_parallel_count < $maxParallelCount) {
-            $this->command->newLine();
-            $this->command->warn('Safely reduced max parallel count to ' . $safe_max_parallel_count . ' because the number of CPU cores is less than expected.');
-            $this->command->newLine();
-
-            $reduction_percent = 1.0 - ($safe_max_parallel_count / max($maxParallelCount, 1));
-            $proportional_batch_size = max(
-                10, // Reasonable minimum batch size
-                (int) round(($batchSize ?? self::BATCHSIZE) * (1.0 - ($reduction_percent * 0.7))),
-            );
-
-            if ($proportional_batch_size !== ($batchSize ?? self::BATCHSIZE)) {
-                $this->command->warn("Batch size has been reduced to {$proportional_batch_size} to avoid system overload (proportional to available cores).");
-            }
-            $batchSize = $proportional_batch_size;
-        }
-
-        if ($db_safe_parallel_count < $safe_max_parallel_count) {
-            $this->command->newLine();
-            $this->command->warn('Safely reduced max parallel count to ' . $db_safe_parallel_count . ' because of database connection limits on ' . $db_connection_name . '.');
-            $this->command->newLine();
-
-            $reduction_percent = 1.0 - ($db_safe_parallel_count / max($safe_max_parallel_count, 1));
-            $proportional_batch_size = max(
-                10, // Reasonable minimum batch size
-                (int) round(($batchSize ?? self::BATCHSIZE) * (1.0 - ($reduction_percent * 0.7))),
-            );
-
-            if ($proportional_batch_size !== ($batchSize ?? self::BATCHSIZE)) {
-                $this->command->warn("Batch size has been reduced to {$proportional_batch_size} to respect DB connection limits.");
-            }
-            $batchSize = $proportional_batch_size;
-        }
-
-        $safe_max_parallel_count = $db_safe_parallel_count;
-
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
 
-        $progress = progress('Creating ' . $entity_name . ' (parallel)', $count_to_create);
-        $progress->hint("Using {$safe_max_parallel_count} parallel processes, {$effective_batch_size} records per batch, {$total_batches} total batches");
-        $progress->start();
+        $tasks = $this->buildSeederTasks($modelClass, $count_to_create, $effective_batch_size, $total_batches);
 
-        // Temporary directory for inter-process communication
-        $temp_dir = sys_get_temp_dir() . '/batch_seeder_' . uniqid();
-        mkdir($temp_dir, 0755, true);
+        if ($tasks === []) {
+            return 0;
+        }
 
-        // Shared file for total progress
-        $progress_file = $temp_dir . '/progress.json';
-        $progress_lock_file = $temp_dir . '/progress.lock';
-
-        // Initialize the progress file
-        file_put_contents($progress_file, json_encode(['total_created' => 0]));
+        $reporter = new ProgressBarReporter(
+            label: 'Creating ' . $entity_name . ' (parallel)',
+            extraHint: "Up to {$maxParallelCount} workers, {$effective_batch_size} records/batch, {$total_batches} batches",
+        );
 
         try {
-            $created = $this->executeParallelBatches(
-                $modelClass,
-                $count_to_create,
-                $effective_batch_size,
-                $total_batches,
-                $safe_max_parallel_count,
-                $progress,
-                $progress_file,
-                $progress_lock_file,
-            );
+            $summary = ParallelTaskRunner::make()
+                ->concurrent($maxParallelCount)
+                ->withResourceSizing($db_connection_name, $effective_batch_size)
+                ->errorPolicy(ErrorPolicy::FailFast)
+                ->reportTo($reporter)
+                ->beforeChild(fn () => $this->bootstrapChildProcess())
+                ->run($tasks);
+        } catch (BatchExecutionFailedException $e) {
+            $error = $e->outcome->error;
+            $message = $error['message'] ?? 'unknown error';
+            $file = $error['file'] ?? '?';
+            $line = (int) ($error['line'] ?? 0);
 
-            $progress->finish();
+            $this->command->error("Task {$e->outcome->taskId} failed: {$message} in {$file} on line {$line}");
 
-            return $created;
-        } finally {
-            // Cleanup
-            $this->cleanupTempDirectory($temp_dir);
-        }
-    }
-
-    private function getCpuCores(): int
-    {
-        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Linux')) {
-            return (int) shell_exec('nproc') ?: 1;
-        }
-
-        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Darwin')) {
-            return (int) shell_exec('sysctl -n hw.ncpu') ?: 1;
-        }
-
-        if (function_exists('shell_exec') && str_contains(PHP_OS_FAMILY, 'Windows')) {
-            return (int) getenv('NUMBER_OF_PROCESSORS') ?: 1;
-        }
-
-        return 1;
-    }
-
-    private function getMaxParallelCount(int $maxParallelCount): int
-    {
-        $cpu_cores = $this->getCpuCores();
-
-        // Heuristic: keep some margin for other system activities; don't exceed the CPU core count.
-        return min($maxParallelCount, max(1, $cpu_cores - 1));
-    }
-
-    private function getMaxDbParallelCount(string $connectionName, int $currentLimit): int
-    {
-        try {
-            $connection = DB::connection($connectionName);
-            $driver = $connection->getDriverName();
-
-            if ($driver !== 'pgsql') {
-                return $currentLimit;
+            if (($trace = $e->trace()) !== '') {
+                $this->command->error($trace);
             }
 
-            $max_connections = (int) ($connection->selectOne('SHOW max_connections')->max_connections ?? 0);
-            $reserved = (int) ($connection->selectOne('SHOW superuser_reserved_connections')->superuser_reserved_connections ?? 0);
-            $active = (int) ($connection->selectOne('SELECT sum(numbackends) AS active_backends FROM pg_stat_database')->active_backends ?? 0);
-
-            // Keep a small safety margin of one connection.
-            $available = max(1, $max_connections - $reserved - $active - 1);
-
-            return max(1, min($currentLimit, $available));
-        } catch (Throwable $e) {
-            Log::warning('Unable to determine DB parallel limit, keeping current limit.', [
-                'connection' => $connectionName,
-                'error' => $e->getMessage(),
+            Log::error('BatchSeeder parallel run failed', [
+                'task_id' => $e->outcome->taskId,
+                'error' => $error,
             ]);
 
-            return $currentLimit;
+            exit(1);
         }
+
+        return $summary->totalUnitsProcessed;
     }
 
     /**
-     * Execute parallel batches using Concurrency facade with grouped batches.
+     * Build the BatchTask list for parallel seeding.
      *
-     * Note: Concurrency::run() is blocking and waits for all closures to complete.
-     * We group batches into chunks of maxParallelCount, execute them in parallel,
-     * wait for completion, then proceed to the next chunk. This approach balances
-     * parallelism with memory management through garbage collection between chunks.
+     * @param  class-string<Model>  $modelClass
+     * @return list<BatchTask>
      */
-    private function executeParallelBatches(
+    private function buildSeederTasks(
         string $modelClass,
         int $count_to_create,
         int $effective_batch_size,
         int $total_batches,
-        int $maxParallelCount,
-        Progress $progress,
-        string $progress_file,
-        string $progress_lock_file,
-    ): int {
-        $driver = Concurrency::driver('fork');
-        $batch = 0;
-        $last_progress = 0;
-        $total_groups = (int) ceil($total_batches / $maxParallelCount);
-        $current_group = 0;
+    ): array {
+        $tasks = [];
+        $remaining = $count_to_create;
 
-        // Track start time for accurate speed calculation
-        $start_time = microtime(true);
-        $total_records_processed = 0; // Sum of all records processed so far
+        for ($i = 0; $i < $total_batches; $i++) {
+            $size = min($effective_batch_size, $remaining);
 
-        // Statistics for moving average calculation (recent performance window)
-        $recent_stats = []; // Array of ['time' => float, 'records' => int] for recent groups
-        $recent_window_seconds = 30; // Use last 30 seconds for speed calculation
-
-        while ($batch < $total_batches) {
-            $current_group++;
-            $group_start_time = microtime(true);
-            // Collect batches for parallel execution (grouped approach for memory efficiency)
-            $batches_to_run = [];
-            $batch_info = [];
-
-            while ($maxParallelCount > count($batches_to_run) && $batch < $total_batches) {
-                $remaining = $count_to_create - $last_progress;
-                $current_batch_size = min($effective_batch_size, $remaining);
-
-                if ($current_batch_size <= 0) {
-                    break;
-                }
-
-                // Create closure for this batch with timing
-                $batches_to_run["batch_{$batch}"] = function () use ($modelClass, $current_batch_size, $batch, $progress_file, $progress_lock_file): array {
-                    $batch_start_time = microtime(true);
-
-                    try {
-                        $result = $this->executeSingleBatch($modelClass, $current_batch_size);
-
-                        $db_complete_time = microtime(true);
-                        $db_duration = $db_complete_time - $batch_start_time;
-
-                        // Time the file locking operation
-                        $file_lock_start = microtime(true);
-                        $this->incrementProgressFile($progress_file, $progress_lock_file, $result);
-                        $file_lock_time = microtime(true) - $file_lock_start;
-
-                        $batch_end_time = microtime(true);
-                        $batch_duration = $batch_end_time - $batch_start_time;
-
-                        return [
-                            'batch' => $batch,
-                            'created' => $result,
-                            'success' => true,
-                            'duration' => $batch_duration,
-                            'db_duration' => $db_duration,
-                            'file_lock_duration' => $file_lock_time,
-                            'timestamp' => microtime(true),
-                        ];
-                    } catch (Throwable $e) {
-                        if ($e instanceof ValidationException) {
-                            $errors = $e->errors();
-                            $failedField = array_key_first($errors);
-                            $failedMessages = $errors[$failedField] ?? [];
-                            $data = method_exists($e->validator, 'getData') ? $e->validator->getData() : [];
-                            $failedValue = $data[$failedField] ?? 'N/A';
-
-                            $message = sprintf('Validation failed for field "%s": %s (value: %s)', $failedField, implode(', ', $failedMessages), $failedValue);
-                        } else {
-                            $message = $e->getMessage();
-                        }
-
-                        return [
-                            'created' => $result ?? 0,
-                            'duration' => $batch_duration ?? 0,
-                            'db_duration' => $db_duration ?? 0,
-                            'file_lock_duration' => $file_lock_time ?? 0,
-                            'batch' => $batch,
-                            'error' => $message,
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                            'trace' => $e->getTraceAsString(),
-                            'timestamp' => microtime(true),
-                            'success' => false,
-                        ];
-                    }
-                };
-
-                $batch++;
-            }
-
-            if ($batches_to_run === []) {
+            if ($size <= 0) {
                 break;
             }
 
-            // Execute all batches in parallel using Concurrency
-            $results = $driver->run($batches_to_run);
+            $remaining -= $size;
 
-            $group_records_processed = 0;
-
-            // Update progressbar based on results and collect timing statistics
-            foreach ($results as $result) {
-                if (! $result['success']) {
-                    $this->command->error("Batch {$result['batch']} failed: " . $result['error'] . ' in ' . $result['file'] . ' on line ' . $result['line']);
-                    $this->command->error($result['trace']);
-
-                    exit();
-                }
-
-                if (is_array($result) && isset($result['created']) && $result['created'] > 0) {
-                    $records_created = $result['created'];
-
-                    $total_records_processed += $records_created;
-                    $group_records_processed += $records_created;
-
-                    $progress->advance($records_created);
-                    $last_progress += $records_created;
-                } elseif (is_int($result) && $result > 0) {
-                    // Fallback for old format
-                    $progress->advance($result);
-                    $last_progress += $result;
-                    $group_records_processed += $result;
-                }
-            }
-
-            // Record statistics for this group
-            $group_end_time = microtime(true);
-            $group_duration = $group_end_time - $group_start_time;
-
-            if ($group_records_processed > 0) {
-                $recent_stats[] = [
-                    'time' => $group_end_time,
-                    'duration' => $group_duration,
-                    'records' => $group_records_processed,
-                ];
-
-                // Keep only statistics from the last N seconds
-                $cutoff_time = $group_end_time - $recent_window_seconds;
-                $recent_stats = array_filter($recent_stats, fn (array $stat): bool => $stat['time'] >= $cutoff_time);
-                $recent_stats = array_values($recent_stats); // Re-index array
-            }
-
-            // Update progressbar hint with statistics
-            $this->updateProgressHint(
-                $progress,
-                $current_group,
-                $total_groups,
-                $start_time,
-                $total_records_processed,
-                $count_to_create,
-                $recent_stats,
+            $tasks[] = new BatchTask(
+                id: "batch_{$i}",
+                units: $size,
+                run: fn (): int => $this->executeSingleBatch($modelClass, $size),
             );
-
-            // Update progressbar from shared file (in case some updates were missed)
-            $current_progress = $this->readProgressFile($progress_file, $progress_lock_file);
-
-            if ($current_progress > $last_progress) {
-                $increment = $current_progress - $last_progress;
-                $progress->advance($increment);
-                $last_progress = $current_progress;
-
-                // Update hint with current progress (if we have statistics)
-                if ($total_records_processed > 0) {
-                    $this->updateProgressHint(
-                        $progress,
-                        $current_group,
-                        $total_groups,
-                        $start_time,
-                        $current_progress,
-                        $count_to_create,
-                        $recent_stats,
-                    );
-                }
-            }
-
-            // Clean up memory after each group of batches
-            unset($batches_to_run, $batch_info, $results);
-            gc_collect_cycles();
         }
 
-        // Read the final progress
-        $final_progress = $this->readProgressFile($progress_file, $progress_lock_file);
-
-        if ($final_progress > $last_progress) {
-            $progress->advance($final_progress - $last_progress);
-        }
-
-        return $final_progress;
+        return $tasks;
     }
 
     /**
-     * Update the progressbar hint with statistics.
+     * Execute a single batch in an isolated forked process.
      *
-     * @param  array<int, array{time: float, duration: float, records: int}>  $recent_stats
-     */
-    private function updateProgressHint(
-        Progress $progress,
-        int $current_group,
-        int $total_groups,
-        float $start_time,
-        int $total_records_processed,
-        int $count_to_create,
-        array $recent_stats = [],
-    ): void {
-        $hint_parts = [];
-
-        // Group information
-        $hint_parts[] = sprintf('Group %d/%d', $current_group, $total_groups);
-
-        // Calculate records per second using recent statistics (moving average)
-        $records_per_second = 0;
-
-        if ($recent_stats !== []) {
-            // Calculate speed based on recent window (more accurate for current performance)
-            $recent_total_records = 0;
-            $recent_total_duration = 0;
-
-            foreach ($recent_stats as $stat) {
-                $recent_total_records += $stat['records'];
-                $recent_total_duration += $stat['duration'];
-            }
-
-            if ($recent_total_duration > 0) {
-                $records_per_second = $recent_total_records / $recent_total_duration;
-            }
-        }
-
-        // Fallback to overall average if we don't have enough recent data
-        if ($records_per_second <= 0 && $total_records_processed > 0) {
-            $elapsed_time = microtime(true) - $start_time;
-
-            if ($elapsed_time > 0) {
-                $records_per_second = $total_records_processed / $elapsed_time;
-            }
-        }
-
-        // Display speed
-        if ($records_per_second > 0) {
-            if ($records_per_second < 0.001) {
-                $hint_parts[] = sprintf('~%.2f records/h', $records_per_second * 3600);
-            } elseif ($records_per_second < 1) {
-                $hint_parts[] = sprintf('~%.2f records/min', $records_per_second * 60);
-            } else {
-                $hint_parts[] = sprintf('~%.1f records/s', $records_per_second);
-            }
-
-            // Estimated time remaining (if we have enough data)
-            if ($total_records_processed < $count_to_create) {
-                $remaining_records = $count_to_create - $total_records_processed;
-                $estimated_seconds = $remaining_records / $records_per_second;
-
-                if ($estimated_seconds < 60) {
-                    $hint_parts[] = sprintf('ETA: ~%.0f s', $estimated_seconds);
-                } elseif ($estimated_seconds < 3600) {
-                    $hint_parts[] = sprintf('ETA: ~%.1f min', $estimated_seconds / 60);
-                } else {
-                    $hint_parts[] = sprintf('ETA: ~%.1f h', $estimated_seconds / 3600);
-                }
-            }
-        }
-
-        $progress->hint(implode(' | ', $hint_parts));
-        $progress->render();
-    }
-
-    /**
-     * Execute a single batch in an isolated process.
-     * In a forked process, each process already has isolated memory,
-     * so we can use the default connections without conflicts.
+     * Connection bootstrap is centralised in bootstrapChildProcess(), invoked
+     * once per fork by ParallelTaskRunner via beforeChild().
      */
     private function executeSingleBatch(string $modelClass, int $batchSize): int
     {
-        // In a forked process, each process already has isolated memory
-        // So we can use the default connections without issues
-        // Just make sure the connections are fresh
-        DB::reconnect();
-        Cache::flush();
-
         $model_instance = new $modelClass();
 
         /** @phpstan-ignore staticMethod.notFound */
@@ -573,136 +255,10 @@ abstract class BatchSeeder extends Seeder
             $factory->createDynamicContentRelations($new_models);
         }
 
-        // Clean up memory in child process
         unset($new_models, $factory, $model_instance);
         gc_collect_cycles();
 
         return $batchSize;
-    }
-
-    /**
-     * Increment the shared progress file atomically.
-     */
-    private function incrementProgressFile(string $progressFile, string $lockFile, int $increment): void
-    {
-        $lock = fopen($lockFile, 'c+');
-
-        throw_if($lock === false, RuntimeException::class, "Unable to create lock file: {$lockFile}");
-
-        // Try to acquire exclusive lock (non-blocking)
-        $attempts = 0;
-        $max_attempts = 100; // 10 seconds max wait
-
-        while (! flock($lock, LOCK_EX | LOCK_NB)) {
-            $attempts++;
-
-            if ($attempts >= $max_attempts) {
-                fclose($lock);
-
-                throw new RuntimeException("Unable to acquire lock on progress file after {$max_attempts} attempts");
-            }
-
-            Sleep::usleep(100000); // 100ms
-        }
-
-        try {
-            // Read current progress
-            $current_data = ['total_created' => 0];
-
-            if (file_exists($progressFile)) {
-                $content = file_get_contents($progressFile);
-
-                if ($content !== false) {
-                    $decoded = json_decode($content, true);
-
-                    if (is_array($decoded)) {
-                        $current_data = $decoded;
-                    }
-                }
-            }
-
-            // Increment progress
-            $current_data['total_created'] += $increment;
-
-            // Write back
-            file_put_contents($progressFile, json_encode($current_data), LOCK_EX);
-        } finally {
-            flock($lock, LOCK_UN);
-            fclose($lock);
-        }
-    }
-
-    /**
-     * Read the current progress from the shared file.
-     */
-    private function readProgressFile(string $progressFile, string $lockFile): int
-    {
-        if (! file_exists($progressFile)) {
-            return 0;
-        }
-
-        $lock = fopen($lockFile, 'c+');
-
-        if ($lock === false) {
-            // If we can't acquire the lock, read anyway (read-only)
-            $content = file_get_contents($progressFile);
-
-            if ($content === false) {
-                return 0;
-            }
-
-            $decoded = json_decode($content, true);
-
-            return is_array($decoded) && isset($decoded['total_created']) ? (int) $decoded['total_created'] : 0;
-        }
-
-        // Try to acquire shared lock (non-blocking)
-        if (flock($lock, LOCK_SH | LOCK_NB)) {
-            try {
-                $content = file_get_contents($progressFile);
-
-                if ($content === false) {
-                    return 0;
-                }
-
-                $decoded = json_decode($content, true);
-
-                return is_array($decoded) && isset($decoded['total_created']) ? (int) $decoded['total_created'] : 0;
-            } finally {
-                flock($lock, LOCK_UN);
-                fclose($lock);
-            }
-        }
-
-        fclose($lock);
-
-        // Fallback: read without lock
-        $content = file_get_contents($progressFile);
-
-        if ($content === false) {
-            return 0;
-        }
-
-        $decoded = json_decode($content, true);
-
-        return is_array($decoded) && isset($decoded['total_created']) ? (int) $decoded['total_created'] : 0;
-    }
-
-    /**
-     * Cleanup temporary directory.
-     */
-    private function cleanupTempDirectory(string $temp_dir): void
-    {
-        if (is_dir($temp_dir)) {
-            $files = glob($temp_dir . '/*');
-
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    unlink($file);
-                }
-            }
-            rmdir($temp_dir);
-        }
     }
 
     private function countCurrentRecords(string $modelClass): int
@@ -732,7 +288,7 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Execute a batch of data creation.
+     * Execute a batch of data creation in the synchronous path.
      *
      * @param  class-string<Model>  $modelClass  The model class to create the data for
      * @param  string  $entityName  The name of the entity to create the data for
@@ -743,8 +299,8 @@ abstract class BatchSeeder extends Seeder
      * @param  int  $created  The number of records created so far
      * @param  int  $remaining  The number of records remaining to create
      * @param  Progress  $progress  The progress bar
-     * @param  bool  $asyncMode  Whether to run the batch asynchronously
-     * @param  callable|null  $force_kill_batches  The function to call if the batch fails
+     * @param  bool  $asyncMode  Whether to run the batch with isolated async connections
+     * @param  callable|null  $force_kill_batches  Optional callback invoked on failure
      */
     private function executeBatch(string &$modelClass, string &$entityName, int &$batch, int &$batchSize, int &$currentCount, int &$countToCreate, int &$created, int &$remaining, Progress $progress, bool $asyncMode = false, ?callable $force_kill_batches = null): void
     {
@@ -763,7 +319,6 @@ abstract class BatchSeeder extends Seeder
         while (! $success && $retry_count < self::MAX_RETRIES) {
             try {
                 if ($asyncMode) {
-                    // Setup fresh connections for async operations
                     $connections = $this->setupAsyncConnections($connections['database'], $connections['cache']);
                 }
 
@@ -821,7 +376,6 @@ abstract class BatchSeeder extends Seeder
                 }
 
                 if ($asyncMode) {
-                    // Reset connections on retry
                     $this->resetAsyncConnections($connections['database'], $connections['cache']);
                 }
 
@@ -861,16 +415,13 @@ abstract class BatchSeeder extends Seeder
      */
     private function setupAsyncDatabaseConnection(string $connection_name): string
     {
-        // Disable prepared statements for better async performance
         config([sprintf('database.connections.%s.prepared_statements', $connection_name) => false]);
 
-        // Create a new connection with unique name
         $tmp_connection_name = 'async_db_' . uniqid();
         config([
             'database.connections.' . $tmp_connection_name => config('database.connections.' . $connection_name),
         ]);
 
-        // Set the new connection as default
         DB::purge();
         DB::setDefaultConnection($tmp_connection_name);
         DB::reconnect();
@@ -883,16 +434,13 @@ abstract class BatchSeeder extends Seeder
      */
     private function setupAsyncCacheConnection(string $cache_connection_name): string
     {
-        // Create a unique Redis connection for this process
         $tmp_cache_connection_name = 'async_cache_' . uniqid();
         $cache_config = config('cache.stores.' . $cache_connection_name);
 
-        // Copy the default Redis configuration
         config([
             'cache.stores.' . $tmp_cache_connection_name => $cache_config,
         ]);
 
-        // Clear and reconnect Redis
         Cache::purge();
 
         return $tmp_cache_connection_name;
@@ -903,10 +451,7 @@ abstract class BatchSeeder extends Seeder
      */
     private function resetAsyncConnections(string $db_connection_name, string $cache_connection_name): void
     {
-        // Reset database connection
         $this->resetAsyncDatabaseConnection($db_connection_name);
-
-        // Reset Redis connection
         $this->resetAsyncCacheConnection($cache_connection_name);
     }
 
@@ -915,11 +460,9 @@ abstract class BatchSeeder extends Seeder
      */
     private function resetAsyncDatabaseConnection(string $connection_name): void
     {
-        // Close current connection
         $current_connection = DB::connection($connection_name);
         $current_connection->disconnect();
 
-        // Reconnect with fresh connection
         DB::reconnect($connection_name);
     }
 
@@ -928,13 +471,11 @@ abstract class BatchSeeder extends Seeder
      */
     private function resetAsyncCacheConnection(string $connection_name): void
     {
-        // Close current cache connection
         /** @var Repository $store */
         $store = Cache::store($connection_name);
         $cache_connection = $store->getConnection();
         $cache_connection->disconnect();
 
-        // Reconnect cache
         $cache_connection->connect();
     }
 }
