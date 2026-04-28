@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(core)* Extract parallel task runner from BatchSeeder
+- *(core)* Rework License with bigint id and public uuid
+
+### ⚙️ Miscellaneous Tasks
+
+- Update testbench modules and enhance dynamic content handling
+- *(core)* Cleanup leftover testbench gitlinks and stale comments
+
+## [1.47.2] - 2026-04-24
+
 ### 🐛 Bug Fixes
 
 - Enhance dynamic model class resolution and caching in DynamicContentsService
