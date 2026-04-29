@@ -69,7 +69,7 @@ final class SearchSyncCommand extends Command
             $this->info(sprintf('Found %s documents to sync.', $total));
             $total_chunks = ceil($total / 100);
             $chunk = 0;
-            $use_soft_deletes = in_array(SoftDeletes::class, class_uses_recursive($model_class), true);
+            $use_soft_deletes = class_uses_trait($model_class, SoftDeletes::class);
             $model->chunk(100, function ($records) use ($total_chunks, &$chunk, $use_soft_deletes): void {
                 $chunk++;
                 $progress = new Progress(

@@ -190,18 +190,22 @@ trait HasBenchmark
 
     private function displayOutput(string $output): void
     {
+        $command = null;
+
         if (app()->runningInConsole()) {
             if ($this instanceof Seeder) {
-                $command = $this->command;
+                if ($this->command instanceof \Illuminate\Console\Command) {
+                    $command = $this->command;
+                }
             } elseif ($this instanceof \Illuminate\Console\Command && $this->output !== null) {
                 $command = $this;
-            } else {
-                return;
             }
 
-            $command->newLine();
-            $command->line($output);
-            $command->newLine();
+            if ($command !== null) {
+                $command->newLine();
+                $command->line($output);
+                $command->newLine();
+            }
         }
 
         Log::debug(preg_replace("/\<bg=[\w-]+;fg=[\w-]+\>|\<\/\>/", '', $output));

@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
+use Modules\Core\Casts\SettingTypeEnum;
 
 final class SettingsTable
 {
@@ -45,7 +46,11 @@ final class SettingsTable
                         ->searchable()
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('value')
-                        ->alignCenter(),
+                        ->alignCenter()
+                        ->state(static fn (Setting $record): mixed => match ($record->type) {
+                                SettingTypeEnum::BOOLEAN => $record->value ? 'true' : 'false',
+                                default => $record->value,
+                            }),
                 ]);
             },
             filters: static function (Collection $default_filters): void {
@@ -81,7 +86,8 @@ final class SettingsTable
             // )
             ->defaultSort(fn (Builder $query): Builder => $query
                 ->orderBy('group_name')
-                ->orderBy('name'));
+                ->orderBy('name'))
+            ->defaultGroup('group_name');
     }
 
     /**

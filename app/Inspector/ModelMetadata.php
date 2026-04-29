@@ -75,7 +75,7 @@ final readonly class ModelMetadata
             incrementing: $instance->getIncrementing(),
             keyName: $instance->getKeyName(),
             keyType: $instance->getKeyType(),
-            hasSoftDeletes: isset($traits[SoftDeletes::class]) || isset($traits[BaseSoftDeletes::class]),
+            hasSoftDeletes: (isset($traits[SoftDeletes::class]) && $instance->softDeletesEnabledBySettings()) || isset($traits[BaseSoftDeletes::class]),
             hasValidity: isset($traits[HasValidity::class]),
             hasActivation: isset($traits[HasActivation::class]),
             hasLocks: isset($traits[HasLocks::class]),

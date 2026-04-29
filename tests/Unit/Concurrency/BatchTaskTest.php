@@ -3,14 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Concurrency\BatchTask;
-
-final class FixtureInvokableTask
-{
-    public function __invoke(int $a, int $b): int
-    {
-        return $a + $b;
-    }
-}
+use Modules\Core\Tests\Fixtures\FixtureInvokableTask;
 
 it('executes a closure task', function (): void {
     $task = new BatchTask(id: 't1', units: 1, run: fn (int $x): int => $x * 2, args: [21]);

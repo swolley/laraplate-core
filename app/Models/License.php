@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Modules\Core\Database\Factories\LicenseFactory;
 use Modules\Core\Helpers\HasValidity;
-use Modules\Core\Overrides\Model;
+use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasVersions;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Override;
 
 /**
@@ -18,6 +21,9 @@ use Override;
  */
 final class License extends Model
 {
+    use HasFactory;
+    use HasValidations;
+    use HasVersions;
     use HasValidity;
 
     /**

@@ -132,7 +132,7 @@ trait Searchable
             $array['valid_to'] = $this->{HasValidity::validToKey()};
         }
 
-        if (class_uses_trait($this, SoftDeletes::class)) {
+        if (class_uses_trait($this, SoftDeletes::class) || $this->softDeletesEnabled ?? true) {
             $array['is_deleted'] = $this->{self::getIsDeletedColumn()};
         }
 

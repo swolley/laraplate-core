@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
+use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkHarness;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkSeederHarness;
@@ -164,4 +166,20 @@ it('writes benchmark output when used from a seeder with command set', function 
     $seeder->runBenchmark($cmd);
 
     Log::shouldHaveReceived('debug');
+});
+
+it('does not throw when a seeder has no command instance', function (): void {
+    $seeder = new class extends Seeder
+    {
+        use HasBenchmark;
+
+        public function emitBenchmarkOutput(string $output): void
+        {
+            $method = new ReflectionMethod($this, 'displayOutput');
+            $method->setAccessible(true);
+            $method->invoke($this, $output);
+        }
+    };
+
+    expect(fn () => $seeder->emitBenchmarkOutput('bench output'))->not->toThrow(Error::class);
 });

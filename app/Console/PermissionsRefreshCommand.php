@@ -126,7 +126,7 @@ final class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
-                if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && ! class_uses_trait($model, SoftDeletes::class)) {
+                if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && (! class_uses_trait($model, SoftDeletes::class) || $instance->softDeletesEnabled ?? true)) {
                     if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
