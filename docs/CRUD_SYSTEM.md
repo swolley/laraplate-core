@@ -363,7 +363,7 @@ The CRUD system uses `DynamicEntity` to resolve model classes from entity names:
 ```php
 // Entity name → Model class
 "users"     → App\Models\User
-"articles"  → Modules\Cms\Models\Article
+"articles"  → Modules\CMS\Models\Article
 "orders"    → Modules\Shop\Models\Order
 ```
 

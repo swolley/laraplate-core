@@ -141,8 +141,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Modules\\Core\\Tests\\": "tests/",
-      "Modules\\Cms\\Helpers\\": "tests/Stubs/Cms/Helpers/"
+      "Modules\\Core\\Tests\\": "tests/"
     }
   },
   "config": {

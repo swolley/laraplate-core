@@ -28,11 +28,11 @@ it('merges app and module paths', function (): void {
         ];
 
         $fs->put($tmpDir . '/App-swagger.json', json_encode($appJson));
-        $fs->put($tmpDir . '/Cms-swagger.json', json_encode($moduleJson));
+        $fs->put($tmpDir . '/CMS-swagger.json', json_encode($moduleJson));
 
         $action = new MergeSwaggerDocsAction(
             filesystem: $fs,
-            modulesProvider: static fn () => ['Cms'],
+            modulesProvider: static fn () => ['CMS'],
             basePath: $tmpDir,
         );
 
