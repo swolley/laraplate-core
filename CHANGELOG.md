@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- Correct module naming and update test references
+
+## [1.48.0] - 2026-04-29
+
 ### 🚀 Features
 
 - *(core)* Introduce Field resource and related pages for dynamic content management
