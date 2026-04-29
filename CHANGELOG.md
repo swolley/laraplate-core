@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Introduce Field resource and related pages for dynamic content management
+
+## [1.47.3] - 2026-04-28
+
 ### 🚜 Refactor
 
 - *(core)* Extract parallel task runner from BatchSeeder
