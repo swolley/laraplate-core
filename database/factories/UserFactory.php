@@ -7,6 +7,7 @@ namespace Modules\Core\Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use Modules\Core\Helpers\HasUniqueFactoryValues;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Override;
 
 /**
@@ -17,11 +18,16 @@ final class UserFactory extends Factory
     use HasUniqueFactoryValues;
 
     /**
-     * The name of the factory's corresponding model.
+     * Resolve the user model at runtime (see `config('auth.providers.users.model')`).
+     * Cannot use {@see user_class()} as a property default: not a constant expression.
      *
-     * @var class-string<\Modules\Core\Models\User>
+     * @return class-string<Authenticatable>
      */
-    protected $model = \Modules\Core\Models\User::class;
+    #[Override]
+    public function modelName(): string
+    {
+        return user_class();
+    }
 
     /**
      * Define the model's default state.
@@ -36,10 +42,12 @@ final class UserFactory extends Factory
         $email_suffix = fake()->boolean() ? mb_substr('0' . fake()->numberBetween(1, 99), -2) : '';
         $email = sprintf('%s%s@%s', $email_prefix, $email_suffix, fake()->domainName());
 
+        $model_class = $this->modelName();
+
         return [
             'name' => $name,
-            'username' => $this->uniqueValue(fn () => $username, $this->model, 'username'),
-            'email' => $this->uniqueEmail($this->model, fn () => $email),
+            'username' => $this->uniqueValue(fn () => $username, $model_class, 'username'),
+            'email' => $this->uniqueEmail($model_class, fn () => $email),
             'email_verified_at' => fake()->boolean() ? now() : null,
             'password' => Str::random(16),
         ];
