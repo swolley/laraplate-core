@@ -11,7 +11,7 @@ use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Search\Traits\Searchable;

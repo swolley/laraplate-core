@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;

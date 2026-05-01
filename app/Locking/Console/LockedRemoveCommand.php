@@ -9,7 +9,7 @@ use Override;
 final class LockedRemoveCommand extends LockedAddCommand
 {
     #[Override]
-    public $signature = 'lock:locked-remove {model} {--namespace=}';
+    public $signature = 'model:locked-remove {model} {--namespace=}';
 
     #[Override]
     public $description = 'Add a migration to remove locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';

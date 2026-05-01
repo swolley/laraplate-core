@@ -1,72 +1,179 @@
-# Modulo Core — fondamenta dell’applicazione
+# Core module — platform runtime and cross-cutting capabilities
 
-## In parole semplici
+## Purpose
 
-Il modulo **Core** è il **basamento** di Laraplate: tutto ciò che non è “contenuto pubblicabile” o “gestione aziendale specifica” ma serve a far funzionare l’applicazione in modo sicuro, coerente e riusabile sta qui. Se immaginiamo Laraplate come un edificio, Core è impianto elettrico, struttura portante e sistema di chiavi: gli altri moduli sono gli ambienti arredati (CMS, ERP, AI).
+`Core` is the platform runtime for Laraplate. It provides shared services that every other module depends on: identity, authorization, record lifecycle controls, dynamic entity infrastructure, API tooling, schema inspector, and operational commands.
 
-## A chi serve e cosa si aspetta
+If a feature exists in multiple modules (security, locking, approvals, translations, generic CRUD), `Core` is usually the owner.
 
-- **Sviluppatore**: qui trovi autenticazione, modello utente di riferimento, permessi, API generiche CRUD, motori di ricerca, integrazione Filament per la gestione piattaforma, job e servizi trasversali.
-- **Utente tecnico avanzato**: capisce dove si configurano ruoli, utenti, parametri di sistema e come si accede alle API “metalinguaggio” `/crud/...` che operano sulle entità registrate.
-- **Profilo non strettamente IT**: in Core non si “fattura” né si “pubblica un articolo”; si gestiscono **accessi**, **autorizzazioni** e **strumenti di amministrazione** (es. salute code, documentazione API).
+## Capability map
 
-## Funzionalità principali
+### Authentication and identity
 
-### Identità, accesso e permessi
+- Laravel Fortify integration (login, password reset, profile, verification).
+- Optional social login through Socialite providers (`ENABLE_SOCIAL_LOGIN` / `auth.providers.socialite.enabled`).
+- Optional 2FA capability (`ENABLE_USER_2FA`) with Fortify two-factor feature wiring.
+- User model includes built-in support for impersonation, approvals, versioning, soft deletes, locks, and role-based permissions.
 
-- Integrazione con **Laravel Fortify** per flussi di login, reset password e profilo nel pannello amministrativo.
-- Modello utente e permessi basati su **Spatie Laravel Permission** (ruoli, permessi, middleware).
-- Un utente con privilegi di **super amministratore** può bypassare i controlli abituali tramite una `Gate::before` definita nel provider del modulo: va trattato con estrema cautela in produzione.
+### Authorization and ACL
 
-### Pannello Filament (amministrazione piattaforma)
+- Role/permission system is based on Spatie Permission.
+- ACL model provides row-level restrictions through filter payloads.
+- ACL resolution logic supports role inheritance fallback, unrestricted ACLs, OR-composition across multiple roles, and cached effective ACL resolution.
+- ACL behavior is used by CRUD/query services, not only by UI.
 
-Il modulo espone risorse Filament per gestire, tra l’altro:
+### Record lifecycle controls
 
-- **Utenti**, **ruoli**, **permessi** e **ACL** (liste di controllo più granulari dove previste).
-- **Impostazioni** (`Setting`) chiave-valore o strutturate per il comportamento dell’app.
-- **Licenze** e vincoli di utilizzo dove il prodotto lo prevede.
-- **Cron job** configurati lato applicazione e tracciamento modifiche (`Modification`) dove usato nel progetto.
-- Pagine di servizio come **benvenuto**, **Swagger / OpenAPI** (documentazione API) e **PhpInfo** per diagnostica ambiente (da limitare in produzione).
+- Soft delete support is implemented through custom `SoftDeletes` trait (`deleted_at` + `is_deleted` behavior).
+- Versioning is implemented via `HasVersions` and `Version` model, including strategy-based replay/revert behavior.
+- Approval flow is implemented with `HasApprovals`, `Modification`, notification services, and preview middleware.
+- Preview mode can expose pending modifications before approval through the `preview` request flag and session state.
 
-Queste schermate convivono nel panel principale dell’app (tipicamente percorso `admin`), insieme ai plugin registrati dall’applicazione (vedi `App\Providers\Filament\AdminPanelProvider`).
+### Locking and concurrency
 
-### API CRUD e griglie dati
+- Record lock API (`HasLocks`) supports lock/unlock/toggle and lock-scoped queries.
+- Optimistic locking (`HasOptimisticLocking`) supports stale-write prevention through `lock_version`.
+- Concurrency exceptions include `AlreadyLockedException`, `CannotUnlockException`, `LockedModelException`, and `StaleModelLockingException`.
+- Locking behavior is configurable through `core.locking.*`.
 
-Il file di route `Modules/Core/routes/web.php` espone un prefisso **`/crud`** con operazioni standard:
+### Dynamic entities and schema inspector
 
-- **Lettura e interrogazione**: elenco (`select`), dettaglio, albero (`tree`), storico (`history`).
-- **Scrittura**: inserimento (`insert`), aggiornamento (`update` / `replace`), eliminazione (`delete`).
-- **Ciclo di vita record**: blocco ottimistico (`lock` / `unlock`), approvazione / disapprovazione, attivazione / disattivazione, svuotamento cache per entità.
+- DynamicEntity model and DynamicEntityService build runtime model metadata from real DB schema.
+- Inspector subsystem (`Inspect`, `SchemaInspector`) caches columns/indexes/FKs (persistent cache + in-request memoization).
+- CRUD/Grid layers reuse inspector metadata for relations, filters, validation, and field behavior.
+- Cache invalidation exists both globally and per entity (including CRUD cache-clear endpoint).
 
-Accanto, sotto `/crud/grid`, il modulo offre endpoint per **configurazioni griglia**, dati tabellari, export e layout: pensati per UI ricche (DataGrid) che consumano la stessa astrazione “entità” senza duplicare controller per ogni tabella.
+### Settings-driven runtime configuration
 
-Dal punto di vista del programmatore, l’`entity` nelle URL è il **nome logico del modello** o della risorsa registrata nel sistema di contenuti dinamici: non è un CRUD “hard-coded” per una sola tabella, ma un **dispatcher** verso i modelli dichiarati.
+Core uses both static config and runtime DB settings:
 
-### Ricerca e contenuti dinamici
+- Runtime settings examples:
+  - `soft_deletes_{table}` in `soft_deletes` group
+  - `version_strategy_{table}` in `versioning` group
+  - `backendModules` for module activation/deactivation
+  - approval notification thresholds in `approvals`
+- Config-based examples:
+  - Fortify/social/2FA toggles
+  - lock column names and lock policy
+  - feature exposure flags (`expose_crud_api`, dynamic entities)
 
-- Registrazione di client e motori per **Elasticsearch** e **Typesense** (e integrazione con **Laravel Scout** tramite motori personalizzati), così la ricerca full-text o ibrida può essere scelta a livello di configurazione.
-- Servizio **DynamicContentsService** (singleton) per orchestrare contenuti e metadati dinamici collegati alle entità Core (`DynamicEntity` e correlati).
+Use DB settings for runtime operational switches; use config/env for deployment-level behavior.
 
-### Altri aspetti trasversali
+### API and Swagger/OpenAPI documentation
 
-- **Embedding** (`ModelEmbedding`): supporto polimorfico per vettori di ricerca semantica; la generazione in coda è una convenzione del progetto (non bloccare le richieste HTTP con chiamate LLM/embedder).
-- **Versioning** e **modifiche** tracciate dove il dominio lo richiede (`Version`, `Modification`).
-- Middleware di contesto: localizzazione, conversione stringhe-booleano per API, anteprima contenuti, abilitazione esplicita delle route CRUD API.
+- Core provides Swagger/OpenAPI generation and version-aware delivery/merge services.
+- Admin-facing pages and routes expose API docs.
+- Keep docs in sync with route/schema changes; stale specs are a common operational failure mode.
 
-### Requisito importante per gli sviluppatori
+### License management
 
-All’avvio, il `CoreServiceProvider` verifica che la classe utente configurata nell’applicazione estenda il modello utente del Core (`Modules\Core\Models\User`). Se si personalizza l’utente nell’`App\Models\User`, va mantenuta la **compatibilità di ereditarietà** o l’applicazione non parte: è una scelta architettonica per uniformare permessi, trait e comportamenti.
+- `License` model and `users.license_id` relationship enable per-session or per-user license enforcement.
+- Authentication providers (credentials and social) can enforce availability of free licenses.
+- Operational commands exist to add/renew/close/free licenses.
+- `max_concurrent_sessions` setting is part of runtime control surface.
 
-## Come si usa in pratica
+### Translation and localization stack
 
-1. **Amministratore di sistema**: crea utenti e ruoli nel pannello Filament, assegna permessi, verifica impostazioni globali e licenze.
-2. **Integratore / sviluppatore front-end o mobile**: consuma le route `/crud/...` e `/crud/grid/...` rispettando autenticazione (es. sessione web o token API secondo configurazione del progetto) e le policy applicate ai modelli.
-3. **Sviluppatore modulo**: registra nuove entità o estensioni rispettando le convenzioni Core (permessi, policy, eventuali hook CRUD) e, se serve ricerca, configura Scout / Elasticsearch / Typesense.
+- Locale middleware and locale scope support per-locale data access with fallback.
+- Translation helpers support multi-locale model data and related testing factories.
+- Model translatable tooling exists to convert existing models to translation-table architecture.
 
-## Dipendenze e ordine di caricamento
+## Built-in abstractions used by other modules
 
-Il file `module.json` del Core imposta **priorità 0**: viene caricato per primo tra i moduli nWidart. CMS, ERP e AI si appoggiano a queste fondamenta (autenticazione, CRUD generico, ricerca, Filament).
+Core exposes reusable primitives for module authors:
 
-## Limiti consapevoli
+- UI/resource helpers (`HasTable`, `HasRecords`).
+- Data lifecycle traits (`HasVersions`, `SoftDeletes`, `HasLocks`, `HasApprovals`).
+- Taxonomy/preset/field-oriented abstractions and dynamic object composition patterns.
+- Shared query/filter/sort casting and CRUD request DTO layer.
 
-Il Core **non** sostituisce CMS o ERP: fornisce meccanismi. La “semantica” di cosa sia un documento fiscale o una pagina web sta nei moduli di dominio. Il Core garantisce che chi accede a quei dati sia **identificato**, **autorizzato** e che le operazioni passino da **canali controllati** (HTTP, code, policy).
+When building new module features, reuse these primitives instead of re-implementing lifecycle logic.
+
+## Core command catalog (developer operations)
+
+### Identity, permissions, approvals
+
+- `auth:create-user`
+- `permission:refresh`
+- `approvals:check-pending`
+
+### Licenses
+
+- `auth:licenses`
+- `auth:free-all-licenses`
+- `auth:free-expired-licenses`
+
+### Locking and concurrency
+
+- `lock:refresh`
+- `lock:locked-add` / `lock:locked-remove` (aliases typically exposed as `lock:add` / `lock:remove`)
+- `lock:optimistic-add` / `lock:optimistic-remove`
+
+### Soft delete lifecycle
+
+- `model:clear-expired`
+- `model:soft-deletes-add`
+- `model:soft-deletes-remove`
+- `model:soft-deletes-refresh`
+
+### Translation and translatable conversion
+
+- `make:model-translatable`
+- `make:translation`
+- `lang:check-translations`
+
+### Inspector and dynamic schema cache
+
+- `inspector:warm`
+- entity cache clear via CRUD route (`cache-clear/{entity}`)
+
+### API docs
+
+- Swagger generation command (module-specific command wiring in Core console)
+
+## How to use Core capabilities correctly
+
+### For product/admin teams
+
+- Manage users/roles/ACL/settings in Filament resources.
+- Use approval queues and preview when moderation is enabled.
+- Keep module activation and runtime settings under change-control.
+
+### For API/front-end teams
+
+- Use `/crud` and `/crud/grid` with permission-aware query behavior.
+- Handle lock/version conflicts explicitly in UX (retry/reload patterns).
+- Consume Swagger docs generated by Core as source of API contract.
+
+### For module developers
+
+- Prefer Core lifecycle traits over custom ad-hoc implementations.
+- Use settings groups for runtime switches when behavior must be configurable per table/module.
+- Reuse inspector-driven metadata and avoid hardcoded schema assumptions.
+
+## Locking toggle design note (planned extension)
+
+The platform already supports runtime toggles for soft deletes and versioning per table.  
+A similar runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict safeguards to avoid accidental concurrency regressions.
+
+## Troubleshooting quick guide
+
+- Permission mismatch despite role assignment: refresh permissions and verify ACL chain/inheritance.
+- Unexpected missing records: check soft-delete scopes and preview mode.
+- Revert/rollback confusion: verify version strategy (`DIFF` vs `SNAPSHOT`) for the table.
+- Concurrent update failures: inspect lock status and `lock_version` mismatch path.
+- Dynamic entity metadata stale: warm or clear inspector caches.
+- API docs outdated: regenerate Swagger/OpenAPI and verify version merge outputs.
+
+## FAQ prompts for RAG
+
+- How do ACL filters merge when a user has multiple roles?
+- What is the difference between record lock and optimistic lock in Core?
+- How do I rollback a record to a previous version?
+- How can I disable soft deletes for one specific table at runtime?
+- How are pending approvals previewed before final approval?
+- How does module activation through settings work?
+- How do I regenerate and publish Swagger docs after route changes?
+- How do license checks affect login for normal users versus superadmins?
+- How do I convert an existing model to translation-table architecture?
+- What should I clear when dynamic entity metadata looks outdated?

@@ -14,7 +14,7 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasVersions;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;

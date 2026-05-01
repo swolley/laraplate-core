@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\SoftDeletes;
 
 use function property_exists;
 
@@ -30,9 +30,6 @@ trait SoftDeletes
     {
         $this->baseInitializeSoftDeletes();
 
-        // if (! isset($this->casts[$this->getIsDeletedColumn()])) {
-        // 	$this->casts[$this->getIsDeletedColumn()] = 'boolean';
-        // }
         if (! in_array($this->getIsDeletedColumn(), $this->guarded, true)) {
             $this->guarded[] = $this->getIsDeletedColumn();
         }
@@ -101,10 +98,7 @@ trait SoftDeletes
      */
     protected static function bootSoftDeletes(): void
     {
-        // Rimuoviamo lo scope predefinito che usa deleted_at
         static::withoutGlobalScope(new SoftDeletingScope());
-
-        // Aggiungiamo il nostro scope personalizzato che usa is_deleted
         static::addGlobalScope(new CustomSoftDeletingScope());
 
         static::updating(function (Model $model): void {
@@ -113,10 +107,7 @@ trait SoftDeletes
 
         static::saving(function (Model $model): void {
             $is_deleted_column = $model->getIsDeletedColumn();
-
-            // Rimuovi is_deleted dai dati da salvare
-            unset($model->attributes[$is_deleted_column]);
-            unset($model->original[$is_deleted_column]);
+            unset($model->attributes[$is_deleted_column], $model->original[$is_deleted_column]);
         });
     }
 
@@ -131,3 +122,4 @@ trait SoftDeletes
         return $this->basePerformDeleteOnModel();
     }
 }
+

@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -157,6 +157,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $search_commands_subpath = (string) Str::replace('Console', 'Search/Console', $module_commands_subpath);
         $search_commands = $this->inspectFolderCommands($search_commands_subpath);
         array_push($commands, ...$search_commands);
+
+        $soft_deletes_commands_subpath = (string) Str::replace('Console', 'SoftDeletes/Console', $module_commands_subpath);
+        $soft_deletes_commands = $this->inspectFolderCommands($soft_deletes_commands_subpath);
+        array_push($commands, ...$soft_deletes_commands);
 
         $this->commands($commands);
     }

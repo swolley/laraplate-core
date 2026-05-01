@@ -9,7 +9,7 @@ use Override;
 final class OptimisticLockRemoveCommand extends OptimisticLockAddCommand
 {
     #[Override]
-    public $signature = 'lock:optimistic-remove {model} {--namespace=}';
+    public $signature = 'model:optimistic-lock-remove {model} {--namespace=}';
 
     #[Override]
     public $description = 'Add a migration to remove optimistic locking columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';

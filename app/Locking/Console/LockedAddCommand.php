@@ -16,7 +16,7 @@ use Symfony\Component\Console\Command\Command as BaseCommand;
 class LockedAddCommand extends Command
 {
     #[Override]
-    public $signature = 'lock:locked-add {model} {--namespace=}';
+    public $signature = 'module:locked-add {model} {--namespace=}';
 
     #[Override]
     public $description = 'Add a migration to add locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';

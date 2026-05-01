@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(soft-deletes)* Implement SoftDeletes functionality with commands and traits
+
+## [1.48.2] - 2026-05-01
+
 ### 🐛 Bug Fixes
 
 - *(User)* Update User model properties and remove duplicate Notifiable trait

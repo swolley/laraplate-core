@@ -31,7 +31,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;

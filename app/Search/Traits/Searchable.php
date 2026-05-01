@@ -15,7 +15,7 @@ use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\Helpers\SoftDeletes;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;

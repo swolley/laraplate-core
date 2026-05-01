@@ -10,7 +10,7 @@ use Override;
 class OptimisticLockAddCommand extends LockedAddCommand
 {
     #[Override]
-    public $signature = 'lock:optimistic-add {model} {--namespace=}';
+    public $signature = 'model:optimistic-lock-add {model} {--namespace=}';
 
     #[Override]
     public $description = 'Add a migration to add optimistic locking columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
