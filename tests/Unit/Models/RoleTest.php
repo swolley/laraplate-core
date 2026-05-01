@@ -24,7 +24,7 @@ it('role model uses correct traits', function (): void {
         ->and($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks')
         ->and($traits)->toContain('Modules\\Core\\Helpers\\HasValidations')
         ->and($traits)->toContain('Modules\\Core\\Helpers\\HasVersions')
-        ->and($traits)->toContain('Modules\\Core\\Helpers\\SoftDeletes');
+        ->and($traits)->toContain('Modules\\Core\\SoftDeletes\\SoftDeletes');
 });
 
 it('role model has required methods', function (): void {

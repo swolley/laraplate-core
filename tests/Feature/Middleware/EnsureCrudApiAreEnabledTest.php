@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
+/**
+ * Middleware structure tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 
 test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(EnsureCrudApiAreEnabled::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled');
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 

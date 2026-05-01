@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * Middleware structure tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 
@@ -39,7 +45,6 @@ test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(ConvertStringToBoolean::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Http\Middleware\ConvertStringToBoolean');
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->isSubclassOf(Illuminate\Foundation\Http\Middleware\TransformsRequest::class))->toBeTrue();
     expect($reflection->hasMethod('transform'))->toBeTrue();
 });

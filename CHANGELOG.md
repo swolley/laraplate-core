@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(translations)* Update pagination translations for multiple languages
+
+## [1.49.0] - 2026-05-01
+
 ### 🚀 Features
 
 - *(soft-deletes)* Implement SoftDeletes functionality with commands and traits

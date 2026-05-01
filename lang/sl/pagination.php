@@ -1,21 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
-    'all' => 'Vse',
-    'next' => 'Naslednji &raquo;',
-    'previous' => '&laquo; Prejšnji',
-    'rowsForPage' => 'vrstic na stran',
-    'rowsOf' => 'vrstic od',
-    'selected' => 'izbranih',
-    'overview' => '{1} Prikazano 1 rezultat v :seconds s|[2,*] Prikazano od :first do :last od :total rezultatov v :seconds s',
+return [
+  'all' => 'Tutte',
+  'next' => 'Prossimo &raquo;',
+  'overview' => '{1} Mostrato 1 risultato in :seconds s|[2,*] Mostrati da :first a :last di :total risultati in :seconds s',
+  'previous' => '&laquo; Precedente',
+  'rowsForPage' => 'righe per pagina',
+  'rowsOf' => 'righe di',
+  'selected' => 'selezionate',
 ];
-
-if ($default_locale !== 'sl') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/pagination.php"));
-}
-
-return $translations;

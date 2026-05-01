@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * Middleware structure tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
 
@@ -29,7 +35,6 @@ test('middleware has correct class structure', function (): void {
     $reflection = new ReflectionClass(PreviewMiddleware::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Http\Middleware\PreviewMiddleware');
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 

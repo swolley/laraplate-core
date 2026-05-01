@@ -1,21 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
-    'all' => 'Todas',
-    'next' => 'Siguiente &raquo;',
-    'previous' => '&laquo; Anterior',
-    'rowsForPage' => 'filas por página',
-    'rowsOf' => 'filas de',
-    'selected' => 'seleccionadas',
-    'overview' => '{1} Mostrado 1 resultado en :seconds s|[2,*] Mostrado de :first a :last de :total resultados en :seconds s',
+return [
+  'all' => 'Tutte',
+  'next' => 'Prossimo &raquo;',
+  'overview' => '{1} Mostrato 1 risultato in :seconds s|[2,*] Mostrati da :first a :last di :total risultati in :seconds s',
+  'previous' => '&laquo; Precedente',
+  'rowsForPage' => 'righe per pagina',
+  'rowsOf' => 'righe di',
+  'selected' => 'selezionate',
 ];
-
-if ($default_locale !== 'es') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/pagination.php"));
-}
-
-return $translations;
