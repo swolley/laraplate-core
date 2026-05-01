@@ -5,13 +5,11 @@ declare(strict_types=1);
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Console\HasCommandModelResolutionOptionOnlyTestCommand;
 use Modules\Core\Tests\Stubs\Console\HasCommandModelResolutionTestCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
-uses(LaravelTestCase::class);
 
 function bind_command_input(Command $command, array $args): void
 {
@@ -39,8 +37,9 @@ it('returns class when model argument is a valid class name', function (): void 
 
 it('resolves short class name via evince when single match exists', function (): void {
     $all_models = models(false);
+    $short_name_matches = array_values(array_filter($all_models, fn (string $m): bool => str_ends_with($m, 'User')));
 
-    if ($all_models === [] || ! in_array(User::class, $all_models, true)) {
+    if ($all_models === [] || ! in_array(User::class, $all_models, true) || count($short_name_matches) !== 1) {
         expect(true)->toBeTrue();
 
         return;

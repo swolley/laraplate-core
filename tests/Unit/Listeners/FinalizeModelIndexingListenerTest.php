@@ -10,9 +10,7 @@ use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Listeners\FinalizeModelIndexingListener;
 use Modules\Core\Models\Setting;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns early when no indexing event in cache', function (): void {
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();

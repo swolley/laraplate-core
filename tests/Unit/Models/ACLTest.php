@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Models\ACL;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('getRules merges acl validation rules with trait defaults', function (): void {
     $rules = (new ACL)->getRules();

@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class);
 
 it('wraps data and meta into a CrudResult dto', function (): void {
     $meta = new CrudMeta(totalRecords: 10, currentRecords: 5);

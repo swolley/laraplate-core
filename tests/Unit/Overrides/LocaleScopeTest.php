@@ -7,9 +7,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->scope = new LocaleScope();

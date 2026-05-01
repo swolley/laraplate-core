@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class);
 
 it('exposes all metadata properties via constructor', function (): void {
     $cachedAt = new CarbonImmutable('2025-01-02 03:04:05');

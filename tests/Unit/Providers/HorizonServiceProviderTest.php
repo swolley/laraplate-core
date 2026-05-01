@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Gate;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Providers\HorizonServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new HorizonServiceProvider(app());

@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
+/**
+ * LockedModelSubscriber tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Modules\Core\Locking\LockedModelSubscriber;
 
 test('subscriber has correct class structure', function (): void {
     $reflection = new ReflectionClass(LockedModelSubscriber::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Locking\LockedModelSubscriber');
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('subscribe'))->toBeTrue();
     expect($reflection->hasMethod('saving'))->toBeTrue();
     expect($reflection->hasMethod('deleting'))->toBeTrue();

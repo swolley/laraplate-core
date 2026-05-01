@@ -7,9 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Modules\Core\Actions\Users\LeaveImpersonationAction;
 use Modules\Core\Events\UserLeftImpersonation;
 use Modules\Core\Http\Resources\UserInfoResponse;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('leaves impersonation and dispatches event', function (): void {
     Event::fake();

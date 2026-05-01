@@ -6,11 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
 use Modules\Core\Tests\Fixtures\StubSearchableModel;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithoutTimestamp;
 use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithTimestamp;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     config(['scout.queue.queue' => 'indexing', 'scout.queue.tries' => 3, 'scout.queue.timeout' => 120, 'scout.queue.backoff' => [30, 60, 180]]);

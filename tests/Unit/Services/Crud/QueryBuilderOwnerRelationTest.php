@@ -19,9 +19,7 @@ use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Fixtures\QueryBuilderOwner;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 /**
  * @param  array<int,Column>  $columns

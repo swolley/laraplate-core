@@ -9,11 +9,10 @@ use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('processes grid with resolvers', function (): void {
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
     $user = User::factory()->create();
     $user->assignRole(Role::findOrCreate('superadmin', 'web'));
     Auth::login($user);
@@ -86,6 +85,7 @@ it('extractActionValue handles object and default branches', function (): void {
 });
 
 it('uses DynamicEntity resolver branch when no custom resolver is provided', function (): void {
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
     $user = User::factory()->create();
     $user->assignRole(Role::findOrCreate('superadmin', 'web'));
     Auth::login($user);

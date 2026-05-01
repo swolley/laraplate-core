@@ -8,11 +8,9 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Modules\Core\Services\DynamicEntityService;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\FakeVersionedModel;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
-uses(LaravelTestCase::class);
 
 it('revertWithoutSaving returns null when versionable cannot be resolved', function (): void {
     $version = new Version();
@@ -65,6 +63,7 @@ it('createForModel stores connection and table refs for dynamic entities', funct
     Schema::create($table_name, function (Blueprint $blueprint): void {
         $blueprint->id();
         $blueprint->string('name')->nullable();
+        $blueprint->boolean('is_deleted')->default(false);
         $blueprint->softDeletes();
     });
 
@@ -86,15 +85,21 @@ it('createForModel stores connection and table refs for dynamic entities', funct
 });
 
 it('revertWithoutSaving applies diff strategy using previous versions and current contents', function (): void {
-    $user = User::factory()->create(['name' => 'Live']);
+    $base_user = User::factory()->create(['name' => 'Live']);
+    $user = new class extends User
+    {
+        protected $table = 'users';
 
-    $strategy = new ReflectionProperty($user, 'versionStrategy');
-    $strategy->setAccessible(true);
-    $strategy->setValue($user, VersionStrategy::DIFF);
+        public VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+    };
+    $user->setConnection(config('database.default'));
+    $user->exists = true;
+    $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => ['name' => 'FromPrev'],
     ]);
     $v1->created_at = now()->subMinutes(5);
@@ -103,6 +108,7 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => ['name' => 'Head'],
     ]);
     $v2->created_at = now()->subMinute();
@@ -117,11 +123,21 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
 });
 
 it('revertWithoutSaving applies snapshot strategy using first version and current contents', function (): void {
-    $user = User::factory()->create(['name' => 'Live']);
+    $base_user = User::factory()->create(['name' => 'Live']);
+    $user = new class extends User
+    {
+        protected $table = 'users';
+
+        public VersionStrategy $versionStrategy = VersionStrategy::SNAPSHOT;
+    };
+    $user->setConnection(config('database.default'));
+    $user->exists = true;
+    $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::SNAPSHOT,
         'contents' => ['name' => 'SnapshotInit'],
     ]);
     $v1->created_at = now()->subMinutes(2);
@@ -130,15 +146,13 @@ it('revertWithoutSaving applies snapshot strategy using first version and curren
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::SNAPSHOT,
         'contents' => ['name' => 'SnapshotTip'],
     ]);
     $v2->created_at = now()->subMinute();
     $v2->save();
 
     $versionable = $user->fresh();
-    $strategy = new ReflectionProperty($versionable, 'versionStrategy');
-    $strategy->setAccessible(true);
-    $strategy->setValue($versionable, VersionStrategy::SNAPSHOT);
 
     $v2->setRelation('versionable', $versionable);
 
@@ -149,11 +163,21 @@ it('revertWithoutSaving applies snapshot strategy using first version and curren
 });
 
 it('revertWithoutSaving snapshot skips merge when first version has empty contents', function (): void {
-    $user = User::factory()->create(['name' => 'Live']);
+    $base_user = User::factory()->create(['name' => 'Live']);
+    $user = new class extends User
+    {
+        protected $table = 'users';
+
+        public VersionStrategy $versionStrategy = VersionStrategy::SNAPSHOT;
+    };
+    $user->setConnection(config('database.default'));
+    $user->exists = true;
+    $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::SNAPSHOT,
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(2);
@@ -162,15 +186,13 @@ it('revertWithoutSaving snapshot skips merge when first version has empty conten
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::SNAPSHOT,
         'contents' => ['name' => 'OnlyTip'],
     ]);
     $v2->created_at = now()->subMinute();
     $v2->save();
 
     $versionable = $user->fresh();
-    $strategy = new ReflectionProperty($versionable, 'versionStrategy');
-    $strategy->setAccessible(true);
-    $strategy->setValue($versionable, VersionStrategy::SNAPSHOT);
 
     $v2->setRelation('versionable', $versionable);
 
@@ -186,6 +208,7 @@ it('previousVersions returns earlier versions for the same versionable', functio
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(3);
@@ -194,6 +217,7 @@ it('previousVersions returns earlier versions for the same versionable', functio
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => [],
     ]);
     $v2->created_at = now()->subMinutes(2);
@@ -212,6 +236,7 @@ it('nextVersion returns the following version when one exists', function (): voi
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(2);
@@ -220,6 +245,7 @@ it('nextVersion returns the following version when one exists', function (): voi
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::DIFF,
         'contents' => [],
     ]);
     $v2->created_at = now()->subMinute();

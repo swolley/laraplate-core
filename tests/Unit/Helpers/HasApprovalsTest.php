@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::create('has_approvals_stub', function (Blueprint $table): void {
@@ -66,27 +64,20 @@ it('returns null from getPreviewAttribute when preview session is disabled', fun
 });
 
 it('requires approval when not in console and user cannot bypass approval', function (): void {
-    $originalApp = $this->app;
-    $app = Mockery::mock($this->app)->makePartial();
-    $app->shouldReceive('runningInConsole')->andReturn(false);
-    $this->app->instance('app', $app);
+    App::shouldReceive('runningInConsole')->andReturn(false);
 
-    try {
-        $user = Mockery::mock(User::class)->makePartial();
-        $user->shouldReceive('isAdmin')->andReturn(false);
-        $user->shouldReceive('isSuperAdmin')->andReturn(false);
-        $user->shouldReceive('can')->with('approve.has_approvals_stub')->andReturn(false);
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
+    $user->shouldReceive('can')->with('approve.has_approvals_stub')->andReturn(false);
 
-        Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('user')->andReturn($user);
 
-        $model = new HasApprovalsStubModel;
-        $method = new ReflectionMethod($model, 'requiresApprovalWhen');
-        $method->setAccessible(true);
+    $model = new HasApprovalsStubModel;
+    $method = new ReflectionMethod($model, 'requiresApprovalWhen');
+    $method->setAccessible(true);
 
-        expect($method->invoke($model, ['name' => 'change']))->toBeTrue();
-    } finally {
-        $this->app->instance('app', $originalApp);
-    }
+    expect($method->invoke($model, ['name' => 'change']))->toBeTrue();
 });
 
 it('does not require approval when modifications are empty', function (): void {

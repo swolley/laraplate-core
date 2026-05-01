@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -46,7 +47,7 @@ trait HasValidity
      *
      * @throws InvalidFormatException
      */
-    public function isValid(?Carbon $date = null): bool
+    public function isValid(?CarbonInterface $date = null): bool
     {
         if (! $date instanceof Carbon) {
             $date = Date::today();
@@ -58,7 +59,7 @@ trait HasValidity
     /**
      * Alias for isValid method.
      */
-    public function isPublished(?Carbon $date = null): bool
+    public function isPublished(?CarbonInterface $date = null): bool
     {
         return $this->isValid($date);
     }

@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Models\Role;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('role model has correct structure', function (): void {
     $reflection = new ReflectionClass(Role::class);

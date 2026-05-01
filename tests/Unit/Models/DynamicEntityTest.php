@@ -11,9 +11,7 @@ use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Services\DynamicEntityService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     DynamicEntityService::reset();
@@ -30,7 +28,7 @@ it('tryResolveModel returns class string when connection is compatible', functio
 });
 
 it('tryResolveModel returns null when request connection does not match model connection', function (): void {
-    $resolved = DynamicEntity::tryResolveModel('users', 'mysql_nonexistent_for_test');
+    $resolved = DynamicEntity::tryResolveModel('settings', 'mysql_nonexistent_for_test');
 
     expect($resolved)->toBeNull();
 });

@@ -4,23 +4,15 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| Default: lightweight PHPUnit TestCase for Unit tests (no app/DB bootstrap).
-| TestCase loads tests/minimal-test-environment.php in setUp() (config(), fake(), …).
-| phpunit.xml uses vendor/autoload.php only, like other Laraplate modules.
+| All Core Pest tests use LaravelTestCase (full app + RefreshDatabase). A single
+| directory binding avoids duplicate Pest bindings when a file also calls uses().
 |
-| Feature tests use LaravelTestCase via ->in(__DIR__.'/Feature'). Unit files that
-| need the app declare uses(Modules\Core\Tests\LaravelTestCase::class).
-|
-| Note: A global uses(LaravelTestCase::class) alone does not attach the case to each
-| test file in this setup; Feature must use ->in(...) or per-file uses().
-|
-| Speed: prefer `composer run test:pest` or `vendor/bin/pest --parallel` during development.
-| `composer test` runs type coverage, coverage, PHPStan, Pint, etc., and is slower by design.
+| Speed: `composer run test:pest` (sequential) or `composer run test:pest:parallel` in Core.
+| `composer test` runs type coverage, unit coverage, PHPStan, Pint, etc., and is slower by design.
+| ParaTest (`--parallel`) can crash workers with coverage; use `test:unit:parallel` only when stable.
 |--------------------------------------------------------------------------
 */
-uses(Modules\Core\Tests\TestCase::class);
-
-uses(Modules\Core\Tests\LaravelTestCase::class)->in(__DIR__ . '/Feature');
+uses(Modules\Core\Tests\LaravelTestCase::class)->in(__DIR__ . '/Feature', __DIR__ . '/Unit');
 
 /*
 |--------------------------------------------------------------------------

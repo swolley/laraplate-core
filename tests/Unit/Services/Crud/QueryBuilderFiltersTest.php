@@ -8,11 +8,9 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('applies equals null as whereNull', function (): void {
     $user_with_null = User::factory()->create(['email_verified_at' => null]);

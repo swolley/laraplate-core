@@ -6,9 +6,7 @@ use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository as IlluminateCacheRepository;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Cache\Repository;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns bound cache store for default driver', function (): void {
     config(['cache.default' => 'array']);

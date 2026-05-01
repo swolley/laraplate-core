@@ -13,13 +13,11 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\SortDirection;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 /**
  * @param  array<string,mixed>  $validated

@@ -5,9 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Str;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->license = License::factory()->create();

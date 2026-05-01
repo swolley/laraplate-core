@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\DatabaseManager;
 use Modules\Core\Overrides\Seeder;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('constructs with DatabaseManager', function (): void {
     $db = app(DatabaseManager::class);

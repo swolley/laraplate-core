@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 use Modules\Core\Actions\Fortify\CreateNewUser;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('creates user with valid input', function (): void {
     $action = new CreateNewUser;
+    $password = 'K9#mP' . bin2hex(random_bytes(12)) . 'xQ!2';
 
     $user = $action->create([
         'name' => 'New User',
         'username' => 'newuser',
         'email' => 'newuser@example.com',
-        'password' => 'Password123!',
-        'password_confirmation' => 'Password123!',
+        'password' => $password,
+        'password_confirmation' => $password,
     ]);
 
     expect($user)->toBeInstanceOf(User::class)

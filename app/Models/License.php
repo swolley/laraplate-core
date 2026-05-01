@@ -22,7 +22,9 @@ use Override;
 final class License extends Model
 {
     use HasFactory;
-    use HasValidations;
+    use HasValidations {
+        getRules as private getRulesFromTrait;
+    }
     use HasVersions;
     use HasValidity;
 
@@ -55,8 +57,8 @@ final class License extends Model
 
     public function getRules(): array
     {
-        $rules = parent::getRules();
-        $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
+        $rules = $this->getRulesFromTrait();
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
             'uuid' => ['required', 'uuid', Rule::unique('licenses', 'uuid')->ignore($this->getKey())],
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],

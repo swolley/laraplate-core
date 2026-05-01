@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('gets and sets locale context', function (): void {
     config(['app.locale' => 'en']);

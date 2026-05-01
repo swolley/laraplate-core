@@ -2,12 +2,17 @@
 
 declare(strict_types=1);
 
+/**
+ * QueryBuilder structure tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Modules\Core\Services\Crud\QueryBuilder;
 
 it('has proper class structure', function (): void {
     $reflection = new ReflectionClass(QueryBuilder::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('prepareQuery'))->toBeTrue();
 });
 
@@ -37,7 +42,6 @@ it('has proper namespace', function (): void {
 it('has proper class structure for query building', function (): void {
     $reflection = new ReflectionClass(QueryBuilder::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('prepareQuery'))->toBeTrue();
     expect($reflection->hasMethod('applyFilters'))->toBeTrue();
 });

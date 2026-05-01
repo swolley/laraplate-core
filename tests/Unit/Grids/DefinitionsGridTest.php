@@ -6,12 +6,10 @@ use Illuminate\Support\Collection;
 use Modules\Core\Grids\Components\Field;
 use Modules\Core\Grids\Definitions\PivotRelationInfo;
 use Modules\Core\Grids\Definitions\RelationInfo;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Grids\DefinitionsModelStub;
 use Modules\Core\Tests\Stubs\Grids\HasPathHarness;
 use Modules\Core\Tests\Stubs\Grids\HasValidationsHarness;
 
-uses(LaravelTestCase::class);
 
 it('covers HasPath getter methods and split helper', function (): void {
     $harness = new HasPathHarness('users.profile', 'email');

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\FieldType;
@@ -12,9 +11,6 @@ use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     if (! Schema::hasColumns('contributors', ['components', 'shared_components'])) {

@@ -3,10 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Console\CompactVersions;
-use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\Console\Tester\CommandTester;
-
-uses(LaravelTestCase::class);
 
 it('fails when id is given without model class', function (): void {
     $command = app(CompactVersions::class);

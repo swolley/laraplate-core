@@ -8,13 +8,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\HasBenchmark;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkHarness;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkSeederHarness;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
-uses(LaravelTestCase::class);
 
 function prepare_benchmark_command(BenchmarkHarness $command): void
 {

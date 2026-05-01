@@ -2,16 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Observers\FieldableObserver;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     setupCmsEntities();

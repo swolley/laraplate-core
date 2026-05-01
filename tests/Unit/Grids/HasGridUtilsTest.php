@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsBreakDeepRootStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsChildModelStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsDatesStub;
@@ -22,7 +21,6 @@ use Modules\Core\Tests\Stubs\Grids\HasGridUtilsPrivateRelationStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsThroughCountryStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsWithoutBelongsStub;
 
-uses(LaravelTestCase::class);
 
 it('returns hidden, fillable and append fields', function (): void {
     $model = new HasGridUtilsModelStub();

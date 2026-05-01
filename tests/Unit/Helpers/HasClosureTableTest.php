@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\TreeCollection;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\ClosureTreeStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::dropIfExists('closure_tree_nodes_closure');

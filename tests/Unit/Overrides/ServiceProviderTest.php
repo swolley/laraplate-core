@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Overrides\ServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('can be instantiated with app and has name properties', function (): void {
     $provider = new class(app()) extends ServiceProvider

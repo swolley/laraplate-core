@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Illuminate\Console\Command as BaseCommand;
 use Illuminate\Foundation\Application;
 use Modules\Core\Overrides\Command;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('constructs without starting benchmark when running unit tests', function (): void {
     app()->instance('runningUnitTests', true);

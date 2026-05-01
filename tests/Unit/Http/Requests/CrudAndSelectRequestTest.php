@@ -5,16 +5,14 @@ declare(strict_types=1);
 use Illuminate\Routing\Route;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\SelectRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('crud request exposes base rules, primary key and parsed payload', function (): void {
     $request = new class() extends CrudRequest
     {
         public function validated($key = null, $default = null): array
         {
-            return ['connection' => 'sqlite'];
+            return [];
         }
     };
 

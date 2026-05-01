@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('splits column name on last dot', function (): void {
     $builder = new QueryBuilder();

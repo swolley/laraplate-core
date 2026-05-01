@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Services\Translation\TranslationCatalogService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('sorts languages with default locale first', function (): void {
     $service = new TranslationCatalogService(

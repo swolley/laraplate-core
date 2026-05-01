@@ -6,9 +6,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('updates user name and email when email unchanged', function (): void {
     $user = User::factory()->create([
@@ -31,25 +29,37 @@ it('updates user name and email when email unchanged', function (): void {
 });
 
 it('nulls email_verified_at and updates when email changed for MustVerifyEmail user', function (): void {
-    $user = User::factory()->create([
+    $base_user = User::factory()->create([
         'name' => 'User',
         'email' => 'old@example.com',
         'email_verified_at' => now(),
     ]);
 
-    $user = Mockery::mock($user)->makePartial();
-    $user->shouldReceive('sendEmailVerificationNotification')->once();
+    $user = new class extends User
+    {
+        public bool $verification_sent = false;
+
+        public function sendEmailVerificationNotification(): void
+        {
+            $this->verification_sent = true;
+        }
+    };
+    $user->setTable('users');
+    $user->setConnection(config('database.default'));
+    $user->exists = true;
+    $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
     $action = new UpdateUserProfileInformation();
     $action->update($user, [
-        'id' => $user->id,
+        'id' => (string) $user->getKey(),
         'name' => 'User',
         'email' => 'new@example.com',
     ]);
 
     $fresh = User::find($user->getKey());
     expect($fresh->email)->toBe('new@example.com')
-        ->and($fresh->email_verified_at)->toBeNull();
+        ->and($fresh->email_verified_at)->toBeNull()
+        ->and($user->verification_sent)->toBeTrue();
 });
 
 it('updates only name when input has no email change', function (): void {
@@ -93,25 +103,36 @@ it('throws validation exception when name exceeds max length', function (): void
 });
 
 it('removes password_confirmation and current_password before force fill', function (): void {
-    $user = Mockery::mock(User::factory()->create([
+    $base_user = User::factory()->create([
         'name' => 'Old Name',
         'email' => 'old-pass@example.com',
-    ]))->makePartial();
-    $user->shouldReceive('save')->once()->andReturnTrue();
-    $user->shouldReceive('forceFill')
-        ->once()
-        ->with(Mockery::on(function (array $payload): bool {
-            return ! array_key_exists('password_confirmation', $payload)
-                && ! array_key_exists('current_password', $payload);
-        }))
-        ->andReturnSelf();
+    ]);
+
+    $user = new class extends User
+    {
+        public array $captured_payload = [];
+
+        public function forceFill(array $attributes): static
+        {
+            $this->captured_payload = $attributes;
+
+            return parent::forceFill($attributes);
+        }
+    };
+    $user->setTable('users');
+    $user->setConnection(config('database.default'));
+    $user->exists = true;
+    $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
     $action = new UpdateUserProfileInformation();
     $action->update($user, [
-        'id' => $user->id,
+        'id' => (string) $user->getKey(),
         'name' => 'New Name',
         'email' => 'old-pass@example.com',
     ]);
+
+    expect($user->captured_payload)->not->toHaveKey('password_confirmation')
+        ->and($user->captured_payload)->not->toHaveKey('current_password');
 });
 
 it('uses validation rules from HasValidations trait when available', function (): void {

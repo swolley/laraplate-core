@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\ValidityStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::create('validity_stub', function (Blueprint $table): void {

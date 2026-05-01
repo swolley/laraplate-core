@@ -8,10 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\CrudOperationsHarness;
 
-uses(LaravelTestCase::class);
 
 /**
  * @param  array<string, mixed>  $props

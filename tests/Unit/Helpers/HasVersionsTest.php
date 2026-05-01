@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
+use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Jobs\CreateVersionJob;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;
 
-uses(LaravelTestCase::class);
 
 it('exposes the versioning entrypoint', function (): void {
     $model = new VersionableStub();
@@ -25,4 +25,24 @@ it('dispatches async job when enabled', function (): void {
     $model->createVersion();
 
     Bus::assertDispatched(CreateVersionJob::class);
+});
+
+it('treats empty versionStrategy string as unset and resolves from settings', function (): void {
+    $model = new class extends Model
+    {
+        use HasVersions;
+
+        protected $table = 'users';
+
+        public string $versionStrategy = '';
+
+        public function shouldBeVersioning(): bool
+        {
+            return false;
+        }
+    };
+
+    $model->setConnection(config('database.default'));
+
+    expect(fn () => $model->getVersionStrategy())->not->toThrow(\ValueError::class);
 });

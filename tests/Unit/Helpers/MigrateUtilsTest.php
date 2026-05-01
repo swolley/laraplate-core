@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('timestamps adds created_at and updated_at when missing', function (): void {
     Schema::create('migrate_utils_ts', function (Blueprint $table): void {

@@ -143,6 +143,12 @@ final class ApprovalNotificationService
 
                 if ($this->usesHasApprovalsTrait($class_name)) {
                     /** @var class-string<Model> $class_name */
+                    $reflection = new ReflectionClass($class_name);
+
+                    if (! $reflection->isInstantiable()) {
+                        continue;
+                    }
+
                     $instance = new $class_name();
                     $this->models_cache[$instance->getTable()] = $class_name;
                 }

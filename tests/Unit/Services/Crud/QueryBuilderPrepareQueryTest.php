@@ -16,11 +16,9 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 /**
  * @param  array<int,Column>  $columns

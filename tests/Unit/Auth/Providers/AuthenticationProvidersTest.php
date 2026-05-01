@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Auth\MustVerifyEmail;
+use App\Models\User as AppUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -12,14 +12,6 @@ use Modules\Core\Auth\Providers\SocialiteProvider;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
-use Modules\Core\Tests\Stubs\Auth\ProviderUserAliasStub;
-
-uses(LaravelTestCase::class);
-
-if (! class_exists(App\Models\User::class, false)) {
-    class_alias(ProviderUserAliasStub::class, App\Models\User::class);
-}
 
 beforeEach(function (): void {
     if (! Schema::hasColumn('users', 'social_id')) {
@@ -50,18 +42,19 @@ it('handles fortify canHandle/isEnabled/provider name branches', function (): vo
 
 it('authenticates credentials and covers invalid and license branches', function (): void {
     $provider = new FortifyCredentialsProvider();
-    $role = Role::factory()->create(['name' => 'member', 'guard_name' => null]);
-    $user = ProviderUserAliasStub::query()->create([
+    $role = Role::factory()->create(['name' => 'member', 'guard_name' => 'web']);
+    $user = new AppUser;
+    $user->forceFill([
         'name' => 'Fortify Member',
         'email' => 'fortify@example.test',
         'username' => 'fortify-user',
         'password' => Hash::make('secret'),
         'license_id' => null,
         'email_verified_at' => now(),
-    ]);
+    ])->save();
     DB::table('model_has_roles')->insert([
         'role_id' => $role->id,
-        'model_type' => ProviderUserAliasStub::class,
+        'model_type' => AppUser::class,
         'model_id' => $user->id,
     ]);
 
@@ -93,19 +86,20 @@ it('authenticates credentials and covers invalid and license branches', function
 
 it('returns email-not-verified and license-available success branches for fortify', function (): void {
     $provider = new FortifyCredentialsProvider();
-    $role = Role::factory()->create(['name' => 'member-verify', 'guard_name' => null]);
+    $role = Role::factory()->create(['name' => 'member-verify', 'guard_name' => 'web']);
 
-    $unverified = ProviderUserAliasStub::query()->create([
+    $unverified = new AppUser;
+    $unverified->forceFill([
         'name' => 'Unverified User',
         'email' => 'unverified@example.test',
         'username' => 'unverified-user',
         'password' => Hash::make('secret'),
         'license_id' => null,
         'email_verified_at' => null,
-    ]);
+    ])->save();
     DB::table('model_has_roles')->insert([
         'role_id' => $role->id,
-        'model_type' => ProviderUserAliasStub::class,
+        'model_type' => AppUser::class,
         'model_id' => $unverified->id,
     ]);
 
@@ -117,17 +111,18 @@ it('returns email-not-verified and license-available success branches for fortif
     expect($email_error['success'])->toBeFalse()
         ->and($email_error['error'])->toBe('Email not verified');
 
-    $verified = ProviderUserAliasStub::query()->create([
+    $verified = new AppUser;
+    $verified->forceFill([
         'name' => 'Licensed User',
         'email' => 'licensed@example.test',
         'username' => 'licensed-user',
         'password' => Hash::make('secret'),
         'license_id' => null,
         'email_verified_at' => now(),
-    ]);
+    ])->save();
     DB::table('model_has_roles')->insert([
         'role_id' => $role->id,
-        'model_type' => ProviderUserAliasStub::class,
+        'model_type' => AppUser::class,
         'model_id' => $verified->id,
     ]);
 
@@ -149,13 +144,12 @@ it('covers fortify private email verification and license helper methods', funct
     $check_license_method = new ReflectionMethod(FortifyCredentialsProvider::class, 'checkLicense');
     $check_license_method->setAccessible(true);
 
-    $verify_user = new class extends ProviderUserAliasStub
-    {
-        use MustVerifyEmail;
-    };
-    $verify_user->email_verified_at = null;
+    $verify_user = new AppUser;
+    $verify_user->forceFill([
+        'email_verified_at' => null,
+        'license_id' => null,
+    ]);
     $verify_user->setRelation('roles', collect());
-    $verify_user->license_id = null;
 
     config(['auth.enable_user_licenses' => false]);
     expect($verify_method->invoke($provider, $verify_user))->toBeTrue()
@@ -192,12 +186,13 @@ it('returns social error when socialite throws', function (): void {
 it('returns conflict when email exists with another account type', function (): void {
     $provider = new SocialiteProvider();
 
-    ProviderUserAliasStub::query()->create([
+    $taken_social = new AppUser;
+    $taken_social->forceFill([
         'name' => 'Taken Social',
         'email' => 'taken-social@example.test',
         'username' => 'taken-social',
         'password' => Hash::make('secret'),
-    ]);
+    ])->save();
     $social_user_conflict = new class
     {
         public string $token = 'token';
@@ -330,16 +325,17 @@ it('covers socialite private checkLicense helper', function (): void {
     $method = new ReflectionMethod(SocialiteProvider::class, 'checkLicense');
     $method->setAccessible(true);
 
-    $role = Role::factory()->create(['name' => 'member-social', 'guard_name' => null]);
+    $role = Role::factory()->create(['name' => 'member-social', 'guard_name' => 'web']);
 
-    /** @var ProviderUserAliasStub $user */
-    $user = ProviderUserAliasStub::query()->create([
+    /** @var AppUser $user */
+    $user = new AppUser;
+    $user->forceFill([
         'name' => 'Social Member',
         'username' => 'social-member',
         'email' => 'social-member@example.test',
         'password' => Hash::make('secret'),
         'license_id' => null,
-    ]);
+    ])->save();
     $user->setRelation('roles', collect([$role]));
 
     config(['auth.enable_user_licenses' => true]);

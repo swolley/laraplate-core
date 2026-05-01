@@ -6,9 +6,7 @@ use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Providers\CommandListenerProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new CommandListenerProvider(app());

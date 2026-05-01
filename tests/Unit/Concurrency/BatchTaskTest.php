@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Concurrency\BatchTask;
-use Modules\Core\Tests\Fixtures\FixtureInvokableTask;
+use Modules\Core\Tests\Unit\Concurrency\InvokableSumForBatchTask;
 
 it('executes a closure task', function (): void {
     $task = new BatchTask(id: 't1', units: 1, run: fn (int $x): int => $x * 2, args: [21]);
@@ -12,7 +12,7 @@ it('executes a closure task', function (): void {
 });
 
 it('executes an invokable class resolved from the container', function (): void {
-    $task = new BatchTask(id: 't2', units: 1, run: FixtureInvokableTask::class, args: [2, 3]);
+    $task = new BatchTask(id: 't2', units: 1, run: InvokableSumForBatchTask::class, args: [2, 3]);
 
     expect($task->execute())->toBe(5);
 });

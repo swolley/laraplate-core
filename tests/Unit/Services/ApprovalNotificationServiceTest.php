@@ -9,12 +9,10 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Notifications\PendingApprovalsNotification;
 use Modules\Core\Services\ApprovalNotificationService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns early when approvals notifications are disabled', function (): void {
     Config::set('core.notifications.approvals.enabled', false);

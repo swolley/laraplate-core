@@ -5,14 +5,12 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationChildStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationParentStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationTagStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersUtilsTestSeeder;
 use Modules\Core\Tests\Stubs\SeedersBulkStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::create('seeders_bulk_stub', function (Blueprint $table): void {

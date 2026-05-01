@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Overrides\ModuleServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('provides returns empty array', function (): void {
     $provider = new class(app()) extends ModuleServiceProvider

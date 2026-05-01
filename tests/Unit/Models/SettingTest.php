@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('creates setting via factory with default attributes', function (): void {
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([

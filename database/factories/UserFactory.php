@@ -17,16 +17,13 @@ final class UserFactory extends Factory
 {
     use HasUniqueFactoryValues;
 
-    /**
-     * Resolve the user model at runtime (see `config('auth.providers.users.model')`).
-     * Cannot use {@see user_class()} as a property default: not a constant expression.
-     *
-     * @return class-string<Authenticatable>
-     */
     #[Override]
     public function modelName(): string
     {
-        return user_class();
+        /** @var class-string<Authenticatable>|null $factory_model */
+        $factory_model = $this->model;
+
+        return $factory_model ?? parent::modelName();
     }
 
     /**

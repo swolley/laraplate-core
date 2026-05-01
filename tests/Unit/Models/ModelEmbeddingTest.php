@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Models\ModelEmbedding;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('fillable contains embedding', function (): void {
     $model = new ModelEmbedding;

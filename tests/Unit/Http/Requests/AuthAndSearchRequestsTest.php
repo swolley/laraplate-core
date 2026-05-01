@@ -6,9 +6,7 @@ use Illuminate\Routing\Route;
 use Modules\Core\Http\Requests\LoginRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TranslationsRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('login request defines expected validation rules', function (): void {
     $rules = (new LoginRequest())->rules();

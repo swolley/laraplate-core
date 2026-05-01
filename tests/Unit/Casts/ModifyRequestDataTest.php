@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Http\Requests\ModifyRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('__get returns value from changes when key exists', function (): void {
     $request = new ModifyRequest(request: ['foo' => 'bar']);

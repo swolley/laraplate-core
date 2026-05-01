@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Modules\Core\Services\FlagCDNService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->service = new FlagCDNService;

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Routing\Route;
 use Modules\Core\Overrides\ModuleDocRoute;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('constructs from Laravel route', function (): void {
     $route = new Route(['GET'], '/test', fn () => null);

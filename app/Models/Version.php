@@ -241,7 +241,7 @@ final class Version extends OvertrueVersion
             return $strategy;
         }
 
-        if ($strategy === false) {
+        if ($strategy === false || $strategy === null || $strategy === '') {
             return VersionStrategy::DIFF;
         }
 

@@ -9,6 +9,7 @@ use Approval\Models\Modification;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use TypeError;
 
@@ -81,7 +82,7 @@ trait HasApprovals
         }
 
         /** @var User|null $user */
-        $user = auth()?->user();
+        $user = Auth::user();
 
         /** @phpstan-ignore method.notFound */
         if ($user && ($user->isAdmin() || $user->isSuperAdmin() && $user->can('approve.' . $this->getTable()))) {

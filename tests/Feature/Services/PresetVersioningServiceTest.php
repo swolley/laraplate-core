@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
@@ -11,9 +10,6 @@ use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\PresetVersioningService;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     if (! Schema::hasColumns('contents', ['components', 'shared_components'])) {

@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Modules\Core\Grids\Casts\GridAction;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Grids\Requests\GridRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('currently throws due request type mismatch in parent constructor', function (): void {
     $request = GridRequest::create('/api/v1/core/users/select', 'GET', [

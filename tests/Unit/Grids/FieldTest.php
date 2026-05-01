@@ -8,11 +8,9 @@ use Modules\Core\Grids\Components\Funnel;
 use Modules\Core\Grids\Components\Option;
 use Modules\Core\Grids\Definitions\FieldType;
 use Modules\Core\Grids\Traits\HasGridUtils;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Grids\FieldModelStub;
 use Modules\Core\Tests\Stubs\Grids\FieldModelWithoutAppendAccessorStub;
 
-uses(LaravelTestCase::class);
 
 it('builds full alias and full query alias', function (): void {
     $field = new Field('users', 'email', 'mail', FieldType::COLUMN, new FieldModelStub());

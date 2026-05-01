@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\SortableStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::dropIfExists('sortable_stub');

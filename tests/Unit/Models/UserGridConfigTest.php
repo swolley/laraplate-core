@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserGridConfig;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class, RefreshDatabase::class);
 
 it('user relation points to configured user class', function (): void {
     $config = new UserGridConfig();

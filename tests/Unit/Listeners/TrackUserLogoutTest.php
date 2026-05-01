@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
+/**
+ * TrackUserLogout listener tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Illuminate\Auth\Events\Logout;
 use Modules\Core\Listeners\TrackUserLogout;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Listeners\TrackUserLogout');
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('handle'))->toBeTrue();
 });
 

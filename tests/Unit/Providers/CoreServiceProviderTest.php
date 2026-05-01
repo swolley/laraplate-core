@@ -21,12 +21,10 @@ use Modules\Core\Providers\FortifyServiceProvider;
 use Modules\Core\Providers\RouteServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\UserForcedSuperRole;
 use Typesense\Client as TypesenseClient;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new CoreServiceProvider(app());

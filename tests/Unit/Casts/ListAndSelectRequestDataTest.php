@@ -13,9 +13,7 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\SelectRequest;
 use Modules\Core\Models\Setting;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('select request data conforms columns and relations', function (): void {
     $request = new class extends SelectRequest {};

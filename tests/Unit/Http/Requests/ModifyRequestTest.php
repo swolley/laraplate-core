@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Http\Requests\ModifyRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('normalizeRules splits piped strings and drops empty segments', function (): void {
     $request = new ModifyRequest();

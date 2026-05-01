@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Providers\ElasticsearchServiceProvider;
 use Modules\Core\Services\ElasticsearchService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new ElasticsearchServiceProvider(app());

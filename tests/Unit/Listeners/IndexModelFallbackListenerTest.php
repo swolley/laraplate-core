@@ -7,9 +7,7 @@ use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Listeners\IndexModelFallbackListener;
 use Modules\Core\Models\Setting;
 use Modules\Core\Tests\Fixtures\StubSearchableModel;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('does nothing when event is already handled', function (): void {
     Bus::fake();

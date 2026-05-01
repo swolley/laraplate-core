@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Services\Docs\VersionService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns null commit hash and tag when git directory does not exist', function (): void {
     $service = new VersionService(__DIR__ . '/non-existent-base');

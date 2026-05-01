@@ -34,9 +34,7 @@ use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Inspector\Inspect;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('column entity computes unsigned and length metadata', function (): void {
     $unsigned = new Column('qty', collect([]), null, 'unsignedInteger');

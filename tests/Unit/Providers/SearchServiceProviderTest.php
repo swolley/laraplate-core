@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Providers\SearchServiceProvider;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new SearchServiceProvider(app());

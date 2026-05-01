@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use Modules\Core\Models\Version;
 use Modules\Core\Services\VersioningService;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\FakeVersionedModel;
 
-uses(LaravelTestCase::class);
 
 it('can be instantiated', function (): void {
     $service = new VersioningService();

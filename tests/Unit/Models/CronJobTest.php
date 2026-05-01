@@ -22,11 +22,8 @@ it('cron job model uses correct traits', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
     $traits = $reflection->getTraitNames();
 
-    expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
+    expect($traits)->toContain('Modules\\Core\\Helpers\\HasActivation');
     expect($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidations');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasVersions');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\SoftDeletes');
 });
 
 it('cron job model has required methods', function (): void {

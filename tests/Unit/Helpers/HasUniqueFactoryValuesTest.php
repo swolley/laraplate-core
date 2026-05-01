@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\UniqueFactoryHarness;
 use Modules\Core\Tests\Stubs\UniqueFactoryQueryThrows;
 
-uses(LaravelTestCase::class);
 
 it('returns first candidate when model and column are omitted', function (): void {
     $harness = new UniqueFactoryHarness;

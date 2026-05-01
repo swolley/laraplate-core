@@ -8,10 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
-uses(LaravelTestCase::class);
 
 it('builds a basic ok response from array data', function (): void {
     config(['app.debug' => false]);

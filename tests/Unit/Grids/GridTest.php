@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\GridUtilsModelStub;
 
-uses(LaravelTestCase::class);
 
 it('detects models that use HasGridUtils', function (): void {
     expect(Grid::useGridUtils(User::factory()->make()))->toBeFalse()

@@ -7,9 +7,7 @@ use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns configs for models', function (): void {
     $auth = $this->app->make(AuthorizationService::class);
@@ -64,6 +62,7 @@ it('skips null grid resolver responses and keeps valid ones', function (): void 
 
 it('uses metadata registry path and indexes results by table name', function (): void {
     Modules\Core\Inspector\ModelMetadataRegistry::reset();
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
     config()->set('permission.roles.superadmin', 'superadmin');
     $auth = $this->app->make(AuthorizationService::class);
 

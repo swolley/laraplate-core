@@ -11,11 +11,9 @@ use Laravel\Socialite\Contracts\User as SocialUser;
 use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Events\SocialLoginCompleted;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\HandleSocialLoginActionTestUserDouble;
 use Symfony\Component\HttpFoundation\Response;
 
-uses(LaravelTestCase::class);
 
 afterEach(function (): void {
     Mockery::close();

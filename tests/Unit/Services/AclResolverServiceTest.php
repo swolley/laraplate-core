@@ -11,11 +11,9 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\AclResolverService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Cache::flush();

@@ -203,7 +203,9 @@ trait HasVersions
         if (property_exists($this, 'versionStrategy')) {
             $configured = $this->versionStrategy;
 
-            return $configured instanceof VersionStrategy ? $configured : VersionStrategy::from((string) $configured);
+            if ($configured !== null && $configured !== '') {
+                return $configured instanceof VersionStrategy ? $configured : VersionStrategy::from((string) $configured);
+            }
         }
 
         $settings_name = "version_strategy_{$this->getTable()}";

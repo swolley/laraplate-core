@@ -133,7 +133,16 @@ trait HasDynamicContents
 
         // Sync entity_id when presettable_id changes
         if ($key === 'presettable_id' && $value) {
-            $this->entity_id = $this->presettable?->entity_id;
+            $entity_id = null;
+            $presettable = $this->presettable;
+
+            if ($presettable instanceof Model) {
+                $entity_id = $presettable->getAttribute('entity_id');
+            } elseif (is_object($presettable) && isset($presettable->entity_id)) {
+                $entity_id = $presettable->entity_id;
+            }
+
+            parent::setAttribute('entity_id', $entity_id);
         }
 
         return $result;
@@ -203,13 +212,21 @@ trait HasDynamicContents
     }
 
     /**
+     * @return class-string<Presettable>
+     */
+    public static function getPresettableClass(): string
+    {
+        return self::getModuleModelClass(Presettable::class);
+    }
+
+    /**
      * Convenience relation to avoid multiple column foreign key references.
      *
      * @return BelongsTo<Presettable,TModel>
      */
     public function presettable(): BelongsTo
     {
-        $presettable_class = self::getModuleModelClass(Presettable::class);
+        $presettable_class = static::getPresettableClass();
         $relation = $this->belongsTo($presettable_class);
         $relation->withTrashed();
 

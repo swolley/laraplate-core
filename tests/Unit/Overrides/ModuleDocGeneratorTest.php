@@ -15,9 +15,6 @@ namespace {
     use Modules\Core\Overrides\ModuleDocRoute;
     use Modules\Core\Tests\Stubs\DummyFormRequest;
     use Modules\Core\Tests\Stubs\Overrides\AbstractModuleDocFormRequest;
-    use Modules\Core\Tests\TestCase;
-
-    uses(TestCase::class);
 
     it('generateCombinations returns empty combination for empty parameters', function (): void {
         $config = ['ignoredRoutes' => []];

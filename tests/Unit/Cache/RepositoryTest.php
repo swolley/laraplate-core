@@ -12,9 +12,7 @@ use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('getCacheTags prepends app name and supports string/array tags', function (): void {
     $store = Mockery::mock(Store::class);
@@ -72,6 +70,7 @@ it('tryByRequest unwraps ResponseBuilder response when remember callback runs', 
 
 it('clear methods flush and forget through tags for entity, request, user and group', function (): void {
     $repository = new Repository(new ArrayStore());
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
 
     $cacheable = new class extends Model
     {
@@ -88,7 +87,7 @@ it('clear methods flush and forget through tags for entity, request, user and gr
     $repository->clearByRequest($request, null);
 
     $user = User::factory()->create();
-    $role = Role::factory()->create();
+    $role = Role::factory()->create(['guard_name' => 'web']);
     $user->assignRole($role);
     $repository->clearByUser($user, $cacheable);
     $repository->clearByUser($user, null);
@@ -103,10 +102,11 @@ it('private helpers compute request key and duration variants', function (): voi
     config()->set('cache.threshold', 10);
 
     $repository = new Repository(new ArrayStore());
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
 
     $request = Request::create('/api/key', 'GET', ['b' => '2', 'a' => ['z' => '3', 'c' => '1']]);
     $user = User::factory()->create();
-    $role = Role::factory()->create();
+    $role = Role::factory()->create(['guard_name' => 'web']);
     $user->assignRole($role);
     $request->setUserResolver(fn (): User => $user);
 
@@ -159,6 +159,7 @@ it('tryByRequest supports entity arrays with class strings and plain return valu
 
 it('clear methods support class-string entities and role/user key helpers branches', function (): void {
     $repository = new Repository(new ArrayStore());
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
     $request = Request::create('/api/clear-string', 'GET', ['a' => '1']);
     $request->setUserResolver(fn (): User => User::factory()->create());
 
@@ -173,7 +174,7 @@ it('clear methods support class-string entities and role/user key helpers branch
     $repository->clearByEntity($class);
     $repository->clearByRequest($request, $class);
 
-    $role = Role::factory()->create();
+    $role = Role::factory()->create(['guard_name' => 'web']);
     $user = User::factory()->create();
     $user->assignRole($role);
     $repository->clearByUser($user, $class);

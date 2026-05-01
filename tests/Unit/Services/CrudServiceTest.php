@@ -18,11 +18,9 @@ use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelChild;
 use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelParent;
-use Modules\Core\Tests\LaravelTestCase;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-uses(LaravelTestCase::class);
 
 it('normalizes scalar and array key values to where condition', function (): void {
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));

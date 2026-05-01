@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Core\Providers\RouteServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new RouteServiceProvider(app());

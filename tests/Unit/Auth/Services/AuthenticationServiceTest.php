@@ -7,9 +7,6 @@ use Modules\Core\Auth\Services\AuthenticationService;
 use Modules\Core\Tests\Stubs\FakeAuthUser;
 use Modules\Core\Tests\Stubs\FakeDisabledProvider;
 use Modules\Core\Tests\Stubs\FakeEnabledProvider;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class);
 
 it('returns first successful authentication result from enabled providers', function (): void {
     $request = new Request();

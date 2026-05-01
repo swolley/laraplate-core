@@ -3,9 +3,6 @@
 declare(strict_types=1);
 
 use Modules\Core\Helpers\TreeCollection;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class);
 
 it('builds a tree with children and aggregated article counts', function (): void {
     $items = [

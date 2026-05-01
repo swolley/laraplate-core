@@ -260,6 +260,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     protected static function newFactory(): UserFactory
     {
+        UserFactory::guessModelNamesUsing(static fn (): string => static::class);
+
         return UserFactory::new();
     }
 

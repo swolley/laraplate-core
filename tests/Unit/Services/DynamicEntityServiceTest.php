@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Services\DynamicEntityService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     DynamicEntityService::reset();

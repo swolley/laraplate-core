@@ -2,18 +2,22 @@
 
 declare(strict_types=1);
 
+/**
+ * ElasticsearchService tests.
+ *
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Response\Elasticsearch;
 use GuzzleHttp\Psr7\Response;
 use Modules\Core\Search\Exceptions\ElasticsearchException;
 use Modules\Core\Services\ElasticsearchService;
-use Modules\Core\Tests\LaravelTestCase;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     resetElasticsearchSingleton();
@@ -22,7 +26,6 @@ beforeEach(function (): void {
 it('has proper class structure', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('getInstance'))->toBeTrue();
     expect($reflection->hasMethod('createIndex'))->toBeTrue();
     expect($reflection->hasMethod('search'))->toBeTrue();
@@ -98,7 +101,6 @@ it('has consistent method signatures', function (): void {
 it('has proper class hierarchy', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->getName())->toBe(ElasticsearchService::class);
 });
 
@@ -111,12 +113,6 @@ it('has required public methods', function (): void {
     expect($methodNames)->toContain('createIndex');
     expect($methodNames)->toContain('search');
     expect($methodNames)->toContain('getInstance');
-});
-
-it('has proper class finality', function (): void {
-    $reflection = new ReflectionClass(ElasticsearchService::class);
-
-    expect($reflection->isFinal())->toBeTrue();
 });
 
 it('has proper namespace', function (): void {
@@ -140,7 +136,6 @@ it('has proper method accessibility', function (): void {
 it('has proper class structure for elasticsearch', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('createIndex'))->toBeTrue();
     expect($reflection->hasMethod('search'))->toBeTrue();
 });
@@ -158,7 +153,6 @@ it('has proper method parameter types', function (): void {
 it('has proper class structure for singleton pattern', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('getInstance'))->toBeTrue();
 
     $constructor = $reflection->getConstructor();
@@ -178,7 +172,6 @@ it('has proper method return types', function (): void {
 it('has proper class structure for service pattern', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('createIndex'))->toBeTrue();
     expect($reflection->hasMethod('search'))->toBeTrue();
 });
@@ -196,7 +189,6 @@ it('has proper method signatures for elasticsearch', function (): void {
 it('has proper class structure for API integration', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('createIndex'))->toBeTrue();
     expect($reflection->hasMethod('search'))->toBeTrue();
 });
@@ -214,7 +206,6 @@ it('has proper method structure for elasticsearch operations', function (): void
 it('has proper class structure for singleton service', function (): void {
     $reflection = new ReflectionClass(ElasticsearchService::class);
 
-    expect($reflection->isFinal())->toBeTrue();
     expect($reflection->hasMethod('getInstance'))->toBeTrue();
 
     $constructor = $reflection->getConstructor();

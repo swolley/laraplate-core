@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Console\HasCommandUtilsTestCommand;
 
-uses(LaravelTestCase::class);
 
 it('returns null when attribute is not in validations', function (): void {
     $command = new HasCommandUtilsTestCommand;

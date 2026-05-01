@@ -14,7 +14,6 @@ use Modules\Core\Grids\Definitions\Relation;
 use Modules\Core\Grids\Definitions\RelationInfo;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Helpers\ResponseBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Grids\EntityHarness;
 use Modules\Core\Tests\Stubs\Grids\EntityLocksStub;
 use Modules\Core\Tests\Stubs\Grids\EntityModelStub;
@@ -25,7 +24,6 @@ use Modules\Core\Tests\Stubs\Grids\EntityNoTimestampsStub;
 use Modules\Core\Tests\Stubs\Grids\EntityPlainModelStub;
 use Modules\Core\Tests\Stubs\Grids\EntityPlainNonFinalModelStub;
 use Modules\Core\Tests\Stubs\Grids\EntitySoftDeleteForceStub;
-uses(LaravelTestCase::class);
 
 it('covers base entity model and table metadata access', function (): void {
     $entity = new EntityHarness(new EntityModelStub());

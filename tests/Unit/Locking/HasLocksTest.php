@@ -7,10 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\Locking\LockableTestModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::dropIfExists('lockable_test_models');

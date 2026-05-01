@@ -6,6 +6,9 @@ declare(strict_types=1);
  * Uses the application {@see Tests\TestCase} (full Laravel bootstrap) so {@see Cache} facade
  * mocking works. {@see Modules\Core\Tests\LaravelTestCase} is avoided here because it runs
  * module migrations that are incompatible with the default SQLite in-memory test database.
+ *
+ * This file lives under {@see UnitShell} so Pest does not apply {@see Modules\Core\Tests\LaravelTestCase}
+ * to the whole {@see Unit} directory binding.
  */
 use Illuminate\Contracts\Cache\Repository as CacheRepositoryContract;
 use Illuminate\Support\Facades\Cache;

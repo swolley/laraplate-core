@@ -507,8 +507,11 @@ class ResponseBuilder
             }
 
             $route = request()->route();
-            $payload['meta']['controller'] = $route->getControllerClass();
-            $payload['meta']['action'] = $route->getActionMethod();
+
+            if ($route !== null) {
+                $payload['meta']['controller'] = $route->getControllerClass();
+                $payload['meta']['action'] = $route->getActionMethod();
+            }
         }
 
         $this->resourceResponse->with = $payload;

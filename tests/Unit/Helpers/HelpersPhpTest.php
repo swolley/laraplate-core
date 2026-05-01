@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Helpers\HasCrudOperations;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('normalize_path uses directory separators', function (): void {
     expect(normalize_path('foo/bar\\baz'))->toContain(DIRECTORY_SEPARATOR);

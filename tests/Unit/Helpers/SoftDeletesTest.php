@@ -5,10 +5,8 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\UnauthorizedException;
-use Modules\Core\Tests\LaravelTestCase;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Schema::create('soft_deletes_stub', function (Blueprint $table): void {

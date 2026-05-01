@@ -136,9 +136,9 @@ trait HasTable
             ->deferColumnManager(true);
     }
 
-    private static function loadUserPermissionsForTable(User $user): void
+    private static function loadUserPermissionsForTable(?User $user): void
     {
-        if (! $user) {
+        if ($user === null) {
             return;
         }
 
@@ -149,8 +149,12 @@ trait HasTable
         ]);
     }
 
-    private static function checkPermissionCached(User $user, string $permission): bool
+    private static function checkPermissionCached(?User $user, string $permission): bool
     {
+        if ($user === null) {
+            return false;
+        }
+
         $key = $user->id . '_' . $permission;
 
         if (! isset(self::$permissionCache[$key])) {
@@ -347,7 +351,7 @@ trait HasTable
         ?callable $actions,
         array $fixedActions,
         string $permissionsPrefix,
-        User $user,
+        ?User $user,
     ): void {
         /** @var Collection<Action> $default_actions */
         $default_actions = collect([
@@ -523,7 +527,7 @@ trait HasTable
         ?callable $filters,
         Model $model_instance,
         string $permissionsPrefix,
-        User $user,
+        ?User $user,
     ): void {
         $default_filters = collect([]);
 

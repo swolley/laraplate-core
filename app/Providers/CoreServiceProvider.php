@@ -11,6 +11,7 @@ use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
@@ -75,12 +76,19 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->registerAuths();
         $this->registerMiddlewares();
 
-        Password::defaults(static fn () => Password::min(8)
-            ->letters()
-            ->mixedCase()
-            ->numbers()
-            ->symbols()
-            ->uncompromised());
+        Password::defaults(function (): Password {
+            $rule = Password::min(8)
+                ->letters()
+                ->mixedCase()
+                ->numbers()
+                ->symbols();
+
+            if ($this->app->environment('testing')) {
+                return $rule;
+            }
+
+            return $rule->uncompromised();
+        });
 
         $this->configureCommands();
         $this->configureModels();
@@ -128,14 +136,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     public function registerAuths(): void
     {
+        $user_class = user_class();
+
         // bypass all other checks if the user is super admin
-        Gate::before(static fn (?User $user): ?true => $user instanceof User && $user->isSuperAdmin() ? true : null);
+        Gate::before(static fn (?Authenticatable $user): ?true => $user instanceof $user_class && $user->isSuperAdmin() ? true : null);
     }
 
     /**
      * Register commands in the format of Command::class.
      */
-    #[Override]
     protected function registerCommands(): void
     {
         $module_commands_subpath = config('modules.paths.generator.command.path');
@@ -157,7 +166,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
      *
      * @throws BindingResolutionException
      */
-    #[Override]
     protected function registerCommandSchedules(): void
     {
         $this->app->booted(function (): void {

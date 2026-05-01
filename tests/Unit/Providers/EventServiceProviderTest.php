@@ -7,9 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Providers\EventServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new EventServiceProvider(app());

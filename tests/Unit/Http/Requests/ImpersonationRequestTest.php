@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Http\Requests\ImpersonationRequest;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('returns validation rules with user required', function (): void {
     $request = new ImpersonationRequest;

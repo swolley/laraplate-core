@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Models\User;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('resets user password with valid input', function (): void {
     $user = User::factory()->create(['password' => Hash::make('old')]);

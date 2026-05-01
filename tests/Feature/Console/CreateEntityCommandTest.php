@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\FieldType;
@@ -12,9 +11,6 @@ use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Preset;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
-use Modules\Core\Tests\TestCase;
-
-uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     if (! Schema::hasTable('fields')) {

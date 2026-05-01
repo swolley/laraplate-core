@@ -15,12 +15,10 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\AclResolverService;
 use Modules\Core\Services\Authorization\AuthorizationService;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     Cache::flush();
@@ -55,9 +53,10 @@ it('hasUnrestrictedAccess returns false when no authenticated user', function ()
 it('hasUnrestrictedAccess returns true for super admin user', function (): void {
     $service = new AuthorizationService(new AclResolverService());
 
-    /** @var User&Mockery\MockInterface $user */
-    $user = Mockery::mock(User::class);
-    $user->shouldReceive('isSuperAdmin')->andReturnTrue();
+    config()->set('permission.roles.superadmin', 'superadmin');
+    $super_role = Role::factory()->create(['name' => 'superadmin', 'guard_name' => 'web']);
+    $user = User::factory()->create();
+    $user->assignRole($super_role);
 
     Auth::shouldReceive('user')->andReturn($user);
 
@@ -77,8 +76,7 @@ it('clearCacheForCurrentUser forwards to AclResolverService when user is authent
     $resolver = new AclResolverService();
     $service = new AuthorizationService($resolver);
 
-    /** @var User&Mockery\MockInterface $user */
-    $user = Mockery::mock(User::class);
+    $user = User::factory()->create();
 
     Auth::shouldReceive('user')->andReturn($user);
 

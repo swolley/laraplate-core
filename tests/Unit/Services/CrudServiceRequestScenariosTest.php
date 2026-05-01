@@ -6,6 +6,7 @@ use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
@@ -17,15 +18,13 @@ use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\User;
+use App\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
-use Modules\Core\Tests\LaravelTestCase;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-uses(LaravelTestCase::class);
 
 function crud_cov_set(object $obj, string $prop, mixed $value): void
 {
@@ -481,9 +480,12 @@ it('detail resolves composite primary key from validated input', function (): vo
 });
 
 it('history returns record and version history for versionable models', function (): void {
+    config()->set('versionable.version_model', Modules\Core\Models\Version::class);
+
     Schema::dropIfExists('crud_cov_hist_one');
     Schema::create('crud_cov_hist_one', function (Illuminate\Database\Schema\Blueprint $table): void {
         $table->id();
+        $table->unsignedBigInteger('user_id')->nullable();
         $table->string('label')->nullable();
         $table->timestamps();
     });
@@ -506,7 +508,13 @@ it('history returns record and version history for versionable models', function
     $superadmin = crud_cov_login_superadmin();
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
 
-    $target = $hist_model->newQuery()->create(['label' => 'hist-row']);
+    $target_id = DB::table('crud_cov_hist_one')->insertGetId([
+        'label' => 'hist-row',
+        'user_id' => $superadmin->getKey(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $target = $hist_model->newQuery()->findOrFail($target_id);
 
     $request = crud_cov_validated_request(['id' => $target->getKey()]);
     $request->setUserResolver(fn () => $superadmin);

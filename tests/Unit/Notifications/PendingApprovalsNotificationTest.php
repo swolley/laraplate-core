@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Collection;
 use Modules\Core\Notifications\PendingApprovalsNotification;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('via returns configured channels', function (): void {
     config(['core.notifications.approvals.channels' => ['mail', 'database']]);

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Str;
 use Modules\Core\Providers\RouteServiceProvider as CoreRouteServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 it('getPrefix returns slug of module name for Core', function (): void {
     $provider = new CoreRouteServiceProvider(app());

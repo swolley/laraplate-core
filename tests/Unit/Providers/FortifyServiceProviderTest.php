@@ -12,9 +12,7 @@ use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Auth\Services\AuthenticationService;
 use Modules\Core\Models\User;
 use Modules\Core\Providers\FortifyServiceProvider;
-use Modules\Core\Tests\LaravelTestCase;
 
-uses(LaravelTestCase::class);
 
 beforeEach(function (): void {
     $this->provider = new FortifyServiceProvider(app());

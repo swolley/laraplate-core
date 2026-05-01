@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Tests\Fixtures;
+namespace Modules\Core\Tests\Unit\Concurrency;
 
-final class FixtureInvokableTask
+final class InvokableSumForBatchTask
 {
     public function __invoke(int $a, int $b): int
     {
