@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(User)* Update User model properties and remove duplicate Notifiable trait
+
+### 🚜 Refactor
+
+- *(core)* Enhance type safety and improve test configurations
+
+## [1.48.1] - 2026-04-29
+
+### 🐛 Bug Fixes
+
 - Correct module naming and update test references
 
 ## [1.48.0] - 2026-04-29
