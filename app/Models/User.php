@@ -41,6 +41,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -57,7 +58,6 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     }
     use HasVersions;
     use Impersonate;
-    use Notifiable;
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
@@ -76,6 +76,13 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         'email',
         'password',
         'lang',
+        'email_verified_at',
+        'license_id',
+        'social_id',
+        'social_service',
+        'social_token',
+        'social_refresh_token',
+        'social_token_secret',
     ];
 
     /**
