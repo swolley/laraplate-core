@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
+use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;
@@ -67,7 +70,24 @@ class LockedAddCommand extends Command
             $this->info(sprintf('File : %s already exists', $path));
         }
 
+        $this->updateSettingsTable($table);
+
+        $this->info('Done. Review the generated migration and run `php artisan migrate`.');
+        
         return BaseCommand::SUCCESS;
+    }
+
+    protected function updateSettingsTable(string $table): void
+    {
+        $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
+
+        Setting::query()->insertOrIgnore([
+            'name' => $key_name,
+            'value' => true,
+            'type' => SettingTypeEnum::BOOLEAN,
+            'group_name' => 'locking',
+            'description' => "Lock status for {$table}",
+        ]);
     }
 
     public function generateMigrationPath(Model $instance): string

@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace $NAMESPACE$;
+
+use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Override;
+
+final class $CLASS$ extends ServiceProvider
+{
+    /**
+     * The event handler mappings for the application.
+     *
+     * @var array<string, array<int, string>>
+     */
+    #[Override]
+    protected $listen = [];
+
+    /**
+     * Indicates if events should be discovered.
+     *
+     * @var bool
+     */
+    #[Override]
+    protected static $shouldDiscoverEvents = true;
+}

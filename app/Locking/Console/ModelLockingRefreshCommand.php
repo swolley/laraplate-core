@@ -8,7 +8,7 @@ use function Laravel\Prompts\confirm;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Locking\HasOptimisticLocking;
+use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Overrides\Command;
 use Override;

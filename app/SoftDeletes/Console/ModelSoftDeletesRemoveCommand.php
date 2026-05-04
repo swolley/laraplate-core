@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
@@ -80,9 +81,18 @@ final class ModelSoftDeletesRemoveCommand extends Command
             $this->info(sprintf('Runtime setting soft_deletes_%s set to false.', $table));
         }
 
+        $this->updateSettingsTable($table);
+
         $this->info('Done. Review the generated migration and run `php artisan migrate`.');
 
         return BaseCommand::SUCCESS;
+    }
+
+    private function updateSettingsTable(string $table): void
+    {
+        $key_name = CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX . ".{$table}";
+
+        Setting::query()->where('name', $key_name)->forceDelete();
     }
 
     private function resolveModelClass(string $model): ?string

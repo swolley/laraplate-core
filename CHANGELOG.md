@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(locking)* Enhance locking commands with settings management
+
+## [1.49.1] - 2026-05-01
+
 ### 🚜 Refactor
 
 - *(translations)* Update pagination translations for multiple languages

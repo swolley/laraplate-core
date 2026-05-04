@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace $NAMESPACE$;
+
+use Modules\Core\Overrides\ModuleServiceProvider;
+use Override;
+
+/**
+ * @property \Illuminate\Foundation\Application $app
+ */
+class $CLASS$ extends ModuleServiceProvider
+{
+    #[Override]
+    protected string $name = '$MODULE$';
+
+    #[Override]
+    protected string $nameLower = '$LOWER_NAME$';
+
+    #[Override]
+    public function register(): void
+    {
+        parent::register();
+    }
+}
