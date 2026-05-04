@@ -28,14 +28,14 @@ final class RoleFactory extends Factory
      *
      * @return array<int,mixed|string>
      *
-     * @psalm-return array{name: string, guard_name: mixed, description: string}
+     * @psalm-return array{name: string, guard_name: string, description: string}
      */
     #[Override]
     public function definition(): array
     {
         return [
             'name' => fake()->name(),
-            'guard_name' => fake()->randomElement(['web', 'api', null]),
+            'guard_name' => (string) config('auth.defaults.guard', 'web'),
             'description' => fake()->optional()->text(),
         ];
     }

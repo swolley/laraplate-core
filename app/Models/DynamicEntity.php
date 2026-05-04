@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Exception;
+use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -49,7 +50,7 @@ final class DynamicEntity extends Model
      *
      * @throws Exception
      */
-    public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): Model
+    public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): EloquentModel
     {
         return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
     }
@@ -61,7 +62,7 @@ final class DynamicEntity extends Model
      * @throws DirectoryNotFoundException
      * @throws Exception
      *
-     * @return class-string<Model>|null
+     * @return class-string<EloquentModel>|null
      */
     public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
     {
@@ -176,6 +177,21 @@ final class DynamicEntity extends Model
     private static function findModel(array $models, string $modelName): ?string
     {
         $found = array_filter($models, fn (string $c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
+        $found = array_values($found);
+
+        if (count($found) > 1) {
+            $expected_basename = Str::studly($modelName);
+            foreach (config('auth.providers', []) as $provider) {
+                $model = $provider['model'] ?? null;
+                if (! is_string($model) || ! class_exists($model)) {
+                    continue;
+                }
+
+                if (class_basename($model) === $expected_basename && in_array($model, $found, true)) {
+                    return $model;
+                }
+            }
+        }
 
         throw_if(count($found) > 1, Exception::class, sprintf("Too many models found for '%s'", $modelName));
 

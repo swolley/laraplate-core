@@ -42,14 +42,18 @@ final class Repository extends BaseRepository
     #[Override]
     /**
      * @param  string  $key
-     * @param  int|array|null  $ttl
+     * @param  int|array<int, DateInterval|DateTimeInterface|int>|null  $ttl  List of two items uses Laravel {@see parent::flexible()}; other arrays are normalized to seconds (e.g. named durations from config).
      */
     public function remember($key, $ttl, Closure $callback): mixed // @pest-ignore-type
     {
         $ttl ??= $this->getDuration();
 
-        if (is_array($ttl)) {
+        if (is_array($ttl) && array_is_list($ttl) && count($ttl) === 2) {
             return parent::flexible($key, $ttl, $callback);
+        }
+
+        if (is_array($ttl)) {
+            $ttl = $this->resolveDurationConfigToSeconds($ttl);
         }
 
         return parent::remember($key, $ttl, $callback);
@@ -108,9 +112,7 @@ final class Repository extends BaseRepository
         }
 
         $key = $this->getKeyFromRequest($request);
-        $duration ??= config('cache.duration');
-
-        $ttl = $duration ?: config('cache.duration');
+        $ttl = $duration ?? $this->resolveDefaultCacheSeconds();
 
         return $this->remember($key, $ttl, function () use ($callback) {
             $data = $callback();
@@ -287,19 +289,72 @@ final class Repository extends BaseRepository
         return array_map(strval(...), $tags);
     }
 
+    /**
+     * @return int|array{0: int, 1: int}
+     */
     private function getDuration(): int|array
     {
         $threshold = $this->getThreshold();
+        $base_seconds = $this->resolveDefaultCacheSeconds();
 
         if ($threshold !== null && $threshold !== 0) {
-            return [$threshold, config('cache.duration')];
+            return [(int) $threshold, $base_seconds];
         }
 
-        return config('cache.duration');
+        return $base_seconds;
     }
 
     private function getThreshold(): ?int
     {
-        return config('cache.threshold');
+        $value = config('cache.threshold');
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function resolveDefaultCacheSeconds(): int
+    {
+        $durations = config('cache.duration');
+
+        if (is_int($durations)) {
+            return max(1, $durations);
+        }
+
+        if (! is_array($durations)) {
+            return 300;
+        }
+
+        foreach (['medium', 'short', 'long'] as $key) {
+            if (isset($durations[$key]) && is_numeric($durations[$key])) {
+                return max(1, (int) $durations[$key]);
+            }
+        }
+
+        foreach ($durations as $value) {
+            if (is_numeric($value)) {
+                return max(1, (int) $value);
+            }
+        }
+
+        return 300;
+    }
+
+    /**
+     * @param  array<string, mixed>  $durations
+     */
+    private function resolveDurationConfigToSeconds(array $durations): int
+    {
+        foreach (['medium', 'short', 'long'] as $key) {
+            if (isset($durations[$key]) && is_numeric($durations[$key])) {
+                return max(1, (int) $durations[$key]);
+            }
+        }
+
+        foreach ($durations as $value) {
+            if (is_numeric($value)) {
+                return max(1, (int) $value);
+            }
+        }
+
+        return 300;
     }
 }

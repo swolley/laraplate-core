@@ -6,6 +6,7 @@ namespace Modules\Core\Tests;
 
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\Repository as CoreCacheRepository;
 
 /**
@@ -62,5 +63,9 @@ abstract class LaravelTestCase extends \Tests\TestCase
                 return parent::store($name);
             }
         });
+
+        // Facade caches the manager from earlier bootstrap; without this, __callStatic
+        // keeps using a default CacheManager whose Repository forwards unknown methods to ArrayStore.
+        Cache::clearResolvedInstance();
     }
 }

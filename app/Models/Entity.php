@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
@@ -95,11 +96,8 @@ abstract class Entity extends Model
         return null;
     }
 
-    /**
-     * @return Builder<static>
-     */
     #[Override]
-    public function newBaseQueryBuilder()
+    protected function newBaseQueryBuilder(): QueryBuilder
     {
         return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), static::getEntityTypeEnumClass()::values());
     }

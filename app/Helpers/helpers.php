@@ -285,6 +285,10 @@ if (! function_exists('models')) {
                     continue;
                 }
 
+                if (! is_dir($models_path)) {
+                    continue;
+                }
+
                 $model_files = File::allFiles($models_path);
 
                 if ($model_files === []) {

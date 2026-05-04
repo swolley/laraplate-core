@@ -111,6 +111,42 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         $this->dontVersionable = array_merge($this->dontVersionable ?? [], ['password', 'remember_token']);
     }
 
+    /**
+     * Guard names for Spatie permission resolution on this user instance.
+     *
+     * Auth providers often reference {@see \App\Models\User} while tests or modules
+     * instantiate {@see self} directly; include every guard whose provider model is
+     * this class or a subclass so role assignment and checks stay consistent.
+     *
+     * @return list<string>
+     */
+    public function guardName(): array
+    {
+        $guard_names = collect(config('auth.guards', []))
+            ->keys()
+            ->filter(function (string $guard_name): bool {
+                $provider = config("auth.guards.{$guard_name}.provider");
+                if (! is_string($provider)) {
+                    return false;
+                }
+
+                $model = config("auth.providers.{$provider}.model");
+                if (! is_string($model) || ! class_exists($model)) {
+                    return false;
+                }
+
+                return is_a(static::class, $model, true) || is_a($model, static::class, true);
+            })
+            ->values()
+            ->all();
+
+        if ($guard_names !== []) {
+            return $guard_names;
+        }
+
+        return [(string) config('auth.defaults.guard', 'web')];
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
         if ($this->isSuperAdmin()) {

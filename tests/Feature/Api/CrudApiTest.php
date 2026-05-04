@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rules\Password;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
@@ -10,6 +11,7 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
 beforeEach(function (): void {
+    Config::set('core.expose_crud_api', true);
     $this->user = User::factory()->create();
     $this->user->assignRole(Role::findOrCreate('superadmin', 'web'));
     $this->actingAs($this->user);
@@ -22,7 +24,9 @@ test('inspector returns users table with SQLite and tryResolveModel returns User
         ->and($inspected->columns->isNotEmpty())->toBeTrue('Inspector should return columns for users table');
 
     $resolved = DynamicEntity::tryResolveModel('users', null);
-    expect($resolved)->toBe(User::class);
+    /** @var class-string<\Illuminate\Database\Eloquent\Model> $expected_user_model */
+    $expected_user_model = config('auth.providers.users.model');
+    expect($resolved)->toBe($expected_user_model);
 });
 
 // Search API disabled: route and controller method commented out.

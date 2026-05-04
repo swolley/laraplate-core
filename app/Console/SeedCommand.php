@@ -14,17 +14,20 @@ final class SeedCommand extends BaseSeedCommand
     protected $description = 'Seed the database with records. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
 
     #[Override]
-    public function handle()
+    public function handle(): int
     {
         if ($this->option('dev')) {
-            $this->call('db:seed', ['--class' => DevDatabaseSeeder::class]);
-        } else {
-            parent::handle();
+            return (int) $this->call('db:seed', ['--class' => DevDatabaseSeeder::class]);
         }
+
+        return parent::handle();
     }
 
+    /**
+     * @return array<int, array{0: string, 1: string|null, 2: int, 3: string, 4?: mixed}>
+     */
     #[Override]
-    protected function getOptions()
+    protected function getOptions(): array
     {
         return array_merge(parent::getOptions(), [
             ['dev', null, InputOption::VALUE_NONE, 'Seed the database with development data'],
