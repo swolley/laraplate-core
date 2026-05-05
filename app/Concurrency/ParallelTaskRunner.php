@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Concurrency;
 
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Concurrency\Contracts\BatchReporter;
 use Modules\Core\Concurrency\Exceptions\BatchExecutionFailedException;
@@ -163,7 +164,7 @@ final class ParallelTaskRunner
         $task_list = $this->materializeTasks($tasks);
 
         if ($task_list === []) {
-            $summary = new BatchSummary([], [], 0, 0.0, 0);
+            $summary = new BatchSummary([], [], 0, 0.0, 0, 0);
             $this->reporter->finish($summary);
 
             return $summary;
@@ -181,6 +182,7 @@ final class ParallelTaskRunner
         /** @var list<BatchOutcome> $failures */
         $failures = [];
         $total_units_processed = 0;
+        $total_query_count = 0;
         $first_failure = null;
 
         $start_time = microtime(true);
@@ -198,6 +200,7 @@ final class ParallelTaskRunner
             &$outcomes,
             &$failures,
             &$total_units_processed,
+            &$total_query_count,
             &$first_failure,
             $fork,
         ): void {
@@ -207,6 +210,7 @@ final class ParallelTaskRunner
 
             if ($result->success) {
                 $total_units_processed += $result->unitsProcessed;
+                $total_query_count += $result->queryCount;
 
                 if ($this->keepResults) {
                     $outcomes[] = $result;
@@ -218,6 +222,7 @@ final class ParallelTaskRunner
             }
 
             $failures[] = $result;
+            $total_query_count += $result->queryCount;
             $this->safeReport(fn () => $this->reporter->failure($result));
 
             if ($this->errorPolicy === ErrorPolicy::FailFast && $first_failure === null) {
@@ -251,6 +256,7 @@ final class ParallelTaskRunner
                     'line' => $e->getLine(),
                     'trace' => $e->getTraceAsString(),
                 ],
+                queryCount: 0,
             );
         }
 
@@ -260,6 +266,7 @@ final class ParallelTaskRunner
             totalUnitsProcessed: $total_units_processed,
             totalDuration: microtime(true) - $start_time,
             totalTasks: $total_tasks,
+            totalQueryCount: $total_query_count,
         );
 
         $this->safeReport(fn () => $this->reporter->finish($summary));
@@ -327,23 +334,32 @@ final class ParallelTaskRunner
     private function executeTask(BatchTask $task): BatchOutcome
     {
         $start = microtime(true);
+        $connection = DB::connection();
+        $connection->enableQueryLog();
 
         try {
             $output = $task->execute();
+            $query_count = count($connection->getQueryLog());
 
             return BatchOutcome::success(
                 taskId: $task->id,
                 units: $task->units,
                 duration: microtime(true) - $start,
                 output: $output,
+                queryCount: $query_count,
             );
         } catch (Throwable $e) {
+            $query_count = count($connection->getQueryLog());
+
             return BatchOutcome::failure(
                 taskId: $task->id,
                 units: 0,
                 duration: microtime(true) - $start,
                 e: $e,
+                queryCount: $query_count,
             );
+        } finally {
+            $connection->disableQueryLog();
         }
     }
 

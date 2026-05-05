@@ -6,19 +6,32 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use MatanYadaev\EloquentSpatial\Objects\Point;
 use Modules\Core\Models\Place;
 
 /**
  * Transparent read/write of geographic fields through {@see Place}, same pattern as {@see HasTranslations}
- * ({@see getAttribute}, {@see setAttribute}, {@see toArray}): bridged keys resolve on the relation; host columns
- * stay in sync where the model still persists them (e.g. {@see Location} + {@see geolocation} Point).
+ * ({@see getAttribute}, {@see setAttribute}, {@see toArray}): bridged keys never persist on the host table;
+ * pending values are flushed into a new {@see Place} on {@see creating} when {@see place_id} is empty.
  *
  * @phpstan-require-extends Model
  */
 trait HasPlace
 {
+    /**
+     * Bridged scalar fields collected before {@see place_id} exists (mass assignment / factory).
+     *
+     * @var array<string, mixed>
+     */
+    private array $pending_place_bridged_scalars = [];
+
+    /**
+     * Point payload held on the host until {@see creating} creates the related {@see Place}.
+     */
+    private ?Point $pending_host_geolocation = null;
+
     public static function bootHasPlace(): void
     {
         static::creating(static function (Model $model): void {
@@ -32,6 +45,7 @@ trait HasPlace
 
             $place = Place::query()->create($model->buildPlaceRowFromHostAttributes());
             $model->setAttribute('place_id', $place->getKey());
+            $model->clear_pending_place_payload();
         });
     }
 
@@ -43,8 +57,44 @@ trait HasPlace
         return $this->belongsTo(Place::class);
     }
 
+    /**
+     * Bridged geography may live on {@see Place} only; validation rules on the host (e.g. Location) still expect those keys.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAttributesForValidation(): array
+    {
+        $attributes = parent::getAttributesForValidation();
+
+        if (! empty($attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
+            if ($place instanceof Place) {
+                foreach ($this->placeBridgedAttributeKeys() as $key) {
+                    $attributes[$key] = $place->getAttribute($key);
+                }
+                $attributes['geolocation'] = $this->pointFromPlace($place);
+            }
+
+            return $attributes;
+        }
+
+        return array_merge($attributes, $this->extraPlaceAttributesPendingForValidation());
+    }
+
     public function getAttribute($key): mixed
     {
+        if ($key === 'geolocation') {
+            if (! empty($this->attributes['place_id'] ?? null)) {
+                $place = $this->resolvePlace();
+
+                if ($place instanceof Place) {
+                    return $this->pointFromPlace($place);
+                }
+            }
+
+            return $this->pending_host_geolocation;
+        }
+
         if ($this->shouldReadGeographyFromPlace($key)) {
             $place = $this->resolvePlace();
 
@@ -57,6 +107,12 @@ trait HasPlace
             }
         }
 
+        if (in_array($key, $this->placeBridgedAttributeKeys(), true) && empty($this->attributes['place_id'] ?? null)) {
+            if (array_key_exists($key, $this->pending_place_bridged_scalars)) {
+                return $this->pending_place_bridged_scalars[$key];
+            }
+        }
+
         return parent::getAttribute($key);
     }
 
@@ -65,6 +121,10 @@ trait HasPlace
      */
     public function setAttribute($key, $value)
     {
+        if ($key === 'geolocation') {
+            return $this->setGeolocationThroughPlace($value);
+        }
+
         if (! in_array($key, $this->placeBridgedAttributeKeys(), true)) {
             return parent::setAttribute($key, $value);
         }
@@ -73,15 +133,31 @@ trait HasPlace
 
         if (method_exists($this, $mutator)) {
             $this->{$mutator}($value);
-            $this->syncGeographyToRelatedPlace();
+
+            if (! empty($this->attributes['place_id'] ?? null)) {
+                $this->syncGeographyToRelatedPlace();
+            }
 
             return $this;
         }
 
-        parent::setAttribute($key, $value);
+        if (empty($this->attributes['place_id'] ?? null)) {
+            $this->pending_place_bridged_scalars[$key] = $value;
 
-        if (! empty($this->attributes['place_id'] ?? null)) {
-            $this->syncGeographyToRelatedPlace();
+            return $this;
+        }
+
+        $place = $this->resolvePlace();
+
+        if (! $place instanceof Place) {
+            return $this;
+        }
+
+        $place->setAttribute($key, $value);
+        $place->save();
+
+        if ($this->relationLoaded('place')) {
+            $this->setRelation('place', $place->fresh());
         }
 
         return $this;
@@ -98,13 +174,29 @@ trait HasPlace
     {
         $content = $parsed ?? (method_exists(parent::class, 'toArray') ? parent::toArray() : $this->attributesToArray());
 
-        if (empty($this->attributes['place_id'] ?? null)) {
-            return $content;
-        }
+        if (! empty($this->attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
 
-        $place = $this->resolvePlace();
+            if (! $place instanceof Place) {
+                return $content;
+            }
 
-        if (! $place instanceof Place) {
+            foreach ($this->placeBridgedAttributeKeys() as $field) {
+                if (in_array($field, $this->hidden, true)) {
+                    continue;
+                }
+
+                $content[$field] = match ($field) {
+                    'latitude' => $place->latitude,
+                    'longitude' => $place->longitude,
+                    default => $place->getAttribute($field),
+                };
+            }
+
+            if (! in_array('geolocation', $this->hidden, true)) {
+                $content['geolocation'] = $this->pointFromPlace($place);
+            }
+
             return $content;
         }
 
@@ -113,11 +205,13 @@ trait HasPlace
                 continue;
             }
 
-            $content[$field] = match ($field) {
-                'latitude' => $place->latitude,
-                'longitude' => $place->longitude,
-                default => $place->getAttribute($field),
-            };
+            if (array_key_exists($field, $this->pending_place_bridged_scalars)) {
+                $content[$field] = $this->pending_place_bridged_scalars[$field];
+            }
+        }
+
+        if ($this->pending_host_geolocation !== null && ! in_array('geolocation', $this->hidden, true)) {
+            $content['geolocation'] = $this->pending_host_geolocation;
         }
 
         return $content;
@@ -158,20 +252,46 @@ trait HasPlace
      */
     protected function buildPlaceRowFromHostAttributes(): array
     {
-        return [
-            'address' => $this->getAttributeFromColumn('address'),
-            'city' => $this->getAttributeFromColumn('city'),
-            'province' => $this->getAttributeFromColumn('province'),
-            'country' => $this->getAttributeFromColumn('country'),
-            'postcode' => $this->getAttributeFromColumn('postcode'),
-            'zone' => $this->getAttributeFromColumn('zone'),
-            'latitude' => $this->decimalLatitudeFromHost(),
-            'longitude' => $this->decimalLongitudeFromHost(),
+        $row = [
+            'address' => $this->resolveBridgedScalarForPlaceRow('address'),
+            'city' => $this->resolveBridgedScalarForPlaceRow('city'),
+            'province' => $this->resolveBridgedScalarForPlaceRow('province'),
+            'country' => $this->resolveBridgedScalarForPlaceRow('country'),
+            'postcode' => $this->resolveBridgedScalarForPlaceRow('postcode'),
+            'zone' => $this->resolveBridgedScalarForPlaceRow('zone'),
         ];
+
+        $lat = $this->decimalLatitudeFromHost();
+
+        if ($lat !== null) {
+            $row['latitude'] = $lat;
+        }
+
+        $lng = $this->decimalLongitudeFromHost();
+
+        if ($lng !== null) {
+            $row['longitude'] = $lng;
+        }
+
+        $point = $this->resolvePointForPlaceRow();
+
+        if ($point instanceof Point && $this->shouldPersistPlaceGeolocationGeometry()) {
+            $row['geolocation'] = $point;
+        }
+
+        return $row;
     }
 
     /**
-     * Persist canonical geography on {@see Place} from the host row (after mutators / column writes on the host).
+     * Geometry bindings (e.g. ST_GeomFromText) are not portable to all test drivers (SQLite).
+     */
+    protected function shouldPersistPlaceGeolocationGeometry(): bool
+    {
+        return in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true);
+    }
+
+    /**
+     * Persist canonical geography on {@see Place} from the current bridged state.
      */
     protected function syncGeographyToRelatedPlace(): void
     {
@@ -203,24 +323,153 @@ trait HasPlace
         }
     }
 
-    protected function getAttributeFromColumn(string $key): ?string
-    {
-        $value = $this->getRawOriginal($key);
-
-        return $value !== null ? (string) $value : null;
-    }
-
     protected function decimalLatitudeFromHost(): ?float
     {
-        $geo = $this->geolocation ?? null;
+        $point = $this->resolvePointForPlaceRow();
 
-        return $geo instanceof Point ? (float) $geo->latitude : null;
+        if ($point instanceof Point) {
+            return (float) $point->latitude;
+        }
+
+        if (! empty($this->attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
+
+            if ($place !== null && $place->latitude !== null) {
+                return (float) $place->latitude;
+            }
+        }
+
+        return null;
     }
 
     protected function decimalLongitudeFromHost(): ?float
     {
-        $geo = $this->geolocation ?? null;
+        $point = $this->resolvePointForPlaceRow();
 
-        return $geo instanceof Point ? (float) $geo->longitude : null;
+        if ($point instanceof Point) {
+            return (float) $point->longitude;
+        }
+
+        if (! empty($this->attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
+
+            if ($place !== null && $place->longitude !== null) {
+                return (float) $place->longitude;
+            }
+        }
+
+        return null;
+    }
+
+    protected function clear_pending_place_payload(): void
+    {
+        $this->pending_place_bridged_scalars = [];
+        $this->pending_host_geolocation = null;
+    }
+
+    /**
+     * @return $this
+     */
+    private function setGeolocationThroughPlace(mixed $value): self
+    {
+        if ($value !== null && ! $value instanceof Point) {
+            throw new \TypeError(sprintf('Geolocation must be null or an instance of %s.', Point::class));
+        }
+
+        if (empty($this->attributes['place_id'] ?? null)) {
+            $this->pending_host_geolocation = $value;
+
+            return $this;
+        }
+
+        $place = $this->resolvePlace();
+
+        if (! $place instanceof Place) {
+            return $this;
+        }
+
+        $place->geolocation = $value;
+        $place->save();
+
+        if ($this->relationLoaded('place')) {
+            $this->setRelation('place', $place->fresh());
+        }
+
+        return $this;
+    }
+
+    private function resolveBridgedScalarForPlaceRow(string $key): ?string
+    {
+        if (! empty($this->attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
+
+            if ($place instanceof Place) {
+                $v = $place->getAttribute($key);
+
+                return $v !== null ? (string) $v : null;
+            }
+        }
+
+        $v = $this->pending_place_bridged_scalars[$key] ?? null;
+
+        if ($v === null) {
+            return null;
+        }
+
+        return is_scalar($v) ? (string) $v : null;
+    }
+
+    private function resolvePointForPlaceRow(): ?Point
+    {
+        if ($this->pending_host_geolocation instanceof Point) {
+            return $this->pending_host_geolocation;
+        }
+
+        if (! empty($this->attributes['place_id'] ?? null)) {
+            $place = $this->resolvePlace();
+
+            return $this->pointFromPlace($place);
+        }
+
+        return null;
+    }
+
+    /**
+     * When geometry column is not populated (e.g. SQLite tests), fall back to decimals.
+     */
+    private function pointFromPlace(?Place $place): ?Point
+    {
+        if (! $place instanceof Place) {
+            return null;
+        }
+
+        if ($place->geolocation instanceof Point) {
+            return $place->geolocation;
+        }
+
+        if ($place->latitude !== null && $place->longitude !== null) {
+            return new Point((float) $place->latitude, (float) $place->longitude);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extraPlaceAttributesPendingForValidation(): array
+    {
+        $extra = [];
+        foreach ($this->placeBridgedAttributeKeys() as $key) {
+            if (array_key_exists($key, $this->pending_place_bridged_scalars)) {
+                $extra[$key] = $this->pending_place_bridged_scalars[$key];
+            }
+        }
+
+        if ($this->pending_host_geolocation !== null) {
+            $extra['geolocation'] = $this->pending_host_geolocation;
+        }
+
+        return $extra;
     }
 }

@@ -12,7 +12,6 @@ use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
-use ReflectionClass;
 use UnexpectedValueException;
 
 /**
@@ -21,6 +20,13 @@ use UnexpectedValueException;
  */
 final class DynamicContentsService
 {
+    /**
+     * Memo / persistent cache keys used for presettable lists (one per concrete Presettable class).
+     *
+     * @var list<string>
+     */
+    private static array $registered_presettable_memo_keys = [];
+
     /**
      * Singleton instance.
      */
@@ -66,6 +72,7 @@ final class DynamicContentsService
     public static function reset(): void
     {
         self::$instance = null;
+        self::$registered_presettable_memo_keys = [];
     }
 
     /**
@@ -142,14 +149,16 @@ final class DynamicContentsService
     {
         // Check in-memory cache first
         if ($this->presettables_cache instanceof Collection) {
-            return $this->presettables_cache->filter(fn (Presettable $presettable): bool => $presettable->entity?->type === $type);
+            return $this->presettables_cache->filter(
+                static fn (mixed $model): bool => $model instanceof Presettable && $model->entity?->type === $type,
+            );
         }
 
         $presettable_class = self::getModuleModelClass($type::class, Presettable::class);
 
-        // Load from external cache or database, then store in memory
-        // Use class name to get table name without instantiating model (avoids database access during boot)
-        $cache_key = new ReflectionClass($presettable_class)->newInstanceWithoutConstructor()->getTable();
+        // Namespaced key (table name alone collides with unrelated cache entries and shared Redis DBs).
+        $cache_key = self::presettableMemoKey($presettable_class);
+        self::registerPresettableMemoKey($cache_key);
 
         $this->presettables_cache = Cache::memo()->rememberForever(
             $cache_key,
@@ -163,7 +172,9 @@ final class DynamicContentsService
                 ->get(),
         );
 
-        return $this->presettables_cache->filter(fn (Presettable $presettable): bool => $presettable->entity?->type === $type);
+        return $this->presettables_cache->filter(
+            static fn (mixed $model): bool => $model instanceof Presettable && $model->entity?->type === $type,
+        );
     }
 
     /**
@@ -193,7 +204,7 @@ final class DynamicContentsService
     public function clearPresettablesCache(): void
     {
         $this->presettables_cache = null;
-        self::forgetMemoCacheKey('presettables');
+        self::forgetAllPresettableMemoKeys();
     }
 
     /**
@@ -206,7 +217,7 @@ final class DynamicContentsService
         $this->presettables_cache = null;
         self::forgetMemoCacheKey('entities');
         self::forgetMemoCacheKey('presets');
-        self::forgetMemoCacheKey('presettables');
+        self::forgetAllPresettableMemoKeys();
     }
 
     /**
@@ -241,5 +252,30 @@ final class DynamicContentsService
     private static function forgetMemoCacheKey(string $key): void
     {
         Cache::memo()->forget($key);
+    }
+
+    /**
+     * @param  class-string<Presettable>  $presettable_class
+     */
+    private static function presettableMemoKey(string $presettable_class): string
+    {
+        return 'core.dynamic_contents.presettables:' . hash('sha256', $presettable_class);
+    }
+
+    private static function registerPresettableMemoKey(string $cache_key): void
+    {
+        if (! in_array($cache_key, self::$registered_presettable_memo_keys, true)) {
+            self::$registered_presettable_memo_keys[] = $cache_key;
+        }
+    }
+
+    private static function forgetAllPresettableMemoKeys(): void
+    {
+        foreach (self::$registered_presettable_memo_keys as $key) {
+            self::forgetMemoCacheKey($key);
+        }
+
+        self::$registered_presettable_memo_keys = [];
+        self::forgetMemoCacheKey('presettables');
     }
 }

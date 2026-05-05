@@ -6,6 +6,8 @@ namespace Modules\Core\Concurrency;
 
 /**
  * Aggregated result of a ParallelTaskRunner run.
+ *
+ * @property-read int $totalQueryCount Sum of {@see BatchOutcome::$queryCount} across all tasks (success and failure).
  */
 final readonly class BatchSummary
 {
@@ -19,6 +21,7 @@ final readonly class BatchSummary
         public int $totalUnitsProcessed,
         public float $totalDuration,
         public int $totalTasks,
+        public int $totalQueryCount = 0,
     ) {}
 
     public function hasFailures(): bool

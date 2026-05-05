@@ -17,6 +17,7 @@ it('builds a successful outcome', function (): void {
     expect($outcome->duration)->toBe(0.42);
     expect($outcome->output)->toBe('ok');
     expect($outcome->error)->toBeNull();
+    expect($outcome->queryCount)->toBe(0);
 });
 
 it('builds a failure outcome from a generic throwable', function (): void {
@@ -30,6 +31,7 @@ it('builds a failure outcome from a generic throwable', function (): void {
     expect($outcome->error['message'])->toBe('boom');
     expect($outcome->error['class'])->toBe(\RuntimeException::class);
     expect($outcome->error)->toHaveKeys(['file', 'line', 'trace']);
+    expect($outcome->queryCount)->toBe(0);
 });
 
 it('formats validation errors with field, value and messages', function (): void {

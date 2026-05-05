@@ -84,7 +84,7 @@ trait HasValidations
         $rules = $this->getOperationRules($operation);
 
         if ($rules !== []) {
-            $attributes = $this->getAttributes();
+            $attributes = $this->getAttributesForValidation();
 
             if (class_uses_trait($this, HasDynamicContents::class)) {
                 /** @phpstan-ignore method.notFound */
@@ -97,7 +97,7 @@ trait HasValidations
                         continue;
                     }
 
-                    if (! str_contains($rules[$key], 'json')) {
+                    if (! str_contains((string) $rules[$key], 'json')) {
                         continue;
                     }
 

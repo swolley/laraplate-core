@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(concurrency)* Enhance batch processing with query count tracking
+
+### 🚜 Refactor
+
+- *(cache)* Enhance cache management and type safety
+
+## [1.50.0] - 2026-05-04
+
+### 🚀 Features
+
 - *(locking)* Enhance locking commands with settings management
 
 ## [1.49.1] - 2026-05-01

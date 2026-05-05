@@ -7,6 +7,8 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Helpers\HasActivation;
@@ -14,6 +16,7 @@ use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasPath;
 use Modules\Core\Helpers\HasTranslatedDynamicContents;
 use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Translations\TaxonomyTranslation;
@@ -116,6 +119,40 @@ abstract class Taxonomy extends Model implements Sortable
         return $rules;
     }
 
+    /**
+     * Shared translation table {@see TaxonomyTranslation} keys rows with taxonomy_id, not {subclass}_id.
+     *
+     * @return HasMany<TaxonomyTranslation>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(static::getTranslationModelClass(), 'taxonomy_id');
+    }
+
+    /**
+     * @return HasOne<TaxonomyTranslation>
+     */
+    public function translation(): HasOne
+    {
+        $current_locale = LocaleContext::get();
+        $default_locale = config('app.locale');
+        $fallback_enabled = LocaleContext::isFallbackEnabled();
+
+        $relation = $this->hasOne(static::getTranslationModelClass(), 'taxonomy_id');
+
+        if ($fallback_enabled) {
+            $relation->where(function ($query) use ($current_locale, $default_locale): void {
+                $query->where('locale', $current_locale)
+                    ->orWhere('locale', $default_locale);
+            })
+                ->orderByRaw('CASE WHEN locale = ? THEN 0 ELSE 1 END', [$current_locale]);
+        } else {
+            $relation->where('locale', $current_locale);
+        }
+
+        return $relation;
+    }
+
     #[Override]
     public function getPath(): string
     {
@@ -148,6 +185,11 @@ abstract class Taxonomy extends Model implements Sortable
         self::addGlobalScope('global_ordered', static function (Builder $query): void {
             $query->ordered();
         });
+    }
+
+    protected static function getTranslationModelClass(): string
+    {
+        return TaxonomyTranslation::class;
     }
 
     /**
@@ -253,10 +295,5 @@ abstract class Taxonomy extends Model implements Sortable
         }
 
         return $segments->join($separator);
-    }
-
-    protected static function getTranslationModelClass(): string
-    {
-        return TaxonomyTranslation::class;
     }
 }

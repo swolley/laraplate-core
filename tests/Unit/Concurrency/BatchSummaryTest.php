@@ -22,6 +22,7 @@ it('reports counts and throughput', function (): void {
     expect($summary->successCount())->toBe(1);
     expect($summary->totalTasks)->toBe(2);
     expect($summary->unitsPerSecond())->toBe(50.0);
+    expect($summary->totalQueryCount)->toBe(0);
 });
 
 it('handles zero-duration runs without dividing by zero', function (): void {

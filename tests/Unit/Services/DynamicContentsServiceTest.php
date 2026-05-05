@@ -61,3 +61,16 @@ it('returns the target class unchanged when local and target share the same modu
 it('throws when the resolved class is not autoloadable', function (): void {
     dynamic_contents_invoke_get_module_model_class(User::class, Preset::class);
 })->throws(UnexpectedValueException::class, 'Target class not found');
+
+it('uses distinct memo cache keys for different module Presettable classes', function (): void {
+    $ref = new ReflectionClass(DynamicContentsService::class);
+    $method = $ref->getMethod('presettableMemoKey');
+    $method->setAccessible(true);
+
+    $cms_key = $method->invoke(null, Modules\CMS\Models\Pivot\Presettable::class);
+    $erp_key = $method->invoke(null, Modules\ERP\Models\Pivot\Presettable::class);
+
+    expect($cms_key)->not->toBe($erp_key)
+        ->and($cms_key)->toStartWith('core.dynamic_contents.presettables:')
+        ->and($erp_key)->toStartWith('core.dynamic_contents.presettables:');
+});

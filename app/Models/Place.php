@@ -4,17 +4,39 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use MatanYadaev\EloquentSpatial\Objects\Point;
+use MatanYadaev\EloquentSpatial\Traits\HasSpatial;
 use Modules\Core\Overrides\Model;
 use Override;
 
 /**
  * Canonical postal / geographic payload shared across modules (e.g. Cms Location, Business Site).
  *
+ * @method static whereDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, float $distance)
+ * @method static orderByDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, string $direction = 'asc')
  * @mixin IdeHelperPlace
  */
 class Place extends Model
 {
+    use HasSpatial;
+
+    private const float COORDINATE_EPSILON = 1e-7;
+
+    /**
+     * Exclude {@see geolocation} from version snapshots: the DB returns binary WKB which breaks JSON
+     * encoding on {@see \Modules\Core\Models\Version}. {@see latitude} / {@see longitude} retain the point.
+     *
+     * @var list<string>
+     */
+    protected array $dontVersionable = [
+        'created_at',
+        'updated_at',
+        'last_login_at',
+        'geolocation',
+    ];
+
     /**
      * The attributes that are mass assignable.
      */
@@ -27,6 +49,7 @@ class Place extends Model
         'zone',
         'latitude',
         'longitude',
+        'geolocation',
     ];
 
     /**
@@ -66,12 +89,63 @@ class Place extends Model
         return Str::slug((string) ($this->country ?? ''));
     }
 
+    /**
+     * Version snapshots store {@see latitude} / {@see longitude} (JSON-safe) but omit binary {@see geolocation}.
+     * On save, rebuild the {@see Point} so rollbacks and plain decimal edits stay consistent with the geometry column.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Place $place): void {
+            $place->syncGeolocationFromDecimalIfNeeded();
+        });
+    }
+
     #[Override]
     protected function casts(): array
     {
         return [
             'latitude' => 'float',
             'longitude' => 'float',
+            'geolocation' => Point::class,
         ];
+    }
+
+    /**
+     * When decimals differ from the cast geometry (e.g. after {@see Version::revertWithoutSaving} merged snapshot lat/lng with stale WKB), align {@see geolocation} before persistence.
+     */
+    private function syncGeolocationFromDecimalIfNeeded(): void
+    {
+        if (! $this->geometryColumnSupportsSpatialBinding()) {
+            return;
+        }
+
+        $lat = $this->getAttribute('latitude');
+        $lng = $this->getAttribute('longitude');
+
+        if ($lat === null || $lng === null) {
+            return;
+        }
+
+        $lat_float = (float) $lat;
+        $lng_float = (float) $lng;
+
+        $current = $this->geolocation;
+
+        if ($current instanceof Point) {
+            if (abs($current->latitude - $lat_float) < self::COORDINATE_EPSILON
+                && abs($current->longitude - $lng_float) < self::COORDINATE_EPSILON) {
+                return;
+            }
+        }
+
+        $this->setAttribute('geolocation', new Point($lat_float, $lng_float));
+    }
+
+    /**
+     * Match {@see \Modules\Core\Helpers\HasPlace::shouldPersistPlaceGeolocationGeometry}: avoid spatial bindings on SQLite tests.
+     */
+    private function geometryColumnSupportsSpatialBinding(): bool
+    {
+        return in_array(DB::connection($this->getConnectionName())->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true);
     }
 }

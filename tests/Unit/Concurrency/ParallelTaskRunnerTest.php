@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Container\Container;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Concurrency\BatchOutcome;
 use Modules\Core\Concurrency\BatchSummary;
 use Modules\Core\Concurrency\BatchTask;
@@ -178,4 +179,28 @@ it('invokes the reporter for start, progress and finish', function (): void {
     expect($event_names[0])->toBe('start');
     expect(end($event_names))->toBe('finish');
     expect(array_count_values($event_names)['progress'] ?? 0)->toBe(2);
+});
+
+it('sums queryCount from each forked child into BatchSummary::totalQueryCount', function (): void {
+    $tasks = [
+        new BatchTask(id: 'sql_light', units: 1, run: function (): bool {
+            DB::select('select 1');
+
+            return true;
+        }),
+        new BatchTask(id: 'sql_heavy', units: 1, run: function (): bool {
+            DB::select('select 1');
+            DB::select('select 1');
+
+            return true;
+        }),
+    ];
+
+    $summary = ParallelTaskRunner::make()
+        ->concurrent(1)
+        ->keepResults(true)
+        ->run($tasks);
+
+    expect($summary->totalQueryCount)->toBeGreaterThanOrEqual(3);
+    expect($summary->outcomes[0]->queryCount + $summary->outcomes[1]->queryCount)->toBe($summary->totalQueryCount);
 });

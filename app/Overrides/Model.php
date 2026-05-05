@@ -16,4 +16,15 @@ abstract class Model extends BaseModel
     use HasValidations;
     use HasVersions;
     use SoftDeletes;
+
+    /**
+     * Attribute payload used by {@see HasValidations::validateWithRules}. Overridden when
+     * some assignable fields are delegated to relations until after validation (e.g. {@see HasPlace}).
+     *
+     * @return array<string, mixed>
+     */
+    public function getAttributesForValidation(): array
+    {
+        return $this->getAttributes();
+    }
 }

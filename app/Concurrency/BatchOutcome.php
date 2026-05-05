@@ -26,6 +26,7 @@ final readonly class BatchOutcome
 {
     /**
      * @param  ErrorPayload|null  $error
+     * @param  int  $queryCount  Queries logged on the worker default connection while running this task
      */
     public function __construct(
         public string $taskId,
@@ -34,9 +35,10 @@ final readonly class BatchOutcome
         public float $duration,
         public mixed $output = null,
         public ?array $error = null,
+        public int $queryCount = 0,
     ) {}
 
-    public static function success(string $taskId, int $units, float $duration, mixed $output = null): self
+    public static function success(string $taskId, int $units, float $duration, mixed $output = null, int $queryCount = 0): self
     {
         return new self(
             taskId: $taskId,
@@ -44,10 +46,11 @@ final readonly class BatchOutcome
             unitsProcessed: $units,
             duration: $duration,
             output: $output,
+            queryCount: $queryCount,
         );
     }
 
-    public static function failure(string $taskId, int $units, float $duration, Throwable $e): self
+    public static function failure(string $taskId, int $units, float $duration, Throwable $e, int $queryCount = 0): self
     {
         return new self(
             taskId: $taskId,
@@ -61,6 +64,7 @@ final readonly class BatchOutcome
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ],
+            queryCount: $queryCount,
         );
     }
 

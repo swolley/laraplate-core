@@ -65,9 +65,19 @@ abstract class BatchSeeder extends Seeder
      * in your seeder if you need additional resets, e.g. cache, queue, or
      * search engine clients. Avoid destructive operations like Cache::flush()
      * which would truncate shared stores (Redis FLUSHDB).
+     *
+     * Forked workers inherit a copy of this seeder instance (including HasBenchmark
+     * state). Child processes share STDOUT with the parent; without cancelling the
+     * benchmark here, {@see \Modules\Core\Overrides\Seeder::__destruct} could emit
+     * duplicate benchmark lines (one per worker) when the child exits.
+     *
+     * Sets {@see \Modules\Core\Overrides\Seeder::PARALLEL_BATCH_WORKER_ENV} so the
+     * destructor can skip benchmark output even if timing state was inconsistent.
      */
     protected function bootstrapChildProcess(): void
     {
+        putenv(self::PARALLEL_BATCH_WORKER_ENV . '=1');
+        $this->cancelBenchmark();
         DB::reconnect();
     }
 

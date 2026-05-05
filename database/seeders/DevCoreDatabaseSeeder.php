@@ -12,9 +12,9 @@ use Modules\Core\Models\License;
 
 final class DevCoreDatabaseSeeder extends BatchSeeder
 {
-    private const TARGET_COUNT_USERS = 6000;
+    private const TARGET_COUNT_USERS = 6_000;
 
-    private const TARGET_COUNT_LICENSES = 2000;
+    private const TARGET_COUNT_LICENSES = 2_000;
 
     protected function execute(): void
     {
