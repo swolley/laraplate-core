@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 
 final class SeedCommand extends BaseSeedCommand
 {
-    protected $description = 'Seed the database with records. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Seed the database with records. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]
     public function handle(): int

@@ -25,7 +25,7 @@ final class ModelSoftDeletesRemoveCommand extends Command
     protected $signature = 'model:soft-deletes-remove {model} {--namespace=}';
 
     #[Override]
-    protected $description = 'Remove SoftDeletes support (trait + migration + runtime setting) from a model. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Remove SoftDeletes support (trait + migration + runtime setting) from a model. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function __construct(private readonly Filesystem $files)
     {

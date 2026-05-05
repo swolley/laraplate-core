@@ -44,7 +44,7 @@ class MakeModelTranslatableCommand extends Command
     protected $signature = 'make:model-translatable';
 
     #[Override]
-    protected $description = 'Make an existing model translatable with HasTranslations trait, translation table and data migration <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Make an existing model translatable with HasTranslations trait, translation table and data migration <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

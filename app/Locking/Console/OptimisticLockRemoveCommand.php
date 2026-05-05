@@ -14,7 +14,7 @@ final class OptimisticLockRemoveCommand extends OptimisticLockAddCommand
     public $signature = 'model:optimistic-lock-remove {model} {--namespace=}';
 
     #[Override]
-    public $description = 'Add a migration to remove optimistic locking columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    public $description = 'Add a migration to remove optimistic locking columns to a model <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]
     protected string $operation = 'remove';

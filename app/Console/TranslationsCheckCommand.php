@@ -26,7 +26,7 @@ final class TranslationsCheckCommand extends Command
      * @var string
      */
     #[Override]
-    protected $description = 'Verify languages, labels coherence and sort all translations keys <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Verify languages, labels coherence and sort all translations keys <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

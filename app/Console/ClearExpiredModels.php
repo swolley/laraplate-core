@@ -24,7 +24,7 @@ final class ClearExpiredModels extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Clear soft deleted models that have expired <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Clear soft deleted models that have expired <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

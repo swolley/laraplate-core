@@ -20,7 +20,7 @@ final class SearchSyncCommand extends Command
     protected $signature = 'scout:sync {model : The model to sync} {--id= : The ID of the document to sync} {--from= : The date to sync from}';
 
     #[Override]
-    protected $description = 'Sync documents modified after the last indexing in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Sync documents modified after the last indexing in Search Engine <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

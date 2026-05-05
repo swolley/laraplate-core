@@ -18,7 +18,7 @@ final class InspectorWarmCommand extends Command
                             {--connection= : Database connection name.}';
 
     #[Override]
-    protected $description = 'Warm the schema inspector cache for the given tables (or all tables) <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Warm the schema inspector cache for the given tables (or all tables) <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

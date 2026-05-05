@@ -42,7 +42,7 @@ final class PermissionsRefreshCommand extends Command
      * @var string
      */
     #[Override]
-    protected $description = 'Refresh the Permission table with inspected rules <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Refresh the Permission table with inspected rules <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * @var array<int,string>

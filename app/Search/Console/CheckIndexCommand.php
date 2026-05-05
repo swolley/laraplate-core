@@ -24,7 +24,7 @@ final class CheckIndexCommand extends Command
     protected $signature = 'scout:check-index {model? : The model to check}';
 
     #[Override]
-    protected $description = 'Check indexes in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Check indexes in Search Engine <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

@@ -18,7 +18,7 @@ final class AddRouteCommentsCommand extends Command
     protected $signature = 'route:add-comments';
 
     #[Override]
-    protected $description = 'Add route comments to controller methods <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Add route comments to controller methods <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): void
     {

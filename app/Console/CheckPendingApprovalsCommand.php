@@ -25,7 +25,7 @@ final class CheckPendingApprovalsCommand extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Check for pending approvals and notify admins <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Check for pending approvals and notify admins <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

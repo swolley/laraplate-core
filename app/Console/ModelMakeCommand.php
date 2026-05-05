@@ -40,7 +40,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     use PromptsForMissingInput;
 
     #[Override]
-    protected $description = 'Create or modify an Eloquent model class <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Create or modify an Eloquent model class <fg=green>(⚡ Modules\Core)</fg=green>';
 
     private bool $isNewClass = false;
 

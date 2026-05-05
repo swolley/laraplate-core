@@ -26,7 +26,7 @@ final class ModelLockingRefreshCommand extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Dynamically generate missing migrations for locking functionalities. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Dynamically generate missing migrations for locking functionalities. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     private bool $quiet_mode = false;
 

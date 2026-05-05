@@ -25,7 +25,7 @@ final class CompactVersions extends Command
     protected $signature = 'versions:compact {modelClass? : Fully-qualified model class (must use HasVersions)} {id? : Primary key of a single record}';
 
     #[Override]
-    protected $description = 'Create a snapshot version per record and purge older version rows. Optionally restrict by model class and/or id. <fg=yellow>(⚡ Modules\\Core)</fg=yellow>';
+    protected $description = 'Create a snapshot version per record and purge older version rows. Optionally restrict by model class and/or id. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

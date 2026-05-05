@@ -22,7 +22,7 @@ final class VendorPublishCommand extends BaseVendorPublishCommand
 
     public function __construct(Filesystem $files)
     {
-        $this->description .= ' <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+        $this->description .= ' <fg=green>(⚡ Modules\Core)</fg=green>';
 
         parent::__construct($files);
 

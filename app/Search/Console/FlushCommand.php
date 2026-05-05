@@ -15,7 +15,7 @@ final class FlushCommand extends BaseFlushCommand
     use SearchableCommandUtils;
 
     #[Override]
-    protected $description = 'Flush all of the model\'s records from the index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Flush all of the model\'s records from the index <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]
     public function handle(): int
