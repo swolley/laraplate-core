@@ -11,7 +11,8 @@ use Modules\Core\Models\ACL;
 /**
  * @phpstan-type HasACLType HasACL
  *
- * @template TModel of Model
+ * @method hasMany<ACL> acl()
+ * @method void addGlobalScope(string $name, callable $callback)
  */
 trait HasACL
 {
