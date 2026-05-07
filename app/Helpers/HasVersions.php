@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Cache\CacheManager;
 use Modules\Core\Events\ModelVersioningRequested;
 use Modules\Core\Jobs\CreateVersionJob;
 use Modules\Core\Models\Setting;
@@ -47,6 +48,24 @@ trait HasVersions
     protected bool $asyncVersioning = true;
 
     protected array $encryptedVersionable = [];
+
+    /**
+     * L1 in-memory cache for version strategy resolution.
+     * Keyed by model class name, value is the resolved VersionStrategy or false (disabled).
+     * Eliminates repeated deserialization of the persistent cache collection on every call.
+     *
+     * @var array<class-string, VersionStrategy|false>
+     */
+    private static array $version_strategy_cache = [];
+
+    /**
+     * Reset the L1 version strategy cache.
+     * Used in tests and long-running processes to clear stale state.
+     */
+    public static function resetVersionStrategyCache(): void
+    {
+        self::$version_strategy_cache = [];
+    }
 
     public function shouldBeVersioning(): bool
     {
@@ -208,15 +227,26 @@ trait HasVersions
             }
         }
 
-        $settings_name = "version_strategy_{$this->getTable()}";
+        $model_class = static::class;
 
-        $raw = Cache::rememberForever('version_strategies', fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
-
-        if ($raw === false) {
-            return false;
+        // L1: static in-memory map — zero-cost after first resolution per request
+        if (array_key_exists($model_class, self::$version_strategy_cache)) {
+            return self::$version_strategy_cache[$model_class];
         }
 
-        return $raw instanceof VersionStrategy ? $raw : VersionStrategy::from((string) $raw);
+        // L2: persistent cache (rememberForever) — avoids DB on subsequent requests
+        $settings_name = "version_strategy_{$this->getTable()}";
+
+        $raw = Cache::rememberForever(CacheManager::key('version_strategies'), fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
+
+        $strategy = $raw === false
+            ? false
+            : ($raw instanceof VersionStrategy ? $raw : VersionStrategy::from((string) $raw));
+
+        // Store in L1 for subsequent calls within the same request
+        self::$version_strategy_cache[$model_class] = $strategy;
+
+        return $strategy;
     }
 
     protected static function bootHasVersions(): void

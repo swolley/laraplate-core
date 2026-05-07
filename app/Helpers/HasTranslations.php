@@ -57,6 +57,12 @@ trait HasTranslations
     protected static array $cached_translatable_fields = [];
 
     /**
+     * Cached default locale to avoid repeated config() calls per request.
+     * Populated once on first access; reset between requests via resetLocaleCache().
+     */
+    private static ?string $default_locale_cache = null;
+
+    /**
      * Get translatable fields for this model.
      * Cached to avoid creating new instances and potential recursion.
      */
@@ -73,6 +79,15 @@ trait HasTranslations
         }
 
         return static::$cached_translatable_fields[$model_class];
+    }
+
+    /**
+     * Reset the static default locale cache.
+     * Used in tests and long-running processes to clear the per-request cache.
+     */
+    public static function resetLocaleCache(): void
+    {
+        self::$default_locale_cache = null;
     }
 
     /**
@@ -496,7 +511,8 @@ trait HasTranslations
      * 1. Pending translations for current locale
      * 2. Pending translations for default locale (if fallback enabled)
      * 3. Saved translation relation
-     * 4. Default translation (if fallback enabled)
+     * 4. Already-loaded translations collection (avoids extra query)
+     * 5. Default translation query (only when collection is not loaded)
      *
      * @param  string  $key  The field name
      * @return mixed The field value or null
@@ -504,7 +520,13 @@ trait HasTranslations
     protected function getTranslatableFieldValue(string $key): mixed
     {
         $current_locale = LocaleContext::get();
-        $default_locale = config('app.locale');
+
+        // Read default locale from static cache to avoid repeated config() calls per request
+        if (self::$default_locale_cache === null) {
+            self::$default_locale_cache = (string) config('app.locale');
+        }
+
+        $default_locale = self::$default_locale_cache;
         $fallback_enabled = LocaleContext::isFallbackEnabled();
 
         // First, check pending translations (values set but not yet saved)
@@ -517,8 +539,8 @@ trait HasTranslations
             return $this->pending_translations[$default_locale][$key];
         }
 
-        // Then check saved translation relation
-        $translation = $this->getRelationValue('translation');
+        // Then check saved translation relation (only if already loaded — avoid triggering a lazy load)
+        $translation = $this->relationLoaded('translation') ? $this->getRelationValue('translation') : null;
 
         if ($translation && isset($translation->{$key})) {
             return $translation->{$key};
@@ -526,6 +548,20 @@ trait HasTranslations
 
         // Fallback to default translation if enabled
         if ($fallback_enabled) {
+            // Check the already-loaded translations collection before issuing a new query
+            $loaded_translations = $this->relationLoaded('translations') ? $this->getRelationValue('translations') : null;
+
+            if ($loaded_translations !== null) {
+                $default_translation = $loaded_translations->firstWhere('locale', $default_locale);
+
+                if ($default_translation && isset($default_translation->{$key})) {
+                    return $default_translation->{$key};
+                }
+
+                return null;
+            }
+
+            // Collection not loaded — fall back to a targeted DB query
             $default_translation = $this->getDefaultTranslation();
 
             if ($default_translation && isset($default_translation->{$key})) {

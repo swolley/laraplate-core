@@ -33,10 +33,18 @@ use Modules\Core\Services\AclResolverService;
  * // Now requestData->filters includes ACL constraints
  * ```
  */
-final readonly class AuthorizationService
+final class AuthorizationService
 {
+    /**
+     * Static in-memory cache for resolved Permission model instances, keyed by permission name.
+     * Populated on first access; avoids repeated Permission::findByName() DB queries per request.
+     *
+     * @var array<string, Permission>
+     */
+    private static array $permission_model_cache = [];
+
     public function __construct(
-        private AclResolverService $acl_resolver,
+        private readonly AclResolverService $acl_resolver,
     ) {}
 
     /**
@@ -116,7 +124,7 @@ final readonly class AuthorizationService
             return null;
         }
 
-        $permission = Permission::findByName($permission_name);
+        $permission = $this->resolvePermission($permission_name);
 
         return $this->acl_resolver->getCombinedFilters($user, $permission);
     }
@@ -164,7 +172,7 @@ final readonly class AuthorizationService
             return true;
         }
 
-        $permission = Permission::findByName($permission_name);
+        $permission = $this->resolvePermission($permission_name);
 
         return $this->acl_resolver->hasUnrestrictedAccess($user, $permission);
     }
@@ -267,6 +275,33 @@ final readonly class AuthorizationService
         }
 
         $query->{$method}($filter->property, $filter->operator->value, $filter->value);
+    }
+
+    /**
+     * Reset the static permission model cache.
+     *
+     * Intended for use in tests to ensure a clean state between test cases.
+     */
+    public static function resetPermissionCache(): void
+    {
+        self::$permission_model_cache = [];
+    }
+
+    /**
+     * Resolve a Permission model instance by name, using the static in-memory cache.
+     *
+     * On first access the model is fetched via Permission::findByName() and stored in the cache.
+     * Subsequent calls for the same name return the cached instance without a DB query.
+     *
+     * @param  string  $permission_name  The full permission name (e.g., 'default.orders.select')
+     */
+    private function resolvePermission(string $permission_name): Permission
+    {
+        if (! isset(self::$permission_model_cache[$permission_name])) {
+            self::$permission_model_cache[$permission_name] = Permission::findByName($permission_name);
+        }
+
+        return self::$permission_model_cache[$permission_name];
     }
 
     /**

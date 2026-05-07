@@ -37,6 +37,15 @@ trait HasValidations
     protected bool $skip_validation = false;
 
     /**
+     * In-memory cache for permission existence checks.
+     * Keyed by permission name, value is whether the permission row exists in DB.
+     * Populated on first access; reset between requests naturally by PHP-FPM.
+     *
+     * @var array<string, bool>
+     */
+    private static array $permission_existence_cache = [];
+
+    /**
      * Imposta il flag per saltare le validazioni.
      */
     public function setSkipValidation(bool $skip = true): void
@@ -159,12 +168,27 @@ trait HasValidations
         }
     }
 
+    /**
+     * Reset the in-memory permission existence cache.
+     * Used in tests and long-running processes to clear stale state.
+     */
+    public static function resetPermissionExistenceCache(): void
+    {
+        self::$permission_existence_cache = [];
+    }
+
     protected static function checkUserCanDo(Model $model, string $operation): bool
     {
         $permission = $model->getTable() . '.' . $operation;
         $permission_class = config('permission.models.permission');
 
-        if (! $permission_class::whereName($permission)->count()) {
+        // L1: check static in-memory cache first to avoid repeated DB queries
+        // for the same permission name within the same request lifecycle
+        if (! array_key_exists($permission, self::$permission_existence_cache)) {
+            self::$permission_existence_cache[$permission] = (bool) $permission_class::whereName($permission)->count();
+        }
+
+        if (! self::$permission_existence_cache[$permission]) {
             return true;
         }
 
