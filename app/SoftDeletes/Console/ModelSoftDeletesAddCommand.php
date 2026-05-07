@@ -23,7 +23,7 @@ final class ModelSoftDeletesAddCommand extends Command
     protected $signature = 'model:soft-deletes-add {model} {--namespace=}';
 
     #[Override]
-    protected $description = 'Add SoftDeletes support (trait + migration + runtime setting) to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Add SoftDeletes support (trait + migration + runtime setting) to a model <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function __construct(private readonly Filesystem $files)
     {

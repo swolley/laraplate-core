@@ -14,7 +14,7 @@ final class LockedRemoveCommand extends LockedAddCommand
     public $signature = 'model:locked-remove {model} {--namespace=}';
 
     #[Override]
-    public $description = 'Add a migration to remove locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    public $description = 'Add a migration to remove locked columns to a model <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]
     protected string $operation = 'remove';

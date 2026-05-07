@@ -19,7 +19,7 @@ class InitializeUsers extends Command
     protected $signature = 'auth:initialize-users';
 
     #[Override]
-    protected $description = 'Initialize users. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Initialize users. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): void
     {

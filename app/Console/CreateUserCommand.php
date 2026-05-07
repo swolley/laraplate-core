@@ -36,7 +36,7 @@ final class CreateUserCommand extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Create new user <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Create new user <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

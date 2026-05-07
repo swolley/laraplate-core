@@ -20,7 +20,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
     protected $signature = 'scout:index {model : The model to create an index for}';
 
     #[Override]
-    protected $description = 'Create an index <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Create an index <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]
     public function handle(EngineManager $manager): int

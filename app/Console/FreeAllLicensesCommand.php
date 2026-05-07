@@ -16,7 +16,7 @@ final class FreeAllLicensesCommand extends Command
     protected $signature = 'auth:free-all-licenses';
 
     #[Override]
-    protected $description = 'Free all the assigned licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Free all the assigned licenses. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

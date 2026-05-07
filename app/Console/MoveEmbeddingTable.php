@@ -24,7 +24,7 @@ final class MoveEmbeddingTable extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Move the embedding table to the new connection. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Move the embedding table to the new connection. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.

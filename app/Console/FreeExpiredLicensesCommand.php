@@ -16,7 +16,7 @@ final class FreeExpiredLicensesCommand extends Command
     protected $signature = 'auth:free-expired-licenses';
 
     #[Override]
-    protected $description = 'Free expired licenses. <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Free expired licenses. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

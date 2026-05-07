@@ -22,7 +22,7 @@ class LockedAddCommand extends Command
     public $signature = 'module:locked-add {model} {--namespace=}';
 
     #[Override]
-    public $description = 'Add a migration to add locked columns to a model <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    public $description = 'Add a migration to add locked columns to a model <fg=green>(⚡ Modules\Core)</fg=green>';
 
     protected string $operation = 'add';
 

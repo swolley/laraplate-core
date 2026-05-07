@@ -18,7 +18,7 @@ final class SearchReindexCommand extends Command
     protected $signature = 'scout:reindex {model : The model to reindex}';
 
     #[Override]
-    protected $description = 'Reindex documents in Search Engine <fg=yellow>(⚡ Modules\Core)</fg=yellow>';
+    protected $description = 'Reindex documents in Search Engine <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {

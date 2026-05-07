@@ -12,11 +12,11 @@ use function Laravel\Prompts\text;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Helpers\HasCommandUtils;
 use Modules\Core\Models\Field;
-use Modules\Core\Models\Preset;
 use Modules\Core\Overrides\Command;
 use Override;
 use Symfony\Component\Console\Input\InputArgument;
@@ -36,7 +36,7 @@ final class CreateEntityCommand extends Command
      * The console command description.
      */
     #[Override]
-    protected $description = 'Create new cms entity <fg=cyan>(📰 Modules\Cms)</fg=cyan>';
+    protected $description = 'Create new CMS entity <fg=cyan>(📰 Modules\CMS)</fg=cyan>';
 
     /**
      * Execute the console command.
@@ -66,6 +66,8 @@ final class CreateEntityCommand extends Command
 
                 if ($attribute === 'type') {
                     $selected_type = select('Choose the type of the entity', $entity_type::values(), required: true);
+
+                    /** @var enum-string $entity_type */
                     $entity->type = $entity_type::from((string) $selected_type);
 
                     continue;
