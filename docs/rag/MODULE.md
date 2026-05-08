@@ -2,90 +2,419 @@
 
 ## Purpose
 
-`Core` is the platform runtime for Laraplate. It provides shared services that every other module depends on: identity, authorization, record lifecycle controls, dynamic entity infrastructure, API tooling, schema inspector, and operational commands.
+`Core` is the platform runtime for Laraplate. It owns identity and authentication (Fortify + Sanctum + social + 2FA + impersonation + license), authorization (Spatie roles/permissions + row-level ACLs), the record lifecycle stack (`SoftDeletes`, `HasVersions`, `HasApprovals`, `HasValidity`, `HasLocks`, `HasOptimisticLocking`), the dynamic-entity infrastructure (`Entity`/`Preset`/`Presettable`/`Field`), the schema inspector + `DynamicEntity` runtime, the CRUD pipeline (`CrudService` + `AuthorizationService` + `QueryBuilder`), the translations stack (`HasTranslations` + `LocaleContext` + `LocaleScope`), the search abstractions (`Searchable` + `SchemaDefinition` + `ISearchEngine`), the canonical `Place` + geocoding contracts, and the settings-backed module activator. Other modules (`AI`, `CMS`, `ERP`, `MES`) consume these primitives instead of reinventing them.
 
-If a feature exists in multiple modules (security, locking, approvals, translations, generic CRUD), `Core` is usually the owner.
+### Module boundaries
+
+Every other module in Laraplate depends on Core. HTTP/Filament/Artisan entry points pass through Fortify/Sanctum and Core middleware; controllers and services use `CrudService` (or directly Eloquent on `Core\Overrides\Model`) which consumes `AuthorizationService` + `AclResolverService` + `QueryBuilder` to enforce permissions and ACL filters. The dynamic-entity stack (`Entity`/`Preset`/`Presettable`/`Field`) is shared across CMS/ERP. Search routes through `Searchable` + `ISearchEngine`, with optional AI overrides (`IReranker`, `ISearchPlanner`, `IQueryIntentParser`). Geocoding goes via `IGeocodingService` (Nominatim or Google Maps). Module activation is driven by `ModuleDatabaseActivator` reading the `backendModules` setting.
+
+```mermaid
+flowchart TB
+  subgraph entry [Entry points]
+    Http[Http controllers]
+    Filament[Filament panels]
+    Artisan[Artisan commands]
+  end
+  subgraph identity [Identity stack]
+    Fortify[Fortify + 2FA]
+    Sanctum[Sanctum]
+    Social[Socialite]
+    Impersonate[Impersonate]
+    License[License model]
+  end
+  subgraph authz [Authorization]
+    Roles[Spatie Role]
+    Perms[Spatie Permission]
+    Acls[ACL rows]
+    AclSvc[AclResolverService]
+    AuthSvc[AuthorizationService]
+  end
+  subgraph crud [CRUD pipeline]
+    CrudSvc[CrudService]
+    QB[QueryBuilder]
+  end
+  subgraph lifecycle [Lifecycle traits]
+    Soft[SoftDeletes]
+    Vers[HasVersions]
+    App[HasApprovals]
+    Val[HasValidity]
+    Locks[HasLocks plus HasOptimisticLocking]
+  end
+  subgraph dyn [Dynamic entities]
+    Entity[Entity abstract]
+    Preset[Preset abstract]
+    Presettable[Presettable snapshot]
+    Field[Field]
+    Inspect[SchemaInspector]
+    DynEnt[DynamicEntity]
+  end
+  subgraph i18n [Translations]
+    HasTrans[HasTranslations]
+    Locale[LocaleContext + LocaleScope]
+  end
+  subgraph search [Search]
+    SearchTrait[Searchable trait]
+    Schema[SchemaDefinition]
+    Engines[ISearchEngine impls]
+  end
+  subgraph place [Geo]
+    PlaceM[Place]
+    Geo[IGeocodingService]
+  end
+  Settings[Setting + ModuleDatabaseActivator]
+  Modules[(AI / CMS / ERP / MES)]
+
+  entry --> Fortify
+  entry --> CrudSvc
+  CrudSvc --> AuthSvc --> AclSvc --> Acls
+  AuthSvc --> Perms --> Roles
+  CrudSvc --> QB
+  Modules --> CrudSvc
+  Modules --> lifecycle
+  Modules --> dyn
+  Modules --> i18n
+  Modules --> search
+  Modules --> place
+  Settings -.->|toggles| lifecycle
+  Settings -.->|backendModules| Modules
+```
 
 ## Capability map
 
-### Authentication and identity
+### Identity, authentication and license
 
-- Laravel Fortify integration (login, password reset, profile, verification).
-- Optional social login through Socialite providers (`ENABLE_SOCIAL_LOGIN` / `auth.providers.socialite.enabled`).
-- Optional 2FA capability (`ENABLE_USER_2FA`) with Fortify two-factor feature wiring.
-- User model includes built-in support for impersonation, approvals, versioning, soft deletes, locks, and role-based permissions.
+`Core\Models\User` extends Laravel's base auth user and stacks `HasRoles` (Spatie), `ApprovesChanges` (Approval), `HasVersions`, `HasLocks`, `SoftDeletes`, `TwoFactorAuthenticatable`, and `Impersonate`. Login flows are wired through Fortify (with optional 2FA via `ENABLE_USER_2FA`) and optional Socialite providers. The `License` model is one-to-one with users (`users.license_id`) and joins on validity windows; commands `auth:licenses`, `auth:free-all-licenses`, and `auth:free-expired-licenses` reconcile state. `Impersonate` is gated by `User::canImpersonate()` (super-admin or `users.impersonate` permission); Filament panel access is decided by `canAccessPanel()` which short-circuits for super-admins.
 
-### Authorization and ACL
+```mermaid
+flowchart LR
+  Login[Login or Social login]
+  Fortify[Fortify guard]
+  Sanctum[Sanctum tokens]
+  TwoFA["2FA (optional)"]
+  User[User model]
+  License[License]
+  Pano[Filament panel]
+  Imp[Impersonator]
 
-- Role/permission system is based on Spatie Permission.
-- ACL model provides row-level restrictions through filter payloads.
-- ACL resolution logic supports role inheritance fallback, unrestricted ACLs, OR-composition across multiple roles, and cached effective ACL resolution.
-- ACL behavior is used by CRUD/query services, not only by UI.
+  Login --> Fortify
+  Login --> Sanctum
+  Fortify --> TwoFA
+  TwoFA --> User
+  Sanctum --> User
+  User -->|belongsTo| License
+  User --> Pano
+  User -->|canImpersonate| Imp
+  Imp -->|getImpersonator| User
+```
 
-### Record lifecycle controls
+### Authorization: roles, permissions and ACLs
 
-- Soft delete support is implemented through custom `SoftDeletes` trait (`deleted_at` + `is_deleted` behavior).
-- Versioning is implemented via `HasVersions` and `Version` model, including strategy-based replay/revert behavior.
-- Approval flow is implemented with `HasApprovals`, `Modification`, notification services, and preview middleware.
-- Preview mode can expose pending modifications before approval through the `preview` request flag and session state.
+Authorization is a two-layer stack. Layer 1 is **Spatie roles + permissions** (`Core\Models\Role` and `Core\Models\Permission`, the latter with `acls()` HasMany). Layer 2 is **row-level ACLs** (`Core\Models\ACL`) tied to a permission and carrying a `FiltersGroup` (JSON query-builder filters), plus an `unrestricted` flag and a `priority`. `AclResolverService::getEffectiveAcls()` resolves ACLs per role with parent-role inheritance (closure-table ancestors), super-admin bypass, OR-composition across non-hierarchical roles, and a 1-hour cache (`acl:resolved:user:{id}:perm:{id}`). `AuthorizationService` is the single entry point used by `CrudService` to enforce permissions and inject ACL filters into request data.
 
-### Locking and concurrency
+```mermaid
+flowchart TB
+  Req[Request]
+  Auth[AuthorizationService]
+  ChkPerm["ensurePermission(entity, op)"]
+  Resolve["AclResolverService.getEffectiveAcls"]
+  Cache["Cache 1h: acl:resolved:user:perm"]
+  Roles[user.roles]
+  Inherit[Parent role ancestors]
+  Direct["ACL on role.permission"]
+  Combine[Combine with OR if multiple roles]
+  Filters[FiltersGroup]
+  Inject[injectAclFilters into ListRequestData]
+  Crud[CrudService.list]
 
-- Record lock API (`HasLocks`) supports lock/unlock/toggle and lock-scoped queries.
-- Optimistic locking (`HasOptimisticLocking`) supports stale-write prevention through `lock_version`.
-- Concurrency exceptions include `AlreadyLockedException`, `CannotUnlockException`, `LockedModelException`, and `StaleModelLockingException`.
-- Locking behavior is configurable through `core.locking.*`.
+  Req --> Auth --> ChkPerm
+  ChkPerm --> Resolve
+  Resolve --> Cache
+  Cache --> Roles
+  Roles --> Direct
+  Roles --> Inherit
+  Inherit --> Direct
+  Direct --> Combine
+  Combine --> Filters
+  Filters --> Inject
+  Inject --> Crud
+```
 
-### Dynamic entities and schema inspector
+### Record lifecycle traits stack
 
-- DynamicEntity model and DynamicEntityService build runtime model metadata from real DB schema.
-- Inspector subsystem (`Inspect`, `SchemaInspector`) caches columns/indexes/FKs (persistent cache + in-request memoization).
-- CRUD/Grid layers reuse inspector metadata for relations, filters, validation, and field behavior.
-- Cache invalidation exists both globally and per entity (including CRUD cache-clear endpoint).
+A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes_{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `version_strategy_{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` global scope), `HasLocks` (`is_locked`/`locked_at`/`locked_by`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
 
-### Settings-driven runtime configuration
+```mermaid
+stateDiagram-v2
+  [*] --> Created
+  Created --> Versioned: HasVersions creates initial snapshot
+  Versioned --> PendingApproval: edit triggers requiresApprovalWhen
+  Versioned --> Live: edit not requiring approval
+  PendingApproval --> Live: Modification approved
+  PendingApproval --> Reverted: Modification disapproved (deleteWhenDisapproved)
+  Live --> Locked: HasLocks acquired
+  Locked --> Live: unlock by owner or admin
+  Live --> StaleConflict: lock_version mismatch
+  StaleConflict --> Live: client retries with fresh version
+  Live --> Trashed: SoftDeletes deleted_at set
+  Trashed --> Live: restore() if enabled by setting
+  Trashed --> [*]: forceDelete or expiration window
+  Live --> ValidityHidden: now > valid_to
+  ValidityHidden --> Live: extend validity
+```
 
-Core uses both static config and runtime DB settings:
+### Versioning flow
 
-- Runtime settings examples:
-  - `soft_deletes_{table}` in `soft_deletes` group
-  - `version_strategy_{table}` in `versioning` group
-  - `backendModules` for module activation/deactivation
-  - approval notification thresholds in `approvals`
-- Config-based examples:
-  - Fortify/social/2FA toggles
-  - lock column names and lock policy
-  - feature exposure flags (`expose_crud_api`, dynamic entities)
+`HasVersions` (extends `Overtrue\LaravelVersionable\Versionable`) controls whether a save creates a new version using `getVersionStrategy()`. The strategy is read with two-level caching: an L1 in-memory map per request and an L2 persistent cache fed by the `version_strategy_{table}` setting in group `versioning`. When versioning is enabled, the trait emits `ModelVersioningRequested` and dispatches `CreateVersionJob` (after-commit) so the `VersioningService` writes a `Core\Models\Version` row with `contents` (DIFF) or full snapshot (SNAPSHOT). Reverts use `Version::revertWithoutSaving()`, replaying previous versions for DIFF or applying the initial snapshot for SNAPSHOT. `createSnapshotVersion()` plus `purgeOldVersionsAfterCreate` enables history compaction.
 
-Use DB settings for runtime operational switches; use config/env for deployment-level behavior.
+```mermaid
+flowchart LR
+  Save[Model.save]
+  Should["shouldBeVersioning()"]
+  Strat["getVersionStrategy()<br/>L1 in-memory + L2 cache"]
+  Setting["Setting version_strategy_{table}"]
+  Event[ModelVersioningRequested]
+  Job["CreateVersionJob (afterCommit)"]
+  Svc[VersioningService]
+  Vers[Version row]
+  DIFF[DIFF contents]
+  SNAP[SNAPSHOT contents]
+  Revert["Version.revertWithoutSaving"]
+  Replay[Replay previousVersions]
+  Apply[Apply initial snapshot]
 
-### API and Swagger/OpenAPI documentation
+  Save --> Should
+  Should --> Strat
+  Strat --> Setting
+  Should --> Event --> Job --> Svc --> Vers
+  Vers --> DIFF
+  Vers --> SNAP
+  Vers --> Revert
+  Revert -->|DIFF| Replay
+  Revert -->|SNAPSHOT| Apply
+```
 
-- Core provides Swagger/OpenAPI generation and version-aware delivery/merge services.
-- Admin-facing pages and routes expose API docs.
-- Keep docs in sync with route/schema changes; stale specs are a common operational failure mode.
+### Approvals and preview
 
-### License management
+`HasApprovals` wraps the Approval package's `RequiresApproval` and adds a `preview` flag driven by request middleware + session. When `requiresApprovalWhen()` returns true (default: any modification by a non-admin/super-admin in HTTP context), the change is persisted as a `Modification` instead of touching the row. While `preview()` is true, the trait appends a `preview` accessor that overlays pending modifications on top of stored attributes via `toArray()`. Disapproval triggers `deleteWhenDisapproved`. Domain models can narrow the rule (e.g. CMS `Content` only requires approval when the validity window changes; ERP `Setting` requires approval on any non-`description` field).
 
-- `License` model and `users.license_id` relationship enable per-session or per-user license enforcement.
-- Authentication providers (credentials and social) can enforce availability of free licenses.
-- Operational commands exist to add/renew/close/free licenses.
-- `max_concurrent_sessions` setting is part of runtime control surface.
+```mermaid
+flowchart TB
+  Edit[Model edit]
+  RequiresChk["requiresApprovalWhen?"]
+  ApplyDirect[Persist directly]
+  Mod[Modification row]
+  Apprv["User.authorizedToApprove?"]
+  Approve[Approve]
+  Disapp[Disapprove]
+  Apply[Replay modifications]
+  Drop["Delete (deleteWhenDisapproved)"]
+  Preview[preview accessor]
+  PreviewMid["preview() session/middleware"]
 
-### Translation and localization stack
+  Edit --> RequiresChk
+  RequiresChk -->|no| ApplyDirect
+  RequiresChk -->|yes| Mod
+  Mod --> Apprv
+  Apprv -->|yes| Approve --> Apply
+  Apprv -->|no| Disapp --> Drop
+  PreviewMid --> Preview
+  Preview -.->|reads| Mod
+```
 
-- Locale middleware and locale scope support per-locale data access with fallback.
-- Translation helpers support multi-locale model data and related testing factories.
-- Model translatable tooling exists to convert existing models to translation-table architecture.
+### Dynamic entities, presets and fields
+
+The dynamic-entity stack lets modules describe domain objects without writing one table per type. `Core\Models\Entity` is **abstract**: each module subclass pins an `EntityType` enum (CMS uses `CONTENTS|CONTRIBUTORS|CATEGORIES`). `Core\Models\Preset` is also abstract and hosts `BelongsToMany Field` via the `fieldables` pivot (with `is_required`, `default`, `order_column`). When a preset's fields change, `Preset::createFieldsVersion()` (delegated to `PresetVersioningService`) writes a new `Presettable` row with a `fields_snapshot` and an incremented `version`. Each domain row carries `entity_id` + `presettable_id`, so editorial changes to the schema do not break older rows: `Preset::migrateRelatedModelsToLastVersion()` reassigns related rows to the active presettable when ready.
+
+```mermaid
+flowchart LR
+  EntityT[Module Entity subclass]
+  Preset[Preset abstract]
+  Field[Field row]
+  Fieldable[fieldables pivot is_required, default]
+  PresetSvc[PresetVersioningService]
+  Presettable[Presettable row fields_snapshot + version]
+  Domain[Domain row entity_id + presettable_id]
+  Migrate[migrateRelatedModelsToLastVersion]
+
+  EntityT --> Preset
+  Preset --> Fieldable --> Field
+  Preset -->|attach/detach/sync fields| PresetSvc
+  PresetSvc --> Presettable
+  Presettable --> Domain
+  Migrate --> Domain
+```
+
+### Schema inspector and DynamicEntity
+
+`SchemaInspector` reads columns/indexes/foreign keys from the live DB and keeps a shared in-memory cache (plus persistent cache via Laravel cache for cross-request reuse). `DynamicEntityService` is a singleton that resolves a table name to either a concrete model (`User` for `users`) or to a `Core\Models\DynamicEntity` instance whose `inspect()` method populates `fillable`, `casts`, validation rules (`type`, `min:0`, `required`, `exists:`, `unique:`), primary key info, and HasMany / BelongsToMany dynamic relations from foreign keys + indexes. CRUD/Grid layers reuse this metadata so adding a column to a table is reflected in routes/forms without re-deploying code. Cache invalidation is exposed via `clearAllCaches()` and the `inspector:warm` command.
+
+```mermaid
+flowchart LR
+  Req[Crud request entity = table]
+  Svc[DynamicEntityService.resolve]
+  Concrete[Concrete model<br/>e.g. User]
+  Fallback[DynamicEntity.inspect]
+  Inspector[SchemaInspector]
+  DB[(Live DB schema)]
+  Out[Resolved Eloquent Model]
+  Crud[CrudService and Grid]
+
+  Req --> Svc
+  Svc --> Concrete
+  Svc -->|no concrete model| Fallback
+  Fallback --> Inspector --> DB
+  Fallback --> Out
+  Concrete --> Out
+  Out --> Crud
+```
+
+### CRUD pipeline
+
+`CrudService` is the unified entry for list/detail/history/tree/search/insert/update/delete. Each read operation runs in this order: (1) `AuthorizationService::ensurePermission()` (super-admin bypass + `hasPermissionTo`), (2) `AuthorizationService::injectAclFilters()` which merges the resolved `FiltersGroup` (AND with caller filters) into request data, (3) `QueryBuilder::prepareQuery()` builds the Eloquent query (filters/sort/relations/cursor), (4) execution either by pagination, range, or others, with optional `applyComputedMethods` and `applyGroupBy`, returning a `CrudResult` with `CrudMeta`. Write operations stack lock checks (`HasLocks`/`HasOptimisticLocking`) and approval routing (`RequiresApproval`).
+
+```mermaid
+flowchart LR
+  Req[CrudService.list req data]
+  Auth[AuthorizationService]
+  Ensure[ensurePermission]
+  Inject[injectAclFilters]
+  QB[QueryBuilder.prepareQuery]
+  Exec[Execute paginated or range or other]
+  Comp[applyComputedMethods]
+  Group[applyGroupBy]
+  Result[CrudResult plus CrudMeta]
+
+  Req --> Auth
+  Auth --> Ensure --> Inject --> QB --> Exec --> Comp --> Group --> Result
+```
+
+### Translations and locale
+
+`HasTranslations` keeps translatable fields in a sibling table (auto-resolved as `Models\Translations\{Model}Translation` and required to implement `ITranslated`). Setting a translatable attribute stores it under `pending_translations[locale][field]` until the model fires `saved`, at which point translations are upserted in batch. Reads consult: pending values, the loaded `translation` relation, then the loaded `translations` collection, then a targeted DB query — with optional fallback to default locale when `LocaleContext::isFallbackEnabled()` is true. A `LocaleScope` global scope eagerly loads the right `translation` per the active `LocaleContext`. After create/update of the default-locale translation the trait emits `TranslatedModelSaved`, which the AI module listens to in order to enqueue automatic translations for other locales.
+
+```mermaid
+flowchart LR
+  Set["set fieldName = value"]
+  Pending[pending_translations locale.field]
+  Save[Model.save]
+  Persist["Upsert in *_translations<br/>(locale, fields)"]
+  Get["read fieldName"]
+  Pend2["pending<br/>(this locale)"]
+  Rel[loaded translation relation]
+  Coll[translations collection]
+  Q[Targeted DB query]
+  Fallback[Default locale fallback]
+  Event[TranslatedModelSaved]
+  AI["AI module job<br/>(other locales)"]
+
+  Set --> Pending --> Save --> Persist
+  Save --> Event --> AI
+  Get --> Pend2
+  Get --> Rel
+  Get --> Coll
+  Get --> Q
+  Q --> Fallback
+```
+
+### Search abstractions and engines
+
+`Searchable` extends Elastic Scout Plus and adds: a `SchemaDefinition` driven by `FieldDefinition` + `IndexType` enums, a `SchemaManager` that synchronises engine schemas, and event-based indexing (`ModelRequiresIndexing` → `ReindexSearchJob` / `IndexInSearchJob` / `BulkIndexSearchJob` / `FinalizeReindexJob`) so listeners can pre-process embeddings or translations before the document is sent to the engine. `ISearchEngine` is bound to the active Scout engine (Typesense or Elasticsearch); database fallback is also provided. Optional AI overrides bind `IReranker`, `ISearchPlanner`, and `IQueryIntentParser` (Core ships heuristic fallbacks via `HeuristicReranker`, `FallbackSearchPlanner`, `SimpleQueryIntentParser`).
+
+```mermaid
+flowchart LR
+  Model[Model with Searchable]
+  Schema[SchemaDefinition + FieldDefinition]
+  Manager[SchemaManager]
+  Event[ModelRequiresIndexing]
+  Jobs[Reindex / Index / Bulk / Finalize jobs]
+  Engine[ISearchEngine binding]
+  ES[ElasticsearchEngine]
+  TS[TypesenseEngine]
+  DB[DatabaseEngine]
+  AIBind[Optional AI overrides]
+  Rerank[IReranker]
+  Planner[ISearchPlanner]
+  Intent[IQueryIntentParser]
+
+  Model --> Schema --> Manager --> Engine
+  Model --> Event --> Jobs --> Engine
+  Engine --> ES
+  Engine --> TS
+  Engine --> DB
+  AIBind --> Rerank
+  AIBind --> Planner
+  AIBind --> Intent
+  Engine -.->|search planning + rerank| AIBind
+```
+
+### Place and geocoding
+
+`Core\Models\Place` is the canonical postal/geographic row shared across modules (CMS `Location.place_id`, ERP `Site.place_id`). It uses `HasSpatial` for a `geolocation` Point and exposes `searchDocumentGeographyFields()` so consumers can flatten the same shape into search documents. `Place::saving` keeps decimal `latitude`/`longitude` and the binary `geolocation` Point in sync; `geolocation` is excluded from version snapshots (binary WKB breaks JSON encoding on `Version`). Geocoding is delegated to `IGeocodingService` (Core), with concrete providers (`NominatimService` and `GoogleMapsService`) selected by config.
+
+```mermaid
+flowchart LR
+  Caller[Place creation or address edit]
+  Action[Module geocode action]
+  Iface[IGeocodingService]
+  Nominatim[NominatimService]
+  Google[GoogleMapsService]
+  Result[GeocodingResult]
+  PlaceM[Place row]
+  Sync[Place.saving syncGeolocationFromDecimal]
+  SearchDoc[searchDocumentGeographyFields]
+  Versioning[HasVersions excludes geolocation]
+
+  Caller --> Action --> Iface
+  Iface --> Nominatim
+  Iface --> Google
+  Nominatim --> Result
+  Google --> Result
+  Result --> PlaceM
+  PlaceM --> Sync
+  PlaceM --> SearchDoc
+  PlaceM --> Versioning
+```
+
+### Settings and module activation
+
+Runtime configuration lives in `Setting` (`Core\Models\Setting` with `HasApprovals` + `HasCache`). Three setting groups drive behaviour: `soft_deletes` (toggles `SoftDeletes` per table via `soft_deletes_{table}`), `versioning` (`version_strategy_{table}`), and `modules` (the `backendModules` JSON array consumed by `ModuleDatabaseActivator`). The activator implements the Nwidart `ActivatorInterface` and reads/writes `backendModules` straight via `DB::table('settings')` (so it works during boot when Eloquent isn't ready), with optional cache. Editing `Setting` triggers `SettingObserver` and Approval flows on any non-`description` field.
+
+```mermaid
+flowchart LR
+  SettingsTable["settings table"]
+  SoftG[soft_deletes group]
+  VerG[versioning group]
+  ModG[modules group: backendModules]
+  Cache[App cache]
+  SoftTrait[SoftDeletes trait]
+  VerTrait[HasVersions trait]
+  Activator[ModuleDatabaseActivator]
+  ModulesEnabled[Active modules registry]
+
+  SettingsTable --> SoftG
+  SettingsTable --> VerG
+  SettingsTable --> ModG
+  SoftG --> SoftTrait
+  VerG --> VerTrait
+  ModG --> Activator
+  Activator --> ModulesEnabled
+  Cache -.-> SoftTrait
+  Cache -.-> VerTrait
+  Cache -.-> Activator
+```
 
 ## Built-in abstractions used by other modules
 
 Core exposes reusable primitives for module authors:
 
-- UI/resource helpers (`HasTable`, `HasRecords`).
-- Data lifecycle traits (`HasVersions`, `SoftDeletes`, `HasLocks`, `HasApprovals`).
-- Taxonomy/preset/field-oriented abstractions and dynamic object composition patterns.
-- Shared query/filter/sort casting and CRUD request DTO layer.
+- UI/resource helpers (`HasTable`, `HasRecords`, `HasSlug`, `HasPath`, `HasActivation`, `SortableTrait`).
+- Data lifecycle traits (`HasVersions`, `SoftDeletes`, `HasLocks`, `HasOptimisticLocking`, `HasApprovals`, `HasValidity`).
+- Translation primitives (`HasTranslations`, `HasTranslatedDynamicContents`, `LocaleContext`, `LocaleScope`).
+- Dynamic-entity primitives (`Entity`, `Preset`, `Presettable`, `Field`, `DynamicEntity`).
+- CRUD/Grid request DTOs and `CrudService`/`AuthorizationService`/`AclResolverService`.
+- Searchable trait + `SchemaDefinition` + `ISearchEngine`/`IReranker`/`ISearchPlanner`/`IQueryIntentParser`.
+- Geocoding contracts and providers (`IGeocodingService`, `NominatimService`, `GoogleMapsService`).
+- Settings infrastructure and module activation.
 
 When building new module features, reuse these primitives instead of re-implementing lifecycle logic.
 
@@ -106,7 +435,7 @@ When building new module features, reuse these primitives instead of re-implemen
 ### Locking and concurrency
 
 - `lock:refresh`
-- `lock:locked-add` / `lock:locked-remove` (aliases typically exposed as `lock:add` / `lock:remove`)
+- `lock:locked-add` / `lock:locked-remove` (often aliased as `lock:add` / `lock:remove`)
 - `lock:optimistic-add` / `lock:optimistic-remove`
 
 ### Soft delete lifecycle
@@ -153,8 +482,7 @@ When building new module features, reuse these primitives instead of re-implemen
 
 ## Locking toggle design note (planned extension)
 
-The platform already supports runtime toggles for soft deletes and versioning per table.  
-A similar runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict safeguards to avoid accidental concurrency regressions.
+The platform already supports runtime toggles for soft deletes and versioning per table. A similar runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict safeguards to avoid accidental concurrency regressions.
 
 ## Troubleshooting quick guide
 
@@ -164,6 +492,7 @@ A similar runtime toggle for locking (`locking_{table}`) is under evaluation to 
 - Concurrent update failures: inspect lock status and `lock_version` mismatch path.
 - Dynamic entity metadata stale: warm or clear inspector caches.
 - API docs outdated: regenerate Swagger/OpenAPI and verify version merge outputs.
+- Translation fallback not kicking in: check `LocaleContext::isFallbackEnabled()` and confirm the default-locale translation row exists.
 
 ## FAQ prompts for RAG
 
@@ -177,3 +506,6 @@ A similar runtime toggle for locking (`locking_{table}`) is under evaluation to 
 - How do license checks affect login for normal users versus superadmins?
 - How do I convert an existing model to translation-table architecture?
 - What should I clear when dynamic entity metadata looks outdated?
+- When is `Presettable.fields_snapshot` updated and how do related rows migrate?
+- How do `IReranker` / `ISearchPlanner` / `IQueryIntentParser` interact with the AI module?
+- Why does `Place` exclude `geolocation` from version snapshots?
