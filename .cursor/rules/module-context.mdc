@@ -1,0 +1,15 @@
+---
+alwaysApply: false
+---
+# Core module context (caveman)
+
+- Path: Modules/Core.
+- Core is required by main app.
+- Core is reused by all modules.
+- Root rules = base law. Always follow.
+- This file = extra Core law.
+
+- Core change = big blast radius.
+- Keep Core generic, stable, backward friendly.
+- No module-specific business logic in Core.
+- If breaking change risk: stop, warn, ask user.
