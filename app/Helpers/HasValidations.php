@@ -61,6 +61,18 @@ trait HasValidations
         return $this->skip_validation;
     }
 
+    /**
+     * Returns the model attributes used for validation.
+     * Can be overridden in concrete classes or other traits (e.g. HasPlace)
+     * to include additional virtual attributes not stored directly on the model.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAttributesForValidation(): array
+    {
+        return $this->getAttributes();
+    }
+
     public function getRules(): array
     {
         $primary_key = $this->getKeyName();
