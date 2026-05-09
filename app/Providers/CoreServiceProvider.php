@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
+use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
@@ -94,6 +95,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->configureModels();
         $this->configureDates();
         $this->configureUrls();
+        $this->registerCacheWarmOnBoot();
     }
 
     /**
@@ -336,6 +338,24 @@ final class CoreServiceProvider extends ModuleServiceProvider
         if ($this->app->isProduction() && config('core.force_https')) {
             URL::forceScheme('https');
         }
+    }
+
+    /**
+     * Register the cache warm-on-boot hook.
+     *
+     * When `core.cache.warm_on_boot` is true, the cache warming command is
+     * executed after all service providers have been registered, ensuring
+     * all bindings are available before warming begins.
+     */
+    private function registerCacheWarmOnBoot(): void
+    {
+        if (! config('core.cache.warm_on_boot', false)) {
+            return;
+        }
+
+        $this->app->booted(function (): void {
+            $this->app->make(WarmCacheCommand::class)->handle();
+        });
     }
 
     private function registerMiddlewares(): void

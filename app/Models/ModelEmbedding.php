@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -32,6 +33,20 @@ final class ModelEmbedding extends Model
     public function model(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Scope to filter embeddings by a specific model instance.
+     * Filters on both model_type and model_id to leverage the composite morphs() index.
+     *
+     * @param  Builder<ModelEmbedding>  $query
+     * @return Builder<ModelEmbedding>
+     */
+    public function scopeForModel(Builder $query, Model $model): Builder
+    {
+        return $query
+            ->where('model_type', $model->getMorphClass())
+            ->where('model_id', $model->getKey());
     }
 
     protected function casts(): array

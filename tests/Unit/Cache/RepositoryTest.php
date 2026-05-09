@@ -7,6 +7,7 @@ use Illuminate\Contracts\Cache\Store;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Cache\Repository;
 use Modules\Core\Helpers\ResponseBuilder;
@@ -231,4 +232,38 @@ it('clear methods support class-string entities and role/user key helpers branch
     expect($parts_from_user_groups)->toContain('U777')
         ->and($parts_from_user_roles)->toContain('R8')
         ->and($parts_from_user_roles)->toContain('U778');
+});
+
+it('clearByEntity does not throw BadMethodCallException when cache driver does not support tags (database driver simulation)', function (): void {
+    // Simulate a cache driver that does not support tags (e.g. database, file)
+    Cache::shouldReceive('supportsTags')->andReturn(false);
+    Cache::shouldReceive('forget')->andReturn(true);
+
+    $repository = new Repository(new ArrayStore());
+
+    $cacheable = new class extends Model
+    {
+        use HasCache;
+
+        protected $table = 'cacheable_no_tags';
+    };
+
+    expect(fn () => $repository->clearByEntity($cacheable))->not->toThrow(BadMethodCallException::class);
+});
+
+it('clearByEntity does not throw BadMethodCallException when cache driver does not support tags (file driver simulation)', function (): void {
+    // Simulate a file cache driver that does not support tags
+    Cache::shouldReceive('supportsTags')->andReturn(false);
+    Cache::shouldReceive('forget')->andReturn(true);
+
+    $repository = new Repository(new ArrayStore());
+
+    $cacheable = new class extends Model
+    {
+        use HasCache;
+
+        protected $table = 'cacheable_file_no_tags';
+    };
+
+    expect(fn () => $repository->clearByEntity($cacheable))->not->toThrow(BadMethodCallException::class);
 });

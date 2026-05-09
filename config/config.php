@@ -46,6 +46,27 @@ return [
         'tabs_counts_ttl_seconds' => env('FILAMENT_TABS_COUNTS_TTL_SECONDS', 60),
     ],
 
+    'acl' => [
+        /**
+         * Maximum number of users for targeted ACL cache invalidation.
+         * When the number of users with a given permission exceeds this threshold,
+         * the service falls back to flushing all ACL-prefixed cache keys instead
+         * of deleting individual user-scoped entries.
+         */
+        'clear_threshold' => 500,
+    ],
+
+    'cache' => [
+        /**
+         * When true, the cache warming command (cache:warm) is executed automatically
+         * during application boot via $app->booted(), after all service providers
+         * have been registered. Useful for reducing cold-cache penalties after deployment.
+         *
+         * Defaults to false to avoid unexpected DB queries on every boot.
+         */
+        'warm_on_boot' => false,
+    ],
+
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'translation_fallback_enabled' => env('TRANSLATION_FALLBACK_ENABLED', true),
 
