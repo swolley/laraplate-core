@@ -7,10 +7,27 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - *(concurrency)* Enhance batch processing with query count tracking
+- *(helpers)* Add HasModuleTableName trait for dynamic table name generation
+- *(helpers)* Replace HasModuleTableName with HasPrefixedTableName and enhance HasACL
+- *(cache)* Implement in-memory caching for various components
+- *(cache)* Introduce WarmCacheCommand for pre-warming critical cache entries
+
+### 🐛 Bug Fixes
+
+- *(core)* Prevent negative padding values in swagger generation and add validation helper
 
 ### 🚜 Refactor
 
 - *(cache)* Enhance cache management and type safety
+- *(console)* Update command descriptions to use green color coding
+
+### 📚 Documentation
+
+- *(module)* Enhance MODULE.md with detailed core functionalities and mermaid diagrams
+
+### ⚙️ Miscellaneous Tasks
+
+- *(rules)* Remove deprecated rule files and add module context
 
 ## [1.50.0] - 2026-05-04
 
