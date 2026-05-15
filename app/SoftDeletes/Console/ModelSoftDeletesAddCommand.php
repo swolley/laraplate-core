@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
@@ -157,7 +158,7 @@ final class ModelSoftDeletesAddCommand extends Command
 
     private function upsertSoftDeletesSetting(string $table, bool $enabled): bool
     {
-        if (! Schema::hasTable('settings')) {
+        if (! Schema::hasTable(CoreTables::Settings->value)) {
             $this->warn('Settings table not found; runtime flag was not updated.');
 
             return false;

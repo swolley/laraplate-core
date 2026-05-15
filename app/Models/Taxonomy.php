@@ -144,7 +144,7 @@ abstract class Taxonomy extends Model implements Sortable
         $relation = $this->hasOne(static::getTranslationModelClass(), 'taxonomy_id');
 
         if ($fallback_enabled) {
-            $relation->where(function ($query) use ($current_locale, $default_locale): void {
+            $relation->where(function (Builder $query) use ($current_locale, $default_locale): void {
                 $query->where('locale', $current_locale)
                     ->orWhere('locale', $default_locale);
             })

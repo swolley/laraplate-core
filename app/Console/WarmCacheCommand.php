@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Cache\CacheManager;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Inspector\SchemaInspector;
@@ -17,6 +19,8 @@ use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionProperty;
 use Symfony\Component\Console\Command\Command as BaseCommand;
+use Symfony\Component\Console\Input\StringInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Throwable;
 
 /**
@@ -38,6 +42,10 @@ final class WarmCacheCommand extends Command
 
     public function handle(): int
     {
+        if ($this->output === null) {
+            $this->setOutput(new OutputStyle(new StringInput(''), new NullOutput()));
+        }
+
         $start = microtime(true);
         $total_warmed = 0;
         $failed_steps = 0;
@@ -110,14 +118,14 @@ final class WarmCacheCommand extends Command
      */
     private function warmSettings(): int
     {
-        if (! SchemaInspector::getInstance()->hasTable('settings')) {
+        if (! SchemaInspector::getInstance()->hasTable(CoreTables::Settings->value)) {
             return 0;
         }
 
         $settings = Setting::query()->get();
 
         // Cache under the model's own cache key (table name), matching HasCache behaviour
-        Cache::forever(CacheManager::key('settings'), $settings);
+        Cache::forever(CacheManager::key((new Setting())->getTable()), $settings);
 
         return 1;
     }
@@ -129,7 +137,7 @@ final class WarmCacheCommand extends Command
      */
     private function warmCronJobs(): int
     {
-        if (! SchemaInspector::getInstance()->hasTable('cron_jobs')) {
+        if (! SchemaInspector::getInstance()->hasTable(CoreTables::CronJobs->value)) {
             return 0;
         }
 
@@ -157,7 +165,7 @@ final class WarmCacheCommand extends Command
      */
     private function warmVersionStrategies(): int
     {
-        if (! SchemaInspector::getInstance()->hasTable('settings')) {
+        if (! SchemaInspector::getInstance()->hasTable(CoreTables::Settings->value)) {
             return 0;
         }
 
@@ -178,7 +186,7 @@ final class WarmCacheCommand extends Command
      */
     private function warmPermissionExistenceMap(): int
     {
-        if (! SchemaInspector::getInstance()->hasTable('permissions')) {
+        if (! SchemaInspector::getInstance()->hasTable(CoreTables::Permissions->value)) {
             return 0;
         }
 

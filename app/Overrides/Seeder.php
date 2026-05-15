@@ -11,7 +11,6 @@ use Modules\Core\Helpers\HasSeedersUtils;
 
 class Seeder extends BaseSeeder
 {
-    private $disableBenchmark;
     use HasBenchmark;
     use HasSeedersUtils;
 
@@ -20,6 +19,8 @@ class Seeder extends BaseSeeder
      * in fork workers so destructors skip benchmark output (shared STDOUT with parent).
      */
     public const string PARALLEL_BATCH_WORKER_ENV = 'LARAPLE_PARALLEL_BATCH_WORKER';
+
+    private bool $disableBenchmark = false;
 
     public function __construct(protected DatabaseManager $db)
     {

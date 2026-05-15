@@ -16,8 +16,8 @@ return [
     */
 
     'models' => [
-        'modification' => Approval\Models\Modification::class,
-        'approval' => Approval\Models\Approval::class,
-        'disapproval' => Approval\Models\Disapproval::class,
+        'modification' => Modules\Core\Models\Modification::class,
+        'approval' => Modules\Core\Models\Approval::class,
+        'disapproval' => Modules\Core\Models\Disapproval::class,
     ],
 ];

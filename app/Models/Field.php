@@ -76,7 +76,7 @@ final class Field extends Model
      */
     public function presets(): BelongsToMany
     {
-        return $this->belongsToMany(Preset::class, 'fieldables')->using(Fieldable::class)->withTimestamps()->withPivot(['order_column', 'is_required', 'default']);
+        return $this->belongsToMany(Preset::class, CoreTables::Fieldables->value)->using(Fieldable::class)->withTimestamps()->withPivot(['order_column', 'is_required', 'default']);
     }
 
     #[Override]

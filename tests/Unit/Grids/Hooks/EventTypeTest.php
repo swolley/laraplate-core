@@ -12,17 +12,16 @@ test('enum has correct class structure', function (): void {
 });
 
 test('enum has all required cases', function (): void {
-    $reflection = new ReflectionClass(EventType::class);
-    $cases = $reflection->getConstants();
+    $case_names = array_map(static fn (EventType $case): string => $case->name, EventType::cases());
 
-    expect($cases)->toHaveKey('PRE_SELECT');
-    expect($cases)->toHaveKey('POST_SELECT');
-    expect($cases)->toHaveKey('PRE_INSERT');
-    expect($cases)->toHaveKey('POST_INSERT');
-    expect($cases)->toHaveKey('PRE_UPDATE');
-    expect($cases)->toHaveKey('POST_UPDATE');
-    expect($cases)->toHaveKey('PRE_DELETE');
-    expect($cases)->toHaveKey('POST_DELETE');
+    expect($case_names)->toContain('PreSelect')
+        ->and($case_names)->toContain('PostSelect')
+        ->and($case_names)->toContain('PreInsert')
+        ->and($case_names)->toContain('PostInsert')
+        ->and($case_names)->toContain('PreUpdate')
+        ->and($case_names)->toContain('PostUpdate')
+        ->and($case_names)->toContain('PreDelete')
+        ->and($case_names)->toContain('PostDelete');
 });
 
 test('enum cases have correct string values', function (): void {

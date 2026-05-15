@@ -42,7 +42,7 @@ final class Template extends Model
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('templates')->where(function (QueryBuilder $query): void {
+                Rule::unique(CoreTables::Templates->value)->where(function (QueryBuilder $query): void {
                     $query->whereNull('deleted_at');
                 }),
             ],
@@ -52,7 +52,7 @@ final class Template extends Model
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('templates')->where(function (QueryBuilder $query): void {
+                Rule::unique(CoreTables::Templates->value)->where(function (QueryBuilder $query): void {
                     $query->whereNull('deleted_at');
                 })->ignore($this->id, 'id'),
             ],

@@ -53,7 +53,7 @@ final class PresetVersioningService
     public function captureFieldsSnapshot(Preset $preset): array
     {
         return $preset->fields()
-            ->orderBy('fieldables.order_column', 'asc')
+            ->orderByPivot('order_column', 'asc')
             ->get()
             ->map(static fn (Field $field): array => [
                 'field_id' => $field->id,

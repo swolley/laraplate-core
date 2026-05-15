@@ -23,9 +23,10 @@ final class MigrationTask extends Component
     use InteractsWithTime;
 
     /**
+     * @param  array<int, string>|string  $description
      * @param  (callable(): bool|int)|null  $task
      */
-    public function render($description, string $module, $task = null, $verbosity = OutputInterface::VERBOSITY_NORMAL): void
+    public function render(array|string $description, string $module, callable|int|null $task = null, int $verbosity = OutputInterface::VERBOSITY_NORMAL): void
     {
         $description = $this->mutate($description, [
             EnsureDynamicContentIsHighlighted::class,

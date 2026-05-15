@@ -46,7 +46,7 @@ it('exposes resetLocaleCache static method', function (): void {
 
 it('resetLocaleCache sets the static cache back to null', function (): void {
     // Manually populate the cache via reflection
-    $reflection = new ReflectionProperty(HasTranslations::class, 'default_locale_cache');
+    $reflection = new ReflectionProperty(LocaleContext::class, 'cached_default_locale');
     $reflection->setValue(null, 'it');
 
     expect($reflection->getValue())->toBe('it');
@@ -199,7 +199,7 @@ it('populates the static default locale cache after first getTranslatableFieldVa
     // Access the field — this should populate the static cache
     $fresh->title;
 
-    $reflection = new ReflectionProperty(HasTranslations::class, 'default_locale_cache');
+    $reflection = new ReflectionProperty(LocaleContext::class, 'cached_default_locale');
     $cached_value = $reflection->getValue();
 
     // The cache must be populated (non-null) after the first access
@@ -240,7 +240,7 @@ it('reads config app.locale at most once for N calls to getTranslatableFieldValu
     }
 
     // After N calls the static cache must be populated (non-null)
-    $reflection = new ReflectionProperty(HasTranslations::class, 'default_locale_cache');
+    $reflection = new ReflectionProperty(LocaleContext::class, 'cached_default_locale');
     $cached_value = $reflection->getValue();
 
     expect($cached_value)->not->toBeNull();
@@ -248,7 +248,7 @@ it('reads config app.locale at most once for N calls to getTranslatableFieldValu
 
 it('re-reads config after resetLocaleCache is called', function (): void {
     // Feature: performance-optimization, Property 18: Default locale is read from config at most once per request
-    $reflection = new ReflectionProperty(HasTranslations::class, 'default_locale_cache');
+    $reflection = new ReflectionProperty(LocaleContext::class, 'cached_default_locale');
 
     // Manually set the cache to a known value
     $reflection->setValue(null, 'it');

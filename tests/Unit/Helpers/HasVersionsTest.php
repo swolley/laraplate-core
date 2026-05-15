@@ -248,25 +248,16 @@ it('does not query DB or access persistent cache on second call for any model cl
     // Use a unique table name per iteration to ensure a fresh anonymous class each time
     $table = 'users_' . fake()->unique()->lexify('????????');
 
-    $model = new class($table) extends Model
+    $model = new class extends Model
     {
         use HasVersions;
-
-        public function __construct(private readonly string $dynamic_table)
-        {
-            parent::__construct();
-        }
-
-        public function getTable(): string
-        {
-            return $this->dynamic_table;
-        }
 
         public function shouldBeVersioning(): bool
         {
             return false;
         }
     };
+    $model->setTable($table);
 
     $model->setConnection(config('database.default'));
 

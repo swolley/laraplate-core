@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- *(core)* Enhance cache warming command and model structure
+
 ## [1.51.0] - 2026-05-09
 
 ### 🚀 Features

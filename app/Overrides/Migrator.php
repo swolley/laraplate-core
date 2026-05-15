@@ -15,8 +15,15 @@ class Migrator extends BaseMigrator
 {
     protected ?string $current_migration_file = null;
 
+    /**
+     * Run "up" a migration instance.
+     *
+     * @param  string  $file
+     * @param  int  $batch
+     * @param  bool  $pretend
+     */
     #[Override]
-    protected function runUp($file, $batch, $pretend): void
+    protected function runUp($file, $batch, $pretend): void // @pest-ignore-type
     {
         $this->current_migration_file = $file;
 
@@ -27,8 +34,15 @@ class Migrator extends BaseMigrator
         }
     }
 
+    /**
+     * Run "down" a migration instance.
+     *
+     * @param  string  $file
+     * @param  object  $migration
+     * @param  bool  $pretend
+     */
     #[Override]
-    protected function runDown($file, $migration, $pretend): void
+    protected function runDown($file, $migration, $pretend): void // @pest-ignore-type
     {
         $this->current_migration_file = $file;
 
@@ -39,8 +53,14 @@ class Migrator extends BaseMigrator
         }
     }
 
+    /**
+     * Write to the console's output.
+     *
+     * @param  string  $component
+     * @param  array<int, string>|string  ...$arguments
+     */
     #[Override]
-    protected function write($component, ...$arguments): void
+    protected function write($component, ...$arguments): void // @pest-ignore-type
     {
         if ($this->output && $component === Task::class && isset($arguments[0])) {
             $module = $this->current_migration_file !== null

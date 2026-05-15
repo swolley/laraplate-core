@@ -246,7 +246,7 @@ it('sendNotifications dispatches PendingApprovalsNotification to configured role
     $pending = collect([
         [
             'entity' => 'Setting',
-            'table' => 'settings',
+            'table' => 'core_settings',
             'count' => 2,
             'oldest_at' => now()->subDay()->toIso8601String(),
         ],
@@ -269,7 +269,7 @@ it('sendNotifications sends nothing when there are no recipients', function (): 
     $pending = collect([
         [
             'entity' => 'Setting',
-            'table' => 'settings',
+            'table' => 'core_settings',
             'count' => 1,
             'oldest_at' => null,
         ],

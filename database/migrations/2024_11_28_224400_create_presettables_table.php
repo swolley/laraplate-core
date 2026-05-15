@@ -203,7 +203,7 @@ return new class extends Migration
             CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
             FOR EACH ROW
             INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
-            VALUES (NEW.entity_id, NEW.id, \'[]\', NEW.deleted_at);
+            VALUES (NEW.entity_id, NEW.id, '[]', NEW.deleted_at);
         ");
 
         DB::unprepared("
@@ -242,7 +242,7 @@ return new class extends Migration
             CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
             BEGIN
                 INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, version, deleted_at)
-                VALUES (NEW.entity_id, NEW.id, \'[]\',
+                VALUES (NEW.entity_id, NEW.id, '[]',
                     COALESCE((SELECT MAX(version) FROM {$presettables_table} WHERE preset_id = NEW.id AND entity_id = NEW.entity_id), 0) + 1,
                     NEW.deleted_at);
             END;
@@ -300,7 +300,7 @@ return new class extends Migration
             BEGIN
                 SET NOCOUNT ON;
                 INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
-                SELECT entity_id, id, \'[]\', deleted_at
+                SELECT entity_id, id, '[]', deleted_at
                 FROM inserted;
             END;
         ");
@@ -367,7 +367,7 @@ return new class extends Migration
             FOR EACH ROW
             BEGIN
                 INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
-                VALUES (:NEW.entity_id, :NEW.id, \'[]\', :NEW.deleted_at);
+                VALUES (:NEW.entity_id, :NEW.id, '[]', :NEW.deleted_at);
             END;
         ");
 

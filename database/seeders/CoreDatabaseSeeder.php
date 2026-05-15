@@ -16,10 +16,10 @@ use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
@@ -29,11 +29,6 @@ use Throwable;
 
 final class CoreDatabaseSeeder extends Seeder
 {
-    /**
-     * @var Collection<string, BaseRole>
-     */
-    private Collection $groups;
-
     public const VERSIONING_NAME_PREFIX = 'version_strategy_';
 
     public const SOFT_DELETES_NAME_PREFIX = 'soft_deletes_';
@@ -41,6 +36,11 @@ final class CoreDatabaseSeeder extends Seeder
     public const LOCK_NAME_PREFIX = 'lock_';
 
     public const OPTIMISTIC_LOCK_NAME_PREFIX = 'optimistic_lock_';
+
+    /**
+     * @var Collection<string, BaseRole>
+     */
+    private Collection $groups;
 
     /**
      * @return array<string,string>
@@ -240,6 +240,7 @@ final class CoreDatabaseSeeder extends Seeder
             // versioned models
 
             $versioned_setting_key_name = $this->getSettingKeyName(self::VERSIONING_NAME_PREFIX, $table);
+
             if (class_uses_trait($model, HasVersions::class)) {
                 $this->seedVersionedModel($default_settings, $instance, $table, $versioned_setting_key_name);
             } else {
@@ -247,8 +248,9 @@ final class CoreDatabaseSeeder extends Seeder
             }
 
             // soft deletes models
-            
+
             $soft_deletes_setting_key_name = $this->getSettingKeyName(self::SOFT_DELETES_NAME_PREFIX, $table);
+
             if (class_uses_trait($model, SoftDeletes::class)) {
                 $this->seedSoftDeletedModel($default_settings, $instance, $table, $soft_deletes_setting_key_name);
             } else {
@@ -256,8 +258,9 @@ final class CoreDatabaseSeeder extends Seeder
             }
 
             // locked models
-            
+
             $locked_model_key_name = $this->getSettingKeyName(self::LOCK_NAME_PREFIX, $table);
+
             if (class_uses_trait($model, HasLocks::class)) {
                 $this->seedLockedModel($default_settings, $instance, $table, $locked_model_key_name);
             } else {
@@ -265,12 +268,13 @@ final class CoreDatabaseSeeder extends Seeder
             }
 
             // optimistic locked models
-            
+
             $optimistic_locked_model_key_name = $this->getSettingKeyName(self::OPTIMISTIC_LOCK_NAME_PREFIX, $table);
+
             if (class_uses_trait($model, HasOptimisticLocking::class)) {
                 $this->seedOptimisticLockedModel($default_settings, $instance, $table, $optimistic_locked_model_key_name);
             } else {
-                $to_remove_settings = $optimistic_locked_model_key_name;
+                $to_remove_settings[] = $optimistic_locked_model_key_name;
             }
         }
 

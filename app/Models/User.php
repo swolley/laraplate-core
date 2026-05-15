@@ -42,6 +42,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
@@ -259,6 +260,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             'locked_at' => ['nullable', 'date'],
         ]);
 
+        $user_class = CoreTables::Users->value;
+
         // Create rules - complex rules (unique with closure) must stay in array format
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],
@@ -267,7 +270,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
+                Rule::unique($user_class)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 }),
             ],
@@ -275,7 +278,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('users'),
+                Rule::unique($user_class),
             ],
             'password' => [Password::required()],
         ]);
@@ -288,7 +291,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'string',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
+                Rule::unique($user_class)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],
@@ -297,7 +300,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
                 'email',
                 'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('users')->where(function ($query): void { // @pest-ignore-type
+                Rule::unique($user_class)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],

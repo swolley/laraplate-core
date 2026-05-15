@@ -11,6 +11,11 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\Setting;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
+/**
+ * Do not assert ReflectionClass::isFinal(): tests/Pest.php enables DG\BypassFinals,
+ * which reports final classes as non-final so Mockery can replace methods.
+ */
+
 // Feature: performance-optimization, Property 22: Cache warming command is idempotent
 // Validates: Requirements 16.3
 
@@ -21,12 +26,6 @@ it('cache:warm command exists and has correct signature', function (): void {
     $instance = $reflection->newInstanceWithoutConstructor();
 
     expect($signature->getValue($instance))->toContain('cache:warm');
-});
-
-it('cache:warm command is final', function (): void {
-    $reflection = new ReflectionClass(WarmCacheCommand::class);
-
-    expect($reflection->isFinal())->toBeTrue();
 });
 
 it('cache:warm command exits with SUCCESS when at least one step succeeds', function (): void {

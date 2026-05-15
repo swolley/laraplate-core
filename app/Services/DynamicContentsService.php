@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
@@ -160,14 +161,18 @@ final class DynamicContentsService
         $cache_key = $this->presettableMemoKey($presettable_class);
         $this->registerPresettableMemoKey($cache_key);
 
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+        $entities_table = CoreTables::Entities->value;
+
         $this->presettables_cache = Cache::memo()->rememberForever(
             $cache_key,
             fn (): Collection => $presettable_class::query()
-                ->join('presets', 'presettables.preset_id', '=', 'presets.id')
-                ->join('entities', 'presets.entity_id', '=', 'entities.id')
-                ->whereNull('presettables.deleted_at')
-                ->whereNull('presets.deleted_at')
-                ->addSelect('presettables.*', DB::raw('CASE WHEN presets.is_default THEN 1 ELSE 0 END + CASE WHEN entities.is_default THEN 1 ELSE 0 END as order_score'))
+                ->join($presets_table, "{$presettables_table}.preset_id", '=', "{$presets_table}.id")
+                ->join($entities_table, "{$presets_table}.entity_id", '=', "{$entities_table}.id")
+                ->whereNull("{$presettables_table}.deleted_at")
+                ->whereNull("{$presets_table}.deleted_at")
+                ->addSelect("{$presettables_table}.*", DB::raw("CASE WHEN {$presets_table}.is_default THEN 1 ELSE 0 END + CASE WHEN {$entities_table}.is_default THEN 1 ELSE 0 END as order_score"))
                 ->orderBy('order_score', 'desc')
                 ->get(),
         );

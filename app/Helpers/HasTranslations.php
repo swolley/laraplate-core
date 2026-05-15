@@ -59,12 +59,6 @@ trait HasTranslations
     protected static array $cached_translatable_fields = [];
 
     /**
-     * Cached default locale to avoid repeated config() calls per request.
-     * Populated once on first access; reset between requests via resetLocaleCache().
-     */
-    private static ?string $default_locale_cache = null;
-
-    /**
      * Get translatable fields for this model.
      * Cached to avoid creating new instances and potential recursion.
      */
@@ -89,7 +83,7 @@ trait HasTranslations
      */
     public static function resetLocaleCache(): void
     {
-        self::$default_locale_cache = null;
+        LocaleContext::resetDefaultLocaleCache();
     }
 
     /**
@@ -523,12 +517,7 @@ trait HasTranslations
     {
         $current_locale = LocaleContext::get();
 
-        // Read default locale from static cache to avoid repeated config() calls per request
-        if (self::$default_locale_cache === null) {
-            self::$default_locale_cache = (string) config('app.locale');
-        }
-
-        $default_locale = self::$default_locale_cache;
+        $default_locale = LocaleContext::getDefaultCached();
         $fallback_enabled = LocaleContext::isFallbackEnabled();
 
         // First, check pending translations (values set but not yet saved)

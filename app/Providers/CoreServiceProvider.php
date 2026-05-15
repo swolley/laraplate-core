@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
-use App\Models\User;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Carbon\CarbonImmutable;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Console\Migrations\StatusCommand as LaravelStatusCommand;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Cache;
@@ -28,7 +26,6 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Console\WarmCacheCommand;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -39,12 +36,14 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
+use Modules\Core\Models\User as CoreUser;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Services\DynamicContentsService;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -75,8 +74,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
-
-        throw_unless(is_subclass_of(user_class(), \Modules\Core\Models\User::class), Exception::class, 'User class is not ' . \Modules\Core\Models\User::class);
 
         $this->registerAuths();
         $this->registerMiddlewares();
@@ -113,6 +110,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
     #[Override]
     public function register(): void
     {
+        throw_unless(is_subclass_of(user_class(), CoreUser::class), Exception::class, 'User class is not ' . CoreUser::class);
+
         parent::register();
 
         $this->app->bind(OpenApiJsonController::class, DocsController::class);
@@ -144,10 +143,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     public function registerAuths(): void
     {
-        $user_class = user_class();
-
         // bypass all other checks if the user is super admin
-        Gate::before(static fn (?Authenticatable $user): ?true => $user instanceof $user_class && $user->isSuperAdmin() ? true : null);
+        Gate::before(static fn (?CoreUser $user): ?true => $user instanceof CoreUser && $user->isSuperAdmin() ? true : null);
     }
 
     /**
@@ -242,14 +239,14 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function registerSearchClients(): void
     {
         // Register Elasticsearch client
-        $this->app->singleton(static function (\Illuminate\Contracts\Foundation\Application $app): ElasticsearchClient {
+        $this->app->singleton(static function (Application $app): ElasticsearchClient {
             $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
 
             return ClientBuilder::fromConfig($config);
         });
 
         // Register Typesense client
-        $this->app->singleton(static function (\Illuminate\Contracts\Foundation\Application $app): TypesenseClient {
+        $this->app->singleton(static function (Application $app): TypesenseClient {
             $config = config('scout.typesense.client-settings');
 
             return new TypesenseClient($config);
@@ -264,7 +261,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function registerSearchEngines(): void
     {
         // Extend Laravel Scout with custom engines
-        $this->app->make(EngineManager::class)->extend('elasticsearch', static function (\Illuminate\Contracts\Foundation\Application $app) {
+        $this->app->make(EngineManager::class)->extend('elasticsearch', static function (Application $app) {
             $config = config('search.engines.elasticsearch');
 
             // Get the Elasticsearch client from the container
@@ -277,7 +274,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ]);
         });
 
-        $this->app->make(EngineManager::class)->extend('typesense', static function (\Illuminate\Contracts\Foundation\Application $app) {
+        $this->app->make(EngineManager::class)->extend('typesense', static function (Application $app) {
             $config = config('search.engines.typesense');
 
             // Get the Typesense client from the container
@@ -316,7 +313,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->booted(function (): void {
             $this->app->loadDeferredProvider('migrator');
 
-            $this->app->singleton('migrator', static function ($app): Migrator {
+            $this->app->singleton('migrator', static function (Application $app): Migrator {
                 return new Migrator(
                     $app['migration.repository'],
                     $app['db'],
@@ -325,11 +322,11 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 );
             });
 
-            $this->app->singleton(LaravelStatusCommand::class, static function ($app): StatusCommand {
+            $this->app->singleton(LaravelStatusCommand::class, static function (Application $app): StatusCommand {
                 return new StatusCommand($app['migrator']);
             });
 
-            $this->app->bind(LaravelMigrator::class, static fn ($app): Migrator => $app['migrator']);
+            $this->app->bind(LaravelMigrator::class, static fn (Application $app): Migrator => $app['migrator']);
         });
     }
 

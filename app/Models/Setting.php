@@ -71,7 +71,7 @@ final class Setting extends Model
                 'string',
                 'max:50',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('settings')->where(function ($query): void { // @pest-ignore-type
+                Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 }),
             ],
@@ -82,7 +82,7 @@ final class Setting extends Model
                 'string',
                 'max:50',
                 /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique('settings')->where(function ($query): void { // @pest-ignore-type
+                Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
             ],

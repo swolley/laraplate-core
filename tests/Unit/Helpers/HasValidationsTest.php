@@ -247,20 +247,11 @@ it('does not query DB on warm cache for any permission name (property test)', fu
     $table = fake()->unique()->word();
     $operation = fake()->randomElement(['select', 'insert', 'update', 'delete']);
 
-    $model = new class ($table) extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
-
-        public function __construct(private readonly string $dynamic_table)
-        {
-            parent::__construct();
-        }
-
-        public function getTable(): string
-        {
-            return $this->dynamic_table;
-        }
     };
+    $model->setTable($table);
 
     $method = new \ReflectionMethod(HasValidations::class, 'checkUserCanDo');
 

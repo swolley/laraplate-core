@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Approval\Models\Modification;
+use Modules\Core\Models\Modification;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;

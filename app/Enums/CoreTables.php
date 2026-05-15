@@ -21,10 +21,10 @@ enum CoreTables: string
     case ModelEmbeddings = 'core_model_embeddings';
 
     // generic or vendors models
-    case Modifications = 'vend_modifications';
     case Roles = 'vend_roles';
     case Permissions = 'vend_permissions';
     case Versions = 'vend_versions';
+    case Modifications = 'vend_modifications';
     case Approvals = 'vend_approvals';
     case Disapprovals = 'vend_disapprovals';
 

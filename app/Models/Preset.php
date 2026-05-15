@@ -83,7 +83,7 @@ abstract class Preset extends Model
      */
     final public function fields(): BelongsToMany
     {
-        return $this->belongsToMany(Field::class, 'fieldables')->using(Fieldable::class)->withTimestamps()->withPivot(['id', 'order_column', 'is_required', 'default']);
+        return $this->belongsToMany(Field::class, CoreTables::Fieldables->value)->using(Fieldable::class)->withTimestamps()->withPivot(['id', 'order_column', 'is_required', 'default']);
     }
 
     /**
@@ -116,8 +116,8 @@ abstract class Preset extends Model
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'is_active' => 'boolean',
-            'template_id' => ['sometimes', 'exists:'.CoreTables::Templates->value.',id'],
-            'entity_id' => ['required', 'exists:'.CoreTables::Entities->value.',id'],
+            'template_id' => ['sometimes', 'exists:' . CoreTables::Templates->value . ',id'],
+            'entity_id' => ['required', 'exists:' . CoreTables::Entities->value . ',id'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],

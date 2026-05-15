@@ -64,7 +64,7 @@ final class License extends Model
     {
         $rules = $this->getRulesFromTrait();
         $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
-            'uuid' => ['required', 'uuid', Rule::unique('licenses', 'uuid')->ignore($this->getKey())],
+            'uuid' => ['required', 'uuid', Rule::unique(CoreTables::Licenses->value, 'uuid')->ignore($this->getKey())],
             'valid_from' => ['date'],
             'valid_to' => ['nullable', 'date'],
         ]);

@@ -14,7 +14,10 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: 'migrate:status')]
 class StatusCommand extends BaseStatusCommand
 {
-    public function handle()
+    /**
+     * Handle the command.
+     */
+    public function handle() // @pest-ignore-type
     {
         return $this->migrator->usingConnection($this->option('database'), function () {
             if (! $this->migrator->repositoryExists()) {
@@ -28,7 +31,7 @@ class StatusCommand extends BaseStatusCommand
             $batches = $this->migrator->getRepository()->getMigrationBatches();
 
             $migrations = $this->getStatusFor($ran, $batches)
-                ->when($this->option('pending') !== false, fn ($collection) => $collection->filter(function ($migration) {
+                ->when($this->option('pending') !== false, fn (Collection $collection): Collection => $collection->filter(static function (array $migration): bool {
                     return (new Stringable($migration[1]))->contains('Pending');
                 }));
 
@@ -39,7 +42,9 @@ class StatusCommand extends BaseStatusCommand
 
                 $migrations
                     ->each(
-                        fn ($migration) => $this->components->twoColumnDetail($migration[0], $migration[1]),
+                        function (array $migration): void {
+                            $this->components->twoColumnDetail($migration[0], $migration[1]);
+                        },
                     );
 
                 $this->newLine();
@@ -49,7 +54,7 @@ class StatusCommand extends BaseStatusCommand
                 $this->components->info('No migrations found');
             }
 
-            if ($this->option('pending') && $migrations->some(fn ($m) => (new Stringable($m[1]))->contains('Pending'))) {
+            if ($this->option('pending') && $migrations->some(static fn (array $m): bool => (new Stringable($m[1]))->contains('Pending'))) {
                 return $this->option('pending');
             }
         });
