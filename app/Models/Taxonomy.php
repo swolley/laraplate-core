@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Helpers\HasPath;
@@ -26,6 +27,7 @@ use Spatie\EloquentSortable\Sortable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperTaxonomy
  */
 abstract class Taxonomy extends Model implements Sortable
@@ -53,7 +55,8 @@ abstract class Taxonomy extends Model implements Sortable
     }
     // endregion
 
-    final protected $table = 'taxonomies';
+    #[Override]
+    final protected $table = CoreTables::Taxonomies->value;
 
     /**
      * The attributes that are mass assignable.

@@ -168,15 +168,15 @@ abstract class Entity
 
         $prefix = $this instanceof Grid || $this instanceof Relation ? $this->getPath() : lcfirst($this->getModelName());
         $fieldpath = $this->stripEntityPrefix(
-            (string) $prefix,
+            $prefix,
             is_string($field) ? (string) preg_replace("/\.\w+$/", '', $field) : $field->getPath(),
         );
 
-        if ((string) $fieldpath === '') {
+        if ($fieldpath === '') {
             return null;
         }
 
-        $exploded_fieldpath = explode('.', (string) $fieldpath);
+        $exploded_fieldpath = explode('.', $fieldpath);
 
         if ($exploded_fieldpath[0] === $this->getCurrentEntityName()) {
             array_shift($exploded_fieldpath);
@@ -224,7 +224,7 @@ abstract class Entity
      */
     final public function getAllQueryFields(): Collection
     {
-        $fields = (clone $this->getFields())->filter(fn (Field $field): bool => $field->getFieldType() !== FieldType::APPEND && $field->getFieldType() !== FieldType::METHOD)->keyBy(fn (Field $f): string => $f->getFullName());
+        $fields = (clone $this->getFields())->filter(fn (Field $field): bool => $field->getFieldType() !== FieldType::Append && $field->getFieldType() !== FieldType::Method)->keyBy(fn (Field $f): string => $f->getFullName());
 
         foreach ($this->getRelations() as $relation) {
             $fields = $fields->merge($relation->getAllQueryFields()->keyBy(fn (Field $f): string => $f->getFullName()));
@@ -553,10 +553,10 @@ abstract class Entity
         ];
     }
 
-    protected static function applyCorrectWhereMethod(Builder|Relation $query, Field|string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::AND): void
+    protected static function applyCorrectWhereMethod(Builder|Relation $query, Field|string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::And): void
     {
         $fieldname = is_string($field) ? $field : $field->getName();
-        $method = $clause === WhereClause::OR ? 'or' : '';
+        $method = $clause === WhereClause::Or ? 'or' : '';
         $params = [$operator->value === 'like' ? DB::raw('LOWER(' . $fieldname . ')') : $fieldname];
 
         switch ($operator->value) {

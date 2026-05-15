@@ -35,63 +35,63 @@ class ElasticsearchTranslator implements ISchemaTranslator
     private function translateField(FieldDefinition $field): array
     {
         $esField = match ($field->type) {
-            FieldType::TEXT => [
+            FieldType::Text => [
                 'type' => 'text',
                 'analyzer' => $field->options['analyzer'] ?? 'standard',
             ],
-            FieldType::KEYWORD => [
+            FieldType::Keyword => [
                 'type' => 'keyword',
             ],
-            FieldType::INTEGER => [
+            FieldType::Integer => [
                 'type' => 'integer',
             ],
-            FieldType::FLOAT => [
+            FieldType::Float => [
                 'type' => 'float',
             ],
-            FieldType::BOOLEAN => [
+            FieldType::Boolean => [
                 'type' => 'boolean',
             ],
-            FieldType::DATE => [
+            FieldType::Date => [
                 // dates and randge operations
                 'type' => 'date',
                 'format' => $field->options['format'] ?? 'strict_date_optional_time||epoch_millis',
                 // equals operations and sorts
                 'fields' => [
                     'keyword' => [
-                        'type' => FieldType::KEYWORD,
+                        'type' => FieldType::Keyword,
                     ],
                 ],
             ],
-            FieldType::VECTOR => [
+            FieldType::Vector => [
                 'type' => 'dense_vector',
                 'dims' => $field->options['dimensions'] ?? 1536,
                 'index' => true,
                 'similarity' => $field->options['similarity'] ?? 'cosine',
             ],
-            FieldType::ARRAY => [
+            FieldType::Array => [
                 'type' => $field->options['element_type'] ?? 'text',
             ],
-            FieldType::OBJECT => [
+            FieldType::Object => [
                 'type' => 'object',
                 'properties' => $field->options['properties'] ?? [],
             ],
-            FieldType::GEOCODE => [
+            FieldType::Geocode => [
                 'type' => 'geo_point',
                 'lat_lon' => true,
             ],
         };
 
-        if ($field->type === FieldType::ARRAY && isset($field->options['properties'])) {
+        if ($field->type === FieldType::Array && isset($field->options['properties'])) {
             $esField['type'] = 'nested';
             $esField['properties'] = $field->options['properties'];
         }
 
         // Add index-specific options
-        if ($field->hasIndexType(IndexType::SORTABLE)) {
+        if ($field->hasIndexType(IndexType::Sortable)) {
             $esField['doc_values'] = true;
         }
 
-        if ($field->hasIndexType(IndexType::FILTERABLE)) {
+        if ($field->hasIndexType(IndexType::Filterable)) {
             $esField['index'] = true;
         }
 

@@ -41,38 +41,38 @@ class DatabaseTranslator implements ISchemaTranslator
     private function getColumnDefinition(FieldDefinition $field): array
     {
         return match ($field->type) {
-            FieldType::TEXT, FieldType::KEYWORD => [
+            FieldType::Text, FieldType::Keyword => [
                 'type' => 'text',
                 'nullable' => ! $field->required,
             ],
-            FieldType::INTEGER => [
+            FieldType::Integer => [
                 'type' => 'integer',
                 'nullable' => ! $field->required,
             ],
-            FieldType::FLOAT => [
+            FieldType::Float => [
                 'type' => 'decimal',
                 'precision' => 10,
                 'scale' => 6,
                 'nullable' => ! $field->required,
             ],
-            FieldType::BOOLEAN => [
+            FieldType::Boolean => [
                 'type' => 'boolean',
                 'nullable' => ! $field->required,
                 'default' => $field->default ?? false,
             ],
-            FieldType::DATE => [
+            FieldType::Date => [
                 'type' => 'timestamp',
                 'nullable' => ! $field->required,
             ],
-            FieldType::VECTOR => [
+            FieldType::Vector => [
                 'type' => 'json', // Store as JSON for vector similarity
                 'nullable' => ! $field->required,
             ],
-            FieldType::ARRAY => [
+            FieldType::Array => [
                 'type' => 'json',
                 'nullable' => ! $field->required,
             ],
-            FieldType::OBJECT => [
+            FieldType::Object => [
                 'type' => 'json',
                 'nullable' => ! $field->required,
             ],
@@ -84,15 +84,15 @@ class DatabaseTranslator implements ISchemaTranslator
         $indexes = [];
 
         foreach ($schema->getFields() as $field) {
-            if ($field->hasIndexType(IndexType::SEARCHABLE) || $field->hasIndexType(IndexType::FILTERABLE)) {
+            if ($field->hasIndexType(IndexType::Searchable) || $field->hasIndexType(IndexType::Filterable)) {
                 $indexes[] = [
                     'name' => sprintf('idx_%s_%s', $schema->name, $field->name),
                     'columns' => [$field->name],
-                    'type' => $field->type === FieldType::TEXT ? 'fulltext' : 'btree',
+                    'type' => $field->type === FieldType::Text ? 'fulltext' : 'btree',
                 ];
             }
 
-            if ($field->hasIndexType(IndexType::VECTOR)) {
+            if ($field->hasIndexType(IndexType::Vector)) {
                 $indexes[] = [
                     'name' => sprintf('idx_%s_%s_vector', $schema->name, $field->name),
                     'columns' => [$field->name],

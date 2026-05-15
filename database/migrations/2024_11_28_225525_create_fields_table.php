@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
@@ -14,13 +15,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('fields', static function (Blueprint $table): void {
+        $fields_table = CoreTables::Fields->value;
+        Schema::create($fields_table, static function (Blueprint $table) use ($fields_table): void {
             $table->id();
             $table->string('name')->nullable(false)->comment('The name of the field');
             $table->string('type')->nullable(false)->comment('The type of the field');
             $table->json('options')->nullable(false)->comment('The options of the field');
             $table->boolean('is_slug')->default(false)->nullable(false)->comment('Whether the field takes part in the slug');
-            $table->boolean('is_active')->default(true)->nullable(false)->index('fields_is_active_IDX')->comment('Whether the field is active');
+            $table->boolean('is_active')->default(true)->nullable(false)->index("{$fields_table}_is_active_IDX")->comment('Whether the field is active');
             $table->boolean('is_translatable')->default(false)->nullable(false)->comment('Whether the field is translatable');
 
             MigrateUtils::timestamps(
@@ -29,7 +31,7 @@ return new class extends Migration
                 hasSoftDelete: true,
             );
 
-            $table->unique(['name', 'deleted_at'], 'fields_name_UN');
+            $table->unique(['name', 'deleted_at'], "{$fields_table}_name_UN");
         });
     }
 
@@ -38,6 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('fields');
+        Schema::dropIfExists(CoreTables::Fields->value);
     }
 };

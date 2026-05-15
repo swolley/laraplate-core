@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Overrides\Model;
@@ -14,6 +15,7 @@ use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperCronJob
  */
 final class CronJob extends Model
@@ -24,6 +26,9 @@ final class CronJob extends Model
     }
     use HasLocks;
     // endregion
+
+    #[Override]
+    protected $table = CoreTables::CronJobs->value;
 
     /**
      * @var array<int,string>

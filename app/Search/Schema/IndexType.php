@@ -6,9 +6,9 @@ namespace Modules\Core\Search\Schema;
 
 enum IndexType: string
 {
-    case SEARCHABLE = 'searchable';
-    case FILTERABLE = 'filterable';
-    case SORTABLE = 'sortable';
-    case FACETABLE = 'facetable';
-    case VECTOR = 'vector';
+    case Searchable = 'searchable';
+    case Filterable = 'filterable';
+    case Sortable = 'sortable';
+    case Facetable = 'facetable';
+    case Vector = 'vector';
 }

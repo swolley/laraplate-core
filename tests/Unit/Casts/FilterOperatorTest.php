@@ -6,8 +6,8 @@ use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\RequestFilterOperator;
 
 it('maps request operator string to filter operator', function (): void {
-    expect(FilterOperator::tryFromRequestOperator('eq'))->toBe(FilterOperator::EQUALS)
-        ->and(FilterOperator::tryFromRequestOperator(RequestFilterOperator::LIKE))->toBe(FilterOperator::LIKE);
+    expect(FilterOperator::tryFromRequestOperator('eq'))->toBe(FilterOperator::Equals)
+        ->and(FilterOperator::tryFromRequestOperator(RequestFilterOperator::Like))->toBe(FilterOperator::Like);
 });
 
 it('returns null for unknown operator', function (): void {
@@ -15,6 +15,6 @@ it('returns null for unknown operator', function (): void {
 });
 
 it('has expected cases', function (): void {
-    expect(FilterOperator::EQUALS->value)->toBe('=')
-        ->and(FilterOperator::IN->value)->toBe('in');
+    expect(FilterOperator::Equals->value)->toBe('=')
+        ->and(FilterOperator::In->value)->toBe('in');
 });

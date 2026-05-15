@@ -66,9 +66,9 @@ it('list request data extracts pagination, filters, groups and sorts from pagina
         ->and($data->to)->toBe(21)
         ->and($data->count)->toBeTrue()
         ->and($data->sort[0])->toBeInstanceOf(Sort::class)
-        ->and($data->sort[1]->direction)->toBe(SortDirection::DESC)
+        ->and($data->sort[1]->direction)->toBe(SortDirection::Desc)
         ->and($data->filters)->toBeInstanceOf(FiltersGroup::class)
-        ->and($data->filters->operator)->toBe(WhereClause::OR)
+        ->and($data->filters->operator)->toBe(WhereClause::Or)
         ->and($data->group_by)->toBe(['name', 'id']);
 });
 
@@ -98,9 +98,9 @@ it('list request data merges filters and computes total pages', function (): voi
     $request = new ListRequest();
     $data = new ListRequestData($request, 'setting', ['sort' => []], 'id');
 
-    $existing = new FiltersGroup([new Filter('name', 'john', FilterOperator::EQUALS)], WhereClause::AND);
+    $existing = new FiltersGroup([new Filter('name', 'john', FilterOperator::Equals)], WhereClause::And);
     $data->mergeFilters($existing);
-    $data->mergeFilters(new FiltersGroup([new Filter('active', true, FilterOperator::EQUALS)], WhereClause::OR));
+    $data->mergeFilters(new FiltersGroup([new Filter('active', true, FilterOperator::Equals)], WhereClause::Or));
 
     expect($data->filters)->toBeInstanceOf(FiltersGroup::class)
         ->and($data->pagination)->toBeGreaterThanOrEqual(1)

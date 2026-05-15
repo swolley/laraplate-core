@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use MatanYadaev\EloquentSpatial\Objects\Point;
 use MatanYadaev\EloquentSpatial\Traits\HasSpatial;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Overrides\Model;
 use Override;
 
@@ -16,6 +17,7 @@ use Override;
  *
  * @method static whereDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, float $distance)
  * @method static orderByDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, string $direction = 'asc')
+ * @mixin \Eloquent
  * @mixin IdeHelperPlace
  */
 class Place extends Model
@@ -24,12 +26,16 @@ class Place extends Model
 
     private const float COORDINATE_EPSILON = 1e-7;
 
+    #[Override]
+    protected $table = CoreTables::Places->value;
+
     /**
      * Exclude {@see geolocation} from version snapshots: the DB returns binary WKB which breaks JSON
-     * encoding on {@see \Modules\Core\Models\Version}. {@see latitude} / {@see longitude} retain the point.
+     * encoding on {@see Version}. {@see latitude} / {@see longitude} retain the point.
      *
      * @var list<string>
      */
+    #[\Override]
     protected array $dontVersionable = [
         'created_at',
         'updated_at',
@@ -40,6 +46,7 @@ class Place extends Model
     /**
      * The attributes that are mass assignable.
      */
+    #[\Override]
     protected $fillable = [
         'address',
         'city',
@@ -131,11 +138,8 @@ class Place extends Model
 
         $current = $this->geolocation;
 
-        if ($current instanceof Point) {
-            if (abs($current->latitude - $lat_float) < self::COORDINATE_EPSILON
-                && abs($current->longitude - $lng_float) < self::COORDINATE_EPSILON) {
-                return;
-            }
+        if ($current instanceof Point && (abs($current->latitude - $lat_float) < self::COORDINATE_EPSILON && abs($current->longitude - $lng_float) < self::COORDINATE_EPSILON)) {
+            return;
         }
 
         $this->setAttribute('geolocation', new Point($lat_float, $lng_float));

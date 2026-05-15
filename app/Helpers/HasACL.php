@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\ACL;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-type HasACLType HasACL
  *
  * @method hasMany<ACL> acl()

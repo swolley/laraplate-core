@@ -11,10 +11,10 @@ trait HasReadHooks
     public function onPreSelect(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->readEvents[EventType::PRE_SELECT->value] ?? null;
+            return $this->readEvents[EventType::PreSelect->value] ?? null;
         }
 
-        $this->readEvents[EventType::PRE_SELECT->value] = $callback;
+        $this->readEvents[EventType::PreSelect->value] = $callback;
 
         return $this;
     }
@@ -22,10 +22,10 @@ trait HasReadHooks
     public function onPostSelect(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->readEvents[EventType::POST_SELECT->value] ?? null;
+            return $this->readEvents[EventType::PostSelect->value] ?? null;
         }
 
-        $this->readEvents[EventType::POST_SELECT->value] = $callback;
+        $this->readEvents[EventType::PostSelect->value] = $callback;
 
         return $this;
     }

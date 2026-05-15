@@ -82,7 +82,7 @@ final class FiltersGroupCast implements CastsAttributes
                 $nested[] = $this->hydrateNode($item);
             }
 
-            $operator = WhereClause::tryFrom(mb_strtolower((string) ($data['operator'] ?? 'and'))) ?? WhereClause::AND;
+            $operator = WhereClause::tryFrom(mb_strtolower((string) ($data['operator'] ?? 'and'))) ?? WhereClause::And;
 
             return new FiltersGroup(filters: $nested, operator: $operator);
         }
@@ -122,7 +122,7 @@ final class FiltersGroupCast implements CastsAttributes
         if (array_is_list($item)) {
             return $this->hydrateGroup([
                 'filters' => $item,
-                'operator' => WhereClause::AND->value,
+                'operator' => WhereClause::And->value,
             ]);
         }
 
@@ -138,7 +138,7 @@ final class FiltersGroupCast implements CastsAttributes
 
         $operator = $operator_raw instanceof FilterOperator
             ? $operator_raw
-            : FilterOperator::tryFrom((string) $operator_raw) ?? FilterOperator::EQUALS;
+            : FilterOperator::tryFrom((string) $operator_raw) ?? FilterOperator::Equals;
 
         return new Filter(
             property: (string) $data['property'],

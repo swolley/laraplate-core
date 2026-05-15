@@ -18,7 +18,7 @@ it('applies equals null as whereNull', function (): void {
 
     $query = User::query();
     $filters = new FiltersGroup([
-        new Filter('email_verified_at', null, FilterOperator::EQUALS),
+        new Filter('email_verified_at', null, FilterOperator::Equals),
     ]);
 
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -32,7 +32,7 @@ it('applies not equals null as whereNotNull', function (): void {
 
     $query = User::query();
     $filters = new FiltersGroup([
-        new Filter('email_verified_at', null, FilterOperator::NOT_EQUALS),
+        new Filter('email_verified_at', null, FilterOperator::NotEquals),
     ]);
 
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -46,7 +46,7 @@ it('applies IN operator with scalar value', function (): void {
 
     $query = User::query();
     $filters = new FiltersGroup([
-        new Filter('username', 'alpha', FilterOperator::IN),
+        new Filter('username', 'alpha', FilterOperator::In),
     ]);
 
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -61,7 +61,7 @@ it('applies BETWEEN operator', function (): void {
 
     $query = User::query();
     $filters = new FiltersGroup([
-        new Filter('id', [$u1->id, $u2->id], FilterOperator::BETWEEN),
+        new Filter('id', [$u1->id, $u2->id], FilterOperator::Between),
     ]);
 
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -77,7 +77,7 @@ it('applies LIKE and NOT LIKE operators', function (): void {
 
     $query_like = User::query();
     $filters_like = new FiltersGroup([
-        new Filter('username', '%doe%', FilterOperator::LIKE),
+        new Filter('username', '%doe%', FilterOperator::Like),
     ]);
     (new QueryBuilder())->applyFilters($query_like, $filters_like);
 
@@ -85,7 +85,7 @@ it('applies LIKE and NOT LIKE operators', function (): void {
 
     $query_not_like = User::query();
     $filters_not_like = new FiltersGroup([
-        new Filter('username', '%doe%', FilterOperator::NOT_LIKE),
+        new Filter('username', '%doe%', FilterOperator::NotLike),
     ]);
     (new QueryBuilder())->applyFilters($query_not_like, $filters_not_like);
 
@@ -99,12 +99,12 @@ it('supports OR groups with nested AND group', function (): void {
     User::factory()->create(['username' => 'gamma', 'email' => 'gamma@example.com']);
 
     $filters = new FiltersGroup([
-        new Filter('username', 'alpha', FilterOperator::EQUALS),
+        new Filter('username', 'alpha', FilterOperator::Equals),
         new FiltersGroup([
-            new Filter('username', 'beta', FilterOperator::EQUALS),
-            new Filter('email', 'beta@example.com', FilterOperator::EQUALS),
-        ], WhereClause::AND),
-    ], WhereClause::OR);
+            new Filter('username', 'beta', FilterOperator::Equals),
+            new Filter('email', 'beta@example.com', FilterOperator::Equals),
+        ], WhereClause::And),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -123,7 +123,7 @@ it('applies relation field filters using whereHas', function (): void {
     $user_support->assignRole($role_support);
 
     $filters = new FiltersGroup([
-        new Filter('roles.name', 'sales', FilterOperator::EQUALS),
+        new Filter('roles.name', 'sales', FilterOperator::Equals),
     ]);
 
     $query = User::query();
@@ -141,7 +141,7 @@ it('supports has() via property pointing to a relation method', function (): voi
     $user_without_role = User::factory()->create();
 
     $filters = new FiltersGroup([
-        new Filter('users.roles', 0, FilterOperator::GREAT),
+        new Filter('users.roles', 0, FilterOperator::Great),
     ]);
 
     $query = User::query();
@@ -168,7 +168,7 @@ it('applies nested relation filter on roles.permissions.name', function (): void
     $user_support->assignRole($role_support);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::EQUALS),
+        new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::Equals),
     ]);
 
     $query = User::query();
@@ -193,7 +193,7 @@ it('supports IN operator on nested relation fields', function (): void {
     $u3->assignRole($role_other);
 
     $filters = new FiltersGroup([
-        new Filter('roles.name', ['sales', 'admin'], FilterOperator::IN),
+        new Filter('roles.name', ['sales', 'admin'], FilterOperator::In),
     ]);
 
     $query = User::query();
@@ -218,14 +218,14 @@ it('applies mixed OR/AND with nested relation and root filters', function (): vo
 
     $filters = new FiltersGroup([
         new FiltersGroup([
-            new Filter('roles.name', 'sales', FilterOperator::EQUALS),
-            new Filter('username', 'alpha', FilterOperator::EQUALS),
-        ], WhereClause::AND),
+            new Filter('roles.name', 'sales', FilterOperator::Equals),
+            new Filter('username', 'alpha', FilterOperator::Equals),
+        ], WhereClause::And),
         new FiltersGroup([
-            new Filter('roles.name', 'support', FilterOperator::EQUALS),
-            new Filter('username', 'beta', FilterOperator::EQUALS),
-        ], WhereClause::AND),
-    ], WhereClause::OR);
+            new Filter('roles.name', 'support', FilterOperator::Equals),
+            new Filter('username', 'beta', FilterOperator::Equals),
+        ], WhereClause::And),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -251,7 +251,7 @@ it('applies LIKE on nested relation field roles.permissions.name', function (): 
     $user_no_match->assignRole($role_b);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.name', '%orders%', FilterOperator::LIKE),
+        new Filter('roles.permissions.name', '%orders%', FilterOperator::Like),
     ]);
 
     $query = User::query();
@@ -279,7 +279,7 @@ it('applies BETWEEN on relation field roles.id', function (): void {
     $u_out->assignRole($role_high);
 
     $filters = new FiltersGroup([
-        new Filter('roles.id', [$low_id, $high_id], FilterOperator::BETWEEN),
+        new Filter('roles.id', [$low_id, $high_id], FilterOperator::Between),
     ]);
 
     $query = User::query();
@@ -309,16 +309,16 @@ it('applies three-level OR nesting with relation and root predicates', function 
     $filters = new FiltersGroup([
         new FiltersGroup([
             new FiltersGroup([
-                new Filter('roles.name', 'sales', FilterOperator::EQUALS),
-                new Filter('username', 'alpha', FilterOperator::EQUALS),
-            ], WhereClause::AND),
+                new Filter('roles.name', 'sales', FilterOperator::Equals),
+                new Filter('username', 'alpha', FilterOperator::Equals),
+            ], WhereClause::And),
             new FiltersGroup([
-                new Filter('roles.name', 'support', FilterOperator::EQUALS),
-                new Filter('username', 'beta', FilterOperator::EQUALS),
-            ], WhereClause::AND),
-        ], WhereClause::OR),
-        new Filter('username', 'delta', FilterOperator::EQUALS),
-    ], WhereClause::OR);
+                new Filter('roles.name', 'support', FilterOperator::Equals),
+                new Filter('username', 'beta', FilterOperator::Equals),
+            ], WhereClause::And),
+        ], WhereClause::Or),
+        new Filter('username', 'delta', FilterOperator::Equals),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -344,7 +344,7 @@ it('applies NOT LIKE on nested relation field roles.permissions.name', function 
     $user_reports->assignRole($role_reports);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.name', '%orders%', FilterOperator::NOT_LIKE),
+        new Filter('roles.permissions.name', '%orders%', FilterOperator::NotLike),
     ]);
 
     $query = User::query();
@@ -375,7 +375,7 @@ it('applies BETWEEN on nested relation field roles.permissions.id', function ():
     $user_out->assignRole($role_out);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.id', [$low_id, $high_id], FilterOperator::BETWEEN),
+        new Filter('roles.permissions.id', [$low_id, $high_id], FilterOperator::Between),
     ]);
 
     $query = User::query();
@@ -393,7 +393,7 @@ it('applies greater than on main model column', function (): void {
     $mid_id = $u_mid->id;
 
     $filters = new FiltersGroup([
-        new Filter('id', $mid_id, FilterOperator::GREAT),
+        new Filter('id', $mid_id, FilterOperator::Great),
     ]);
 
     $query = User::query();
@@ -418,7 +418,7 @@ it('applies great equals on relation field roles.id', function (): void {
     $user_higher->assignRole($higher);
 
     $filters = new FiltersGroup([
-        new Filter('roles.id', $higher->id, FilterOperator::GREAT_EQUALS),
+        new Filter('roles.id', $higher->id, FilterOperator::GreatEquals),
     ]);
 
     $query = User::query();
@@ -445,7 +445,7 @@ it('applies not equals on nested relation field roles.permissions.name', functio
     $user_no->assignRole($role_skip);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.name', 'default.qb_ne_target.select', FilterOperator::NOT_EQUALS),
+        new Filter('roles.permissions.name', 'default.qb_ne_target.select', FilterOperator::NotEquals),
     ]);
 
     $query = User::query();
@@ -460,7 +460,7 @@ it('accepts table-prefixed main field in filter property', function (): void {
     User::factory()->create(['username' => 'other']);
 
     $filters = new FiltersGroup([
-        new Filter('users.username', 'qb_prefixed_user', FilterOperator::EQUALS),
+        new Filter('users.username', 'qb_prefixed_user', FilterOperator::Equals),
     ]);
 
     $query = User::query();
@@ -475,9 +475,9 @@ it('applies OR group with multiple LIKE filters', function (): void {
     User::factory()->create(['username' => 'gamma_only']);
 
     $filters = new FiltersGroup([
-        new Filter('username', '%alpha%', FilterOperator::LIKE),
-        new Filter('username', '%beta%', FilterOperator::LIKE),
-    ], WhereClause::OR);
+        new Filter('username', '%alpha%', FilterOperator::Like),
+        new Filter('username', '%beta%', FilterOperator::Like),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -491,7 +491,7 @@ it('applies less than on main model column', function (): void {
     $u_high = User::factory()->create();
 
     $filters = new FiltersGroup([
-        new Filter('id', $u_mid->id, FilterOperator::LESS),
+        new Filter('id', $u_mid->id, FilterOperator::Less),
     ]);
 
     $query = User::query();
@@ -516,7 +516,7 @@ it('applies less equals on relation field roles.id', function (): void {
     $user_higher->assignRole($higher);
 
     $filters = new FiltersGroup([
-        new Filter('roles.id', $lower->id, FilterOperator::LESS_EQUALS),
+        new Filter('roles.id', $lower->id, FilterOperator::LessEquals),
     ]);
 
     $query = User::query();
@@ -550,9 +550,9 @@ it('applies OR between relation between and main equals filters', function (): v
     $user_no_match->assignRole($role_out);
 
     $filters = new FiltersGroup([
-        new Filter('roles.permissions.id', [$low_id, $high_id], FilterOperator::BETWEEN),
-        new Filter('username', 'qb_or_target', FilterOperator::EQUALS),
-    ], WhereClause::OR);
+        new Filter('roles.permissions.id', [$low_id, $high_id], FilterOperator::Between),
+        new Filter('username', 'qb_or_target', FilterOperator::Equals),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -591,11 +591,11 @@ it('applies nested OR combining NOT LIKE on permissions BETWEEN on roles.id and 
 
     $filters = new FiltersGroup([
         new FiltersGroup([
-            new Filter('roles.permissions.name', '%qbcomplexbadtoken%', FilterOperator::NOT_LIKE),
-            new Filter('roles.id', [$low_between, $high_between], FilterOperator::BETWEEN),
-        ], WhereClause::OR),
-        new Filter('id', $user_ge->id, FilterOperator::GREAT_EQUALS),
-    ], WhereClause::OR);
+            new Filter('roles.permissions.name', '%qbcomplexbadtoken%', FilterOperator::NotLike),
+            new Filter('roles.id', [$low_between, $high_between], FilterOperator::Between),
+        ], WhereClause::Or),
+        new Filter('id', $user_ge->id, FilterOperator::GreatEquals),
+    ], WhereClause::Or);
 
     $candidate_ids = [$user_not_like->id, $user_between->id, $user_ge->id, $user_none->id];
 
@@ -610,7 +610,7 @@ it('keeps query unchanged when OR filter group is empty', function (): void {
     $u1 = User::factory()->create();
     $u2 = User::factory()->create();
 
-    $filters = new FiltersGroup([], WhereClause::OR);
+    $filters = new FiltersGroup([], WhereClause::Or);
 
     $query = User::query()->whereKey([$u1->id, $u2->id]);
     (new QueryBuilder())->applyFilters($query, $filters);

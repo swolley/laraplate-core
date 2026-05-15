@@ -8,23 +8,23 @@ use Modules\Core\Casts\ActionEnum;
 
 enum GridAction: string
 {
-    case SELECT = ActionEnum::SELECT->value;
-    case INSERT = ActionEnum::INSERT->value;
-    case UPDATE = ActionEnum::UPDATE->value;
-    case DELETE = ActionEnum::DELETE->value;
-    // case RESTORE = 'restore';
-    case FORCE_DELETE = ActionEnum::FORCE_DELETE->value;
-    case APPROVE = ActionEnum::APPROVE->value;
-    // case DISAPPROVE = 'disapprove';
-    // case IMPERSONATE = 'impersonate';
-    case LOCK = ActionEnum::LOCK->value;
-    // case UNLOCK = 'unlock';
-    case FUNNELS = 'funnels';
-    case OPTIONS = 'options';
-    case DATA = 'data';
-    case EXPORT = 'export';
-    case CHECK = 'check';
-    case GET_ALL = 'get_all';
+    case Select = ActionEnum::Select->value;
+    case Insert = ActionEnum::Insert->value;
+    case Update = ActionEnum::Update->value;
+    case Delete = ActionEnum::Delete->value;
+    // case Restore = 'restore';
+    case ForceDelete = ActionEnum::ForceDelete->value;
+    case Approve = ActionEnum::Approve->value;
+    // case Disapprove = 'disapprove';
+    // case Impersonate = 'impersonate';
+    case Lock = ActionEnum::Lock->value;
+    // case Unlock = 'unlock';
+    case Funnels = 'funnels';
+    case Options = 'options';
+    case Data = 'data';
+    case Export = 'export';
+    case Check = 'check';
+    case GetAll = 'get_all';
 
     public static function values(): array
     {
@@ -41,7 +41,7 @@ enum GridAction: string
         }
 
         return match ($action) {
-            self::INSERT->value, self::UPDATE->value, self::DELETE->value, self::FORCE_DELETE->value, self::APPROVE->value, self::LOCK->value => false,
+            self::Insert->value, self::Update->value, self::Delete->value, self::ForceDelete->value, self::Approve->value, self::Lock->value => false,
             default => true,
         };
     }

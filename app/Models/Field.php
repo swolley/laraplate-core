@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldObserver;
@@ -17,6 +18,8 @@ use Override;
 
 /**
  * @property-read object $options
+ * @mixin \Illuminate\Database\Eloquent\Model
+ * @mixin \Eloquent
  * @mixin IdeHelperField
  */
 #[ObservedBy(FieldObserver::class)]
@@ -27,6 +30,9 @@ final class Field extends Model
         HasActivation::casts as private activationCasts;
     }
     // endregion
+
+    #[Override]
+    protected $table = CoreTables::Fields->value;
 
     /**
      * The attributes that are mass assignable.
@@ -97,10 +103,10 @@ final class Field extends Model
             'type' => ['required', 'string', Rule::enum(FieldType::class)],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:fields,name'],
+            'name' => ['required', 'string', 'max:255', 'unique:'.CoreTables::Fields->value.',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:fields,name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'unique:'.CoreTables::Fields->value.',name,' . $this->id],
         ]);
 
         return $rules;

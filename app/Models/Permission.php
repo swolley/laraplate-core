@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
 use Override;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperPermission
  */
 final class Permission extends ModelsPermission
@@ -25,6 +27,9 @@ final class Permission extends ModelsPermission
         getRules as private getRulesTrait;
     }
     use HasVersions;
+
+    #[Override]
+    protected $table = CoreTables::Permissions->value;
 
     /**
      * @var array<int,string>
@@ -83,10 +88,10 @@ final class Permission extends ModelsPermission
             'description' => ['string', 'max:255', 'nullable'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:permissions,name'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:'.CoreTables::Permissions->value.',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:permissions,name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:'.CoreTables::Permissions->value.',name,' . $this->id],
         ]);
 
         return $rules;

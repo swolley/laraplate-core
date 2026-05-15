@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
@@ -15,7 +16,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('places', function (Blueprint $table): void {
+        $places_table = CoreTables::Places->value;
+        Schema::create($places_table, function (Blueprint $table) use ($places_table): void {
             $table->id();
             $table->string('address')->nullable();
             $table->string('city')->nullable();
@@ -39,9 +41,10 @@ return new class extends Migration
                 // Campo opzionale; registriamo metadata SDO e creiamo indice spaziale
                 $table->geometry('geolocation')->nullable()->comment('The geolocation of the location');
 
+                $upper_places_table = mb_strtoupper($places_table);
                 DB::unprepared("
                     DECLARE
-                        tbl VARCHAR2(128) := 'LOCATIONS';
+                        tbl VARCHAR2(128) := '{$upper_places_table}';
                         col VARCHAR2(128) := 'GEOLOCATION';
                         srid NUMBER := 4326;
                     BEGIN
@@ -64,7 +67,7 @@ return new class extends Migration
                     END;
                 ");
 
-                DB::unprepared('CREATE INDEX locations_geolocation_spx ON locations(geolocation) INDEXTYPE IS MDSYS.SPATIAL_INDEX');
+                DB::unprepared("CREATE INDEX {$places_table}_geolocation_spx ON {$places_table}(geolocation) INDEXTYPE IS MDSYS.SPATIAL_INDEX");
             }
 
             MigrateUtils::timestamps(
@@ -73,8 +76,8 @@ return new class extends Migration
                 hasSoftDelete: true,
             );
 
-            $table->index('city', 'places_city_IDX');
-            $table->index('province', 'places_province_IDX');
+            $table->index('city', "{$places_table}_city_IDX");
+            $table->index('province', "{$places_table}_province_IDX");
         });
     }
 
@@ -83,6 +86,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('places');
+        Schema::dropIfExists(CoreTables::Places->value);
     }
 };

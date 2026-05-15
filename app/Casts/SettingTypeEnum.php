@@ -6,10 +6,10 @@ namespace Modules\Core\Casts;
 
 enum SettingTypeEnum: string
 {
-    case BOOLEAN = 'boolean';
-    case INTEGER = 'integer';
-    case FLOAT = 'float';
-    case STRING = 'string';
-    case JSON = 'json';
-    case DATE = 'date';
+    case Boolean = 'boolean';
+    case Integer = 'integer';
+    case Float = 'float';
+    case String = 'string';
+    case Json = 'json';
+    case Date = 'date';
 }

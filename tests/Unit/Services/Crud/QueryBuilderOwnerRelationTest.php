@@ -51,9 +51,9 @@ it('prepareQuery stacks multiple aggregates on the same relation key', function 
     $query = User::query();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.id', ColumnType::SUM),
-            new Column('users.roles.id', ColumnType::AVG),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.id', ColumnType::Sum),
+            new Column('users.roles.id', ColumnType::Avg),
         ],
         relations: ['roles'],
     );
@@ -70,9 +70,9 @@ it('prepareQuery stacks multiple column selections on the same relation', functi
     $query = User::query();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
-            new Column('users.roles.guard_name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
+            new Column('users.roles.guard_name', ColumnType::Column),
         ],
         relations: ['roles'],
     );
@@ -86,9 +86,9 @@ it('prepareQuery applies nested relation count aggregate inside eager role callb
     $query = User::query();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
-            new Column('users.roles.permissions.id', ColumnType::COUNT),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
+            new Column('users.roles.permissions.id', ColumnType::Count),
         ],
         relations: ['roles'],
     );
@@ -109,16 +109,16 @@ it('extractRelationFilters walks nested filter groups and skips main-entity-only
     $query = User::query();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: ['roles'],
         filters: new FiltersGroup([
             new FiltersGroup([
-                new Filter('users.username', 'alpha', FilterOperator::EQUALS),
-                new Filter('roles.name', 'sales', FilterOperator::EQUALS),
-            ], WhereClause::AND),
-            new Filter('id', 1, FilterOperator::GREAT),
+                new Filter('users.username', 'alpha', FilterOperator::Equals),
+                new Filter('roles.name', 'sales', FilterOperator::Equals),
+            ], WhereClause::And),
+            new Filter('id', 1, FilterOperator::Great),
         ]),
     );
 
@@ -130,11 +130,11 @@ it('extractRelationFilters walks nested filter groups and skips main-entity-only
 it('prepareQuery applies sort branches for main column orderBy, relation method skip, and single-segment relation path', function (): void {
     $query = User::query();
     $request_data = qb_fullcov_list_data(
-        columns: [new Column('users.id', ColumnType::COLUMN)],
+        columns: [new Column('users.id', ColumnType::Column)],
         relations: [],
         sort: [
-            new Sort('username', SortDirection::ASC),
-            new Sort('roles', SortDirection::DESC),
+            new Sort('username', SortDirection::Asc),
+            new Sort('roles', SortDirection::Desc),
         ],
     );
 
@@ -164,9 +164,9 @@ it('prepareQuery skips relation sort when stripped sort path has no relation seg
 
     $query = $model->newQuery();
     $request_data = qb_fullcov_list_data(
-        columns: [new Column('cov_a.id', ColumnType::COLUMN)],
+        columns: [new Column('cov_a.id', ColumnType::Column)],
         relations: [],
-        sort: [new Sort('xcov_a.ky', SortDirection::ASC)],
+        sort: [new Sort('xcov_a.ky', SortDirection::Asc)],
     );
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -210,9 +210,9 @@ it('prepareQuery owner relation uses crudComputedDependencies merge and nested w
     $query = $item_model->newQuery();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('qb_cov_items.title', ColumnType::COLUMN),
-            new Column('qb_cov_items.owner.username', ColumnType::COLUMN),
-            new Column('qb_cov_items.owner.nick', ColumnType::APPEND),
+            new Column('qb_cov_items.title', ColumnType::Column),
+            new Column('qb_cov_items.owner.username', ColumnType::Column),
+            new Column('qb_cov_items.owner.nick', ColumnType::Append),
         ],
         relations: ['owner'],
     );
@@ -266,9 +266,9 @@ it('prepareQuery drops owner relation column list when append has no crudCompute
     $query = $item_model->newQuery();
     $request_data = qb_fullcov_list_data(
         columns: [
-            new Column('qb_cov_items.title', ColumnType::COLUMN),
-            new Column('qb_cov_items.owner.username', ColumnType::COLUMN),
-            new Column('qb_cov_items.owner.orphan_append', ColumnType::APPEND),
+            new Column('qb_cov_items.title', ColumnType::Column),
+            new Column('qb_cov_items.owner.username', ColumnType::Column),
+            new Column('qb_cov_items.owner.orphan_append', ColumnType::Append),
         ],
         relations: ['owner'],
     );
@@ -318,9 +318,9 @@ it('resolveComputedDependencies forces select-all when a dependency key is missi
 
     $query = $model->newQuery();
     $request_data = qb_fullcov_list_data([
-        new Column('qb_cov_dep.label', ColumnType::COLUMN),
-        new Column('qb_cov_dep.known', ColumnType::APPEND),
-        new Column('qb_cov_dep.missing_append', ColumnType::APPEND),
+        new Column('qb_cov_dep.label', ColumnType::Column),
+        new Column('qb_cov_dep.known', ColumnType::Append),
+        new Column('qb_cov_dep.missing_append', ColumnType::Append),
     ]);
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -341,12 +341,12 @@ it('exercises QueryBuilder private helpers via reflection for remaining branches
 
     $user = User::factory()->create();
     $relation = $user->roles();
-    $relation_columns = [new Column('id', ColumnType::SUM)];
+    $relation_columns = [new Column('id', ColumnType::Sum)];
     $apply_columns->invokeArgs($qb, [$relation, &$relation_columns]);
 
     $apply_agg = $ref->getMethod('applyAggregatesToQuery');
     $apply_agg->setAccessible(true);
-    $agg = ['other_relation.sum' => [new Column('id', ColumnType::SUM)]];
+    $agg = ['other_relation.sum' => [new Column('id', ColumnType::Sum)]];
     $apply_agg->invokeArgs($qb, [$relation, &$agg, 'roles']);
     expect($agg)->toHaveKey('other_relation.sum');
 
@@ -356,11 +356,11 @@ it('exercises QueryBuilder private helpers via reflection for remaining branches
 
     $merge = $ref->getMethod('mergeComputedDependencies');
     $merge->setAccessible(true);
-    $rel_cols = ['roles' => [new Column('name', ColumnType::COLUMN)]];
+    $rel_cols = ['roles' => [new Column('name', ColumnType::Column)]];
     $merge->invokeArgs($qb, [&$rel_cols, 'roles', ['name', 'guard_name']]);
     expect(count($rel_cols['roles']))->toBe(2);
 
-    $rel_cols_dup = ['roles' => [new Column('name', ColumnType::COLUMN)]];
+    $rel_cols_dup = ['roles' => [new Column('name', ColumnType::Column)]];
     $merge->invokeArgs($qb, [&$rel_cols_dup, 'roles', ['name']]);
     expect(count($rel_cols_dup['roles']))->toBe(1);
 
@@ -370,7 +370,7 @@ it('exercises QueryBuilder private helpers via reflection for remaining branches
     $extract_computed = $ref->getMethod('extractComputedColumns');
     $extract_computed->setAccessible(true);
     $computed = $extract_computed->invoke($qb, 'users', [
-        new Column('users.roles.fake_append', ColumnType::APPEND),
+        new Column('users.roles.fake_append', ColumnType::Append),
     ]);
     expect($computed['relations']['roles']['append'])->toContain('fake_append');
 
@@ -387,7 +387,7 @@ it('exercises QueryBuilder private helpers via reflection for remaining branches
     $extract_for_relation->setAccessible(true);
     $user_for_filter = User::factory()->create();
     $only_main_filter = new FiltersGroup([
-        new Filter('users.username', 'x', FilterOperator::EQUALS),
-    ], WhereClause::AND);
+        new Filter('users.username', 'x', FilterOperator::Equals),
+    ], WhereClause::And);
     expect($extract_for_relation->invoke($qb, $user_for_filter, $only_main_filter, 'roles'))->toBeNull();
 });

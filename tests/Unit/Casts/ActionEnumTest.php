@@ -21,7 +21,7 @@ it('isReadAction returns false for update', function (): void {
 });
 
 it('has expected cases', function (): void {
-    expect(ActionEnum::SELECT->value)->toBe('select')
-        ->and(ActionEnum::INSERT->value)->toBe('insert')
-        ->and(ActionEnum::DELETE->value)->toBe('delete');
+    expect(ActionEnum::Select->value)->toBe('select')
+        ->and(ActionEnum::Insert->value)->toBe('insert')
+        ->and(ActionEnum::Delete->value)->toBe('delete');
 });

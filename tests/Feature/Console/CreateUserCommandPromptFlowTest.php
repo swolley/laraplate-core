@@ -11,6 +11,7 @@ use Laravel\Prompts\PasswordPrompt;
 use Laravel\Prompts\SearchPrompt;
 use Laravel\Prompts\TextPrompt;
 use Modules\Core\Console\CreateUserCommand;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
@@ -43,13 +44,13 @@ it('covers CreateUserCommand success and failure branches', function (): void {
         'auth.providers.users.model' => User::class,
     ]);
 
-    DB::table('roles')->insert([
+    DB::table(CoreTables::Roles->value)->insert([
         'name' => 'console',
         'guard_name' => 'web',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    DB::table('permissions')->insert([
+    DB::table(CoreTables::Permissions->value)->insert([
         'name' => 'console_permission',
         'guard_name' => 'web',
         'created_at' => now(),
@@ -97,7 +98,7 @@ it('covers CreateUserCommand success and failure branches', function (): void {
 it('covers CreateUserCommand in-string options and random password branch', function (): void {
     config(['auth.providers.users.model' => CreateUserPromptFlowStub::class]);
 
-    DB::table('roles')->insert([
+    DB::table(CoreTables::Roles->value)->insert([
         'name' => 'console_second',
         'guard_name' => 'web',
         'created_at' => now(),

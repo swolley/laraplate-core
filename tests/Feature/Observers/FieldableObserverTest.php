@@ -19,7 +19,7 @@ it('creates preset version when fieldable pivot is saved', function (): void {
 
     $field = Field::query()->create([
         'name' => 'obs_field_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 
@@ -38,7 +38,7 @@ it('creates preset version when fieldable pivot is deleted', function (): void {
     $preset = Preset::query()->firstOrFail();
     $field = Field::query()->create([
         'name' => 'obs_field_del_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 

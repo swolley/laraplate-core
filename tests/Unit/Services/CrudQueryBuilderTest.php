@@ -26,9 +26,9 @@ it('groups main and relation columns correctly', function (): void {
 
     $mainEntity = 'orders';
     $columns = [
-        new Column('orders.id', ColumnType::COLUMN),
-        new Column('orders.total', ColumnType::COLUMN),
-        new Column('orders.customer.name', ColumnType::COLUMN),
+        new Column('orders.id', ColumnType::Column),
+        new Column('orders.total', ColumnType::Column),
+        new Column('orders.customer.name', ColumnType::Column),
     ];
 
     $args = [&$mainEntity, $columns];

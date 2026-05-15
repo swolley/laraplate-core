@@ -136,11 +136,11 @@ final class CreateEntityCommand extends Command
             required: $is_required,
             validate: null,
             hint: match (true) {
-                $field->type === FieldType::SELECT && isset($field->options->multiple) && $field->options->multiple => 'Use [] for an empty selection; numbers, booleans, or JSON arrays as needed.',
-                $field->type === FieldType::SWITCH => $is_required
+                $field->type === FieldType::Select && isset($field->options->multiple) && $field->options->multiple => 'Use [] for an empty selection; numbers, booleans, or JSON arrays as needed.',
+                $field->type === FieldType::Switch => $is_required
                     ? 'Enter true or false (required).'
                     : 'Enter true or false.',
-                $field->type === FieldType::CHECKBOX => 'Use [] for an empty list; JSON array syntax otherwise.',
+                $field->type === FieldType::Checkbox => 'Use [] for an empty list; JSON array syntax otherwise.',
                 default => "Type 'null' to set the default value to null.",
             },
         );

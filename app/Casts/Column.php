@@ -8,7 +8,7 @@ final readonly class Column
 {
     public ColumnType $type;
 
-    public function __construct(public string $name, string|ColumnType $type = ColumnType::COLUMN)
+    public function __construct(public string $name, string|ColumnType $type = ColumnType::Column)
     {
         $this->type = $type instanceof ColumnType ? $type : ColumnType::tryFrom(mb_strtolower($type));
     }

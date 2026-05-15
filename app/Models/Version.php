@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Date;
+use Modules\Core\Enums\CoreTables;
 use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -16,11 +17,15 @@ use Overtrue\LaravelVersionable\VersionStrategy;
 /**
  * @property VersionStrategy $version_strategy
  *
+ * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin IdeHelperVersion
  */
 final class Version extends OvertrueVersion
 {
     use HasFactory;
+
+    #[Override]
+    protected $table = CoreTables::Versions->value;
 
     /**
      * @var array<int,string>
@@ -241,7 +246,7 @@ final class Version extends OvertrueVersion
             return $strategy;
         }
 
-        if ($strategy === false || $strategy === null || $strategy === '') {
+        if (in_array($strategy, [false, null, ''], true)) {
             return VersionStrategy::DIFF;
         }
 

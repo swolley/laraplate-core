@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
@@ -14,7 +15,8 @@ return new class() extends Migration
      */
     public function up(): void
     {
-        Schema::create('disapprovals', function (Blueprint $table): void {
+        $disapprovals_table = CoreTables::Disapprovals->value;
+        Schema::create($disapprovals_table, function (Blueprint $table) use ($disapprovals_table): void {
             $table->id();
             $table->unsignedBigInteger('modification_id')->comment('The id of the modification');
             $table->unsignedBigInteger('disapprover_id')->comment('The id of the disapprover');
@@ -26,8 +28,8 @@ return new class() extends Migration
                 hasCreateUpdate: true,
             );
 
-            $table->foreign(['modification_id'])->references('id')->on('modifications')->cascadeOnDelete();
-            $table->index(['disapprover_id', 'disapprover_type'], 'disapprovals_disapproverable_IDX');
+            $table->foreign(['modification_id'])->references('id')->on(CoreTables::Modifications->value)->cascadeOnDelete();
+            $table->index(['disapprover_id', 'disapprover_type'], "{$disapprovals_table}_disapproverable_IDX");
         });
     }
 
@@ -36,6 +38,6 @@ return new class() extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('disapprovals');
+        Schema::dropIfExists(CoreTables::Disapprovals->value);
     }
 };

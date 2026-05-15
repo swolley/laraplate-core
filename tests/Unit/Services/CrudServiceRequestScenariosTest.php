@@ -145,7 +145,7 @@ it('list applies group_by branch when requested', function (): void {
         $model,
         $request,
         $model->getKeyName(),
-        [new Column('users.lang', ColumnType::COLUMN)],
+        [new Column('users.lang', ColumnType::Column)],
     );
 
     crud_cov_set($data, 'page', null);
@@ -177,7 +177,7 @@ it('detail throws when primary key is missing', function (): void {
         $model,
         $request,
         $model->getKeyName(),
-        [new Column('users.id', ColumnType::COLUMN)],
+        [new Column('users.id', ColumnType::Column)],
     );
 
     $service->detail($data);
@@ -235,7 +235,7 @@ it('tree selects relation type and switches between sole and get modes', functio
     $request_single->query->set('id', $root->getKey());
     $request_single->setUserResolver(fn () => $superadmin);
     $data_single = crud_cov_make_request_data(TreeRequestData::class, $tree_model, $request_single, 'id', [
-        new Column('crud_cov_tree.id', ColumnType::COLUMN),
+        new Column('crud_cov_tree.id', ColumnType::Column),
     ]);
     crud_cov_set($data_single, 'parents', true);
     crud_cov_set($data_single, 'children', true);
@@ -247,7 +247,7 @@ it('tree selects relation type and switches between sole and get modes', functio
     $request_many = Request::create('/tree', 'GET');
     $request_many->setUserResolver(fn () => $superadmin);
     $data_many = crud_cov_make_request_data(TreeRequestData::class, $tree_model, $request_many, 'id', [
-        new Column('crud_cov_tree.id', ColumnType::COLUMN),
+        new Column('crud_cov_tree.id', ColumnType::Column),
     ]);
     crud_cov_set($data_many, 'parents', false);
     crud_cov_set($data_many, 'children', true);
@@ -363,7 +363,7 @@ it('history and tree throw on unsupported models', function (): void {
         $plain_model,
         $history_request,
         'id',
-        [new Column('users.id', ColumnType::COLUMN)],
+        [new Column('users.id', ColumnType::Column)],
     );
 
     expect(fn () => $service->history($history_data))
@@ -376,7 +376,7 @@ it('history and tree throw on unsupported models', function (): void {
         $plain_model,
         $tree_request,
         'id',
-        [new Column('users.id', ColumnType::COLUMN)],
+        [new Column('users.id', ColumnType::Column)],
     );
     crud_cov_set($tree_data, 'parents', false);
     crud_cov_set($tree_data, 'children', true);
@@ -418,8 +418,8 @@ it('detail resolves single primary key and applies main-entity method columns', 
         $request,
         'id',
         [
-            new Column('crud_cov_d_scalar.id', ColumnType::COLUMN),
-            new Column('crud_cov_d_scalar.rowCode', ColumnType::METHOD),
+            new Column('crud_cov_d_scalar.id', ColumnType::Column),
+            new Column('crud_cov_d_scalar.rowCode', ColumnType::Method),
         ],
     );
 
@@ -470,7 +470,7 @@ it('detail resolves composite primary key from validated input', function (): vo
         $composite,
         $request,
         ['tenant_id', 'id'],
-        [new Column('crud_cov_composite_detail.slug', ColumnType::COLUMN)],
+        [new Column('crud_cov_composite_detail.slug', ColumnType::Column)],
     );
 
     $result = $service->detail($data);
@@ -523,7 +523,7 @@ it('history returns record and version history for versionable models', function
         $target,
         $request,
         'id',
-        [new Column('crud_cov_hist_one.id', ColumnType::COLUMN)],
+        [new Column('crud_cov_hist_one.id', ColumnType::Column)],
     );
 
     $limit_prop = new ReflectionProperty($history_data, 'limit');
@@ -563,7 +563,7 @@ it('tree uses ancestorsAndSelf when only parents are requested', function (): vo
     $request->query->set('id', $solo->getKey());
     $request->setUserResolver(fn () => $superadmin);
     $data = crud_cov_make_request_data(TreeRequestData::class, $tree_model, $request, 'id', [
-        new Column('crud_cov_tree_anc.id', ColumnType::COLUMN),
+        new Column('crud_cov_tree_anc.id', ColumnType::Column),
     ]);
     crud_cov_set($data, 'parents', true);
     crud_cov_set($data, 'children', false);
@@ -578,7 +578,7 @@ it('list uses pagination from-to and count branches', function (): void {
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
     $model = new User();
 
-    $base_columns = [new Column('users.id', ColumnType::COLUMN)];
+    $base_columns = [new Column('users.id', ColumnType::Column)];
 
     $req_page = crud_cov_validated_request();
     $req_page->setUserResolver(fn () => $superadmin);

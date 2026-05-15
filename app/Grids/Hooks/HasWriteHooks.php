@@ -11,10 +11,10 @@ trait HasWriteHooks
     public function onPreInsert(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::PRE_INSERT->value] ?? null;
+            return $this->writeEvents[EventType::PreInsert->value] ?? null;
         }
 
-        $this->writeEvents[EventType::PRE_INSERT->value] = $callback;
+        $this->writeEvents[EventType::PreInsert->value] = $callback;
 
         return $this;
     }
@@ -22,10 +22,10 @@ trait HasWriteHooks
     public function onPostInsert(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::POST_INSERT->value] ?? null;
+            return $this->writeEvents[EventType::PostInsert->value] ?? null;
         }
 
-        $this->writeEvents[EventType::POST_INSERT->value] = $callback;
+        $this->writeEvents[EventType::PostInsert->value] = $callback;
 
         return $this;
     }
@@ -33,10 +33,10 @@ trait HasWriteHooks
     public function onPreUpdate(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::PRE_UPDATE->value] ?? null;
+            return $this->writeEvents[EventType::PreUpdate->value] ?? null;
         }
 
-        $this->writeEvents[EventType::PRE_UPDATE->value] = $callback;
+        $this->writeEvents[EventType::PreUpdate->value] = $callback;
 
         return $this;
     }
@@ -44,10 +44,10 @@ trait HasWriteHooks
     public function onPostUpdate(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::POST_UPDATE->value] ?? null;
+            return $this->writeEvents[EventType::PostUpdate->value] ?? null;
         }
 
-        $this->writeEvents[EventType::POST_UPDATE->value] = $callback;
+        $this->writeEvents[EventType::PostUpdate->value] = $callback;
 
         return $this;
     }
@@ -55,10 +55,10 @@ trait HasWriteHooks
     public function onPreDelete(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::PRE_DELETE->value] ?? null;
+            return $this->writeEvents[EventType::PreDelete->value] ?? null;
         }
 
-        $this->writeEvents[EventType::PRE_DELETE->value] = $callback;
+        $this->writeEvents[EventType::PreDelete->value] = $callback;
 
         return $this;
     }
@@ -66,10 +66,10 @@ trait HasWriteHooks
     public function onPostDelete(?callable $callback = null)
     {
         if ($callback === null) {
-            return $this->writeEvents[EventType::POST_DELETE->value] ?? null;
+            return $this->writeEvents[EventType::PostDelete->value] ?? null;
         }
 
-        $this->writeEvents[EventType::POST_DELETE->value] = $callback;
+        $this->writeEvents[EventType::PostDelete->value] = $callback;
 
         return $this;
     }

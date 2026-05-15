@@ -91,9 +91,6 @@ final class VersioningService
         return $version;
     }
 
-    /**
-     * @param  Model&object  $model
-     */
     private function purgeAllVersionRowsExcept(Model $model, Version $keepVersion): void
     {
         /** @var class-string<Version> $versionModelClass */

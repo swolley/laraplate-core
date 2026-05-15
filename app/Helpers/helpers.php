@@ -37,6 +37,22 @@ if (! function_exists('class_module')) {
     }
 }
 
+if (! function_exists('file_module')) {
+    /**
+     * Get the module of a file.
+     *
+     * @param  string  $file  The file to get the module of
+     */
+    function file_module(string $file): string
+    {
+        if (! Str::contains($file, 'Modules')) {
+            return 'App';
+        }
+
+        return Str::before(Str::after($file, 'Modules' . DIRECTORY_SEPARATOR), DIRECTORY_SEPARATOR);
+    }
+}
+
 if (! function_exists('modules')) {
     /**
      * get list of available modules.

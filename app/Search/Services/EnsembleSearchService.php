@@ -14,7 +14,7 @@ use Throwable;
  */
 class EnsembleSearchService
 {
-    public function __construct(private IReranker $reranker) {}
+    public function __construct(private readonly IReranker $reranker) {}
 
     /**
      * Execute an ensemble search across multiple retrieval strategies.
@@ -88,7 +88,7 @@ class EnsembleSearchService
             ->values()
             ->map(fn (array $item): array => [
                 'id' => $item['id'],
-                'score' => round((float) $item['score'], 6),
+                'score' => round($item['score'], 6),
                 'source' => $item['source'] ?? [],
             ])
             ->all();
@@ -142,10 +142,12 @@ class EnsembleSearchService
         $rank = 1;
 
         foreach ($hits as $hit) {
-            if (! is_array($hit) || ! isset($hit['_id'])) {
+            if (! is_array($hit)) {
                 continue;
             }
-
+            if (! isset($hit['_id'])) {
+                continue;
+            }
             $id = (string) $hit['_id'];
             $out[$id] = [
                 'id' => $id,
@@ -176,7 +178,7 @@ class EnsembleSearchService
         $max_score = max($scores);
         $range = $max_score - $min_score;
 
-        foreach ($hits as $id => &$hit) {
+        foreach ($hits as &$hit) {
             $hit['score'] = $range > 0.0
                 ? ($hit['score'] - $min_score) / $range
                 : 1.0;

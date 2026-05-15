@@ -16,7 +16,7 @@ use Modules\Core\Helpers\ResponseBuilder;
 
 final class EntityHarness extends Entity
 {
-    public static function applyWhere(\Illuminate\Database\Eloquent\Builder $query, string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::AND): void
+    public static function applyWhere(\Illuminate\Database\Eloquent\Builder $query, string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::And): void
     {
         self::applyCorrectWhereMethod($query, $field, $operator, $value, $clause);
     }

@@ -95,7 +95,7 @@ final class ModelSoftDeletesRemoveCommand extends Command
         Setting::query()->where('name', $key_name)->forceDelete();
     }
 
-    private function resolveModelClass(string $model): ?string
+    private function resolveModelClass(string $model): string
     {
         if (Str::contains($model, '\\')) {
             return $model;

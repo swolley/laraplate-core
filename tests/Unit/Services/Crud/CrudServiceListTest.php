@@ -117,7 +117,7 @@ it('list returns paginated results when page is set', function (): void {
     $request = crud_make_validated_request();
     $request->setUserResolver(fn () => $superadmin);
     $request_data = crud_make_list_request_data(new User(), $request, [
-        new Column('users.id', ColumnType::COLUMN),
+        new Column('users.id', ColumnType::Column),
     ]);
 
     $ref = new ReflectionProperty($request_data, 'page');
@@ -161,7 +161,7 @@ it('list returns results for from/to range when set', function (): void {
     $request = crud_make_validated_request();
     $request->setUserResolver(fn () => $superadmin);
     $request_data = crud_make_list_request_data(new User(), $request, [
-        new Column('users.id', ColumnType::COLUMN),
+        new Column('users.id', ColumnType::Column),
     ]);
 
     (new ReflectionProperty($request_data, 'from'))->setValue($request_data, 3);
@@ -187,7 +187,7 @@ it('list returns limited results when limit is set (no page/from)', function ():
     $request = crud_make_validated_request();
     $request->setUserResolver(fn () => $superadmin);
     $request_data = crud_make_list_request_data(new User(), $request, [
-        new Column('users.id', ColumnType::COLUMN),
+        new Column('users.id', ColumnType::Column),
     ]);
 
     (new ReflectionProperty($request_data, 'limit'))->setValue($request_data, 7);
@@ -221,14 +221,14 @@ it('list applies request filters sort and relation eager-load consistently', fun
     $request->setUserResolver(fn () => $superadmin);
 
     $request_data = crud_make_list_request_data(new User(), $request, [
-        new Column('users.username', ColumnType::COLUMN),
-        new Column('users.roles.name', ColumnType::COLUMN),
+        new Column('users.username', ColumnType::Column),
+        new Column('users.roles.name', ColumnType::Column),
     ]);
 
     crud_set_request_data_prop($request_data, 'relations', ['roles']);
-    crud_set_request_data_prop($request_data, 'sort', [new Sort('username', SortDirection::DESC)]);
+    crud_set_request_data_prop($request_data, 'sort', [new Sort('username', SortDirection::Desc)]);
     crud_set_request_data_prop($request_data, 'filters', new FiltersGroup([
-        new Filter('roles.name', 'sales', FilterOperator::EQUALS),
+        new Filter('roles.name', 'sales', FilterOperator::Equals),
     ]));
 
     $result = $service->list($request_data);

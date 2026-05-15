@@ -13,6 +13,8 @@ use InvalidArgumentException;
 use InvalidFormatException;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @template TModel of Model
  */
 trait HasValidity

@@ -24,7 +24,7 @@ it('hydrates group from json string and dehydrates back to json', function (): v
     $encoded = $cast->set($model, 'filters', $group, []);
 
     expect($group)->toBeInstanceOf(FiltersGroup::class)
-        ->and($group->operator)->toBe(WhereClause::OR)
+        ->and($group->operator)->toBe(WhereClause::Or)
         ->and($group->filters[0])->toBeInstanceOf(Filter::class)
         ->and($group->filters[1])->toBeInstanceOf(FiltersGroup::class)
         ->and($encoded)->toBeString();
@@ -68,7 +68,7 @@ it('throws for invalid node/group structures and handles null set', function ():
 
     expect($cast->set($model, 'filters', null, []))->toBeNull();
     expect($cast->get($model, 'filters', '', []))->toBeNull();
-    expect($cast->get($model, 'filters', ['property' => 'id', 'value' => 1, 'operator' => Modules\Core\Casts\FilterOperator::EQUALS], []))
+    expect($cast->get($model, 'filters', ['property' => 'id', 'value' => 1, 'operator' => Modules\Core\Casts\FilterOperator::Equals], []))
         ->toBeInstanceOf(FiltersGroup::class);
     expect($cast->get($model, 'filters', ['filters' => [[['property' => 'id', 'value' => 1, 'operator' => '=']]]], []))
         ->toBeInstanceOf(FiltersGroup::class);

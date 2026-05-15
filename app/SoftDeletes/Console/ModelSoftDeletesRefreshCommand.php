@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\SoftDeletes\Console;
 
-use function Laravel\Prompts\confirm;
 use function class_uses_trait;
+use function Laravel\Prompts\confirm;
 use function models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -48,7 +49,7 @@ final class ModelSoftDeletesRefreshCommand extends Command
             return;
         }
 
-        $instance = (new ReflectionClass($model_class))->newInstanceWithoutConstructor();
+        $instance = new ReflectionClass($model_class)->newInstanceWithoutConstructor();
 
         if (! $instance instanceof Model) {
             return;
@@ -93,7 +94,9 @@ final class ModelSoftDeletesRefreshCommand extends Command
 
     private function reconcileSetting(string $table, bool $has_trait): void
     {
-        if (! Schema::hasTable('settings')) {
+        $settings_table = CoreTables::Settings->value;
+
+        if (! Schema::hasTable($settings_table)) {
             return;
         }
 
@@ -131,4 +134,3 @@ final class ModelSoftDeletesRefreshCommand extends Command
         $this->changes = true;
     }
 }
-

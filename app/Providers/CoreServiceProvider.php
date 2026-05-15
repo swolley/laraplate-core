@@ -13,7 +13,9 @@ use Exception;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Console\Migrations\StatusCommand as LaravelStatusCommand;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
@@ -37,7 +39,9 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
+use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
+use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Services\DynamicContentsService;
@@ -134,6 +138,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
             $this->app->register($oci8_provider);
             $this->app->register($oci8_validation_provider);
         }
+
+        $this->registerMigrationOverrides();
     }
 
     public function registerAuths(): void
@@ -303,6 +309,28 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function configureCommands(): void
     {
         DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    private function registerMigrationOverrides(): void
+    {
+        $this->app->booted(function (): void {
+            $this->app->loadDeferredProvider('migrator');
+
+            $this->app->singleton('migrator', static function ($app): Migrator {
+                return new Migrator(
+                    $app['migration.repository'],
+                    $app['db'],
+                    $app['files'],
+                    $app['events'] ?? null,
+                );
+            });
+
+            $this->app->singleton(LaravelStatusCommand::class, static function ($app): StatusCommand {
+                return new StatusCommand($app['migrator']);
+            });
+
+            $this->app->bind(LaravelMigrator::class, static fn ($app): Migrator => $app['migrator']);
+        });
     }
 
     /**

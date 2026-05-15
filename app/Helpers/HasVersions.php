@@ -28,6 +28,8 @@ use Overtrue\LaravelVersionable\VersionStrategy;
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-type HasVersionsType HasVersions
  */
 trait HasVersions
@@ -237,7 +239,7 @@ trait HasVersions
         // L2: persistent cache (rememberForever) — avoids DB on subsequent requests
         $settings_name = "version_strategy_{$this->getTable()}";
 
-        $raw = Cache::rememberForever(CacheManager::key('version_strategies'), fn () => Setting::where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
+        $raw = Cache::rememberForever(CacheManager::key('version_strategies'), fn () => Setting::query()->where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
 
         $strategy = $raw === false
             ? false

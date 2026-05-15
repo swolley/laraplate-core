@@ -51,7 +51,7 @@ final class HandleLicensesCommand extends Command
                             $data->valid_to && today()->greaterThan($data->valid_to) ? $data->valid_to : ($data->valid_to ? 'expired' : 'perpetual'),
                             $data->valid_to,
                             $data->count,
-                        ])->values()->toArray(),
+                        ])->values()->all(),
                     );
                 }
 

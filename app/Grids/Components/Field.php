@@ -40,7 +40,7 @@ final class Field implements JsonSerializable
      * @param  string  $name  field name (column)
      * @param  string|null  $alias  field alias (name will be used if nothing assigned)
      */
-    public function __construct(string $path, string $name, ?string $alias = null, private FieldType $fieldType = FieldType::COLUMN, ?Model $model = null)
+    public function __construct(string $path, string $name, ?string $alias = null, private FieldType $fieldType = FieldType::Column, ?Model $model = null)
     {
         $this->path = $path;
         $this->name = $name;
@@ -56,7 +56,7 @@ final class Field implements JsonSerializable
      *
      * @return Closure(Model): Field
      */
-    public static function create(string $fullpath, ?string $alias = null, bool $readable = true, bool $writable = true, FieldType $fieldType = FieldType::COLUMN): Closure
+    public static function create(string $fullpath, ?string $alias = null, bool $readable = true, bool $writable = true, FieldType $fieldType = FieldType::Column): Closure
     {
         [$path, $name] = self::splitPath($fullpath);
 
@@ -186,7 +186,7 @@ final class Field implements JsonSerializable
             return $this;
         } // throw new \UnexpectedValueException("Cannot set column {$this->name} as readable because is an HIDDEN field in Model " . $this->model::class);
 
-        throw_if(! $isReadable && $this->fieldType !== FieldType::COLUMN, UnexpectedValueException::class, sprintf("Cannot disable read operation for column %s because is an aggregated field. Remove it from fields if you don't need it", $this->name));
+        throw_if(! $isReadable && $this->fieldType !== FieldType::Column, UnexpectedValueException::class, sprintf("Cannot disable read operation for column %s because is an aggregated field. Remove it from fields if you don't need it", $this->name));
 
         throw_if($isReadable && $this->isAppend() && ! $this->hasGetAppend(), UnexpectedValueException::class, sprintf("Cannot set column %s as readable because it is a calculated field but it doesn't have a getter ", $this->name) . $this->model::class);
         $this->readable = $isReadable;
@@ -211,7 +211,7 @@ final class Field implements JsonSerializable
             return $this;
         } // throw new \UnexpectedValueException("Cannot set column {$this->name} as writable because is not a FILLABLE field in Model " . $this->model::class);
 
-        throw_if($isWritable && $this->fieldType !== FieldType::COLUMN, UnexpectedValueException::class, sprintf('Cannot set column %s as writable because is an aggregated field', $this->name));
+        throw_if($isWritable && $this->fieldType !== FieldType::Column, UnexpectedValueException::class, sprintf('Cannot set column %s as writable because is an aggregated field', $this->name));
 
         throw_if($isWritable && $this->isAppend() && ! $this->hasSetAppend(), UnexpectedValueException::class, sprintf("Cannot set column %s as readable because it is a calculated field but it doesn't have a setter ", $this->name) . $this->model::class);
         $this->writable = $isWritable;

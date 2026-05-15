@@ -138,7 +138,7 @@ trait HasTable
 
     private static function loadUserPermissionsForTable(?User $user): void
     {
-        if ($user === null) {
+        if (!$user instanceof \App\Models\User) {
             return;
         }
 
@@ -151,7 +151,7 @@ trait HasTable
 
     private static function checkPermissionCached(?User $user, string $permission): bool
     {
-        if ($user === null) {
+        if (!$user instanceof \App\Models\User) {
             return false;
         }
 

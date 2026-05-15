@@ -6,6 +6,9 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait SortableTrait
 {
     use \Spatie\EloquentSortable\SortableTrait {

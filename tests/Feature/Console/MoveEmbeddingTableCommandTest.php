@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\MoveEmbeddingTable;
+use Modules\Core\Enums\CoreTables;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -22,16 +23,16 @@ function moveEmbeddingCommandWithOutput(MoveEmbeddingTable $command): MoveEmbedd
 it('reports when model embeddings already exist on target connection', function (): void {
     $command = moveEmbeddingCommandWithOutput(app(MoveEmbeddingTable::class));
 
-    expect(Schema::hasTable('model_embeddings'))->toBeTrue();
+    expect(Schema::hasTable(CoreTables::ModelEmbeddings->value))->toBeTrue();
     expect($command->handle())->toBe(0);
 });
 
 it('recreates model embeddings table when missing on target connection', function (): void {
-    Schema::dropIfExists('model_embeddings');
+    Schema::dropIfExists(CoreTables::ModelEmbeddings->value);
 
     $command = moveEmbeddingCommandWithOutput(app(MoveEmbeddingTable::class));
     expect($command->handle())->toBe(0);
-    expect(Schema::hasTable('model_embeddings'))->toBeTrue();
+    expect(Schema::hasTable(CoreTables::ModelEmbeddings->value))->toBeTrue();
 });
 
 it('resolves embeddings migration file path to an existing migration on disk', function (): void {

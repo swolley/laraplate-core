@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\CMS\Enums\CMSTables;
+use Modules\CMS\Models\Contributor;
 use Modules\Core\Casts\FieldType;
-use Modules\Core\Models\Contributor;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Presettable;
@@ -13,7 +14,7 @@ use Modules\Core\Models\Preset;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
 
 beforeEach(function (): void {
-    if (! Schema::hasColumns('contributors', ['components', 'shared_components'])) {
+    if (! Schema::hasColumns(CMSTables::Contributors->value, ['components', 'shared_components'])) {
         $this->markTestSkipped('Dynamic contents integration requires full Core runtime.');
     }
 
@@ -27,7 +28,7 @@ function createTestEntityWithFields(): array
 {
     $entity = Entity::query()->create([
         'name' => 'test_entity_' . uniqid(),
-        'type' => EntityTypeStub::VALUE1,
+        'type' => EntityTypeStub::Value1,
     ]);
 
     $preset = Preset::query()->create([
@@ -42,25 +43,25 @@ function createTestEntityWithFields(): array
 
     $textField = Field::query()->create([
         'name' => 'text_field_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 
     $arrayField = Field::query()->create([
         'name' => 'array_field_' . uniqid(),
-        'type' => FieldType::ARRAY,
+        'type' => FieldType::Array,
         'options' => new stdClass(),
     ]);
 
     $objectField = Field::query()->create([
         'name' => 'object_field_' . uniqid(),
-        'type' => FieldType::OBJECT,
+        'type' => FieldType::Object,
         'options' => new stdClass(),
     ]);
 
     $editorField = Field::query()->create([
         'name' => 'editor_field_' . uniqid(),
-        'type' => FieldType::EDITOR,
+        'type' => FieldType::Editor,
         'options' => new stdClass(),
     ]);
 
@@ -115,7 +116,7 @@ describe('HasTranslatedDynamicContents', function (): void {
         $contributor->save();
 
         // Verify components are saved in translations table, not in contributors table
-        $translation = DB::table('contributors_translations')
+        $translation = DB::table(CMSTables::ContributorsTranslations->value)
             ->where('contributor_id', $contributor->id)
             ->where('locale', $default_locale)
             ->first();
@@ -124,7 +125,7 @@ describe('HasTranslatedDynamicContents', function (): void {
         expect(json_decode((string) $translation->components, true))->toBeArray();
 
         // Verify components are NOT in contributors table
-        $contributorRecord = DB::table('contributors')->where('id', $contributor->id)->first();
+        $contributorRecord = DB::table(CMSTables::Contributors->value)->where('id', $contributor->id)->first();
         expect($contributorRecord)->not->toHaveProperty('components');
     });
 

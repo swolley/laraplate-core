@@ -32,31 +32,31 @@ use MatanYadaev\EloquentSpatial\Doctrine\GeometryType;
 
 enum DoctrineTypeEnum: string
 {
-    case ASCII_STRING = 'ascii_string';
-    case BIGINT = 'bigint';
-    case BINARY = 'binary';
-    case BLOB = 'blob';
-    case BOOLEAN = 'boolean';
-    case DATE = 'date';
-    case DATE_IMMUTABLE = 'date_immutable';
-    case DATEINTERVAL = 'dateinterval';
-    case DATETIME = 'datetime';
-    case DATETIME_IMMUTABLE = 'datetime_immutable';
-    case DATETIMETZ = 'datetimetz';
-    case DATETIMETZ_IMMUTABLE = 'datetimetz_immutable';
-    case DECIMAL = 'decimal';
-    case FLOAT = 'float';
-    case GUID = 'guid';
-    case INTEGER = 'integer';
-    case JSON = 'json';
-    case SIMPLE_ARRAY = 'simple_array';
-    case SMALLINT = 'smallint';
-    case STRING = 'string';
-    case TEXT = 'text';
-    case TIME = 'time';
-    case TIME_IMMUTABLE = 'time_immutable';
-    case UNKNOWN = 'unknown';
-    case GEOMETRY = 'geometry';
+    case AsciiString = 'ascii_string';
+    case Bigint = 'bigint';
+    case Binary = 'binary';
+    case Blob = 'blob';
+    case Boolean = 'boolean';
+    case Date = 'date';
+    case DateImmutable = 'date_immutable';
+    case Dateinterval = 'dateinterval';
+    case Datetime = 'datetime';
+    case DatetimeImmutable = 'datetime_immutable';
+    case Datetimetz = 'datetimetz';
+    case DatetimetzImmutable = 'datetimetz_immutable';
+    case Decimal = 'decimal';
+    case Float = 'float';
+    case Guid = 'guid';
+    case Integer = 'integer';
+    case Json = 'json';
+    case SimpleArray = 'simple_array';
+    case Smallint = 'smallint';
+    case String = 'string';
+    case Text = 'text';
+    case Time = 'time';
+    case TimeImmutable = 'time_immutable';
+    case Unknown = 'unknown';
+    case Geometry = 'geometry';
 
     public static function fromDoctrine(DoctrineType|self $type): self
     {
@@ -69,7 +69,7 @@ enum DoctrineTypeEnum: string
 
     public static function fromString(string $type): self
     {
-        return self::tryFrom($type) ?: self::UNKNOWN;
+        return self::tryFrom($type) ?: self::Unknown;
     }
 
     private static function fromDoctrineType(DoctrineType|GeometryType $type): self
@@ -85,37 +85,37 @@ enum DoctrineTypeEnum: string
         $class = $type::class;
 
         return match ($class) {
-            AsciiStringType::class => self::ASCII_STRING,
-            BigIntType::class => self::BIGINT,
-            BinaryType::class => self::BINARY,
-            BlobType::class => self::BLOB,
-            BooleanType::class => self::BOOLEAN,
-            DateType::class => self::DATE,
-            DateImmutableType::class => self::DATE_IMMUTABLE,
-            DateIntervalType::class => self::DATEINTERVAL,
-            DateTimeType::class => self::DATETIME,
-            DateTimeImmutableType::class => self::DATETIME_IMMUTABLE,
-            DateTimeTzType::class => self::DATETIMETZ,
-            DateTimeTzImmutableType::class => self::DATETIMETZ_IMMUTABLE,
-            DecimalType::class => self::DECIMAL,
-            FloatType::class => self::FLOAT,
-            GuidType::class => self::GUID,
-            IntegerType::class => self::INTEGER,
-            JsonType::class => self::JSON,
-            SimpleArrayType::class => self::SIMPLE_ARRAY,
-            SmallIntType::class => self::SMALLINT,
-            StringType::class => self::STRING,
-            TextType::class => self::TEXT,
-            TimeType::class => self::TIME,
-            TimeImmutableType::class => self::TIME_IMMUTABLE,
-            GeometryType::class => self::GEOMETRY,
-            default => self::UNKNOWN,
+            AsciiStringType::class => self::AsciiString,
+            BigIntType::class => self::Bigint,
+            BinaryType::class => self::Binary,
+            BlobType::class => self::Blob,
+            BooleanType::class => self::Boolean,
+            DateType::class => self::Date,
+            DateImmutableType::class => self::DateImmutable,
+            DateIntervalType::class => self::Dateinterval,
+            DateTimeType::class => self::Datetime,
+            DateTimeImmutableType::class => self::DatetimeImmutable,
+            DateTimeTzType::class => self::Datetimetz,
+            DateTimeTzImmutableType::class => self::DatetimetzImmutable,
+            DecimalType::class => self::Decimal,
+            FloatType::class => self::Float,
+            GuidType::class => self::Guid,
+            IntegerType::class => self::Integer,
+            JsonType::class => self::Json,
+            SimpleArrayType::class => self::SimpleArray,
+            SmallIntType::class => self::Smallint,
+            StringType::class => self::String,
+            TextType::class => self::Text,
+            TimeType::class => self::Time,
+            TimeImmutableType::class => self::TimeImmutable,
+            GeometryType::class => self::Geometry,
+            default => self::Unknown,
         };
     }
 
     // public function raw(): ?string
     // {
-    //     if ($this->value === self::UNKNOWN->value) {
+    //     if ($this->value === self::Unknown->value) {
     //         return null;
     //     }
 

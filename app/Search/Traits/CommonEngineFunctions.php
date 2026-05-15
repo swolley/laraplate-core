@@ -12,6 +12,9 @@ use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Override;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait CommonEngineFunctions
 {
     public const string INDEXED_AT_FIELD = '_indexed_at';

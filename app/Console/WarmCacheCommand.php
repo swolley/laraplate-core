@@ -133,7 +133,7 @@ final class WarmCacheCommand extends Command
             return 0;
         }
 
-        $cache_key = (new CronJob())->getTable();
+        $cache_key = new CronJob()->getTable();
         $crons = CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
 
         /** @var \Illuminate\Cache\Repository $cache */

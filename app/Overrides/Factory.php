@@ -108,7 +108,7 @@ abstract class Factory extends BaseFactory
      */
     protected function translatedFieldsArray(Model $model): array
     {
-        throw_if($this->usesTranslations(), new RuntimeException('Method translatedFieldsArray() must be implemented in child factories that use HasTranslations trait.'));
+        throw_if($this->usesTranslations(), RuntimeException::class, 'Method translatedFieldsArray() must be implemented in child factories that use HasTranslations trait.');
 
         return [];
     }

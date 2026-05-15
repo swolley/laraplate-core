@@ -32,20 +32,25 @@ return new class extends Migration
             throw new Exception('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
-        if (! Schema::hasColumn($tableNames['roles'], $columnNames['team_foreign_key'])) {
-            Schema::table($tableNames['roles'], function (Blueprint $table) use ($columnNames): void {
-                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable()->after('id')->default('1')->comment('The team id');
-                $table->index($columnNames['team_foreign_key'], 'roles_team_foreign_key_index');
+        $roles_table = $tableNames['roles'];
+        $permissions_table = $tableNames['permissions'];
+        $model_has_permissions_table = $tableNames['model_has_permissions'];
+        $model_has_roles_table = $tableNames['model_has_roles'];
 
-                $table->dropUnique('roles_name_guard_name_unique');
+        if (! Schema::hasColumn($roles_table, $columnNames['team_foreign_key'])) {
+            Schema::table($roles_table, function (Blueprint $table) use ($columnNames, $roles_table): void {
+                $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable()->after('id')->default('1')->comment('The team id');
+                $table->index($columnNames['team_foreign_key'], "{$roles_table}_team_foreign_key_index");
+
+                $table->dropUnique("{$roles_table}_name_guard_name_unique");
                 $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);
             });
         }
 
-        if (! Schema::hasColumn($tableNames['model_has_permissions'], $columnNames['team_foreign_key'])) {
-            Schema::table($tableNames['model_has_permissions'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotPermission): void {
+        if (! Schema::hasColumn($model_has_permissions_table, $columnNames['team_foreign_key'])) {
+            Schema::table($model_has_permissions_table, function (Blueprint $table) use ($model_has_permissions_table, $columnNames, $pivotPermission, $permissions_table): void {
                 $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1')->comment('The team id');
-                $table->index($columnNames['team_foreign_key'], 'model_has_permissions_team_foreign_key_index');
+                $table->index($columnNames['team_foreign_key'], "{$model_has_permissions_table}_team_foreign_key_index");
 
                 if (DB::getDriverName() !== 'sqlite') {
                     $table->dropForeign([$pivotPermission]);
@@ -54,20 +59,20 @@ return new class extends Migration
 
                 $table->primary(
                     [$columnNames['team_foreign_key'], $pivotPermission, $columnNames['model_morph_key'], 'model_type'],
-                    'model_has_permissions_permission_model_type_primary',
+                    "{$model_has_permissions_table}_permission_model_type_primary",
                 );
 
                 if (DB::getDriverName() !== 'sqlite') {
                     $table->foreign($pivotPermission)
-                        ->references('id')->on($tableNames['permissions'])->onDelete('cascade');
+                        ->references('id')->on($permissions_table)->onDelete('cascade');
                 }
             });
         }
 
-        if (! Schema::hasColumn($tableNames['model_has_roles'], $columnNames['team_foreign_key'])) {
-            Schema::table($tableNames['model_has_roles'], function (Blueprint $table) use ($tableNames, $columnNames, $pivotRole): void {
+        if (! Schema::hasColumn($model_has_roles_table, $columnNames['team_foreign_key'])) {
+            Schema::table($model_has_roles_table, function (Blueprint $table) use ($model_has_roles_table, $columnNames, $pivotRole, $roles_table): void {
                 $table->unsignedBigInteger($columnNames['team_foreign_key'])->default('1')->comment('The team id');
-                $table->index($columnNames['team_foreign_key'], 'model_has_roles_team_foreign_key_index');
+                $table->index($columnNames['team_foreign_key'], "{$model_has_roles_table}_team_foreign_key_index");
 
                 if (DB::getDriverName() !== 'sqlite') {
                     $table->dropForeign([$pivotRole]);
@@ -76,12 +81,12 @@ return new class extends Migration
 
                 $table->primary(
                     [$columnNames['team_foreign_key'], $pivotRole, $columnNames['model_morph_key'], 'model_type'],
-                    'model_has_roles_role_model_type_primary',
+                    "{$model_has_roles_table}_role_model_type_primary",
                 );
 
                 if (DB::getDriverName() !== 'sqlite') {
                     $table->foreign($pivotRole)
-                        ->references('id')->on($tableNames['roles'])->onDelete('cascade');
+                        ->references('id')->on($roles_table)->onDelete('cascade');
                 }
             });
         }

@@ -109,13 +109,13 @@ final class CoreDatabaseSeeder extends Seeder
                 'locked_at' => now(),
                 'permissions' => fn () => $permission_class::query()->where(function ($query) use ($user_table, $role_table): void {
                     $query->whereIn('table_name', [$user_table, $role_table])
-                        ->orWhere('name', 'like', '%.' . ActionEnum::SELECT->value);
-                })->whereNot('name', 'like', '%.' . ActionEnum::LOCK->value)->get(),
+                        ->orWhere('name', 'like', '%.' . ActionEnum::Select->value);
+                })->whereNot('name', 'like', '%.' . ActionEnum::Lock->value)->get(),
             ],
             [
                 'name' => $roles['guest'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::query()->where('name', 'like', '%.' . ActionEnum::SELECT->value)
+                'permissions' => fn () => $permission_class::query()->where('name', 'like', '%.' . ActionEnum::Select->value)
                     ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
                     ->get(),
             ],
@@ -208,21 +208,21 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => 'default_language',
                 'value' => config('app.locale'),
-                'type' => SettingTypeEnum::STRING,
+                'type' => SettingTypeEnum::String,
                 'group_name' => 'base',
                 'description' => 'Lingua default',
             ],
             [
                 'name' => 'pagination',
                 'value' => 20,
-                'type' => SettingTypeEnum::INTEGER,
+                'type' => SettingTypeEnum::Integer,
                 'group_name' => 'base',
                 'description' => 'Paginazione default chiamate',
             ],
             [
                 'name' => 'max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
-                'type' => SettingTypeEnum::INTEGER,
+                'type' => SettingTypeEnum::Integer,
                 'group_name' => 'base',
                 'description' => 'Numero massimo sessioni simultanee',
             ],
@@ -327,7 +327,7 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => VersionStrategy::DIFF,
-            'type' => SettingTypeEnum::JSON,
+            'type' => SettingTypeEnum::Json,
             'group_name' => 'versioning',
             'description' => "Version strategy for {$table}",
             'choices' => [false, ...VersionStrategy::cases()],
@@ -343,7 +343,7 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
-            'type' => SettingTypeEnum::BOOLEAN,
+            'type' => SettingTypeEnum::Boolean,
             'group_name' => 'soft_deletes',
             'description' => "Soft deletes status for {$table}",
         ];
@@ -358,7 +358,7 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
-            'type' => SettingTypeEnum::BOOLEAN,
+            'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Lock status for {$table}",
         ];
@@ -373,7 +373,7 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
-            'type' => SettingTypeEnum::BOOLEAN,
+            'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Optimistic lock status for {$table}",
         ];
@@ -461,7 +461,7 @@ final class CoreDatabaseSeeder extends Seeder
             $approval_settings[] = [
                 'name' => "approval_threshold_{$table}",
                 'value' => $default_threshold,
-                'type' => SettingTypeEnum::INTEGER,
+                'type' => SettingTypeEnum::Integer,
                 'group_name' => 'approvals',
                 'description' => "Hours before notification for pending {$table} approvals",
             ];

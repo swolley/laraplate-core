@@ -31,6 +31,8 @@ use Modules\Core\Services\Translation\Definitions\ITranslated;
  * - Create translation model with $fillable containing translatable fields
  * - Translation model class is auto-resolved: ModelTranslation in Translations subfolder
  *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @template TModel of Model
  * @template TTranslationModel of Model&ITranslated
  */

@@ -11,6 +11,7 @@ use Modules\Core\Helpers\HasSeedersUtils;
 
 class Seeder extends BaseSeeder
 {
+    private $disableBenchmark;
     use HasBenchmark;
     use HasSeedersUtils;
 

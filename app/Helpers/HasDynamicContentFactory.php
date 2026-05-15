@@ -13,6 +13,9 @@ use Modules\Core\Models\Field;
 use RuntimeException;
 use stdClass;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasDynamicContentFactory
 {
     public function dynamicContentDefinition(): array
@@ -89,14 +92,14 @@ trait HasDynamicContentFactory
                     $value = $forcedValues[$field->name];
                 } else {
                     $value = match ($field->type) {
-                        FieldType::TEXTAREA => fake()->paragraphs(fake()->numberBetween(1, 3), true),
-                        FieldType::TEXT => fake()->text(fake()->numberBetween(100, 255)),
-                        FieldType::NUMBER => fake()->randomNumber(),
-                        FieldType::EMAIL => fake()->unique()->email(),
-                        FieldType::PHONE => fake()->boolean() ? fake()->unique()->e164PhoneNumber() : null,
-                        FieldType::URL => fake()->boolean() ? fake()->unique()->url() : null,
-                        FieldType::DATETIME => fake()->dateTime()->format('Y-m-d H:i:s'),
-                        FieldType::EDITOR => (object) [
+                        FieldType::Textarea => fake()->paragraphs(fake()->numberBetween(1, 3), true),
+                        FieldType::Text => fake()->text(fake()->numberBetween(100, 255)),
+                        FieldType::Number => fake()->randomNumber(),
+                        FieldType::Email => fake()->unique()->email(),
+                        FieldType::Phone => fake()->boolean() ? fake()->unique()->e164PhoneNumber() : null,
+                        FieldType::Url => fake()->boolean() ? fake()->unique()->url() : null,
+                        FieldType::Datetime => fake()->dateTime()->format('Y-m-d H:i:s'),
+                        FieldType::Editor => (object) [
                             'blocks' => array_map(static fn (string $paragraph) => (object) [
                                 'type' => 'paragraph',
                                 'data' => [
@@ -104,7 +107,7 @@ trait HasDynamicContentFactory
                                 ],
                             ], fake()->paragraphs(fake()->numberBetween(1, 10))),
                         ],
-                        FieldType::OBJECT => new stdClass(),
+                        FieldType::Object => new stdClass(),
                         default => $value,
                     };
                 }

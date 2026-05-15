@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace Modules\Core\Models\Pivot;
 
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\Pivot;
-use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Preset;
+use Modules\Core\Overrides\Pivot;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 
 /**
  * @property int $version
  * @property array<int, array{field_id: int, name: string, type: string, options: mixed, is_translatable: bool, is_slug: bool, pivot: array{is_required: bool, order_column: int, default: mixed}}> $fields_snapshot
  *
+ * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin IdeHelperPresettable
  */
 abstract class Presettable extends Pivot
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     #[Override]
     final public $incrementing = true;
@@ -31,7 +32,7 @@ abstract class Presettable extends Pivot
     final public $timestamps = false;
 
     #[Override]
-    final protected $table = 'presettables';
+    final protected $table = CoreTables::Presettables->value;
 
     #[Override]
     final protected $fillable = [

@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
@@ -24,7 +25,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('presettables', static function (Blueprint $table): void {
+        $presettables_table = CoreTables::Presettables->value;
+        Schema::create($presettables_table, static function (Blueprint $table) use ($presettables_table): void {
             $table->id();
             $table->unsignedBigInteger('preset_id')->nullable(false)->comment('The preset that the entity preset relation belongs to');
             $table->unsignedBigInteger('entity_id')->nullable(false)->comment('The entity that the entity preset relation belongs to');
@@ -40,11 +42,11 @@ return new class extends Migration
                 hasSoftDelete: true,
             );
 
-            $table->foreign(['entity_id', 'preset_id'], 'presettables_preset_FK')
+            $table->foreign(['entity_id', 'preset_id'], "{$presettables_table}_preset_FK")
                 ->references(['entity_id', 'id'])
-                ->on('presets')
+                ->on(CoreTables::Presets->value)
                 ->cascadeOnDelete();
-            $table->unique(['entity_id', 'preset_id', 'version'], 'presettables_version_UN');
+            $table->unique(['entity_id', 'preset_id', 'version'], "{$presettables_table}_version_UN");
         });
 
         $this->applyFieldsSnapshotNotNullConstraint();
@@ -54,7 +56,7 @@ return new class extends Migration
     public function down(): void
     {
         $this->dropTriggers();
-        Schema::dropIfExists('presettables');
+        Schema::dropIfExists(CoreTables::Presettables->value);
     }
 
     /**
@@ -62,13 +64,13 @@ return new class extends Migration
      */
     private function applyFieldsSnapshotNotNullConstraint(): void
     {
-        if (DB::table('presettables')->whereNull('fields_snapshot')->exists()) {
+        if (DB::table(CoreTables::Presettables->value)->whereNull('fields_snapshot')->exists()) {
             throw new RuntimeException(
                 'Cannot enforce NOT NULL on presettables.fields_snapshot: null values remain.',
             );
         }
 
-        Schema::table('presettables', static function (Blueprint $table): void {
+        Schema::table(CoreTables::Presettables->value, static function (Blueprint $table): void {
             $table->json('fields_snapshot')->nullable(false)->change();
         });
     }
@@ -105,113 +107,122 @@ return new class extends Migration
 
     private function createPostgreSQLTriggers(): void
     {
-        DB::unprepared('
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("
             CREATE OR REPLACE FUNCTION set_presettable_version()
             RETURNS TRIGGER AS $$
             BEGIN
                 NEW.version := COALESCE(
-                    (SELECT MAX(version) FROM presettables
+                    (SELECT MAX(version) FROM {$presettables_table}
                      WHERE preset_id = NEW.preset_id AND entity_id = NEW.entity_id), 0
                 ) + 1;
                 RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE TRIGGER trg_presettables_version
-            BEFORE INSERT ON presettables
+            BEFORE INSERT ON {$presettables_table}
             FOR EACH ROW EXECUTE FUNCTION set_presettable_version();
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE OR REPLACE FUNCTION sync_presettables_on_preset()
             RETURNS TRIGGER AS $$
             BEGIN
-                IF TG_OP = \'INSERT\' THEN
-                    INSERT INTO presettables (entity_id, preset_id, fields_snapshot, deleted_at)
-                    VALUES (NEW.entity_id, NEW.id, \'[]\', NEW.deleted_at);
+                IF TG_OP = 'INSERT' THEN
+                    INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
+                    VALUES (NEW.entity_id, NEW.id, '[]', NEW.deleted_at);
                     RETURN NEW;
-                ELSIF TG_OP = \'UPDATE\' THEN
+                ELSIF TG_OP = 'UPDATE' THEN
                     IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at THEN
-                        UPDATE presettables
+                        UPDATE {$presettables_table}
                         SET deleted_at = NEW.deleted_at
                         WHERE preset_id = NEW.id AND deleted_at IS NULL;
                     END IF;
                     RETURN NEW;
-                ELSIF TG_OP = \'DELETE\' THEN
-                    DELETE FROM presettables WHERE preset_id = OLD.id;
+                ELSIF TG_OP = 'DELETE' THEN
+                    DELETE FROM {$presettables_table} WHERE preset_id = OLD.id;
                     RETURN OLD;
                 END IF;
                 RETURN NULL;
             END;
             $$ LANGUAGE plpgsql;
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE TRIGGER trg_presets_insert
-            AFTER INSERT ON presets
+            AFTER INSERT ON {$presets_table}
             FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE TRIGGER trg_presets_update
-            AFTER UPDATE ON presets
+            AFTER UPDATE ON {$presets_table}
             FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE TRIGGER trg_presets_delete
-            AFTER DELETE ON presets
+            AFTER DELETE ON {$presets_table}
             FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
-        ');
+        ");
     }
 
     private function dropPostgreSQLTriggers(): void
     {
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_presettables_version ON presettables');
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("DROP TRIGGER IF EXISTS trg_presettables_version ON {$presettables_table}");
         DB::unprepared('DROP FUNCTION IF EXISTS set_presettable_version()');
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_presets_insert ON presets');
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_presets_update ON presets');
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_presets_delete ON presets');
+        DB::unprepared("DROP TRIGGER IF EXISTS trg_presets_insert ON {$presets_table}");
+        DB::unprepared("DROP TRIGGER IF EXISTS trg_presets_update ON {$presets_table}");
+        DB::unprepared("DROP TRIGGER IF EXISTS trg_presets_delete ON {$presets_table}");
         DB::unprepared('DROP FUNCTION IF EXISTS sync_presettables_on_preset()');
     }
 
     private function createMySQLTriggers(): void
     {
-        DB::unprepared('
-            CREATE TRIGGER trg_presettables_version BEFORE INSERT ON presettables
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("
+            CREATE TRIGGER trg_presettables_version BEFORE INSERT ON {$presettables_table}
             FOR EACH ROW
             SET NEW.version = COALESCE(
-                (SELECT MAX(version) FROM presettables
+                (SELECT MAX(version) FROM {$presettables_table}
                  WHERE preset_id = NEW.preset_id AND entity_id = NEW.entity_id), 0
             ) + 1;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_insert AFTER INSERT ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
             FOR EACH ROW
-            INSERT INTO presettables (entity_id, preset_id, fields_snapshot, deleted_at)
+            INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
             VALUES (NEW.entity_id, NEW.id, \'[]\', NEW.deleted_at);
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_update AFTER UPDATE ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_update AFTER UPDATE ON {$presets_table}
             FOR EACH ROW
             BEGIN
                 IF NEW.deleted_at <> OLD.deleted_at OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL) THEN
-                    UPDATE presettables
+                    UPDATE {$presettables_table}
                     SET deleted_at = NEW.deleted_at
                     WHERE preset_id = NEW.id AND deleted_at IS NULL;
                 END IF;
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_delete AFTER DELETE ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_delete AFTER DELETE ON {$presets_table}
             FOR EACH ROW
-            DELETE FROM presettables WHERE preset_id = OLD.id;
-        ');
+            DELETE FROM {$presettables_table} WHERE preset_id = OLD.id;
+        ");
     }
 
     private function dropMySQLTriggers(): void
@@ -224,32 +235,35 @@ return new class extends Migration
 
     private function createSQLiteTriggers(): void
     {
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_insert AFTER INSERT ON presets
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
             BEGIN
-                INSERT INTO presettables (entity_id, preset_id, fields_snapshot, version, deleted_at)
+                INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, version, deleted_at)
                 VALUES (NEW.entity_id, NEW.id, \'[]\',
-                    COALESCE((SELECT MAX(version) FROM presettables WHERE preset_id = NEW.id AND entity_id = NEW.entity_id), 0) + 1,
+                    COALESCE((SELECT MAX(version) FROM {$presettables_table} WHERE preset_id = NEW.id AND entity_id = NEW.entity_id), 0) + 1,
                     NEW.deleted_at);
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_update AFTER UPDATE ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_update AFTER UPDATE ON {$presets_table}
             WHEN NEW.deleted_at IS NOT OLD.deleted_at
             BEGIN
-                UPDATE presettables
+                UPDATE {$presettables_table}
                 SET deleted_at = NEW.deleted_at
                 WHERE preset_id = NEW.id AND deleted_at IS NULL;
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_delete AFTER DELETE ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_delete AFTER DELETE ON {$presets_table}
             BEGIN
-                DELETE FROM presettables WHERE preset_id = OLD.id;
+                DELETE FROM {$presettables_table} WHERE preset_id = OLD.id;
             END;
-        ');
+        ");
     }
 
     private function dropSQLiteTriggers(): void
@@ -261,60 +275,63 @@ return new class extends Migration
 
     private function createSQLServerTriggers(): void
     {
-        DB::unprepared('
-            CREATE TRIGGER trg_presettables_version ON presettables
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("
+            CREATE TRIGGER trg_presettables_version ON {$presettables_table}
             INSTEAD OF INSERT
             AS
             BEGIN
                 SET NOCOUNT ON;
-                INSERT INTO presettables (entity_id, preset_id, version, fields_snapshot, created_at, deleted_at)
+                INSERT INTO {$presettables_table} (entity_id, preset_id, version, fields_snapshot, created_at, deleted_at)
                 SELECT i.entity_id, i.preset_id,
-                    COALESCE((SELECT MAX(version) FROM presettables p
+                    COALESCE((SELECT MAX(version) FROM {$presettables_table} p
                               WHERE p.preset_id = i.preset_id AND p.entity_id = i.entity_id), 0) + 1,
                     i.fields_snapshot, i.created_at, i.deleted_at
                 FROM inserted i;
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_insert ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_insert ON {$presets_table}
             AFTER INSERT
             AS
             BEGIN
                 SET NOCOUNT ON;
-                INSERT INTO presettables (entity_id, preset_id, fields_snapshot, deleted_at)
+                INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
                 SELECT entity_id, id, \'[]\', deleted_at
                 FROM inserted;
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_update ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_update ON {$presets_table}
             AFTER UPDATE
             AS
             BEGIN
                 SET NOCOUNT ON;
-                UPDATE presettables
+                UPDATE {$presettables_table}
                 SET deleted_at = i.deleted_at
-                FROM presettables ep
+                FROM {$presettables_table} ep
                 INNER JOIN inserted i ON ep.preset_id = i.id
                 INNER JOIN deleted d ON ep.preset_id = d.id
                 WHERE (i.deleted_at IS NULL AND d.deleted_at IS NOT NULL)
                    OR (i.deleted_at IS NOT NULL AND d.deleted_at IS NULL)
                    OR (i.deleted_at <> d.deleted_at);
             END;
-        ');
+        ");
 
-        DB::unprepared('
-            CREATE TRIGGER trg_presets_delete ON presets
+        DB::unprepared("
+            CREATE TRIGGER trg_presets_delete ON {$presets_table}
             AFTER DELETE
             AS
             BEGIN
                 SET NOCOUNT ON;
-                DELETE FROM presettables
+                DELETE FROM {$presettables_table}
                 WHERE preset_id IN (SELECT id FROM deleted);
             END;
-        ');
+        ");
     }
 
     private function dropSQLServerTriggers(): void
@@ -327,52 +344,55 @@ return new class extends Migration
 
     private function createOracleTriggers(): void
     {
-        DB::unprepared('
+        $presettables_table = CoreTables::Presettables->value;
+        $presets_table = CoreTables::Presets->value;
+
+        DB::unprepared("
             CREATE OR REPLACE TRIGGER trg_presettables_version
-            BEFORE INSERT ON presettables
+            BEFORE INSERT ON {$presettables_table}
             FOR EACH ROW
             DECLARE
                 v_max_version NUMBER;
             BEGIN
                 SELECT COALESCE(MAX(version), 0) + 1 INTO v_max_version
-                FROM presettables
+                FROM {$presettables_table}
                 WHERE preset_id = :NEW.preset_id AND entity_id = :NEW.entity_id;
                 :NEW.version := v_max_version;
             END;
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE OR REPLACE TRIGGER trg_presets_insert
-            AFTER INSERT ON presets
+            AFTER INSERT ON {$presets_table}
             FOR EACH ROW
             BEGIN
-                INSERT INTO presettables (entity_id, preset_id, fields_snapshot, deleted_at)
+                INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
                 VALUES (:NEW.entity_id, :NEW.id, \'[]\', :NEW.deleted_at);
             END;
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE OR REPLACE TRIGGER trg_presets_update
-            AFTER UPDATE ON presets
+            AFTER UPDATE ON {$presets_table}
             FOR EACH ROW
             BEGIN
                 IF (:NEW.deleted_at IS NULL AND :OLD.deleted_at IS NOT NULL)
                    OR (:NEW.deleted_at IS NOT NULL AND :OLD.deleted_at IS NULL) THEN
-                    UPDATE presettables
+                    UPDATE {$presettables_table}
                     SET deleted_at = :NEW.deleted_at
                     WHERE preset_id = :NEW.id AND deleted_at IS NULL;
                 END IF;
             END;
-        ');
+        ");
 
-        DB::unprepared('
+        DB::unprepared("
             CREATE OR REPLACE TRIGGER trg_presets_delete
-            AFTER DELETE ON presets
+            AFTER DELETE ON {$presets_table}
             FOR EACH ROW
             BEGIN
-                DELETE FROM presettables WHERE preset_id = :OLD.id;
+                DELETE FROM {$presettables_table} WHERE preset_id = :OLD.id;
             END;
-        ');
+        ");
     }
 
     private function dropOracleTriggers(): void

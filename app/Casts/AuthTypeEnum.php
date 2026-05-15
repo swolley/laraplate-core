@@ -6,6 +6,6 @@ namespace Modules\Core\Casts;
 
 enum AuthTypeEnum: string
 {
-    case BASIC = 'basic';
-    case BEARER = 'bearer';
+    case Basic = 'basic';
+    case Bearer = 'bearer';
 }

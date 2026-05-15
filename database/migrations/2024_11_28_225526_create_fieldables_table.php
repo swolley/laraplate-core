@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class extends Migration
@@ -14,12 +15,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('fieldables', static function (Blueprint $table): void {
+        $fieldables_table = CoreTables::Fieldables->value;
+        Schema::create($fieldables_table, static function (Blueprint $table) use ($fieldables_table): void {
             $table->id();
-            $table->foreignId('preset_id')->nullable(false)->constrained('presets', 'id', 'fieldables_preset_id_FK')->cascadeOnDelete()->comment('The preset that the field belongs to');
-            $table->foreignId('field_id')->nullable(false)->constrained('fields', 'id', 'fieldables_field_id_FK')->cascadeOnDelete()->comment('The field that the preset belongs to');
+            $table->foreignId('preset_id')->nullable(false)->constrained(CoreTables::Presets->value, 'id', "{$fieldables_table}_preset_id_FK")->cascadeOnDelete()->comment('The preset that the field belongs to');
+            $table->foreignId('field_id')->nullable(false)->constrained(CoreTables::Fields->value, 'id', "{$fieldables_table}_field_id_FK")->cascadeOnDelete()->comment('The field that the preset belongs to');
             $table->boolean('is_required')->default(false)->nullable(false)->comment('Whether the field is required');
-            $table->integer('order_column')->nullable(false)->default(0)->index('fieldables_order_column_IDX')->comment('The order of the field');
+            $table->integer('order_column')->nullable(false)->default(0)->index("{$fieldables_table}_order_column_IDX")->comment('The order of the field');
             $table->json('default')->nullable(true)->comment('The default value of the field');
             MigrateUtils::timestamps(
                 $table,
@@ -27,7 +29,7 @@ return new class extends Migration
                 hasSoftDelete: true,
             );
 
-            $table->unique(['preset_id', 'field_id'], 'fieldables_UN');
+            $table->unique(['preset_id', 'field_id'], "{$fieldables_table}_UN");
         });
     }
 
@@ -36,6 +38,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('fieldables');
+        Schema::dropIfExists(CoreTables::Fieldables->value);
     }
 };

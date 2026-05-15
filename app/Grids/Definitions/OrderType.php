@@ -6,6 +6,6 @@ namespace Modules\Core\Grids\Definitions;
 
 enum OrderType: string
 {
-    case ASC = 'ASC';
-    case DESC = 'DESC';
+    case Asc = 'ASC';
+    case Desc = 'DESC';
 }

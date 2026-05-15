@@ -303,8 +303,8 @@ it('injectAclFilters sets filters when request has none', function (): void {
     $acl->forceFill([
         'permission_id' => $permission->id,
         'filters' => new FiltersGroup([
-            new Filter('users.id', [1, 2], FilterOperator::IN),
-        ], WhereClause::AND),
+            new Filter('users.id', [1, 2], FilterOperator::In),
+        ], WhereClause::And),
         'unrestricted' => false,
         'priority' => 10,
         'is_active' => true,
@@ -316,8 +316,8 @@ it('injectAclFilters sets filters when request has none', function (): void {
     Auth::login($user);
 
     $expected = new FiltersGroup([
-        new Filter('users.id', [1, 2], FilterOperator::IN),
-    ], WhereClause::AND);
+        new Filter('users.id', [1, 2], FilterOperator::In),
+    ], WhereClause::And);
 
     $service = new AuthorizationService(new AclResolverService());
 
@@ -343,8 +343,8 @@ it('injectAclFilters wraps existing filters with ACL filters using AND', functio
     $role->givePermissionTo($permission);
 
     $acl_filters = new FiltersGroup([
-        new Filter('users.id', [1, 2], FilterOperator::IN),
-    ], WhereClause::AND);
+        new Filter('users.id', [1, 2], FilterOperator::In),
+    ], WhereClause::And);
 
     $acl = new ACL();
     $acl->setSkipValidation(true);
@@ -358,8 +358,8 @@ it('injectAclFilters wraps existing filters with ACL filters using AND', functio
     $acl->save();
 
     $user_filters = new FiltersGroup([
-        new Filter('users.email', null, FilterOperator::EQUALS),
-    ], WhereClause::AND);
+        new Filter('users.email', null, FilterOperator::Equals),
+    ], WhereClause::And);
 
     $user = User::factory()->create();
     $user->assignRole($role);
@@ -375,7 +375,7 @@ it('injectAclFilters wraps existing filters with ACL filters using AND', functio
     /** @var FiltersGroup $merged */
     $merged = (new ReflectionProperty($request_data, 'filters'))->getValue($request_data);
 
-    expect($merged->operator)->toBe(WhereClause::AND);
+    expect($merged->operator)->toBe(WhereClause::And);
     expect($merged->filters)->toHaveCount(2);
     expect($merged->filters[0])->toEqual($acl_filters);
     expect($merged->filters[1])->toBe($user_filters);
@@ -395,11 +395,11 @@ it('applyAclFiltersToQuery applies null, in, between and comparison operators', 
     $role->givePermissionTo($permission);
 
     $acl_filters = new FiltersGroup([
-        new Filter('users.email', null, FilterOperator::EQUALS),
-        new Filter('users.id', [1, 2], FilterOperator::IN),
-        new Filter('users.created_at', ['2020-01-01 00:00:00', '2020-01-02 00:00:00'], FilterOperator::BETWEEN),
-        new Filter('users.name', 'john', FilterOperator::LIKE),
-    ], WhereClause::AND);
+        new Filter('users.email', null, FilterOperator::Equals),
+        new Filter('users.id', [1, 2], FilterOperator::In),
+        new Filter('users.created_at', ['2020-01-01 00:00:00', '2020-01-02 00:00:00'], FilterOperator::Between),
+        new Filter('users.name', 'john', FilterOperator::Like),
+    ], WhereClause::And);
 
     $acl = new ACL();
     $acl->setSkipValidation(true);
@@ -532,10 +532,10 @@ it('applyAclFiltersToQuery applies nested filter groups recursively', function (
     $role->givePermissionTo($permission);
 
     $nested = new FiltersGroup([
-        new Filter('users.id', 99, FilterOperator::EQUALS),
-    ], WhereClause::AND);
+        new Filter('users.id', 99, FilterOperator::Equals),
+    ], WhereClause::And);
 
-    $acl_filters = new FiltersGroup([$nested], WhereClause::AND);
+    $acl_filters = new FiltersGroup([$nested], WhereClause::And);
 
     $acl = new ACL;
     $acl->setSkipValidation(true);
@@ -575,9 +575,9 @@ it('applyAclFiltersToQuery uses orWhereNull when OR group contains an equals-nul
     $role->givePermissionTo($permission);
 
     $acl_filters = new FiltersGroup([
-        new Filter('users.id', 1, FilterOperator::EQUALS),
-        new Filter('users.email', null, FilterOperator::EQUALS),
-    ], WhereClause::OR);
+        new Filter('users.id', 1, FilterOperator::Equals),
+        new Filter('users.email', null, FilterOperator::Equals),
+    ], WhereClause::Or);
 
     $acl = new ACL;
     $acl->setSkipValidation(true);

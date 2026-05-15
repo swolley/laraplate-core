@@ -13,9 +13,9 @@ final class SearchRequestData extends ListRequestData
     /**
      * @param  string|array<string>  $primaryKey
      */
-    public function __construct(SearchRequest $request, ?string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(SearchRequest $request, ?string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
-        parent::__construct($request, $mainEntity ?? '', $validated, $primaryKey);
+        parent::__construct($request, $mainEntity ?? '', $validated, $primaryKey, $module);
 
         $this->qs = $validated['qs'];
     }

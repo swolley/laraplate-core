@@ -84,12 +84,12 @@ it('trait methods use EventType enum values', function (): void {
     $reflection = new ReflectionClass(HasWriteHooks::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('EventType::PRE_INSERT->value');
-    expect($source)->toContain('EventType::POST_INSERT->value');
-    expect($source)->toContain('EventType::PRE_UPDATE->value');
-    expect($source)->toContain('EventType::POST_UPDATE->value');
-    expect($source)->toContain('EventType::PRE_DELETE->value');
-    expect($source)->toContain('EventType::POST_DELETE->value');
+    expect($source)->toContain('EventType::PreInsert->value');
+    expect($source)->toContain('EventType::PostInsert->value');
+    expect($source)->toContain('EventType::PreUpdate->value');
+    expect($source)->toContain('EventType::PostUpdate->value');
+    expect($source)->toContain('EventType::PreDelete->value');
+    expect($source)->toContain('EventType::PostDelete->value');
 });
 
 it('trait methods handle callback parameters', function (): void {

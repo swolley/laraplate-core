@@ -6,14 +6,19 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Validation\Rule;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Overrides\Model;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperTemplate
  */
 final class Template extends Model
 {
+    #[Override]
+    protected $table = CoreTables::Templates->value;
+
     /**
      * The attributes that are mass assignable.
      */

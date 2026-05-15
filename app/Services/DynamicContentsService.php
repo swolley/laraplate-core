@@ -122,7 +122,7 @@ final class DynamicContentsService
         }
 
         // Load from external cache or database, then store in memory
-        $preset_class = self::getModuleModelClass($type::class, Preset::class);
+        $preset_class = $this->getModuleModelClass($type::class, Preset::class);
         $preset_model = new $preset_class();
         $cache_key = $preset_model->getCacheKey();
 
@@ -154,11 +154,11 @@ final class DynamicContentsService
             );
         }
 
-        $presettable_class = self::getModuleModelClass($type::class, Presettable::class);
+        $presettable_class = $this->getModuleModelClass($type::class, Presettable::class);
 
         // Namespaced key (table name alone collides with unrelated cache entries and shared Redis DBs).
-        $cache_key = self::presettableMemoKey($presettable_class);
-        self::registerPresettableMemoKey($cache_key);
+        $cache_key = $this->presettableMemoKey($presettable_class);
+        $this->registerPresettableMemoKey($cache_key);
 
         $this->presettables_cache = Cache::memo()->rememberForever(
             $cache_key,
@@ -204,7 +204,7 @@ final class DynamicContentsService
     public function clearPresettablesCache(): void
     {
         $this->presettables_cache = null;
-        self::forgetAllPresettableMemoKeys();
+        $this->forgetAllPresettableMemoKeys();
     }
 
     /**
@@ -217,7 +217,7 @@ final class DynamicContentsService
         $this->presettables_cache = null;
         self::forgetMemoCacheKey('entities');
         self::forgetMemoCacheKey('presets');
-        self::forgetAllPresettableMemoKeys();
+        $this->forgetAllPresettableMemoKeys();
     }
 
     /**
@@ -227,7 +227,7 @@ final class DynamicContentsService
      * @param  class-string  $target_class  The target class
      * @return class-string  The module model class
      */
-    private static function getModuleModelClass(string $local_class, string $target_class): string
+    private function getModuleModelClass(string $local_class, string $target_class): string
     {
         $from_module = class_module($local_class);
         $to_module = class_module($target_class);
@@ -257,19 +257,19 @@ final class DynamicContentsService
     /**
      * @param  class-string<Presettable>  $presettable_class
      */
-    private static function presettableMemoKey(string $presettable_class): string
+    private function presettableMemoKey(string $presettable_class): string
     {
         return 'core.dynamic_contents.presettables:' . hash('sha256', $presettable_class);
     }
 
-    private static function registerPresettableMemoKey(string $cache_key): void
+    private function registerPresettableMemoKey(string $cache_key): void
     {
         if (! in_array($cache_key, self::$registered_presettable_memo_keys, true)) {
             self::$registered_presettable_memo_keys[] = $cache_key;
         }
     }
 
-    private static function forgetAllPresettableMemoKeys(): void
+    private function forgetAllPresettableMemoKeys(): void
     {
         foreach (self::$registered_presettable_memo_keys as $key) {
             self::forgetMemoCacheKey($key);

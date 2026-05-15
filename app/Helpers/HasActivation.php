@@ -7,6 +7,9 @@ namespace Modules\Core\Helpers;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasActivation
 {
     protected static $activation_column = 'is_active';

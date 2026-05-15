@@ -133,7 +133,7 @@ final class Grid extends Entity
         $action = $this->requestData->action;
 
         // TODO: solo imbastito, da testare
-        if ($action !== GridAction::CHECK) {
+        if ($action !== GridAction::Check) {
             // if ($action !== GridAction::LAYOUT) {
             $this->prepareFields();
             // } else {
@@ -143,7 +143,7 @@ final class Grid extends Entity
 
         if (GridAction::isReadAction($this->requestData->action)) {
             // validation rules
-            if ($this->requestData->action === GridAction::SELECT) {
+            if ($this->requestData->action === GridAction::Select) {
                 $all_rules = [];
 
                 foreach ($this->getAllFields() as $name => $field) {
@@ -271,7 +271,7 @@ final class Grid extends Entity
                 if (isset($this->requestData)) {
                     $action = $this->requestData->action;
 
-                    if ($action === GridAction::CHECK /* || $action === GridAction::LAYOUT */) {
+                    if ($action === GridAction::Check /* || $action === GridAction::LAYOUT */) {
                         return;
                     }
 
@@ -558,7 +558,7 @@ final class Grid extends Entity
         // }
 
         // concurrency checks
-        if ($action === GridAction::CHECK) {
+        if ($action === GridAction::Check) {
             return $this->processConcurrencies($responseBuilder);
         }
 
@@ -571,17 +571,17 @@ final class Grid extends Entity
         $processes = [];
 
         // data
-        if (in_array($action, [GridAction::SELECT, GridAction::DATA], true)) {
+        if (in_array($action, [GridAction::Select, GridAction::Data], true)) {
             $processes[] = fn (): ResponseBuilder => $this->processData($responseBuilder);
         }
 
         // options
-        if ($action === GridAction::SELECT || $action === GridAction::OPTIONS) {
+        if ($action === GridAction::Select || $action === GridAction::Options) {
             $processes[] = fn (): ResponseBuilder => $this->processOptions($responseBuilder);
         }
 
         // funnels
-        if ($action === GridAction::SELECT || $action === GridAction::FUNNELS) {
+        if ($action === GridAction::Select || $action === GridAction::Funnels) {
             $processes[] = fn (): ResponseBuilder => $this->processFunnels($responseBuilder);
         }
 
@@ -689,18 +689,18 @@ final class Grid extends Entity
             // GridAction::LAYOUT && in_array($request->getMethod(), [Request::METHOD_PUT, Request::METHOD_PATCH]) => $this->updateUserLayout(),
             /** @phpstan-ignore classConstant.notFound */
             // GridAction::LAYOUT && $request->getMethod() === Request::METHOD_DELETE => $this->deleteUserLayout(),
-            GridAction::INSERT => $this->createRecord(),
-            GridAction::UPDATE => $this->updateRecords(),
-            GridAction::DELETE => $this->softDeleteRecords(),
-            GridAction::FORCE_DELETE => $this->forceDeleteRecords(),
-            // GridAction::RESTORE => $this->restoreRecords(),
+            GridAction::Insert => $this->createRecord(),
+            GridAction::Update => $this->updateRecords(),
+            GridAction::Delete => $this->softDeleteRecords(),
+            GridAction::ForceDelete => $this->forceDeleteRecords(),
+            // GridAction::Restore => $this->restoreRecords(),
             default => throw new InvalidArgumentException('Not a valid action'),
         };
 
         $responseBuilder->setData($data);
 
         /** @phpstan-ignore classConstant.notFound */
-        if ($this->requestData->action === GridAction::INSERT) {
+        if ($this->requestData->action === GridAction::Insert) {
             // || ($this->requestData->action === GridAction::LAYOUT && $request->getMethod() === Request::METHOD_POST)) {
             $responseBuilder->setStatus(Response::HTTP_CREATED);
         }
@@ -960,10 +960,10 @@ final class Grid extends Entity
 
                 throw_if($primary_key_fields !== array_keys($record['record']), InvalidArgumentException::class, 'Invalid primary key fields');
 
-                self::applyCorrectWhereMethod($q, $record['property'], FilterOperator::NOT_EQUALS, $record['value']);
+                self::applyCorrectWhereMethod($q, $record['property'], FilterOperator::NotEquals, $record['value']);
 
                 foreach ($record['record'] as $column => $value) {
-                    self::applyCorrectWhereMethod($q, $column, FilterOperator::EQUALS, $value);
+                    self::applyCorrectWhereMethod($q, $column, FilterOperator::Equals, $value);
                 }
 
                 if ($fields === []) {

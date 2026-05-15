@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use FilesystemIterator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -15,6 +16,9 @@ use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use ReflectionClass;
 
 /**
  * Service for resolving effective ACLs for users based on their roles and permissions.
@@ -51,21 +55,13 @@ final class AclResolverService
     private const int CACHE_TTL = 3600; // 1 hour
 
     /**
-     * Build the ACL cache key for a specific user and permission.
-     */
-    private static function buildCacheKey(int|string $user_id, int|string $perm_id): string
-    {
-        return CacheManager::key('acl', 'user', (string) $user_id, 'perm', (string) $perm_id);
-    }
-
-    /**
      * Get the effective ACLs for a user on a specific permission.
      *
      * @return Collection<int, ACL> Collection of effective ACLs (empty if unrestricted or no ACLs)
      */
     public function getEffectiveAcls(User $user, Permission $permission): Collection
     {
-        $cache_key = self::buildCacheKey($user->id, $permission->id);
+        $cache_key = $this->buildCacheKey($user->id, $permission->id);
 
         return Cache::remember($cache_key, self::CACHE_TTL, fn (): Collection => $this->resolveAcls($user, $permission));
     }
@@ -113,7 +109,7 @@ final class AclResolverService
         // Combine multiple filter groups with OR (union of access from different roles)
         return new FiltersGroup(
             filters: $all_filters,
-            operator: WhereClause::OR,
+            operator: WhereClause::Or,
         );
     }
 
@@ -151,7 +147,7 @@ final class AclResolverService
         $permissions = Permission::query()->select('id')->get();
 
         foreach ($permissions as $permission) {
-            Cache::forget(self::buildCacheKey($user->id, $permission->id));
+            Cache::forget($this->buildCacheKey($user->id, $permission->id));
         }
     }
 
@@ -169,15 +165,23 @@ final class AclResolverService
         // Collect all user IDs that have this permission (directly or via roles)
         $user_ids = $this->getUserIdsForPermission($permission);
 
-        if ($user_ids->count() > $threshold) {
+        if ($threshold < $user_ids->count()) {
             $this->flushAclPrefixedKeys();
 
             return;
         }
 
         foreach ($user_ids as $user_id) {
-            Cache::forget(self::buildCacheKey($user_id, $permission->id));
+            Cache::forget($this->buildCacheKey($user_id, $permission->id));
         }
+    }
+
+    /**
+     * Build the ACL cache key for a specific user and permission.
+     */
+    private function buildCacheKey(int|string $user_id, int|string $perm_id): string
+    {
+        return CacheManager::key('acl', 'user', (string) $user_id, 'perm', (string) $perm_id);
     }
 
     /**
@@ -191,20 +195,20 @@ final class AclResolverService
         $user_model = config('auth.providers.users.model', \App\Models\User::class);
 
         // Users with the permission assigned directly
-        $direct_ids = DB::table('model_has_permissions')
+        $direct_ids = DB::table(config('permission.table_names.model_has_permissions'))
             ->where('permission_id', $permission->id)
             ->where('model_type', $user_model)
             ->pluck('model_id');
 
         // Users with a role that has this permission
-        $role_ids = DB::table('role_has_permissions')
+        $role_ids = DB::table(config('permission.table_names.role_has_permissions'))
             ->where('permission_id', $permission->id)
             ->pluck('role_id');
 
         $via_role_ids = collect();
 
         if ($role_ids->isNotEmpty()) {
-            $via_role_ids = DB::table('model_has_roles')
+            $via_role_ids = DB::table(config('permission.table_names.model_has_roles'))
                 ->whereIn('role_id', $role_ids)
                 ->where('model_type', $user_model)
                 ->pluck('model_id');
@@ -224,8 +228,9 @@ final class AclResolverService
 
         // Array driver: filter in-memory storage
         if ($store instanceof \Illuminate\Cache\ArrayStore) {
-            $reflection = new \ReflectionClass($store);
+            $reflection = new ReflectionClass($store);
             $storage_prop = $reflection->getProperty('storage');
+
             /** @var array<string, mixed> $storage */
             $storage = $storage_prop->getValue($store);
 
@@ -257,8 +262,8 @@ final class AclResolverService
             $directory = $store->getDirectory();
 
             if (is_dir($directory)) {
-                $iterator = new \RecursiveIteratorIterator(
-                    new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
                 );
 
                 foreach ($iterator as $file) {

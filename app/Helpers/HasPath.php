@@ -6,6 +6,9 @@ namespace Modules\Core\Helpers;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasPath
 {
     /**

@@ -21,10 +21,6 @@ final class SettingController extends Controller
         private readonly GetVersionInfoAction $getVersionInfoAction,
     ) {}
 
-    /**
-     * @route-comment
-     * Route(path: 'app/translations/{lang?}', name: 'core.info.translations', methods: [GET, HEAD], middleware: [info])
-     */
     public function getTranslations(TranslationsRequest $request, ?string $lang = null): \Illuminate\Http\JsonResponse
     {
         $translations = Cache::tags(Cache::getCacheTags('translations'))->rememberForever(RequestFacade::route()->getName() . $lang . json_encode($request->validated()), function () use ($lang): array {
@@ -38,10 +34,6 @@ final class SettingController extends Controller
             ->json();
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/configs', name: 'core.info.getSiteConfigs', methods: [GET, HEAD], middleware: [info])
-     */
     public function getSiteConfigs(Request $request): \Illuminate\Http\JsonResponse
     {
         $settings = Cache::tags(Cache::getCacheTags('settings'))->rememberForever(
@@ -54,10 +46,6 @@ final class SettingController extends Controller
             ->json();
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/info', name: 'core.info.siteInfo', methods: [GET, HEAD], middleware: [info])
-     */
     public function siteInfo(Request $request): \Illuminate\Http\JsonResponse
     {
         return new ResponseBuilder($request)

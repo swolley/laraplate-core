@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-type HasCacheType HasCache
  */
 trait HasCache

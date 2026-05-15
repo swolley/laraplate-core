@@ -8,6 +8,7 @@ use function Laravel\Prompts\confirm;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\ModelEmbedding;
 use Override;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
@@ -51,7 +52,7 @@ final class MoveEmbeddingTable extends Command
             }
 
             $this->info(sprintf('Dropping the embedding table on %s connection...', $default_connection));
-            Schema::connection($default_connection)->dropIfExists('model_embeddings');
+            Schema::connection($default_connection)->dropIfExists(CoreTables::ModelEmbeddings->value);
         }
         // @codeCoverageIgnoreEnd
 

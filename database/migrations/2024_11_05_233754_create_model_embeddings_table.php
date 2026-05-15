@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 use Modules\Core\Models\ModelEmbedding;
 
@@ -21,9 +22,10 @@ return new class extends Migration
 
         $supports_vector = $driver === 'pgsql' && DB::connection($connection->getName())->table('pg_available_extensions')->where('name', 'vector')->exists();
 
-        Schema::connection($connection->getName())->create('model_embeddings', function (Blueprint $table) use ($supports_vector): void {
+        $model_embeddings_table = CoreTables::ModelEmbeddings->value;
+        Schema::connection($connection->getName())->create($model_embeddings_table, function (Blueprint $table) use ($supports_vector, $model_embeddings_table): void {
             $table->id();
-            $table->morphs('model', 'embedding_model_IDX');
+            $table->morphs('model', "{$model_embeddings_table}_embedding_model_IDX");
 
             if ($supports_vector) {
                 $table->vector('embedding', 1536)->nullable(false)->comment('The generated embedding of the model'); // 1536 dimensions for OpenAI
@@ -38,7 +40,7 @@ return new class extends Migration
         });
 
         if ($driver === 'pgsql' && $supports_vector) {
-            DB::connection($connection->getName())->statement('CREATE INDEX idx_model_embeddings_embedding ON model_embeddings USING ivfflat (embedding vector_cosine_ops);');
+            DB::connection($connection->getName())->statement("CREATE INDEX {$model_embeddings_table}_embedding_IDX ON {$model_embeddings_table} USING ivfflat (embedding vector_cosine_ops);");
         }
     }
 
@@ -49,7 +51,7 @@ return new class extends Migration
     {
         $connection = new ModelEmbedding()->getConnection();
 
-        Schema::connection($connection->getName())->dropIfExists('model_embeddings');
-        Schema::dropIfExists('model_embeddings');
+        Schema::connection($connection->getName())->dropIfExists(CoreTables::ModelEmbeddings->value);
+        Schema::dropIfExists(CoreTables::ModelEmbeddings->value);
     }
 };

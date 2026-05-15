@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Models\Pivot\Fieldable;
@@ -32,6 +33,9 @@ abstract class Preset extends Model
     }
     use HasApprovals;
     use HasCache;
+
+    #[Override]
+    final protected $table = CoreTables::Presets->value;
 
     /**
      * The attributes that are mass assignable.
@@ -97,7 +101,7 @@ abstract class Preset extends Model
      */
     final public function activePresettable(): ?Presettable
     {
-        $presettable_class = self::getModuleModelClass(Presettable::class);
+        $presettable_class = $this->getModuleModelClass(Presettable::class);
 
         return $presettable_class::query()
             ->where('preset_id', $this->id)
@@ -112,8 +116,8 @@ abstract class Preset extends Model
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'is_active' => 'boolean',
-            'template_id' => ['sometimes', 'exists:templates,id'],
-            'entity_id' => ['required', 'exists:entities,id'],
+            'template_id' => ['sometimes', 'exists:'.CoreTables::Templates->value.',id'],
+            'entity_id' => ['required', 'exists:'.CoreTables::Entities->value.',id'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255'],
@@ -137,12 +141,12 @@ abstract class Preset extends Model
             return 0;
         }
 
-        $related_model_class = $this->getRelatedModelClass();
+        $related_model_class = static::getRelatedModelClass();
 
         return $related_model_class::query()
             ->whereIn('presettable_id', function (QueryBuilder $query): void {
                 $query->select('id')
-                    ->from('presettables')
+                    ->from(CoreTables::Presettables->value)
                     ->where('preset_id', $this->id)
                     ->where('entity_id', $this->entity_id);
             })
@@ -173,7 +177,7 @@ abstract class Preset extends Model
         ]);
     }
 
-    private static function getModuleModelClass(string $class): string
+    private function getModuleModelClass(string $class): string
     {
         $module = class_module(self::class);
 

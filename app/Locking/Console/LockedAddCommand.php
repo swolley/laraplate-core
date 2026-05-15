@@ -84,7 +84,7 @@ class LockedAddCommand extends Command
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
             'value' => true,
-            'type' => SettingTypeEnum::BOOLEAN,
+            'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Lock status for {$table}",
         ]);

@@ -113,7 +113,7 @@ final class LocaleScope implements Scope
     private function applyLocaleConstraint(Builder $query, string $current_locale, string $default_locale, bool $use_fallback): void
     {
         if (! $use_fallback) {
-            $target_locale = $current_locale === $default_locale ? $default_locale : $current_locale;
+            $target_locale = $current_locale;
             $query->where('locale', $target_locale);
 
             return;

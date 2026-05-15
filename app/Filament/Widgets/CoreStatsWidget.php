@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Enums\CoreTables;
 use Override;
 
 final class CoreStatsWidget extends BaseWidget
@@ -17,12 +18,15 @@ final class CoreStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $data = DB::table('licenses')->select([
+        $licenses_table = CoreTables::Licenses->value;
+        $users_table = CoreTables::Users->value;
+
+        $data = DB::table($licenses_table)->select([
             DB::raw('count(*) as total'),
             DB::raw('coalesce(sum(case when valid_to >= now() or valid_to is null then 1 else 0 end), 0) as active'),
-            DB::raw('coalesce(sum(case when users.id is not null then 1 else 0 end), 0) as occupied'),
+            DB::raw("coalesce(sum(case when {$users_table}.id is not null then 1 else 0 end), 0) as occupied"),
         ])
-            ->leftJoin('users', 'licenses.id', '=', 'users.license_id')
+            ->leftJoin($users_table, "{$licenses_table}.id", '=', "{$users_table}.license_id")
             ->first();
 
         return [

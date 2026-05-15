@@ -49,9 +49,9 @@ final class EventServiceProvider extends ServiceProvider
         ], function (Model $model): void {
             if ($model instanceof CronJob) {
                 Cache::forget($model->getTable());
-            } else if ($model instanceof Fieldable || $model instanceof Preset) {
+            } elseif ($model instanceof Fieldable || $model instanceof Preset) {
                 $this->clearPresetCache();
-            } else if ($model instanceof Entity) {
+            } elseif ($model instanceof Entity) {
                 $this->clearEntityCache($model);
             }
         });

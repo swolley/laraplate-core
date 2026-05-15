@@ -38,6 +38,6 @@ final class TreeRequest extends DetailRequest
     #[Override]
     public function parsed(): TreeRequestData
     {
-        return new TreeRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+        return new TreeRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 }

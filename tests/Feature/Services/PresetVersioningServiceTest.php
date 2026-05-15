@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\CMS\Enums\CMSTables;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Presettable;
@@ -12,7 +13,7 @@ use Modules\Core\Services\PresetVersioningService;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
 
 beforeEach(function (): void {
-    if (! Schema::hasColumns('contents', ['components', 'shared_components'])) {
+    if (! Schema::hasColumns(CMSTables::Contents->value, ['components', 'shared_components'])) {
         $this->markTestSkipped('Preset versioning integration requires full Core runtime.');
     }
 });
@@ -26,7 +27,7 @@ function createPresetWithFields(int $field_count = 2): array
 {
     $entity = Entity::query()->create([
         'name' => 'test_entity_' . uniqid(),
-        'type' => EntityTypeStub::VALUE1,
+        'type' => EntityTypeStub::Value1,
     ]);
 
     $preset = Preset::query()->create([
@@ -39,7 +40,7 @@ function createPresetWithFields(int $field_count = 2): array
     for ($i = 0; $i < $field_count; $i++) {
         $field = Field::query()->create([
             'name' => 'field_' . uniqid(),
-            'type' => FieldType::TEXT,
+            'type' => FieldType::Text,
             'options' => new stdClass(),
         ]);
         $field->is_translatable = $i === 0;
@@ -80,7 +81,7 @@ describe('PresetVersioningService', function (): void {
 
         expect($snapshot_field['field_id'])->toBe($fields[0]->id);
         expect($snapshot_field['name'])->toBe($fields[0]->name);
-        expect($snapshot_field['type'])->toBe(FieldType::TEXT->value);
+        expect($snapshot_field['type'])->toBe(FieldType::Text->value);
         expect($snapshot_field['is_translatable'])->toBeTrue();
         expect($snapshot_field['pivot']['is_required'])->toBeTrue();
         expect($snapshot_field['pivot']['order_column'])->toBeInt();
@@ -121,7 +122,7 @@ describe('PresetVersioningService', function (): void {
 
         $new_field = Field::query()->create([
             'name' => 'new_field_' . uniqid(),
-            'type' => FieldType::NUMBER,
+            'type' => FieldType::Number,
             'options' => new stdClass(),
         ]);
         $preset->fields()->attach($new_field->id, [
@@ -146,7 +147,7 @@ describe('PresetVersioningService', function (): void {
 
         expect($hydrated)->toHaveCount(2);
         expect($hydrated->first()->name)->toBe($fields[0]->name);
-        expect($hydrated->first()->type)->toBe(FieldType::TEXT);
+        expect($hydrated->first()->type)->toBe(FieldType::Text);
         expect($hydrated->first()->getRelation('pivot')->is_required)->toBeTrue();
     });
 
@@ -184,7 +185,7 @@ describe('Content uses presettable snapshot', function (): void {
 
         $new_field = Field::query()->create([
             'name' => 'extra_field_' . uniqid(),
-            'type' => FieldType::TEXT,
+            'type' => FieldType::Text,
             'options' => new stdClass(),
         ]);
         $preset->fields()->attach($new_field->id, [
@@ -208,7 +209,7 @@ describe('Content uses presettable snapshot', function (): void {
 
         $new_field = Field::query()->create([
             'name' => 'added_field_' . uniqid(),
-            'type' => FieldType::TEXT,
+            'type' => FieldType::Text,
             'options' => new stdClass(),
         ]);
         $preset->fields()->attach($new_field->id, [
@@ -238,7 +239,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityTypeStub::VALUE1);
+            ->fetchAvailablePresettables(EntityTypeStub::Value1);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -255,7 +256,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityTypeStub::VALUE1);
+            ->fetchAvailablePresettables(EntityTypeStub::Value1);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -267,7 +268,7 @@ describe('Presettable model', function (): void {
     it('is created automatically when a preset is created', function (): void {
         $entity = Entity::query()->create([
             'name' => 'auto_entity_' . uniqid(),
-            'type' => EntityTypeStub::VALUE1,
+            'type' => EntityTypeStub::Value1,
         ]);
 
         $preset = Preset::query()->create([
@@ -302,7 +303,7 @@ describe('Presettable model', function (): void {
     it('returns empty collection for empty snapshot', function (): void {
         $entity = Entity::query()->create([
             'name' => 'empty_entity_' . uniqid(),
-            'type' => EntityTypeStub::VALUE1,
+            'type' => EntityTypeStub::Value1,
         ]);
 
         $preset = Preset::query()->create([

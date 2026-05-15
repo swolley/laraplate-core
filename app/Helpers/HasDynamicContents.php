@@ -40,6 +40,8 @@ use stdClass;
  * @property ?int $entity_id
  * @property ?int $presettable_id
  *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @template TModel of Model
  */
 trait HasDynamicContents
@@ -287,7 +289,7 @@ trait HasDynamicContents
             if ($field->pivot->is_required) {
                 $rule .= '|required';
 
-                if ($field->type === FieldType::ARRAY) {
+                if ($field->type === FieldType::Array) {
                     $rule .= '|filled';
                 }
             } else {
@@ -304,7 +306,7 @@ trait HasDynamicContents
 
             $fields[$field->name] = mb_trim($rule, '|');
 
-            if ($field->type === FieldType::EDITOR) {
+            if ($field->type === FieldType::Editor) {
                 $fields[$field->name . '.blocks'] = 'array';
                 $fields[$field->name . '.blocks.*.type'] = 'string';
                 $fields[$field->name . '.blocks.*.data'] = 'array';
@@ -376,7 +378,7 @@ trait HasDynamicContents
                 continue;
             }
 
-            if ($field->type === FieldType::EDITOR) {
+            if ($field->type === FieldType::Editor) {
                 $accumulator .= ' ' . implode(' ', Arr::pluck(((object) $this->{$field->name})->blocks, 'data.text'));
             } else {
                 $accumulator .= ' ' . $this->{$field->name};
@@ -481,14 +483,14 @@ trait HasDynamicContents
                 $value = data_get($components, $field->name, $field->pivot->default);
 
                 // Ensure ARRAY fields always have an array value (even if empty) to pass validation
-                if ($field->type === FieldType::ARRAY && $value === null) {
+                if ($field->type === FieldType::Array && $value === null) {
                     $value = [];
                 }
 
                 // Ensure OBJECT/JSON fields always have a valid JSON value (empty object) to pass validation
                 // Laravel's 'json' rule doesn't accept null unless 'nullable' is also present
-                if (($field->type === FieldType::OBJECT || $field->type === FieldType::EDITOR) && $value === null) {
-                    $value = $field->type === FieldType::EDITOR ? ['blocks' => []] : new stdClass();
+                if (($field->type === FieldType::Object || $field->type === FieldType::Editor) && $value === null) {
+                    $value = $field->type === FieldType::Editor ? ['blocks' => []] : new stdClass();
                 }
 
                 return [$field->name => $value];

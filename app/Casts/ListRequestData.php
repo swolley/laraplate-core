@@ -36,9 +36,9 @@ class ListRequestData extends SelectRequestData
     /**
      * @param  string|array<string>  $primaryKey
      */
-    public function __construct(ListRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(ListRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
-        parent::__construct($request, $mainEntity, $validated, $primaryKey);
+        parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
 
         $this->extractPagination($validated);
 
@@ -46,7 +46,7 @@ class ListRequestData extends SelectRequestData
             $this->limit = (int) ($validated['limit'] ?? $this->pagination);
         }
 
-        $this->count = isset($validated['count']) ? (bool) $validated['count'] : false;
+        $this->count = isset($validated['count']) && (bool) $validated['count'];
         $this->sort = $this->conformSorts($validated['sort'] ?? []);
         $this->relations = $this->conformRelations($validated['relations'] ?? []);
 
@@ -93,7 +93,7 @@ class ListRequestData extends SelectRequestData
         // Result: new_filters AND existing_filters
         $this->filters = new FiltersGroup(
             filters: [$filters, $this->filters],
-            operator: WhereClause::AND,
+            operator: WhereClause::And,
         );
     }
 
@@ -134,7 +134,7 @@ class ListRequestData extends SelectRequestData
         if (array_key_exists('operator', $filter)) {
             $filter['operator'] = FilterOperator::tryFromRequestOperator($filter['operator']);
         } elseif (array_key_exists('value', $filter)) {
-            $filter['operator'] = FilterOperator::EQUALS;
+            $filter['operator'] = FilterOperator::Equals;
         }
     }
 
@@ -145,9 +145,9 @@ class ListRequestData extends SelectRequestData
     {
         if ($filter['value'] === 'null' || $filter['value'] === null) {
             $filter['value'] = null;
-        } elseif (in_array($filter['operator'], [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
+        } elseif (in_array($filter['operator'], [FilterOperator::Like, FilterOperator::NotLike], true)) {
             $filter['value'] = ! Str::startsWith($filter['value'], '%') && ! Str::endsWith($filter['value'], '%') ? '%' . $filter['value'] . '%' : $filter['value'];
-        } elseif ($filter['operator'] === FilterOperator::IN && is_string($filter['value'])) {
+        } elseif ($filter['operator'] === FilterOperator::In && is_string($filter['value'])) {
             $filter['value'] = is_json($filter['value']) ? json_decode($filter['value'], true) : explode(',', $filter['value']);
         }
     }
@@ -161,7 +161,7 @@ class ListRequestData extends SelectRequestData
 
             unset($filter);
         } elseif (Arr::has($filters, 'filters')) {
-            $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower((string) $filters['operator'])) : WhereClause::AND;
+            $filters['operator'] = isset($filters['operator']) ? WhereClause::tryFrom(mb_strtolower((string) $filters['operator'])) : WhereClause::And;
             $this->conformFiltersToQueryBuilderFormat($filters['filters'], $level + 1);
             $filters = new FiltersGroup($filters['filters'], $filters['operator']);
         } else {
@@ -197,7 +197,7 @@ class ListRequestData extends SelectRequestData
             if (is_string($value)) {
                 $value = new Sort($value);
             } else {
-                $value = new Sort($value['property'], $value['direction'] ?? SortDirection::ASC);
+                $value = new Sort($value['property'], $value['direction'] ?? SortDirection::Asc);
             }
         }
 

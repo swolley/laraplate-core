@@ -48,7 +48,7 @@ final class SettingsTable
                     TextColumn::make('value')
                         ->alignCenter()
                         ->state(static fn (Setting $record): mixed => match ($record->type) {
-                                SettingTypeEnum::BOOLEAN => $record->value ? 'true' : 'false',
+                                SettingTypeEnum::Boolean => $record->value ? 'true' : 'false',
                                 default => $record->value,
                             }),
                 ]);

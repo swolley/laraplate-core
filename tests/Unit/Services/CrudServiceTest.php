@@ -110,9 +110,9 @@ it('translates elastic filters for less/less-equals/between operators', function
     $method = $ref->getMethod('translateFilterToElasticsearch');
     $method->setAccessible(true);
 
-    $less = $method->invoke($service, new Filter('users.id', 10, FilterOperator::LESS));
-    $less_equals = $method->invoke($service, new Filter('users.id', 10, FilterOperator::LESS_EQUALS));
-    $between = $method->invoke($service, new Filter('users.id', [5, 15], FilterOperator::BETWEEN));
+    $less = $method->invoke($service, new Filter('users.id', 10, FilterOperator::Less));
+    $less_equals = $method->invoke($service, new Filter('users.id', 10, FilterOperator::LessEquals));
+    $between = $method->invoke($service, new Filter('users.id', [5, 15], FilterOperator::Between));
 
     expect($less)->toBe(['lt' => ['users.id' => 10]])
         ->and($less_equals)->toBe(['lte' => ['users.id' => 10]])
@@ -128,31 +128,31 @@ it('translates elastic filters for remaining operators and nested groups', funct
     $translate_group = $ref->getMethod('translateFiltersToElasticsearch');
     $translate_group->setAccessible(true);
 
-    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::EQUALS)))
+    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::Equals)))
         ->toBe(['term' => ['a' => 1]]);
-    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::NOT_EQUALS)))
+    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::NotEquals)))
         ->toBe(['bool' => ['must_not' => ['term' => ['a' => 1]]]]);
-    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::LIKE)))
+    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::Like)))
         ->toBe(['wildcard' => ['a' => '*x*']]);
-    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::NOT_LIKE)))
+    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::NotLike)))
         ->toBe(['bool' => ['must_not' => ['wildcard' => ['a' => '*x*']]]]);
-    expect($translate_filter->invoke($service, new Filter('a', [1, 2], FilterOperator::IN)))
+    expect($translate_filter->invoke($service, new Filter('a', [1, 2], FilterOperator::In)))
         ->toBe(['terms' => ['a' => [1, 2]]]);
-    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::GREAT)))
+    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::Great)))
         ->toBe(['gt' => ['a' => 5]]);
-    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::GREAT_EQUALS)))
+    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::GreatEquals)))
         ->toBe(['gte' => ['a' => 5]]);
 
     $nested_or = new FiltersGroup(
-        filters: [new Filter('x', 1, FilterOperator::EQUALS)],
-        operator: WhereClause::OR,
+        filters: [new Filter('x', 1, FilterOperator::Equals)],
+        operator: WhereClause::Or,
     );
     $root = new FiltersGroup(
         filters: [
-            new Filter('root', 'v', FilterOperator::EQUALS),
+            new Filter('root', 'v', FilterOperator::Equals),
             $nested_or,
         ],
-        operator: WhereClause::AND,
+        operator: WhereClause::And,
     );
 
     $group_result = $translate_group->invoke($service, $root);
@@ -168,9 +168,9 @@ it('extracts method columns grouped by relation and without duplicates', functio
     $request_data = (new ReflectionClass(SelectRequestData::class))->newInstanceWithoutConstructor();
     (new ReflectionProperty($request_data, 'model'))->setValue($request_data, new Modules\Core\Models\User());
     (new ReflectionProperty($request_data, 'columns'))->setValue($request_data, [
-        new Column('users.full_name', ColumnType::METHOD),
-        new Column('users.roles.isEditable', ColumnType::METHOD),
-        new Column('users.roles.isEditable', ColumnType::METHOD),
+        new Column('users.full_name', ColumnType::Method),
+        new Column('users.roles.isEditable', ColumnType::Method),
+        new Column('users.roles.isEditable', ColumnType::Method),
     ]);
 
     $ref = new ReflectionClass(CrudService::class);
@@ -268,7 +268,7 @@ it('applyComputedMethods iterates collection models when method columns requeste
     $request_data = (new ReflectionClass(SelectRequestData::class))->newInstanceWithoutConstructor();
     (new ReflectionProperty($request_data, 'model'))->setValue($request_data, $row);
     (new ReflectionProperty($request_data, 'columns'))->setValue($request_data, [
-        new Column('crud_cov_method_rows.rowLabel', ColumnType::METHOD),
+        new Column('crud_cov_method_rows.rowLabel', ColumnType::Method),
     ]);
 
     $ref = new ReflectionClass(CrudService::class);

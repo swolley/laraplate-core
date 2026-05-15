@@ -26,6 +26,8 @@ use Modules\Core\Search\Schema\SchemaManager;
 /**
  * Extended searchable trait that supports multiple engines
  * Provides enhanced functionality for Elasticsearch and Typesense.
+ *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait Searchable
 {
@@ -212,9 +214,9 @@ trait Searchable
 
             foreach ($document as $key => $value) {
                 if ($key === 'embedding') {
-                    $schema->addField(new FieldDefinition($key, FieldType::VECTOR, [IndexType::SEARCHABLE, IndexType::VECTOR]));
+                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector]));
                 } else {
-                    $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::SEARCHABLE]));
+                    $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::Searchable]));
                 }
             }
         }

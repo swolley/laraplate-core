@@ -82,7 +82,7 @@ final class QueryBuilder
                 $only_standard_columns = [];
 
                 foreach ($cols as $column) {
-                    if ($column->type === ColumnType::COLUMN) {
+                    if ($column->type === ColumnType::Column) {
                         $only_standard_columns[] = $column->name;
                     }
                 }
@@ -108,7 +108,7 @@ final class QueryBuilder
                     $only_relation_columns = [];
 
                     foreach ($relation_cols as $column) {
-                        if ($column->type === ColumnType::COLUMN) {
+                        if ($column->type === ColumnType::Column) {
                             $only_relation_columns[] = $column;
                         }
                     }
@@ -284,7 +284,7 @@ final class QueryBuilder
             // Nested relation filter, propagate it to the parent eager load too.
             // Example: "roles.permissions.name" becomes "permissions.name" for the "roles" relation callback.
             $nested_relation = Str::after($splitted['relation'], $relation_prefix);
-            $nested_property = $nested_relation === '' ? (string) $splitted['field'] : $nested_relation . '.' . (string) $splitted['field'];
+            $nested_property = $nested_relation === '' ? (string) $splitted['field'] : $nested_relation . '.' . $splitted['field'];
             $kept[] = new Filter($nested_property, $subfilter->value, $subfilter->operator);
         }
 
@@ -322,7 +322,7 @@ final class QueryBuilder
             foreach ($columns_filters as $column) {
                 $index = str_replace($mainEntity . '.', '', $column->name);
 
-                if (preg_match("/^\w+\.\w+$/", $column->name) && $column->type === ColumnType::COLUMN) {
+                if (preg_match("/^\w+\.\w+$/", $column->name) && $column->type === ColumnType::Column) {
                     $columns['main'][] = new Column($index, $column->type);
                 } else {
                     $splitted = $this->splitColumnNameOnLastDot($index);
@@ -331,7 +331,7 @@ final class QueryBuilder
                         $splitted[1] = '*';
                     }
 
-                    if ($column->type === ColumnType::COLUMN) {
+                    if ($column->type === ColumnType::Column) {
                         $remapped_column = new Column($splitted[1], $column->type);
 
                         if (! in_array($splitted[0], $all_relations_names, true)) {
@@ -467,28 +467,28 @@ final class QueryBuilder
         }
 
         if ($filter->value === null) {
-            $null_method = $filter->operator === FilterOperator::EQUALS ? 'Null' : 'NotNull';
+            $null_method = $filter->operator === FilterOperator::Equals ? 'Null' : 'NotNull';
             $final_method = $method . $null_method;
             $query->{$final_method}($filter->property);
 
             return;
         }
 
-        if ($filter->operator === FilterOperator::IN) {
+        if ($filter->operator === FilterOperator::In) {
             $in_method = $method === 'orWhere' ? 'orWhereIn' : 'whereIn';
             $query->{$in_method}($filter->property, Arr::wrap($filter->value));
 
             return;
         }
 
-        if ($filter->operator === FilterOperator::BETWEEN && is_array($filter->value)) {
+        if ($filter->operator === FilterOperator::Between && is_array($filter->value)) {
             $between_method = $method === 'orWhere' ? 'orWhereBetween' : 'whereBetween';
             $query->{$between_method}($filter->property, $filter->value);
 
             return;
         }
 
-        if (in_array($filter->operator, [FilterOperator::LIKE, FilterOperator::NOT_LIKE], true)) {
+        if (in_array($filter->operator, [FilterOperator::Like, FilterOperator::NotLike], true)) {
             $final_method = $method . Str::studly($filter->operator->value);
             $query->{$final_method}($filter->property, $filter->value);
 
@@ -506,15 +506,15 @@ final class QueryBuilder
     private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
     {
         $iterable = is_array($filters) && Arr::isList($filters) ? $filters : $filters->filters;
-        $operator = $filters instanceof FiltersGroup ? $filters->operator : WhereClause::AND;
-        $is_or = $operator === WhereClause::OR;
+        $operator = $filters instanceof FiltersGroup ? $filters->operator : WhereClause::And;
+        $is_or = $operator === WhereClause::Or;
         $first = true;
 
         foreach ($iterable as $subfilter) {
             $method = $is_or && $first ? 'where' : ($is_or ? 'orWhere' : 'where');
 
             if (isset($subfilter->filters)) {
-                if ($method !== '' && is_callable([$query, $method])) {
+                if (is_callable([$query, $method])) {
                     $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
             } else {
@@ -542,7 +542,7 @@ final class QueryBuilder
 
         foreach ($primary_key as $key) {
             if (! in_array($key, $all_columns_name, true)) {
-                array_unshift($columns, new Column($key, ColumnType::COLUMN));
+                array_unshift($columns, new Column($key, ColumnType::Column));
                 $all_columns_name[] = $key;
             }
         }
@@ -557,7 +557,7 @@ final class QueryBuilder
         $simple_columns = [];
 
         foreach ($relation_columns as $column) {
-            if ($column->type === ColumnType::COLUMN) {
+            if ($column->type === ColumnType::Column) {
                 $simple_columns[] = $column->name;
             }
         }
@@ -586,7 +586,7 @@ final class QueryBuilder
             foreach ($aggregates_cols as $col) {
                 $method = $this->resolveAggregateMethod($col->type);
 
-                if ($col->type === ColumnType::COUNT) {
+                if ($col->type === ColumnType::Count) {
                     $query->{$method}([$subrelation]);
 
                     continue;
@@ -699,7 +699,7 @@ final class QueryBuilder
             foreach ($aggregates_cols as $col) {
                 $method = $this->resolveAggregateMethod($col->type);
 
-                if ($col->type === ColumnType::COUNT) {
+                if ($col->type === ColumnType::Count) {
                     $query->{$method}([$relation]);
 
                     continue;
@@ -725,7 +725,7 @@ final class QueryBuilder
 
     private function resolveAggregateMethod(ColumnType $column_type): string
     {
-        if ($column_type === ColumnType::AVG) {
+        if ($column_type === ColumnType::Avg) {
             return 'withAvg';
         }
 
@@ -767,7 +767,7 @@ final class QueryBuilder
         ];
 
         foreach ($columns as $column) {
-            if (! in_array($column->type, [ColumnType::APPEND, ColumnType::METHOD], true)) {
+            if (! in_array($column->type, [ColumnType::Append, ColumnType::Method], true)) {
                 continue;
             }
 
@@ -775,7 +775,7 @@ final class QueryBuilder
             $splitted = $this->splitColumnNameOnLastDot($index);
             $relation = $splitted[1] ?? null ? $splitted[0] : '';
             $name = $splitted[1] ?? $splitted[0];
-            $bucket = $column->type === ColumnType::APPEND ? 'append' : 'method';
+            $bucket = $column->type === ColumnType::Append ? 'append' : 'method';
 
             if ($relation === '') {
                 $computed['main'][$bucket][] = $name;
@@ -867,7 +867,7 @@ final class QueryBuilder
                 continue;
             }
 
-            $relations_columns[$relation][] = new Column($dependency_column, ColumnType::COLUMN);
+            $relations_columns[$relation][] = new Column($dependency_column, ColumnType::Column);
             $existing_columns[] = $dependency_column;
         }
     }

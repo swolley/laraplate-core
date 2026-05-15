@@ -13,6 +13,8 @@ use Modules\Core\Casts\CrudExecutor;
 /**
  * Trait per aggiungere validazioni ai modelli.
  *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @method void setSkipValidation(bool $skip = true) Imposta il flag per saltare le validazioni
  * @method bool shouldSkipValidation() Verifica se le validazioni devono essere saltate
  * @method array getRules() Ottiene le regole di validazione

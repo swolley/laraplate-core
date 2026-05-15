@@ -50,8 +50,8 @@ it('prepareQuery auto-injects relations when relation columns are requested', fu
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: [],
     );
@@ -64,7 +64,7 @@ it('prepareQuery auto-injects relations when relation columns are requested', fu
 it('prepareQuery selects requested columns and always includes primary key', function (): void {
     $query = User::query();
     $request_data = qb_make_list_request_data([
-        new Column('users.username', ColumnType::COLUMN),
+        new Column('users.username', ColumnType::Column),
     ]);
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -80,7 +80,7 @@ it('prepareQuery selects requested columns and always includes primary key', fun
 it('prepareQuery adds foreign keys to selected columns (unless selecting all)', function (): void {
     $query = User::query();
     $request_data = qb_make_list_request_data([
-        new Column('users.username', ColumnType::COLUMN),
+        new Column('users.username', ColumnType::Column),
     ]);
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -97,8 +97,8 @@ it('prepareQuery adds foreign keys to selected columns (unless selecting all)', 
 it('prepareQuery forces select all when computed columns are requested but dependencies are unknown', function (): void {
     $query = User::query();
     $request_data = qb_make_list_request_data([
-        new Column('users.username', ColumnType::COLUMN),
-        new Column('users.someComputed', ColumnType::APPEND),
+        new Column('users.username', ColumnType::Column),
+        new Column('users.someComputed', ColumnType::Append),
     ]);
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -114,12 +114,12 @@ it('prepareQuery registers eager load closures for relations and applies relatio
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: ['roles'],
         sort: [
-            new Sort('roles.name', SortDirection::ASC),
+            new Sort('roles.name', SortDirection::Asc),
         ],
     );
 
@@ -145,8 +145,8 @@ it('prepareQuery applies aggregates on relations (withCount)', function (): void
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles', ColumnType::COUNT),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles', ColumnType::Count),
         ],
         relations: ['roles'],
     );
@@ -166,8 +166,8 @@ it('relation deleted_at filter requires delete permission to include trashed rel
     $role->delete();
 
     $filters = new FiltersGroup([
-        new Filter('roles.deleted_at', null, FilterOperator::NOT_EQUALS),
-    ], WhereClause::AND);
+        new Filter('roles.deleted_at', null, FilterOperator::NotEquals),
+    ], WhereClause::And);
 
     $query_without_permission = User::query();
     (new QueryBuilder())->applyFilters($query_without_permission, $filters);
@@ -233,11 +233,11 @@ it('applies nested filters on relations (AND/OR) via whereHas', function (): voi
 
     $filters = new FiltersGroup([
         new FiltersGroup([
-            new Filter('roles.name', 'sales', FilterOperator::EQUALS),
-            new Filter('username', 'alpha', FilterOperator::EQUALS),
-        ], WhereClause::AND),
-        new Filter('roles.name', 'support', FilterOperator::EQUALS),
-    ], WhereClause::OR);
+            new Filter('roles.name', 'sales', FilterOperator::Equals),
+            new Filter('username', 'alpha', FilterOperator::Equals),
+        ], WhereClause::And),
+        new Filter('roles.name', 'support', FilterOperator::Equals),
+    ], WhereClause::Or);
 
     $query = User::query();
     (new QueryBuilder())->applyFilters($query, $filters);
@@ -263,12 +263,12 @@ it('should apply filters within eager-loaded relations (future behavior)', funct
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: ['roles'],
         filters: new FiltersGroup([
-            new Filter('roles.name', 'sales', FilterOperator::EQUALS),
+            new Filter('roles.name', 'sales', FilterOperator::Equals),
         ]),
     );
 
@@ -301,12 +301,12 @@ it('should force FK columns for deep relation selections (future behavior)', fun
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.permissions.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.permissions.name', ColumnType::Column),
         ],
         relations: [],
         filters: new FiltersGroup([
-            new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::EQUALS),
+            new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::Equals),
         ]),
     );
 
@@ -342,11 +342,11 @@ it('eager-loads deep relations constrained by nested relation filters', function
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.permissions.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.permissions.name', ColumnType::Column),
         ],
         filters: new FiltersGroup([
-            new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::EQUALS),
+            new Filter('roles.permissions.name', 'default.orders.select', FilterOperator::Equals),
         ]),
     );
 
@@ -405,8 +405,8 @@ it('should support computed columns with explicit dependencies (future behavior)
 
     $query = $model->newQuery();
     $request_data = qb_make_list_request_data([
-        new Column('qb_items.title', ColumnType::COLUMN),
-        new Column('qb_items.owner_name', ColumnType::APPEND),
+        new Column('qb_items.title', ColumnType::Column),
+        new Column('qb_items.owner_name', ColumnType::Append),
     ]);
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -429,8 +429,8 @@ it('should support computed columns with explicit dependencies (future behavior)
 it('prepareQuery orders by fully qualified main column when sort uses table prefix', function (): void {
     $query = User::query();
     $request_data = qb_make_list_request_data(
-        columns: [new Column('users.username', ColumnType::COLUMN)],
-        sort: [new Sort('users.username', SortDirection::DESC)],
+        columns: [new Column('users.username', ColumnType::Column)],
+        sort: [new Sort('users.username', SortDirection::Desc)],
     );
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -446,8 +446,8 @@ it('prepareQuery normalizes relations from associative array entries', function 
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: [['name' => 'roles']],
     );
@@ -461,8 +461,8 @@ it('prepareQuery applies withSum aggregate on relation column', function (): voi
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.id', ColumnType::SUM),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.id', ColumnType::Sum),
         ],
         relations: ['roles'],
     );
@@ -479,11 +479,11 @@ it('prepareQuery applies descending sort on relation eager load', function (): v
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: ['roles'],
-        sort: [new Sort('roles.name', SortDirection::DESC)],
+        sort: [new Sort('roles.name', SortDirection::Desc)],
     );
 
     (new QueryBuilder())->prepareQuery($query, $request_data);
@@ -503,8 +503,8 @@ it('prepareQuery applies withAvg aggregate on relation column', function (): voi
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.id', ColumnType::AVG),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.id', ColumnType::Avg),
         ],
         relations: ['roles'],
     );
@@ -521,8 +521,8 @@ it('prepareQuery applies withMax aggregate on relation column', function (): voi
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.id', ColumnType::MAX),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.id', ColumnType::Max),
         ],
         relations: ['roles'],
     );
@@ -539,9 +539,9 @@ it('prepareQuery applies withMin aggregate on nested relation permissions id', f
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
-            new Column('users.roles.permissions.id', ColumnType::MIN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
+            new Column('users.roles.permissions.id', ColumnType::Min),
         ],
         relations: ['roles'],
     );
@@ -562,8 +562,8 @@ it('prepareQuery ignores blacklisted relations from request payload', function (
     $query = User::query();
     $request_data = qb_make_list_request_data(
         columns: [
-            new Column('users.username', ColumnType::COLUMN),
-            new Column('users.roles.name', ColumnType::COLUMN),
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
         ],
         relations: ['children', 'roles'],
     );
@@ -579,8 +579,8 @@ it('prepareQuery ignores blacklisted relations from request payload', function (
 it('prepareQuery ignores relation sort without field segment', function (): void {
     $query = User::query();
     $request_data = qb_make_list_request_data(
-        columns: [new Column('users.username', ColumnType::COLUMN)],
-        sort: [new Sort('roles', SortDirection::ASC)],
+        columns: [new Column('users.username', ColumnType::Column)],
+        sort: [new Sort('roles', SortDirection::Asc)],
     );
 
     (new QueryBuilder())->prepareQuery($query, $request_data);

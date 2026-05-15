@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
@@ -14,7 +15,8 @@ return new class() extends Migration
      */
     public function up(): void
     {
-        Schema::create('modifications', function (Blueprint $table): void {
+        $modifications_table = CoreTables::Modifications->value;
+        Schema::create($modifications_table, function (Blueprint $table) use ($modifications_table): void {
             $table->id();
             $table->unsignedBigInteger('modifiable_id')->nullable()->comment('The id of the modifiable model');
             $table->string('modifiable_type')->nullable()->comment('The type of the modifiable model');
@@ -32,7 +34,7 @@ return new class() extends Migration
                 hasCreateUpdate: true,
             );
 
-            $table->index(['modifier_id', 'modifier_type'], 'modifications_modifierable_IDX');
+            $table->index(['modifier_id', 'modifier_type'], "{$modifications_table}_modifierable_IDX");
         });
     }
 
@@ -41,6 +43,6 @@ return new class() extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('modifications');
+        Schema::dropIfExists(CoreTables::Modifications->value);
     }
 };

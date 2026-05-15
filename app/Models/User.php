@@ -29,18 +29,20 @@ use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\Permission\Traits\HasRoles;
 
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
+ * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
@@ -60,6 +62,9 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
+
+    #[Override]
+    protected $table = CoreTables::Users->value;
 
     /**
      * The attributes that are mass assignable.
@@ -126,11 +131,13 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             ->keys()
             ->filter(function (string $guard_name): bool {
                 $provider = config("auth.guards.{$guard_name}.provider");
+
                 if (! is_string($provider)) {
                     return false;
                 }
 
                 $model = config("auth.providers.{$provider}.model");
+
                 if (! is_string($model) || ! class_exists($model)) {
                     return false;
                 }

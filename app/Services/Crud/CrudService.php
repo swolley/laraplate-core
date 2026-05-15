@@ -523,7 +523,7 @@ class CrudService
             if ($filter instanceof Filter) {
                 $mustClauses[] = $this->translateFilterToElasticsearch($filter);
             } elseif ($filter instanceof FiltersGroup) {
-                $clause = $filter->operator === WhereClause::AND ? 'must' : 'should';
+                $clause = $filter->operator === WhereClause::And ? 'must' : 'should';
                 $mustClauses[] = [
                     'bool' => [
                         $clause => $this->translateFiltersToElasticsearch($filter),
@@ -538,16 +538,16 @@ class CrudService
     private function translateFilterToElasticsearch(Filter $filter): array
     {
         return match ($filter->operator) {
-            FilterOperator::EQUALS => ['term' => [$filter->property => $filter->value]],
-            FilterOperator::NOT_EQUALS => ['bool' => ['must_not' => ['term' => [$filter->property => $filter->value]]]],
-            FilterOperator::LIKE => ['wildcard' => [$filter->property => '*' . $filter->value . '*']],
-            FilterOperator::NOT_LIKE => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $filter->value . '*']]]],
-            FilterOperator::IN => ['terms' => [$filter->property => $filter->value]],
-            FilterOperator::GREAT => ['gt' => [$filter->property => $filter->value]],
-            FilterOperator::GREAT_EQUALS => ['gte' => [$filter->property => $filter->value]],
-            FilterOperator::LESS => ['lt' => [$filter->property => $filter->value]],
-            FilterOperator::LESS_EQUALS => ['lte' => [$filter->property => $filter->value]],
-            FilterOperator::BETWEEN => ['range' => [$filter->property => ['gte' => $filter->value[0], 'lte' => $filter->value[1]]]],
+            FilterOperator::Equals => ['term' => [$filter->property => $filter->value]],
+            FilterOperator::NotEquals => ['bool' => ['must_not' => ['term' => [$filter->property => $filter->value]]]],
+            FilterOperator::Like => ['wildcard' => [$filter->property => '*' . $filter->value . '*']],
+            FilterOperator::NotLike => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $filter->value . '*']]]],
+            FilterOperator::In => ['terms' => [$filter->property => $filter->value]],
+            FilterOperator::Great => ['gt' => [$filter->property => $filter->value]],
+            FilterOperator::GreatEquals => ['gte' => [$filter->property => $filter->value]],
+            FilterOperator::Less => ['lt' => [$filter->property => $filter->value]],
+            FilterOperator::LessEquals => ['lte' => [$filter->property => $filter->value]],
+            FilterOperator::Between => ['range' => [$filter->property => ['gte' => $filter->value[0], 'lte' => $filter->value[1]]]],
         };
     }
 
@@ -656,7 +656,7 @@ class CrudService
         $main_entity = $request_data->model->getTable();
 
         foreach ($request_data->columns ?? [] as $column) {
-            if ($column->type !== \Modules\Core\Casts\ColumnType::METHOD) {
+            if ($column->type !== \Modules\Core\Casts\ColumnType::Method) {
                 continue;
             }
 

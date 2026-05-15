@@ -37,7 +37,7 @@ final readonly class BatchTask
     public function execute(): mixed
     {
         if (is_string($this->run)) {
-            $instance = app($this->run);
+            $instance = resolve($this->run);
 
             return $instance(...$this->args);
         }

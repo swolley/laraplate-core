@@ -37,7 +37,7 @@ it('covers base entity model and table metadata access', function (): void {
 
 it('adds and resolves fields on entity', function (): void {
     $entity = new EntityHarness(new EntityModelStub());
-    $field = new Field('', 'email', null, FieldType::COLUMN, new EntityModelStub());
+    $field = new Field('', 'email', null, FieldType::Column, new EntityModelStub());
 
     expect($entity->seedField($field))->toBeTrue()
         ->and($entity->seedField($field))->toBeFalse()
@@ -64,7 +64,7 @@ it('adds and removes relations deeply', function (): void {
 
 it('constructs relation with predefined fields list', function (): void {
     $model = new EntityModelStub();
-    $field = new Field('', 'email', null, FieldType::COLUMN, $model);
+    $field = new Field('', 'email', null, FieldType::Column, $model);
     $relation_info = new RelationInfo('hasMany', 'roles', EntityModelStub::class, 'roles', 'user_id', 'id');
     $relation = new Relation('', $relation_info, [$field]);
 
@@ -87,9 +87,9 @@ it('builds deep relations from root entity without forcing typed errors', functi
 
 it('applies where methods for null and like operators', function (): void {
     $query = EntityModelStub::query();
-    EntityHarness::applyWhere($query, 'email', FilterOperator::LIKE, 'John');
-    EntityHarness::applyWhere($query, 'email_verified_at', FilterOperator::EQUALS, null);
-    EntityHarness::applyWhere($query, 'deleted_at', FilterOperator::NOT_EQUALS, null, WhereClause::OR);
+    EntityHarness::applyWhere($query, 'email', FilterOperator::Like, 'John');
+    EntityHarness::applyWhere($query, 'email_verified_at', FilterOperator::Equals, null);
+    EntityHarness::applyWhere($query, 'deleted_at', FilterOperator::NotEquals, null, WhereClause::Or);
 
     $sql = $query->toSql();
 
@@ -135,13 +135,13 @@ it('covers relation and field deep lookup negative branches', function (): void 
 
 it('covers setFields and addFields helper methods', function (): void {
     $entity = new EntityHarness(new EntityModelStub());
-    $field = new Field('', 'email', null, FieldType::COLUMN, new EntityModelStub());
+    $field = new Field('', 'email', null, FieldType::Column, new EntityModelStub());
 
     $entity->setFieldsPublic([$field]);
     expect($entity->hasField($field))->toBeTrue();
 
     expect(fn () => $entity->addFieldsPublic([
-        'users.name' => static fn (Model $model): Field => new Field('', 'name', null, FieldType::COLUMN, $model),
+        'users.name' => static fn (Model $model): Field => new Field('', 'name', null, FieldType::Column, $model),
     ]))->toThrow(Error::class);
 });
 
@@ -206,7 +206,7 @@ it('covers explicit columns branch in checkColumnsOrGetDefaults', function (): v
 
 it('covers in operator branch in applyCorrectWhereMethod', function (): void {
     $query = EntityModelStub::query();
-    EntityHarness::applyWhere($query, 'id', FilterOperator::IN, [1, 2, 3]);
+    EntityHarness::applyWhere($query, 'id', FilterOperator::In, [1, 2, 3]);
 
     expect($query->toSql())->toContain('in (?, ?, ?)');
 });
@@ -231,7 +231,7 @@ it('covers nested relations traversal branches', function (): void {
 it('covers addField relation path branch with addRelationField', function (): void {
     $entity = new EntityHarness(new EntityNestedParentStub());
     $entity->setPathAndName('', 'entityNestedParentStub');
-    $field = new Field('entityNestedParentStub.children', 'name', null, FieldType::COLUMN, new EntityNestedChildStub());
+    $field = new Field('entityNestedParentStub.children', 'name', null, FieldType::Column, new EntityNestedChildStub());
 
     expect($entity->seedField($field))->toBeFalse()
         ->and($entity->hasRelation('children'))->toBeTrue();
@@ -239,7 +239,7 @@ it('covers addField relation path branch with addRelationField', function (): vo
 
 it('covers where like branch without auto wrapping percents', function (): void {
     $query = EntityModelStub::query();
-    EntityHarness::applyWhere($query, 'email', FilterOperator::LIKE, '%john');
+    EntityHarness::applyWhere($query, 'email', FilterOperator::Like, '%john');
 
     expect($query->getBindings()[0])->toBe('%john');
 });
@@ -265,7 +265,7 @@ it('covers direct and nested field lookup branches', function (): void {
     $entity = new EntityHarness(new EntityNestedParentStub());
     $entity->setPathAndName('', 'entityNestedParentStub');
 
-    $top_field = new Field('', 'title', null, FieldType::COLUMN, new EntityNestedParentStub());
+    $top_field = new Field('', 'title', null, FieldType::Column, new EntityNestedParentStub());
     $entity->seedField($top_field);
 
     $relations = [
@@ -273,7 +273,7 @@ it('covers direct and nested field lookup branches', function (): void {
     ];
     $entity->addRelationDeeply($relations);
 
-    $child_field = new Field('entityNestedParentStub.children', 'name', null, FieldType::COLUMN, new EntityNestedChildStub());
+    $child_field = new Field('entityNestedParentStub.children', 'name', null, FieldType::Column, new EntityNestedChildStub());
     $entity->getRelation('children')?->addField($child_field);
 
     expect($entity->getFieldDeeply($top_field))->toBe($top_field)
@@ -287,15 +287,15 @@ it('covers all fields/query fields merge and deep flags', function (): void {
     $entity = new EntityHarness(new EntityNestedParentStub());
     $entity->setPathAndName('', 'entityNestedParentStub');
 
-    $entity->seedField(new Field('', 'local_column', null, FieldType::COLUMN, new EntityNestedParentStub()));
+    $entity->seedField(new Field('', 'local_column', null, FieldType::Column, new EntityNestedParentStub()));
     $relations = [
         new RelationInfo('hasMany', 'children', EntityNestedChildStub::class, 'nested_child', 'parent_id', 'id'),
     ];
     $entity->addRelationDeeply($relations);
     $relation = $entity->getRelation('children');
-    $relation?->addField(new Field('entityNestedParentStub.children', 'remote_column', null, FieldType::COLUMN, new EntityNestedChildStub()));
-    $relation?->addField(new Field('entityNestedParentStub.children', 'computed', null, FieldType::APPEND, new EntityNestedChildStub()));
-    $relation?->addField(new Field('entityNestedParentStub.children', 'method_column', null, FieldType::METHOD, new EntityNestedChildStub()));
+    $relation?->addField(new Field('entityNestedParentStub.children', 'remote_column', null, FieldType::Column, new EntityNestedChildStub()));
+    $relation?->addField(new Field('entityNestedParentStub.children', 'computed', null, FieldType::Append, new EntityNestedChildStub()));
+    $relation?->addField(new Field('entityNestedParentStub.children', 'method_column', null, FieldType::Method, new EntityNestedChildStub()));
 
     expect($entity->getAllFields()->count())->toBeGreaterThanOrEqual(2)
         ->and($entity->getAllQueryFields()->keys()->join(','))->toContain('entityNestedParentStub.children.remote_column')
@@ -331,7 +331,7 @@ it('covers deep field false/delegate and deep relation second-branch checks', fu
 
     expect($entity->hasDeepFields())->toBeFalse();
 
-    $entity->getRelation('children')?->addField(new Field('entityNestedParentStub.children', 'only_remote', null, FieldType::COLUMN, new EntityNestedChildStub()));
+    $entity->getRelation('children')?->addField(new Field('entityNestedParentStub.children', 'only_remote', null, FieldType::Column, new EntityNestedChildStub()));
     expect($entity->hasFieldsDeeply())->toBeTrue();
 
     $fake_relation = new class
@@ -376,19 +376,19 @@ it('covers setFields propagation and addFields closure branches', function (): v
     ]);
 
     $fields = collect([
-        'title' => new Field('', 'title', null, FieldType::COLUMN, new EntityNestedParentStub()),
-        'entityNestedParentStub.children.remote' => new Field('entityNestedParentStub.children', 'remote', null, FieldType::COLUMN, new EntityNestedChildStub()),
+        'title' => new Field('', 'title', null, FieldType::Column, new EntityNestedParentStub()),
+        'entityNestedParentStub.children.remote' => new Field('entityNestedParentStub.children', 'remote', null, FieldType::Column, new EntityNestedChildStub()),
     ]);
     $entity->setFieldsPublic($fields);
 
     $entity->addFieldsPublic([
-        'entityNestedParentStub.generated' => static fn (Model $model): Field => new Field('', 'generated', null, FieldType::COLUMN, $model),
+        'entityNestedParentStub.generated' => static fn (Model $model): Field => new Field('', 'generated', null, FieldType::Column, $model),
     ]);
 
     expect($entity->getFields()->has('generated'))->toBeTrue();
 
     expect(fn () => $entity->addFieldsPublic([
-        'other.path.broken' => static fn (Model $model): Field => new Field('', 'broken', null, FieldType::COLUMN, $model),
+        'other.path.broken' => static fn (Model $model): Field => new Field('', 'broken', null, FieldType::Column, $model),
     ]))->toThrow(Exception::class);
 });
 

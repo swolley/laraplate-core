@@ -29,7 +29,7 @@ it('currently throws due request type mismatch in parent constructor', function 
     ];
 
     expect(fn (): GridRequestData => new GridRequestData(
-        GridAction::SELECT,
+        GridAction::Select,
         $request,
         'users',
         $validated,
@@ -50,7 +50,7 @@ it('throws for write action with same mismatch', function (): void {
     ];
 
     expect(fn (): GridRequestData => new GridRequestData(
-        GridAction::UPDATE,
+        GridAction::Update,
         $request,
         'users',
         $validated,
@@ -62,7 +62,7 @@ it('throws type error before primary key validation branch', function (): void {
     $request = GridRequest::create('/api/v1/core/users/update', 'POST');
 
     expect(fn (): GridRequestData => new GridRequestData(
-        GridAction::UPDATE,
+        GridAction::Update,
         $request,
         'users',
         ['pagination' => 25, 'changes' => ['name' => 'No PK']],

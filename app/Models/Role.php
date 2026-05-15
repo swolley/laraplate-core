@@ -12,11 +12,12 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Database\Factories\RoleFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
 use Modules\Core\Helpers\HasVersions;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\Permission\Exceptions\GuardDoesNotMatch;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
@@ -24,6 +25,7 @@ use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperRole
  */
 final class Role extends BaseRole
@@ -37,6 +39,9 @@ final class Role extends BaseRole
     }
     use HasVersions;
     use SoftDeletes;
+
+    #[Override]
+    protected $table = CoreTables::Roles->value;
 
     /**
      * @var array<int,string>

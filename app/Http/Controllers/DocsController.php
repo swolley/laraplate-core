@@ -31,9 +31,6 @@ final class DocsController extends OpenApiJsonController
 
     /**
      * Serves merged OpenAPI spec (from MergeSwaggerDocsAction) with server_url and oauth applied.
-     *
-     * @route-comment
-     * Route(path: 'swagger/{filename}', name: 'core.docs.swaggerDocs', methods: [GET, HEAD], middleware: [web])
      */
     public function mergeDocs(Request $request, string $filename = 'v1'): JsonResponse
     {

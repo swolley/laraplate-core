@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rules\Password;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
@@ -129,7 +130,7 @@ test('api insert creates new record', function (): void {
             ],
         ]);
 
-    $this->assertDatabaseHas('users', [
+    $this->assertDatabaseHas(CoreTables::Users->value, [
         'name' => 'New User',
         'email' => 'new@example.com',
     ]);
@@ -157,7 +158,7 @@ test('api insert rejects weak password and does not create record', function ():
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['password']);
 
-    $this->assertDatabaseMissing('users', [
+    $this->assertDatabaseMissing(CoreTables::Users->value, [
         'email' => 'weak@example.com',
     ]);
 });
@@ -182,7 +183,7 @@ test('api update modifies existing record', function (): void {
         'email' => 'updated@example.com',
     ]);
 
-    $this->assertDatabaseHas('users', [
+    $this->assertDatabaseHas(CoreTables::Users->value, [
         'id' => $this->user->id,
         'name' => 'Updated User',
         'email' => 'updated@example.com',
@@ -210,7 +211,7 @@ test('api delete removes record', function (): void {
 
     $response->assertStatus(200);
 
-    $this->assertDatabaseMissing('users', [
+    $this->assertDatabaseMissing(CoreTables::Users->value, [
         'id' => $this->user->id,
     ]);
 });

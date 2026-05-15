@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
@@ -15,23 +16,24 @@ return new class() extends Migration
      */
     public function up(): void
     {
-        Schema::create('settings', function (Blueprint $table): void {
+        $settings_table = CoreTables::Settings->value;
+        Schema::create($settings_table, function (Blueprint $table) use ($settings_table): void {
             $types = [
-                DoctrineTypeEnum::BOOLEAN->value,
-                DoctrineTypeEnum::INTEGER->value,
-                DoctrineTypeEnum::FLOAT->value,
-                DoctrineTypeEnum::STRING->value,
-                DoctrineTypeEnum::JSON->value,
-                DoctrineTypeEnum::DATE->value,
+                DoctrineTypeEnum::Boolean->value,
+                DoctrineTypeEnum::Integer->value,
+                DoctrineTypeEnum::Float->value,
+                DoctrineTypeEnum::String->value,
+                DoctrineTypeEnum::Json->value,
+                DoctrineTypeEnum::Date->value,
             ];
 
             $table->id();
-            $table->string('name', 50)->nullable(false)->comment('The name of the setting');
+            $table->string('name', 50)->nullable(false)->unique("{$settings_table}_name_UN")->comment('The name of the setting');
             $table->json('value')->nullable(false)->comment('The value of the setting');
             $table->boolean('encrypted')->nullable(false)->comment('Is the value encrypted');
             $table->json('choices')->nullable(true)->comment('Constrained available values');
             $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20])->comment('The type of the setting');
-            $table->string('group_name', 50)->nullable(false)->comment('The group name of the setting');
+            $table->string('group_name', 50)->nullable(false)->index("{$settings_table}_group_name_IDX")->comment('The group name of the setting');
             $table->string('description')->nullable(false)->comment('The description of the setting');
 
             MigrateUtils::timestamps(
@@ -47,6 +49,6 @@ return new class() extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('settings');
+        Schema::dropIfExists(CoreTables::Settings->value);
     }
 };

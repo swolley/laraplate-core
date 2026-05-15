@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Database\Factories\EntityFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasActivation;
 use Modules\Core\Helpers\HasPath;
 use Modules\Core\Helpers\HasSlug;
@@ -36,7 +37,7 @@ abstract class Entity extends Model
     // endregion
 
     #[Override]
-    final protected $table = 'entities';
+    final protected $table = CoreTables::Entities->value;
 
     /**
      * The attributes that are mass assignable.
@@ -81,10 +82,10 @@ abstract class Entity extends Model
             'type' => ['required', static::getEntityTypeEnumClass()::validationRule()],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:entities,name'],
+            'name' => ['required', 'string', 'max:255', 'unique:'.CoreTables::Entities->value.',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:entities,name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'unique:'.CoreTables::Entities->value.',name,' . $this->id],
         ]);
 
         return $rules;
@@ -94,12 +95,6 @@ abstract class Entity extends Model
     public function getPath(): ?string
     {
         return null;
-    }
-
-    #[Override]
-    protected function newBaseQueryBuilder(): QueryBuilder
-    {
-        return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), static::getEntityTypeEnumClass()::values());
     }
 
     protected static function newFactory(): EntityFactory
@@ -116,6 +111,12 @@ abstract class Entity extends Model
         self::addGlobalScope('active', static function (Builder $builder): void {
             $builder->active();
         });
+    }
+
+    #[Override]
+    protected function newBaseQueryBuilder(): QueryBuilder
+    {
+        return parent::newBaseQueryBuilder()->whereIn($this->qualifyColumn('type'), static::getEntityTypeEnumClass()::values());
     }
 
     final protected function casts(): array

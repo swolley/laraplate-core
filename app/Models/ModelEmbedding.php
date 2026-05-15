@@ -8,9 +8,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Enums\CoreTables;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperModelEmbedding
  */
 final class ModelEmbedding extends Model
@@ -24,6 +26,9 @@ final class ModelEmbedding extends Model
     protected $fillable = [
         'embedding',
     ];
+
+    #[Override]
+    protected $table = CoreTables::ModelEmbeddings->value;
 
     /**
      * The model that belongs to the embedding.
@@ -42,7 +47,8 @@ final class ModelEmbedding extends Model
      * @param  Builder<ModelEmbedding>  $query
      * @return Builder<ModelEmbedding>
      */
-    public function scopeForModel(Builder $query, Model $model): Builder
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function forModel(Builder $query, Model $model): Builder
     {
         return $query
             ->where('model_type', $model->getMorphClass())

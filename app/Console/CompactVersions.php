@@ -13,6 +13,7 @@ use Generator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Overrides\Command;
 use Override;
@@ -96,7 +97,8 @@ final class CompactVersions extends Command
         $prototype = new $modelClass();
         $morph = $prototype->getMorphClass();
 
-        $refs = DB::table('versions')
+        $versions_table = CoreTables::Versions->value;
+        $refs = DB::table($versions_table)
             ->whereNull('deleted_at')
             ->where('versionable_type', $morph)
             ->where('versionable_id', $id)
@@ -128,7 +130,8 @@ final class CompactVersions extends Command
      */
     private function iterateDistinctVersionTargets(?string $modelClass): Generator
     {
-        $query = DB::table('versions')
+        $versions_table = CoreTables::Versions->value;
+        $query = DB::table($versions_table)
             ->select(['versionable_type', 'versionable_id', 'connection_ref', 'table_ref'])
             ->whereNull('deleted_at')
             ->distinct()
@@ -136,7 +139,7 @@ final class CompactVersions extends Command
             ->orderBy('versionable_id');
 
         if ($modelClass !== null) {
-            $query->where('versionable_type', (new $modelClass())->getMorphClass());
+            $query->where('versionable_type', new $modelClass()->getMorphClass());
         }
 
         foreach ($query->cursor() as $row) {
@@ -151,7 +154,7 @@ final class CompactVersions extends Command
     {
         $model = $this->resolveTargetModel($className, $versionableId, $connectionRef, $tableRef);
 
-        if ($model === null) {
+        if (!$model instanceof \Illuminate\Database\Eloquent\Model) {
             $this->warn("Could not resolve model {$className}#{$versionableId}.");
 
             return false;
@@ -197,7 +200,6 @@ final class CompactVersions extends Command
         }
 
         $property = $reflection->getProperty('asyncVersioning');
-        $property->setAccessible(true);
         $property->setValue($model, false);
     }
 }

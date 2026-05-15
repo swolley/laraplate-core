@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Helpers\Exceptions\ReadOnlyModelException;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * Prevents create, update, delete, restore, and force-delete on the using model.
  *
  * Bulk writes via {@see \Illuminate\Database\Eloquent\Builder::update()} bypass model events

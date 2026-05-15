@@ -11,7 +11,7 @@ final class TreeCollection extends EloquentCollection
 {
     private const string ROOT_KEY = '__root__';
 
-    public function tree(): Collection
+    public function tree(): \Modules\Core\Helpers\TreeCollection
     {
         $grouped = $this->groupBy(fn (object $item): int|string => $item->parent_id ?? self::ROOT_KEY);
 

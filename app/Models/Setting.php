@@ -10,12 +10,14 @@ use Illuminate\Validation\Rules\Enum;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Observers\SettingObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperSetting
  */
 #[ObservedBy(SettingObserver::class)]
@@ -23,6 +25,9 @@ final class Setting extends Model
 {
     use HasApprovals;
     use HasCache;
+
+    #[Override]
+    protected $table = CoreTables::Settings->value;
 
     /**
      * @var array<int,string>
@@ -93,7 +98,7 @@ final class Setting extends Model
 
     protected function setTypeAttribute(mixed $value): void
     {
-        $this->attributes['type'] = ($value instanceof SettingTypeEnum ? $value : (SettingTypeEnum::tryFrom($value)) ?? SettingTypeEnum::STRING);
+        $this->attributes['type'] = ($value instanceof SettingTypeEnum ? $value : (SettingTypeEnum::tryFrom($value)) ?? SettingTypeEnum::String);
     }
 
     protected function casts(): array

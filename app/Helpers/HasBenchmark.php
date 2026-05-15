@@ -201,7 +201,7 @@ trait HasBenchmark
                 $command = $this;
             }
 
-            if ($command !== null) {
+            if ($command instanceof \Illuminate\Console\Command) {
                 $command->newLine();
                 $command->line($output);
                 $command->newLine();

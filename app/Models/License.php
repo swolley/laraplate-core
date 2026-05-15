@@ -6,17 +6,19 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Modules\Core\Database\Factories\LicenseFactory;
-use Modules\Core\Helpers\HasValidity;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\HasVersions;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperLicense
  */
 final class License extends Model
@@ -25,8 +27,11 @@ final class License extends Model
     use HasValidations {
         getRules as private getRulesFromTrait;
     }
-    use HasVersions;
     use HasValidity;
+    use HasVersions;
+
+    #[Override]
+    protected $table = CoreTables::Licenses->value;
 
     /**
      * The attributes that are mass assignable.

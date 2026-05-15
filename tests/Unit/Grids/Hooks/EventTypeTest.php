@@ -26,21 +26,21 @@ test('enum has all required cases', function (): void {
 });
 
 test('enum cases have correct string values', function (): void {
-    expect(EventType::PRE_SELECT->value)->toBe('retrieving');
-    expect(EventType::POST_SELECT->value)->toBe('retrieved');
-    expect(EventType::PRE_INSERT->value)->toBe('creating');
-    expect(EventType::POST_INSERT->value)->toBe('created');
-    expect(EventType::PRE_UPDATE->value)->toBe('updating');
-    expect(EventType::POST_UPDATE->value)->toBe('updated');
-    expect(EventType::PRE_DELETE->value)->toBe('deleting');
-    expect(EventType::POST_DELETE->value)->toBe('deleted');
+    expect(EventType::PreSelect->value)->toBe('retrieving');
+    expect(EventType::PostSelect->value)->toBe('retrieved');
+    expect(EventType::PreInsert->value)->toBe('creating');
+    expect(EventType::PostInsert->value)->toBe('created');
+    expect(EventType::PreUpdate->value)->toBe('updating');
+    expect(EventType::PostUpdate->value)->toBe('updated');
+    expect(EventType::PreDelete->value)->toBe('deleting');
+    expect(EventType::PostDelete->value)->toBe('deleted');
 });
 
 test('enum is backed by string', function (): void {
     $reflection = new ReflectionClass(EventType::class);
 
     expect($reflection->isEnum())->toBeTrue();
-    expect(EventType::PRE_SELECT->value)->toBeString();
+    expect(EventType::PreSelect->value)->toBeString();
 });
 
 test('enum has correct namespace', function (): void {
@@ -51,18 +51,18 @@ test('enum has correct namespace', function (): void {
 });
 
 test('enum cases can be accessed by value', function (): void {
-    expect(EventType::from('retrieving'))->toBe(EventType::PRE_SELECT);
-    expect(EventType::from('retrieved'))->toBe(EventType::POST_SELECT);
-    expect(EventType::from('creating'))->toBe(EventType::PRE_INSERT);
-    expect(EventType::from('created'))->toBe(EventType::POST_INSERT);
-    expect(EventType::from('updating'))->toBe(EventType::PRE_UPDATE);
-    expect(EventType::from('updated'))->toBe(EventType::POST_UPDATE);
-    expect(EventType::from('deleting'))->toBe(EventType::PRE_DELETE);
-    expect(EventType::from('deleted'))->toBe(EventType::POST_DELETE);
+    expect(EventType::from('retrieving'))->toBe(EventType::PreSelect);
+    expect(EventType::from('retrieved'))->toBe(EventType::PostSelect);
+    expect(EventType::from('creating'))->toBe(EventType::PreInsert);
+    expect(EventType::from('created'))->toBe(EventType::PostInsert);
+    expect(EventType::from('updating'))->toBe(EventType::PreUpdate);
+    expect(EventType::from('updated'))->toBe(EventType::PostUpdate);
+    expect(EventType::from('deleting'))->toBe(EventType::PreDelete);
+    expect(EventType::from('deleted'))->toBe(EventType::PostDelete);
 });
 
 test('enum has tryFrom method', function (): void {
-    expect(EventType::tryFrom('retrieving'))->toBe(EventType::PRE_SELECT);
+    expect(EventType::tryFrom('retrieving'))->toBe(EventType::PreSelect);
     expect(EventType::tryFrom('invalid'))->toBeNull();
 });
 
@@ -70,12 +70,12 @@ test('enum has cases method', function (): void {
     $cases = EventType::cases();
 
     expect($cases)->toHaveCount(8);
-    expect($cases)->toContain(EventType::PRE_SELECT);
-    expect($cases)->toContain(EventType::POST_SELECT);
-    expect($cases)->toContain(EventType::PRE_INSERT);
-    expect($cases)->toContain(EventType::POST_INSERT);
-    expect($cases)->toContain(EventType::PRE_UPDATE);
-    expect($cases)->toContain(EventType::POST_UPDATE);
-    expect($cases)->toContain(EventType::PRE_DELETE);
-    expect($cases)->toContain(EventType::POST_DELETE);
+    expect($cases)->toContain(EventType::PreSelect);
+    expect($cases)->toContain(EventType::PostSelect);
+    expect($cases)->toContain(EventType::PreInsert);
+    expect($cases)->toContain(EventType::PostInsert);
+    expect($cases)->toContain(EventType::PreUpdate);
+    expect($cases)->toContain(EventType::PostUpdate);
+    expect($cases)->toContain(EventType::PreDelete);
+    expect($cases)->toContain(EventType::PostDelete);
 });

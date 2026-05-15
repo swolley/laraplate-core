@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Auth\Providers\SocialiteProvider;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
@@ -52,7 +53,7 @@ it('authenticates credentials and covers invalid and license branches', function
         'license_id' => null,
         'email_verified_at' => now(),
     ])->save();
-    DB::table('model_has_roles')->insert([
+    DB::table(CoreTables::ModelHasRoles->value)->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $user->id,
@@ -97,7 +98,7 @@ it('returns email-not-verified and license-available success branches for fortif
         'license_id' => null,
         'email_verified_at' => null,
     ])->save();
-    DB::table('model_has_roles')->insert([
+    DB::table(CoreTables::ModelHasRoles->value)->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $unverified->id,
@@ -120,7 +121,7 @@ it('returns email-not-verified and license-available success branches for fortif
         'license_id' => null,
         'email_verified_at' => now(),
     ])->save();
-    DB::table('model_has_roles')->insert([
+    DB::table(CoreTables::ModelHasRoles->value)->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $verified->id,

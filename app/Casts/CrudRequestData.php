@@ -18,11 +18,12 @@ class CrudRequestData
      */
     public protected(set) Model $model;
 
-    public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey)
+    public function __construct(public readonly Request $request, public readonly string $mainEntity, array $validated, public readonly string|array $primaryKey, public readonly ?string $module = null)
     {
         $this->connection = $validated['connection'] ?? null;
 
         throw_if($this->mainEntity === '', Exception::class, 'Main entity is required');
-        $this->model = DynamicEntity::resolve($this->mainEntity, $this->connection, request: $this->request);
+
+        $this->model = DynamicEntity::resolve($this->mainEntity, $this->connection, request: $this->request, module: $this->module);
     }
 }

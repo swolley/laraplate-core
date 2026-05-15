@@ -125,7 +125,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 if (confirm(sprintf("Would you like to automatically map '%s' table?", $table_name))) {
                     $all_types = array_merge(...array_values($this->availableTypes));
 
-                    /** @var Model $class */
                     $class = DynamicEntity::resolve($table_name);
 
                     foreach ($class->getFillable() as $fillable) {
@@ -873,7 +872,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
      */
     private function validateFieldTypeInput(string $value, array $allInputTypes): ?string
     {
-        return ! in_array($value, $allInputTypes, true) ? sprintf('Invalid type "%s"', $value) : null;
+        return in_array($value, $allInputTypes, true) ? null : sprintf('Invalid type "%s"', $value);
     }
 
     /**

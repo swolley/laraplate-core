@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Translations;
 
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasSlug;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperTaxonomyTranslation
  */
 final class TaxonomyTranslation extends Model implements ITranslated
@@ -17,7 +19,7 @@ final class TaxonomyTranslation extends Model implements ITranslated
     use HasSlug;
 
     #[Override]
-    protected $table = 'taxonomies_translations';
+    protected $table = CoreTables::TaxonomiesTranslations->value;
 
     /**
      * The attributes that are mass assignable.

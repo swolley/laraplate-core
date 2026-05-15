@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Fortify;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
@@ -15,8 +16,9 @@ return new class() extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table): void {
-            $table->string('username')->unique('users_username_UN')->nullable(false)->comment('The username of the user');
+        $users_table = CoreTables::Users->value;
+        Schema::table($users_table, function (Blueprint $table) use ($users_table): void {
+            $table->string('username')->unique("{$users_table}_username_UN")->nullable(false)->comment('The username of the user');
             $table->string('lang')->nullable(true)->comment('The language of the user');
             $table->datetime('last_login_at')->nullable(true)->comment('The last login date of the user');
             $table->foreignId('license_id')->nullable()->comment('The license assigned to the user');
@@ -34,7 +36,7 @@ return new class() extends Migration
                 hasLocks: true,
             );
 
-            $table->foreign('license_id', 'FK_users_licenses')->references('id')->on('licenses')->nullOnDelete();
+            $table->foreign('license_id', "{$users_table}_licenses_FK")->references('id')->on(CoreTables::Licenses->value)->nullOnDelete();
         });
     }
 
@@ -43,11 +45,12 @@ return new class() extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table): void {
+        $users_table = CoreTables::Users->value;
+        Schema::table($users_table, function (Blueprint $table) use ($users_table): void {
             $driver = Schema::getConnection()->getDriverName();
 
             if ($driver === 'sqlite') {
-                $table->dropUnique('users_username_UN');
+                $table->dropUnique("{$users_table}_username_UN");
             }
             $table->dropColumn('username');
             $table->dropColumn('lang');

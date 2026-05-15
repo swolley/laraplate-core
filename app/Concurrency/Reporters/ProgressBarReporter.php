@@ -23,7 +23,7 @@ final class ProgressBarReporter implements BatchReporter
 {
     private ?Progress $progress = null;
 
-    private SlidingWindowStats $stats;
+    private readonly SlidingWindowStats $stats;
 
     private float $startTime = 0.0;
 
@@ -35,7 +35,7 @@ final class ProgressBarReporter implements BatchReporter
 
     private int $totalUnits = 0;
 
-    private string $initialHint;
+    private string $initialHint = '';
 
     public function __construct(
         private readonly string $label,
@@ -43,7 +43,6 @@ final class ProgressBarReporter implements BatchReporter
         int $statsWindowSeconds = 30,
     ) {
         $this->stats = new SlidingWindowStats($statsWindowSeconds);
-        $this->initialHint = '';
     }
 
     public function start(int $totalTasks, int $totalUnits): void
@@ -64,7 +63,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function progress(BatchOutcome $outcome): void
     {
-        if ($this->progress === null) {
+        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
             return;
         }
 
@@ -83,7 +82,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function failure(BatchOutcome $outcome): void
     {
-        if ($this->progress === null) {
+        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
             return;
         }
 
@@ -94,7 +93,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function finish(BatchSummary $summary): void
     {
-        if ($this->progress === null) {
+        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
             return;
         }
 

@@ -6,6 +6,7 @@ use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\FieldType;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Console\CreateEntityCommand;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
@@ -13,7 +14,7 @@ use Modules\Core\Models\Preset;
 use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
 
 beforeEach(function (): void {
-    if (! Schema::hasTable('fields')) {
+    if (! Schema::hasTable(CoreTables::Fields->value)) {
         $this->markTestSkipped('CreateEntityCommand requires fields table.');
     }
 
@@ -59,7 +60,7 @@ it('defines optional entity argument and content-model option', function (): voi
 it('creates entity preset and field pivot when entity name is passed as argument', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_field_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 
@@ -85,7 +86,7 @@ it('creates entity preset and field pivot when entity name is passed as argument
 it('prompts for name when the entity argument is omitted', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_field2_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 
@@ -106,7 +107,7 @@ it('prompts for name when the entity argument is omitted', function (): void {
 it('parses switch default true when the field is required', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_switch_' . uniqid(),
-        'type' => FieldType::SWITCH,
+        'type' => FieldType::Switch,
         'options' => new stdClass(),
     ]);
 
@@ -124,7 +125,7 @@ it('parses switch default true when the field is required', function (): void {
 it('parses switch default false when the field is not required', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_switch2_' . uniqid(),
-        'type' => FieldType::SWITCH,
+        'type' => FieldType::Switch,
         'options' => new stdClass(),
     ]);
 
@@ -142,7 +143,7 @@ it('parses switch default false when the field is not required', function (): vo
 it('parses multiselect field default as empty json array', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_msel_' . uniqid(),
-        'type' => FieldType::SELECT,
+        'type' => FieldType::Select,
         'options' => (object) ['multiple' => true],
     ]);
 
@@ -160,7 +161,7 @@ it('parses multiselect field default as empty json array', function (): void {
 it('parses checkbox field default as empty json array', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_cb_' . uniqid(),
-        'type' => FieldType::CHECKBOX,
+        'type' => FieldType::Checkbox,
         'options' => new stdClass(),
     ]);
 
@@ -178,7 +179,7 @@ it('parses checkbox field default as empty json array', function (): void {
 it('parses integer default from numeric text', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_num_' . uniqid(),
-        'type' => FieldType::NUMBER,
+        'type' => FieldType::Number,
         'options' => new stdClass(),
     ]);
 
@@ -196,7 +197,7 @@ it('parses integer default from numeric text', function (): void {
 it('parses float default when the value contains a decimal point', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_float_' . uniqid(),
-        'type' => FieldType::NUMBER,
+        'type' => FieldType::Number,
         'options' => new stdClass(),
     ]);
 
@@ -214,7 +215,7 @@ it('parses float default when the value contains a decimal point', function (): 
 it('parses json array default for bracketed input', function (): void {
     $field = Field::query()->create([
         'name' => 'cmd_json_' . uniqid(),
-        'type' => FieldType::TEXT,
+        'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
 

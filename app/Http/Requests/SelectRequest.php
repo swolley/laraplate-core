@@ -27,7 +27,7 @@ abstract class SelectRequest extends CrudRequest
     public function parsed(): SelectRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new SelectRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+        return new SelectRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 
     protected static function decode(string $value): array

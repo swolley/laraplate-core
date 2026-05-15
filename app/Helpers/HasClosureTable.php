@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use ReflectionClass;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @template TModel of Model
  */
 trait HasClosureTable

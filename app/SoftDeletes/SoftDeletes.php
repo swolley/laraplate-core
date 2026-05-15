@@ -8,12 +8,14 @@ use function property_exists;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\UnauthorizedException;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait SoftDeletes
 {
     use BaseSoftDeletes {
@@ -98,7 +100,10 @@ trait SoftDeletes
      */
     protected static function bootSoftDeletes(): void
     {
-        static::withoutGlobalScope(new SoftDeletingScope());
+        // Do not call baseBootSoftDeletes() (would register SoftDeletingScope) or
+        // static::withoutGlobalScope() here: the latter is not a Model API and
+        // resolves via __callStatic → query(), which requires a DB connection during
+        // composer package:discover / ide-helper when the resolver is not set yet.
         static::addGlobalScope(new CustomSoftDeletingScope());
 
         static::updating(function (Model $model): void {
@@ -122,4 +127,3 @@ trait SoftDeletes
         return $this->basePerformDeleteOnModel();
     }
 }
-

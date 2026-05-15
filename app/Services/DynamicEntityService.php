@@ -43,7 +43,7 @@ final class DynamicEntityService
         self::$instance = null;
     }
 
-    public function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): Model
+    public function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null, ?string $module = null): Model
     {
         $cache_key = sprintf('dynamic_entities.%s.%s', $connection ?? 'default', $tableName);
 
@@ -55,7 +55,7 @@ final class DynamicEntityService
             return clone $cached;
         }
 
-        $model = DynamicEntity::tryResolveModel($tableName, $connection);
+        $model = DynamicEntity::tryResolveModel($tableName, $connection, $module);
 
         if (! in_array($model, [null, '', '0'], true)) {
             return new $model($attributes);

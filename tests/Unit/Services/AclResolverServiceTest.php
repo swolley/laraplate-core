@@ -142,7 +142,7 @@ it('getCombinedFilters returns stored filters when a role has an active ACL for 
     $role->givePermissionTo($permission);
 
     $filter_group = new FiltersGroup([
-        new Filter('status', 'published', FilterOperator::EQUALS),
+        new Filter('status', 'published', FilterOperator::Equals),
     ]);
 
     $acl = new ACL;
@@ -163,7 +163,7 @@ it('getCombinedFilters returns stored filters when a role has an active ACL for 
     $combined = $service->getCombinedFilters($user, $permission);
 
     expect($combined)->toBeInstanceOf(FiltersGroup::class)
-        ->and($combined->operator)->toBe(WhereClause::AND)
+        ->and($combined->operator)->toBe(WhereClause::And)
         ->and($combined->filters)->toHaveCount(1)
         ->and($combined->filters[0])->toBeInstanceOf(Filter::class)
         ->and($combined->filters[0]->property)->toBe('status')
@@ -179,7 +179,7 @@ it('getCombinedFilters wraps multiple contributing ACLs with OR', function (): v
     ]);
 
     $filter_group = new FiltersGroup([
-        new Filter('region', 'it', FilterOperator::EQUALS),
+        new Filter('region', 'it', FilterOperator::Equals),
     ]);
 
     $acl = new ACL;
@@ -205,7 +205,7 @@ it('getCombinedFilters wraps multiple contributing ACLs with OR', function (): v
     $combined = $service->getCombinedFilters($user, $permission);
 
     expect($combined)->toBeInstanceOf(FiltersGroup::class)
-        ->and($combined->operator)->toBe(WhereClause::OR)
+        ->and($combined->operator)->toBe(WhereClause::Or)
         ->and($combined->filters)->toHaveCount(2);
 });
 
@@ -222,7 +222,7 @@ it('inherits ACL filters from an ancestor role when the direct role has no ACL r
     $child->forceFill(['parent_id' => $parent->id])->saveQuietly();
 
     $filter_group = new FiltersGroup([
-        new Filter('tenant_id', 42, FilterOperator::EQUALS),
+        new Filter('tenant_id', 42, FilterOperator::Equals),
     ]);
 
     $acl = new ACL;
@@ -289,7 +289,7 @@ it('ignores roles that lack the permission when resolving effective ACLs', funct
     $role_with_acl->givePermissionTo($permission);
 
     $filter_group = new FiltersGroup([
-        new Filter('region', 'eu', FilterOperator::EQUALS),
+        new Filter('region', 'eu', FilterOperator::Equals),
     ]);
 
     $acl = new ACL;
@@ -441,7 +441,7 @@ it('resolveAcls returns the same effective ACLs as the original per-role impleme
     $role_a = Role::factory()->create(['name' => 'acl_parity_a_' . uniqid(), 'guard_name' => 'web']);
     $role_a->givePermissionTo($permission);
 
-    $filter_a = new FiltersGroup([new Filter('country', 'IT', FilterOperator::EQUALS)]);
+    $filter_a = new FiltersGroup([new Filter('country', 'IT', FilterOperator::Equals)]);
     $acl_a = new ACL();
     $acl_a->setSkipValidation(true);
     $acl_a->forceFill([
@@ -457,7 +457,7 @@ it('resolveAcls returns the same effective ACLs as the original per-role impleme
     $role_b = Role::factory()->create(['name' => 'acl_parity_b_' . uniqid(), 'guard_name' => 'web']);
     $role_b->givePermissionTo($permission);
 
-    $filter_b = new FiltersGroup([new Filter('country', 'DE', FilterOperator::EQUALS)]);
+    $filter_b = new FiltersGroup([new Filter('country', 'DE', FilterOperator::Equals)]);
     $acl_b = new ACL();
     $acl_b->setSkipValidation(true);
     $acl_b->forceFill([
@@ -481,7 +481,7 @@ it('resolveAcls returns the same effective ACLs as the original per-role impleme
     // Combined filters should be OR of both filter groups
     $combined = $service->getCombinedFilters($user, $permission);
     expect($combined)->toBeInstanceOf(FiltersGroup::class)
-        ->and($combined->operator)->toBe(WhereClause::OR)
+        ->and($combined->operator)->toBe(WhereClause::Or)
         ->and($combined->filters)->toHaveCount(2);
 });
 
@@ -497,7 +497,7 @@ it('resolveAcls correctly inherits ACL from ancestor role when direct role has n
     $parent = Role::factory()->create(['name' => 'acl_batch_parent_' . uniqid(), 'guard_name' => 'web']);
     $parent->givePermissionTo($permission);
 
-    $filter_group = new FiltersGroup([new Filter('tenant_id', 99, FilterOperator::EQUALS)]);
+    $filter_group = new FiltersGroup([new Filter('tenant_id', 99, FilterOperator::Equals)]);
     $acl = new ACL();
     $acl->setSkipValidation(true);
     $acl->forceFill([

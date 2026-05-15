@@ -22,9 +22,9 @@ class SelectRequestData extends CrudRequestData
     /**
      * @param  string|array<string>  $primaryKey
      */
-    public function __construct(SelectRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(SelectRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
-        parent::__construct($request, $mainEntity, $validated, $primaryKey);
+        parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
         $this->columns = $this->conformColumns($validated['columns'] ?? []);
         $this->relations = $this->conformRelations($validated['relations'] ?? []);
     }

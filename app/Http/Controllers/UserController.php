@@ -45,10 +45,6 @@ final class UserController extends Controller
         return self::parseUserInfo();
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/auth/user/profile-information', name: 'core.auth.userInfo', methods: [GET, HEAD], middleware: [web, auth])
-     */
     public function userInfo(Request $request): \Illuminate\Http\JsonResponse
     {
         /** @var User|null $user */
@@ -67,10 +63,6 @@ final class UserController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/auth/impersonate', name: 'core.auth.impersonate', methods: [POST], middleware: [web, auth, can:impersonate])
-     */
     public function impersonate(ImpersonationRequest $request): \Illuminate\Http\JsonResponse
     {
         $user_to_impersonate_id = $request->validated()['user'];
@@ -84,10 +76,6 @@ final class UserController extends Controller
             ->json();
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/auth/leave-impersonate', name: 'core.auth.leaveImpersonate', methods: [POST], middleware: [web, auth, can:impersonate])
-     */
     public function leaveImpersonate(Request $request): \Illuminate\Http\JsonResponse
     {
         /** @var User $current_user */
@@ -108,10 +96,6 @@ final class UserController extends Controller
         return ($this->handleSocialLoginAction)($service);
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/auth/still-here', name: 'core.auth.maintainSession', methods: [GET, HEAD], middleware: [web, auth])
-     */
     public function maintainSession(): \Illuminate\Http\JsonResponse
     {
         return Auth::user()

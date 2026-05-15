@@ -35,11 +35,11 @@ final class GridRequest extends FormRequest implements IParsableRequest
         /** @phpstan-ignore method.notFound */
         $url = $this->url();
 
-        if (Str::contains($url, '/' . GridAction::FUNNELS->value)) {
+        if (Str::contains($url, '/' . GridAction::Funnels->value)) {
             $grid_rules = $this->remapListRules('funnels.*');
-        } elseif (Str::contains($url, '/' . GridAction::OPTIONS->value)) {
+        } elseif (Str::contains($url, '/' . GridAction::Options->value)) {
             $grid_rules = $this->remapListRules('options.*');
-        } elseif (Str::contains($url, '/' . GridAction::SELECT->value)) {
+        } elseif (Str::contains($url, '/' . GridAction::Select->value)) {
             $grid_rules = [
                 'options' => ['sometimes'],
                 'funnels' => ['sometimes'],
@@ -48,13 +48,13 @@ final class GridRequest extends FormRequest implements IParsableRequest
             ];
             // TODO: serve anche l'entità o parto da quella della griglia e poi guardo che colonne vengono chieste?
         } elseif (Str::contains($url, [
-            '/' . GridAction::INSERT->value,
-            '/' . GridAction::UPDATE->value,
-            '/' . GridAction::DELETE->value,
-            '/' . GridAction::FORCE_DELETE->value,
-            '/' . GridAction::APPROVE->value,
-            '/' . GridAction::LOCK->value,
-            '/' . GridAction::CHECK->value,
+            '/' . GridAction::Insert->value,
+            '/' . GridAction::Update->value,
+            '/' . GridAction::Delete->value,
+            '/' . GridAction::ForceDelete->value,
+            '/' . GridAction::Approve->value,
+            '/' . GridAction::Lock->value,
+            '/' . GridAction::Check->value,
         ])) {
             $grid_rules = ['funnels' => 'exclude', 'options' => 'exclude'];
         } else {
@@ -126,11 +126,11 @@ final class GridRequest extends FormRequest implements IParsableRequest
         $this->action = GridAction::from($exploded_url[count($exploded_url) - 2]);
 
         switch ($this->action) {
-            case GridAction::DATA:
-            case GridAction::SELECT:
-            case GridAction::EXPORT:
-            case GridAction::FUNNELS:
-            case GridAction::OPTIONS:
+            case GridAction::Data:
+            case GridAction::Select:
+            case GridAction::Export:
+            case GridAction::Funnels:
+            case GridAction::Options:
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ListRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);
@@ -161,14 +161,14 @@ final class GridRequest extends FormRequest implements IParsableRequest
                 break;
                 // case GridAction::LAYOUT:
                 // case GridAction::COUNT:
-            case GridAction::INSERT:
-            case GridAction::UPDATE:
+            case GridAction::Insert:
+            case GridAction::Update:
                 /** @phpstan-ignore staticMethod.notFound */
                 // $this->realMainRequest = ModifyRequest::createFrom($this);
-            case GridAction::CHECK:
-            case GridAction::FORCE_DELETE:
-            case GridAction::DELETE:
-                // case GridAction::RESTORE:
+            case GridAction::Check:
+            case GridAction::ForceDelete:
+            case GridAction::Delete:
+                // case GridAction::Restore:
                 /** @phpstan-ignore staticMethod.notFound */
                 $this->realMainRequest = ModifyRequest::createFrom($this);
                 $this->realMainRequest->setContainer($this->container);

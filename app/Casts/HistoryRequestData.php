@@ -13,9 +13,9 @@ final class HistoryRequestData extends DetailRequestData
     /**
      * @param  string|array<string>  $primaryKey
      */
-    public function __construct(HistoryRequest $request, string $mainEntity, array $validated, string|array $primaryKey)
+    public function __construct(HistoryRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
-        parent::__construct($request, $mainEntity, $validated, $primaryKey);
+        parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
         $this->limit = isset($validated['limit']) ? (int) $validated['limit'] : null;
     }
 }

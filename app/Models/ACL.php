@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
@@ -32,12 +33,14 @@ use Override;
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
+ * @mixin \Illuminate\Database\Eloquent\Model
+ * @mixin \Eloquent
  * @mixin IdeHelperACL
  */
 final class ACL extends Model
 {
     #[Override]
-    protected $table = 'acls';
+    protected $table = CoreTables::Acls->value;
 
     #[Override]
     protected $fillable = [
@@ -64,7 +67,7 @@ final class ACL extends Model
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
-            'permission_id' => ['required', 'exists:permissions,id'],
+            'permission_id' => ['required', 'exists:'.CoreTables::Permissions->value.',id'],
             'filters' => [new QueryBuilder()],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],

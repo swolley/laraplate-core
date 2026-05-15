@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 use Nwidart\Modules\Module;
@@ -18,11 +19,6 @@ use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
-    /**
-     * Table name for Setting model (used in checkSettingTable without loading Eloquent).
-     */
-    private const string SETTING_TABLE = 'settings';
-
     public static string $RECORD_NAME = 'backendModules';
 
     /**
@@ -53,6 +49,8 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     public static function checkSettingTable(): bool
     {
+        $settings_table = CoreTables::Settings->value;
+
         try {
             $cache_key = 'modules_db_activator_checked';
 
@@ -61,7 +59,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             }
 
             // Cached "table exists" can be stale after migrate:fresh / drop-all; always verify.
-            if (Cache::get($cache_key) === true && Schema::hasTable(self::SETTING_TABLE)) {
+            if (Cache::get($cache_key) === true && Schema::hasTable($settings_table)) {
                 return true;
             }
 
@@ -69,7 +67,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 Cache::forget($cache_key);
             }
 
-            if (! Schema::hasTable(self::SETTING_TABLE)) {
+            if (! Schema::hasTable($settings_table)) {
                 return false;
             }
 
@@ -187,7 +185,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     private function ensureBackendModulesRecord(): void
     {
-        $exists = DB::table(self::SETTING_TABLE)
+        $settings_table = CoreTables::Settings->value;
+
+        $exists = DB::table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->exists();
@@ -199,7 +199,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $all_modules = self::getAllModulesNames();
         $now = now();
 
-        DB::table(self::SETTING_TABLE)->insertOrIgnore([
+        DB::table($settings_table)->insertOrIgnore([
             'name' => self::$RECORD_NAME,
             'value' => json_encode($all_modules),
             'choices' => json_encode($all_modules),
@@ -216,7 +216,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     private function updateRecordValue(array $value): void
     {
-        DB::table(self::SETTING_TABLE)
+        $settings_table = CoreTables::Settings->value;
+
+        DB::table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->update([
@@ -230,11 +232,13 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     private function readSettings(): array
     {
-        if (! Schema::hasTable(self::SETTING_TABLE)) {
+        $settings_table = CoreTables::Settings->value;
+
+        if (! Schema::hasTable($settings_table)) {
             return self::getAllModulesNames();
         }
 
-        $raw = DB::table(self::SETTING_TABLE)
+        $raw = DB::table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->value('value');

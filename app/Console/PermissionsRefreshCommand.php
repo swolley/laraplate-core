@@ -69,18 +69,18 @@ final class PermissionsRefreshCommand extends Command
         $user_class = user_class();
 
         $common_permissions = [
-            ActionEnum::SELECT,
-            ActionEnum::INSERT,
-            ActionEnum::LOCK,
-            // ActionEnum::UNLOCK,
-            ActionEnum::UPDATE,
-            ActionEnum::DELETE,
-            ActionEnum::FORCE_DELETE,
-            ActionEnum::RESTORE,
-            ActionEnum::APPROVE,
-            // ActionEnum::DISAPPROVE,
-            ActionEnum::PUBLISH,
-            // ActionEnum::UNPUBLISH,
+            ActionEnum::Select,
+            ActionEnum::Insert,
+            ActionEnum::Lock,
+            // ActionEnum::Unlock,
+            ActionEnum::Update,
+            ActionEnum::Delete,
+            ActionEnum::ForceDelete,
+            ActionEnum::Restore,
+            ActionEnum::Approve,
+            // ActionEnum::Disapprove,
+            ActionEnum::Publish,
+            // ActionEnum::Unpublish,
         ];
 
         $changes = false;
@@ -97,10 +97,12 @@ final class PermissionsRefreshCommand extends Command
         DB::beginTransaction();
 
         foreach ($all_models as $model) {
-            if (! is_string($model) || ! class_exists($model)) {
+            if (! is_string($model)) {
                 continue;
             }
-
+            if (! class_exists($model)) {
+                continue;
+            }
             $need_bypass = $this->checkIfBlacklisted($model);
 
             if ($need_bypass) {
@@ -126,7 +128,7 @@ final class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
-                if (($permission === ActionEnum::DELETE || $permission === ActionEnum::RESTORE) && (! class_uses_trait($model, SoftDeletes::class) || $instance->softDeletesEnabled ?? true)) {
+                if (($permission === ActionEnum::Delete || $permission === ActionEnum::Restore) && (! class_uses_trait($model, SoftDeletes::class) || $instance->softDeletesEnabled ?? true)) {
                     if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
@@ -139,7 +141,7 @@ final class PermissionsRefreshCommand extends Command
                 }
 
                 // permessi di approvazione
-                if ($permission === ActionEnum::APPROVE && ! class_uses_trait($model, RequiresApproval::class)) {
+                if ($permission === ActionEnum::Approve && ! class_uses_trait($model, RequiresApproval::class)) {
                     if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
@@ -152,7 +154,7 @@ final class PermissionsRefreshCommand extends Command
                 }
 
                 // permessi di pubblicazione
-                if ($permission === ActionEnum::PUBLISH && ! class_uses_trait($model, HasValidity::class)) {
+                if ($permission === ActionEnum::Publish && ! class_uses_trait($model, HasValidity::class)) {
                     if (in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
@@ -194,7 +196,7 @@ final class PermissionsRefreshCommand extends Command
 
             if ($model === $user_class) {
                 // solo per gli utenti aggiungo l'impersonificazione
-                $permission_name = sprintf('%s.%s.', $connection, $table) . ActionEnum::IMPERSONATE->value;
+                $permission_name = sprintf('%s.%s.', $connection, $table) . ActionEnum::Impersonate->value;
                 $all_permissions[] = $permission_name;
 
                 if (! in_array($permission_name, $found_permissions, true)) {

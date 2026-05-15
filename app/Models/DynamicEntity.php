@@ -24,11 +24,14 @@ use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 use UnexpectedValueException;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperDynamicEntity
  */
 final class DynamicEntity extends Model
 {
     use HasGridUtils;
+
+    // no need to override table here, it's dynamically injected by code
 
     /**
      * @var bool
@@ -50,9 +53,9 @@ final class DynamicEntity extends Model
      *
      * @throws Exception
      */
-    public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null): EloquentModel
+    public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null, ?string $module = null): EloquentModel
     {
-        return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request);
+        return DynamicEntityService::getInstance()->resolve($tableName, $connection, $attributes, $request, $module);
     }
 
     /**
@@ -64,12 +67,12 @@ final class DynamicEntity extends Model
      *
      * @return class-string<EloquentModel>|null
      */
-    public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null): ?string
+    public static function tryResolveModel(string $requestEntity, ?string $requestConnection = null, ?string $module = null): ?string
     {
         $models = models();
-        $found = self::findModel($models, $requestEntity);
 
-        $found ??= self::findModel($models, Str::singular($requestEntity));
+        $found = self::findModel($models, $requestEntity, $module);
+        $found ??= self::findModel($models, Str::singular($requestEntity), $module);
 
         if (in_array($found, [null, '', '0'], true)) {
             return null;
@@ -174,20 +177,26 @@ final class DynamicEntity extends Model
      *
      * @return class-string<Model>|null
      */
-    private static function findModel(array $models, string $modelName): ?string
+    private static function findModel(array $models, string $modelName, ?string $module = null): ?string
     {
         $found = array_filter($models, fn (string $c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
         $found = array_values($found);
 
         if (count($found) > 1) {
             $expected_basename = Str::studly($modelName);
+
             foreach (config('auth.providers', []) as $provider) {
                 $model = $provider['model'] ?? null;
-                if (! is_string($model) || ! class_exists($model)) {
+
+                if (! is_string($model)) {
                     continue;
                 }
 
-                if (class_basename($model) === $expected_basename && in_array($model, $found, true)) {
+                if (! class_exists($model)) {
+                    continue;
+                }
+
+                if ($expected_basename === class_basename($model) && in_array($model, $found, true) && ($module === null || $module === class_module($model))) {
                     return $model;
                 }
             }
@@ -273,7 +282,7 @@ final class DynamicEntity extends Model
 
         foreach ($indexes as $idx) {
             if (count($idx->columns) === 1 && ($idx->isPrimaryKey() || $idx->isUnique())) {
-                $remapped_uids[] = $idx->columns[0];
+                $remapped_uids[] = $idx->columns->first();
             }
         }
 

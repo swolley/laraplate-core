@@ -16,7 +16,7 @@ use Modules\Core\Models\Place;
  * ({@see getAttribute}, {@see setAttribute}, {@see toArray}): bridged keys never persist on the host table;
  * pending values are flushed into a new {@see Place} on {@see creating} when {@see place_id} is empty.
  *
- * @phpstan-require-extends Model
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait HasPlace
 {
@@ -84,7 +84,7 @@ trait HasPlace
     public function getAttribute($key): mixed
     {
         if ($key === 'geolocation') {
-            if (! empty($this->attributes['place_id'] ?? null)) {
+            if (! (($this->attributes['place_id'] ?? null) === null)) {
                 $place = $this->resolvePlace();
 
                 if ($place instanceof Place) {
@@ -107,10 +107,8 @@ trait HasPlace
             }
         }
 
-        if (in_array($key, $this->placeBridgedAttributeKeys(), true) && empty($this->attributes['place_id'] ?? null)) {
-            if (array_key_exists($key, $this->pending_place_bridged_scalars)) {
-                return $this->pending_place_bridged_scalars[$key];
-            }
+        if (in_array($key, $this->placeBridgedAttributeKeys(), true) && empty($this->attributes['place_id'] ?? null) && array_key_exists((string) $key, $this->pending_place_bridged_scalars)) {
+            return $this->pending_place_bridged_scalars[$key];
         }
 
         return parent::getAttribute($key);
@@ -134,14 +132,14 @@ trait HasPlace
         if (method_exists($this, $mutator)) {
             $this->{$mutator}($value);
 
-            if (! empty($this->attributes['place_id'] ?? null)) {
+            if (! (($this->attributes['place_id'] ?? null) === null)) {
                 $this->syncGeographyToRelatedPlace();
             }
 
             return $this;
         }
 
-        if (empty($this->attributes['place_id'] ?? null)) {
+        if (($this->attributes['place_id'] ?? null) === null) {
             $this->pending_place_bridged_scalars[$key] = $value;
 
             return $this;
@@ -174,7 +172,7 @@ trait HasPlace
     {
         $content = $parsed ?? (method_exists(parent::class, 'toArray') ? parent::toArray() : $this->attributesToArray());
 
-        if (! empty($this->attributes['place_id'] ?? null)) {
+        if (! (($this->attributes['place_id'] ?? null) === null)) {
             $place = $this->resolvePlace();
 
             if (! $place instanceof Place) {
@@ -205,7 +203,7 @@ trait HasPlace
                 continue;
             }
 
-            if (array_key_exists($field, $this->pending_place_bridged_scalars)) {
+            if (array_key_exists((string) $field, $this->pending_place_bridged_scalars)) {
                 $content[$field] = $this->pending_place_bridged_scalars[$field];
             }
         }
@@ -223,7 +221,7 @@ trait HasPlace
             return false;
         }
 
-        return ! empty($this->attributes['place_id'] ?? null);
+        return ! (($this->attributes['place_id'] ?? null) === null);
     }
 
     /**
@@ -236,7 +234,7 @@ trait HasPlace
 
     protected function resolvePlace(): ?Place
     {
-        if (empty($this->attributes['place_id'] ?? null)) {
+        if (($this->attributes['place_id'] ?? null) === null) {
             return null;
         }
 
@@ -328,10 +326,10 @@ trait HasPlace
         $point = $this->resolvePointForPlaceRow();
 
         if ($point instanceof Point) {
-            return (float) $point->latitude;
+            return $point->latitude;
         }
 
-        if (! empty($this->attributes['place_id'] ?? null)) {
+        if (! (($this->attributes['place_id'] ?? null) === null)) {
             $place = $this->resolvePlace();
 
             if ($place !== null && $place->latitude !== null) {
@@ -347,10 +345,10 @@ trait HasPlace
         $point = $this->resolvePointForPlaceRow();
 
         if ($point instanceof Point) {
-            return (float) $point->longitude;
+            return $point->longitude;
         }
 
-        if (! empty($this->attributes['place_id'] ?? null)) {
+        if (! (($this->attributes['place_id'] ?? null) === null)) {
             $place = $this->resolvePlace();
 
             if ($place !== null && $place->longitude !== null) {
@@ -376,7 +374,7 @@ trait HasPlace
             throw new \TypeError(sprintf('Geolocation must be null or an instance of %s.', Point::class));
         }
 
-        if (empty($this->attributes['place_id'] ?? null)) {
+        if (($this->attributes['place_id'] ?? null) === null) {
             $this->pending_host_geolocation = $value;
 
             return $this;
@@ -400,7 +398,7 @@ trait HasPlace
 
     private function resolveBridgedScalarForPlaceRow(string $key): ?string
     {
-        if (! empty($this->attributes['place_id'] ?? null)) {
+        if (! (($this->attributes['place_id'] ?? null) === null)) {
             $place = $this->resolvePlace();
 
             if ($place instanceof Place) {
@@ -425,7 +423,7 @@ trait HasPlace
             return $this->pending_host_geolocation;
         }
 
-        if (! empty($this->attributes['place_id'] ?? null)) {
+        if (! (($this->attributes['place_id'] ?? null) === null)) {
             $place = $this->resolvePlace();
 
             return $this->pointFromPlace($place);
@@ -461,7 +459,7 @@ trait HasPlace
     {
         $extra = [];
         foreach ($this->placeBridgedAttributeKeys() as $key) {
-            if (array_key_exists($key, $this->pending_place_bridged_scalars)) {
+            if (array_key_exists((string) $key, $this->pending_place_bridged_scalars)) {
                 $extra[$key] = $this->pending_place_bridged_scalars[$key];
             }
         }

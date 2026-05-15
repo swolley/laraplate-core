@@ -24,6 +24,6 @@ final class HistoryRequest extends DetailRequest
     public function parsed(): HistoryRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new HistoryRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+        return new HistoryRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 }

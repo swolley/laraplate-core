@@ -78,13 +78,13 @@ final class ModelSoftDeletesAddCommand extends Command
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
             'value' => true,
-            'type' => SettingTypeEnum::BOOLEAN,
+            'type' => SettingTypeEnum::Boolean,
             'group_name' => 'soft_deletes',
             'description' => "Soft deletes status for {$table}",
         ]);
     }
 
-    private function resolveModelClass(string $model): ?string
+    private function resolveModelClass(string $model): string
     {
         if (Str::contains($model, '\\')) {
             return $model;

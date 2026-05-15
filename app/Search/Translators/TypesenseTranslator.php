@@ -63,15 +63,15 @@ class TypesenseTranslator implements ISchemaTranslator
         }
 
         // Add index-specific options
-        if ($field->hasIndexType(IndexType::SEARCHABLE)) {
+        if ($field->hasIndexType(IndexType::Searchable)) {
             $tsField['index'] = true;
         }
 
-        if ($field->hasIndexType(IndexType::FACETABLE)) {
+        if ($field->hasIndexType(IndexType::Facetable)) {
             $tsField['facet'] = true;
         }
 
-        if ($field->hasIndexType(IndexType::SORTABLE)) {
+        if ($field->hasIndexType(IndexType::Sortable)) {
             $tsField['sort'] = true;
         }
 
@@ -81,14 +81,14 @@ class TypesenseTranslator implements ISchemaTranslator
     private function getTypesenseType(FieldType $type, array $options = []): string
     {
         return match ($type) {
-            FieldType::TEXT, FieldType::KEYWORD => 'string',
-            FieldType::INTEGER => 'int32',
-            FieldType::FLOAT => 'float',
-            FieldType::BOOLEAN => 'bool',
-            FieldType::DATE => 'string', // Typesense uses string for dates
-            FieldType::VECTOR => 'float[]',
-            FieldType::ARRAY => isset($options['properties']) ? 'object[]' : 'string[]',
-            FieldType::OBJECT, FieldType::GEOCODE => 'object',
+            FieldType::Text, FieldType::Keyword => 'string',
+            FieldType::Integer => 'int32',
+            FieldType::Float => 'float',
+            FieldType::Boolean => 'bool',
+            FieldType::Date => 'string', // Typesense uses string for dates
+            FieldType::Vector => 'float[]',
+            FieldType::Array => isset($options['properties']) ? 'object[]' : 'string[]',
+            FieldType::Object, FieldType::Geocode => 'object',
         };
     }
 }

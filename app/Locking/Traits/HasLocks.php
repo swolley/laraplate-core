@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Locked;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasLocks
 {
     public static function bootHasLocks(): void

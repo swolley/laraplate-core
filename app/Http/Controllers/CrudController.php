@@ -7,8 +7,8 @@ namespace Modules\Core\Http\Controllers;
 use BadMethodCallException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Query\RecordsNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\UnauthorizedException;
@@ -34,10 +34,6 @@ class CrudController extends Controller
 {
     public function __construct(private readonly CrudService $crudService) {}
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/select/{entity}', name: 'core.api.list', methods: [GET, POST, HEAD], middleware: [api, crud_api])
-     */
     final public function list(ListRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -56,10 +52,6 @@ class CrudController extends Controller
      * @throws Throwable
      * @throws UnexpectedValueException
      */
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/detail/{entity}', name: 'core.api.detail', methods: [GET, HEAD], middleware: [api, crud_api])
-     */
     final public function detail(DetailRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -71,11 +63,6 @@ class CrudController extends Controller
         );
     }
 
-    // /**
-    //  * @route-comment
-    //  * Route(path: 'api/v1/search/{entity?}', name: 'core.api.search', methods: [GET, POST, HEAD], middleware: [api, crud_api])
-    //  * Route(path: 'app/crud/search/{entity?}', name: 'core.crud.search', methods: [GET, POST, HEAD], middleware: [web])
-    //  */
     // public function search(SearchRequest $request): Response
     // {
     //     $requestData = $request->parsed();
@@ -88,10 +75,6 @@ class CrudController extends Controller
     //     );
     // }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/history/{entity}', name: 'core.api.history', methods: [GET, HEAD], middleware: [api, crud_api])
-     */
     final public function history(HistoryRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -103,10 +86,6 @@ class CrudController extends Controller
         );
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/tree/{entity}', name: 'core.api.tree', methods: [GET, HEAD], middleware: [api, crud_api])
-     */
     final public function tree(TreeRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -118,10 +97,6 @@ class CrudController extends Controller
         );
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/insert/{entity}', name: 'core.api.insert', methods: [POST], middleware: [api, crud_api])
-     */
     final public function insert(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -138,10 +113,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/update/{entity}', name: 'core.api.replace', methods: [PATCH, PUT], middleware: [api, crud_api])
-     */
     final public function update(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -158,10 +129,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'api/v1/delete/{entity}', name: 'core.api.delete', methods: [DELETE, POST], middleware: [api, crud_api])
-     */
     final public function delete(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -202,28 +169,16 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/activate/{entity}', name: 'core.crud.activate', methods: [PATCH], middleware: [web])
-     */
     final public function activate(ModifyRequest $request): Response
     {
         return $this->doActivateOperation($request, 'activate');
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/inactivate/{entity}', name: 'core.crud.inactivate', methods: [PATCH], middleware: [web])
-     */
     final public function inactivate(ModifyRequest $request): Response
     {
         return $this->doActivateOperation($request, 'inactivate');
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/approve/{entity}', name: 'core.crud.approve', methods: [PATCH], middleware: [web])
-     */
     final public function approve(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -240,10 +195,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/disapprove/{entity}', name: 'core.crud.disapprove', methods: [PATCH], middleware: [web])
-     */
     final public function disapprove(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -260,10 +211,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/lock/{entity}', name: 'core.crud.lock', methods: [PATCH], middleware: [web])
-     */
     final public function lock(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -280,10 +227,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/unlock/{entity}', name: 'core.crud.unlock', methods: [PATCH], middleware: [web])
-     */
     final public function unlock(ModifyRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -300,10 +243,6 @@ class CrudController extends Controller
         }
     }
 
-    /**
-     * @route-comment
-     * Route(path: 'app/crud/cache-clear/{entity}', name: 'core.crud.cache-clear', methods: [DELETE], middleware: [web])
-     */
     final public function clearModelCache(CrudRequest $request): Response
     {
         $requestData = $request->parsed();
@@ -423,7 +362,7 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (RecordsNotFoundException|ModelNotFoundException $ex) {
+        } catch (DatabaseRecordsNotFoundException|ModelNotFoundException $ex) {
             return $this->buildResponse(
                 new CrudResult(
                     data: null,

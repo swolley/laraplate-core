@@ -7,21 +7,21 @@ namespace Modules\Core\Models\Pivot;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\Pivot;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Helpers\SortableTrait;
 use Modules\Core\Observers\FieldableObserver;
+use Modules\Core\Overrides\Pivot;
 use Override;
 use Spatie\EloquentSortable\Sortable;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperFieldable
  */
 #[ObservedBy(FieldableObserver::class)]
 final class Fieldable extends Pivot implements Sortable
 {
-    use HasFactory;
     use HasVersions;
     use SortableTrait;
 
@@ -29,7 +29,7 @@ final class Fieldable extends Pivot implements Sortable
     public $incrementing = true;
 
     #[Override]
-    protected $table = 'fieldables';
+    protected $table = CoreTables::Fieldables->value;
 
     #[Override]
     protected $attributes = [

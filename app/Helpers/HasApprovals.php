@@ -14,6 +14,8 @@ use InvalidArgumentException;
 use TypeError;
 
 /**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-type HasApprovalsType HasApprovals
  */
 trait HasApprovals

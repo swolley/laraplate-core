@@ -8,7 +8,7 @@ final readonly class Sort
 {
     public SortDirection $direction;
 
-    public function __construct(public string $property, string|SortDirection $type = SortDirection::ASC)
+    public function __construct(public string $property, string|SortDirection $type = SortDirection::Asc)
     {
         $this->direction = $type instanceof SortDirection ? $type : SortDirection::tryFrom(mb_strtolower($type));
     }

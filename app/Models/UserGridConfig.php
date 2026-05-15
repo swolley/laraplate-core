@@ -6,15 +6,20 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Overrides\Model;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperUserGridConfig
  */
 final class UserGridConfig extends Model
 {
     use HasCache;
+
+    #[Override]
+    protected $table = CoreTables::UsersGridConfigs->value;
 
     /**
      * The attributes that are mass assignable.
@@ -44,7 +49,7 @@ final class UserGridConfig extends Model
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
-            'user_id' => ['integer', 'exists:users,id'],
+            'user_id' => ['integer', 'exists:'.CoreTables::Users->value.',id'],
             'grid_name' => ['required', 'max:255'],
             'layout_name' => ['required', 'max:255'],
             'is_public' => ['boolean', 'required'],

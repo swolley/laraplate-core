@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasOptimisticLocking
 {
     /**

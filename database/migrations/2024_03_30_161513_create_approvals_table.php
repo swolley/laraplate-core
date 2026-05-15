@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
@@ -14,7 +15,8 @@ return new class() extends Migration
      */
     public function up(): void
     {
-        Schema::create('approvals', function (Blueprint $table): void {
+        $approvals_table = CoreTables::Approvals->value;
+        Schema::create($approvals_table, function (Blueprint $table) use ($approvals_table): void {
             $table->id();
             $table->unsignedBigInteger('modification_id')->comment('The id of the modification');
             $table->unsignedBigInteger('approver_id')->comment('The id of the approver');
@@ -26,8 +28,8 @@ return new class() extends Migration
                 hasCreateUpdate: true,
             );
 
-            $table->foreign(['modification_id'])->references('id')->on('modifications')->cascadeOnDelete();
-            $table->index(['approver_id', 'approver_type'], 'approvals_approverable_IDX');
+            $table->foreign(['modification_id'])->references('id')->on(CoreTables::Modifications->value)->cascadeOnDelete();
+            $table->index(['approver_id', 'approver_type'], "{$approvals_table}_approverable_IDX");
         });
     }
 
@@ -36,6 +38,6 @@ return new class() extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('approvals');
+        Schema::dropIfExists(CoreTables::Approvals->value);
     }
 };

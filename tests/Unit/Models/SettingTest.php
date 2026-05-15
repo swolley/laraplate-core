@@ -9,7 +9,7 @@ use Modules\Core\Models\Setting;
 it('creates setting via factory with default attributes', function (): void {
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'test_setting',
-        'type' => SettingTypeEnum::STRING,
+        'type' => SettingTypeEnum::String,
         'group_name' => 'base',
         'encrypted' => false,
     ]);
@@ -17,7 +17,7 @@ it('creates setting via factory with default attributes', function (): void {
     expect($setting->exists)->toBeTrue()
         ->and($setting->id)->not->toBeNull()
         ->and($setting->name)->toBe('test_setting')
-        ->and($setting->type)->toBe(SettingTypeEnum::STRING)
+        ->and($setting->type)->toBe(SettingTypeEnum::String)
         ->and($setting->group_name)->toBe('base')
         ->and($setting->encrypted)->toBeFalse();
 });
@@ -36,23 +36,23 @@ it('getRules returns rules with default create and update', function (): void {
 
 it('type mutator accepts enum', function (): void {
     $setting = new Setting;
-    $setting->type = SettingTypeEnum::BOOLEAN;
+    $setting->type = SettingTypeEnum::Boolean;
 
-    expect($setting->type)->toBe(SettingTypeEnum::BOOLEAN);
+    expect($setting->type)->toBe(SettingTypeEnum::Boolean);
 });
 
 it('type mutator accepts string and maps to enum', function (): void {
     $setting = new Setting;
     $setting->type = 'integer';
 
-    expect($setting->type)->toBe(SettingTypeEnum::INTEGER);
+    expect($setting->type)->toBe(SettingTypeEnum::Integer);
 });
 
 it('type mutator falls back to string for invalid value', function (): void {
     $setting = new Setting;
     $setting->type = 'invalid_type';
 
-    expect($setting->type)->toBe(SettingTypeEnum::STRING);
+    expect($setting->type)->toBe(SettingTypeEnum::String);
 });
 
 it('requiresApprovalWhen returns true when fillable except description is modified', function (): void {

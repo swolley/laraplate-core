@@ -6,26 +6,26 @@ namespace Modules\Core\Casts;
 
 enum ActionEnum: string
 {
-    case SELECT = 'select';
-    case INSERT = 'insert';
-    case UPDATE = 'update';
-    case DELETE = 'delete';
-    case RESTORE = 'restore';
-    case FORCE_DELETE = 'forceDelete';
-    case APPROVE = 'approve';
-    // case DISAPPROVE = 'disapprove';
-    case PUBLISH = 'publish';
-    // case UNPUBLISH = 'unpublish';
-    case IMPERSONATE = 'impersonate';
-    case LOCK = 'lock';
-    // case UNLOCK = 'unlock';
+    case Select = 'select';
+    case Insert = 'insert';
+    case Update = 'update';
+    case Delete = 'delete';
+    case Restore = 'restore';
+    case ForceDelete = 'forceDelete';
+    case Approve = 'approve';
+    // case Disapprove = 'disapprove';
+    case Publish = 'publish';
+    // case Unpublish = 'unpublish';
+    case Impersonate = 'impersonate';
+    case Lock = 'lock';
+    // case Unlock = 'unlock';
 
     /**
      * returns if is a read action.
      */
     public static function isReadAction(string $action): bool
     {
-        return $action === self::SELECT->value;
+        return $action === self::Select->value;
     }
 
     /**

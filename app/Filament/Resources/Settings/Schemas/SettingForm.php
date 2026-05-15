@@ -33,7 +33,7 @@ final class SettingForm
                 Select::make('type')
                     ->required()
                     ->options($typeOptions)
-                    ->default(SettingTypeEnum::STRING->value),
+                    ->default(SettingTypeEnum::String->value),
                 TextInput::make('value')
                     ->required()
                     ->maxLength(65535),

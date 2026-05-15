@@ -6,30 +6,30 @@ namespace Modules\Core\Casts;
 
 enum FilterOperator: string
 {
-    case GREAT = '>';
-    case GREAT_EQUALS = '>=';
-    case LESS = '<';
-    case LESS_EQUALS = '<=';
-    case LIKE = 'like';
-    case NOT_LIKE = 'not like';
-    case EQUALS = '=';
-    case IN = 'in';
-    case NOT_EQUALS = '!=';
-    case BETWEEN = 'between';
+    case Great = '>';
+    case GreatEquals = '>=';
+    case Less = '<';
+    case LessEquals = '<=';
+    case Like = 'like';
+    case NotLike = 'not like';
+    case Equals = '=';
+    case In = 'in';
+    case NotEquals = '!=';
+    case Between = 'between';
 
     public static function tryFromRequestOperator(RequestFilterOperator|string $operator): ?self
     {
         return match ($operator) {
-            RequestFilterOperator::GREAT, RequestFilterOperator::GREAT->value => self::GREAT,
-            RequestFilterOperator::GREAT_EQUALS, RequestFilterOperator::GREAT_EQUALS->value => self::GREAT_EQUALS,
-            RequestFilterOperator::LESS, RequestFilterOperator::LESS->value => self::LESS,
-            RequestFilterOperator::LESS_EQUALS, RequestFilterOperator::LESS_EQUALS->value => self::LESS_EQUALS,
-            RequestFilterOperator::LIKE, RequestFilterOperator::LIKE->value => self::LIKE,
-            RequestFilterOperator::NOT_LIKE, RequestFilterOperator::NOT_LIKE->value => self::NOT_LIKE,
-            RequestFilterOperator::EQUALS, RequestFilterOperator::EQUALS->value => self::EQUALS,
-            RequestFilterOperator::IN, RequestFilterOperator::IN->value => self::IN,
-            RequestFilterOperator::NOT_EQUALS, RequestFilterOperator::NOT_EQUALS->value => self::NOT_EQUALS,
-            RequestFilterOperator::BETWEEN, RequestFilterOperator::BETWEEN->value => self::BETWEEN,
+            RequestFilterOperator::Great, RequestFilterOperator::Great->value => self::Great,
+            RequestFilterOperator::GreatEquals, RequestFilterOperator::GreatEquals->value => self::GreatEquals,
+            RequestFilterOperator::Less, RequestFilterOperator::Less->value => self::Less,
+            RequestFilterOperator::LessEquals, RequestFilterOperator::LessEquals->value => self::LessEquals,
+            RequestFilterOperator::Like, RequestFilterOperator::Like->value => self::Like,
+            RequestFilterOperator::NotLike, RequestFilterOperator::NotLike->value => self::NotLike,
+            RequestFilterOperator::Equals, RequestFilterOperator::Equals->value => self::Equals,
+            RequestFilterOperator::In, RequestFilterOperator::In->value => self::In,
+            RequestFilterOperator::NotEquals, RequestFilterOperator::NotEquals->value => self::NotEquals,
+            RequestFilterOperator::Between, RequestFilterOperator::Between->value => self::Between,
             default => null,
         };
     }

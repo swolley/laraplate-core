@@ -188,11 +188,11 @@ final class ParallelTaskRunner
         $start_time = microtime(true);
         $fork = Fork::new()->concurrent($effective_concurrent);
 
-        if ($this->beforeChild !== null) {
+        if ($this->beforeChild instanceof \Closure) {
             $fork = $fork->before(child: $this->beforeChild);
         }
 
-        if ($this->afterChild !== null) {
+        if ($this->afterChild instanceof \Closure) {
             $fork = $fork->after(child: $this->afterChild);
         }
 
@@ -225,7 +225,7 @@ final class ParallelTaskRunner
             $total_query_count += $result->queryCount;
             $this->safeReport(fn () => $this->reporter->failure($result));
 
-            if ($this->errorPolicy === ErrorPolicy::FailFast && $first_failure === null) {
+            if ($this->errorPolicy === ErrorPolicy::FailFast && !$first_failure instanceof \Modules\Core\Concurrency\BatchOutcome) {
                 $first_failure = $result;
                 $this->drainPendingTasks($fork);
             }
@@ -271,9 +271,7 @@ final class ParallelTaskRunner
 
         $this->safeReport(fn () => $this->reporter->finish($summary));
 
-        if ($first_failure !== null) {
-            throw new BatchExecutionFailedException($first_failure);
-        }
+        throw_if($first_failure instanceof \Modules\Core\Concurrency\BatchOutcome, BatchExecutionFailedException::class, $first_failure);
 
         if ($this->errorPolicy === ErrorPolicy::FailFast && $summary->hasFailures()) {
             throw new BatchExecutionFailedException($summary->failures[0]);

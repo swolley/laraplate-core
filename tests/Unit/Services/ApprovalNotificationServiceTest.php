@@ -207,7 +207,7 @@ it('getThresholdForTable returns the stored setting value', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'approval_threshold_posts',
         'value' => '48',
-        'type' => SettingTypeEnum::STRING,
+        'type' => SettingTypeEnum::String,
     ]);
 
     $service = new ApprovalNotificationService();

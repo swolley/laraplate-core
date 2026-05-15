@@ -7,6 +7,7 @@ namespace Modules\Core\Http\Requests;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Lab404\Impersonate\Impersonate;
+use Modules\Core\Enums\CoreTables;
 
 /**
  * @property int $user
@@ -32,7 +33,7 @@ final class ImpersonationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user' => ['required', 'number', 'exists:User,id'],
+            'user' => ['required', 'number', 'exists:'.CoreTables::Users->value.',id'],
         ];
     }
 }

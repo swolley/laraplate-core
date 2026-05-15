@@ -6,16 +6,16 @@ use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\RequestFilterOperator;
 
 it('maps filter operator to request operator', function (): void {
-    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::EQUALS))->toBe(RequestFilterOperator::EQUALS)
-        ->and(RequestFilterOperator::tryFromFilterOperator(FilterOperator::GREAT))->toBe(RequestFilterOperator::GREAT);
+    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::Equals))->toBe(RequestFilterOperator::Equals)
+        ->and(RequestFilterOperator::tryFromFilterOperator(FilterOperator::Great))->toBe(RequestFilterOperator::Great);
 });
 
 it('maps IN filter operator to request operator', function (): void {
-    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::IN))->toBe(RequestFilterOperator::IN);
+    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::In))->toBe(RequestFilterOperator::In);
 });
 
 it('maps NOT_EQUALS filter operator to request operator', function (): void {
-    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::NOT_EQUALS))->toBe(RequestFilterOperator::NOT_EQUALS);
+    expect(RequestFilterOperator::tryFromFilterOperator(FilterOperator::NotEquals))->toBe(RequestFilterOperator::NotEquals);
 });
 
 it('maps all filter operators to request operators', function (): void {
@@ -26,6 +26,6 @@ it('maps all filter operators to request operators', function (): void {
 });
 
 it('has expected cases', function (): void {
-    expect(RequestFilterOperator::EQUALS->value)->toBe('eq')
-        ->and(RequestFilterOperator::GREAT->value)->toBe('gt');
+    expect(RequestFilterOperator::Equals->value)->toBe('eq')
+        ->and(RequestFilterOperator::Great->value)->toBe('gt');
 });

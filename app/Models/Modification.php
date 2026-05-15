@@ -6,14 +6,19 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Modification as ApprovalModification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Modules\Core\Enums\CoreTables;
 use Override;
 
 /**
+ * @mixin \Eloquent
  * @mixin IdeHelperModification
  */
 final class Modification extends ApprovalModification
 {
     use HasFactory;
+
+    #[Override]
+    protected $table = CoreTables::Modifications->value;
 
     /**
      * @var array<int,string>

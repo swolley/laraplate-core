@@ -17,6 +17,9 @@ use ReflectionClass;
 use ReflectionMethod;
 use Throwable;
 
+/**
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ */
 trait HasGridUtils
 {
     /**

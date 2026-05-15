@@ -230,7 +230,7 @@ final class AuthorizationService
      */
     private function applyFiltersRecursively(Builder $query, FiltersGroup $filters): void
     {
-        $method = $filters->operator === WhereClause::AND ? 'where' : 'orWhere';
+        $method = $filters->operator === WhereClause::And ? 'where' : 'orWhere';
 
         foreach ($filters->filters as $filter) {
             if ($filter instanceof FiltersGroup) {

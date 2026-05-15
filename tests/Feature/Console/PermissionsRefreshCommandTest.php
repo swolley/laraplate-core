@@ -334,7 +334,7 @@ it('creates impersonate permission for the configured user model when missing', 
     $instance = $reflection->newInstanceWithoutConstructor();
     $connection = $instance->getConnectionName() ?? 'default';
     $table = $instance->getTable();
-    $impersonate_name = sprintf('%s.%s.%s', $connection, $table, ActionEnum::IMPERSONATE->value);
+    $impersonate_name = sprintf('%s.%s.%s', $connection, $table, ActionEnum::Impersonate->value);
 
     Permission::query()->where('name', $impersonate_name)->delete();
 

@@ -37,6 +37,6 @@ final class SearchRequest extends ListRequest
     public function parsed(): SearchRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new SearchRequestData($this, $this->route()->entity, $this->validated(), $this->primaryKey);
+        return new SearchRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 }

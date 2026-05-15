@@ -24,9 +24,7 @@ trait HasTranslationsFactory
 
         $default_translation = $content->translations()->where('locale', $default_locale)->first();
 
-        if (! $default_translation) {
-            throw new RuntimeException('Default translation not found for locale: ' . $default_locale);
-        }
+        throw_unless($default_translation, RuntimeException::class, 'Default translation not found for locale: ' . $default_locale);
 
         $fields = $content::getTranslatableFields();
 

@@ -6,6 +6,6 @@ namespace Modules\Core\Casts;
 
 enum WhereClause: string
 {
-    case AND = 'and';
-    case OR = 'or';
+    case And = 'and';
+    case Or = 'or';
 }
