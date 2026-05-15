@@ -48,7 +48,7 @@ class ListRequest extends SelectRequest
     public function parsed(): ListRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new ListRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
+        return new ListRequestData($this, $this->resolveMainEntity(), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 
     #[Override]

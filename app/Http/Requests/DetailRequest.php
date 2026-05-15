@@ -25,7 +25,7 @@ class DetailRequest extends SelectRequest
     public function parsed(): DetailRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new DetailRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
+        return new DetailRequestData($this, $this->resolveMainEntity(), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 
     #[Override]

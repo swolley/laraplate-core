@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(requests)* Unify entity resolution across request classes
+
+## [1.52.1] - 2026-05-15
+
 ### 🚀 Features
 
 - *(core)* Enhance cache warming command and model structure

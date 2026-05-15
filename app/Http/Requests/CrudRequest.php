@@ -51,7 +51,15 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
     public function parsed(): CrudRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new CrudRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey ?? 'id', $this->input('module'));
+        return new CrudRequestData($this, $this->resolveMainEntity(), $this->validated(), $this->primaryKey ?? 'id', $this->input('module'));
+    }
+
+    protected function resolveMainEntity(): string
+    {
+        /** @var string|null $entity */
+        $entity = $this->input('entity') ?? $this->route('entity');
+
+        return (string) ($entity ?? '');
     }
 
     #[Override]
@@ -60,7 +68,7 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
         $connection = $this->connection ?? null;
 
         /** @phpstan-ignore method.notFound */
-        $this->model = DynamicEntity::resolve($this->getEntity(), $connection);
+        $this->model = DynamicEntity::resolve($this->resolveMainEntity(), $connection);
         $this->primaryKey = $this->model->getKeyName();
 
         /** @phpstan-ignore method.notFound */

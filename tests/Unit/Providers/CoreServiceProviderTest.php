@@ -187,7 +187,8 @@ it('loadCronJobsFromDatabase returns active cron rows when table exists', functi
 });
 
 it('loadCronJobsFromDatabase returns empty array on exceptions', function (): void {
-    Schema::drop('cron_jobs');
+    $cron_table = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+    Schema::drop($cron_table);
 
     $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', ['users']);
 

@@ -29,7 +29,7 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
     public function parsed(): ModifyRequestData
     {
         /** @phpstan-ignore method.notFound */
-        return new ModifyRequestData($this, $this->input('entity'), $this->validated(), $this->primaryKey, $this->input('module'));
+        return new ModifyRequestData($this, $this->resolveMainEntity(), $this->validated(), $this->primaryKey, $this->input('module'));
     }
 
     #[Override]
@@ -79,7 +79,7 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
         if (class_uses_trait($this->model, HasValidations::class) && ! $is_delete) {
             /** @phpstan-ignore method.notFound */
-            $main_entity = $this->getEntity();
+            $main_entity = $this->resolveMainEntity();
 
             $pk_keys = is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey];
 

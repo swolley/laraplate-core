@@ -20,13 +20,13 @@ class Seeder extends BaseSeeder
      */
     public const string PARALLEL_BATCH_WORKER_ENV = 'LARAPLE_PARALLEL_BATCH_WORKER';
 
-    private bool $disableBenchmark = false;
+    protected bool $disableBenchmark = false;
 
     public function __construct(protected DatabaseManager $db)
     {
         $this->db = $db;
 
-        if (config('app.debug') && ! (property_exists($this, 'disableBenchmark') && $this->disableBenchmark === true)) {
+        if (config('app.debug') && ! $this->disableBenchmark) {
             $this->startBenchmark();
         }
     }
@@ -37,7 +37,7 @@ class Seeder extends BaseSeeder
             return;
         }
 
-        if (config('app.debug')) {
+        if (config('app.debug') && ! $this->disableBenchmark) {
             $this->endBenchmark();
         }
     }
