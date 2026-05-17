@@ -55,6 +55,9 @@ abstract class Taxonomy extends Model implements Sortable
     }
     // endregion
 
+    /**
+     * @var string
+     */
     #[Override]
     final protected $table = CoreTables::Taxonomies->value;
 
@@ -139,7 +142,7 @@ abstract class Taxonomy extends Model implements Sortable
     {
         $current_locale = LocaleContext::get();
         $default_locale = config('app.locale');
-        $fallback_enabled = LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $this->translationFallbackEnabledBySettings();
 
         $relation = $this->hasOne(static::getTranslationModelClass(), 'taxonomy_id');
 

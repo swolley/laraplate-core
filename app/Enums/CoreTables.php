@@ -39,7 +39,7 @@ enum CoreTables: string
     // pivots
     case Presettables = 'core_presettables';
     case Fieldables = 'core_fieldables';
-    case ModelHasRoles = 'model_has_roles';
-    case ModelHasPermissions = 'model_has_permissions';
-    case RoleHasPermissions = 'role_has_permissions';
+    case ModelHasRoles = 'vend_model_has_roles';
+    case ModelHasPermissions = 'vend_model_has_permissions';
+    case RoleHasPermissions = 'vend_role_has_permissions';
 }

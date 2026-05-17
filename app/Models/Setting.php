@@ -26,6 +26,9 @@ final class Setting extends Model
     use HasApprovals;
     use HasCache;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Settings->value;
 

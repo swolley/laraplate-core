@@ -8,12 +8,14 @@ use App\Models\User;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Modules\Core\Auth\Concerns\ValidatesUserAccount;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
-use Modules\Core\Models\License;
 use Override;
 
 final class FortifyCredentialsProvider implements IAuthenticationProvider
 {
+    use ValidatesUserAccount;
+
     #[Override]
     public function canHandle(Request $request): bool
     {
@@ -45,7 +47,18 @@ final class FortifyCredentialsProvider implements IAuthenticationProvider
             return [
                 'success' => false,
                 'user' => null,
-                'error' => 'Invalid credentials',
+                'error' => 'Invalid credentials or user not allowed to login',
+                'license' => null,
+            ];
+        }
+
+        $error = $this->accountValidityError($user);
+
+        if ($error !== null) {
+            return [
+                'success' => false,
+                'user' => null,
+                'error' => $error,
                 'license' => null,
             ];
         }
@@ -96,27 +109,5 @@ final class FortifyCredentialsProvider implements IAuthenticationProvider
     {
         return class_uses_trait($user, MustVerifyEmail::class)
             && ! $user->hasVerifiedEmail();
-    }
-
-    private function checkLicense(User $user): ?string
-    {
-        if (! config('auth.enable_user_licenses')) {
-            return null;
-        }
-
-        if (! $user->license_id) {
-            $available_license = License::query()
-                ->doesntHave('user')
-                ->first();
-
-            if (
-                ! $available_license
-                && $user->roles->where('name', 'superadmin')->isEmpty()
-            ) {
-                return 'No free licenses available';
-            }
-        }
-
-        return null;
     }
 }

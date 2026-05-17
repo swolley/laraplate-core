@@ -30,6 +30,9 @@ final class License extends Model
     use HasValidity;
     use HasVersions;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Licenses->value;
 

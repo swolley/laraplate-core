@@ -100,6 +100,7 @@ final class PermissionsRefreshCommand extends Command
             if (! is_string($model)) {
                 continue;
             }
+
             if (! class_exists($model)) {
                 continue;
             }
@@ -248,6 +249,11 @@ final class PermissionsRefreshCommand extends Command
 
     private function checkIfBlacklisted(string $model): bool
     {
-        return array_any(self::$MODELS_BLACKLIST, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
+        /** @var list<class-string> $config_blacklist */
+        $config_blacklist = config('permission.models_blacklist', []);
+
+        $blacklist = array_merge(self::$MODELS_BLACKLIST, $config_blacklist);
+
+        return array_any($blacklist, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
     }
 }

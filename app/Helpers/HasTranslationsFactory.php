@@ -40,7 +40,13 @@ trait HasTranslationsFactory
             $data = [];
 
             foreach ($fields as $field) {
-                $data[$field] = $default_translation->{$field};
+                $value = $default_translation->{$field};
+
+                if ($field === 'components' && $value === null) {
+                    $value = [];
+                }
+
+                $data[$field] = $value;
             }
 
             // Allow callers to override specific fields (e.g. title) for each locale.

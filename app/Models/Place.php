@@ -26,6 +26,9 @@ class Place extends Model
 
     private const float COORDINATE_EPSILON = 1e-7;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Places->value;
 
@@ -35,7 +38,7 @@ class Place extends Model
      *
      * @var list<string>
      */
-    #[\Override]
+    #[Override]
     protected array $dontVersionable = [
         'created_at',
         'updated_at',
@@ -46,7 +49,7 @@ class Place extends Model
     /**
      * The attributes that are mass assignable.
      */
-    #[\Override]
+    #[Override]
     protected $fillable = [
         'address',
         'city',

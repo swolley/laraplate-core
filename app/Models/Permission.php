@@ -28,6 +28,9 @@ final class Permission extends ModelsPermission
     }
     use HasVersions;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Permissions->value;
 
@@ -88,10 +91,10 @@ final class Permission extends ModelsPermission
             'description' => ['string', 'max:255', 'nullable'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:'.CoreTables::Permissions->value.',name'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:' . CoreTables::Permissions->value . ',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:'.CoreTables::Permissions->value.',name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:' . CoreTables::Permissions->value . ',name,' . $this->id],
         ]);
 
         return $rules;

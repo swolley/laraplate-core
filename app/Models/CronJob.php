@@ -27,6 +27,9 @@ final class CronJob extends Model
     use HasLocks;
     // endregion
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::CronJobs->value;
 

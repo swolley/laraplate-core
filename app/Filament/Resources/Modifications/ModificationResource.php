@@ -48,7 +48,7 @@ final class ModificationResource extends Resource
     public static function table(Table $table): Table
     {
         return ModificationsTable::configure($table)
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('modifier'));
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['modifier', 'approvals', 'disapprovals']));
     }
 
     public static function getRelations(): array

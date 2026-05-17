@@ -31,6 +31,9 @@ final class Field extends Model
     }
     // endregion
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Fields->value;
 
@@ -103,10 +106,10 @@ final class Field extends Model
             'type' => ['required', 'string', Rule::enum(FieldType::class)],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:'.CoreTables::Fields->value.',name'],
+            'name' => ['required', 'string', 'max:255', 'unique:' . CoreTables::Fields->value . ',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:'.CoreTables::Fields->value.',name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'unique:' . CoreTables::Fields->value . ',name,' . $this->id],
         ]);
 
         return $rules;

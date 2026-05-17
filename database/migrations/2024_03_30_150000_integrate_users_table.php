@@ -34,6 +34,7 @@ return new class() extends Migration
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
                 hasLocks: true,
+                hasValidity: true,
             );
 
             $table->foreign('license_id', "{$users_table}_licenses_FK")->references('id')->on(CoreTables::Licenses->value)->nullOnDelete();

@@ -24,6 +24,9 @@ final class Version extends OvertrueVersion
 {
     use HasFactory;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Versions->value;
 

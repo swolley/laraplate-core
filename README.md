@@ -256,6 +256,8 @@ class ... extends Model
 
 ### Validity configuration
 
+`HasValidity` adds `valid_from` / `valid_to` datetime columns (via `MigrateUtils::timestamps(..., hasValidity: true)`) and helpers such as `isValid()`, `isExpired()`, `isScheduled()`, `isDraft()`, `publish()`, and `unpublish()`.
+
 ```php
 <?php
 namespace App\Models;
@@ -271,6 +273,28 @@ class ... extends Model
 	protected static $valid_to_column = 'valid_to';
 }
 ```
+
+#### Temporary users (`Core\Models\User`)
+
+`User` uses `HasValidity` so accounts can expire automatically at `valid_to` without soft-delete or manual deactivation.
+
+| Account type | `valid_from` | `valid_to` |
+| --- | --- | --- |
+| Permanent | `now()` (or start date) | `null` |
+| Temporary | access start | access end |
+
+```php
+// Seven-day contractor account
+$user->publish(now(), now()->addDays(7));
+
+// Or direct assignment
+$user->update([
+    'valid_from' => now(),
+    'valid_to' => now()->addDays(7),
+]);
+```
+
+Seeded system users (`superadmin`, `admin`, `guest`, `system`) use `valid_from => now()` and `valid_to => null`. Enforce the window at login by checking `$user->isValid()` in Fortify/Socialite providers or auth middleware (not applied automatically on every query).
 
 If you need to override the Core Module or dependencies configs you can publish them by running the following command:
 
@@ -385,10 +409,12 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 The Core Module includes built-in features such as:
 
 -   User management with multi-level roles and permissions.
+-   Temporal user validity (`valid_from` / `valid_to` on `users` for temporary accounts that auto-expire).
 -   Email verification for new users.
 -   Command-line tools for user registration and model management.
 -   Redis caching for improved performance.
 -   Automatic indexing of entities with Elasticsearch (embeddings generation requires AI module).
+-   **Event orchestration** for search indexing and modification moderation ([docs/EVENT_ORCHESTRATION.md](docs/EVENT_ORCHESTRATION.md)).
 -   Enhanced Swagger documentation generation.
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.

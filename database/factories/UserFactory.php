@@ -59,4 +59,48 @@ final class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Active user with an open-ended validity window.
+     */
+    public function perpetual(): static
+    {
+        return $this->state(fn () => [
+            'valid_from' => now()->subDay(),
+            'valid_to' => null,
+        ]);
+    }
+
+    /**
+     * User valid from now until the given end datetime.
+     */
+    public function temporary(\DateTimeInterface $valid_to): static
+    {
+        return $this->state(fn () => [
+            'valid_from' => now()->subDay(),
+            'valid_to' => $valid_to,
+        ]);
+    }
+
+    /**
+     * User whose validity window ended in the past.
+     */
+    public function expired(): static
+    {
+        return $this->state(fn () => [
+            'valid_from' => now()->subWeek(),
+            'valid_to' => now()->subDay(),
+        ]);
+    }
+
+    /**
+     * User whose validity window starts in the future.
+     */
+    public function scheduled(): static
+    {
+        return $this->state(fn () => [
+            'valid_from' => now()->addDay(),
+            'valid_to' => now()->addWeek(),
+        ]);
+    }
 }

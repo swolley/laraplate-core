@@ -18,6 +18,9 @@ final class TaxonomyTranslation extends Model implements ITranslated
 {
     use HasSlug;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::TaxonomiesTranslations->value;
 

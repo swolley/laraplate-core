@@ -8,7 +8,6 @@ use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
 
-
 beforeEach(function (): void {
     DynamicContentsService::reset();
 });
@@ -20,8 +19,9 @@ function dynamic_contents_invoke_get_module_model_class(string $local_class, str
 {
     $ref = new ReflectionClass(DynamicContentsService::class);
     $method = $ref->getMethod('getModuleModelClass');
+    $method->setAccessible(true);
 
-    return $method->invoke(null, $local_class, $target_class);
+    return $method->invoke(DynamicContentsService::getInstance(), $local_class, $target_class);
 }
 
 it('maps App target model to app namespace', function (): void {
@@ -67,8 +67,9 @@ it('uses distinct memo cache keys for different module Presettable classes', fun
     $method = $ref->getMethod('presettableMemoKey');
     $method->setAccessible(true);
 
-    $cms_key = $method->invoke(null, Modules\CMS\Models\Pivot\Presettable::class);
-    $erp_key = $method->invoke(null, Modules\ERP\Models\Pivot\Presettable::class);
+    $service = DynamicContentsService::getInstance();
+    $cms_key = $method->invoke($service, Modules\CMS\Models\Pivot\Presettable::class);
+    $erp_key = $method->invoke($service, Modules\ERP\Models\Pivot\Presettable::class);
 
     expect($cms_key)->not->toBe($erp_key)
         ->and($cms_key)->toStartWith('core.dynamic_contents.presettables:')

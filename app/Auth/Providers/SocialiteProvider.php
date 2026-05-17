@@ -10,12 +10,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Modules\Core\Auth\Concerns\ValidatesUserAccount;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
-use Modules\Core\Models\License;
 use Override;
 
 final class SocialiteProvider implements IAuthenticationProvider
 {
+    use ValidatesUserAccount;
     #[Override]
     public function canHandle(Request $request): bool
     {
@@ -62,6 +63,17 @@ final class SocialiteProvider implements IAuthenticationProvider
                 'social_id' => $socialUser->getId(),
             ], $defaults);
 
+            $error = $this->accountValidityError($user);
+
+            if ($error !== null) {
+                return [
+                    'success' => false,
+                    'user' => null,
+                    'error' => $error,
+                    'license' => null,
+                ];
+            }
+
             // Verifica licenza
             $error = $this->checkLicense($user);
 
@@ -102,25 +114,4 @@ final class SocialiteProvider implements IAuthenticationProvider
         return 'social';
     }
 
-    private function checkLicense(User $user): ?string
-    {
-        if (! config('auth.enable_user_licenses')) {
-            return null;
-        }
-
-        if (! $user->license_id) {
-            $available_license = License::query()
-                ->doesntHave('user')
-                ->first();
-
-            if (
-                ! $available_license
-                && $user->roles->where('name', 'superadmin')->isEmpty()
-            ) {
-                return 'No free licenses available';
-            }
-        }
-
-        return null;
-    }
 }

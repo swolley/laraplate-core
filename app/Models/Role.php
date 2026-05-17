@@ -40,6 +40,9 @@ final class Role extends BaseRole
     use HasVersions;
     use SoftDeletes;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Roles->value;
 

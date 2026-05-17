@@ -20,7 +20,7 @@ final class LocaleScope implements Scope
     {
         $default_locale = config('app.locale');
         $current_locale = LocaleContext::get();
-        $fallback_enabled = LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $this->modelUsesTranslationFallback($model);
 
         $use_fallback = $fallback_enabled && $current_locale !== $default_locale;
 
@@ -42,7 +42,7 @@ final class LocaleScope implements Scope
         $builder->macro('forLocale', function (Builder $builder, ?string $locale = null, ?bool $with_fallback = null): Builder {
             $locale ??= LocaleContext::get();
             $default_locale = config('app.locale');
-            $fallback_enabled = $with_fallback ?? LocaleContext::isFallbackEnabled();
+            $fallback_enabled = $with_fallback ?? $this->modelUsesTranslationFallback($builder->getModel());
 
             // Rimuovi il global scope
             $builder->withoutGlobalScope($this);
@@ -121,5 +121,14 @@ final class LocaleScope implements Scope
 
         $query->where('locale', $current_locale)
             ->orWhere('locale', $default_locale);
+    }
+
+    private function modelUsesTranslationFallback(Model $model): bool
+    {
+        if (method_exists($model, 'translationFallbackEnabledBySettings')) {
+            return $model->translationFallbackEnabledBySettings();
+        }
+
+        return true;
     }
 }

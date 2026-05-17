@@ -8,7 +8,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
+use Modules\CMS\Models\Comment;
 use Modules\Core\Filament\Utils\HasTable;
+use Modules\Core\Models\Modification;
 
 final class ModificationsTable
 {
@@ -35,6 +37,33 @@ final class ModificationsTable
                     TextColumn::make('modifications.modified')
                         ->label('Modified')
                         ->limit(50),
+                    TextColumn::make('meta')
+                        ->label('Meta')
+                        ->badge()
+                        ->getStateUsing(function (Modification $record): ?string {
+                            $meta = $record->latestAutomatedVoteMeta();
+
+                            $string = '';
+
+                            foreach ($meta as $key => $value) {
+                                $string .= $key . ': ' . $value . '<br>';
+                            }
+
+                            return $string;
+                        })
+                        ->color(fn (?string $state): string => match ($state) {
+                            'requires_human_review' => 'warning',
+                            'processing', 'queued' => 'gray',
+                            'auto_approved' => 'success',
+                            'auto_rejected' => 'danger',
+                            default => 'gray',
+                        })
+                        ->visible(fn (Modification $record): bool => $record->modifiable_type === Comment::class)
+                        ->html(),
+                    TextColumn::make('disapprovers_required')
+                        ->label('Disapprovals required')
+                        ->numeric()
+                        ->visible(fn (Modification $record): bool => $record->modifiable_type === Comment::class),
                 ]);
             },
         )

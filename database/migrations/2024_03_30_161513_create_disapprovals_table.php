@@ -22,6 +22,7 @@ return new class() extends Migration
             $table->unsignedBigInteger('disapprover_id')->comment('The id of the disapprover');
             $table->string('disapprover_type')->comment('The type of the disapprover');
             $table->text('reason')->nullable()->comment('The reason for the disapproval');
+            $table->json('meta')->nullable()->comment('The additional meta data for the disapproval');
 
             MigrateUtils::timestamps(
                 $table,

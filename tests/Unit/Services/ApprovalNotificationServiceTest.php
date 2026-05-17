@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
@@ -9,10 +10,8 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
-use App\Models\User;
 use Modules\Core\Notifications\PendingApprovalsNotification;
 use Modules\Core\Services\ApprovalNotificationService;
-
 
 it('returns early when approvals notifications are disabled', function (): void {
     Config::set('core.notifications.approvals.enabled', false);
@@ -205,7 +204,7 @@ it('checkAndNotify sends notification when pending approvals exist', function ()
 
 it('getThresholdForTable returns the stored setting value', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'approval_threshold_posts',
+        'name' => 'approval_threshold__posts',
         'value' => '48',
         'type' => SettingTypeEnum::String,
     ]);

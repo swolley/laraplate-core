@@ -43,6 +43,8 @@ use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Services\DynamicContentsService;
+use Modules\Core\Services\ModerationAdapterRegistry;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
@@ -292,6 +294,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->alias(Locked::class, 'locked');
 
         $this->app->singleton(SchemaInspector::class, static fn (): SchemaInspector => SchemaInspector::getInstance());
+
+        $this->app->singleton(PerModelSettingResolver::class);
+
+        $this->app->singleton(ModerationAdapterRegistry::class);
 
         $this->app->alias(BaseSoftDeletes::class, SoftDeletes::class);
 

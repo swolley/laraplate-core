@@ -29,6 +29,14 @@ it('isValid returns true when date is within range', function (): void {
     expect($model->isValid(now()))->toBeTrue();
 });
 
+it('isValid accepts CarbonImmutable as the evaluation date', function (): void {
+    $from = now()->subDay();
+    $to = now()->addDay();
+    $model = ValidityStubModel::create(['name' => 'x-immutable', 'valid_from' => $from, 'valid_to' => $to]);
+
+    expect($model->isValid(now()))->toBeTrue();
+});
+
 it('isValid returns false when date is before valid_from', function (): void {
     $from = now()->addDay();
     $to = now()->addDays(2);

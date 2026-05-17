@@ -4,12 +4,32 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\LocaleContext;
+use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
 
+function configureFakeTranslatableFallback(bool $enabled): void
+{
+    Setting::query()->where('name', 'translation_fallback_fake_translatable_models')->forceDelete();
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'translation_fallback_fake_translatable_models',
+        'value' => $enabled,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'translations',
+        'description' => 'test',
+    ]);
+
+    app(PerModelSettingResolver::class)->flush();
+}
 
 beforeEach(function (): void {
+    app(PerModelSettingResolver::class)->flush();
+    Setting::query()->where('group_name', 'translations')->delete();
+
     $this->scope = new LocaleScope();
 
     Schema::create('fake_translatable_models', function (Blueprint $table): void {
@@ -53,7 +73,8 @@ it('apply runs without throwing when locale equals default', function (): void {
 });
 
 it('apply filters with fallback when locale differs from default and fallback enabled', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('it');
 
     $model = new FakeTranslatableModel();
@@ -66,7 +87,8 @@ it('apply filters with fallback when locale differs from default and fallback en
 });
 
 it('apply filters only current locale when fallback disabled and locale differs', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(false);
     LocaleContext::set('it');
 
     $model = new FakeTranslatableModel();
@@ -79,7 +101,8 @@ it('apply filters only current locale when fallback disabled and locale differs'
 });
 
 it('forLocale macro filters with fallback for non-default locale', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('en');
 
     $model = new FakeTranslatableModel();
@@ -118,7 +141,8 @@ it('forLocale with fallback enabled and locale equals default filters only local
 });
 
 it('apply uses only current locale branch when fallback is disabled', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(false);
     LocaleContext::set('it');
 
     $relation_query = Mockery::mock(Illuminate\Database\Eloquent\Builder::class);
@@ -168,7 +192,8 @@ it('forLocale without fallback constrains translation locale in eager load', fun
 });
 
 it('apply executes whereHas closure for fallback when query runs against database', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('it');
 
     $model = new FakeTranslatableModel();
@@ -179,7 +204,8 @@ it('apply executes whereHas closure for fallback when query runs against databas
 });
 
 it('apply executes whereHas closure for current locale only when fallback disabled and query runs', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(false);
     LocaleContext::set('it');
 
     $model = new FakeTranslatableModel();
@@ -190,7 +216,8 @@ it('apply executes whereHas closure for current locale only when fallback disabl
 });
 
 it('apply invokes whereHas fallback closure with current and default locale constraints', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('it');
 
     $parent_model = new FakeTranslatableModel();
@@ -221,7 +248,8 @@ it('apply invokes whereHas fallback closure with current and default locale cons
 });
 
 it('apply invokes whereHas closure for current locale only when fallback is disabled', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(false);
     LocaleContext::set('it');
 
     $parent_model = new FakeTranslatableModel();
@@ -252,7 +280,8 @@ it('apply invokes whereHas closure for current locale only when fallback is disa
 });
 
 it('apply invokes whereHas closure for default locale branch', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('en');
 
     $nested = Mockery::mock(Illuminate\Database\Query\Builder::class);
@@ -294,7 +323,8 @@ it('apply invokes whereHas closure for default locale branch', function (): void
 });
 
 it('apply returns only default locale records when current locale equals default', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('en');
 
     $with_en = FakeTranslatableModel::query()->create([]);
@@ -310,7 +340,8 @@ it('apply returns only default locale records when current locale equals default
 });
 
 it('apply fallback returns rows with current or default locale', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
     LocaleContext::set('it');
 
     $with_en = FakeTranslatableModel::query()->create([]);
@@ -328,7 +359,8 @@ it('apply fallback returns rows with current or default locale', function (): vo
 });
 
 it('apply without fallback returns only current locale rows', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(false);
     LocaleContext::set('it');
 
     $with_en = FakeTranslatableModel::query()->create([]);
@@ -344,7 +376,8 @@ it('apply without fallback returns only current locale rows', function (): void 
 });
 
 it('forLocale fallback eager-load orders current locale first', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => true]);
+    config(['app.locale' => 'en']);
+    configureFakeTranslatableFallback(true);
 
     $model = new FakeTranslatableModel();
     $builder = $model->newQuery();

@@ -18,6 +18,9 @@ final class UserGridConfig extends Model
 {
     use HasCache;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::UsersGridConfigs->value;
 
@@ -49,7 +52,7 @@ final class UserGridConfig extends Model
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
-            'user_id' => ['integer', 'exists:'.CoreTables::Users->value.',id'],
+            'user_id' => ['integer', 'exists:' . CoreTables::Users->value . ',id'],
             'grid_name' => ['required', 'max:255'],
             'layout_name' => ['required', 'max:255'],
             'is_public' => ['boolean', 'required'],

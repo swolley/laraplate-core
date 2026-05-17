@@ -74,11 +74,4 @@ final class LocaleContext
         self::$cached_default_locale = null;
     }
 
-    /**
-     * Check if translation fallback is enabled.
-     */
-    public static function isFallbackEnabled(): bool
-    {
-        return (bool) config('core.translation_fallback_enabled', config('app.translation_fallback_enabled', true));
-    }
 }

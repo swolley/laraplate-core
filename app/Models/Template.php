@@ -16,6 +16,9 @@ use Override;
  */
 final class Template extends Model
 {
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Templates->value;
 

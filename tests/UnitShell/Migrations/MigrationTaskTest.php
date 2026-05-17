@@ -24,7 +24,7 @@ it('renders module badge before status with adjusted dots', function (): void {
 
     expect($content)
         ->toContain('2026_01_24_174744_create_ai_messages_table')
-        ->toContain('[AI]')
+        ->toContain('AI')
         ->toContain('DONE')
-        ->and(mb_strpos($content, '[AI]'))->toBeLessThan(mb_strpos($content, 'DONE'));
+        ->and(mb_strpos($content, 'AI'))->toBeLessThan(mb_strpos($content, 'DONE'));
 });

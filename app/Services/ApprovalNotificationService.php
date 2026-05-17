@@ -163,7 +163,7 @@ final class ApprovalNotificationService
      */
     public function getThresholdForTable(string $table, int $default): int
     {
-        $setting_name = "approval_threshold_{$table}";
+        $setting_name = "approval_threshold__{$table}";
 
         $setting = Setting::query()
             ->withoutGlobalScopes()

@@ -8,9 +8,8 @@ use function property_exists;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\UnauthorizedException;
-use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 
 /**
@@ -72,18 +71,10 @@ trait SoftDeletes
             return (bool) $this->softDeletesEnabled;
         }
 
-        $settings_name = "soft_deletes_{$this->getTable()}";
-
-        $stored = Cache::rememberForever(
-            'soft_deletes_flags',
-            static fn () => Setting::query()->where('group_name', 'soft_deletes')->get(),
-        )->firstWhere('name', $settings_name)?->value;
-
-        if ($stored === null) {
-            return true;
-        }
-
-        return (bool) $stored;
+        return app(PerModelSettingResolver::class)->boolean(
+            'soft_deletes_' . $this->getTable(),
+            default: true,
+        );
     }
 
     public function restore()

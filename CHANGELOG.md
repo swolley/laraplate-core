@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(validity)* Implement user account validity checks and enhance moderation features
+
+## [1.52.2] - 2026-05-15
+
 ### 🚜 Refactor
 
 - *(requests)* Unify entity resolution across request classes

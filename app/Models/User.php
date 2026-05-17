@@ -6,6 +6,7 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
+use Carbon\CarbonInterface;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -18,9 +19,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Lab404\Impersonate\Exceptions\InvalidUserProvider;
@@ -31,6 +34,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Helpers\HasValidity;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
@@ -58,6 +62,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     use HasValidations {
         getRules as private getRulesTrait;
     }
+    use HasValidity;
     use HasVersions;
     use Impersonate;
     use Notifiable;
@@ -177,6 +182,23 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function isAdmin(): bool
     {
         return $this->hasRole(config('permission.roles.admin'));
+    }
+
+    /**
+     * Whether the account may sign in at the given moment.
+     * Accounts with both validity columns unset are always allowed (legacy behaviour).
+     */
+    public function canAuthenticate(?CarbonInterface $at = null): bool
+    {
+        if ($this->valid_from === null && $this->valid_to === null) {
+            return true;
+        }
+
+        if ($this->valid_from === null) {
+            return false;
+        }
+
+        return $this->isValid($at ?? Date::now());
     }
 
     public function canImpersonate(): bool
@@ -310,6 +332,22 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         return $rules;
     }
 
+    /**
+     * @return MorphMany<Approval, $this>
+     */
+    public function approvals(): MorphMany
+    {
+        return $this->morphMany(Approval::class, 'approver');
+    }
+
+    /**
+     * @return MorphMany<Disapproval, $this>
+     */
+    public function disapprovals(): MorphMany
+    {
+        return $this->morphMany(Disapproval::class, 'disapprover');
+    }
+
     protected static function newFactory(): UserFactory
     {
         UserFactory::guessModelNamesUsing(static fn (): string => static::class);
@@ -338,6 +376,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'valid_from' => 'datetime',
+            'valid_to' => 'datetime',
             'password' => 'hashed',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
@@ -346,16 +386,29 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     protected function authorizedToApprove(Modification $mod): bool
     {
-        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.approve');
+        return $this->can($this->approvalPermissionFor($mod, 'approve'));
     }
 
     protected function authorizedToDisapprove(Modification $mod): bool
     {
-        return $this->can(($this->getConnectionName() ?? 'default') . $mod->modifiable->getTable() . '.disapprove');
+        return $this->can($this->approvalPermissionFor($mod, 'disapprove'));
     }
 
     protected function getDefaultGuardName(): string
     {
         return 'web';
+    }
+
+    private function approvalPermissionFor(Modification $mod, string $action): string
+    {
+        $table = $mod->modifiable?->getTable();
+
+        if ($table === null && is_string($mod->modifiable_type) && class_exists($mod->modifiable_type)) {
+            $table = (new $mod->modifiable_type())->getTable();
+        }
+
+        $connection = $this->getConnectionName() ?? 'default';
+
+        return "{$connection}.{$table}.{$action}";
     }
 }

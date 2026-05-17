@@ -72,7 +72,7 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
         ],
     ]);
     Setting::query()->withoutGlobalScopes()->updateOrCreate(
-        ['name' => 'approval_threshold_users'],
+        ['name' => 'approval_threshold__users'],
         ['group_name' => 'core', 'value' => 1],
     );
     expect($service->getPendingApprovalsByEntity()->isEmpty())->toBeFalse();

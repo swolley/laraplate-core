@@ -7,6 +7,7 @@ namespace Modules\Core\Observers;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 
 final class SettingObserver
 {
@@ -21,9 +22,9 @@ final class SettingObserver
     {
         if ($setting->group_name === 'versioning' || $setting->getOriginal('group_name') === 'versioning') {
             Cache::forget(CacheManager::key('version_strategies'));
-        } elseif ($setting->group_name === 'soft_deletes' && $setting->getOriginal('group_name') === 'soft_deletes') {
-            Cache::forget('soft_deletes_flags');
         }
+
+        app(PerModelSettingResolver::class)->flush();
     }
 
     public function deleted(Setting $setting): void
@@ -31,5 +32,7 @@ final class SettingObserver
         if ($setting->group_name === 'versioning') {
             Cache::forget(CacheManager::key('version_strategies'));
         }
+
+        app(PerModelSettingResolver::class)->flush();
     }
 }

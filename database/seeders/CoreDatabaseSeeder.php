@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Helpers\HasTranslations;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
@@ -37,6 +38,12 @@ final class CoreDatabaseSeeder extends Seeder
 
     public const OPTIMISTIC_LOCK_NAME_PREFIX = 'optimistic_lock_';
 
+    public const TRANSLATION_FALLBACK_NAME_PREFIX = 'translation_fallback_';
+
+    public const AUTO_TRANSLATE_NAME_PREFIX = 'auto_translate_';
+
+    public const AI_MODERATION_NAME_PREFIX = 'ai_moderation_';
+
     /**
      * @var Collection<string, BaseRole>
      */
@@ -51,6 +58,7 @@ final class CoreDatabaseSeeder extends Seeder
             'superadmin' => (string) config('permission.roles.superadmin'),
             'admin' => (string) config('permission.roles.admin'),
             'guest' => (string) config('permission.roles.guest'),
+            'system' => (string) config('permission.roles.system'),
         ];
     }
 
@@ -98,6 +106,8 @@ final class CoreDatabaseSeeder extends Seeder
 
         $roles = self::getDefaultUserRoles();
 
+        $all_permissions = $permission_class::query()->get();
+
         $roles_data = [
             [
                 'name' => $roles['superadmin'],
@@ -107,17 +117,34 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => $roles['admin'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::query()->where(function ($query) use ($user_table, $role_table): void {
-                    $query->whereIn('table_name', [$user_table, $role_table])
-                        ->orWhere('name', 'like', '%.' . ActionEnum::Select->value);
-                })->whereNot('name', 'like', '%.' . ActionEnum::Lock->value)->get(),
+                'permissions' => fn () => $all_permissions
+                    ->filter(function ($permission) use ($user_table, $role_table) {
+                        $isUserOrRoleTable = in_array($permission->table_name, [$user_table, $role_table], true);
+                        $isSelectAction = str_ends_with($permission->name, '.' . ActionEnum::Select->value);
+                        $isLockAction = str_ends_with($permission->name, '.' . ActionEnum::Lock->value);
+
+                        return ($isUserOrRoleTable || $isSelectAction) && ! $isLockAction;
+                    }),
             ],
             [
                 'name' => $roles['guest'],
                 'locked_at' => now(),
-                'permissions' => fn () => $permission_class::query()->where('name', 'like', '%.' . ActionEnum::Select->value)
-                    ->whereNotIn('table_name', ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'])
-                    ->get(),
+                'permissions' => fn () => $all_permissions
+                    ->filter(function ($permission) {
+                        $isSelectAction = str_ends_with($permission->name, '.' . ActionEnum::Select->value);
+                        $excludedTables = ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'];
+
+                        return $isSelectAction && ! in_array($permission->table_name, $excludedTables, true);
+                    }),
+            ],
+            // system is not superadmin so develper can decide what to do with it and limit permissions for security reasons
+            [
+                'name' => $roles['system'],
+                'locked_at' => now(),
+                'permissions' => fn () => $all_permissions,
+                // ->filter(function ($permission) {
+                //     return $permission->name === 'system.permissions';
+                // }),
             ],
         ];
 
@@ -151,6 +178,7 @@ final class CoreDatabaseSeeder extends Seeder
         $anonymous = config('permission.users.guest');
         $superadmin = config('permission.users.superadmin');
         $admin = config('permission.users.admin');
+        $system = config('permission.users.system');
 
         $users_data = [
             [
@@ -160,6 +188,9 @@ final class CoreDatabaseSeeder extends Seeder
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
                 'roles' => [$this->groups->get('superadmin')],
+                'locked_at' => now(),
+                'valid_from' => now(),
+                'valid_to' => null,
             ],
             [
                 'name' => $admin,
@@ -168,6 +199,9 @@ final class CoreDatabaseSeeder extends Seeder
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
                 'roles' => [$this->groups->get('admin')],
+                'locked_at' => now(),
+                'valid_from' => now(),
+                'valid_to' => null,
             ],
             [
                 'name' => $anonymous,
@@ -176,6 +210,20 @@ final class CoreDatabaseSeeder extends Seeder
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
                 'roles' => [$this->groups->get('guest')],
+                'locked_at' => now(),
+                'valid_from' => now(),
+                'valid_to' => null,
+            ],
+            [
+                'name' => $system,
+                'username' => $system,
+                'email' => "{$system}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
+                'password' => Str::random(16),
+                'email_verified_at' => now(),
+                'roles' => [$this->groups->get('system')],
+                'locked_at' => now(),
+                'valid_from' => now(),
+                'valid_to' => null,
             ],
         ];
 
@@ -276,6 +324,26 @@ final class CoreDatabaseSeeder extends Seeder
             } else {
                 $to_remove_settings[] = $optimistic_locked_model_key_name;
             }
+
+            $translation_fallback_key_name = $this->getSettingKeyName(self::TRANSLATION_FALLBACK_NAME_PREFIX, $table);
+
+            $auto_translate_key_name = $this->getSettingKeyName(self::AUTO_TRANSLATE_NAME_PREFIX, $table);
+
+            if (class_uses_trait($model, HasTranslations::class)) {
+                $this->seedTranslationFallbackModel($default_settings, $instance, $table, $translation_fallback_key_name);
+                $this->seedAutoTranslateModel($default_settings, $instance, $table, $auto_translate_key_name);
+            } else {
+                $to_remove_settings[] = $translation_fallback_key_name;
+                $to_remove_settings[] = $auto_translate_key_name;
+            }
+
+            $ai_moderation_key_name = $this->getSettingKeyName(self::AI_MODERATION_NAME_PREFIX, $table);
+
+            if (class_uses_trait($model, HasApprovals::class)) {
+                $this->seedAiModerationModel($default_settings, $instance, $table, $ai_moderation_key_name);
+            } else {
+                $to_remove_settings[] = $ai_moderation_key_name;
+            }
         }
 
         if ($to_remove_settings !== []) {
@@ -324,7 +392,7 @@ final class CoreDatabaseSeeder extends Seeder
 
     private function seedVersionedModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
     {
-        if (property_exists($model, 'versionStrategy') && $model->versionStrategy === false) {
+        if (property_exists($model, 'versionStrategy')) {
             return;
         }
 
@@ -340,7 +408,7 @@ final class CoreDatabaseSeeder extends Seeder
 
     private function seedSoftDeletedModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
     {
-        if (property_exists($model, 'softDeletesEnabled') && $model->softDeletesEnabled === false) {
+        if (property_exists($model, 'softDeletesEnabled')) {
             return;
         }
 
@@ -355,7 +423,7 @@ final class CoreDatabaseSeeder extends Seeder
 
     private function seedLockedModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
     {
-        if (property_exists($model, 'locksEnabled') && $model->locksEnabled === false) {
+        if (property_exists($model, 'locksEnabled')) {
             return;
         }
 
@@ -370,7 +438,7 @@ final class CoreDatabaseSeeder extends Seeder
 
     private function seedOptimisticLockedModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
     {
-        if (property_exists($model, 'optimisticLocksEnabled') && $model->optimisticLocksEnabled === false) {
+        if (property_exists($model, 'optimisticLocksEnabled')) {
             return;
         }
 
@@ -380,6 +448,51 @@ final class CoreDatabaseSeeder extends Seeder
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Optimistic lock status for {$table}",
+        ];
+    }
+
+    private function seedTranslationFallbackModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
+    {
+        if (property_exists($model, 'translation_fallback_enabled')) {
+            return;
+        }
+
+        $defaultSettings[] = [
+            'name' => $keyName,
+            'value' => true,
+            'type' => SettingTypeEnum::Boolean,
+            'group_name' => 'translations',
+            'description' => "Translation fallback for {$table}",
+        ];
+    }
+
+    private function seedAutoTranslateModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
+    {
+        if (property_exists($model, 'auto_translate_enabled')) {
+            return;
+        }
+
+        $defaultSettings[] = [
+            'name' => $keyName,
+            'value' => false,
+            'type' => SettingTypeEnum::Boolean,
+            'group_name' => 'translations',
+            'description' => "Auto-translate for {$table}",
+        ];
+    }
+
+    private function seedAiModerationModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
+    {
+        if (property_exists($model, 'ai_moderation_enabled')) {
+            return;
+        }
+
+        $defaultSettings[] = [
+            'name' => $keyName,
+            'value' => false,
+            'type' => SettingTypeEnum::Boolean,
+            'group_name' => 'moderation',
+            'description' => "AI moderation for {$table}",
         ];
     }
 
@@ -463,7 +576,7 @@ final class CoreDatabaseSeeder extends Seeder
 
         foreach ($models_with_approvals as $table => $model_class) {
             $approval_settings[] = [
-                'name' => "approval_threshold_{$table}",
+                'name' => "approval_threshold__{$table}",
                 'value' => $default_threshold,
                 'type' => SettingTypeEnum::Integer,
                 'group_name' => 'approvals',

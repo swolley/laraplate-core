@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
-use Modules\Core\Models\Entity;
+use Modules\Core\Events\ModificationPreProcessingCompleted;
+use Modules\Core\Events\ModificationRequiresModeration;
 use Modules\Core\Models\CronJob;
+use Modules\Core\Models\Entity;
+use Modules\Core\Models\Modification;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
@@ -30,6 +33,12 @@ final class EventServiceProvider extends ServiceProvider
         \Modules\Core\Events\ModelPreProcessingCompleted::class => [
             \Modules\Core\Listeners\FinalizeModelIndexingListener::class, // Handles finalization
         ],
+        ModificationRequiresModeration::class => [
+            \Modules\Core\Listeners\ModificationModerationFallbackListener::class,
+        ],
+        ModificationPreProcessingCompleted::class => [
+            \Modules\Core\Listeners\FinalizeModificationModerationListener::class,
+        ],
     ];
 
     /**
@@ -43,6 +52,14 @@ final class EventServiceProvider extends ServiceProvider
     #[Override]
     public function boot(): void
     {
+        Event::listen('eloquent.saved: ' . Modification::class, function (Modification $modification): void {
+            if (! $modification->active || ! $modification->wasRecentlyCreated) {
+                return;
+            }
+
+            event(new ModificationRequiresModeration($modification));
+        });
+
         Event::listen([
             'eloquent.saved: ' . CronJob::class,
             'eloquent.deleted: ' . CronJob::class,

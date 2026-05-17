@@ -14,6 +14,9 @@ final class [TRANSLATION_CLASS_NAME] extends Model
 {
     use HasFactory;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = [TRANSLATION_TABLE_NAME];
 

@@ -68,11 +68,6 @@ return [
     ],
 
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-    'translation_fallback_enabled' => env('TRANSLATION_FALLBACK_ENABLED', true),
-
-    // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-    'auto_translate_enabled' => env('AUTO_TRANSLATE_ENABLED', false),
-    // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'auto_translate_provider' => env('AUTO_TRANSLATE_PROVIDER', 'deepl'),
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'auto_translate_fallback_to_ai' => env('AUTO_TRANSLATE_FALLBACK_TO_AI', true),

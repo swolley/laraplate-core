@@ -39,6 +39,9 @@ use Override;
  */
 final class ACL extends Model
 {
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Acls->value;
 
@@ -67,7 +70,7 @@ final class ACL extends Model
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
-            'permission_id' => ['required', 'exists:'.CoreTables::Permissions->value.',id'],
+            'permission_id' => ['required', 'exists:' . CoreTables::Permissions->value . ',id'],
             'filters' => [new QueryBuilder()],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],

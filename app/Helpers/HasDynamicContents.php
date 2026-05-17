@@ -81,6 +81,14 @@ trait HasDynamicContents
     }
 
     /**
+     * @return class-string<Presettable>
+     */
+    public static function getPresettableClass(): string
+    {
+        return static::getModuleModelClass(Presettable::class);
+    }
+
+    /**
      * Override getAttribute to handle dynamic fields.
      *
      * Priority:
@@ -211,14 +219,6 @@ trait HasDynamicContents
         if (! in_array('presettable', $this->hidden, true)) {
             $this->hidden[] = 'presettable';
         }
-    }
-
-    /**
-     * @return class-string<Presettable>
-     */
-    public static function getPresettableClass(): string
-    {
-        return self::getModuleModelClass(Presettable::class);
     }
 
     /**

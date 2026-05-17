@@ -28,6 +28,9 @@ final class Fieldable extends Pivot implements Sortable
     #[Override]
     public $incrementing = true;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Fieldables->value;
 

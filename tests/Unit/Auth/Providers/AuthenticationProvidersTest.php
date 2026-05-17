@@ -64,7 +64,7 @@ it('authenticates credentials and covers invalid and license branches', function
         'password' => 'wrong',
     ]));
     expect($invalid['success'])->toBeFalse()
-        ->and($invalid['error'])->toBe('Invalid credentials');
+        ->and($invalid['error'])->toBe('Invalid credentials or user not allowed to login');
 
     config(['auth.enable_user_licenses' => false]);
     $success = $provider->authenticate(request()->duplicate([

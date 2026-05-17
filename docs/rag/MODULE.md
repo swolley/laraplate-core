@@ -83,7 +83,24 @@ flowchart TB
 
 ### Identity, authentication and license
 
-`Core\Models\User` extends Laravel's base auth user and stacks `HasRoles` (Spatie), `ApprovesChanges` (Approval), `HasVersions`, `HasLocks`, `SoftDeletes`, `TwoFactorAuthenticatable`, and `Impersonate`. Login flows are wired through Fortify (with optional 2FA via `ENABLE_USER_2FA`) and optional Socialite providers. The `License` model is one-to-one with users (`users.license_id`) and joins on validity windows; commands `auth:licenses`, `auth:free-all-licenses`, and `auth:free-expired-licenses` reconcile state. `Impersonate` is gated by `User::canImpersonate()` (super-admin or `users.impersonate` permission); Filament panel access is decided by `canAccessPanel()` which short-circuits for super-admins.
+`Core\Models\User` extends Laravel's base auth user and stacks `HasRoles` (Spatie), `ApprovesChanges` (Approval), `HasVersions`, `HasValidity`, `HasLocks`, `SoftDeletes`, `TwoFactorAuthenticatable`, and `Impersonate`. Login flows are wired through Fortify (with optional 2FA via `ENABLE_USER_2FA`) and optional Socialite providers. The `License` model is one-to-one with users (`users.license_id`) and joins on validity windows; commands `auth:licenses`, `auth:free-all-licenses`, and `auth:free-expired-licenses` reconcile state. `Impersonate` is gated by `User::canImpersonate()` (super-admin or `users.impersonate` permission); Filament panel access is decided by `canAccessPanel()` which short-circuits for super-admins.
+
+#### User temporal validity (temporary accounts)
+
+The `users` table includes `valid_from` and `valid_to` (via `MigrateUtils::timestamps(..., hasValidity: true)`). `User` composes `HasValidity` so accounts can be **time-boxed**: a temporary user stops being valid when `valid_to` is in the past, without soft-delete or manual intervention.
+
+| Pattern | `valid_from` | `valid_to` | Runtime helpers |
+| --- | --- | --- | --- |
+| Permanent (seeded system users) | `now()` | `null` | `isValid()` while `valid_from <= today` |
+| Temporary / contractor | start datetime | end datetime | `isValid()` inside window; `isExpired()` after `valid_to` |
+| Scheduled (not yet active) | future | optional end | `isScheduled()` |
+| Unset / draft | `null` | `null` | `isDraft()` — treat as inactive for access decisions |
+
+Set the window with mass assignment, Filament, or `User::publish(?Carbon $valid_from, ?Carbon $valid_to)` / `unpublish()` from `HasValidity`. Query helpers: `User::query()->valid()`, `->expired()`, `->scheduled()`, `->draft()`.
+
+Unlike CMS `Content`, `User` does **not** register a `valid` global scope in `booted()`; scopes and `isValid()` must be applied explicitly (e.g. `FortifyCredentialsProvider`, `SocialiteProvider`, or auth middleware calling `! $user->isValid()`). Sessions started before `valid_to` may remain active until expiry unless a middleware re-checks validity on each request.
+
+Seeded accounts in `CoreDatabaseSeeder` use `valid_from => now()` and `valid_to => null` so built-in superadmin/admin/guest/system users stay perpetual.
 
 ```mermaid
 flowchart LR
@@ -141,7 +158,7 @@ flowchart TB
 
 ### Record lifecycle traits stack
 
-A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes_{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `version_strategy_{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` global scope), `HasLocks` (`is_locked`/`locked_at`/`locked_by`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
+A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes_{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `version_strategy_{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` columns plus scopes `valid()`, `expired()`, `scheduled()`, `draft()`; some models such as CMS `Content` also add a `valid` global scope in `booted()`), `HasLocks` (`is_locked`/`locked_at`/`locked_by`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
 
 ```mermaid
 stateDiagram-v2
@@ -319,6 +336,8 @@ flowchart LR
 ### Search abstractions and engines
 
 `Searchable` extends Elastic Scout Plus and adds: a `SchemaDefinition` driven by `FieldDefinition` + `IndexType` enums, a `SchemaManager` that synchronises engine schemas, and event-based indexing (`ModelRequiresIndexing` → `ReindexSearchJob` / `IndexInSearchJob` / `BulkIndexSearchJob` / `FinalizeReindexJob`) so listeners can pre-process embeddings or translations before the document is sent to the engine. `ISearchEngine` is bound to the active Scout engine (Typesense or Elasticsearch); database fallback is also provided. Optional AI overrides bind `IReranker`, `ISearchPlanner`, and `IQueryIntentParser` (Core ships heuristic fallbacks via `HeuristicReranker`, `FallbackSearchPlanner`, `SimpleQueryIntentParser`).
+
+**Event orchestration (indexing + moderation):** Core emits `ModelRequiresIndexing` and `ModificationRequiresModeration`; the AI module registers optional pre-processing (embeddings, translation, `ai_approval`); Core finalize/fallback listeners complete indexing or leave moderation to humans. Per-model toggles: `auto_translate_{table}`, `ai_moderation_{table}` via `PerModelSettingResolver`. Full RAG-oriented flow: [EVENT_ORCHESTRATION.md](./EVENT_ORCHESTRATION.md) in this folder; extended diagrams: `Modules/Core/docs/EVENT_ORCHESTRATION.md`.
 
 ```mermaid
 flowchart LR
@@ -504,6 +523,9 @@ The platform already supports runtime toggles for soft deletes and versioning pe
 - How does module activation through settings work?
 - How do I regenerate and publish Swagger docs after route changes?
 - How do license checks affect login for normal users versus superadmins?
+- How do I create a temporary user account with `valid_from` / `valid_to` on `users`?
+- What is the difference between `User::isExpired()`, `isScheduled()`, and `isDraft()`?
+- Should login providers check `User::isValid()` for time-boxed accounts?
 - How do I convert an existing model to translation-table architecture?
 - What should I clear when dynamic entity metadata looks outdated?
 - When is `Presettable.fields_snapshot` updated and how do related rows migrate?

@@ -568,21 +568,27 @@ class CrudService
         if (isset($requestData->changes['modification'])) {
             $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $requestData->primaryKey])->findOrFail($requestData->changes['modification']);
 
+            $reason = $requestData->changes['reason'] ?? null;
+            $vote_reason = is_string($reason) ? $reason : null;
+
             if ($operation === 'approve') {
-                $user->approve($modification);
+                $user->approve($modification, $vote_reason);
             } else {
-                $user->disapprove($modification);
+                $user->disapprove($modification, $vote_reason);
             }
         } else {
             $modifications = $model->newQuery()->findOrFail($requestData->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
 
             throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
+            $reason = $requestData->changes['reason'] ?? null;
+            $vote_reason = is_string($reason) ? $reason : null;
+
             foreach ($modifications as $modification) {
                 if ($operation === 'approve') {
-                    $user->approve($modification);
+                    $user->approve($modification, $vote_reason);
                 } else {
-                    $user->disapprove($modification);
+                    $user->disapprove($modification, $vote_reason);
                 }
             }
         }

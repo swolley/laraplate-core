@@ -24,13 +24,9 @@ it('returns available locales from translations helper', function (): void {
     expect($locales)->toBeArray();
 });
 
-it('reports default locale and fallback flag', function (): void {
-    config(['app.locale' => 'en', 'core.translation_fallback_enabled' => false]);
+it('reports default locale', function (): void {
+    config(['app.locale' => 'en']);
 
     expect(LocaleContext::getDefault())->toBe('en')
-        ->and(LocaleContext::isFallbackEnabled())->toBeFalse();
-
-    config(['core.translation_fallback_enabled' => true]);
-
-    expect(LocaleContext::isFallbackEnabled())->toBeTrue();
+        ->and(LocaleContext::isDefault('en'))->toBeTrue();
 });

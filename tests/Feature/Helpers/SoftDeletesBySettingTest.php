@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Cache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Services\PerModelSettingResolver;
 
 beforeEach(function (): void {
-    Cache::forget('soft_deletes_flags');
+    app(PerModelSettingResolver::class)->flush();
 });
 
 it('soft deletes by default when no setting is defined', function (): void {
@@ -29,6 +29,8 @@ it('performs hard delete when soft_deletes setting is disabled for the model tab
         'value' => false,
     ]);
 
+    app(PerModelSettingResolver::class)->flush();
+
     $user = User::factory()->create();
     $id = $user->id;
     $user->delete();
@@ -43,6 +45,8 @@ it('returns false from restore when soft deletes persistence is disabled', funct
         'type' => SettingTypeEnum::Boolean,
         'value' => false,
     ]);
+
+    app(PerModelSettingResolver::class)->flush();
 
     $user = User::factory()->create();
 

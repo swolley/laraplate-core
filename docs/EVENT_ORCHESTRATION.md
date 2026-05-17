@@ -1,0 +1,352 @@
+# Event orchestration (Core event bus)
+
+> **RAG / assistant corpus:** a retrieval-optimized copy lives in [`docs/rag/EVENT_ORCHESTRATION.md`](rag/EVENT_ORCHESTRATION.md). Run `php artisan ai:index-docs` after editing it. This file is the full technical reference (extra diagrams).
+
+Core owns the **contract** between domain modules (CMS, ERP, …) and optional capabilities (AI, search). Modules never import each other for these pipelines; they communicate through Core events, registries, and settings.
+
+This document describes two orchestration patterns:
+
+1. **Search indexing** — `ModelRequiresIndexing` (embeddings + optional translation sync → Elasticsearch/Typesense)
+2. **Modification moderation** — `ModificationRequiresModeration` (optional AI vote on pending approvals)
+
+Both mirror the same ideas: emit always, optional AI pre-processing, cache coordination, Core finalize/fallback listeners.
+
+---
+
+## Design principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| Core is the bus | Events and registries live in `Modules\Core` |
+| Domain modules register adapters | e.g. CMS registers `CommentModerationContextBuilder` |
+| AI never imports CMS/ERP | AI resolves builders via `ModerationContextBuilderRegistry` |
+| Opt-in per model | Settings: `ai_moderation_{table}`, `auto_translate_{table}`; search: `Searchable` + `$embed` |
+| Fallback when AI skips | Indexing: Core still runs `IndexInSearchJob`; moderation: humans only (no-op) |
+
+---
+
+## 1. Search indexing (embeddings + translations)
+
+### Trigger
+
+Any model using `Modules\Core\Search\Traits\Searchable` calls `queueMakeSearchable()` / `makeSearchable()`, which dispatches:
+
+- **Event:** `Modules\Core\Events\ModelRequiresIndexing`
+- **Payload:** `Model $model`, `bool $sync`
+
+### High-level flow
+
+```mermaid
+flowchart TB
+    subgraph Core
+        ST[Searchable trait]
+        E1[ModelRequiresIndexing]
+        FB[IndexModelFallbackListener]
+        FIN[FinalizeModelIndexingListener]
+        IDX[IndexInSearchJob]
+    end
+    subgraph AI
+        HMI[HandleModelIndexingListener]
+        GEJ[GenerateEmbeddingsJob]
+        HMT[HandleModelTranslationListener]
+        TMJ[TranslateModelJob]
+    end
+    ST --> E1
+    E1 --> HMI
+    E1 --> FB
+    HMI --> GEJ
+    GEJ --> FIN
+    HMT --> TMJ
+    TMJ --> FIN
+    FIN --> IDX
+    FB --> IDX
+```
+
+### Sequence (async, with embeddings)
+
+```mermaid
+sequenceDiagram
+    participant Model as Searchable model
+    participant Core as Core (Searchable)
+    participant AI as AI HandleModelIndexingListener
+    participant Emb as GenerateEmbeddingsJob
+    participant Cache as Cache model_indexing:*
+    participant Fin as FinalizeModelIndexingListener
+    participant ES as IndexInSearchJob
+
+    Model->>Core: save / queueMakeSearchable()
+    Core->>Core: event ModelRequiresIndexing
+    AI->>AI: shouldHandle? embeddings enabled + $embed
+  AI->>Core: addRequiredPreProcessing(embeddings)
+    AI->>Cache: put indexing event
+    AI->>Emb: dispatch job
+    AI->>Core: markAsHandled()
+    Emb->>Emb: EmbeddingService embedDocument()
+    Emb->>Core: event ModelPreProcessingCompleted(embeddings)
+    Fin->>Cache: get indexing event
+    Fin->>Fin: markPreProcessingCompleted(embeddings)
+    alt all pre-processing done
+        Fin->>ES: dispatch IndexInSearchJob
+        Fin->>Cache: forget key
+    else wait for more steps
+        Fin->>Cache: put updated event
+    end
+```
+
+### Translation synchronized with indexing
+
+When a translatable **and** searchable model is saved:
+
+```mermaid
+sequenceDiagram
+    participant Model as HasTranslations + Searchable
+    participant Core as TranslatedModelSaved
+    participant AI as HandleModelTranslationListener
+    participant Cache as Cache model_indexing:*
+    participant TMJ as TranslateModelJob
+    participant Fin as FinalizeModelIndexingListener
+
+    Model->>Core: event TranslatedModelSaved
+    AI->>AI: autoTranslateEnabledBySettings?
+    AI->>Cache: addRequiredPreProcessing(translation) if indexing pending
+    AI->>TMJ: dispatch TranslateModelJob
+    TMJ->>Core: ModelPreProcessingCompleted(translation)
+    Fin->>Fin: when embeddings + translation both complete → IndexInSearchJob
+```
+
+If indexing was not started yet, translation runs **without** blocking on the indexing cache (see `HandleModelTranslationListener`).
+
+### Fallback (AI disabled or model without embeddings)
+
+```mermaid
+sequenceDiagram
+    participant Core as ModelRequiresIndexing
+    participant FB as IndexModelFallbackListener
+    participant ES as IndexInSearchJob
+
+    Core->>FB: handle (handled = false)
+    FB->>ES: dispatch IndexInSearchJob (no embeddings)
+```
+
+### Cache keys and pre-processing types
+
+| Cache key | Event type | Pre-processing keys |
+|-----------|------------|---------------------|
+| `model_indexing:{table}:{id}` | `ModelRequiresIndexing` | `embeddings`, `translation` |
+
+### Core classes
+
+| Class | Role |
+|-------|------|
+| `Events\ModelRequiresIndexing` | Orchestration state (`handled`, `required_pre_processing`, …) |
+| `Events\ModelPreProcessingCompleted` | Signals one step finished (`embeddings`, `translation`) |
+| `Listeners\IndexModelFallbackListener` | Index without AI when `!handled` |
+| `Listeners\FinalizeModelIndexingListener` | Dispatches `IndexInSearchJob` when all steps complete |
+| `Search\Jobs\IndexInSearchJob` | Writes document to Scout engine |
+
+### AI classes
+
+| Class | Role |
+|-------|------|
+| `Listeners\HandleModelIndexingListener` | Registers `embeddings`, dispatches `GenerateEmbeddingsJob` |
+| `Jobs\GenerateEmbeddingsJob` | Persists vectors, emits `ModelPreProcessingCompleted` |
+| `Listeners\HandleModelTranslationListener` | `TranslatedModelSaved` → `TranslateModelJob` |
+| `Jobs\TranslateModelJob` | Fills translation rows, may emit `ModelPreProcessingCompleted('translation')` |
+
+### Configuration (summary)
+
+| Layer | Keys |
+|-------|------|
+| Scout / Core | `SCOUT_DRIVER`, `VECTOR_SEARCH_ENABLED`, model `$embed`, `vectorSearchEnabled()` |
+| AI | `ai.features.embeddings.enabled`, embedding provider env vars |
+| Per model | `auto_translate_{table}` (translations group) via `PerModelSettingResolver` |
+
+See also: [Modules/AI/docs/SEARCH_AND_TRANSLATION.md](../AI/docs/SEARCH_AND_TRANSLATION.md).
+
+---
+
+## 2. Modification moderation (approvals + optional AI)
+
+### Trigger
+
+When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core emits:
+
+- **Event:** `Modules\Core\Events\ModificationRequiresModeration`
+- **Payload:** `Modification $modification`, `bool $sync`
+
+Emitter: `Modules\Core\Providers\EventServiceProvider` (no CMS-specific listener).
+
+> Pending comments create a modification **before** the comment row is public; the event fires on first save even if `modifiable_id` is still null. The AI builder reads context from the modification JSON (`body`, `content_id`, …).
+
+### Module boundaries
+
+```mermaid
+flowchart LR
+    subgraph CMS
+        Comment[Comment + CommentApprovalCapture]
+        Builder[CommentModerationContextBuilder]
+    end
+    subgraph Core
+        Mod[Modification]
+        Ev[ModificationRequiresModeration]
+        Reg[ModerationContextBuilderRegistry]
+        EvA[ModificationApproved]
+    end
+    subgraph AI
+        L[HandleModificationModerationListener]
+        J[ApproveModificationJob]
+        S[ModerationService]
+    end
+    Comment --> Mod
+    Mod --> Ev
+    Builder --> Reg
+    Ev --> L
+    L --> J
+    J --> Reg
+    J --> S
+    Comment --> EvA
+```
+
+### Sequence (comment + AI enabled)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CMS as CMS CommentApprovalCapture
+    participant Mod as Modification
+    participant Core as Core emitter
+    participant AI as HandleModificationModerationListener
+    participant Job as ApproveModificationJob
+    participant Reg as ModerationContextBuilderRegistry
+    participant CMSB as CMS CommentModerationContextBuilder
+    participant Vote as approvals / disapprovals
+
+    User->>CMS: Comment save (pending)
+    CMS->>Mod: create active modification + diff
+    Mod->>Core: saved → ModificationRequiresModeration
+    Core->>AI: event
+    AI->>AI: moderation.enabled + registry.supports + ai_moderation_* setting
+    AI->>AI: addRequiredPreProcessing(ai_approval)
+    AI->>Job: dispatch ApproveModificationJob
+    AI->>Core: markAsHandled()
+    Job->>Reg: build(modification)
+    Reg->>CMSB: build context (Content + body)
+    Job->>Job: ModerationService.analyze()
+    Job->>Vote: system user approve/disapprove + meta JSON
+    Job->>Core: ModificationPreProcessingCompleted(ai_approval)
+    Note over User,Vote: Humans may still approve/reject in Filament
+    User->>CMS: human approve
+    CMS->>Core: ModificationApproved(modification, comment)
+```
+
+### Fallback (no AI)
+
+```mermaid
+sequenceDiagram
+    participant Core as ModificationRequiresModeration
+    participant FB as ModificationModerationFallbackListener
+
+    Core->>FB: handle (handled = false)
+    Note over FB: No-op — human approval workflow unchanged
+```
+
+Unlike indexing, there is **no** automated fallback step when AI skips moderation.
+
+### Post-approval: translations
+
+```mermaid
+sequenceDiagram
+    participant CMS as Comment applyModificationChanges
+    participant Core as ModificationApproved
+    participant AI as HandleModificationApprovedTranslationListener
+
+    CMS->>Core: event(modification, modifiable)
+    AI->>AI: HasTranslations + auto_translate_* ?
+    AI->>AI: dispatch TranslateModelJob
+```
+
+### Registry (opt-in per modifiable type)
+
+```php
+// Modules\Core\Contracts\ModerationContextBuilder
+interface ModerationContextBuilder {
+    public function supports(Modification $modification): bool;
+    public function build(Modification $modification): ModerationContext;
+}
+```
+
+CMS registers in `CMSServiceProvider::boot()`:
+
+```php
+$this->app->make(ModerationContextBuilderRegistry::class)
+    ->register($this->app->make(CommentModerationContextBuilder::class));
+```
+
+### Cache keys
+
+| Cache key | Purpose |
+|-----------|---------|
+| `modification_moderation:{modification_id}` | Cached `ModificationRequiresModeration` until `ModificationPreProcessingCompleted` |
+
+### Core classes
+
+| Class | Role |
+|-------|------|
+| `Events\ModificationRequiresModeration` | Same orchestration pattern as indexing |
+| `Events\ModificationApproved` | `Modification` + `Model $modifiable` after apply |
+| `Events\ModificationPreProcessingCompleted` | e.g. `ai_approval` step done |
+| `Contracts\ModerationContextBuilder` | Domain adapter interface |
+| `Services\ModerationContextBuilderRegistry` | Resolves builder by modification |
+| `Listeners\ModificationModerationFallbackListener` | No-op if `!handled` |
+| `Listeners\FinalizeModificationModerationListener` | Clears cache when steps complete (v1) |
+| `Services\PerModelSettingResolver` | Cached DB flags (`ai_moderation_*`, …) |
+
+### Configuration (summary)
+
+| Layer | Keys |
+|-------|------|
+| AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
+| Per model | Setting `ai_moderation_{table}` (group `moderation`) or property `$ai_moderation_enabled` |
+| System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
+
+See also:
+
+- [Modules/AI/docs/MODERATION.md](../AI/docs/MODERATION.md) — AI listeners, job, thresholds
+- [Modules/CMS/docs/COMMENT_MODERATION.md](../CMS/docs/COMMENT_MODERATION.md) — comment capture and CMS adapter
+
+---
+
+## Comparison
+
+| Aspect | Search indexing | Modification moderation |
+|--------|-----------------|-------------------------|
+| Core event | `ModelRequiresIndexing` | `ModificationRequiresModeration` |
+| AI pre-processing key | `embeddings`, `translation` | `ai_approval` |
+| Core fallback if AI skips | **Runs** `IndexInSearchJob` | **No-op** (humans only) |
+| Domain adapter | Model traits (`Searchable`, `HasTranslations`) | `ModerationContextBuilder` registry |
+| Durable outcome | Search index + embeddings table | `approvals` / `disapprovals` + `meta` |
+| Post-success event | `ModelPreProcessingCompleted` | `ModificationPreProcessingCompleted` |
+
+---
+
+## Extending
+
+### New searchable model
+
+1. Add `Searchable` trait and implement `toSearchableArray()` / `$embed`.
+2. Ensure `ai.features.embeddings.enabled` and provider configured.
+3. Optionally enable `auto_translate_{table}` for `TranslatedModelSaved` flow.
+
+### New moderatable model
+
+1. Implement `ModerationContextBuilder` in the domain module.
+2. Register it on `ModerationContextBuilderRegistry` in the module `ServiceProvider`.
+3. Seed or enable `ai_moderation_{table}` for models using `HasApprovals`.
+4. No changes required in the AI module.
+
+---
+
+## Related specs
+
+- `docs/superpowers/specs/2026-05-15-modification-moderation-design.md` — moderation design (orchestration)
+- `docs/superpowers/specs/2026-05-15-cms-comments-moderation-design.md` — comment product rules (thresholds, Filament, ratings)

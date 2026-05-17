@@ -185,11 +185,21 @@ return [
         'superadmin' => env('SUPERADMIN_ROLE', 'superadmin'),
         'admin' => env('ADMIN_ROLE', 'admin'),
         'guest' => env('GUEST_ROLE', 'guest'),
+        'system' => env('SYSTEM_ROLE', 'system'),
     ],
 
     'users' => [
         'superadmin' => env('SUPERADMIN_USER', 'superadmin'),
         'admin' => env('ADMIN_USER', 'admin'),
         'guest' => env('GUEST_USER', 'anonymous'),
+        'system' => env('SYSTEM_USER', 'system'),
     ],
+
+    /**
+     * Eloquent models excluded from permission:refresh (audit/internal tables).
+     * Modules may append class names via config merge in their service provider.
+     *
+     * @var list<class-string>
+     */
+    'models_blacklist' => [],
 ];

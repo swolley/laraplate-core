@@ -6,6 +6,7 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Approval as BaseApproval;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Helpers\HasModerationMeta;
 use Override;
 
 /**
@@ -14,6 +15,11 @@ use Override;
  */
 final class Approval extends BaseApproval
 {
+    use HasModerationMeta;
+
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::Approvals->value;
 }

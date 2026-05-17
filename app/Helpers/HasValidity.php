@@ -51,11 +51,14 @@ trait HasValidity
      */
     public function isValid(?CarbonInterface $date = null): bool
     {
-        if (! $date instanceof Carbon) {
-            $date = Date::today();
+        if ($this->{static::$valid_from_column} === null) {
+            return false;
         }
 
-        return $date->gte($this->{static::$valid_from_column}) && (! $this->{static::$valid_to_column} || $date->lte($this->{static::$valid_to_column}));
+        $date ??= Date::now();
+
+        return $date->gte($this->{static::$valid_from_column})
+            && (! $this->{static::$valid_to_column} || $date->lte($this->{static::$valid_to_column}));
     }
 
     /**

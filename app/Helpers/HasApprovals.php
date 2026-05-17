@@ -11,6 +11,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Modules\Core\Services\PerModelSettingResolver;
 use TypeError;
 
 /**
@@ -48,6 +49,23 @@ trait HasApprovals
         }
 
         return $preview;
+    }
+
+    /**
+     * Whether AI moderation is enabled for this model.
+     * Reads optional {@see $ai_moderation_enabled} or settings in group {@code moderation}
+     * with name {@code ai_moderation_{table}}. When no setting exists, AI moderation stays disabled.
+     */
+    public function aiModerationEnabledBySettings(): bool
+    {
+        if (property_exists($this, 'ai_moderation_enabled')) {
+            return (bool) $this->ai_moderation_enabled;
+        }
+
+        return app(PerModelSettingResolver::class)->boolean(
+            'ai_moderation_' . $this->getTable(),
+            default: false,
+        );
     }
 
     protected function getPreviewAttribute(): ?array

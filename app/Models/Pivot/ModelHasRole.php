@@ -20,6 +20,9 @@ final class ModelHasRole extends MorphPivot
 {
     use HasFactory;
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::ModelHasRoles->value;
 

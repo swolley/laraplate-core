@@ -27,6 +27,9 @@ final class ModelEmbedding extends Model
         'embedding',
     ];
 
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::ModelEmbeddings->value;
 

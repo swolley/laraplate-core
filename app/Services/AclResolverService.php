@@ -348,7 +348,7 @@ final class AclResolverService
             ->byPriority()
             ->with(['permission.roles'])
             ->whereHas('permission.roles', static function (Builder $query) use ($all_role_ids): void {
-                $query->whereIn('roles.id', $all_role_ids);
+                $query->whereIn($query->qualifyColumn('id'), $all_role_ids);
             })
             ->get();
 

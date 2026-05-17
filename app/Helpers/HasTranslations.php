@@ -14,7 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Modules\Core\Events\TranslatedModelSaved;
+use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\LocaleScope;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
 
 /**
@@ -172,7 +174,7 @@ trait HasTranslations
     {
         $current_locale = LocaleContext::get();
         $default_locale = config('app.locale');
-        $fallback_enabled = LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $this->isFallbackEnabled();
 
         $relation = $this->hasOne(static::getTranslationModelClass());
 
@@ -210,7 +212,7 @@ trait HasTranslations
     {
         $locale ??= LocaleContext::get();
         $default_locale = config('app.locale');
-        $fallback_enabled = $with_fallback ?? LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         // Prova a ottenere traduzione per la lingua richiesta
         $translation = $this->translations()->where('locale', $locale)->first();
@@ -228,6 +230,7 @@ trait HasTranslations
      */
     public function setTranslation(string $locale, array $data): self
     {
+        $data = $this->ensureTranslationFieldDefaults($data);
         $translation = $this->translations()->where('locale', $locale)->first();
 
         if ($translation) {
@@ -307,6 +310,40 @@ trait HasTranslations
         if (! in_array('locale', $this->appends, true)) {
             $this->appends[] = 'locale';
         }
+    }
+
+    /**
+     * Whether locale fallback is enabled for this model.
+     * Reads optional {@see $translation_fallback_enabled} or settings in group {@code translations}
+     * with name {@code translation_fallback_{table}}. When no setting exists, fallback stays enabled.
+     */
+    public function translationFallbackEnabledBySettings(): bool
+    {
+        if (property_exists($this, 'translation_fallback_enabled')) {
+            return (bool) $this->translation_fallback_enabled;
+        }
+
+        return app(PerModelSettingResolver::class)->boolean(
+            'translation_fallback_' . $this->getTable(),
+            default: true,
+        );
+    }
+
+    /**
+     * Whether automatic translation is enabled for this model.
+     * Reads optional {@see $auto_translate_enabled} or settings in group {@code translations}
+     * with name {@code auto_translate_{table}}. When no setting exists, auto-translate stays disabled.
+     */
+    public function autoTranslateEnabledBySettings(): bool
+    {
+        if (property_exists($this, 'auto_translate_enabled')) {
+            return (bool) $this->auto_translate_enabled;
+        }
+
+        return app(PerModelSettingResolver::class)->boolean(
+            'auto_translate_' . $this->getTable(),
+            default: false,
+        );
     }
 
     /**
@@ -397,6 +434,7 @@ trait HasTranslations
         }
 
         foreach ($this->pending_translations as $locale => $fields) {
+            $fields = $this->ensureTranslationFieldDefaults($fields);
             $translation = $this->translations()->where('locale', $locale)->first();
 
             if ($translation) {
@@ -425,7 +463,7 @@ trait HasTranslations
     {
         $locale ??= LocaleContext::get();
         $default_locale = config('app.locale');
-        $fallback_enabled = $with_fallback ?? LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         // Rimuovi il global scope di default
         $query->withoutGlobalScope(LocaleScope::class);
@@ -471,7 +509,7 @@ trait HasTranslations
     {
         $locale ??= LocaleContext::get();
         $default_locale = config('app.locale');
-        $fallback_enabled = $with_fallback ?? LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         $query->with(['translation' => function ($q) use ($locale, $default_locale, $fallback_enabled): void {
             if ($fallback_enabled) {
@@ -518,7 +556,7 @@ trait HasTranslations
         $current_locale = LocaleContext::get();
 
         $default_locale = LocaleContext::getDefaultCached();
-        $fallback_enabled = LocaleContext::isFallbackEnabled();
+        $fallback_enabled = $this->isFallbackEnabled();
 
         // First, check pending translations (values set but not yet saved)
         if (isset($this->pending_translations[$current_locale][$key])) {
@@ -599,10 +637,28 @@ trait HasTranslations
         $this->setTranslatableFieldValue($key, $value);
     }
 
+    private function isFallbackEnabled(): bool
+    {
+        return $this->translationFallbackEnabledBySettings();
+    }
+
     /**
      * Get the current locale for setter operations.
      * This is a helper method used internally by the trait.
      */
+    /**
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    private function ensureTranslationFieldDefaults(array $fields): array
+    {
+        if (in_array('components', static::getTranslatableFields(), true) && ! array_key_exists('components', $fields)) {
+            $fields['components'] = [];
+        }
+
+        return $fields;
+    }
+
     private function getCurrentLocale(): string
     {
         return $this->current_setter_locale ?? LocaleContext::get();
