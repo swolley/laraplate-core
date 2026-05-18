@@ -16,9 +16,12 @@ use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Helpers\HasCommandUtils;
+use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Overrides\Command;
 use Override;
+use ReflectionClass;
+use RuntimeException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -27,16 +30,21 @@ final class CreateEntityCommand extends Command
     use HasCommandUtils;
 
     /**
+     * @var list<string>
+     */
+    private const PROMPTED_ENTITY_ATTRIBUTES = ['name', 'slug', 'type'];
+
+    /**
      * The name and signature of the console command.
      */
     #[Override]
-    protected $signature = 'model:create-entity';
+    protected $signature = 'model:create-entity {entity?} {--content-model}';
 
     /**
      * The console command description.
      */
     #[Override]
-    protected $description = 'Create new CMS entity <fg=cyan>(📰 Modules\CMS)</fg=cyan>';
+    protected $description = 'Create new CMS entity <fg=cyan>(📰 Modules/CMS)</fg=cyan>';
 
     /**
      * Execute the console command.
@@ -44,14 +52,18 @@ final class CreateEntityCommand extends Command
     public function handle(): void
     {
         DB::transaction(function (): void {
-            $valid_modules = modules(true, filter: fn (string $module): bool => $module !== 'Core' && file_exists(base_path("Modules/{$module}/Models/Entity.php")));
-            $module = $this->argument('module') ?? select('Choose the module', $valid_modules, required: true);
+            $module = $this->resolveModule();
 
+            /** @var class-string<Entity> $entity_model_class */
             $entity_model_class = "Modules\\{$module}\\Models\\Entity";
             $entity = new $entity_model_class();
 
-            /** @var IDynamicEntityTypable $entity_type */
-            // $entity_type = $entity::getEntityType();
+            /** @var class-string<IDynamicEntityTypable> $entity_type_class */
+            $entity_type_class = $this->resolveEntityTypeClass($entity_model_class);
+
+            if ($this->argument('entity')) {
+                $entity->name = (string) $this->argument('entity');
+            }
 
             $fillables = $entity->getFillable();
             $validations = $entity->getOperationRules('create');
@@ -59,21 +71,28 @@ final class CreateEntityCommand extends Command
             /** @var EloquentCollection<int,Field> $all_fields */
             $all_fields = Field::query()->get()->keyBy('id');
 
-            foreach ($fillables as $attribute) {
+            foreach (self::PROMPTED_ENTITY_ATTRIBUTES as $attribute) {
+                if (! in_array($attribute, $fillables, true)) {
+                    continue;
+                }
                 if ($attribute === 'name' && $entity->name) {
                     continue;
                 }
 
                 if ($attribute === 'type') {
-                    $selected_type = select('Choose the type of the entity', $entity_type::values(), required: true);
-
-                    /** @var enum-string $entity_type */
-                    $entity->type = $entity_type::from((string) $selected_type);
+                    $selected_type = select('Choose the type of the entity', $entity_type_class::values(), required: true);
+                    $entity->type = $entity_type_class::from((string) $selected_type);
 
                     continue;
                 }
 
-                $entity->{$attribute} = text(ucfirst($attribute), '', $attribute === 'slug' ? Str::slug($entity->name) : '', true, fn (string $value): ?string => $this->validationCallback($attribute, $value, $validations));
+                $entity->{$attribute} = text(
+                    ucfirst($attribute),
+                    '',
+                    $attribute === 'slug' ? Str::slug((string) $entity->name) : '',
+                    true,
+                    fn (string $value): ?string => $this->validationCallback($attribute, $value, $validations),
+                );
             }
 
             $entity->save();
@@ -89,7 +108,7 @@ final class CreateEntityCommand extends Command
 
             foreach ($preset_fields as $field) {
                 $field = $all_fields->get($field);
-                $is_required = confirm(sprintf("Do you want '%s' to be required?", $field['name']), false);
+                $is_required = confirm(sprintf("Do you want '%s' to be required?", $field->name), false);
                 $this->assignFieldToPreset($preset, $field, $is_required);
             }
 
@@ -117,6 +136,50 @@ final class CreateEntityCommand extends Command
         return [
             ['content-model', '', InputOption::VALUE_NONE, 'Create a content model file for this entity.', false],
         ];
+    }
+
+    private function resolveModule(): string
+    {
+        if (class_exists(\Modules\CMS\Models\Entity::class)) {
+            return 'CMS';
+        }
+
+        $valid_modules = array_values(array_filter(
+            modules(filter: function (string $module): bool {
+                if (in_array($module, ['Core', 'App'], true)) {
+                    return false;
+                }
+
+                $entity_class = "Modules\\{$module}\\Models\\Entity";
+
+                return class_exists($entity_class);
+            }),
+        ));
+
+        if ($valid_modules === []) {
+            throw new RuntimeException('No module with an Entity model found.');
+        }
+
+        if (count($valid_modules) === 1) {
+            return $valid_modules[0];
+        }
+
+        return select('Choose the module', $valid_modules, required: true);
+    }
+
+    /**
+     * @param  class-string<Entity>  $entity_model_class
+     * @return class-string<IDynamicEntityTypable>
+     */
+    private function resolveEntityTypeClass(string $entity_model_class): string
+    {
+        $method = (new ReflectionClass($entity_model_class))->getMethod('getEntityTypeEnumClass');
+        $method->setAccessible(true);
+
+        /** @var class-string<IDynamicEntityTypable> $entity_type_class */
+        $entity_type_class = $method->invoke(null);
+
+        return $entity_type_class;
     }
 
     private function assignFieldToPreset(Preset $preset, Field $field, bool $is_required): void

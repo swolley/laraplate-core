@@ -8,10 +8,10 @@ use Illuminate\Support\Str;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Console\CreateEntityCommand;
-use Modules\Core\Models\Entity;
+use Modules\CMS\Casts\EntityType;
+use Modules\CMS\Models\Entity;
+use Modules\CMS\Models\Preset;
 use Modules\Core\Models\Field;
-use Modules\Core\Models\Preset;
-use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
 
 beforeEach(function (): void {
     if (! Schema::hasTable(CoreTables::Fields->value)) {
@@ -31,7 +31,7 @@ beforeEach(function (): void {
  */
 function entityTypeChoiceOptions(): array
 {
-    return EntityTypeStub::values();
+    return EntityType::values();
 }
 
 it('shows help without prompting', function (): void {

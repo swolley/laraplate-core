@@ -6,9 +6,11 @@ namespace Modules\Core\Http\Requests;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Models\DynamicEntity;
+use Nwidart\Modules\Facades\Module;
 use Override;
 
 /**
@@ -62,19 +64,39 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
         return (string) ($entity ?? '');
     }
 
+    protected function resolveModule(): ?string
+    {
+        /** @var string|null $module */
+        $module = $this->route('module') ?? $this->input('module');
+
+        if ($module === null || $module === '') {
+            return null;
+        }
+
+        $studly_module = Str::studly($module);
+
+        if (Module::has($studly_module)) {
+            return $studly_module;
+        }
+
+        return $module;
+    }
+
     #[Override]
     protected function prepareForValidation(): void
     {
         $connection = $this->connection ?? null;
+        $entity = $this->resolveMainEntity();
+        $module = $this->resolveModule();
 
         /** @phpstan-ignore method.notFound */
-        $this->model = DynamicEntity::resolve($this->resolveMainEntity(), $connection);
+        $this->model = DynamicEntity::resolve($entity, $connection, [], null, $module);
         $this->primaryKey = $this->model->getKeyName();
 
         /** @phpstan-ignore method.notFound */
         $this->merge([
-            'entity' => $this->route('entity'),
-            'module' => $this->route('module') ?? $this->input('module'),
+            'entity' => $this->route('entity') ?? $entity,
+            'module' => $module,
         ]);
     }
 }

@@ -64,7 +64,7 @@ it('covers CreateUserCommand success and failure branches', function (): void {
         static $answers = ['console_name', 'console_user', 'console@example.test'];
         static $index = 0;
 
-        return $answers[$index++] ?? 'fallback';
+        return $answers[$index++] ?? '';
     });
     PasswordPrompt::fallbackWhen(true);
     PasswordPrompt::fallbackUsing(static fn (): string => 'StrongPassword123!');

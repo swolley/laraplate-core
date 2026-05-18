@@ -182,6 +182,13 @@ final class DynamicEntity extends Model
         $found = array_filter($models, fn (string $c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
         $found = array_values($found);
 
+        if ($module !== null && $module !== '') {
+            $found = array_values(array_filter(
+                $found,
+                static fn (string $class): bool => class_module($class) === $module,
+            ));
+        }
+
         if (count($found) > 1) {
             $expected_basename = Str::studly($modelName);
 

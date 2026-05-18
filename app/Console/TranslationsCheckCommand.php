@@ -35,7 +35,7 @@ final class TranslationsCheckCommand extends Command
     {
         $this->output->writeln(['', 'Sorting translations', '']);
         $languages = translations(true);
-        $translations = [];
+        $grouped_translations = [];
         $to_be_ignored_files = [];
 
         foreach ($languages as $lang) {
@@ -43,11 +43,11 @@ final class TranslationsCheckCommand extends Command
             $files = glob($file);
 
             foreach ($files as $file) {
-                $this->sortTranslations($translations, $lang, $file, $to_be_ignored_files);
+                $this->sortTranslations($grouped_translations, $lang, $file, $to_be_ignored_files);
             }
         }
 
-        $this->checkLabels($translations, $to_be_ignored_files);
+        $this->checkLabels($grouped_translations, $to_be_ignored_files);
 
         $this->output->writeln('');
 
@@ -62,37 +62,37 @@ final class TranslationsCheckCommand extends Command
         return BaseCommand::SUCCESS;
     }
 
-    private function compactTranslations(array &$translations, ?string $subgroup = null): array
+    private function compactTranslations(array $label_groups, ?string $subgroup = null): array
     {
         $mapped = [];
 
-        foreach (array_keys($translations) as $key) {
+        foreach (array_keys($label_groups) as $key) {
             $fullpath = in_array($subgroup, [null, '', '0'], true) ? $key : sprintf('%s.%s', $subgroup, $key);
 
-            if (gettype($translations[$key]) === 'string') {
+            if (gettype($label_groups[$key]) === 'string') {
                 $mapped[] = $fullpath;
             } else {
-                $mapped = array_merge($mapped, $this->compactTranslations($translations[$key], $fullpath));
+                $mapped = array_merge($mapped, $this->compactTranslations($label_groups[$key], $fullpath));
             }
         }
 
         return $mapped;
     }
 
-    private function sortTranslations(array &$translations, string $lang, string $file, array &$to_be_ignored_files): void
+    private function sortTranslations(array &$grouped_translations, string $lang, string $file, array &$to_be_ignored_files): void
     {
-        $langname = explode(DIRECTORY_SEPARATOR, $lang);
-        $langname = array_pop($langname);
+        $langname = basename($lang);
+        $lang_directory = rtrim($lang, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         $contains_requires = Str::contains(file_get_contents($file), 'require(__DIR__');
-        $required = require $file;
-        $file_identifier = str_replace(DIRECTORY_SEPARATOR . $langname . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR, $file);
+        $labels = require $file;
+        $file_identifier = $this->buildTranslationFileIdentifier($lang_directory, $file);
 
-        if (! array_key_exists($file_identifier, $translations)) {
-            $translations[$file_identifier] = [];
+        if (! array_key_exists($file_identifier, $grouped_translations)) {
+            $grouped_translations[$file_identifier] = [];
         }
 
-        $translations[$file_identifier][$langname] = $this->compactTranslations($required);
+        $grouped_translations[$file_identifier][$langname] = $this->compactTranslations($labels);
 
         if ($contains_requires) {
             $to_be_ignored_files[] = $file;
@@ -101,8 +101,8 @@ final class TranslationsCheckCommand extends Command
             return;
         }
 
-        $stringified = var_export($required, true);
-        $imported = var_export(array_sort_keys($required), true);
+        $stringified = var_export($labels, true);
+        $imported = var_export(array_sort_keys($labels), true);
 
         if ($stringified === $imported) {
             $this->output->writeln(sprintf('<info>%s is ok</info>', $file));
@@ -115,13 +115,13 @@ final class TranslationsCheckCommand extends Command
         $this->output->writeln(sprintf('<info>%s has been sorted</info>', $file));
     }
 
-    private function checkLabels(array &$translations, array &$to_be_ignored_files): void
+    private function checkLabels(array &$grouped_translations, array &$to_be_ignored_files): void
     {
         $this->output->writeln(['', 'Checking labels', '']);
         $all_languages = [];
 
         // prima accumulo tutte le lingue
-        foreach ($translations as $file => $langs) {
+        foreach ($grouped_translations as $file => $langs) {
             $all_labels = [];
 
             // prima accumulo tutte le labels
@@ -162,7 +162,11 @@ final class TranslationsCheckCommand extends Command
         $any_missing_file = false;
 
         // poi controllo di quale file manca la lingua
-        foreach ($translations as $file => $langs) {
+        foreach ($grouped_translations as $file => $langs) {
+            if (! is_array($langs)) {
+                continue;
+            }
+
             $diff = array_diff($all_languages, array_keys($langs));
 
             if ($diff !== []) {
@@ -178,5 +182,16 @@ final class TranslationsCheckCommand extends Command
         if (! $any_missing_file) {
             $this->output->writeln('<info>All languages are correctly translated</info>');
         }
+    }
+
+    private function buildTranslationFileIdentifier(string $lang_directory, string $file): string
+    {
+        if (! str_starts_with($file, $lang_directory)) {
+            return $file;
+        }
+
+        $relative_path = substr($file, strlen($lang_directory));
+
+        return dirname(rtrim($lang_directory, DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $relative_path;
     }
 }

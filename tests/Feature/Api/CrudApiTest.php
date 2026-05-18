@@ -11,6 +11,14 @@ use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
+/**
+ * @return array{module: string, entity: string}
+ */
+function coreCrudRouteParams(string $entity): array
+{
+    return ['module' => 'core', 'entity' => $entity];
+}
+
 beforeEach(function (): void {
     Config::set('core.expose_crud_api', true);
     $this->user = User::factory()->create();
@@ -28,6 +36,8 @@ test('inspector returns users table with SQLite and tryResolveModel returns User
     /** @var class-string<\Illuminate\Database\Eloquent\Model> $expected_user_model */
     $expected_user_model = config('auth.providers.users.model');
     expect($resolved)->toBe($expected_user_model);
+
+    expect(DynamicEntity::tryResolveModel('users', null, 'Core'))->toBe(\Modules\Core\Models\User::class);
 });
 
 // Search API disabled: route and controller method commented out.
@@ -74,7 +84,7 @@ test('inspector returns users table with SQLite and tryResolveModel returns User
 // });
 
 test('api select returns data for valid entity', function (): void {
-    $response = $this->getJson(route('core.api.list', ['entity' => 'users']));
+    $response = $this->getJson(route('core.api.list', coreCrudRouteParams('users')));
 
     $response->assertStatus(200)
         ->assertJsonStructure([
@@ -88,7 +98,7 @@ test('api select returns data for valid entity', function (): void {
 
 test('api detail returns specific record', function (): void {
     $response = $this->getJson(route('core.api.detail', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => $this->user->id,
     ]));
 
@@ -104,7 +114,7 @@ test('api detail returns specific record', function (): void {
 
 test('api detail returns 404 for non-existent record', function (): void {
     $response = $this->getJson(route('core.api.detail', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => 99999,
     ]));
 
@@ -121,7 +131,7 @@ test('api insert creates new record', function (): void {
         'password' => 'Aa1!VeryUniqueTestPass',
     ];
 
-    $response = $this->postJson(route('core.api.insert', ['entity' => 'users']), $userData);
+    $response = $this->postJson(route('core.api.insert', coreCrudRouteParams('users')), $userData);
 
     $response->assertStatus(201)
         ->assertJsonStructure([
@@ -137,7 +147,7 @@ test('api insert creates new record', function (): void {
 });
 
 test('api insert validates required fields', function (): void {
-    $response = $this->postJson(route('core.api.insert', ['entity' => 'users']), []);
+    $response = $this->postJson(route('core.api.insert', coreCrudRouteParams('users')), []);
 
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['name', 'email', 'password']);
@@ -153,7 +163,7 @@ test('api insert rejects weak password and does not create record', function ():
         'password' => 'password',
     ];
 
-    $response = $this->postJson(route('core.api.insert', ['entity' => 'users']), $userData);
+    $response = $this->postJson(route('core.api.insert', coreCrudRouteParams('users')), $userData);
 
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['password']);
@@ -170,7 +180,7 @@ test('api update modifies existing record', function (): void {
     ];
 
     $response = $this->putJson(route('core.api.replace', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => $this->user->id,
     ]), $updateData);
 
@@ -196,7 +206,7 @@ test('api update returns 404 for non-existent record', function (): void {
     ];
 
     $response = $this->putJson(route('core.api.replace', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => 99999,
     ]), $updateData);
 
@@ -205,7 +215,7 @@ test('api update returns 404 for non-existent record', function (): void {
 
 test('api delete removes record', function (): void {
     $response = $this->deleteJson(route('core.api.delete', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => $this->user->id,
     ]));
 
@@ -218,7 +228,7 @@ test('api delete removes record', function (): void {
 
 test('api delete returns 404 for non-existent record', function (): void {
     $response = $this->deleteJson(route('core.api.delete', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => 99999,
     ]));
 
@@ -226,7 +236,7 @@ test('api delete returns 404 for non-existent record', function (): void {
 });
 
 test('api tree returns hierarchical data', function (): void {
-    $response = $this->getJson(route('core.api.tree', ['entity' => 'roles']));
+    $response = $this->getJson(route('core.api.tree', coreCrudRouteParams('roles')));
 
     $response->assertStatus(200)
         ->assertJsonStructure([
@@ -240,7 +250,7 @@ test('api tree returns hierarchical data', function (): void {
 
 test('api history returns record history', function (): void {
     $response = $this->getJson(route('core.api.history', [
-        'entity' => 'users',
+        ...coreCrudRouteParams('users'),
         'id' => $this->user->id,
     ]));
 

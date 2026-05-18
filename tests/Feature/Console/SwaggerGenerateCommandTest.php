@@ -89,13 +89,19 @@ it('verbose generation reports unchanged paths when previous doc matches', funct
 
 function swaggerTestConfig(): void
 {
-    $swagger_config_path = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'laravel-swagger.php';
+    $swagger_config_path = module_path('Core', 'config/laravel-swagger.php');
     expect(is_file($swagger_config_path))->toBeTrue();
 
     /** @var array<string, mixed> $swagger_config */
     $swagger_config = require $swagger_config_path;
     config(['laravel-swagger' => $swagger_config]);
 }
+
+beforeEach(function (): void {
+    if (! is_array(config('laravel-swagger'))) {
+        swaggerTestConfig();
+    }
+});
 
 it('runs swagger generate handle and completes successfully', function (): void {
     swaggerTestConfig();

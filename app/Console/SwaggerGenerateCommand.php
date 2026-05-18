@@ -80,7 +80,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         /** @var string|null $file */
         $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
-        $config = config('laravel-swagger');
+        $config = $this->resolveSwaggerConfig();
 
         if ($moduleName !== 'App') {
             $module_path = Module::getModulePath($moduleName);
@@ -90,7 +90,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             $composer_json = json_decode(file_get_contents($module_path . 'composer.json'));
 
             if (isset($composer_json->version)) {
-                $config['version'] = $composer_json->version;
+                $config['appVersion'] = $composer_json->version;
             }
         }
 
@@ -144,6 +144,29 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         return [
             ['module', null, InputOption::VALUE_OPTIONAL, 'Filter to a specific Module', null],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveSwaggerConfig(): array
+    {
+        $config = config('laravel-swagger');
+
+        if (is_array($config) && $config !== []) {
+            return $config;
+        }
+
+        $config_path = module_path('Core', 'config/laravel-swagger.php');
+
+        if (! is_file($config_path)) {
+            throw new LaravelSwaggerException('laravel-swagger configuration is missing.');
+        }
+
+        /** @var array<string, mixed> $loaded */
+        $loaded = require $config_path;
+
+        return $loaded;
     }
 
     private function verboseGeneration(array $doc, ?array $old_doc): void

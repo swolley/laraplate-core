@@ -98,10 +98,10 @@ it('command handles common permissions', function (): void {
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('common_permissions');
-    expect($source)->toContain('SELECT');
-    expect($source)->toContain('INSERT');
-    expect($source)->toContain('UPDATE');
-    expect($source)->toContain('DELETE');
+    expect($source)->toContain('ActionEnum::Select');
+    expect($source)->toContain('ActionEnum::Insert');
+    expect($source)->toContain('ActionEnum::Update');
+    expect($source)->toContain('ActionEnum::Delete');
 });
 
 it('command handles soft delete permissions', function (): void {
@@ -109,8 +109,8 @@ it('command handles soft delete permissions', function (): void {
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('SoftDeletes');
-    expect($source)->toContain('RESTORE');
-    expect($source)->toContain('FORCE_DELETE');
+    expect($source)->toContain('ActionEnum::Restore');
+    expect($source)->toContain('ActionEnum::ForceDelete');
 });
 
 it('command handles approval permissions', function (): void {
@@ -118,7 +118,7 @@ it('command handles approval permissions', function (): void {
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('RequiresApproval');
-    expect($source)->toContain('APPROVE');
+    expect($source)->toContain('ActionEnum::Approve');
 });
 
 it('command handles publish permissions', function (): void {
@@ -126,21 +126,21 @@ it('command handles publish permissions', function (): void {
     $source = file_get_contents($reflection->getFileName());
 
     expect($source)->toContain('HasValidity');
-    expect($source)->toContain('PUBLISH');
+    expect($source)->toContain('ActionEnum::Publish');
 });
 
 it('command handles lock permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('LOCK');
+    expect($source)->toContain('ActionEnum::Lock');
 });
 
 it('command handles impersonate permission for users', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('IMPERSONATE');
+    expect($source)->toContain('ActionEnum::Impersonate');
     expect($source)->toContain('user_class');
 });
 
@@ -338,7 +338,7 @@ it('creates impersonate permission for the configured user model when missing', 
 
     Permission::query()->where('name', $impersonate_name)->delete();
 
-    HelpersCache::setModels('active', [User::class]);
+    HelpersCache::setModels('active', [user_class()]);
 
     $output = runPermissionsRefreshForCoverage([]);
 

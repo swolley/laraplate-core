@@ -61,7 +61,12 @@ final class CreateUserCommand extends Command
                     $user = new (user_class());
                     $password = '';
 
-                    foreach ($fillables as &$attribute) {
+                    $prompt_attributes = array_values(array_filter(
+                        $fillables,
+                        static fn (string $attribute): bool => array_key_exists($attribute, $validations),
+                    ));
+
+                    foreach ($prompt_attributes as &$attribute) {
                         if ($attribute !== 'password') {
                             $suggestion = $attribute === 'email' ? '@' . str_replace('_', '', Str::slug(config('app.name'))) . '.com' : '';
                             $options = null;

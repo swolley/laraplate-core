@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(command)* Enhance CreateEntityCommand with module resolution and entity type handling
+
+## [1.53.0] - 2026-05-17
+
 ### 🚀 Features
 
 - *(validity)* Implement user account validity checks and enhance moderation features

@@ -8,7 +8,6 @@ use function Laravel\Prompts\confirm;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\ModelEmbedding;
 use Override;
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
@@ -34,9 +33,11 @@ final class MoveEmbeddingTable extends Command
     {
         $embedding_connection = new ModelEmbedding()->getConnection();
         $configured_connection_name = $embedding_connection->getName();
-        $already_migrated = Schema::connection($configured_connection_name)->hasTable('model_embeddings');
+        $embeddings_table = (new ModelEmbedding())->getTable();
+        $already_migrated = Schema::connection($configured_connection_name)->hasTable($embeddings_table);
         $default_connection = (string) config('database.default');
-        $other_connection_exists = $default_connection !== $configured_connection_name && Schema::connection($default_connection)->hasTable('model_embeddings');
+        $other_connection_exists = $default_connection !== $configured_connection_name
+            && Schema::connection($default_connection)->hasTable($embeddings_table);
 
         if ($already_migrated) {
             $this->error(sprintf('The embedding table already exists on the %s connection.', $configured_connection_name));
@@ -52,7 +53,7 @@ final class MoveEmbeddingTable extends Command
             }
 
             $this->info(sprintf('Dropping the embedding table on %s connection...', $default_connection));
-            Schema::connection($default_connection)->dropIfExists(CoreTables::ModelEmbeddings->value);
+            Schema::connection($default_connection)->dropIfExists($embeddings_table);
         }
         // @codeCoverageIgnoreEnd
 
