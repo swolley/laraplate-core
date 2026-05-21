@@ -45,7 +45,7 @@ final readonly class HandleSocialLoginAction
 
         event(new SocialLoginCompleted($user, $service));
 
-        return redirect('/dashboard');
+        return redirect('/admin');
     }
 
     public function redirect(string $service): RedirectResponse

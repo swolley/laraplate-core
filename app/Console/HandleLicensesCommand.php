@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
-use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\Command;
 use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
@@ -123,7 +123,8 @@ final class HandleLicensesCommand extends Command
         }
 
         table(['License', 'Expiration', 'User'], $remapped);
-        $this->output->info('Current max sessions available: ' . (Setting::query()->where('name', 'max_concurrent_sessions')->first()?->value ?? 'unlimited'));
+        $max_sessions = app(PerModelSettingResolver::class)->value('max_concurrent_sessions', null);
+        $this->output->info('Current max sessions available: ' . ($max_sessions === null ? 'unlimited' : (string) $max_sessions));
     }
 
     private function renewLicenses(int $number, int $licensesCount, ?CarbonInterface $validTo): void

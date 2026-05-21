@@ -7,4 +7,6 @@ use Modules\Core\Http\Controllers\SettingController;
 
 Route::controller(SettingController::class)->name('info.')->group(function (): void {
     Route::get('/translations/{lang?}', 'getTranslations')->where('lang', '[a-z]{2}(?:[-_][A-Z]{2})?')->name('translations');
+
+    Route::get('/about', 'about')->name('about');
 });

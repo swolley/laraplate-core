@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Modules\Core\Helpers\HasVersions;
 use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;
 
 it('exposes the versioning entrypoint', function (): void {
@@ -47,8 +48,8 @@ it('treats empty versionStrategy string as unset and resolves from settings', fu
 });
 
 // Feature: performance-optimization, Property 4: Version strategy L1 cache eliminates repeated deserialization
-// Feature: performance-optimization, Property 15: Version strategies cache key includes app name prefix
-// Feature: performance-optimization, Property 16: Versioning settings cache is invalidated on Setting save/delete
+// Feature: performance-optimization, Property 15: Settings cache key includes app name prefix (via PerModelSettingResolver)
+// Feature: performance-optimization, Property 16: Unified settings cache is invalidated on any Setting save/delete
 
 it('exposes resetVersionStrategyCache static method', function (): void {
     expect(method_exists(HasVersions::class, 'resetVersionStrategyCache'))->toBeTrue();
@@ -121,12 +122,13 @@ it('resets L1 cache so next call re-resolves from persistent cache', function ()
     expect($query_count)->toBeGreaterThanOrEqual(0); // may hit persistent cache (no DB) or DB on cold cache
 });
 
-it('uses prefixed cache key containing app name for version strategies', function (): void {
+it('uses prefixed unified settings cache key when resolving version strategy', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
     config(['app.name' => 'laraplate']);
     Illuminate\Support\Facades\Cache::flush();
+    app(PerModelSettingResolver::class)->flush();
 
     $model = new class extends Model
     {
@@ -143,33 +145,30 @@ it('uses prefixed cache key containing app name for version strategies', functio
     $model->setConnection(config('database.default'));
     $model->getVersionStrategy();
 
-    $expected_key = Modules\Core\Cache\CacheManager::key('version_strategies');
+    $expected_key = PerModelSettingResolver::cacheKey();
 
     expect($expected_key)->toStartWith('laraplate:')
         ->and(Illuminate\Support\Facades\Cache::has($expected_key))->toBeTrue();
 });
 
 /**
- * Property 16: Versioning settings cache is invalidated on Setting save/delete.
+ * Property 16: Unified settings cache is invalidated on Setting save/delete.
  *
- * For any Setting record with group_name = 'versioning', saving or deleting that record
- * SHALL cause the version_strategies persistent cache entry to be absent on the next read.
+ * Saving or deleting any Setting record SHALL clear the PerModelSettingResolver
+ * persistent cache so version strategy resolution reloads on the next read.
  *
  * Validates: Requirements 11.2
  */
-it('invalidates the version_strategies persistent cache when a versioning Setting is saved', function (): void {
-    // Feature: performance-optimization, Property 16: Versioning settings cache is invalidated on Setting save/delete
+it('invalidates the unified settings cache when a versioning Setting is saved', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = Modules\Core\Cache\CacheManager::key('version_strategies');
+    $cache_key = PerModelSettingResolver::cacheKey();
 
-    // Pre-populate the persistent cache to simulate a warm state
     Illuminate\Support\Facades\Cache::forever($cache_key, collect());
 
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeTrue();
 
-    // Save a Setting with group_name = 'versioning' — the observer must invalidate the cache
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
         ->make(['group_name' => 'versioning', 'name' => 'version_strategy_' . fake()->unique()->lexify('????????')]);
@@ -181,14 +180,12 @@ it('invalidates the version_strategies persistent cache when a versioning Settin
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeFalse();
 });
 
-it('invalidates the version_strategies persistent cache when a versioning Setting is deleted', function (): void {
-    // Feature: performance-optimization, Property 16: Versioning settings cache is invalidated on Setting save/delete
+it('invalidates the unified settings cache when a versioning Setting is deleted', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = Modules\Core\Cache\CacheManager::key('version_strategies');
+    $cache_key = PerModelSettingResolver::cacheKey();
 
-    // Create and persist a versioning Setting
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
         ->make(['group_name' => 'versioning', 'name' => 'version_strategy_' . fake()->unique()->lexify('????????')]);
@@ -197,30 +194,25 @@ it('invalidates the version_strategies persistent cache when a versioning Settin
     $setting->setForcedApprovalUpdate(true);
     $setting->save();
 
-    // Re-populate the persistent cache to simulate a warm state after the save
     Illuminate\Support\Facades\Cache::forever($cache_key, collect());
 
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeTrue();
 
-    // Delete the Setting — the observer must invalidate the cache
     $setting->forceDelete();
 
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeFalse();
 });
 
-it('does not invalidate the version_strategies cache when a non-versioning Setting is saved', function (): void {
-    // Feature: performance-optimization, Property 16: Versioning settings cache is invalidated on Setting save/delete
+it('invalidates the unified settings cache when any Setting is saved', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = Modules\Core\Cache\CacheManager::key('version_strategies');
+    $cache_key = PerModelSettingResolver::cacheKey();
 
-    // Pre-populate the persistent cache
     Illuminate\Support\Facades\Cache::forever($cache_key, collect());
 
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeTrue();
 
-    // Save a Setting with a different group_name — cache must remain intact
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
         ->make(['group_name' => 'base', 'name' => fake()->unique()->lexify('????????')]);
@@ -229,7 +221,7 @@ it('does not invalidate the version_strategies cache when a non-versioning Setti
     $setting->setForcedApprovalUpdate(true);
     $setting->save();
 
-    expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeTrue();
+    expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeFalse();
 });
 
 /**

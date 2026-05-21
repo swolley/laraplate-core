@@ -46,7 +46,7 @@ final class FortifyServiceProvider extends ServiceProvider
                 //     return redirect()->route('filament.auth.login');
                 // }
 
-                return redirect()->intended(Fortify::redirects('logout', '/'));
+                return redirect()->intended(Fortify::redirects('logout', '/admin'));
             }
         });
 

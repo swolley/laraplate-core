@@ -13,11 +13,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Cache;
-use Modules\Core\Cache\CacheManager;
 use Modules\Core\Events\ModelVersioningRequested;
 use Modules\Core\Jobs\CreateVersionJob;
-use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\VersioningService;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
@@ -236,10 +234,9 @@ trait HasVersions
             return self::$version_strategy_cache[$model_class];
         }
 
-        // L2: persistent cache (rememberForever) — avoids DB on subsequent requests
         $settings_name = "version_strategy_{$this->getTable()}";
 
-        $raw = Cache::rememberForever(CacheManager::key('version_strategies'), fn () => Setting::query()->where('group_name', 'versioning')->get())->firstWhere('name', $settings_name)?->value ?? false;
+        $raw = app(PerModelSettingResolver::class)->value($settings_name, false);
 
         $strategy = $raw === false
             ? false

@@ -89,7 +89,7 @@ it('uses updateOrCreate and logs in when userUpserter is null', function (): voi
     $response = $action('github');
 
     expect($response->getStatusCode())->toBe(Response::HTTP_FOUND);
-    expect($response->getTargetUrl())->toContain('/dashboard');
+    expect($response->getTargetUrl())->toContain('/admin');
     Event::assertDispatched(SocialLoginCompleted::class, fn ($e) => $e->user === $userFromDb && $e->service === 'github');
 });
 
@@ -182,7 +182,7 @@ it('handles social login and dispatches event', function (): void {
     $response = $action('github');
 
     expect($response->getStatusCode())->toBe(302);
-    expect($response->getTargetUrl())->toContain('/dashboard');
+    expect($response->getTargetUrl())->toContain('/admin');
     Event::assertDispatched(SocialLoginCompleted::class);
 });
 

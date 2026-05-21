@@ -10,7 +10,7 @@ use Modules\Core\Cache\CacheManager;
 use Modules\Core\Models\Setting;
 
 /**
- * Singleton that loads settings from the database once per lifecycle.
+ * Singleton gateway for reading rows from the {@see Setting} table.
  *
  * The first lookup reads the persistent cache (or hydrates it from the DB);
  * further lookups reuse the in-memory collection until {@see flush()}.
@@ -23,18 +23,84 @@ final class PerModelSettingResolver
     private ?Collection $loaded_settings = null;
 
     /**
+     * @return Collection<string, Setting>
+     */
+    public function collection(): Collection
+    {
+        return $this->settings();
+    }
+
+    /**
+     * @return Collection<string, Setting>
+     */
+    public function group(string $group_name): Collection
+    {
+        return $this->settings()->filter(
+            static fn (Setting $setting): bool => $setting->group_name === $group_name,
+        );
+    }
+
+    /**
+     * Resolve a setting value by name.
+     * When no row exists, returns {@see $default}.
+     */
+    public function value(string $name, mixed $default = null): mixed
+    {
+        $setting = $this->settings()->get($name);
+
+        if ($setting === null) {
+            return $default;
+        }
+
+        return $setting->value ?? $default;
+    }
+
+    /**
      * Resolve a boolean setting by name.
      * When no row exists, returns {@see $default}.
      */
     public function boolean(string $name, bool $default): bool
     {
-        $stored = $this->settings()->get($name)?->value;
+        $stored = $this->value($name, null);
 
         if ($stored === null) {
             return $default;
         }
 
         return (bool) $stored;
+    }
+
+    public function int(string $name, int $default): int
+    {
+        $stored = $this->value($name, null);
+
+        if ($stored === null) {
+            return $default;
+        }
+
+        return (int) $stored;
+    }
+
+    public function float(string $name, float $default): float
+    {
+        $stored = $this->value($name, null);
+
+        if ($stored === null) {
+            return $default;
+        }
+
+        return (float) $stored;
+    }
+
+    public function string(string $name, string $default): string
+    {
+        $stored = $this->value($name, null);
+
+        if ($stored === null) {
+            return $default;
+        }
+
+        return (string) $stored;
     }
 
     /**
@@ -46,7 +112,7 @@ final class PerModelSettingResolver
         $this->loaded_settings = null;
     }
 
-    private static function cacheKey(): string
+    public static function cacheKey(): string
     {
         return CacheManager::key('settings', 'by_name');
     }

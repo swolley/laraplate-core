@@ -7,7 +7,7 @@ namespace Modules\Core\Casts;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Modules\Core\Http\Requests\ListRequest;
-use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 
 class ListRequestData extends SelectRequestData
 {
@@ -182,7 +182,7 @@ class ListRequestData extends SelectRequestData
 
     private function getDefaultPagination(): int
     {
-        $value = (int) (Setting::query()->where('name', 'pagination')->first('value')?->value ?? 25);
+        $value = app(PerModelSettingResolver::class)->int('pagination', 25);
 
         return max(1, $value);
     }

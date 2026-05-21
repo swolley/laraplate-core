@@ -14,6 +14,9 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: 'migrate:status')]
 class StatusCommand extends BaseStatusCommand
 {
+    #[Override]
+    protected $description = 'Show the status of each migration <fg=green>(⚡ Modules\Core)</fg=green>';
+
     /**
      * Handle the command.
      */

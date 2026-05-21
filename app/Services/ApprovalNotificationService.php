@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Modules\Core\Helpers\HasApprovals;
 use Modules\Core\Models\Modification;
-use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Notifications\PendingApprovalsNotification;
 use ReflectionClass;
 use Throwable;
@@ -165,16 +165,7 @@ final class ApprovalNotificationService
     {
         $setting_name = "approval_threshold__{$table}";
 
-        $setting = Setting::query()
-            ->withoutGlobalScopes()
-            ->where('name', $setting_name)
-            ->first();
-
-        if ($setting === null) {
-            return $default;
-        }
-
-        return (int) $setting->value;
+        return app(PerModelSettingResolver::class)->int($setting_name, $default);
     }
 
     /**

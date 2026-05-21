@@ -51,6 +51,40 @@ it('reloads from database after flush', function (): void {
     expect($resolver->boolean('auto_translate_test_table', false))->toBeTrue();
 });
 
+it('resolves typed values', function (): void {
+    $resolver = app(PerModelSettingResolver::class);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'typed_pagination_test',
+        'value' => 15,
+        'type' => SettingTypeEnum::Integer,
+        'group_name' => 'base',
+        'description' => 'test',
+    ]);
+
+    $resolver->flush();
+
+    expect($resolver->int('typed_pagination_test', 25))->toBe(15)
+        ->and($resolver->value('typed_pagination_test', 0))->toBe(15);
+});
+
+it('filters settings by group name', function (): void {
+    $resolver = app(PerModelSettingResolver::class);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'erp_group_test_flag',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'erp',
+        'description' => 'test',
+    ]);
+
+    $resolver->flush();
+
+    expect($resolver->group('erp')->has('erp_group_test_flag'))->toBeTrue()
+        ->and($resolver->group('base')->has('erp_group_test_flag'))->toBeFalse();
+});
+
 it('resolves settings regardless of group name', function (): void {
     $resolver = app(PerModelSettingResolver::class);
 
