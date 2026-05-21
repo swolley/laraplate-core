@@ -12,7 +12,12 @@ declare(strict_types=1);
 | ParaTest (`--parallel`) can crash workers with coverage; use `test:unit:parallel` only when stable.
 |--------------------------------------------------------------------------
 */
-uses(Modules\Core\Tests\LaravelTestCase::class)->in(__DIR__ . '/Feature', __DIR__ . '/Unit');
+uses(Modules\Core\Tests\TestCase::class)->in(__DIR__ . '/Unit');
+
+uses(Modules\Core\Tests\LaravelTestCase::class)->in(
+    __DIR__ . '/Integration',
+    __DIR__ . '/Feature',
+);
 
 /*
 |--------------------------------------------------------------------------

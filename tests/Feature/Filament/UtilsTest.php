@@ -8,8 +8,9 @@ use Filament\Tables\Contracts\HasTable as HasTableContract;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\Filament\HasFormHarness;
 use Modules\Core\Tests\Stubs\Filament\HasRecordsHarness;
@@ -20,8 +21,8 @@ beforeEach(function (): void {
         'password' => 'Aa1!FilamentAdminPass',
     ]);
 
-    $admin_role = Role::factory()->create(['name' => 'admin']);
-    $this->admin->roles()->attach($admin_role);
+    $this->admin_role = Role::factory()->create(['name' => 'admin']);
+    $this->admin->roles()->attach($this->admin_role);
     $this->actingAs($this->admin);
 });
 
@@ -35,7 +36,18 @@ it('executes HasForm configureForm workflow', function (): void {
 });
 
 it('returns create action when user can create records', function (): void {
-    Gate::define('default.settings.create', static fn (): bool => true);
+    $setting = new Setting;
+    $permission_name = sprintf(
+        '%s.%s.create',
+        $setting->getConnectionName() ?? 'default',
+        $setting->getTable(),
+    );
+
+    $permission = Permission::factory()->create([
+        'name' => $permission_name,
+        'guard_name' => 'web',
+    ]);
+    $this->admin_role->givePermissionTo($permission);
 
     $livewire = $this->createStub(HasTableContract::class);
     $table = Table::make($livewire);
