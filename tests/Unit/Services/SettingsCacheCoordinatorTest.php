@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -64,5 +65,125 @@ it('invalidates settings on model save via observer', function (): void {
     $setting->save();
 
     expect($resolver->int('observer_flush_test', 0))->toBe(20)
-        ->and(Cache::has(PerModelSettingResolver::cacheKey()))->toBeTrue();
+        ->and(Cache::has(PerModelSettingResolver::groupCacheKey('base')))->toBeTrue();
+});
+
+it('flushes only the affected settings group', function (): void {
+    $resolver = app(PerModelSettingResolver::class);
+
+    $translation_setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'coordinator_translation_group_test',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'translations',
+        'description' => 'test',
+    ]);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'coordinator_erp_group_test',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'erp',
+        'description' => 'test',
+    ]);
+
+    $resolver->flush();
+    $resolver->group('translations');
+    $resolver->group('erp');
+
+    app(SettingsCacheCoordinator::class)->flushSetting($translation_setting);
+
+    expect(Cache::has(PerModelSettingResolver::groupCacheKey('translations')))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::groupCacheKey('erp')))->toBeTrue()
+        ->and(Cache::has(PerModelSettingResolver::nameIndexCacheKey()))->toBeFalse();
+});
+
+it('flushes old and new groups when a setting moves groups', function (): void {
+    $resolver = app(PerModelSettingResolver::class);
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'coordinator_group_move_test',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'base',
+        'description' => 'test',
+    ]);
+
+    $resolver->flush();
+    $resolver->group('base');
+
+    $setting->setForcedApprovalUpdate(true);
+    $setting->group_name = 'erp';
+    $setting->save();
+
+    expect(Cache::has(PerModelSettingResolver::groupCacheKey('base')))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::groupCacheKey('erp')))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::nameIndexCacheKey()))->toBeFalse();
+});
+
+it('forgets derived settings caches when flushing a setting', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'coordinator_derived_cache_test',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'base',
+        'description' => 'test',
+    ]);
+
+    Cache::put('filament_settings_distinct_group_name', ['base' => 'base'], 300);
+    Cache::forever(PerModelSettingResolver::legacyTableCacheKey(), collect([$setting]));
+    Cache::forever(PerModelSettingResolver::cacheKey(), collect([$setting]));
+
+    app(SettingsCacheCoordinator::class)->flushSetting($setting);
+
+    expect(Cache::has('filament_settings_distinct_group_name'))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::legacyTableCacheKey()))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::cacheKey()))->toBeFalse();
+});
+
+it('resets versioning caches when the versioning group is affected', function (): void {
+    $versioning_setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'version_strategy_coordinator_test',
+        'value' => false,
+        'type' => SettingTypeEnum::Json,
+        'group_name' => 'versioning',
+        'description' => 'test',
+    ]);
+
+    Cache::forever(CacheManager::key('version_strategies'), collect([$versioning_setting]));
+
+    app(SettingsCacheCoordinator::class)->flushSetting($versioning_setting);
+
+    expect(Cache::has(CacheManager::key('version_strategies')))->toBeFalse();
+});
+
+it('setting observer invalidates only the saved setting group', function (): void {
+    $resolver = app(PerModelSettingResolver::class);
+
+    $translation_setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'observer_translation_group_test',
+        'value' => false,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'translations',
+        'description' => 'test',
+    ]);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'observer_erp_group_test',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'erp',
+        'description' => 'test',
+    ]);
+
+    $resolver->flush();
+    $resolver->group('translations');
+    $resolver->group('erp');
+
+    $translation_setting->setForcedApprovalUpdate(true);
+    $translation_setting->value = true;
+    $translation_setting->save();
+
+    expect(Cache::has(PerModelSettingResolver::groupCacheKey('translations')))->toBeFalse()
+        ->and(Cache::has(PerModelSettingResolver::groupCacheKey('erp')))->toBeTrue();
 });

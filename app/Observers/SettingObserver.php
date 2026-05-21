@@ -18,11 +18,11 @@ final class SettingObserver
 
     public function saved(Setting $setting): void
     {
-        app(SettingsCacheCoordinator::class)->flushAll();
+        app(SettingsCacheCoordinator::class)->flushSetting($setting);
     }
 
     public function deleted(Setting $setting): void
     {
-        app(SettingsCacheCoordinator::class)->flushAll();
+        app(SettingsCacheCoordinator::class)->flushSetting($setting);
     }
 }

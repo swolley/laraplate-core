@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(settings)* Unify settings retrieval and cache management
+- *(settings)* Improve cache management for settings by group
+
+## [1.53.1] - 2026-05-18
+
 ### 🐛 Bug Fixes
 
 - *(command)* Enhance CreateEntityCommand with module resolution and entity type handling

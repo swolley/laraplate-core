@@ -12,22 +12,33 @@ use Modules\Core\Models\Setting;
 /**
  * Singleton gateway for reading rows from the {@see Setting} table.
  *
- * The first lookup reads the persistent cache (or hydrates it from the DB);
- * further lookups reuse the in-memory collection until {@see flush()}.
+ * Group lookups read the persistent group cache (or hydrate it from the DB);
+ * further lookups reuse in-memory group collections until flushed.
  */
 final class PerModelSettingResolver
 {
     /**
-     * @var Collection<string, Setting>|null
+     * @var array<string, Collection<string, Setting>>
      */
-    private ?Collection $loaded_settings = null;
+    private array $loaded_groups = [];
+
+    /**
+     * @var array<string, string>|null
+     */
+    private ?array $name_index = null;
 
     /**
      * @return Collection<string, Setting>
      */
     public function collection(): Collection
     {
-        return $this->settings();
+        $settings = new Collection();
+
+        foreach (array_unique(array_values($this->nameIndex())) as $group_name) {
+            $settings = $settings->merge($this->group($group_name));
+        }
+
+        return $settings;
     }
 
     /**
@@ -35,8 +46,12 @@ final class PerModelSettingResolver
      */
     public function group(string $group_name): Collection
     {
-        return $this->settings()->filter(
-            static fn (Setting $setting): bool => $setting->group_name === $group_name,
+        return $this->loaded_groups[$group_name] ??= Cache::rememberForever(
+            self::groupCacheKey($group_name),
+            static fn (): Collection => Setting::query()
+                ->where('group_name', $group_name)
+                ->get()
+                ->keyBy('name'),
         );
     }
 
@@ -46,7 +61,13 @@ final class PerModelSettingResolver
      */
     public function value(string $name, mixed $default = null): mixed
     {
-        $setting = $this->settings()->get($name);
+        $group_name = $this->nameIndex()[$name] ?? null;
+
+        if ($group_name === null) {
+            return $default;
+        }
+
+        $setting = $this->group($group_name)->get($name);
 
         if ($setting === null) {
             return $default;
@@ -109,7 +130,36 @@ final class PerModelSettingResolver
     public function flush(): void
     {
         Cache::forget(self::cacheKey());
-        $this->loaded_settings = null;
+        Cache::forget(self::legacyTableCacheKey());
+        $this->flushNameIndex();
+
+        foreach (array_keys($this->loaded_groups) as $group_name) {
+            Cache::forget(self::groupCacheKey($group_name));
+        }
+
+        $this->loaded_groups = [];
+    }
+
+    public function flushGroup(string $group_name): void
+    {
+        Cache::forget(self::groupCacheKey($group_name));
+        unset($this->loaded_groups[$group_name]);
+    }
+
+    /**
+     * @param  array<int, string>  $group_names
+     */
+    public function flushGroups(array $group_names): void
+    {
+        foreach (array_unique(array_filter($group_names)) as $group_name) {
+            $this->flushGroup((string) $group_name);
+        }
+    }
+
+    public function flushNameIndex(): void
+    {
+        Cache::forget(self::nameIndexCacheKey());
+        $this->name_index = null;
     }
 
     public static function cacheKey(): string
@@ -117,22 +167,37 @@ final class PerModelSettingResolver
         return CacheManager::key('settings', 'by_name');
     }
 
-    /**
-     * @return Collection<string, Setting>
-     */
-    private function settings(): Collection
+    public static function groupCacheKey(string $group_name): string
     {
-        if ($this->loaded_settings !== null) {
-            return $this->loaded_settings;
+        return CacheManager::key('settings', 'group', $group_name);
+    }
+
+    public static function nameIndexCacheKey(): string
+    {
+        return CacheManager::key('settings', 'name_index');
+    }
+
+    public static function legacyTableCacheKey(): string
+    {
+        return CacheManager::key('settings');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function nameIndex(): array
+    {
+        if ($this->name_index !== null) {
+            return $this->name_index;
         }
 
-        $this->loaded_settings = Cache::rememberForever(
-            self::cacheKey(),
-            static fn (): Collection => Setting::query()
-                ->get()
-                ->keyBy('name'),
+        $this->name_index = Cache::rememberForever(
+            self::nameIndexCacheKey(),
+            static fn (): array => Setting::query()
+                ->pluck('group_name', 'name')
+                ->toArray(),
         );
 
-        return $this->loaded_settings;
+        return $this->name_index;
     }
 }

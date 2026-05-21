@@ -122,13 +122,21 @@ it('resets L1 cache so next call re-resolves from persistent cache', function ()
     expect($query_count)->toBeGreaterThanOrEqual(0); // may hit persistent cache (no DB) or DB on cold cache
 });
 
-it('uses prefixed unified settings cache key when resolving version strategy', function (): void {
+it('uses prefixed grouped settings cache key when resolving version strategy', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
     config(['app.name' => 'laraplate']);
     Illuminate\Support\Facades\Cache::flush();
     app(PerModelSettingResolver::class)->flush();
+
+    Modules\Core\Models\Setting::factory()
+        ->persistedWithoutApprovalCapture()
+        ->create([
+            'group_name' => 'versioning',
+            'name' => 'version_strategy_users',
+            'value' => 'DIFF',
+        ]);
 
     $model = new class extends Model
     {
@@ -145,25 +153,25 @@ it('uses prefixed unified settings cache key when resolving version strategy', f
     $model->setConnection(config('database.default'));
     $model->getVersionStrategy();
 
-    $expected_key = PerModelSettingResolver::cacheKey();
+    $expected_key = PerModelSettingResolver::groupCacheKey('versioning');
 
     expect($expected_key)->toStartWith('laraplate:')
         ->and(Illuminate\Support\Facades\Cache::has($expected_key))->toBeTrue();
 });
 
 /**
- * Property 16: Unified settings cache is invalidated on Setting save/delete.
+ * Property 16: Grouped settings cache is invalidated on Setting save/delete.
  *
- * Saving or deleting any Setting record SHALL clear the PerModelSettingResolver
- * persistent cache so version strategy resolution reloads on the next read.
+ * Saving or deleting a Setting record SHALL clear the affected PerModelSettingResolver
+ * group cache so version strategy resolution reloads on the next read.
  *
  * Validates: Requirements 11.2
  */
-it('invalidates the unified settings cache when a versioning Setting is saved', function (): void {
+it('invalidates the versioning group settings cache when a versioning Setting is saved', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = PerModelSettingResolver::cacheKey();
+    $cache_key = PerModelSettingResolver::groupCacheKey('versioning');
 
     Illuminate\Support\Facades\Cache::forever($cache_key, collect());
 
@@ -180,11 +188,11 @@ it('invalidates the unified settings cache when a versioning Setting is saved', 
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeFalse();
 });
 
-it('invalidates the unified settings cache when a versioning Setting is deleted', function (): void {
+it('invalidates the versioning group settings cache when a versioning Setting is deleted', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = PerModelSettingResolver::cacheKey();
+    $cache_key = PerModelSettingResolver::groupCacheKey('versioning');
 
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
@@ -203,11 +211,11 @@ it('invalidates the unified settings cache when a versioning Setting is deleted'
     expect(Illuminate\Support\Facades\Cache::has($cache_key))->toBeFalse();
 });
 
-it('invalidates the unified settings cache when any Setting is saved', function (): void {
+it('invalidates the affected group settings cache when any Setting is saved', function (): void {
     HasVersions::resetVersionStrategyCache();
     Modules\Core\Cache\CacheManager::resetAppNameCache();
 
-    $cache_key = PerModelSettingResolver::cacheKey();
+    $cache_key = PerModelSettingResolver::groupCacheKey('base');
 
     Illuminate\Support\Facades\Cache::forever($cache_key, collect());
 

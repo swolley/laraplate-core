@@ -17,10 +17,17 @@ use Modules\Core\Models\Setting;
  */
 final class SettingsCacheCoordinator
 {
+    private const string FILAMENT_GROUP_OPTIONS_CACHE_KEY = 'filament_settings_distinct_group_name';
+
     /**
      * @var array<int, callable(): void>
      */
     private array $invalidators = [];
+
+    /**
+     * @var array<string, array<int, callable(): void>>
+     */
+    private array $group_invalidators = [];
 
     /**
      * Register an extra invalidator (e.g. module-specific derived caches).
@@ -28,6 +35,52 @@ final class SettingsCacheCoordinator
     public function registerInvalidator(callable $invalidator): void
     {
         $this->invalidators[] = $invalidator;
+    }
+
+    public function registerGroupInvalidator(string $group_name, callable $invalidator): void
+    {
+        $this->group_invalidators[$group_name][] = $invalidator;
+    }
+
+    public function flushSetting(Setting $setting): void
+    {
+        $groups = [$setting->group_name];
+        $original_group = $setting->getOriginal('group_name');
+
+        if (is_string($original_group) && $original_group !== '' && $original_group !== $setting->group_name) {
+            $groups[] = $original_group;
+        }
+
+        $this->flushGroups($groups);
+        $this->flushNameIndex();
+        $this->flushDerivedSettingsCaches();
+    }
+
+    /**
+     * @param  array<int, string|null>  $group_names
+     */
+    public function flushGroups(array $group_names): void
+    {
+        foreach (array_unique(array_filter($group_names)) as $group_name) {
+            $this->flushGroup((string) $group_name);
+        }
+    }
+
+    public function flushGroup(string $group_name): void
+    {
+        if (app()->bound(PerModelSettingResolver::class)) {
+            app(PerModelSettingResolver::class)->flushGroup($group_name);
+        } else {
+            Cache::forget(PerModelSettingResolver::groupCacheKey($group_name));
+        }
+
+        if ($group_name === 'versioning') {
+            $this->flushVersioningCaches();
+        }
+
+        foreach ($this->group_invalidators[$group_name] ?? [] as $invalidator) {
+            $invalidator();
+        }
     }
 
     /**
@@ -39,15 +92,36 @@ final class SettingsCacheCoordinator
             app(PerModelSettingResolver::class)->flush();
         }
 
-        // Legacy key used by older HasVersions builds; safe to forget until fully removed.
-        Cache::forget(CacheManager::key('version_strategies'));
-
-        HasVersions::resetVersionStrategyCache();
-
+        $this->flushVersioningCaches();
+        $this->flushDerivedSettingsCaches();
         (new Setting)->invalidateCache();
 
         foreach ($this->invalidators as $invalidator) {
             $invalidator();
         }
+    }
+
+    private function flushNameIndex(): void
+    {
+        if (app()->bound(PerModelSettingResolver::class)) {
+            app(PerModelSettingResolver::class)->flushNameIndex();
+        } else {
+            Cache::forget(PerModelSettingResolver::nameIndexCacheKey());
+        }
+    }
+
+    private function flushVersioningCaches(): void
+    {
+        // Legacy key used by older HasVersions builds; safe to forget until fully removed.
+        Cache::forget(CacheManager::key('version_strategies'));
+
+        HasVersions::resetVersionStrategyCache();
+    }
+
+    private function flushDerivedSettingsCaches(): void
+    {
+        Cache::forget(self::FILAMENT_GROUP_OPTIONS_CACHE_KEY);
+        Cache::forget(PerModelSettingResolver::cacheKey());
+        Cache::forget(PerModelSettingResolver::legacyTableCacheKey());
     }
 }
