@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
+use Modules\CMS\Models\Pivot\Presettable;
+use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Fieldable;
-use Modules\Core\Models\Pivot\Presettable;
-use Modules\Core\Models\Preset;
 use Modules\Core\Observers\FieldableObserver;
 
 beforeEach(function (): void {
-    setupCmsEntities();
+    setupCMSEntities();
 });
 
 it('creates preset version when fieldable pivot is saved', function (): void {
@@ -66,4 +66,6 @@ it('skips versioning when preset id does not resolve', function (): void {
     $method->invoke($observer, $fieldable);
 
     expect(Preset::query()->find(999_999_999))->toBeNull();
+
+    expect(Presettable::query()->withTrashed()->where('preset_id', 999_999_999)->count())->toBe(0);
 });

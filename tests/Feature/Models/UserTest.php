@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\UnauthorizedException;
 use Lab404\Impersonate\Services\ImpersonateManager;
+use Modules\Core\Models\License;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
@@ -102,6 +104,23 @@ it('has soft deletes trait', function (): void {
 
     expect($this->user->trashed())->toBeTrue();
     expect(User::withTrashed()->find($this->user->id))->not->toBeNull();
+});
+
+it('can be updated after create when soft-delete columns were not hydrated', function (): void {
+    $user = User::factory()->create();
+    $license = License::factory()->create();
+
+    $user->license_id = $license->id;
+    $user->save();
+
+    expect($user->fresh()->license_id)->toBe($license->id);
+});
+
+it('cannot update a soft deleted user', function (): void {
+    $this->user->delete();
+
+    expect(fn () => $this->user->update(['name' => 'Updated Name']))
+        ->toThrow(UnauthorizedException::class, 'Cannot update a softdeleted model');
 });
 
 it('has versions trait', function (): void {

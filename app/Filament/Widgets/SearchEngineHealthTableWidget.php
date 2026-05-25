@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
 use Modules\Core\Filament\Pages\CacheHealth;
+use Modules\Core\Search\Contracts\ISearchEngine;
+use Throwable;
 use Override;
 
 final class SearchEngineHealthTableWidget extends Widget
@@ -73,12 +75,22 @@ final class SearchEngineHealthTableWidget extends Widget
 
             foreach ($models as $model) {
                 $instance = new $model();
+                $documents = 0;
+                $index_exists = false;
 
-                try {
-                    $stats = $engine->stats();
-                    $documents = $stats[$instance->searchableAs()]['num_documents'] ?? 0;
-                } catch (Exception) {
-                    $documents = 0;
+                if ($engine instanceof ISearchEngine) {
+                    try {
+                        $stats = $engine->stats();
+                        $documents = $stats[$instance->searchableAs()]['num_documents'] ?? 0;
+                    } catch (Throwable) {
+                        $documents = 0;
+                    }
+
+                    try {
+                        $index_exists = $engine->checkIndex($instance);
+                    } catch (Throwable) {
+                        $index_exists = false;
+                    }
                 }
 
                 $modelData[] = [
@@ -86,7 +98,7 @@ final class SearchEngineHealthTableWidget extends Widget
                     'full_name' => $model,
                     'searchable_as' => $instance->searchableAs(),
                     'count' => $model::query()->count(),
-                    'index_exists' => $engine->checkIndex($instance),
+                    'index_exists' => $index_exists,
                     'documents' => $documents,
                 ];
             }

@@ -67,7 +67,15 @@ it('returns search engine health view data structure', function (): void {
     $method->setAccessible(true);
     $data = $method->invoke($widget);
 
-    expect($data)->toHaveKeys(['driver', 'models', 'error', 'cache_minutes']);
+    expect($data)->toHaveKeys(['driver', 'models', 'error', 'cache_minutes'])
+        ->and($data['driver'])->toBe('collection')
+        ->and($data['error'])->toBeNull();
+
+    if ($data['models'] !== []) {
+        expect($data['models'][0])->toHaveKeys(['name', 'full_name', 'searchable_as', 'count', 'index_exists', 'documents'])
+            ->and($data['models'][0]['documents'])->toBe(0)
+            ->and($data['models'][0]['index_exists'])->toBeFalse();
+    }
 });
 
 it('returns system health widget columns and stats', function (): void {

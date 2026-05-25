@@ -7,6 +7,7 @@ namespace Modules\Core\Observers;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Services\PresetVersioningService;
+use ReflectionClass;
 
 final readonly class FieldableObserver
 {
@@ -24,12 +25,41 @@ final readonly class FieldableObserver
 
     private function createVersionForPreset(Fieldable $fieldable): void
     {
-        $preset = $fieldable->preset; // ?? Preset::query()->find($fieldable->preset_id);
+        $preset = $this->resolvePreset($fieldable);
 
-        if (! $preset) {
+        if (! $preset instanceof Preset) {
             return;
         }
 
         $this->versioning->createVersion($preset);
+    }
+
+    private function resolvePreset(Fieldable $fieldable): ?Preset
+    {
+        if ($fieldable->preset_id === null) {
+            return null;
+        }
+
+        foreach (models(filter: $this->isConcretePresetClass(...)) as $preset_class) {
+            $preset = $preset_class::query()->find($fieldable->preset_id);
+
+            if ($preset instanceof Preset) {
+                return $preset;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  class-string  $model
+     */
+    private function isConcretePresetClass(string $model): bool
+    {
+        if (! is_subclass_of($model, Preset::class)) {
+            return false;
+        }
+
+        return ! (new ReflectionClass($model))->isAbstract();
     }
 }

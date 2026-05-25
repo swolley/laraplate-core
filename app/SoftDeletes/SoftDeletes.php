@@ -87,6 +87,37 @@ trait SoftDeletes
     }
 
     /**
+     * Determine if the model instance has been soft-deleted.
+     *
+     * Uses is_deleted / deleted_at from attributes or original so updates work when
+     * nullable soft-delete columns were not hydrated after insert (Laravel 12 strict mode).
+     */
+    public function trashed(): bool
+    {
+        $is_deleted_column = $this->getIsDeletedColumn();
+
+        if (array_key_exists($is_deleted_column, $this->attributes)) {
+            return (bool) $this->attributes[$is_deleted_column];
+        }
+
+        $deleted_at_column = $this->getDeletedAtColumn();
+
+        if (array_key_exists($deleted_at_column, $this->attributes)) {
+            return $this->attributes[$deleted_at_column] !== null;
+        }
+
+        if (array_key_exists($is_deleted_column, $this->original)) {
+            return (bool) $this->original[$is_deleted_column];
+        }
+
+        if (array_key_exists($deleted_at_column, $this->original)) {
+            return $this->original[$deleted_at_column] !== null;
+        }
+
+        return false;
+    }
+
+    /**
      * Boot the soft deleting trait for a model.
      */
     protected static function bootSoftDeletes(): void
