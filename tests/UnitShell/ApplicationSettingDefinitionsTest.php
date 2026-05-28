@@ -37,10 +37,9 @@ it('defines ai runtime settings with current defaults and choices', function ():
     $definitions = collect(AIDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
     expect($definitions->get('ai.features.embeddings.enabled')['value'])->toBeTrue()
-        ->and($definitions->get('ai.features.embeddings.default_provider')['value'])->toBe('sentence_transformers')
-        ->and($definitions->get('ai.features.embeddings.default_provider')['choices'])
-        ->toBe(['sentence_transformers', 'openai', 'ollama', 'voyageai', 'mistral'])
-        ->and($definitions->get('ai.features.faq.vector_store')['choices'])->toBe(['filesystem', 'memory'])
+        ->and($definitions->get('ai.features.faq.splitter.driver')['value'])->toBe('markdown_aware')
+        ->and($definitions->get('ai.features.faq.splitter.driver')['choices'])
+        ->toBe(['markdown_aware', 'sentence', 'delimiter'])
         ->and($definitions->get('ai.features.moderation.approval_mode')['choices'])->toBe(['threshold', 'dual']);
 });
 
@@ -49,8 +48,7 @@ it('defines cms and mes runtime settings with current defaults and choices', fun
     $mesDefinitions = collect(MESDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
     expect($cmsDefinitions->get('cms.locale.auto_translate')['value'])->toBeFalse()
-        ->and($cmsDefinitions->get('cms.services.geocoding.provider')['choices'])->toBe(['nominatim'])
-        ->and($cmsDefinitions->get('media-library.image_driver')['choices'])->toBe(['gd', 'imagick'])
+        ->and($cmsDefinitions->get('cms.geocoding.cache_ttl')['value'])->toBe(604800)
         ->and($mesDefinitions->get('mes.rate_limit')['value'])->toBe(60)
         ->and($mesDefinitions->get('mes.lot_number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
 });
