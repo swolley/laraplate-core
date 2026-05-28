@@ -168,24 +168,12 @@ final class PermissionsRefreshCommand extends Command
                 }
 
                 if (! in_array($permission_name, $found_permissions, true)) {
-                    $query = $permission_class::query()->where('name', $permission_name);
+                    $permission = $permission_class::query()->firstOrCreate(
+                        ['name' => $permission_name],
+                        ['guard_name' => config('auth.defaults.guard', 'web')],
+                    );
 
-                    if ($query->exists()) {
-                        // @codeCoverageIgnoreStart
-                        // Permission model does not use SoftDeletes; the query builder has no restore() macro, so this branch is not reachable at runtime.
-                        $query->restore();
-
-                        if (! $quiet_mode) {
-                            $this->line(sprintf("<fg=green>Restored</> '%s' permission %s", $permission_name, $new_model_suffix));
-                        }
-
-                        $changes = true;
-                        // @codeCoverageIgnoreEnd
-                    } else {
-                        $permission_class::create([
-                            'name' => $permission_name,
-                        ]);
-
+                    if ($permission->wasRecentlyCreated) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
                         }
@@ -201,16 +189,18 @@ final class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 if (! in_array($permission_name, $found_permissions, true)) {
-                    $permission_class::query()->updateOrCreate(
+                    $permission = $permission_class::query()->firstOrCreate(
                         ['name' => $permission_name],
-                        ['name' => $permission_name],
+                        ['guard_name' => config('auth.defaults.guard', 'web')],
                     );
 
-                    if (! $quiet_mode) {
-                        $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
-                    }
+                    if ($permission->wasRecentlyCreated) {
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
+                        }
 
-                    $changes = true;
+                        $changes = true;
+                    }
                 }
             }
 

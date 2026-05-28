@@ -46,7 +46,6 @@ use Spatie\Permission\Traits\HasRoles;
 #[ObservedBy([UserObserver::class])]
 /**
  * @property BelongsToMany $roles
- *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */

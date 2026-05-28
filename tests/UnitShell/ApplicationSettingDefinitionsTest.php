@@ -11,6 +11,18 @@ use Modules\MES\Database\Seeders\MESDatabaseSeeder;
 
 uses(Tests\TestCase::class);
 
+it('keeps runtime setting names within the Setting model name limit', function (): void {
+    $all_names = collect([
+        ...CoreDatabaseSeeder::runtimeSettingDefinitions(),
+        ...AIDatabaseSeeder::runtimeSettingDefinitions(),
+        ...CMSDatabaseSeeder::runtimeSettingDefinitions(),
+        ...MESDatabaseSeeder::runtimeSettingDefinitions(),
+        ...ErpCompanySettings::globalSettingDefinitions(),
+    ])->pluck('name');
+
+    expect($all_names->every(fn (string $name): bool => mb_strlen($name) <= 255))->toBeTrue();
+});
+
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 

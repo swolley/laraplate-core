@@ -72,7 +72,7 @@ final class Setting extends Model
             'name' => [
                 'required',
                 'string',
-                'max:50',
+                'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
@@ -83,7 +83,7 @@ final class Setting extends Model
             'name' => [
                 'sometimes',
                 'string',
-                'max:50',
+                'max:255',
                 /** @var \Illuminate\Database\Query\Builder $query */
                 Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);

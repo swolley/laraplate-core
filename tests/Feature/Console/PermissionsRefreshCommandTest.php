@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\AI\Models\ActionRequest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Console\PermissionsRefreshCommand;
 use Modules\Core\Helpers\HelpersCache;
@@ -163,7 +164,7 @@ it('command handles permission creation', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('create(');
+    expect($source)->toContain('firstOrCreate(');
     expect($source)->toContain('query()');
 });
 
@@ -175,11 +176,23 @@ it('command handles permission deletion', function (): void {
     expect($source)->toContain('whereNotIn');
 });
 
-it('command handles permission restoration', function (): void {
-    $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
-    $source = file_get_contents($reflection->getFileName());
+it('does not duplicate permissions when they already exist for the model table', function (): void {
+    $instance = new ReflectionClass(ActionRequest::class)->newInstanceWithoutConstructor();
+    $connection = $instance->getConnectionName() ?? 'default';
+    $table = $instance->getTable();
+    $permission_name = "{$connection}.{$table}." . ActionEnum::Select->value;
 
-    expect($source)->toContain('restore()');
+    Permission::query()->firstOrCreate(
+        ['name' => $permission_name],
+        ['guard_name' => 'web'],
+    );
+
+    HelpersCache::setModels('active', [ActionRequest::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $permission_name)->count())->toBe(1)
+        ->and($output)->not->toContain("Created '{$permission_name}' permission");
 });
 
 it('command handles connection and table names', function (): void {
@@ -213,7 +226,6 @@ it('command handles output messages', function (): void {
 
     expect($source)->toContain('Created');
     expect($source)->toContain('Deleted');
-    expect($source)->toContain('Restored');
 });
 
 it('runs in pretend mode with merged quiet option', function (): void {

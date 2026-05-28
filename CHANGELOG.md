@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(permissions)* Streamline permission handling in PermissionsRefreshCommand
+
+## [1.54.0] - 2026-05-28
+
 ### 🚀 Features
 
 - *(logging)* Enrich GELF metadata and add error fingerprint

@@ -45,16 +45,6 @@ class Seeder extends BaseSeeder
     }
 
     /**
-     * Whether this PHP process is a spatie/fork worker started by BatchSeeder.
-     */
-    private function isParallelBatchForkWorker(): bool
-    {
-        $flag = getenv(self::PARALLEL_BATCH_WORKER_ENV);
-
-        return $flag === '1' || $flag === 'true';
-    }
-
-    /**
      * @param  array<int, array<string, mixed>>  $definitions
      */
     protected function seedSettingDefinitions(array $definitions): void
@@ -88,5 +78,15 @@ class Seeder extends BaseSeeder
                 $this->command?->line("    - {$definition['name']} <fg=green>created</>");
             }
         });
+    }
+
+    /**
+     * Whether this PHP process is a spatie/fork worker started by BatchSeeder.
+     */
+    private function isParallelBatchForkWorker(): bool
+    {
+        $flag = getenv(self::PARALLEL_BATCH_WORKER_ENV);
+
+        return $flag === '1' || $flag === 'true';
     }
 }

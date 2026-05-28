@@ -277,7 +277,8 @@ final class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $existing_users = $user_class::query()->withoutGlobalScopes()->whereIn('username', [$anonymous, $superadmin, $admin])->get(['id', 'username'])->keyBy('username');
+        $seed_usernames = array_column($users_data, 'username');
+        $existing_users = $user_class::query()->withoutGlobalScopes()->whereIn('username', $seed_usernames)->get(['id', 'username'])->keyBy('username');
         $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
 
         if ($new_users === []) {
@@ -559,7 +560,7 @@ final class CoreDatabaseSeeder extends Seeder
                 'parameters' => [],
                 'schedule' => '@midnight',
                 'description' => 'Resetta assegnazione licenze login a utenti',
-                'is_active' => config('auth.enable_user_licenses'),
+                'is_active' => (bool) config('core.enable_user_licenses', false),
             ],
             [
                 'name' => 'clearResetTokens',
