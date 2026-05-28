@@ -86,6 +86,13 @@ final class Locked
         return ! $this->usesHasLocks($model);
     }
 
+    /**
+     * Whether saves, deletes, and replicates on locked models should be blocked.
+     *
+     * Config: core.locking.prevent_modifications_on_locked_objects (runtime setting, DB overlay).
+     * Used by {@see LockedModelSubscriber} on eloquent.saving, eloquent.deleting, eloquent.replicating.
+     * When false (default), locked records can still be modified; when true, dirty changes throw {@see LockedModelException}.
+     */
     public function preventsModificationsOnLockedObjects(): bool
     {
         try {
@@ -99,11 +106,21 @@ final class Locked
         }
     }
 
+    /**
+     * Inverse of {@see preventsModificationsOnLockedObjects()}; early-exit in {@see LockedModelSubscriber} when true.
+     */
     public function allowsModificationsOnLockedObjects(): bool
     {
         return ! $this->preventsModificationsOnLockedObjects();
     }
 
+    /**
+     * Reads core.locking.prevent_notifications_to_locked_objects (name is misleading: returns the "prevent" flag, not "allow").
+     *
+     * Used by {@see LockedModelSubscriber::notificationSending()}: when this returns true, the listener returns false
+     * and cancels the notification before checking whether the notifiable is locked.
+     * When false, only locked {@see HasLocks} notifiables are blocked (via exception).
+     */
     public function allowsNotificationsToLockedObjects(): bool
     {
         try {

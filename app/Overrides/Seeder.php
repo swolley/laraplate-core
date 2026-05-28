@@ -6,8 +6,10 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Seeder as BaseSeeder;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Helpers\HasBenchmark;
 use Modules\Core\Helpers\HasSeedersUtils;
+use Modules\Core\Models\Setting;
 
 class Seeder extends BaseSeeder
 {
@@ -50,5 +52,41 @@ class Seeder extends BaseSeeder
         $flag = getenv(self::PARALLEL_BATCH_WORKER_ENV);
 
         return $flag === '1' || $flag === 'true';
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $definitions
+     */
+    protected function seedSettingDefinitions(array $definitions): void
+    {
+        if ($definitions === []) {
+            return;
+        }
+
+        $existing = Setting::query()
+            ->withoutGlobalScopes()
+            ->whereIn('name', array_column($definitions, 'name'))
+            ->select(['name'])
+            ->pluck('name')
+            ->flip()
+            ->all();
+
+        $newDefinitions = array_filter(
+            $definitions,
+            static fn (array $definition): bool => ! isset($existing[$definition['name']]),
+        );
+
+        if ($newDefinitions === []) {
+            $this->command?->line('    - runtime settings already exist');
+
+            return;
+        }
+
+        DB::transaction(function () use ($newDefinitions): void {
+            foreach ($newDefinitions as $definition) {
+                Setting::factory()->persistedWithoutApprovalCapture()->create($definition);
+                $this->command?->line("    - {$definition['name']} <fg=green>created</>");
+            }
+        });
     }
 }

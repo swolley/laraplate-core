@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(logging)* Enrich GELF metadata and add error fingerprint
+- *(settings)* Implement runtime configuration syncing and enhance settings management
+
+### 🚜 Refactor
+
+- *(tests)* Enhance testing structure and add integration tests
+- *(SearchEngineHealthTableWidget)* Improve error handling and index checking
+
+## [1.53.2] - 2026-05-21
+
 ### 🚜 Refactor
 
 - *(settings)* Unify settings retrieval and cache management

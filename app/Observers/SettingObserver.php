@@ -18,7 +18,7 @@ final class SettingObserver
 
     public function saved(Setting $setting): void
     {
-        app(SettingsCacheCoordinator::class)->flushSetting($setting);
+        app(SettingsCacheCoordinator::class)->flushSetting($setting, sync_runtime_config: true);
     }
 
     public function deleted(Setting $setting): void

@@ -68,6 +68,41 @@ it('invalidates settings on model save via observer', function (): void {
         ->and(Cache::has(PerModelSettingResolver::groupCacheKey('base')))->toBeTrue();
 });
 
+it('syncs runtime config on model save via observer after cache flush', function (): void {
+    config(['core.expose_crud_api' => true]);
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'core.expose_crud_api',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'core',
+        'description' => 'Expose CRUD API endpoints',
+    ]);
+
+    expect(config('core.expose_crud_api'))->toBeTrue();
+
+    $setting->setForcedApprovalUpdate(true);
+    $setting->value = false;
+    $setting->save();
+
+    expect(config('core.expose_crud_api'))->toBeFalse();
+});
+
+it('does not sync non-overlay settings onto runtime config when saved', function (): void {
+    config(['site' => ['default_language' => 'en']]);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'default_language',
+        'value' => 'it',
+        'type' => SettingTypeEnum::String,
+        'group_name' => 'base',
+        'description' => 'Default site language',
+    ]);
+
+    expect(config('default_language'))->toBeNull()
+        ->and(config('site.default_language'))->toBe('en');
+});
+
 it('flushes only the affected settings group', function (): void {
     $resolver = app(PerModelSettingResolver::class);
 

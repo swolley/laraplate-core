@@ -42,7 +42,7 @@ final class SettingsCacheCoordinator
         $this->group_invalidators[$group_name][] = $invalidator;
     }
 
-    public function flushSetting(Setting $setting): void
+    public function flushSetting(Setting $setting, bool $sync_runtime_config = false): void
     {
         $groups = [$setting->group_name];
         $original_group = $setting->getOriginal('group_name');
@@ -54,6 +54,10 @@ final class SettingsCacheCoordinator
         $this->flushGroups($groups);
         $this->flushNameIndex();
         $this->flushDerivedSettingsCaches();
+
+        if ($sync_runtime_config) {
+            $this->syncRuntimeConfig($setting);
+        }
     }
 
     /**
@@ -123,5 +127,14 @@ final class SettingsCacheCoordinator
         Cache::forget(self::FILAMENT_GROUP_OPTIONS_CACHE_KEY);
         Cache::forget(PerModelSettingResolver::cacheKey());
         Cache::forget(PerModelSettingResolver::legacyTableCacheKey());
+    }
+
+    private function syncRuntimeConfig(Setting $setting): void
+    {
+        if (! app()->bound(DatabaseConfigOverlay::class)) {
+            return;
+        }
+
+        app(DatabaseConfigOverlay::class)->applySetting($setting);
     }
 }

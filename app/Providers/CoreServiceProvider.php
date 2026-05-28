@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Http\Controllers\DocsController;
@@ -42,6 +43,7 @@ use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -77,6 +79,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        $this->app->make(DatabaseConfigOverlay::class)
+            ->applyFromDatabase($this->app->make(PerModelSettingResolver::class));
+        $this->configureFortifyFeatures();
 
         $this->registerAuths();
         $this->registerMiddlewares();
@@ -156,7 +162,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     protected function registerCommands(): void
     {
         $module_commands_subpath = config('modules.paths.generator.command.path');
-        $commands = $this->inspectFolderCommands($module_commands_subpath);
+        $commands = $this->inspectFolderCommands((string) $module_commands_subpath);
 
         $locking_commands_subpath = (string) Str::replace('Console', 'Locking/Console', $module_commands_subpath);
         $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
@@ -245,14 +251,14 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->singleton(static function (Application $app): ElasticsearchClient {
             $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
 
-            return ClientBuilder::fromConfig($config);
+            return ClientBuilder::fromConfig((array) $config);
         });
 
         // Register Typesense client
         $this->app->singleton(static function (Application $app): TypesenseClient {
             $config = config('scout.typesense.client-settings');
 
-            return new TypesenseClient($config);
+            return new TypesenseClient((array) $config);
         });
     }
 
@@ -298,6 +304,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(PerModelSettingResolver::class);
         $this->app->singleton(SettingsCacheCoordinator::class);
+        $this->app->singleton(DatabaseConfigOverlay::class);
 
         $this->app->singleton(ModerationAdapterRegistry::class);
 
@@ -314,6 +321,32 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function configureCommands(): void
     {
         DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    private function configureFortifyFeatures(): void
+    {
+        $features = [
+            Features::resetPasswords(),
+            Features::updateProfileInformation(),
+            Features::updatePasswords(),
+        ];
+
+        if (config('core.enable_user_registration')) {
+            $features[] = Features::registration();
+        }
+
+        if (config('core.verify_new_user')) {
+            $features[] = Features::emailVerification();
+        }
+
+        if (config('core.enable_user_2fa')) {
+            $features[] = Features::twoFactorAuthentication([
+                'confirm' => true,
+                'confirmPassword' => true,
+            ]);
+        }
+
+        config()?->set('fortify.features', $features);
     }
 
     private function registerMigrationOverrides(): void

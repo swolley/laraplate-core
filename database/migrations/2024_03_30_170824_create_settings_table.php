@@ -28,12 +28,12 @@ return new class() extends Migration
             ];
 
             $table->id();
-            $table->string('name', 50)->nullable(false)->unique("{$settings_table}_name_UN")->comment('The name of the setting');
+            $table->string('name')->nullable(false)->unique("{$settings_table}_name_UN")->comment('The name of the setting');
             $table->json('value')->nullable(false)->comment('The value of the setting');
             $table->boolean('encrypted')->nullable(false)->comment('Is the value encrypted');
             $table->json('choices')->nullable(true)->comment('Constrained available values');
             $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20])->comment('The type of the setting');
-            $table->string('group_name', 50)->nullable(false)->index("{$settings_table}_group_name_IDX")->comment('The group name of the setting');
+            $table->string('group_name')->nullable(false)->index("{$settings_table}_group_name_IDX")->comment('The group name of the setting');
             $table->string('description')->nullable(false)->comment('The description of the setting');
 
             MigrateUtils::timestamps(

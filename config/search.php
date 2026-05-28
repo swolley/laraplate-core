@@ -19,20 +19,20 @@ return [
     | Feature flags
     |--------------------------------------------------------------------------
     */
-    'features' => [
-        'reranker' => env('SEARCH_RERANKER_ENABLED', true),
-        'ensemble' => env('SEARCH_ENSEMBLE_ENABLED', true),
-    ],
+    // 'features' => [
+    //     'reranker' => env('SEARCH_RERANKER_ENABLED', true),
+    //     'ensemble' => env('SEARCH_ENSEMBLE_ENABLED', true),
+    // ],
 
     /*
     |--------------------------------------------------------------------------
     | Reranker configuration
     |--------------------------------------------------------------------------
     */
-    'reranker' => [
-        'top_k' => (int) env('SEARCH_RERANKER_TOP_K', 30),
-        'weight' => (float) env('SEARCH_RERANKER_WEIGHT', 0.5),
-    ],
+    // 'reranker' => [
+    //     'top_k' => (int) env('SEARCH_RERANKER_TOP_K', 30),
+    //     'weight' => (float) env('SEARCH_RERANKER_WEIGHT', 0.5),
+    // ],
 
     /*
     |--------------------------------------------------------------------------
@@ -56,11 +56,11 @@ return [
     | Configurazioni per la ricerca vettoriale (embedding).
     |
     */
-    'vector_search' => [
-        'enabled' => env('VECTOR_SEARCH_ENABLED', true),
-        'dimension' => env('VECTOR_DIMENSION', 768), // Default per OpenAI text-embedding-3-small
-        'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
-    ],
+    // 'vector_search' => [
+    //     'enabled' => env('VECTOR_SEARCH_ENABLED', true),
+    //     'dimension' => env('VECTOR_DIMENSION', 768), // Default per OpenAI text-embedding-3-small
+    //     'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
+    // ],
 
     /*
     |--------------------------------------------------------------------------

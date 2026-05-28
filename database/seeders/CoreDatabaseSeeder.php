@@ -63,6 +63,39 @@ final class CoreDatabaseSeeder extends Seeder
     }
 
     /**
+     * @return array<int, array{name: string, value: mixed, type: SettingTypeEnum, group_name: string, description: string, choices?: array<int, mixed>}>
+     */
+    public static function runtimeSettingDefinitions(): array
+    {
+        return [
+            self::setting('core.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
+            self::setting('core.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
+            self::setting('core.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('core.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
+            self::setting('core.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
+            self::setting('core.locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
+            self::setting('core.locking.prevent_modifications_on_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
+            self::setting('core.locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
+            self::setting('core.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
+            self::setting('core.dynamic_gridutils', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic grid utilities'),
+            self::setting('core.expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
+            self::setting('core.auto_translate_fallback_to_ai', true, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
+            self::setting('core.translation_cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
+            self::setting('core.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
+            self::setting('core.notifications.approvals.enabled', true, SettingTypeEnum::Boolean, 'approvals', 'Enable pending approval notifications'),
+            self::setting('core.notifications.approvals.channels', ['mail'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
+            self::setting('core.notifications.approvals.default_threshold_hours', 8, SettingTypeEnum::Integer, 'approvals', 'Default hours before pending approval notification'),
+            self::setting('search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
+            self::setting('search.features.ensemble', true, SettingTypeEnum::Boolean, 'search', 'Enable ensemble search'),
+            self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
+            self::setting('search.reranker.weight', 0.5, SettingTypeEnum::Float, 'search', 'Reranker score weight'),
+            self::setting('search.vector_search.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
+            self::setting('search.vector_search.dimension', 768, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
+            self::setting('search.vector_search.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
+        ];
+    }
+
+    /**
      * Seed the application's database.
      */
     public function run(): void
@@ -77,6 +110,23 @@ final class CoreDatabaseSeeder extends Seeder
         });
 
         Artisan::call('cache:clear');
+    }
+
+    private static function setting(string $name, mixed $value, SettingTypeEnum $type, string $group, string $description, ?array $choices = null): array
+    {
+        $definition = [
+            'name' => $name,
+            'value' => $value,
+            'type' => $type,
+            'group_name' => $group,
+            'description' => $description,
+        ];
+
+        if ($choices !== null) {
+            $definition['choices'] = $choices;
+        }
+
+        return $definition;
     }
 
     private function defaultPermissions(): void
@@ -276,6 +326,8 @@ final class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
+        array_push($default_settings, ...self::runtimeSettingDefinitions());
+
         $to_remove_settings = [];
 
         $all_models = models();
@@ -350,7 +402,7 @@ final class CoreDatabaseSeeder extends Seeder
             $this->deleteRefuses($to_remove_settings);
         }
 
-        $existing_settings = Setting::withoutGlobalScopes()
+        $existing_settings = Setting::query()->withoutGlobalScopes()
             ->whereIn('name', array_column($default_settings, 'name'))
             ->select(['name'])
             ->pluck('name')
@@ -527,7 +579,7 @@ final class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        $existing_crons = CronJob::withoutGlobalScopes()
+        $existing_crons = CronJob::query()->withoutGlobalScopes()
             ->pluck('name')
             ->flip()
             ->all();
@@ -584,7 +636,7 @@ final class CoreDatabaseSeeder extends Seeder
             ];
         }
 
-        $existing_settings = Setting::withoutGlobalScopes()
+        $existing_settings = Setting::query()->withoutGlobalScopes()
             ->whereIn('name', array_column($approval_settings, 'name'))
             ->select(['name'])
             ->pluck('name')
