@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(database)* Add table existence check in DatabaseConfigOverlay
+
+### 🧪 Testing
+
+- *(settings)* Update runtime settings definitions and enhance test expectations
+
+## [1.54.1] - 2026-05-28
+
+### 🐛 Bug Fixes
+
 - *(permissions)* Streamline permission handling in PermissionsRefreshCommand
 
 ## [1.54.0] - 2026-05-28

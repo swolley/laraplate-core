@@ -89,8 +89,8 @@ final class NominatimService extends AbstractGeocodingService
             province: $address['state'] ?? null,
             country: $address['country'] ?? null,
             postcode: $address['postcode'] ?? null,
-            latitude: $result['lat'] ?? null,
-            longitude: $result['lon'] ?? null,
+            latitude: isset($result['lat']) ? (float) $result['lat'] : null,
+            longitude: isset($result['lon']) ? (float) $result['lon'] : null,
             zone: $address['suburb'] ?? null,
         );
     }
