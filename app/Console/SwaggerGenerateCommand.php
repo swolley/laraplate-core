@@ -79,7 +79,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $filter = $this->option('filter') ?: null;
 
         /** @var string|null $file */
-        $file = $this->option('output') ?: resource_path('swagger') . DIRECTORY_SEPARATOR . $moduleName . '-swagger.json';
+        $file = $this->option('output') ?: swagger_doc_path($moduleName);
         $config = $this->resolveSwaggerConfig();
 
         if ($moduleName !== 'App') {
@@ -109,12 +109,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             ->format();
 
         if ($file) {
-            $committed_swagger_dir = resource_path('swagger');
-
-            if (
-                app()->environment('testing')
-                && str_starts_with($file, $committed_swagger_dir . DIRECTORY_SEPARATOR)
-            ) {
+            if (app()->environment('testing') && $this->isCommittedSwaggerPath($file)) {
                 throw new LaravelSwaggerException(
                     'Refusing to overwrite committed swagger assets during tests. Pass --output to a temporary path.',
                 );
@@ -178,6 +173,17 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $loaded = require $config_path;
 
         return $loaded;
+    }
+
+    private function isCommittedSwaggerPath(string $file): bool
+    {
+        foreach (modules(true, false, false) as $module_name) {
+            if ($file === swagger_doc_path($module_name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function verboseGeneration(array $doc, ?array $old_doc): void

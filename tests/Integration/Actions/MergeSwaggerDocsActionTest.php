@@ -30,8 +30,8 @@ it('merges app and module paths', function (): void {
 
         $action = new MergeSwaggerDocsAction(
             filesystem: $fs,
-            modulesProvider: static fn () => ['CMS'],
-            basePath: $tmpDir,
+            modulesProvider: static fn () => ['App', 'CMS'],
+            pathResolver: static fn (string $module): string => $tmpDir . '/' . $module . '-swagger.json',
         );
 
         $result = $action('v1');

@@ -13,53 +13,69 @@ final readonly class MergeSwaggerDocsAction
     public function __construct(
         private Filesystem $filesystem,
         private ?Closure $modulesProvider = null,
-        private ?string $basePath = null,
+        private ?Closure $pathResolver = null,
     ) {}
 
     public function __invoke(string $version): array
     {
-        $assetsPath = $this->basePath ?? resource_path('swagger');
-        $files = glob($assetsPath . DIRECTORY_SEPARATOR . '*-swagger.json');
         $modules = $this->modulesProvider instanceof Closure ? ($this->modulesProvider)() : modules(true, false, true);
+        $resolve_path = $this->pathResolver ?? static fn (string $module): string => swagger_doc_path($module);
+        $additional_paths = [];
+        $main_json = [];
 
-        $additionalPaths = [];
-        $mainJson = [];
+        $app_file = $resolve_path('App');
 
-        foreach ($files as $file) {
-            $shortName = str_replace($assetsPath . DIRECTORY_SEPARATOR, '', $file);
-            $json = json_decode($this->filesystem->get($file), true);
-            $json['paths'] = array_filter($json['paths'], function (string $path) use ($version): bool {
-                if (Str::contains($path, $version)) {
-                    return true;
-                }
+        if ($this->filesystem->exists($app_file)) {
+            $main_json = $this->loadFilteredDocument($app_file, $version);
+        }
 
-                return ! Str::contains($path, '/api/');
-            }, ARRAY_FILTER_USE_KEY);
-
-            if (Str::startsWith($shortName, 'App')) {
-                $mainJson = $json;
-
+        foreach ($modules as $module_name) {
+            if ($module_name === 'App') {
                 continue;
             }
 
-            $moduleName = str_replace(['-swagger.json'], '', $shortName);
+            $module_file = $resolve_path($module_name);
 
-            if (in_array($moduleName, $modules, true)) {
-                $additionalPaths = array_merge(
-                    $additionalPaths,
-                    array_filter(
-                        $json['paths'],
-                        fn (string $path): bool => Str::contains($path, $version) || ! Str::contains($path, '/api/'),
-                        ARRAY_FILTER_USE_KEY,
-                    ),
-                );
+            if (! $this->filesystem->exists($module_file)) {
+                continue;
             }
+
+            $module_json = $this->loadFilteredDocument($module_file, $version);
+            $additional_paths = array_merge(
+                $additional_paths,
+                $this->filterPaths($module_json['paths'] ?? [], $version),
+            );
         }
 
-        if ($additionalPaths !== []) {
-            $mainJson['paths'] = array_merge($mainJson['paths'] ?? [], $additionalPaths);
+        if ($additional_paths !== []) {
+            $main_json['paths'] = array_merge($main_json['paths'] ?? [], $additional_paths);
         }
 
-        return $mainJson;
+        return $main_json;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadFilteredDocument(string $file, string $version): array
+    {
+        /** @var array<string, mixed> $json */
+        $json = json_decode($this->filesystem->get($file), true);
+        $json['paths'] = $this->filterPaths($json['paths'] ?? [], $version);
+
+        return $json;
+    }
+
+    /**
+     * @param  array<string, mixed>  $paths
+     * @return array<string, mixed>
+     */
+    private function filterPaths(array $paths, string $version): array
+    {
+        return array_filter(
+            $paths,
+            static fn (string $path): bool => Str::contains($path, $version) || ! Str::contains($path, '/api/'),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 }

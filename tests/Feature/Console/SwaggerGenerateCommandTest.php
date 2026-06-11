@@ -220,7 +220,12 @@ it('refuses to overwrite committed swagger assets while the app is in testing en
 
     expect(fn () => $command->run(new ArrayInput([
         '--module' => 'App',
-        '--output' => resource_path('swagger/App-swagger.json'),
+        '--output' => swagger_doc_path('App'),
+    ]), new BufferedOutput()))->toThrow(LaravelSwaggerException::class);
+
+    expect(fn () => $command->run(new ArrayInput([
+        '--module' => 'Core',
+        '--output' => swagger_doc_path('Core'),
     ]), new BufferedOutput()))->toThrow(LaravelSwaggerException::class);
 });
 

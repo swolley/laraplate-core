@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(swagger)* Enhance Swagger documentation handling and path resolution
+
+## [1.54.3] - 2026-06-11
+
 ### 🐛 Bug Fixes
 
 - *(swagger)* Prevent overwriting committed swagger assets during testing

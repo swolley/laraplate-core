@@ -141,6 +141,22 @@ if (! function_exists('normalize_path')) {
     }
 }
 
+if (! function_exists('swagger_doc_path')) {
+    /**
+     * Resolve the committed OpenAPI document path for a module or the main app shell.
+     */
+    function swagger_doc_path(string $moduleName): string
+    {
+        $filename = $moduleName . '-swagger.json';
+
+        if ($moduleName === 'App') {
+            return resource_path('swagger' . DIRECTORY_SEPARATOR . $filename);
+        }
+
+        return module_path($moduleName, 'resources/swagger/' . $filename);
+    }
+}
+
 if (! function_exists('connections')) {
     /**
      * Get list of connections from models. Results are memoized per $onlyActive key.
