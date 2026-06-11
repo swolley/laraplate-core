@@ -20,7 +20,7 @@ final class ModelLockingRefreshCommand extends Command
      * The name and signature of the console command.
      */
     #[Override]
-    protected $signature = 'model:lock-refresh { --quiet: prevent output }';
+    protected $signature = 'model:lock-refresh';
 
     /**
      * The console command description.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesAddCommand;
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesRefreshCommand;
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesRemoveCommand;
+use Symfony\Component\Console\Application as SymfonyConsoleApplication;
 
 it('defines expected command signatures', function (): void {
     $add = new ReflectionClass(ModelSoftDeletesAddCommand::class);
@@ -32,5 +33,14 @@ it('refresh command reconciles trait-schema-setting consistency', function (): v
     expect($source)->toContain('model:soft-deletes-add')
         ->and($source)->toContain('model:soft-deletes-remove')
         ->and($source)->toContain('soft_deletes_');
+});
+
+it('refresh command merges application quiet option without duplicate definition', function (): void {
+    $command = app(ModelSoftDeletesRefreshCommand::class);
+    $command->setLaravel(app());
+    $command->setApplication(new SymfonyConsoleApplication('coverage', '1.0.0'));
+    $command->mergeApplicationDefinition();
+
+    expect($command->getDefinition()->hasOption('quiet'))->toBeTrue();
 });
 

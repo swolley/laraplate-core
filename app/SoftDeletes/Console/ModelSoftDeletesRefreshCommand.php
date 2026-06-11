@@ -20,7 +20,7 @@ use ReflectionClass;
 final class ModelSoftDeletesRefreshCommand extends Command
 {
     #[Override]
-    protected $signature = 'model:soft-deletes-refresh {--quiet : prevent output}';
+    protected $signature = 'model:soft-deletes-refresh';
 
     #[Override]
     protected $description = 'Check and reconcile SoftDeletes consistency (trait, schema and runtime setting) across models. <fg=green>(⚡ Modules\Core)</fg=green>';

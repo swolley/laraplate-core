@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\File;
 use Modules\Core\Console\SwaggerGenerateCommand;
+use Mtrajano\LaravelSwagger\LaravelSwaggerException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -97,6 +98,20 @@ function swaggerTestConfig(): void
     config(['laravel-swagger' => $swagger_config]);
 }
 
+/**
+ * @return array{base: string, output_file: string}
+ */
+function swaggerTempOutput(string $filename = 'swagger-out.json'): array
+{
+    $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'swagger_test_' . uniqid('', true);
+    mkdir($base, 0755, true);
+
+    return [
+        'base' => $base,
+        'output_file' => $base . DIRECTORY_SEPARATOR . $filename,
+    ];
+}
+
 beforeEach(function (): void {
     if (! is_array(config('laravel-swagger'))) {
         swaggerTestConfig();
@@ -106,10 +121,21 @@ beforeEach(function (): void {
 it('runs swagger generate handle and completes successfully', function (): void {
     swaggerTestConfig();
 
-    $command = app(SwaggerGenerateCommand::class);
-    $command->setLaravel(app());
-    $exit = $command->run(new ArrayInput([]), new BufferedOutput());
-    expect($exit)->toBe(0);
+    $temp = swaggerTempOutput('App-swagger.json');
+
+    try {
+        $command = app(SwaggerGenerateCommand::class);
+        $command->setLaravel(app());
+        $exit = $command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $temp['output_file'],
+        ]), new BufferedOutput());
+
+        expect($exit)->toBe(0)
+            ->and(is_file($temp['output_file']))->toBeTrue();
+    } finally {
+        File::deleteDirectory($temp['base']);
+    }
 });
 
 it('creates nested output directories when the output path parent is missing', function (): void {
@@ -119,14 +145,19 @@ it('creates nested output directories when the output path parent is missing', f
     $output_file = $base . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'deep' . DIRECTORY_SEPARATOR . 'swagger-out.json';
     expect(is_dir(dirname($output_file)))->toBeFalse();
 
-    $command = app(SwaggerGenerateCommand::class);
-    $command->setLaravel(app());
-    $exit = $command->run(new ArrayInput(['--output' => $output_file]), new BufferedOutput());
+    try {
+        $command = app(SwaggerGenerateCommand::class);
+        $command->setLaravel(app());
+        $exit = $command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $output_file,
+        ]), new BufferedOutput());
 
-    expect($exit)->toBe(0)
-        ->and(is_file($output_file))->toBeTrue();
-
-    File::deleteDirectory($base);
+        expect($exit)->toBe(0)
+            ->and(is_file($output_file))->toBeTrue();
+    } finally {
+        File::deleteDirectory($base);
+    }
 });
 
 it('parses existing JSON output as the previous document on a second run', function (): void {
@@ -136,13 +167,23 @@ it('parses existing JSON output as the previous document on a second run', funct
     mkdir($base, 0755, true);
     $output_file = $base . DIRECTORY_SEPARATOR . 'doc.json';
 
-    $command = app(SwaggerGenerateCommand::class);
-    $command->setLaravel(app());
+    try {
+        $command = app(SwaggerGenerateCommand::class);
+        $command->setLaravel(app());
 
-    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'json']), new BufferedOutput()))->toBe(0);
-    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'json']), new BufferedOutput()))->toBe(0);
-
-    File::deleteDirectory($base);
+        expect($command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $output_file,
+            '--format' => 'json',
+        ]), new BufferedOutput()))->toBe(0);
+        expect($command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $output_file,
+            '--format' => 'json',
+        ]), new BufferedOutput()))->toBe(0);
+    } finally {
+        File::deleteDirectory($base);
+    }
 });
 
 it('parses existing YAML output as the previous document on a second run', function (): void {
@@ -152,13 +193,35 @@ it('parses existing YAML output as the previous document on a second run', funct
     mkdir($base, 0755, true);
     $output_file = $base . DIRECTORY_SEPARATOR . 'doc.yaml';
 
+    try {
+        $command = app(SwaggerGenerateCommand::class);
+        $command->setLaravel(app());
+
+        expect($command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $output_file,
+            '--format' => 'yaml',
+        ]), new BufferedOutput()))->toBe(0);
+        expect($command->run(new ArrayInput([
+            '--module' => 'App',
+            '--output' => $output_file,
+            '--format' => 'yaml',
+        ]), new BufferedOutput()))->toBe(0);
+    } finally {
+        File::deleteDirectory($base);
+    }
+});
+
+it('refuses to overwrite committed swagger assets while the app is in testing environment', function (): void {
+    swaggerTestConfig();
+
     $command = app(SwaggerGenerateCommand::class);
     $command->setLaravel(app());
 
-    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'yaml']), new BufferedOutput()))->toBe(0);
-    expect($command->run(new ArrayInput(['--output' => $output_file, '--format' => 'yaml']), new BufferedOutput()))->toBe(0);
-
-    File::deleteDirectory($base);
+    expect(fn () => $command->run(new ArrayInput([
+        '--module' => 'App',
+        '--output' => resource_path('swagger/App-swagger.json'),
+    ]), new BufferedOutput()))->toThrow(LaravelSwaggerException::class);
 });
 
 it('skips modules that do not match the module filter option', function (): void {
@@ -178,9 +241,19 @@ it('skips modules that do not match the module filter option', function (): void
     expect($module_names)->not->toBeEmpty();
     expect($non_app)->not->toBeNull('testbench should register at least one module besides App (e.g. Core)');
 
-    $command = app(SwaggerGenerateCommand::class);
-    $command->setLaravel(app());
-    $exit = $command->run(new ArrayInput(['--module' => $non_app]), new BufferedOutput());
+    $temp = swaggerTempOutput($non_app . '-swagger.json');
 
-    expect($exit)->toBe(0);
+    try {
+        $command = app(SwaggerGenerateCommand::class);
+        $command->setLaravel(app());
+        $exit = $command->run(new ArrayInput([
+            '--module' => $non_app,
+            '--output' => $temp['output_file'],
+        ]), new BufferedOutput());
+
+        expect($exit)->toBe(0)
+            ->and(is_file($temp['output_file']))->toBeTrue();
+    } finally {
+        File::deleteDirectory($temp['base']);
+    }
 });

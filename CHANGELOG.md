@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(swagger)* Prevent overwriting committed swagger assets during testing
+
+### 📚 Documentation
+
+- *(docs)* Update PHPStan configuration paths and add glossary documentation
+
+### ⚙️ Miscellaneous Tasks
+
+- *(swagger)* Adjust padding for route display in SwaggerGenerateCommand
+
+## [1.54.2] - 2026-05-30
+
+### 🐛 Bug Fixes
+
 - *(database)* Add table existence check in DatabaseConfigOverlay
 
 ### 🧪 Testing

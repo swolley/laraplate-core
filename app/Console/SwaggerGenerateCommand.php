@@ -109,6 +109,17 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             ->format();
 
         if ($file) {
+            $committed_swagger_dir = resource_path('swagger');
+
+            if (
+                app()->environment('testing')
+                && str_starts_with($file, $committed_swagger_dir . DIRECTORY_SEPARATOR)
+            ) {
+                throw new LaravelSwaggerException(
+                    'Refusing to overwrite committed swagger assets during tests. Pass --output to a temporary path.',
+                );
+            }
+
             $folder = Str::beforeLast($file, DIRECTORY_SEPARATOR);
 
             if (! file_exists($folder)) {
