@@ -49,27 +49,27 @@ return new class extends Migration
         } elseif (in_array($driver_name, ['mysql', 'mariadb'], true)) {
             // MySQL/MariaDB non consentono il CHECK con colonna usata da una FK (errore 3823),
             // quindi usiamo trigger per bloccare parent_id = id.
-            DB::unprepared("
+            DB::unprepared(<<<SQL
                 CREATE TRIGGER taxonomies_parent_check_insert
                 BEFORE INSERT ON {$taxonomies_table}
                 FOR EACH ROW
                 BEGIN
                     IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN
-                        SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'parent_id cannot reference self\';
+                        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id cannot reference self';
                     END IF;
                 END;
-            ");
+            SQL);
 
-            DB::unprepared("
+            DB::unprepared(<<<SQL
                 CREATE TRIGGER taxonomies_parent_check_update
                 BEFORE UPDATE ON {$taxonomies_table}
                 FOR EACH ROW
                 BEGIN
                     IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN
-                        SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'parent_id cannot reference self\';
+                        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id cannot reference self';
                     END IF;
                 END;
-            ");
+            SQL);
         }
     }
 
