@@ -149,7 +149,7 @@ class Place extends Model
     }
 
     /**
-     * Match {@see \Modules\Core\Helpers\HasPlace::shouldPersistPlaceGeolocationGeometry}: avoid spatial bindings on SQLite tests.
+     * Match {@see \Modules\Core\Models\Concerns\HasPlace::shouldPersistPlaceGeolocationGeometry}: avoid spatial bindings on SQLite tests.
      */
     private function geometryColumnSupportsSpatialBinding(): bool
     {

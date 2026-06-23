@@ -6,7 +6,7 @@ namespace Modules\Core\Tests\Unit\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Helpers\ReadonlyModel;
+use Modules\Core\Models\Concerns\ReadonlyModel;
 
 final class ReadonlyModelStub extends Model
 {

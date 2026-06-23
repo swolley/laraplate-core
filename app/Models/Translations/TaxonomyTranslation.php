@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models\Translations;
 
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasSlug;
+use Modules\Core\Models\Concerns\HasSlug;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
 use Override;

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
-use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
 use Modules\Core\Models\ModelEmbedding;

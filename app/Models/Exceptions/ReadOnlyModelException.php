@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers\Exceptions;
+namespace Modules\Core\Models\Exceptions;
 
 use LogicException;
 

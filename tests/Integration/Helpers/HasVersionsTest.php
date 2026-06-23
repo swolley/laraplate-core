@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Jobs\CreateVersionJob;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;

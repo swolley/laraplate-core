@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 

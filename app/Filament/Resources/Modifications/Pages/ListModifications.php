@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Utils\HasRecords;
-use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Override;
 
 final class ListModifications extends ListRecords

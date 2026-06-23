@@ -65,7 +65,7 @@ it('discovers ERP models with forced version strategy DIFF', function (): void {
 });
 
 it('applies protected versionStrategy through HasVersions at runtime', function (): void {
-    Modules\Core\Helpers\HasVersions::resetVersionStrategyCache();
+    Modules\Core\Models\Concerns\HasVersions::resetVersionStrategyCache();
 
     $models = [
         Modules\ERP\Models\FiscalPeriod::class,

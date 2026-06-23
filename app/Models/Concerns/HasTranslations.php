@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\Models\Concerns;
 
 use Exception;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Modules\Core\Events\TranslatedModelSaved;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Services\PerModelSettingResolver;

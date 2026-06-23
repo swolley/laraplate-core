@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasActivation;
+use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;

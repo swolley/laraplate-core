@@ -10,8 +10,8 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasValidations;
+use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 

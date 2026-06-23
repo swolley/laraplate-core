@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;

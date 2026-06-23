@@ -6,9 +6,9 @@ namespace Modules\Core\Tests\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
-use Modules\Core\Helpers\HasApprovals;
-use Modules\Core\Helpers\HasTranslations;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Concerns\HasTranslations;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\SoftDeletes\SoftDeletes;

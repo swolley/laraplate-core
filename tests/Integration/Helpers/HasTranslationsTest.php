@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Helpers\HasTranslations;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;

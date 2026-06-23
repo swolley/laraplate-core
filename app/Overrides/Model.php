@@ -6,9 +6,9 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model as BaseModel;
-use Modules\Core\Helpers\HasPrefixedTableName;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasPrefixedTableName;
+use Modules\Core\Models\Concerns\HasValidations;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\SoftDeletes\SoftDeletes;
 
 /**

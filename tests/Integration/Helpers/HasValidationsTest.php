@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Models\Concerns\HasValidations;
 
 it('trait can be used', function (): void {
     $trait = new class

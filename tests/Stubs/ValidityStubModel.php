@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Models\Concerns\HasValidity;
 
 class ValidityStubModel extends Model
 {

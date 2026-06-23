@@ -12,9 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Modules\Core\Database\Factories\LicenseFactory;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasValidations;
-use Modules\Core\Helpers\HasValidity;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasValidations;
+use Modules\Core\Models\Concerns\HasValidity;
+use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 
 /**

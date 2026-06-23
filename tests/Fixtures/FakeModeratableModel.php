@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Models\Concerns\HasApprovals;
 
 class FakeModeratableModel extends Model
 {

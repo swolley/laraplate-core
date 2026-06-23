@@ -191,7 +191,7 @@ SOCIALITE_REDIRECT= 							#socialite redirect
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasVersions;
 
 class ... extends Model
 {
@@ -240,7 +240,7 @@ class ... extends Model
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Models\Concerns\HasValidations;
 
 class ... extends Model
 {
@@ -263,7 +263,7 @@ class ... extends Model
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasValidity;
+use Modules\Core\Models\Concerns\HasValidity;
 
 class ... extends Model
 {
@@ -520,7 +520,7 @@ This section tracks all pending tasks and issues that need to be addressed in th
   - Test DynamicEntity with Oracle and SQL Server databases
   - Current implementation may not be fully compatible
 
-- [ ] **Authentication Events Fix** - `Modules/Core/app/Helpers/HasValidations.php:97`
+- [ ] **Authentication Events Fix** - `Modules/Core/app/Models/Concerns/HasValidations.php:97`
   - FIXME: No events before retrieved, current implementation queries and then checks permissions
   - Need to implement proper event handling for user authorization
 
@@ -569,7 +569,7 @@ This section tracks all pending tasks and issues that need to be addressed in th
   - TODO: Review and improve Funnel component (`Modules/Core/app/Grids/Components/Funnel.php:43`)
   - TODO: Test Grid component implementation (`Modules/Core/app/Grids/Components/Grid.php:134`)
 
-- [ ] **Versioning Implementation** - `Modules/Core/app/Helpers/HasVersions.php:161,166`
+- [ ] **Versioning Implementation** - `Modules/Core/app/Models/Concerns/HasVersions.php:161,166`
   - TODO: May need override for multiple primary keys
   - TODO: Complete implementation for versioning functionality
 

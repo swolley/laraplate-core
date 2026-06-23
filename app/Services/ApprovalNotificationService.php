@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
-use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Notifications\PendingApprovalsNotification;

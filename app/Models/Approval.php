@@ -6,7 +6,7 @@ namespace Modules\Core\Models;
 
 use Approval\Models\Approval as BaseApproval;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasModerationMeta;
+use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
 
 /**

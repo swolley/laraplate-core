@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
-use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\User;
 
 

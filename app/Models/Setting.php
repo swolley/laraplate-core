@@ -11,7 +11,7 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasApprovals;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Observers\SettingObserver;
 use Modules\Core\Overrides\Model;
 use Override;

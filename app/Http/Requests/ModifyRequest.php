@@ -7,7 +7,7 @@ namespace Modules\Core\Http\Requests;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Casts\ModifyRequestData;
-use Modules\Core\Helpers\HasValidations;
+use Modules\Core\Models\Concerns\HasValidations;
 use Override;
 
 // use Illuminate\Foundation\Http\FormRequest;

@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Helpers\HasActivation;
+use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;

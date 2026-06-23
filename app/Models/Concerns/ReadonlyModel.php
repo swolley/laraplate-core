@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\Exceptions\ReadOnlyModelException;
+use Modules\Core\Models\Exceptions\ReadOnlyModelException;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model

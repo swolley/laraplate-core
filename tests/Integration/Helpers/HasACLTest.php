@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Helpers\HasACL;
+use Modules\Core\Models\Concerns\HasACL;
 
 it('trait can be used', function (): void {
     $trait = new class

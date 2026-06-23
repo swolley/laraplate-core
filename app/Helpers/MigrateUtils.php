@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Locking\Locked;
+use Modules\Core\Models\Concerns\HasValidity;
 
 final class MigrateUtils
 {

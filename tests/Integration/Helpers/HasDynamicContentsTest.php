@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Contracts\IDynamicEntityTypable;
-use Modules\Core\Helpers\HasDynamicContents;
+use Modules\Core\Models\Concerns\HasDynamicContents;
 
 it('stores and reads dynamic fields from components for models using HasDynamicContents', function (): void {
     $presettable = new class

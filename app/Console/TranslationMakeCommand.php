@@ -9,7 +9,7 @@ use function Laravel\Prompts\select;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
-use Modules\Core\Helpers\HasTranslations;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Override;
 use ReflectionClass;
 use Throwable;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\Models\Concerns;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;

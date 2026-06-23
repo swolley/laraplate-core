@@ -7,7 +7,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Events\Dispatcher;
-use Modules\Core\Helpers\Exceptions\ReadOnlyModelException;
+use Modules\Core\Models\Exceptions\ReadOnlyModelException;
 use Modules\Core\Tests\Unit\Helpers\ReadonlyModelStub;
 use Modules\Core\Tests\Unit\Helpers\ReadonlySoftDeletingStub;
 

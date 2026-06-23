@@ -6,7 +6,7 @@ namespace Modules\Core\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Helpers\HasTranslations;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModelFactory;
 

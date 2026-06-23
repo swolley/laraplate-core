@@ -6,7 +6,7 @@ namespace Modules\Core\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\CacheManager;
-use Modules\Core\Helpers\HasVersions;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Setting;
 
 /**

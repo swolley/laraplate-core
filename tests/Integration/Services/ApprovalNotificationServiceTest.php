@@ -297,7 +297,7 @@ it('usesHasApprovalsTrait returns true when trait is declared in parent class', 
     $method = (new ReflectionClass($service))->getMethod('usesHasApprovalsTrait');
     $method->setAccessible(true);
 
-    eval('namespace Modules\\Core\\Tests\\Tmp; class ApprovalParent extends \Illuminate\Database\Eloquent\Model { use \Modules\Core\Helpers\HasApprovals; }');
+    eval('namespace Modules\\Core\\Tests\\Tmp; class ApprovalParent extends \Illuminate\Database\Eloquent\Model { use \Modules\Core\Models\Concerns\HasApprovals; }');
     eval('namespace Modules\\Core\\Tests\\Tmp; class ApprovalChild extends ApprovalParent {}');
 
     expect($method->invoke($service, 'Modules\\Core\\Tests\\Tmp\\ApprovalChild'))->toBeTrue();
@@ -324,7 +324,7 @@ it('getModelsWithApprovals discovers models from Modules directory', function ()
 namespace Modules\CoverageModule\Models;
 class WithApprovals extends \Illuminate\Database\Eloquent\Model
 {
-    use \Modules\Core\Helpers\HasApprovals;
+    use \Modules\Core\Models\Concerns\HasApprovals;
     protected $table = 'coverage_with_approvals';
 }
 PHP);
