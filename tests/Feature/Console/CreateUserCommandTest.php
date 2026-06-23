@@ -40,7 +40,7 @@ it('command uses HasCommandUtils trait', function (): void {
     $reflection = new ReflectionClass(CreateUserCommand::class);
     $traits = $reflection->getTraitNames();
 
-    expect($traits)->toContain('Modules\Core\Helpers\HasCommandUtils');
+    expect($traits)->toContain('Modules\Core\Console\Concerns\HasCommandUtils');
 });
 
 it('command has correct namespace', function (): void {

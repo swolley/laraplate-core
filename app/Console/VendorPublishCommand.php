@@ -11,7 +11,7 @@ use function modules;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Console\VendorPublishCommand as BaseVendorPublishCommand;
 use Illuminate\Support\Str;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Override;
 
 final class VendorPublishCommand extends BaseVendorPublishCommand

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Traits;
 
-use Modules\Core\Helpers\HasCommandModelResolution;
+use Modules\Core\Console\Concerns\HasCommandModelResolution;
 
 trait SearchableCommandUtils
 {

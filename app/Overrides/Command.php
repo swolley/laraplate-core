@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Overrides;
 
 use Illuminate\Console\Command as BaseCommand;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Throwable;
 
 class Command extends BaseCommand

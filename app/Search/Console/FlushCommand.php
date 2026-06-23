@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Console;
 
 use Laravel\Scout\Console\FlushCommand as BaseFlushCommand;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 

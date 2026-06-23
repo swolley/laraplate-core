@@ -6,7 +6,7 @@ namespace Modules\Core\Search\Console;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Laravel\Scout\Console\ImportCommand as BaseImportCommand;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 use Symfony\Component\Console\Command\Command;

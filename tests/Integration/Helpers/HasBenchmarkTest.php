@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkHarness;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkSeederHarness;
 use Symfony\Component\Console\Input\ArrayInput;

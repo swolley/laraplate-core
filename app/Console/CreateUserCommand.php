@@ -14,7 +14,7 @@ use function Laravel\Prompts\text;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Helpers\HasCommandUtils;
+use Modules\Core\Console\Concerns\HasCommandUtils;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;

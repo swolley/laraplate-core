@@ -7,7 +7,7 @@ namespace Modules\Core\Console;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Overrides\ModuleDocGenerator;
 use Mtrajano\LaravelSwagger\FormatterManager;
 use Mtrajano\LaravelSwagger\GenerateSwaggerDoc as BaseGenerateSwaggerDoc;

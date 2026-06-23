@@ -6,7 +6,7 @@ namespace Modules\Core\Tests\Stubs\Benchmark;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Seeder;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 
 final class BenchmarkSeederHarness extends Seeder
 {

@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Contracts\IDynamicEntityTypable;
-use Modules\Core\Helpers\HasCommandUtils;
+use Modules\Core\Console\Concerns\HasCommandUtils;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Overrides\Command;

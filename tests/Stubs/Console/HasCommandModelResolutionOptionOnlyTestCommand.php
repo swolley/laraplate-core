@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Console;
 
 use Illuminate\Console\Command;
-use Modules\Core\Helpers\HasCommandModelResolution;
+use Modules\Core\Console\Concerns\HasCommandModelResolution;
 
 final class HasCommandModelResolutionOptionOnlyTestCommand extends Command
 {

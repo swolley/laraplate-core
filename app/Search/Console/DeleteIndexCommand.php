@@ -6,7 +6,7 @@ namespace Modules\Core\Search\Console;
 
 use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Helpers\HasBenchmark;
+use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 use Symfony\Component\Console\Command\Command;
