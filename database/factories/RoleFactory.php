@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Modules\Core\Helpers\HasUniqueFactoryValues;
+use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
 use Modules\Core\Models\Role;
 use Override;
 

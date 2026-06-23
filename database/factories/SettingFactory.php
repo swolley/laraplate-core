@@ -9,7 +9,7 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Modules\Core\Casts\SettingTypeEnum;
-use Modules\Core\Helpers\HasUniqueFactoryValues;
+use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
 use Modules\Core\Models\Setting;
 use Override;
 

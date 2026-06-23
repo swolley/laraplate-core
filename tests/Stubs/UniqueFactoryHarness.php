@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Tests\Stubs;
 
-use Modules\Core\Helpers\HasUniqueFactoryValues;
+use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
 
 final class UniqueFactoryHarness
 {

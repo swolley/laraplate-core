@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\Database\Factories\Concerns;
 
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FieldType;
+use Modules\Core\Models\Concerns\HasSlug;
 use Modules\Core\Models\Field;
 use RuntimeException;
 use stdClass;

@@ -7,7 +7,7 @@ namespace Modules\Core\Tests\Stubs\Seeders;
 use Illuminate\Console\Command;
 use Illuminate\Database\Seeder as BaseSeeder;
 use Illuminate\Support\Collection;
-use Modules\Core\Helpers\HasSeedersUtils;
+use Modules\Core\Database\Seeders\Concerns\HasSeedersUtils;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\SeedersBulkStubModel;
 

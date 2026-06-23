@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Helpers;
+namespace Modules\Core\Database\Factories\Concerns;
 
 use Exception;
 use Illuminate\Database\Eloquent\Model;

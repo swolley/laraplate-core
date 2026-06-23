@@ -7,8 +7,8 @@ namespace Modules\Core\Overrides;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Seeder as BaseSeeder;
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Helpers\HasBenchmark;
-use Modules\Core\Helpers\HasSeedersUtils;
+use Modules\Core\Console\Concerns\HasBenchmark;
+use Modules\Core\Database\Seeders\Concerns\HasSeedersUtils;
 use Modules\Core\Models\Setting;
 
 class Seeder extends BaseSeeder
