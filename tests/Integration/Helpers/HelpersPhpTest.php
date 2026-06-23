@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Helpers\HasCrudOperations;
+use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 
 
 it('normalize_path uses directory separators', function (): void {

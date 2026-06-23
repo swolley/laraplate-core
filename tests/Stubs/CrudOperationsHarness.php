@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\ListRequestData;
-use Modules\Core\Helpers\HasCrudOperations;
+use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Models\User;
 use ReflectionMethod;
 
