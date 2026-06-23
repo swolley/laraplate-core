@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(migration)* Use heredoc for MySQL taxonomy parent triggers
+
+### 🚜 Refactor
+
+- *(core)* Move Eloquent traits from Helpers to Models/Concerns
+- *(core)* Move command traits from Helpers to Console/Concerns
+- *(core)* Move database traits from Helpers to Database concerns
+- *(core)* Move HasCrudOperations to Services/Crud/Concerns
+
+## [1.54.4] - 2026-06-11
+
 ### 🚜 Refactor
 
 - *(swagger)* Enhance Swagger documentation handling and path resolution

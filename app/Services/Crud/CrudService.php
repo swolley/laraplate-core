@@ -28,7 +28,7 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
-use Modules\Core\Helpers\HasCrudOperations;
+use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
