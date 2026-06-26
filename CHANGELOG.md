@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(core)* Update trait namespaces and improve type declarations
+
+## [1.54.5] - 2026-06-23
+
 ### 🐛 Bug Fixes
 
 - *(migration)* Use heredoc for MySQL taxonomy parent triggers
@@ -14,6 +20,10 @@ All notable changes to this project will be documented in this file.
 - *(core)* Move command traits from Helpers to Console/Concerns
 - *(core)* Move database traits from Helpers to Database concerns
 - *(core)* Move HasCrudOperations to Services/Crud/Concerns
+
+### ⚙️ Miscellaneous Tasks
+
+- *(core)* Release v1.54.5
 
 ## [1.54.4] - 2026-06-11
 
