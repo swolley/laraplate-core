@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
-use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Console\Concerns\HasCommandUtils;
+use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Overrides\Command;
@@ -32,7 +32,7 @@ final class CreateEntityCommand extends Command
     /**
      * @var list<string>
      */
-    private const PROMPTED_ENTITY_ATTRIBUTES = ['name', 'slug', 'type'];
+    private const array PROMPTED_ENTITY_ATTRIBUTES = ['name', 'slug', 'type'];
 
     /**
      * The name and signature of the console command.
@@ -75,6 +75,7 @@ final class CreateEntityCommand extends Command
                 if (! in_array($attribute, $fillables, true)) {
                     continue;
                 }
+
                 if ($attribute === 'name' && $entity->name) {
                     continue;
                 }
@@ -177,9 +178,7 @@ final class CreateEntityCommand extends Command
         $method->setAccessible(true);
 
         /** @var class-string<IDynamicEntityTypable> $entity_type_class */
-        $entity_type_class = $method->invoke(null);
-
-        return $entity_type_class;
+        return $method->invoke(null);
     }
 
     private function assignFieldToPreset(Preset $preset, Field $field, bool $is_required): void

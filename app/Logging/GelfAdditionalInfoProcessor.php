@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Logging;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
@@ -15,11 +14,10 @@ use Throwable;
 
 final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
 {
-    /** @var array<string, string|null> */
-    private static array $moduleVersionCache = [];
-
-    /** @var list<string> */
-    private const SKIP_CLASS_PARTIALS = [
+    /**
+     * @var list<string>
+     */
+    private const array SKIP_CLASS_PARTIALS = [
         'Monolog\\',
         'Illuminate\\Log\\',
         'Illuminate\\Support\\Facades\\',
@@ -30,10 +28,18 @@ final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
         'Pest\\',
     ];
 
-    private const SKIP_FUNCTIONS = [
+    /**
+     * @var list<string>
+     */
+    private const array SKIP_FUNCTIONS = [
         'call_user_func',
         'call_user_func_array',
     ];
+
+    /**
+     * @var array<string, string|null>
+     */
+    private array $moduleVersionCache;
 
     private PsrLogMessageProcessor $psrLogMessageProcessor;
 
@@ -45,6 +51,7 @@ final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
     ) {
         $this->psrLogMessageProcessor = new PsrLogMessageProcessor(removeUsedContextFields: true);
         $this->fingerprint_resolver = $fingerprint_resolver ?? new GelfErrorFingerprintResolver;
+        $this->moduleVersionCache = [];
     }
 
     #[Override]
@@ -165,14 +172,14 @@ final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
             return null;
         }
 
-        if (array_key_exists($module, self::$moduleVersionCache)) {
-            return self::$moduleVersionCache[$module];
+        if (array_key_exists($module, $this->moduleVersionCache)) {
+            return $this->moduleVersionCache[$module];
         }
 
         $composer_path = module_path($module, 'composer.json');
 
         if (! is_file($composer_path)) {
-            self::$moduleVersionCache[$module] = null;
+            $this->moduleVersionCache[$module] = null;
 
             return null;
         }
@@ -182,7 +189,7 @@ final readonly class GelfAdditionalInfoProcessor implements ProcessorInterface
             ? $composer['version']
             : null;
 
-        self::$moduleVersionCache[$module] = $resolved;
+        $this->moduleVersionCache[$module] = $resolved;
 
         return $resolved;
     }

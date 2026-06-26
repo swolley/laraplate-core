@@ -1092,7 +1092,7 @@ describe('addTraitToModel', function (): void {
 
         $content = file_get_contents($this->fixture_path);
 
-        expect($content)->toContain('use Modules\\Core\\Helpers\\HasTranslations;');
+        expect($content)->toContain('use Modules\\Core\\Models\\Concerns\\HasTranslations;');
     });
 
     it('adds use HasTranslations statement inside class body', function (): void {
@@ -1150,7 +1150,7 @@ describe('addTraitToModel', function (): void {
 
         $content = file_get_contents($this->fixture_path);
 
-        expect(mb_substr_count($content, 'use Modules\\Core\\Helpers\\HasTranslations;'))->toBe(1);
+        expect(mb_substr_count($content, 'use Modules\\Core\\Models\\Concerns\\HasTranslations;'))->toBe(1);
         expect(mb_substr_count($content, 'use HasTranslations;'))->toBe(1);
     });
 

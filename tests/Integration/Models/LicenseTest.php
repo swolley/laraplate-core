@@ -17,8 +17,8 @@ it('license model uses correct traits', function (): void {
     $traits = class_uses_recursive(License::class);
 
     expect($traits)->toHaveKey('Illuminate\\Database\\Eloquent\\Factories\\HasFactory')
-        ->and($traits)->toHaveKey('Modules\\Core\\Helpers\\HasValidations')
-        ->and($traits)->toHaveKey('Modules\\Core\\Helpers\\HasValidity');
+        ->and($traits)->toHaveKey('Modules\\Core\\Models\\Concerns\\HasValidations')
+        ->and($traits)->toHaveKey('Modules\\Core\\Models\\Concerns\\HasValidity');
 });
 
 it('license model has required methods', function (): void {

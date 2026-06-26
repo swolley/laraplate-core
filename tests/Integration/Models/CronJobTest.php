@@ -22,7 +22,7 @@ it('cron job model uses correct traits', function (): void {
     $reflection = new ReflectionClass(CronJob::class);
     $traits = $reflection->getTraitNames();
 
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasActivation');
+    expect($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasActivation');
     expect($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks');
 });
 

@@ -22,8 +22,8 @@ it('role model uses correct traits', function (): void {
 
     expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory')
         ->and($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks')
-        ->and($traits)->toContain('Modules\\Core\\Helpers\\HasValidations')
-        ->and($traits)->toContain('Modules\\Core\\Helpers\\HasVersions')
+        ->and($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasValidations')
+        ->and($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasVersions')
         ->and($traits)->toContain('Modules\\Core\\SoftDeletes\\SoftDeletes');
 });
 

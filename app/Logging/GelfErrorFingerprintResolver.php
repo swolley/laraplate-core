@@ -9,8 +9,10 @@ use Throwable;
 
 final class GelfErrorFingerprintResolver
 {
-    /** @var list<string> */
-    private const SKIP_CLASS_PARTIALS = [
+    /**
+     * @var list<string>
+     */
+    private const array SKIP_CLASS_PARTIALS = [
         'Monolog\\',
         'Illuminate\\Log\\',
         'Illuminate\\Support\\Facades\\',
@@ -21,7 +23,10 @@ final class GelfErrorFingerprintResolver
         'Pest\\',
     ];
 
-    private const SKIP_FUNCTIONS = [
+    /**
+     * @var list<string>
+     */
+    private const array SKIP_FUNCTIONS = [
         'call_user_func',
         'call_user_func_array',
     ];
@@ -179,7 +184,7 @@ final class GelfErrorFingerprintResolver
         $base_path = base_path() . DIRECTORY_SEPARATOR;
 
         if (str_starts_with($path, $base_path)) {
-            return str_replace('\\', '/', substr($path, strlen($base_path)));
+            return str_replace('\\', '/', mb_substr($path, mb_strlen($base_path)));
         }
 
         return str_replace('\\', '/', $path);
@@ -211,7 +216,7 @@ final class GelfErrorFingerprintResolver
             $normalized,
         ) ?? $normalized;
 
-        return trim($normalized);
+        return mb_trim($normalized);
     }
 
     /**
@@ -219,6 +224,6 @@ final class GelfErrorFingerprintResolver
      */
     private function hash(array $parts): string
     {
-        return substr(hash('sha256', implode("\0", $parts)), 0, 16);
+        return mb_substr(hash('sha256', implode("\0", $parts)), 0, 16);
     }
 }

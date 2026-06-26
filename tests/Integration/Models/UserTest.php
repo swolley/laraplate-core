@@ -42,8 +42,8 @@ it('user model uses correct traits', function (): void {
     expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
     expect($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks');
     expect($traits)->toContain('Spatie\\Permission\\Traits\\HasRoles');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidations');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasVersions');
+    expect($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasValidations');
+    expect($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasVersions');
     expect($traits)->toContain('Illuminate\\Notifications\\Notifiable');
     expect($traits)->toContain('Modules\\Core\\SoftDeletes\\SoftDeletes');
     expect($traits)->toContain('Laravel\\Fortify\\TwoFactorAuthenticatable');

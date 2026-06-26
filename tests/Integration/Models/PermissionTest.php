@@ -24,7 +24,7 @@ it('permission model uses correct traits', function (): void {
 
     expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
     expect($traits)->toContain('Modules\\Core\\Cache\\HasCache');
-    expect($traits)->toContain('Modules\\Core\\Helpers\\HasValidations');
+    expect($traits)->toContain('Modules\\Core\\Models\\Concerns\\HasValidations');
 });
 
 it('permission model has required methods', function (): void {

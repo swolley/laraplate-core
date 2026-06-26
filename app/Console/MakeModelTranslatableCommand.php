@@ -436,7 +436,7 @@ class MakeModelTranslatableCommand extends Command
 
         $content = file_get_contents($file_path);
 
-        $import_line = 'use Modules\\Core\\Helpers\\HasTranslations;';
+        $import_line = 'use Modules\\Core\\Models\\Concerns\\HasTranslations;';
 
         if (! str_contains($content, $import_line)) {
             preg_match_all('/^use [^;]+;$/m', $content, $matches, PREG_OFFSET_CAPTURE);
