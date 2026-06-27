@@ -25,8 +25,6 @@ use Illuminate\Support\Str;
  * 3. Dynamic fields (from preset configuration)
  *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
- *
- * @template TModel of \Illuminate\Database\Eloquent\Model
  */
 trait HasTranslatedDynamicContents
 {
