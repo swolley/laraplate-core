@@ -7,7 +7,7 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\CrudExecutor;
 
 /**
@@ -147,37 +147,37 @@ trait HasValidations
     {
         // FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
         static::retrieved(function (Model $model): void {
-            throw_unless(static::checkUserCanDo($model, 'select'), UnauthorizedException::class, 'User cannot select ' . $model->getTable());
+            throw_unless(static::checkUserCanDo($model, 'select'), AuthorizationException::class, 'User cannot select ' . $model->getTable());
         });
         static::creating(function (Model $model): void {
-            throw_unless(static::checkUserCanDo($model, 'insert'), UnauthorizedException::class, 'User cannot insert ' . $model->getTable());
+            throw_unless(static::checkUserCanDo($model, 'insert'), AuthorizationException::class, 'User cannot insert ' . $model->getTable());
 
             if (! $model->shouldSkipValidation()) {
                 $model->validateWithRules(CrudExecutor::INSERT);
             }
         });
         static::updating(function (Model $model): void {
-            throw_unless(static::checkUserCanDo($model, 'update'), UnauthorizedException::class, 'User cannot update ' . $model->getTable());
+            throw_unless(static::checkUserCanDo($model, 'update'), AuthorizationException::class, 'User cannot update ' . $model->getTable());
 
             if (! $model->isDirty('deleted_at') && ! $model->shouldSkipValidation()) {
                 $model->validateWithRules(CrudExecutor::UPDATE);
             }
         });
         static::deleting(function (Model $model): void {
-            throw_if((! method_exists($model, 'isForceDeleting') || $model->isForceDeleting()) && ! static::checkUserCanDo($model, 'forceDelete'), UnauthorizedException::class, 'User cannot delete ' . $model->getTable());
+            throw_if((! method_exists($model, 'isForceDeleting') || $model->isForceDeleting()) && ! static::checkUserCanDo($model, 'forceDelete'), AuthorizationException::class, 'User cannot delete ' . $model->getTable());
 
-            throw_unless(static::checkUserCanDo($model, 'delete'), UnauthorizedException::class, 'User cannot soft delete ' . $model->getTable());
+            throw_unless(static::checkUserCanDo($model, 'delete'), AuthorizationException::class, 'User cannot soft delete ' . $model->getTable());
         });
 
         if (method_exists(static::class, 'forceDeleting')) {
             static::forceDeleting(function (Model $model): void {
-                throw_unless(static::checkUserCanDo($model, 'forceDelete'), UnauthorizedException::class, 'User cannot delete ' . $model->getTable());
+                throw_unless(static::checkUserCanDo($model, 'forceDelete'), AuthorizationException::class, 'User cannot delete ' . $model->getTable());
             });
         }
 
         if (method_exists(static::class, 'restoring')) {
             static::restoring(function (Model $model): void {
-                throw_unless(static::checkUserCanDo($model, 'restore'), UnauthorizedException::class, 'User cannot restore ' . $model->getTable());
+                throw_unless(static::checkUserCanDo($model, 'restore'), AuthorizationException::class, 'User cannot restore ' . $model->getTable());
             });
         }
     }

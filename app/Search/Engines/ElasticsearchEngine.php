@@ -6,7 +6,8 @@ namespace Modules\Core\Search\Engines;
 
 use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Exception;
-use Illuminate\Database\Eloquent\Collection;
+use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -45,7 +46,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         try {
             $matched = $this->matchModelToCollectionName($name);
 
-            throw_if($matched === null, Exception::class, 'Unable to resolve collection name for index creation.');
+            throw_if($matched === null, SearchCollectionResolutionException::class, 'Unable to resolve collection name for index creation.');
 
             $model = $matched['model'];
             $collection = $matched['collection'];
@@ -62,7 +63,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             } elseif (method_exists($model, 'toSearchableIndex')) {
                 $schema = $model->toSearchableIndex();
             } else {
-                throw new Exception('No schema definition method found on model ' . $model::class);
+                throw new MissingSearchSchemaException('No schema definition method found on model ' . $model::class);
             }
 
             if ($force) {

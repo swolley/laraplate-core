@@ -79,7 +79,7 @@ final readonly class GetGridConfigsAction
      * @throws ExpectationFailedException
      * @throws FrameworkException
      * @throws Exception
-     * @throws \Illuminate\Validation\UnauthorizedException
+     * @throws \Illuminate\Auth\Access\AuthorizationException
      */
     private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request): ?array
     {

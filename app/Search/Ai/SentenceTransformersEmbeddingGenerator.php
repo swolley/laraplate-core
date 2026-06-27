@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Ai;
 
-use Exception;
 use GuzzleHttp\Client;
+use InvalidArgumentException;
+use Modules\Core\Search\Exceptions\EmbeddingsException;
 use JsonException;
 use LLPhant\Embeddings\Document;
 use LLPhant\Embeddings\DocumentUtils;
@@ -71,9 +72,9 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
         $searchResults = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-        throw_unless(is_array($searchResults), Exception::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
+        throw_unless(is_array($searchResults), EmbeddingsException::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
 
-        throw_unless(isset($searchResults['embeddings']), Exception::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
+        throw_unless(isset($searchResults['embeddings']), EmbeddingsException::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
 
         return $searchResults['embeddings'][0];
     }
@@ -97,7 +98,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
      */
     public function embedDocuments(array $documents): array
     {
-        throw_if($this->batch_size_limit <= 0, Exception::class, 'Batch size limit must be greater than 0.');
+        throw_if($this->batch_size_limit <= 0, InvalidArgumentException::class, 'Batch size limit must be greater than 0.');
 
         // Process documents in batches
         $batches = array_chunk($documents, $this->batch_size_limit);
@@ -122,9 +123,9 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
 
             $searchResults = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-            throw_unless(is_array($searchResults), Exception::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
+            throw_unless(is_array($searchResults), EmbeddingsException::class, "Request to SentenceTransformers didn't returned an array: " . $response->getBody()->getContents());
 
-            throw_unless(isset($searchResults['embeddings']), Exception::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
+            throw_unless(isset($searchResults['embeddings']), EmbeddingsException::class, "Request to SentenceTransformers didn't returned expected format: " . $response->getBody()->getContents());
 
             // Assign embeddings to documents in this batch
             $embeddings = $searchResults['embeddings'];
@@ -132,7 +133,7 @@ final class SentenceTransformersEmbeddingGenerator implements EmbeddingGenerator
             $embeddingsCount = count($embeddings);
 
             // Check if embeddings count matches batch size
-            throw_if($embeddingsCount !== $batchSize, Exception::class, sprintf('Embeddings count mismatch: expected %d, got %d. Response: ', $batchSize, $embeddingsCount) . json_encode($searchResults));
+            throw_if($embeddingsCount !== $batchSize, EmbeddingsException::class, sprintf('Embeddings count mismatch: expected %d, got %d. Response: ', $batchSize, $embeddingsCount) . json_encode($searchResults));
 
             for ($i = 0; $i < $batchSize; $i++) {
                 $batch[$i]->embedding = $embeddings[$i];

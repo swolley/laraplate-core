@@ -28,11 +28,11 @@ return new class() extends Migration
         $role_has_permissions_table = $tableNames['role_has_permissions'];
 
         if ($tableNames === '' || $tableNames === null) {
-            throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new RuntimeException('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         if ($teams && ($columnNames['team_foreign_key'] ?? null) === null) {
-            throw new Exception('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new RuntimeException('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         Schema::create($permissions_table, function (Blueprint $table) use ($permissions_table): void {
@@ -134,7 +134,7 @@ return new class() extends Migration
                 END
             ");
         } else {
-            throw new Exception('Unsupported database driver');
+            throw new RuntimeException('Unsupported database driver');
         }
 
         Schema::create($roles_table, function (Blueprint $table) use ($teams, $columnNames, $roles_table): void {
@@ -268,7 +268,7 @@ return new class() extends Migration
         $tableNames = config('permission.table_names');
 
         if ($tableNames === '' || $tableNames === null) {
-            throw new Exception('Error: config/permission.php not found and defaults could not be merged. Please publish the package configuration before proceeding, or drop the tables manually.');
+            throw new RuntimeException('Error: config/permission.php not found and defaults could not be merged. Please publish the package configuration before proceeding, or drop the tables manually.');
         }
 
         Schema::drop($tableNames['role_has_permissions']);

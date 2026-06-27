@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Exception;
+use Modules\Core\Exceptions\AmbiguousModelException;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -209,7 +209,7 @@ final class DynamicEntity extends Model
             }
         }
 
-        throw_if(count($found) > 1, Exception::class, sprintf("Too many models found for '%s'", $modelName));
+        throw_if(count($found) > 1, AmbiguousModelException::class, sprintf("Too many models found for '%s'", $modelName));
 
         return count($found) === 1 ? head($found) : null;
     }

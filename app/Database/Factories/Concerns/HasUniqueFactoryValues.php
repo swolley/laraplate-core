@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories\Concerns;
 
-use Exception;
+use RuntimeException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Throwable;
@@ -61,7 +61,7 @@ trait HasUniqueFactoryValues
                 if (count($attempting_values) > 0) {
                     break;
                 }
-                throw_if($attempts >= $maxAttempts, Exception::class, 'Failed to generate a unique value after ' . $maxAttempts . ' attempts');
+                throw_if($attempts >= $maxAttempts, RuntimeException::class, 'Failed to generate a unique value after ' . $maxAttempts . ' attempts');
             } else {
                 break;
             }

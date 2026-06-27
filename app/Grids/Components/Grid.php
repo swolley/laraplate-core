@@ -1036,7 +1036,7 @@ final class Grid extends Entity
         // DB::rollBack();
         // $this->setNotModifiedData();
 
-        throw new Exception('Not implemented');
+        throw new BadMethodCallException('Not implemented');
     }
 
     // private function getPrimaryKeyFromRequest(Request $request, string $key)
@@ -1064,17 +1064,17 @@ final class Grid extends Entity
         $query = $this->withTrashed() ? $this->getModel()::withTrashed() : $this->getModel()::query();
         $query->findOrFail($primary_value);
 
-        throw new Exception('Not implemented');
+        throw new BadMethodCallException('Not implemented');
     }
 
     private function softDeleteRecords(): never
     {
-        throw new Exception('Not implemented');
+        throw new BadMethodCallException('Not implemented');
     }
 
     private function forceDeleteRecords(): never
     {
-        throw new Exception('Not implemented');
+        throw new BadMethodCallException('Not implemented');
     }
 
     // endregion [EXECUTION]

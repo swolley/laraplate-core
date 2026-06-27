@@ -7,7 +7,7 @@ namespace Modules\Core\Grids\Definitions;
 use function PHPUnit\Framework\assertInstanceOf;
 
 use Closure;
-use Exception;
+use LogicException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -704,7 +704,7 @@ abstract class Entity
                 if ($this->isCurrentEntity($path)) {
                     $field = $field($this->getModel());
                 } else {
-                    throw new Exception('Cosa devo fare in questo caso?');
+                    throw new LogicException('Nested field closure path does not resolve to the current entity model.');
                 }
             }
 

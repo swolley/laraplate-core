@@ -10,10 +10,12 @@ use Modules\Core\Enums\CoreTables;
 use Override;
 
 /**
+ * @property int|null $id
+ * @property bool $active
+ * @property int $approvers_required
+ * @property int $disapprovers_required
+ * @property string|null $modifiable_type
  * @property-read array<string, mixed>|null $latest_automated_vote_meta
- */
-
-/**
  * @mixin \Eloquent
  * @mixin IdeHelperModification
  */

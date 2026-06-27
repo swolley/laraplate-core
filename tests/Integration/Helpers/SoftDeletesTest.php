@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
 
 
@@ -40,9 +40,9 @@ it('throws when updating a trashed model', function (): void {
 
     try {
         $model->update(['name' => 'b']);
-        expect(false)->toBeTrue('Expected UnauthorizedException');
+        expect(false)->toBeTrue('Expected AuthorizationException');
     } catch (Throwable $e) {
-        expect($e)->toBeInstanceOf(UnauthorizedException::class);
+        expect($e)->toBeInstanceOf(AuthorizationException::class);
         expect($e->getMessage())->toContain('Cannot update');
     }
 });

@@ -43,12 +43,15 @@ use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\Permission\Traits\HasRoles;
 
-#[ObservedBy([UserObserver::class])]
 /**
+ * @property int|null $id
+ * @property string|null $name
+ * @property string $email
  * @property BelongsToMany $roles
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
+#[ObservedBy([UserObserver::class])]
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
 {
     use ApprovesChanges;

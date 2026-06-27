@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
+use Modules\Core\Exceptions\ConfigurationException;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Console\Migrations\StatusCommand as LaravelStatusCommand;
@@ -119,7 +120,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     #[Override]
     public function register(): void
     {
-        throw_unless(is_subclass_of(user_class(), CoreUser::class), Exception::class, 'User class is not ' . CoreUser::class);
+        throw_unless(is_subclass_of(user_class(), CoreUser::class), ConfigurationException::class, 'User class is not ' . CoreUser::class);
 
         parent::register();
 

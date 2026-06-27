@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Engines;
 
 use Exception;
-use Illuminate\Database\Eloquent\Collection;
+use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Date;
@@ -46,7 +47,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         try {
             $matched = $this->matchModelToCollectionName($name);
 
-            throw_if($matched === null, Exception::class, 'Unable to resolve collection name for index creation.');
+            throw_if($matched === null, SearchCollectionResolutionException::class, 'Unable to resolve collection name for index creation.');
 
             $model = $matched['model'];
             $collection = $matched['collection'];
@@ -60,7 +61,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             } elseif (method_exists($model, 'toSearchableIndex')) {
                 $schema = $model->toSearchableIndex();
             } else {
-                throw new Exception('No schema definition method found on model ' . $model::class);
+                throw new MissingSearchSchemaException('No schema definition method found on model ' . $model::class);
             }
 
             if ($force) {

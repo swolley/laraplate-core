@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Helpers\ResponseBuilder;
@@ -32,7 +32,7 @@ final class GridsController extends Controller
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_BAD_REQUEST);
-        } catch (UnauthorizedException $ex) {
+        } catch (AuthorizationException $ex) {
             $response_builder
                 ->setData($ex)
                 ->setStatus(Response::HTTP_UNAUTHORIZED);
@@ -45,7 +45,7 @@ final class GridsController extends Controller
     {
         try {
             return ($this->processGridAction)($request, $entity);
-        } catch (UnexpectedValueException|UnauthorizedException $ex) {
+        } catch (UnexpectedValueException|AuthorizationException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
                 ->json();

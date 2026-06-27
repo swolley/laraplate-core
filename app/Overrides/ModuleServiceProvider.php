@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Exception;
+use Modules\Core\Exceptions\ConfigurationException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Str;
@@ -31,7 +31,7 @@ class ModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         if ($this->name !== 'Core') {
-            throw_unless(Module::find('Core'), Exception::class, 'Core is required and must be enabled');
+            throw_unless(Module::find('Core'), ConfigurationException::class, 'Core is required and must be enabled');
         }
 
         $this->registerConfig();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-use Exception;
+use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Models\DynamicEntity;
@@ -22,7 +22,7 @@ class CrudRequestData
     {
         $this->connection = $validated['connection'] ?? null;
 
-        throw_if($this->mainEntity === '', Exception::class, 'Main entity is required');
+        throw_if($this->mainEntity === '', InvalidArgumentException::class, 'Main entity is required');
 
         $this->model = DynamicEntity::resolve($this->mainEntity, $this->connection, request: $this->request, module: $this->module);
     }

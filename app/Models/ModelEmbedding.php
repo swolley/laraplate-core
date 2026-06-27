@@ -12,6 +12,10 @@ use Modules\Core\Enums\CoreTables;
 use Override;
 
 /**
+ * @property int|null $id
+ * @property array<int, float>|null $embedding
+ * @property int|null $model_id
+ * @property string|null $model_type
  * @mixin \Eloquent
  * @mixin IdeHelperModelEmbedding
  */

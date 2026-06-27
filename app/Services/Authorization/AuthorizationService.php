@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\WhereClause;
@@ -85,7 +85,7 @@ final class AuthorizationService
      * Ensure user has permission or throw exception.
      *
      *
-     * @throws UnauthorizedException If user doesn't have permission
+     * @throws AuthorizationException If user doesn't have permission
      *
      * @return string The permission name that was checked (for ACL resolution)
      */
@@ -99,7 +99,7 @@ final class AuthorizationService
 
         throw_unless(
             $this->checkPermission($request, $entity, $operation, $connection),
-            UnauthorizedException::class,
+            AuthorizationException::class,
             'User not allowed to access this resource',
         );
 

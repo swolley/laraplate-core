@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- *(core)* Introduce domain exception hierarchy and auth exceptions
+
+## [1.54.6] - 2026-06-26
+
+### 🚜 Refactor
+
 - *(core)* Update trait namespaces and improve type declarations
 
 ## [1.54.5] - 2026-06-23

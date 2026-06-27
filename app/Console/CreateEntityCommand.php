@@ -16,12 +16,12 @@ use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Console\Concerns\HasCommandUtils;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;
-use RuntimeException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
@@ -158,7 +158,7 @@ final class CreateEntityCommand extends Command
         ));
 
         if ($valid_modules === []) {
-            throw new RuntimeException('No module with an Entity model found.');
+            throw new ConfigurationException('No module with an Entity model found.');
         }
 
         if (count($valid_modules) === 1) {

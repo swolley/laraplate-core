@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Exceptions;
 
-final class ElasticsearchException extends SearchException
+final class MissingSearchSchemaException extends SearchException
 {
 }

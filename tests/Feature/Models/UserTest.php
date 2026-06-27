@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Permission;
@@ -120,7 +120,7 @@ it('cannot update a soft deleted user', function (): void {
     $this->user->delete();
 
     expect(fn () => $this->user->update(['name' => 'Updated Name']))
-        ->toThrow(UnauthorizedException::class, 'Cannot update a softdeleted model');
+        ->toThrow(AuthorizationException::class, 'Cannot update a softdeleted model');
 });
 
 it('has versions trait', function (): void {

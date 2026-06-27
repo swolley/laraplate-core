@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Actions\Users\ImpersonateUserAction;
@@ -55,7 +55,7 @@ final class UserController extends Controller
             return new ResponseBuilder($request)
                 ->setData(($this->getUserInfoAction)($user))
                 ->json();
-        } catch (UnauthorizedException $unauthorizedException) {
+        } catch (AuthorizationException $unauthorizedException) {
             return new ResponseBuilder($request)
                 ->setError($unauthorizedException->getMessage())
                 ->setStatus(Response::HTTP_UNAUTHORIZED)

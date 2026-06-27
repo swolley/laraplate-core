@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Logging;
 
-use Exception;
+use InvalidArgumentException;
 use Gelf\Publisher;
 use Gelf\Transport\IgnoreErrorTransportWrapper;
 use Hedii\LaravelGelfLogger\GelfLoggerFactory as BaseGelfLoggerGelfLoggerFactory;
@@ -46,7 +46,7 @@ final class GelfLoggerFactory extends BaseGelfLoggerGelfLoggerFactory
 
         foreach ($this->parseProcessors($config) as $processor) {
             if (is_array($processor)) {
-                throw_unless(array_key_exists('processor', $processor), Exception::class, "Not a valid processor configuration. array key 'processor' expected");
+                throw_unless(array_key_exists('processor', $processor), InvalidArgumentException::class, "Not a valid processor configuration. array key 'processor' expected");
                 $class = $processor['processor'];
                 $args = $processor['with'] ?? [];
                 $instance = new $class(...$args);

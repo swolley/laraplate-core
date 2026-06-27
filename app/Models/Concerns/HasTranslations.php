@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
-use Exception;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -13,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use LogicException;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Setting;
@@ -35,6 +35,8 @@ use Modules\Core\Services\Translation\Definitions\ITranslated;
  * - Translation model class is auto-resolved: ModelTranslation in Translations subfolder
  *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
+ * @phpstan-require-implements \Modules\Core\Contracts\ITranslatableModel
  *
  * @template TModel of Model
  * @template TTranslationModel of Model&ITranslated
@@ -366,9 +368,9 @@ trait HasTranslations
 
         $class_name = str_replace('\\Models\\', '\\Models\\Translations\\', $current_class) . 'Translation';
 
-        throw_unless(class_exists($class_name), Exception::class, 'Translation model class not found: ' . $class_name);
+        throw_unless(class_exists($class_name), LogicException::class, 'Translation model class not found: ' . $class_name);
 
-        throw_unless(is_subclass_of($class_name, ITranslated::class), Exception::class, 'Translation model class does not implement ITranslated: ' . $class_name);
+        throw_unless(is_subclass_of($class_name, ITranslated::class), LogicException::class, 'Translation model class does not implement ITranslated: ' . $class_name);
 
         return $class_name;
     }

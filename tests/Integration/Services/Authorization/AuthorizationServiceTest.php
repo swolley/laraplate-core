@@ -6,7 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -101,7 +101,7 @@ it('ensurePermission throws when the user lacks the permission', function (): vo
     $request->setUserResolver(fn (): ?User => auth()->user());
 
     expect(fn () => $service->ensurePermission($request, $entity, 'select'))
-        ->toThrow(UnauthorizedException::class, 'User not allowed to access this resource');
+        ->toThrow(AuthorizationException::class, 'User not allowed to access this resource');
 });
 
 it('ensurePermission returns the permission name when the user is allowed', function (): void {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Traits;
 
-use Exception;
+use Modules\Core\Exceptions\AmbiguousModelException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
@@ -109,7 +109,7 @@ trait HasGridUtils
             return false;
         }
 
-        throw_if(count($relationships) > 1, Exception::class, 'Too many relationships found for the same model');
+        throw_if(count($relationships) > 1, AmbiguousModelException::class, 'Too many relationships found for the same model');
 
         return head($relationships);
     }

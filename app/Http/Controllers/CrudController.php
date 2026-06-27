@@ -11,7 +11,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use LogicException;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
@@ -371,7 +371,7 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (UnauthorizedException $ex) {
+        } catch (AuthorizationException $ex) {
             return $this->buildResponse(
                 new CrudResult(
                     data: null,

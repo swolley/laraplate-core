@@ -8,7 +8,7 @@ use function property_exists;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
-use Illuminate\Validation\UnauthorizedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 
@@ -129,7 +129,7 @@ trait SoftDeletes
         static::addGlobalScope(new CustomSoftDeletingScope());
 
         static::updating(function (Model $model): void {
-            throw_if($model->trashed(), UnauthorizedException::class, 'Cannot update a softdeleted model');
+            throw_if($model->trashed(), AuthorizationException::class, 'Cannot update a softdeleted model');
         });
 
         static::saving(function (Model $model): void {

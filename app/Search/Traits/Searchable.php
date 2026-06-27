@@ -6,7 +6,7 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
-use Exception;
+use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Engines\DatabaseEngine;
@@ -28,6 +28,7 @@ use Modules\Core\Search\Schema\SchemaManager;
  * Provides enhanced functionality for Elasticsearch and Typesense.
  *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ * @phpstan-require-implements \Modules\Core\Contracts\IEmbeddableModel
  */
 trait Searchable
 {
@@ -231,7 +232,7 @@ trait Searchable
         } elseif ($engine instanceof DatabaseEngine) {
             $engineName = 'database';
         } else {
-            throw new Exception('Unsupported engine ' . $engine::class);
+            throw new UnsupportedSearchEngineException('Unsupported engine ' . $engine::class);
         }
 
         $schemaManager = resolve(SchemaManager::class);

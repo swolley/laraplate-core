@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Locking\Exceptions;
 
-use Exception;
+use RuntimeException;
 
-final class CannotUnlockException extends Exception {}
+final class CannotUnlockException extends RuntimeException
+{
+}

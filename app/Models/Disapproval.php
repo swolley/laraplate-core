@@ -10,6 +10,12 @@ use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
 
 /**
+ * @property int|null $id
+ * @property int $modification_id
+ * @property int $disapprover_id
+ * @property string $disapprover_type
+ * @property string|null $reason
+ * @property array<string, mixed>|null $meta
  * @mixin \Eloquent
  * @mixin IdeHelperDisapproval
  */

@@ -25,11 +25,11 @@ return new class extends Migration
         }
 
         if ($tableNames === '' || $tableNames === null) {
-            throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new RuntimeException('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         if (($columnNames['team_foreign_key'] ?? null) === null) {
-            throw new Exception('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new RuntimeException('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         $roles_table = $tableNames['roles'];

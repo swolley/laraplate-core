@@ -16,6 +16,7 @@ use TypeError;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ * @phpstan-require-implements \Modules\Core\Contracts\IModeratableModel
  *
  * @phpstan-type HasApprovalsType HasApprovals
  */

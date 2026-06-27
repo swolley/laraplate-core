@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Exception;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -133,13 +133,13 @@ trait CommonEngineFunctions
         } elseif (is_string($name)) {
             $models = models(true, filter: fn (string $model): bool => class_uses_trait($model, Searchable::class) && new $model()->searchableAs() === $name);
 
-            throw_if(count($models) > 1, Exception::class, 'Multiple models found for collection name: ' . $name);
+            throw_if(count($models) > 1, SearchCollectionResolutionException::class, 'Multiple models found for collection name: ' . $name);
 
             $model = head($models);
             $collection = $name;
         }
 
-        throw_if($collection === null, Exception::class, 'Unable to resolve collection name for index creation.');
+        throw_if($collection === null, SearchCollectionResolutionException::class, 'Unable to resolve collection name for index creation.');
 
         // Get mapping from the model if available; otherwise fail
         if ($model === null) {
