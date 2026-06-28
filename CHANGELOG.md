@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚜 Refactor
+
+- *(core)* Enhance type declarations and method visibility across models and traits
+
 ## [1.54.7] - 2026-06-27
 
 ### 🚜 Refactor

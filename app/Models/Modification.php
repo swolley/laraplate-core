@@ -15,6 +15,11 @@ use Override;
  * @property int $approvers_required
  * @property int $disapprovers_required
  * @property string|null $modifiable_type
+ * @property string|null $md5
+ * @property int|null $modifier_id
+ * @property string|null $modifier_type
+ * @property bool $is_update
+ * @property array<string, array{original: mixed, modified: mixed}>|null $modifications
  * @property-read array<string, mixed>|null $latest_automated_vote_meta
  * @mixin \Eloquent
  * @mixin IdeHelperModification

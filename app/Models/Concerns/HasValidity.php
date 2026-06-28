@@ -137,7 +137,8 @@ trait HasValidity
      *
      * @return Builder<static>
      */
-    protected function scopeValid(Builder $query): Builder
+    #[Scope]
+    protected function valid(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($q): void {
             $q->where($this->qualifyColumn(static::$valid_to_column), '>=', now())->orWhereNull($this->qualifyColumn(static::$valid_to_column));
@@ -186,7 +187,7 @@ trait HasValidity
     #[Scope]
     protected function validAt(Builder $query, Carbon $date): Builder
     {
-        return static::withoutGlobalScope('valid')->withValidityFilter($query, $date);
+        return $query->withoutGlobalScope('valid')->withValidityFilter($date);
     }
 
     /**

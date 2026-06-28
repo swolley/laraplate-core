@@ -20,15 +20,14 @@ trait HasLocks
     public static function bootHasLocks(): void
     {
         static::saving(function (Model $model): void {
+            // Handle lock_version from request
             $lock_version = request('lock_version');
 
             if ($lock_version) {
                 // @phpstan-ignore property.notFound
                 $model->lock_version = $lock_version;
             }
-        });
 
-        static::saving(function (Model $model): void {
             // Remove is_locked from saving data
             unset($model->attributes[$model->getIsLockedColumn()]);
             unset($model->original[$model->getIsLockedColumn()]);
@@ -199,9 +198,10 @@ trait HasLocks
     /**
      * @param  Builder<static>  $query
      */
-    protected function scopeLocked($query): void
+    #[Scope]
+    protected function locked(Builder $query): Builder
     {
-        $query->whereNotNull(new Locked()->lockedAtColumn());
+        return $query->whereNotNull(new Locked()->lockedAtColumn());
     }
 
     /**

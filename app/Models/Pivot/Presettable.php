@@ -48,14 +48,36 @@ abstract class Presettable extends Pivot
     ];
 
     /**
-     * @return BelongsTo<Preset>
+     * @return BelongsTo<Preset, $this>
      */
-    abstract public function preset(): BelongsTo;
+    final public function preset(): BelongsTo
+    {
+        return $this->belongsTo($this->presetModelClass());
+    }
 
     /**
-     * @return BelongsTo<Entity>
+     * @return class-string<Preset>
      */
-    abstract public function entity(): BelongsTo;
+    protected function presetModelClass(): string
+    {
+        return Preset::class;
+    }
+
+    /**
+     * @return BelongsTo<Entity, $this>
+     */
+    final public function entity(): BelongsTo
+    {
+        return $this->belongsTo($this->entityModelClass());
+    }
+
+    /**
+     * @return class-string<Entity>
+     */
+    protected function entityModelClass(): string
+    {
+        return Entity::class;
+    }
 
     /**
      * Hydrate Field model instances from the frozen snapshot.

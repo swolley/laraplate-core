@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -32,7 +33,8 @@ trait SortableTrait
      * @param  Builder<static>  $query
      * @return Builder<static>
      */
-    public function scopeOrdered(Builder $query, string $direction = 'asc'): Builder
+    #[Scope]
+    protected function ordered(Builder $query, string $direction = 'asc'): Builder
     {
         return $query->orderBy($this->qualifyColumn($this->determineOrderColumnName()), $direction);
     }
