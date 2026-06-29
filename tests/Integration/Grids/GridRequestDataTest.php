@@ -6,8 +6,7 @@ use Modules\Core\Grids\Casts\GridAction;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Grids\Requests\GridRequest;
 
-
-it('currently throws due request type mismatch in parent constructor', function (): void {
+it('constructs read request data from grid request', function (): void {
     $request = GridRequest::create('/api/v1/core/users/select', 'GET', [
         'user_id' => '42',
     ]);
@@ -28,16 +27,21 @@ it('currently throws due request type mismatch in parent constructor', function 
         ],
     ];
 
-    expect(fn (): GridRequestData => new GridRequestData(
+    $data = new GridRequestData(
         GridAction::Select,
         $request,
         'users',
         $validated,
         'user.id',
-    ))->toThrow(TypeError::class);
+    );
+
+    expect($data->globalSearch)->toBe('john')
+        ->and($data->layout)->toBe(['grid_name' => 'users'])
+        ->and($data->funnelsFilters)->toHaveCount(1)
+        ->and($data->optionsFilters)->toHaveCount(1);
 });
 
-it('throws for write action with same mismatch', function (): void {
+it('constructs write request data from grid request', function (): void {
     $request = GridRequest::create('/api/v1/core/users/update', 'POST', [
         'user_id' => '12',
     ]);
@@ -49,16 +53,19 @@ it('throws for write action with same mismatch', function (): void {
         ],
     ];
 
-    expect(fn (): GridRequestData => new GridRequestData(
+    $data = new GridRequestData(
         GridAction::Update,
         $request,
         'users',
         $validated,
         'user.id',
-    ))->toThrow(TypeError::class);
+    );
+
+    expect($data->globalSearch)->toBeNull()
+        ->and($data->changes)->toBe(['name' => 'Updated Name']);
 });
 
-it('throws type error before primary key validation branch', function (): void {
+it('throws when update action has empty primary key', function (): void {
     $request = GridRequest::create('/api/v1/core/users/update', 'POST');
 
     expect(fn (): GridRequestData => new GridRequestData(
@@ -67,5 +74,5 @@ it('throws type error before primary key validation branch', function (): void {
         'users',
         ['pagination' => 25, 'changes' => ['name' => 'No PK']],
         [],
-    ))->toThrow(TypeError::class);
+    ))->toThrow(BadMethodCallException::class);
 });

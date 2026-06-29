@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Engines;
 
+use Elastic\Adapter\Search\SearchResult;
+use Elastic\Elasticsearch\Response\Elasticsearch;
 use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Exception;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +22,7 @@ use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\ElasticsearchService;
 use Override;
+use RuntimeException;
 use stdClass;
 
 /**
@@ -40,9 +44,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      * @throws Exception
      * @throws \Http\Client\Exception
      */
+    /**
+     * @param  array<string, mixed>  $options
+     */
     #[Override]
     public function createIndex($name, array $options = [], bool $force = false): void // @pest-ignore-type
     {
+        $collection = is_string($name) ? $name : 'unknown';
+
         try {
             $matched = $this->matchModelToCollectionName($name);
 
@@ -90,18 +99,23 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     #[Override]
-    public function search(Builder $builder): mixed
+    public function search(Builder $builder): SearchResult
     {
-        // Check if it's a vector search.
         if ($this->isVectorSearch($builder)) {
             return $this->performVectorSearch($builder);
         }
 
-        // Otherwise, use the traditional search.
         return parent::search($builder);
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
+     */
     #[Override]
     public function buildSearchFilters(array $filters): array
     {
@@ -172,7 +186,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
     #[Override]
     /**
-     * @param  class-string<Model>  $modelClass
+     * @param  class-string<Model&Searchable>  $modelClass
      *
      * @throws \Http\Client\Exception
      * @throws JsonException
@@ -181,14 +195,8 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     {
         throw_unless(class_exists($modelClass), InvalidArgumentException::class, sprintf('Class %s does not exist', $modelClass));
 
-        throw_unless($this->usesSearchableTrait(new $modelClass()), InvalidArgumentException::class, sprintf('Model %s does not implement the Searchable trait', $modelClass));
-
-        $query = $modelClass::query();
-
-        // Support for soft delete
-        if (method_exists($modelClass, 'withTrashed')) {
-            $query->withTrashed();
-        }
+        $model_instance = new $modelClass();
+        $query = $this->newQueryIncludingTrashed($modelClass);
 
         // Filters
         if ($id !== null && $id !== 0) {
@@ -196,10 +204,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         } elseif (! in_array($from, [null, '', '0'], true)) {
             $query->where('updated_at', '>', Date::parse($from));
         } else {
-            $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
+            $last_indexed = $this->getLastIndexedTimestamp($model_instance);
 
-            if ($lastIndexed) {
-                $query->where('updated_at', '>', $lastIndexed);
+            if ($last_indexed) {
+                $query->where('updated_at', '>', $last_indexed);
             }
         }
 
@@ -525,10 +533,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     //        return $response['aggregations']['histogram']['buckets'] ?? [];
     //    }
 
-    #[Override]
     /**
-     * @param  Model&Searchable  $model
+     * @return array<string, mixed>
      */
+    #[Override]
     public function getSearchMapping(Model $model): array
     {
         if (method_exists($model, 'getSearchMapping')) {
@@ -571,9 +579,12 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     {
         try {
             if ($model instanceof Model) {
-                $this->ensureSearchable($model);
-                $collection = $model->searchableAs();
-            } elseif (is_string($model) && class_exists($model)) {
+                $collection = $this->resolveSearchableCollectionName($model);
+
+                if ($collection === null) {
+                    return false;
+                }
+            } elseif (class_exists($model)) {
                 $collection = new $model()->searchableAs();
             } else {
                 $collection = $model;
@@ -630,40 +641,57 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     //        return false;
     //    }
 
+    /**
+     * @return array<string, mixed>
+     */
     #[Override]
     public function health(): array
     {
-        $health = ElasticsearchService::getInstance()->client->cluster()->health();
-        // TODO: stats or state('metrics') ???
-        $metrics = ElasticsearchService::getInstance()->client->cluster()->stats();
+        $client = ElasticsearchService::getInstance()->client;
+        $health = $this->elasticsearchResponseToArray($client->cluster()->health());
+        $metrics = $this->elasticsearchResponseToArray($client->cluster()->stats());
 
         return [
-            'status' => $health->asArray()['status'] ?? 'danger',
-            'metrics' => $metrics->asArray(),
+            'status' => $health['status'] ?? 'danger',
+            'metrics' => $metrics,
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     #[Override]
     public function stats(): array
     {
-        $health = ElasticsearchService::getInstance()->client->cluster()->health();
+        $health = $this->elasticsearchResponseToArray(
+            ElasticsearchService::getInstance()->client->cluster()->health(),
+        );
 
-        return $health->asArray();
+        return $health;
     }
 
-    private function performVectorSearch(Builder $builder): mixed
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private function performVectorSearch(Builder $builder): SearchResult
     {
-        // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
 
         if ($vector === []) {
-            // Fallback to regular search if no vector provided
             return parent::search($builder);
         }
 
-        /** @var Model&Searchable $model */
         $model = $builder->model;
-        $index = $model->searchableAs();
+
+        if (! $model instanceof Model) {
+            return parent::search($builder);
+        }
+
+        $index = $this->resolveSearchableCollectionName($model);
+
+        if ($index === null) {
+            return parent::search($builder);
+        }
 
         // Build the vector search query using knn (more efficient than script_score)
         $query = [
@@ -720,16 +748,18 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
         $response = $client->search($params);
 
-        // Transform results to match Scout's expected format
-        $results = $response->asArray();
-        $hits = $results['hits']['hits'] ?? [];
+        return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
 
-        return collect($hits)->map(function (array $hit) {
-            $document = $hit['_source'] ?? [];
-            $document['_id'] = $hit['_id'] ?? null;
-            $document['_score'] = $hit['_score'] ?? 0;
+    /**
+     * @return array<string, mixed>
+     */
+    private function elasticsearchResponseToArray(mixed $response): array
+    {
+        if ($response instanceof Elasticsearch) {
+            return $response->asArray();
+        }
 
-            return $document;
-        });
+        throw new RuntimeException('Unexpected Elasticsearch client response type.');
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Cache;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -43,11 +42,11 @@ trait HasCache
 
     protected static function bootHasCache(): void
     {
-        static::saved(function (Model $model): void {
+        static::saved(function (self $model): void {
             $model->invalidateCache();
         });
 
-        static::deleted(function (Model $model): void {
+        static::deleted(function (self $model): void {
             $model->invalidateCache();
         });
     }

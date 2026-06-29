@@ -24,6 +24,8 @@ use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 use UnexpectedValueException;
 
 /**
+ * @property string|Collection<int, string> $primaryKey
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperDynamicEntity
  */
@@ -39,8 +41,14 @@ final class DynamicEntity extends Model
     #[Override]
     public $timestamps = false;
 
+    /**
+     * @var array<string, array{type: string, foreignKey: ForeignKey}>
+     */
     private array $dynamic_relations = [];
 
+    /**
+     * @var array<string, string>
+     */
     private array $dynamic_casts = [];
 
     /**
@@ -51,7 +59,9 @@ final class DynamicEntity extends Model
     /**
      * Returns a DynamicEntity for the table or a concrete Model (e.g. User) when one exists.
      *
-     * @throws Exception
+     * @param  array<string, mixed>  $attributes
+     *
+     * @throws \Exception
      */
     public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null, ?string $module = null): EloquentModel
     {
@@ -63,7 +73,7 @@ final class DynamicEntity extends Model
      *
      * @throws InvalidArgumentException
      * @throws DirectoryNotFoundException
-     * @throws Exception
+     * @throws \Exception
      *
      * @return class-string<EloquentModel>|null
      */
@@ -115,6 +125,9 @@ final class DynamicEntity extends Model
         return $this->fillable;
     }
 
+    /**
+     * @return array<string, array{type: string, foreignKey: ForeignKey}>
+     */
     public function getDynamicRelations(): array
     {
         return $this->dynamic_relations;
@@ -144,6 +157,9 @@ final class DynamicEntity extends Model
         $this->setColumnsInfo($inspected->columns, $inspected->foreignKeys, $inspected->indexes);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     #[Override]
     public function jsonSerialize(): array
     {
@@ -153,13 +169,26 @@ final class DynamicEntity extends Model
         return array_filter($serialized, static fn (mixed $v): bool => gettype($v) !== 'string' || ! (mb_strlen($v) === 60 && preg_match('/^\$2y\$/', $v)));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getRules(): array
     {
         $rules = parent::getRules();
 
-        if ($this->inspected_rules !== []) {
-            $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE] ?? [], $this->inspected_rules[Model::DEFAULT_RULE] ?? []);
+        if ($this->inspected_rules === []) {
+            return $rules;
         }
+
+        $parent_default_rules = $rules[Model::DEFAULT_RULE] ?? [];
+        if (! is_array($parent_default_rules)) {
+            $parent_default_rules = [];
+        }
+
+        $rules[Model::DEFAULT_RULE] = array_merge(
+            $parent_default_rules,
+            $this->inspected_rules[Model::DEFAULT_RULE] ?? [],
+        );
 
         return $rules;
     }
@@ -173,26 +202,41 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @throws Exception
+     * @param  list<class-string<EloquentModel>>  $models
      *
-     * @return class-string<Model>|null
+     * @throws \Exception
+     *
+     * @return class-string<EloquentModel>|null
      */
     private static function findModel(array $models, string $modelName, ?string $module = null): ?string
     {
-        $found = array_filter($models, fn (string $c) => Str::endsWith($c, '\\' . Str::studly($modelName)));
-        $found = array_values($found);
+        $found = [];
+
+        foreach ($models as $class) {
+            if (Str::endsWith($class, '\\' . Str::studly($modelName))) {
+                $found[] = $class;
+            }
+        }
 
         if ($module !== null && $module !== '') {
-            $found = array_values(array_filter(
-                $found,
-                static fn (string $class): bool => class_module($class) === $module,
-            ));
+            $filtered = [];
+
+            foreach ($found as $class) {
+                if (class_module($class) === $module) {
+                    $filtered[] = $class;
+                }
+            }
+
+            $found = $filtered;
         }
 
         if (count($found) > 1) {
             $expected_basename = Str::studly($modelName);
 
-            foreach (config('auth.providers', []) as $provider) {
+            /** @var array<string, array<string, mixed>> $auth_providers */
+            $auth_providers = config('auth.providers', []);
+
+            foreach ($auth_providers as $provider) {
                 $model = $provider['model'] ?? null;
 
                 if (! is_string($model)) {
@@ -226,10 +270,13 @@ final class DynamicEntity extends Model
 
     private function verifyTableExistence(): void
     {
+        $table = $this->getTable();
+        $connection = $this->getConnectionName();
+
         throw_unless(
-            SchemaInspector::getInstance()->hasTable($this->table, $this->connection),
+            SchemaInspector::getInstance()->hasTable($table, $connection),
             UnexpectedValueException::class,
-            sprintf("Table '%s' doesn't exists on '%s' connection", $this->table, $this->connection),
+            sprintf("Table '%s' doesn't exists on '%s' connection", $table, $connection ?? 'default'),
         );
     }
 
@@ -242,27 +289,34 @@ final class DynamicEntity extends Model
         }
     }
 
+    /**
+     * @param  Collection<int, Column>  $primaryKeyColumns
+     */
     private function setPrimaryKeyInfo(Index $primaryKeyIndex, Collection $primaryKeyColumns): void
     {
         if ($primaryKeyColumns->count() > 1) {
             $this->primaryKey = $primaryKeyIndex->columns;
             $this->keyType = 'string';
             $this->incrementing = false;
-        } else {
-            $first_column = $primaryKeyColumns->first();
 
-            if ($first_column) {
-                $this->primaryKey = $first_column->name;
-                $this->incrementing = $first_column->isAutoincrement();
-                $this->keyType = $first_column->type->value && ! Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
-            }
+            return;
         }
+
+        $first_column = $primaryKeyColumns->first();
+
+        if (! $first_column instanceof Column) {
+            return;
+        }
+
+        $this->primaryKey = $first_column->name;
+        $this->incrementing = $first_column->isAutoincrement();
+        $this->keyType = $first_column->type->value && ! Str::contains($first_column->type->value, 'int') ? 'string' : 'int';
     }
 
     /**
-     * @param  Collection<Column>  $columns
-     * @param  Collection<ForeignKey>  $foreignKeys
-     * @param  Collection<Index>  $indexes
+     * @param  Collection<int, Column>  $columns
+     * @param  Collection<int, ForeignKey>  $foreignKeys
+     * @param  Collection<int, Index>  $indexes
      */
     private function setColumnsInfo(Collection $columns, Collection $foreignKeys, Collection $indexes): void
     {
@@ -272,24 +326,44 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @param  Collection<ForeignKey>  $foreignKeys
-     * @param  Collection<Index>  $indexes
+     * @param  Collection<int, ForeignKey>  $foreignKeys
+     * @param  Collection<int, Index>  $indexes
      */
     private function setColumnInfo(Column $column, Collection $foreignKeys, Collection $indexes): void
     {
+        /** @var array<string, array{0: string, 1: string}> $remapped_fks */
         $remapped_fks = [];
 
         foreach ($foreignKeys as $fk) {
-            foreach ($fk->localColumnNames() as $idx => $lc) {
-                $remapped_fks[$lc] = [$fk->foreignTable, $fk->foreignColumnNames()[$idx]];
+            $foreign_column_names = $fk->foreignColumnNames()->values()->all();
+
+            foreach ($fk->localColumnNames()->values()->all() as $idx => $local_column) {
+                if (! is_string($local_column)) {
+                    continue;
+                }
+
+                $foreign_column = $foreign_column_names[$idx] ?? null;
+
+                if (! is_string($foreign_column)) {
+                    continue;
+                }
+
+                $remapped_fks[$local_column] = [$fk->foreignTable, $foreign_column];
             }
         }
 
+        /** @var list<string> $remapped_uids */
         $remapped_uids = [];
 
         foreach ($indexes as $idx) {
-            if (count($idx->columns) === 1 && ($idx->isPrimaryKey() || $idx->isUnique())) {
-                $remapped_uids[] = $idx->columns->first();
+            if (count($idx->columns) !== 1 || ! ($idx->isPrimaryKey() || $idx->isUnique())) {
+                continue;
+            }
+
+            $unique_column = $idx->columns->first();
+
+            if (is_string($unique_column)) {
+                $remapped_uids[] = $unique_column;
             }
         }
 
@@ -321,12 +395,20 @@ final class DynamicEntity extends Model
         }
 
         if (array_key_exists($column->name, $remapped_fks)) {
-            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = sprintf('exists:%s.%s,%s', $this->connection ?? 'default', $remapped_fks[$column->name][0], $remapped_fks[$column->name][1]);
+            $foreign_key_target = $remapped_fks[$column->name];
+            $connection_name = $this->getConnectionName() ?? 'default';
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = sprintf(
+                'exists:%s.%s,%s',
+                $connection_name,
+                $foreign_key_target[0],
+                $foreign_key_target[1],
+            );
         }
 
-        if (in_array($column->name, $remapped_uids, true)) {
-            /** @var \Illuminate\Database\Query\Builder $query */
-            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = Rule::unique($this->table)->where(function ($query) use ($soft_delete): void { // @pest-ignore-type
+        $table = $this->getTable();
+
+        if ($table !== '' && in_array($column->name, $remapped_uids, true)) {
+            $this->inspected_rules[Model::DEFAULT_RULE][$column->name][] = Rule::unique($table)->where(function ($query) use ($soft_delete): void { // @pest-ignore-type
                 if ($soft_delete) {
                     $query->whereNull('deleted_at');
                 }
@@ -339,7 +421,7 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @param  Collection<ForeignKey>  $foreignKeys
+     * @param  Collection<int, ForeignKey>  $foreignKeys
      */
     private function setDirectRelationsInfo(Collection $foreignKeys): void
     {
@@ -357,45 +439,61 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @throws Exception
+     * @throws \Exception
      */
     private function setReverseRelationsInfo(Request $request): void
     {
-        if (! $request->has('relations')) {
+        $relations = $request->input('relations');
+
+        if (! is_array($relations)) {
             return;
         }
 
-        foreach ($request->get('relations') as $relation_name) {
+        foreach ($relations as $relation_name) {
+            if (! is_string($relation_name)) {
+                continue;
+            }
+
             $this->setReverseRelationInfo($relation_name);
         }
     }
 
     /**
-     * @throws Exception
+     * @throws \Exception
      */
     private function setReverseRelationInfo(string $relationName): void
     {
         $resolved_model = self::resolve($relationName, $this->getConnectionName());
+
+        if (! $resolved_model instanceof DynamicEntity) {
+            return;
+        }
+
         $reverse_relations = $resolved_model->getDynamicRelations();
 
         foreach ($reverse_relations as $relation => $relation_data) {
-            if ($relation === $this->table) {
-                $table = $resolved_model->getTable();
-                $this->dynamic_relations[$table] = [
-                    'type' => 'belongsToMany',
-                    'foreignKey' => new ForeignKey(
-                        'reversed_' . $relation_data->name,
-                        $relation_data->foreignColumns,
-                        $relation_data->localSchema,
-                        $relation_data->localConnection,
-                        $relation_data->columns,
-                        $resolved_model->getConnectionName(),
-                        $table,
-                    ),
-                ];
-
-                break;
+            if ($relation !== $this->getTable()) {
+                continue;
             }
+
+            $source_foreign_key = $relation_data instanceof ForeignKey
+                ? $relation_data
+                : $relation_data['foreignKey'];
+            $table = $resolved_model->getTable();
+            $this->dynamic_relations[$table] = [
+                'type' => 'belongsToMany',
+                'foreignKey' => new ForeignKey(
+                    'reversed_' . $source_foreign_key->name,
+                    $source_foreign_key->foreignColumns,
+                    $source_foreign_key->localSchema,
+                    $source_foreign_key->localConnection ?? $source_foreign_key->foreignTable,
+                    $source_foreign_key->columns,
+                    $resolved_model->getConnectionName() ?? '',
+                    $table,
+                ),
+            ];
+
+            break;
         }
     }
 }

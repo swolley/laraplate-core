@@ -8,6 +8,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Cache\Repository as CoreCacheRepository;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
@@ -28,23 +29,21 @@ final class Inspect
         $key_name = self::keyName($name, $schema);
         $cache = Cache::store();
 
-        /** @var Illuminate\Support\Facades\Cache $cache * */
         $use_tags = $cache->supportsTags() && method_exists($cache, 'getCacheTags');
 
-        $inspected_data = $use_tags
-            ? Cache::tags(Cache::getCacheTags(['inspector', $schema ?? 'default']))->get($key_name)
+        $inspected_data = $use_tags && $cache instanceof CoreCacheRepository
+            ? Cache::tags($cache->getCacheTags(['inspector', $schema ?? 'default']))->get($key_name)
             : Cache::get(self::cacheKeyWithoutTags($key_name));
 
-        if ($inspected_data) {
+        if ($inspected_data instanceof Table) {
             return $inspected_data;
         }
 
-        /** @phpstan-ignore staticMethod.notFound */
         $connection = Schema::connection($schema);
         $tables = $connection->getTables();
         $table = Arr::first($tables, fn (array $table): bool => $table['name'] === $name);
 
-        if (! $table) {
+        if (! is_array($table)) {
             return null;
         }
 
@@ -62,8 +61,8 @@ final class Inspect
             $schema,
         );
 
-        if ($use_tags) {
-            Cache::tags(Cache::getCacheTags(['inspector', $schema]))->forever($key_name, $inspected_data);
+        if ($use_tags && $cache instanceof CoreCacheRepository) {
+            Cache::tags($cache->getCacheTags(['inspector', $schema ?? 'default']))->forever($key_name, $inspected_data);
         } else {
             Cache::forever(self::cacheKeyWithoutTags($key_name), $inspected_data);
         }
@@ -73,6 +72,8 @@ final class Inspect
 
     /**
      * Retrieve the columns of a particular table for a given database connection.
+     *
+     * @return Collection<int, Column>
      */
     public static function columns(string $table, ?string $schema = null): Collection
     {
@@ -87,6 +88,8 @@ final class Inspect
 
     /**
      * Retrieve the indexes of a particular table for a given database connection.
+     *
+     * @return Collection<int, Index>
      */
     public static function indexes(string $table, ?string $schema = null): Collection
     {
@@ -101,6 +104,8 @@ final class Inspect
 
     /**
      * Retrieve the foreign keys of a particular table for a given database connection.
+     *
+     * @return Collection<int, ForeignKey>
      */
     public static function foreignKeys(string $table, ?string $schema = null): Collection
     {
@@ -121,7 +126,7 @@ final class Inspect
     {
         $columns = self::columns($table, $schema);
 
-        return Arr::first($columns, fn (Column $column): bool => $column->name === $name);
+        return $columns->first(fn (Column $column): bool => $column->name === $name);
     }
 
     /**
@@ -132,7 +137,7 @@ final class Inspect
     {
         $indexes = self::indexes($table, $schema);
 
-        return Arr::first($indexes, fn (Index $index): bool => $index->name === $name);
+        return $indexes->first(fn (Index $index): bool => $index->name === $name);
     }
 
     /**
@@ -143,7 +148,7 @@ final class Inspect
     {
         $foreigns = self::foreignKeys($table, $schema);
 
-        return Arr::first($foreigns, fn (ForeignKey $foreign): bool => $foreign->name === $name);
+        return $foreigns->first(fn (ForeignKey $foreign): bool => $foreign->name === $name);
     }
 
     private static function cacheKeyWithoutTags(string $key_name): string
@@ -151,70 +156,159 @@ final class Inspect
         return 'inspector:' . $key_name;
     }
 
+    /**
+     * @param  array<string, mixed>  $column
+     * @return Collection<int, string>
+     */
     private static function getAttributesForColumn(array $column): Collection
     {
-        return collect([
-            $column['type_name'],
-            $column['auto_increment'] ? 'autoincrement' : null,
-            $column['nullable'] ? 'nullable' : null,
-            $column['collation'],
-        ])->filter();
+        $attributes = [];
+
+        $type_name = self::optionalString($column, 'type_name');
+
+        if ($type_name !== null) {
+            $attributes[] = $type_name;
+        }
+
+        if (($column['auto_increment'] ?? false) === true) {
+            $attributes[] = 'autoincrement';
+        }
+
+        if (($column['nullable'] ?? false) === true) {
+            $attributes[] = 'nullable';
+        }
+
+        $collation = self::optionalString($column, 'collation');
+
+        if ($collation !== null) {
+            $attributes[] = $collation;
+        }
+
+        return collect($attributes);
     }
 
     /**
-     * @return Collection<Column>
+     * @param  array<int, array<string, mixed>>  $columns
+     * @return Collection<int, Column>
      */
     private static function parseColumns(array $columns): Collection
     {
         return collect($columns)->map(static fn (array $column): Column => new Column(
-            $column['name'],
+            self::requiredString($column, 'name'),
             self::getAttributesForColumn($column),
-            $column['default'],
-            $column['type'],
+            $column['default'] ?? null,
+            self::requiredString($column, 'type'),
         ));
     }
 
+    /**
+     * @param  array<string, mixed>  $index
+     * @return Collection<int, string>
+     */
     private static function getAttributesForIndex(array $index): Collection
     {
-        return collect([
-            $index['type'],
-            count($index['columns']) > 1 ? 'compound' : null,
-            $index['unique'] && ! $index['primary'] ? 'unique' : null,
-            $index['primary'] ? 'primary' : null,
-        ])->filter();
+        $attributes = [];
+        $type = self::optionalString($index, 'type');
+
+        if ($type !== null) {
+            $attributes[] = $type;
+        }
+
+        $index_columns = self::stringList($index['columns'] ?? []);
+
+        if (count($index_columns) > 1) {
+            $attributes[] = 'compound';
+        }
+
+        if (($index['unique'] ?? false) === true && ($index['primary'] ?? false) !== true) {
+            $attributes[] = 'unique';
+        }
+
+        if (($index['primary'] ?? false) === true) {
+            $attributes[] = 'primary';
+        }
+
+        return collect($attributes);
     }
 
     /**
-     * @return Collection<Index>
+     * @param  array<int, array<string, mixed>>  $indexes
+     * @return Collection<int, Index>
      */
     private static function parseIndexes(array $indexes): Collection
     {
-        return collect($indexes)->map(static fn (array $index): Index => new Index(
-            $index['name'],
-            collect($index['columns']),
-            self::getAttributesForIndex($index),
-        ));
+        return collect($indexes)->map(static function (array $index): Index {
+            return new Index(
+                self::requiredString($index, 'name'),
+                collect(self::stringList($index['columns'] ?? [])),
+                self::getAttributesForIndex($index),
+            );
+        });
     }
 
     /**
-     * @return Collection<ForeignKey>
+     * @param  array<int, array<string, mixed>>  $keys
+     * @return Collection<int, ForeignKey>
      */
     private static function parseForeignKeys(array $keys, string $schema, ?string $connection = null): Collection
     {
         return collect($keys)->map(function (array $foreignKey) use ($schema, $connection): ForeignKey {
-            $name = $foreignKey['name'] ?? ($foreignKey['foreign_table'] . '_' . implode('_', $foreignKey['columns']));
+            $columns = self::stringList($foreignKey['columns'] ?? []);
+            $foreign_columns = self::stringList($foreignKey['foreign_columns'] ?? []);
+            $foreign_table = self::requiredString($foreignKey, 'foreign_table');
+            $name = self::optionalString($foreignKey, 'name') ?? ($foreign_table . '_' . implode('_', $columns));
 
             return new ForeignKey(
-                (string) $name,
-                collect($foreignKey['columns']),
-                $foreignKey['foreign_schema'],
-                $foreignKey['foreign_table'],
-                collect($foreignKey['foreign_columns']),
+                $name,
+                collect($columns),
+                self::optionalString($foreignKey, 'foreign_schema'),
+                $foreign_table,
+                collect($foreign_columns),
                 $schema,
                 $connection,
-                $foreignKey['on_update'],
-                $foreignKey['on_delete'],
+                self::optionalString($foreignKey, 'on_update'),
+                self::optionalString($foreignKey, 'on_delete'),
             );
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function requiredString(array $data, string $key): string
+    {
+        $value = $data[$key] ?? null;
+
+        return is_string($value) ? $value : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function optionalString(array $data, string $key): ?string
+    {
+        $value = $data[$key] ?? null;
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $strings = [];
+
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $strings[] = $item;
+            }
+        }
+
+        return $strings;
     }
 }

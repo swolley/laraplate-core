@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Core\Console;
 
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Cache\CacheManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Modules\Core\Cache\Repository as CoreCacheRepository;
 use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Overrides\ModuleDocGenerator;
 use Mtrajano\LaravelSwagger\FormatterManager;
@@ -58,10 +60,14 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         // @codeCoverageIgnoreStart
         // Requires a cache store with tag support (e.g. Redis); the test suite uses the array driver.
         if (Cache::supportsTags()) {
-            $repository = Cache::getFacadeRoot()->store();
+            $facade_root = Cache::getFacadeRoot();
 
-            if (method_exists($repository, 'getCacheTags')) {
-                Cache::tags($repository->getCacheTags('docs'))->flush();
+            if ($facade_root instanceof CacheManager) {
+                $store = $facade_root->store();
+
+                if ($store instanceof CoreCacheRepository) {
+                    Cache::tags($store->getCacheTags('docs'))->flush();
+                }
             }
         }
         // @codeCoverageIgnoreEnd
@@ -84,17 +90,22 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
         if ($moduleName !== 'App') {
             $module_path = Module::getModulePath($moduleName);
-            $module_json = json_decode(file_get_contents($module_path . DIRECTORY_SEPARATOR . 'module.json'), true);
-            $config['title'] .= ' ' . $module_json['name'] . ' module';
-            $config['description'] = $module_json['description'] . ($module_json['keywords'] === [] ? '' : ' (' . implode(', ', $module_json['keywords']) . ')');
-            $composer_json = json_decode(file_get_contents($module_path . 'composer.json'));
+            $module_json = $this->readModuleJson($module_path);
+            $title = $config['title'] ?? '';
+            $config['title'] = (is_string($title) ? $title : '') . ' ' . $module_json['name'] . ' module';
+            $keywords = $module_json['keywords'];
+            $config['description'] = $module_json['description'] . ($keywords === [] ? '' : ' (' . implode(', ', $keywords) . ')');
+            $composer_version = $this->readComposerVersion($module_path . 'composer.json');
 
-            if (isset($composer_json->version)) {
-                $config['appVersion'] = $composer_json->version;
+            if ($composer_version !== null) {
+                $config['appVersion'] = $composer_version;
             }
         }
 
-        $doc = new ModuleDocGenerator($config, $moduleName !== 'App' ? config('modules.namespace') . '\\' . $moduleName : $moduleName, $filter)->generate();
+        $module_namespace = config('modules.namespace');
+        $namespace = is_string($module_namespace) && $module_namespace !== '' ? $module_namespace : 'Modules';
+
+        $doc = new ModuleDocGenerator($config, $moduleName !== 'App' ? $namespace . '\\' . $moduleName : $moduleName, $filter)->generate();
         $doc['tags'] = [$moduleName];
 
         // @codeCoverageIgnoreStart
@@ -121,19 +132,22 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
                 mkdir($folder, recursive: true);
             }
 
-            if (file_exists($file)) {
-                $old_doc = file_get_contents($file);
+            $old_doc = null;
 
-                if ($this->option('format') === 'json') {
-                    $old_doc = json_decode($old_doc, true);
-                } elseif ($this->option('format') === 'yaml') {
-                    $parsed_old = Yaml::parse($old_doc, Yaml::PARSE_OBJECT_FOR_MAP);
-                    $old_doc = json_decode(json_encode($parsed_old, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
-                } else {
-                    $old_doc = null; // @codeCoverageIgnore
+            if (file_exists($file)) {
+                $old_doc_contents = file_get_contents($file);
+
+                if ($old_doc_contents !== false) {
+                    if ($this->option('format') === 'json') {
+                        $decoded = json_decode($old_doc_contents, true);
+                        $old_doc = is_array($decoded) ? $this->normalizeConfigArray($decoded) : null;
+                    } elseif ($this->option('format') === 'yaml') {
+                        $parsed_old = Yaml::parse($old_doc_contents, Yaml::PARSE_OBJECT_FOR_MAP);
+                        $encoded = json_encode($parsed_old, JSON_THROW_ON_ERROR);
+                        $decoded = json_decode($encoded, true, 512, JSON_THROW_ON_ERROR);
+                        $old_doc = is_array($decoded) ? $this->normalizeConfigArray($decoded) : null;
+                    }
                 }
-            } else {
-                $old_doc = null;
             }
 
             file_put_contents($file, $formattedDoc);
@@ -148,7 +162,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
     protected function getOptions(): array
     {
         return [
-            ['module', null, InputOption::VALUE_OPTIONAL, 'Filter to a specific Module', null],
+            ['module', 'm', InputOption::VALUE_OPTIONAL, 'Filter to a specific Module'],
         ];
     }
 
@@ -160,7 +174,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $config = config('laravel-swagger');
 
         if (is_array($config) && $config !== []) {
-            return $config;
+            return $this->normalizeConfigArray($config);
         }
 
         $config_path = module_path('Core', 'config/laravel-swagger.php');
@@ -169,10 +183,91 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             throw new LaravelSwaggerException('laravel-swagger configuration is missing.');
         }
 
-        /** @var array<string, mixed> $loaded */
         $loaded = require $config_path;
 
-        return $loaded;
+        if (! is_array($loaded)) {
+            throw new LaravelSwaggerException('laravel-swagger configuration is missing.');
+        }
+
+        return $this->normalizeConfigArray($loaded);
+    }
+
+    /**
+     * @param  array<mixed, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private function normalizeConfigArray(array $config): array
+    {
+        $normalized = [];
+
+        foreach ($config as $key => $value) {
+            if (! is_string($key)) {
+                throw new LaravelSwaggerException('laravel-swagger configuration keys must be strings.');
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array{name: string, description: string, keywords: list<string>}
+     */
+    private function readModuleJson(string $modulePath): array
+    {
+        $contents = file_get_contents($modulePath . DIRECTORY_SEPARATOR . 'module.json');
+
+        if ($contents === false) {
+            throw new LaravelSwaggerException('Could not read module.json for ' . $modulePath);
+        }
+
+        $decoded = json_decode($contents, true);
+
+        if (! is_array($decoded)) {
+            throw new LaravelSwaggerException('Invalid module.json for ' . $modulePath);
+        }
+
+        $name = $decoded['name'] ?? null;
+        $description = $decoded['description'] ?? null;
+        $keywords = $decoded['keywords'] ?? [];
+
+        if (! is_string($name) || ! is_string($description) || ! is_array($keywords)) {
+            throw new LaravelSwaggerException('Invalid module.json for ' . $modulePath);
+        }
+
+        $keyword_list = [];
+
+        foreach ($keywords as $keyword) {
+            if (! is_string($keyword)) {
+                throw new LaravelSwaggerException('Invalid module.json keywords for ' . $modulePath);
+            }
+
+            $keyword_list[] = $keyword;
+        }
+
+        return [
+            'name' => $name,
+            'description' => $description,
+            'keywords' => $keyword_list,
+        ];
+    }
+
+    private function readComposerVersion(string $composerPath): ?string
+    {
+        $contents = file_get_contents($composerPath);
+
+        if ($contents === false) {
+            return null;
+        }
+
+        $decoded = json_decode($contents);
+
+        if (! is_object($decoded) || ! isset($decoded->version) || ! is_string($decoded->version)) {
+            return null;
+        }
+
+        return $decoded->version;
     }
 
     private function isCommittedSwaggerPath(string $file): bool
@@ -186,20 +281,44 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         return false;
     }
 
+    /**
+     * @param  array<string, mixed>  $doc
+     * @param  array<string, mixed>|null  $old_doc
+     */
     private function verboseGeneration(array $doc, ?array $old_doc): void
     {
-        $this->info($doc['info']['title']);
+        $info = $doc['info'] ?? null;
+        $title = is_array($info) && isset($info['title']) && is_string($info['title']) ? $info['title'] : 'Swagger documentation';
+        $this->info($title);
 
-        foreach ($doc['paths'] as $path => $methods) {
+        $paths = $doc['paths'] ?? null;
+
+        if (! is_array($paths)) {
+            $this->line('');
+
+            return;
+        }
+
+        $old_paths = is_array($old_doc) && isset($old_doc['paths']) && is_array($old_doc['paths']) ? $old_doc['paths'] : [];
+
+        foreach ($paths as $path => $methods) {
+            if (! is_array($methods)) {
+                continue;
+            }
+
             $keys = array_keys($methods);
-            $imploded_methods = implode('|', array_map(strtoupper(...), $keys));
+            $imploded_methods = implode('|', array_map(
+                static fn (int|string $method): string => strtoupper((string) $method),
+                $keys,
+            ));
             $post_methods_padding = max(0, 40 - mb_strlen($imploded_methods));
-            $post_route_padding = max(0, 80 - mb_strlen((string) $path));
+            $path_string = is_string($path) ? $path : (string) $path;
+            $post_route_padding = max(0, 80 - mb_strlen($path_string));
 
-            if (isset($old_doc['paths'][$path]) && $old_doc['paths'][$path] === $doc['paths'][$path]) {
+            if (isset($old_paths[$path]) && $old_paths[$path] === $methods) {
                 $color = 'gray';
                 $message = 'unchanged';
-            } elseif (isset($old_doc['paths'][$path])) {
+            } elseif (isset($old_paths[$path])) {
                 $color = 'yellow';
                 $message = 'updated';
             } else {
@@ -207,7 +326,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
                 $message = 'new';
             }
 
-            $this->line($imploded_methods . str_repeat(' ', $post_methods_padding) . $path . str_repeat(' ', $post_route_padding) . sprintf('<fg=%s>%s</fg=%s>', $color, $message, $color));
+            $this->line($imploded_methods . str_repeat(' ', $post_methods_padding) . $path_string . str_repeat(' ', $post_route_padding) . sprintf('<fg=%s>%s</fg=%s>', $color, $message, $color));
         }
 
         $this->line('');

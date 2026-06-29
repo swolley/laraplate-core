@@ -10,7 +10,12 @@ use Doctrine\DBAL\Exception as DBALException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\Relations\Relation as EloquentRelation;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\LazyCollection;
+use Modules\Core\Cache\Repository as CacheRepository;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FiltersGroup;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +41,7 @@ use Modules\Core\Grids\Hooks\HasWriteHooks;
 use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Grids\Resources\ResponseBuilder;
 use Modules\Core\Grids\Traits\HasGridUtils;
+use Modules\Core\Helpers\ResponseBuilder as BaseResponseBuilder;
 use Modules\Core\Inspector\SchemaInspector;
 use PHPUnit\Framework\Exception;
 use PHPUnit\Framework\ExpectationFailedException;
@@ -55,8 +61,9 @@ final class Grid extends Entity
 
     private bool $initialized = false;
 
-    private array $forcedFields = [];
-
+    /**
+     * @var array<int, Closure(Model): Field>
+     */
     private array $prepareFieldsCallbacks = [];
 
     public function __construct(Model|string $model)
@@ -71,6 +78,8 @@ final class Grid extends Entity
     }
 
     /**
+     * @return array{fields: array<string, array<string, mixed>>}
+     *
      * @throws \Exception
      * @throws Exception
      * @throws ExpectationFailedException
@@ -93,11 +102,11 @@ final class Grid extends Entity
     /**
      * alias of setFields for pipe.
      *
-     * @param array<Closure(Model $model): Field>
+     * @param  Closure(Model): Field  ...$fields
      */
     public function fields(Closure ...$fields): void
     {
-        $this->prepareFieldsCallbacks = $fields;
+        $this->prepareFieldsCallbacks = array_values($fields);
     }
 
     // endregion [FIELDS]
@@ -121,12 +130,17 @@ final class Grid extends Entity
 
         $this->checkGridConfigs();
 
-        $response_builder = new ResponseBuilder($request);
+        $http_request = $request instanceof GridRequest ? $request : $request->request;
+        $response_builder = new ResponseBuilder($http_request);
         $response_builder->setAction($this->requestData->action->value);
         $response_builder->setPrimaryKey($this->getModel()->getKeyName());
 
-        foreach ($this->getModel()::getTimestampColumns($this->getModel()) as $key => $value) {
-            $method = 'set' . ucfirst(preg_replace('/At$/', '', $key));
+        foreach (HasGridUtils::getTimestampColumns($this->getModel()) as $key => $value) {
+            if (! is_string($key) || ! is_string($value)) {
+                continue;
+            }
+
+            $method = 'set' . ucfirst((string) preg_replace('/At$/', '', $key));
             $response_builder->{$method}($value);
         }
 
@@ -144,12 +158,13 @@ final class Grid extends Entity
         if (GridAction::isReadAction($this->requestData->action)) {
             // validation rules
             if ($this->requestData->action === GridAction::Select) {
+                /** @var array<string, array<string, mixed>> $all_rules */
                 $all_rules = [];
 
                 foreach ($this->getAllFields() as $name => $field) {
                     $rules = $field->getRules();
 
-                    if (! empty($rules)) {
+                    if ($rules !== []) {
                         $all_rules[$name] = $rules;
                     }
                 }
@@ -185,15 +200,13 @@ final class Grid extends Entity
 
     /**
      * append column into grid configs fields and checks as forcedField.
+     *
+     * @param  array<string, array{readable: bool, writable: bool}|Closure(Model): Field>  $necessary_fields
      */
     private function appendFieldIntoList(array &$necessary_fields, string $column, bool $force = false): bool
     {
         if (! array_key_exists($column, $necessary_fields) && ! $this->hasFieldDeeply($column)) {
             $necessary_fields[$column] = Field::create($column);
-
-            if ($force) {
-                $this->forcedFields[] = $column;
-            }
 
             return true;
         }
@@ -204,6 +217,7 @@ final class Grid extends Entity
     /**
      * complete grid properties with request data.
      *
+     * @param  array<string, array{readable: bool, writable: bool}|Closure(Model): Field>  $necessary_fields
      *
      * @throws Exception
      * @throws ExpectationFailedException
@@ -219,9 +233,11 @@ final class Grid extends Entity
         if (($relations = $this->requestData->relations) !== []) {
             foreach ($relations as $relation) {
                 if (! $this->hasRelationDeeply($relation)) {
-                    // @phpstan-ignore method.notFound
-                    $relation_info = $this->getModel()->getRelationshipDeeply($relation);
-                    $this->addRelationDeeply($relation_info);
+                    $relation_info = $this->resolveRelationshipDeeply($relation);
+
+                    if ($relation_info !== false) {
+                        $this->addRelationDeeply($relation_info);
+                    }
                 }
             }
         }
@@ -265,8 +281,6 @@ final class Grid extends Entity
                 $this->getDefaultModelFields();
             } else {
                 $necessary_fields = [];
-                $options = null;
-                $funnels = null;
 
                 if (isset($this->requestData)) {
                     $action = $this->requestData->action;
@@ -285,16 +299,10 @@ final class Grid extends Entity
 
                 $necessary_fields = array_filter($necessary_fields, fn (Field|string $name): bool => ! $this->hasField($name), ARRAY_FILTER_USE_KEY);
                 $this->initFieldsByConfigs($necessary_fields);
-                $necessary_fields = array_map(fn (callable $generator) => $generator($this->getModel()), $necessary_fields);
-                $this->addFields($necessary_fields);
-
-                if ($options) {
-                    $this->initOptions($options);
-                }
-
-                if ($funnels) {
-                    $this->initFunnels($funnels);
-                }
+                /** @var array<string, Closure(Model): Field> $field_generators */
+                $field_generators = $necessary_fields;
+                $generated_fields = array_map(fn (Closure $generator): Field => $generator($this->getModel()), $field_generators);
+                $this->setFields($generated_fields);
             }
         } finally {
             $this->initialized = true;
@@ -302,6 +310,8 @@ final class Grid extends Entity
     }
 
     /**
+     * @param  array<string, array<string, mixed>>  $options
+     *
      * @throws DBALException
      * @throws \Exception
      * @throws Exception
@@ -312,6 +322,10 @@ final class Grid extends Entity
     private function initOptions(array $options): void
     {
         foreach ($options as $column => $option_data) {
+            if (! is_array($option_data)) {
+                continue;
+            }
+
             $field = $this->getFieldDeeply($column);
 
             if (! $field instanceof Field) {
@@ -321,31 +335,52 @@ final class Grid extends Entity
             $prefix = $field->getPath();
             $label = $option_data['label'] ?? null;
             $model = $field->getModel();
+            $option_columns = $option_data['columns'] ?? [$field->getName()];
 
-            if (! $label && $model) {
-                $label = $this->checkColumnsOrGetDefaults($field->getModel(), $field->getName(), $option_data['columns'] ?? [$field->getName()]);
+            if (! is_array($option_columns)) {
+                $option_columns = [$field->getName()];
             }
 
-            $field->options(Option::create($label));
+            if (! $label && $model instanceof Model) {
+                $label = $this->checkColumnsOrGetDefaults($model, $field->getName(), $option_columns);
+            }
+
+            $field->options(Option::create(is_string($label) ? $label : null));
             $option = $field->getOption();
 
-            if (isset($option_data['columns'])) {
+            if (! $option instanceof Option) {
+                continue;
+            }
+
+            if (isset($option_data['columns']) && is_array($option_data['columns'])) {
                 $additional_fields = [];
 
-                foreach ($option_data['columns'] as $column) {
-                    if (! Str::contains($column, '.')) {
-                        $column = $prefix . '.' . $column;
+                foreach ($option_data['columns'] as $option_column) {
+                    if (! is_string($option_column)) {
+                        continue;
                     }
 
-                    $additional_fields[$column] = Field::create($column, writable: false);
+                    if (! Str::contains($option_column, '.')) {
+                        $option_column = $prefix . '.' . $option_column;
+                    }
+
+                    $additional_fields[$option_column] = Field::create($option_column, writable: false);
                 }
 
-                $option->addFields($additional_fields);
+                $resolved_fields = [];
+
+                foreach ($additional_fields as $field_name => $field_factory) {
+                    $resolved_fields[$field_name] = $field_factory($this->getModel());
+                }
+
+                $option->addFields($resolved_fields);
             }
         }
     }
 
     /**
+     * @param  array<string, array<string, mixed>>  $funnels
+     *
      * @throws DBALException
      * @throws \Exception
      * @throws Exception
@@ -356,6 +391,10 @@ final class Grid extends Entity
     private function initFunnels(array $funnels): void
     {
         foreach ($funnels as $column => $funnel_data) {
+            if (! is_array($funnel_data)) {
+                continue;
+            }
+
             $field = $this->getFieldDeeply($column);
 
             if (! $field instanceof Field) {
@@ -365,26 +404,45 @@ final class Grid extends Entity
             $prefix = $field->getPath();
             $label = $funnel_data['label'] ?? null;
             $model = $field->getModel();
+            $funnel_columns = $funnel_data['columns'] ?? [$field->getName()];
 
-            if (! $label && $model) {
-                $label = $this->checkColumnsOrGetDefaults($field->getModel(), $field->getName(), $funnel_data['columns'] ?? [$field->getName()]);
+            if (! is_array($funnel_columns)) {
+                $funnel_columns = [$field->getName()];
             }
 
-            $field->funnel(Funnel::create($label));
+            if (! $label && $model instanceof Model) {
+                $label = $this->checkColumnsOrGetDefaults($model, $field->getName(), $funnel_columns);
+            }
+
+            $field->funnel(Funnel::create(is_string($label) ? $label : null));
             $funnel = $field->getFunnel();
 
-            if (isset($funnel_data['columns'])) {
+            if (! $funnel instanceof Funnel) {
+                continue;
+            }
+
+            if (isset($funnel_data['columns']) && is_array($funnel_data['columns'])) {
                 $additional_fields = [];
 
-                foreach ($funnel_data['columns'] as $column) {
-                    if (! Str::contains($column, '.')) {
-                        $column = $prefix . '.' . $column;
+                foreach ($funnel_data['columns'] as $funnel_column) {
+                    if (! is_string($funnel_column)) {
+                        continue;
                     }
 
-                    $additional_fields[] = Field::create($column, writable: false);
+                    if (! Str::contains($funnel_column, '.')) {
+                        $funnel_column = $prefix . '.' . $funnel_column;
+                    }
+
+                    $additional_fields[$funnel_column] = Field::create($funnel_column, writable: false);
                 }
 
-                $funnel->addFields($additional_fields);
+                $resolved_fields = [];
+
+                foreach ($additional_fields as $field_name => $field_factory) {
+                    $resolved_fields[$field_name] = $field_factory($this->getModel());
+                }
+
+                $funnel->addFields($resolved_fields);
             }
         }
     }
@@ -402,25 +460,75 @@ final class Grid extends Entity
         $this->addAppendFieldsToDefaults($all_fields);
         $this->addNecessaryFields($all_fields);
         $this->initFieldsByConfigs($all_fields);
-        $this->setFields(array_values($all_fields));
+        /** @var array<string, Closure(Model): Field> $field_generators */
+        $field_generators = $all_fields;
+        $generated_fields = array_map(fn (Closure $generator): Field => $generator($this->getModel()), $field_generators);
+        $this->setFields($generated_fields);
     }
 
-    private function addAndScrollDefaultFields(array &$allFields, bool $readable): void
+    /**
+     * @return array<string, string>
+     */
+    private function getModelColumnTypes(): array
     {
         $model = $this->getModel();
-        $fields = $model->getColumns();
+        $hidden = property_exists($model, 'hidden') && is_array($model->hidden)
+            ? array_values(array_filter($model->hidden, fn (mixed $column): bool => is_string($column)))
+            : [];
+        $fillable = property_exists($model, 'fillable') && is_array($model->fillable)
+            ? array_values(array_filter($model->fillable, fn (mixed $column): bool => is_string($column)))
+            : [];
+        $columns = array_unique([...$hidden, ...$fillable]);
+        $casts = $model->getCasts();
+        $mapped_columns = [];
+
+        foreach ($columns as $column) {
+            $column_name = (string) $column;
+            $cast_type = $casts[$column_name] ?? 'string';
+            $mapped_columns[$column_name] = is_string($cast_type) ? $cast_type : 'string';
+        }
+
+        return $mapped_columns;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getModelAppendFields(): array
+    {
+        $model = $this->getModel();
+
+        if (! property_exists($model, 'appends') || ! is_array($model->appends)) {
+            return [];
+        }
+
+        return array_values(array_filter($model->appends, fn (mixed $name): bool => is_string($name)));
+    }
+
+    /**
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}>  $allFields
+     */
+    private function addAndScrollDefaultFields(array &$allFields, bool $readable): void
+    {
+        $fields = $this->getModelColumnTypes();
 
         foreach ($fields as $name => $type) {
+            if (! is_string($name)) {
+                continue;
+            }
+
             if (array_key_exists($name, $allFields)) {
                 $allFields[$name][$readable ? 'readable' : 'writable'] = true;
             } else {
-                $allFields[$name] = ['validation' => [$type], 'readable' => $readable, 'writable' => ! $readable];
+                $allFields[$name] = ['validation' => [is_string($type) ? $type : 'string'], 'readable' => $readable, 'writable' => ! $readable];
             }
         }
     }
 
     /**
      * get all readable fields and appends configs to array of default fields.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}>  $allFields
      */
     private function addDefaultReadableFields(array &$allFields): void
     {
@@ -429,6 +537,8 @@ final class Grid extends Entity
 
     /**
      * get all writable fields and appends configs to array of default fields.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}>  $allFields
      */
     private function addDefaultWritableFields(array &$allFields): void
     {
@@ -437,12 +547,17 @@ final class Grid extends Entity
 
     /**
      * get all calculated fields in Model and appends configs to array of default fields.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}>  $allFields
      */
     private function addAppendFieldsToDefaults(array &$allFields): void
     {
-        $appends = $this->getModel()->getAppendFields();
+        $appends = $this->getModelAppendFields();
 
         foreach ($appends as $name) {
+            if (! is_string($name)) {
+                continue;
+            }
             if (! array_key_exists($name, $allFields)) {
                 $allFields[lcfirst($this->getModelName()) . '.' . $name] = ['validation' => [], 'readable' => true, 'writable' => false];
             }
@@ -451,6 +566,8 @@ final class Grid extends Entity
 
     /**
      * call addTimestampsFields and addPrimaryKey methods.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}|Closure(Model): Field>  $allFields
      */
     private function addNecessaryFields(array &$allFields): void
     {
@@ -460,10 +577,12 @@ final class Grid extends Entity
 
     /**
      * get all timestamps fields and appends configs to array of passed one.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}|Closure(Model): Field>  $allFields
      */
     private function addTimestampsFields(array &$allFields): void
     {
-        $timestamps = $this->getTimestampsColumns();
+        $timestamps = array_filter($this->getTimestampsColumns(), fn (mixed $name): bool => is_string($name) && $name !== '');
 
         foreach ($timestamps as $name) {
             $allFields[lcfirst($this->getModelName()) . '.' . $name] = ['validation' => ['date', 'filled'], 'readable' => true, 'writable' => true];
@@ -472,6 +591,8 @@ final class Grid extends Entity
 
     /**
      * get primary key field/s and appends configs to array of passed one.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}|Closure(Model): Field>  $allFields
      */
     private function addPrimaryKey(array &$allFields): void
     {
@@ -480,11 +601,15 @@ final class Grid extends Entity
         $is_autoincremental = $this->getModel()->incrementing;
 
         foreach ($primary_key_name as $name) {
+            if (! is_string($name)) {
+                continue;
+            }
+
             $full_name = lcfirst($this->getModelName()) . '.' . $name;
 
             if (! array_key_exists($full_name, $allFields)) {
                 $allFields[$full_name] = ['validation' => [$primary_key_type, 'filled'], 'readable' => true, 'writable' => ! $is_autoincremental];
-            } else {
+            } elseif (is_array($allFields[$full_name])) {
                 $allFields[$full_name]['readable'] = true;
                 $allFields[$full_name]['writable'] = ! $is_autoincremental;
             }
@@ -520,6 +645,10 @@ final class Grid extends Entity
         $this->addNecessaryFields($necessary_fields);
 
         foreach ($necessary_fields as $name => &$config) {
+            if (! is_array($config)) {
+                continue;
+            }
+
             $config = Field::create($name, readable: $config['readable'], writable: $config['writable']);
         }
 
@@ -530,6 +659,8 @@ final class Grid extends Entity
 
     /**
      * call Field constructors from list of configs.
+     *
+     * @param  array<string, array{validation?: array<int, string>, readable: bool, writable: bool}|Closure(Model): Field>  $list
      */
     private function initFieldsByConfigs(array &$list): void
     {
@@ -563,7 +694,6 @@ final class Grid extends Entity
         }
 
         // layouts
-        /** @phpstan-ignore classConstant.notFound */
         if ((/* $action === GridAction::LAYOUT && */ $request->getMethod() === Request::METHOD_GET)) {
             return $this->processLayouts($responseBuilder);
         }
@@ -585,7 +715,15 @@ final class Grid extends Entity
             $processes[] = fn (): ResponseBuilder => $this->processFunnels($responseBuilder);
         }
 
-        Concurrency::driver(App::runningInConsole() ? 'fork' : 'process')->run($processes);
+        if ($processes !== []) {
+            $concurrency_driver = Concurrency::driver(App::runningInConsole() ? 'fork' : 'process');
+
+            if (! is_object($concurrency_driver) || ! method_exists($concurrency_driver, 'run')) {
+                throw new RuntimeException('Invalid concurrency driver');
+            }
+
+            $concurrency_driver->run($processes);
+        }
 
         return $responseBuilder;
     }
@@ -598,13 +736,21 @@ final class Grid extends Entity
      * @throws SuspiciousOperationException
      * @throws QueryException
      */
-    private function processReadActions(ResponseBuilder $responseBuilder, GridRequest $request): ResponseBuilder
+    private function processReadActions(ResponseBuilder $responseBuilder, GridRequest|GridRequestData $request): ResponseBuilder
     {
+        $http_request = $request instanceof GridRequest ? $request : $request->request;
+
         if (class_uses_trait($this->getModel(), HasCache::class)) {
-            return Cache::tryByRequest($this->getModel(), $request, fn (Request $cbRequest): ResponseBuilder => $this->callbackToReadAction($responseBuilder, $cbRequest));
+            $cache = Cache::getFacadeRoot();
+
+            if (! $cache instanceof CacheRepository) {
+                throw new RuntimeException('Invalid cache repository');
+            }
+
+            return $cache->tryByRequest($this->getModel(), $http_request, fn (): ResponseBuilder => $this->callbackToReadAction($responseBuilder, $http_request));
         }
 
-        return $this->callbackToReadAction($responseBuilder, $request);
+        return $this->callbackToReadAction($responseBuilder, $http_request);
     }
 
     /**
@@ -618,6 +764,11 @@ final class Grid extends Entity
     private function processData(ResponseBuilder $responseBuilder): ResponseBuilder
     {
         [$data, $total_records] = $this->getData();
+
+        if ($data instanceof LazyCollection) {
+            $data = $data->collect();
+        }
+
         $this->setDataIntoResponse($responseBuilder, $data, $total_records);
         $responseBuilder->setClass($this->getModel());
         $responseBuilder->setTable($this->getModel()->getTable());
@@ -659,7 +810,8 @@ final class Grid extends Entity
      */
     private function processConcurrencies(ResponseBuilder $responseBuilder): ResponseBuilder
     {
-        $data = $this->checkRecordsConcurrency();
+        $data = $this->checkRecordsConcurrency() ?? new Collection();
+
         $responseBuilder->setData($data);
         $responseBuilder->setTotalRecords($data->count());
 
@@ -682,30 +834,28 @@ final class Grid extends Entity
      */
     private function processWriteActions(ResponseBuilder $responseBuilder): ResponseBuilder
     {
-        $data = match ($this->requestData->action) {
-            /** @phpstan-ignore classConstant.notFound */
-            // GridAction::LAYOUT && $request->getMethod() === Request::METHOD_POST => $this->createUserLayout(),
-            /** @phpstan-ignore classConstant.notFound, classConstant.notFound */
-            // GridAction::LAYOUT && in_array($request->getMethod(), [Request::METHOD_PUT, Request::METHOD_PATCH]) => $this->updateUserLayout(),
-            /** @phpstan-ignore classConstant.notFound */
-            // GridAction::LAYOUT && $request->getMethod() === Request::METHOD_DELETE => $this->deleteUserLayout(),
-            GridAction::Insert => $this->createRecord(),
-            GridAction::Update => $this->updateRecords(),
-            GridAction::Delete => $this->softDeleteRecords(),
-            GridAction::ForceDelete => $this->forceDeleteRecords(),
-            // GridAction::Restore => $this->restoreRecords(),
-            default => throw new InvalidArgumentException('Not a valid action'),
-        };
+        $action = $this->requestData->action;
 
-        $responseBuilder->setData($data);
-
-        /** @phpstan-ignore classConstant.notFound */
-        if ($this->requestData->action === GridAction::Insert) {
-            // || ($this->requestData->action === GridAction::LAYOUT && $request->getMethod() === Request::METHOD_POST)) {
+        if ($action === GridAction::Insert) {
+            $responseBuilder->setData($this->createRecord());
             $responseBuilder->setStatus(Response::HTTP_CREATED);
+
+            return $responseBuilder;
         }
 
-        return $responseBuilder;
+        if ($action === GridAction::Update) {
+            $this->updateRecords();
+        }
+
+        if ($action === GridAction::Delete) {
+            $this->softDeleteRecords();
+        }
+
+        if ($action === GridAction::ForceDelete) {
+            $this->forceDeleteRecords();
+        }
+
+        throw new InvalidArgumentException('Not a valid action');
     }
 
     /**
@@ -723,8 +873,7 @@ final class Grid extends Entity
     }
 
     /**
-     * @throws QueryException
-     * @throws InvalidArgumentException
+     * @return Collection<int, \stdClass>
      */
     private function getUserLayouts(): Collection
     {
@@ -743,55 +892,84 @@ final class Grid extends Entity
         })->where('grid_name', $this->requestData->layout['grid_name'])->get();
     }
 
+    /**
+     * @param  array<int|string, array<string, mixed>>  $filters
+     * @return array<int, array<string, mixed>>
+     */
     private function getEntityFilters(string $entity, array $filters): array
     {
-        return array_filter($filters, fn (string $c): int|false => preg_match('/^' . preg_quote($entity, '/') . "\.[a-zA-Z0-9_]+$/", $c), ARRAY_FILTER_USE_KEY);
+        $matched = [];
+
+        foreach ($filters as $key => $filter) {
+            if (! is_array($filter)) {
+                continue;
+            }
+
+            $property = is_string($key) && str_contains($key, '.')
+                ? $key
+                : ($filter['property'] ?? null);
+
+            if (! is_string($property) || preg_match('/^' . preg_quote($entity, '/') . "\.[a-zA-Z0-9_]+$/", $property) !== 1) {
+                continue;
+            }
+
+            if (! isset($filter['property'])) {
+                $filter['property'] = $property;
+            }
+
+            $matched[] = $filter;
+        }
+
+        return $matched;
     }
 
     /**
-     * @psalm-param Collection<string, Field> $allFields
+     * @param  Builder<Model>|EloquentRelation<*, *, *>  $query
+     * @param  array<int, array<string, mixed>>  $filters
+     * @param  Collection<string, Field>  $allFields
      */
-    private function addWhereFiltersIntoQuery(Builder|Relation $query, array $filters, Collection $allFields): void
+    private function addWhereFiltersIntoQuery(Builder|EloquentRelation $query, array $filters, Collection $allFields): void
     {
         foreach ($filters as $filter) {
-            $field = $allFields->offsetExists($filter['property']) ? $allFields->offsetGet($filter['property']) : false;
+            if (! is_array($filter)) {
+                continue;
+            }
 
-            if ($field && isset($filter['value'])) {
-                $operator = FilterOperator::tryFrom($filter['operator']);
+            $property = $filter['property'] ?? null;
+
+            if (! is_string($property)) {
+                continue;
+            }
+
+            $field = $allFields->offsetExists($property) ? $allFields->offsetGet($property) : false;
+
+            if ($field instanceof Field && array_key_exists('value', $filter)) {
+                $operator_value = $filter['operator'] ?? '';
+                $operator = is_string($operator_value)
+                    ? FilterOperator::tryFrom($operator_value)
+                    : null;
 
                 if ($operator instanceof FilterOperator) {
-                    self::applyCorrectWhereMethod($query, $field, $operator, $filter['value'] === 'null' ? null : $filter['value']);
+                    $this->applyCorrectWhereMethodForQuery($query, $field, $operator, $filter['value'] === 'null' ? null : $filter['value']);
                 }
             }
         }
     }
 
     /**
-     * get grid main data.
-     *
-     * @return (Builder[]|\Illuminate\Database\Eloquent\Collection|int)[]
-     *
-     * @psalm-return list{\Illuminate\Database\Eloquent\Collection<array-key, Model>|array<Builder>, int}
+     * @return array{Collection<int, Model>|LazyCollection<int, Model>, int}
      */
     private function getData(): array
     {
         $all_fields = $this->getAllFields()->reject(fn (Field $f): bool => $f->isAppend());
         $request_columns = $this->requestData->columns;
         $main_columns = ($request_columns !== [] ? $this->getFields() : $all_fields)->map(fn (Field $f): string => $f->getName())->all();
-        // Optimize array filtering to reduce memory allocations
-        $columns_filters = [];
-
-        foreach ($this->requestData->filters ?? [] as $f) {
-            if ($f['value'] !== '') {
-                $columns_filters[] = $f;
-            }
-        }
-
+        $columns_filters = $this->flattenRequestFilters($this->requestData->filters);
         $funnels_filters = [];
 
-        foreach ($this->requestData->funnelsFilters ?? [] as $f) {
-            if ($f['value'] !== []) {
-                $funnels_filters[] = $f;
+        foreach ($this->requestData->funnelsFilters ?? [] as $funnel_filter) {
+            if (is_array($funnel_filter) && ($funnel_filter['value'] ?? []) !== []) {
+                $funnels_filters[] = $funnel_filter;
             }
         }
 
@@ -810,10 +988,14 @@ final class Grid extends Entity
         foreach ($all_relations as $relation) {
             $relation_info = $this->getRelationDeeply($relation);
 
-            if (! in_array($relation_info->info->getForeignKey(), $query->getQuery()->columns, true)) {
+            if ($relation_info === null) {
+                continue;
+            }
+
+            $query_columns = $query->getQuery()->columns ?? [];
+
+            if (! in_array($relation_info->info->getForeignKey(), $query_columns, true)) {
                 $query->addSelect($relation_info->info->getForeignKey());
-                // li aggiungo per fare la query ma mi salvo in qualche modo che poi non li devo vsualizzare perché non sono richiesti
-                // $this->getModel()->makeHidden($relation_info->info->getForeignKey());
             }
 
             $relation_filters = [
@@ -822,25 +1004,28 @@ final class Grid extends Entity
             ];
 
             $real_relation_name = preg_replace('/^' . lcfirst($this->getModelName()) . "\./", '', $relation);
-            $query->with($real_relation_name, function (Builder|Relation $q) use ($relation_filters, $relation_info, $all_fields): void {
-                $relation_columns = $relation_info->getFields()->map(fn (Field $f): string => $f->getName())->all();
-                $q->select(empty($relation_columns) ? ['*'] : array_values($relation_columns));
 
-                if (! in_array($relation_info->info->getOwnerKey(), $q->getQuery()->getQuery()->columns, true)) {
-                    $q->addSelect($relation_info->info->getOwnerKey());
-                    // li aggiungo per fare la query ma mi salvo in qualche modo hce poi non li devo vsualizzare perché non sono richiesti
-                    // $relation_info->getModel()->makeHidden($relation_info->info->getOwnerKey());
+            if (! is_string($real_relation_name) || $real_relation_name === '') {
+                continue;
+            }
+
+            $query->with($real_relation_name, function (EloquentRelation $relation_query) use ($relation_filters, $relation_info, $all_fields): void {
+                $relation_builder = $relation_query->getQuery();
+                $relation_columns = $relation_info->getFields()->map(fn (Field $f): string => $f->getName())->all();
+                $relation_builder->select($relation_columns === [] ? ['*'] : array_values($relation_columns));
+
+                $relation_query_columns = $relation_builder->getQuery()->columns ?? [];
+
+                if (! in_array($relation_info->info->getOwnerKey(), $relation_query_columns, true)) {
+                    $relation_builder->addSelect($relation_info->info->getOwnerKey());
                 }
 
-                // Add limit to eager loaded relations to prevent memory issues with large datasets
-                // $q->limit(100);
-
-                $this->addWhereFiltersIntoQuery($q, $relation_filters, $all_fields);
+                $this->addWhereFiltersIntoQuery($relation_query, $relation_filters, $all_fields);
             });
 
             if ($relation_filters !== []) {
-                $query->whereHas($real_relation_name, function (Builder|Relation $q) use ($relation_filters, $all_fields): void {
-                    $this->addWhereFiltersIntoQuery($q, $relation_filters, $all_fields);
+                $query->whereHas($real_relation_name, function (Builder $relation_query) use ($relation_filters, $all_fields): void {
+                    $this->addWhereFiltersIntoQuery($relation_query, $relation_filters, $all_fields);
                 });
             }
         }
@@ -860,8 +1045,6 @@ final class Grid extends Entity
             $this->addSortsIntoQuery($query, $sorts);
         }
 
-        // Log::debug(static::dumpQuery($query));
-
         // Use lazy loading for large datasets without pagination to reduce memory usage
         $data = $this->requestData->pagination === 0 && $count > 500 ? $query->lazy() : $query->get();
 
@@ -869,29 +1052,40 @@ final class Grid extends Entity
     }
 
     /**
-     * @psalm-return Collection<string,\Modules\Core\Helpers\ResponseBuilder>|null
+     * @return Collection<string, BaseResponseBuilder>|null
      */
     private function getFunnelsData(): ?Collection
     {
         $request_funnels = $this->requestData->funnelsFilters;
 
-        if ($request_funnels === []) {
+        if ($request_funnels === null || $request_funnels === []) {
             return null;
         }
 
-        /** @psalm-var Collection<string,\Modules\Core\Helpers\ResponseBuilder> */
+        /** @var Collection<string, BaseResponseBuilder> $funnels */
         $funnels = new Collection();
 
-        /** @var string $name */
         foreach (array_keys($request_funnels) as $name) {
+            if (! is_string($name)) {
+                continue;
+            }
+
             $field = $this->getFieldDeeply($name);
 
-            if (($funnel = $field->getFunnel()) instanceof Funnel) {
-                $response = $funnel->process($this->requestData);
+            if (! $field instanceof Field) {
+                continue;
+            }
 
-                if ($response->isNotEmpty()) {
-                    $funnels->offsetSet($name, $response->data());
-                }
+            $funnel = $field->getFunnel();
+
+            if (! $funnel instanceof Funnel) {
+                continue;
+            }
+
+            $response = $funnel->process($this->requestData);
+
+            if ($response->isNotEmpty()) {
+                $funnels->offsetSet($name, $response);
             }
         }
 
@@ -899,30 +1093,40 @@ final class Grid extends Entity
     }
 
     /**
-     * @psalm-return Collection<string,\Modules\Core\Helpers\ResponseBuilder>|null
+     * @return Collection<string, BaseResponseBuilder>|null
      */
     private function getOptionsData(): ?Collection
     {
         $request_options = $this->requestData->optionsFilters;
 
-        if ($request_options === []) {
+        if ($request_options === null || $request_options === []) {
             return null;
         }
 
-        /** @psalm-var Collection<string,\Modules\Core\Helpers\ResponseBuilder> */
+        /** @var Collection<string, BaseResponseBuilder> $options */
         $options = new Collection();
 
-        /** @var string $name */
         foreach (array_keys($request_options) as $name) {
-            // if (Str::startsWith($name, lcfirst($this->getModelName()))) $name = preg_replace("/^" . lcfirst($this->getModelName()) . "\./", '', $name);
+            if (! is_string($name)) {
+                continue;
+            }
+
             $field = $this->getFieldDeeply($name);
 
-            if (($option = $field->getOption()) instanceof Option) {
-                $response = $option->process($this->requestData);
+            if (! $field instanceof Field) {
+                continue;
+            }
 
-                if ($response->isNotEmpty()) {
-                    $options->offsetSet($name, $response->data());
-                }
+            $option = $field->getOption();
+
+            if (! $option instanceof Option) {
+                continue;
+            }
+
+            $response = $option->process($this->requestData);
+
+            if ($response->isNotEmpty()) {
+                $options->offsetSet($name, $response);
             }
         }
 
@@ -930,7 +1134,7 @@ final class Grid extends Entity
     }
 
     /**
-     * @throws InvalidArgumentException
+     * @return Collection<int, Model>|null
      */
     private function checkRecordsConcurrency(): ?Collection
     {
@@ -946,37 +1150,33 @@ final class Grid extends Entity
             $primary_key_fields = [$primary_key_fields];
         }
 
-        $query = $this->getModel()::query();
-
-        if ($this->hasSoftDelete()) {
-            $query->withTrashed();
-        }
+        $query = $this->newModelQuery($this->hasSoftDelete());
 
         $fields = [];
 
-        foreach ($request_changes as $record) {
-            $query->orWhere(function (Builder|\Modules\Core\Grids\Definitions\Relation $q) use ($record, $primary_key_fields, &$fields): void {
-                throw_unless(is_array($record['record']), InvalidArgumentException::class, 'Invalid record value');
+        if ($request_changes !== null) {
+            foreach ($request_changes as $record) {
+                $query->orWhere(function (Builder $q) use ($record, $primary_key_fields, &$fields): void {
+                    throw_unless(is_array($record['record']), InvalidArgumentException::class, 'Invalid record value');
 
-                throw_if($primary_key_fields !== array_keys($record['record']), InvalidArgumentException::class, 'Invalid primary key fields');
+                    throw_if($primary_key_fields !== array_keys($record['record']), InvalidArgumentException::class, 'Invalid primary key fields');
 
-                self::applyCorrectWhereMethod($q, $record['property'], FilterOperator::NotEquals, $record['value']);
+                    $this->applyCorrectWhereMethodForQuery($q, $record['property'], FilterOperator::NotEquals, $record['value']);
 
-                foreach ($record['record'] as $column => $value) {
-                    self::applyCorrectWhereMethod($q, $column, FilterOperator::Equals, $value);
-                }
+                    foreach ($record['record'] as $column => $value) {
+                        $this->applyCorrectWhereMethodForQuery($q, $column, FilterOperator::Equals, $value);
+                    }
 
-                if ($fields === []) {
-                    array_push($fields, ...array_keys($record['record']));
-                    $fields[] = $record['property'];
-                }
-            });
+                    if ($fields === []) {
+                        array_push($fields, ...array_keys($record['record']));
+                        $fields[] = $record['property'];
+                    }
+                });
+            }
         }
 
         $query->select($fields === [] ? ['*'] : $fields);
-        // Log::debug(static::dumpQuery($query));
 
-        /** @psalm-suppress InvalidReturnStatement */
         return $query->get();
     }
 
@@ -1061,7 +1261,7 @@ final class Grid extends Entity
     {
         $primary_key = $this->getPrimaryKey();
         $primary_value = is_string($primary_key) ? $this->requestData->request->get($primary_key) : array_map($this->requestData->request->get(...), $primary_key);
-        $query = $this->withTrashed() ? $this->getModel()::withTrashed() : $this->getModel()::query();
+        $query = $this->newModelQuery($this->withTrashed());
         $query->findOrFail($primary_value);
 
         throw new BadMethodCallException('Not implemented');
@@ -1075,6 +1275,90 @@ final class Grid extends Entity
     private function forceDeleteRecords(): never
     {
         throw new BadMethodCallException('Not implemented');
+    }
+
+    /**
+     * @return Builder<Model>
+     */
+    private function newModelQuery(bool $withTrashed = false): Builder
+    {
+        $model_class = $this->getModel()::class;
+
+        if ($withTrashed && in_array(SoftDeletes::class, class_uses_recursive($model_class), true)) {
+            return $model_class::withTrashed();
+        }
+
+        return $model_class::query();
+    }
+
+    /**
+     * @param  Builder<Model>|EloquentRelation<*, *, *>  $query
+     */
+    private function applyCorrectWhereMethodForQuery(Builder|EloquentRelation $query, Field|string $field, FilterOperator $operator, mixed $value): void
+    {
+        if ($query instanceof EloquentRelation) {
+            self::applyCorrectWhereMethod($query->getQuery(), $field, $operator, $value);
+
+            return;
+        }
+
+        self::applyCorrectWhereMethod($query, $field, $operator, $value);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function flattenRequestFilters(?FiltersGroup $filters): array
+    {
+        if (! $filters instanceof FiltersGroup) {
+            return [];
+        }
+
+        $flat_filters = [];
+
+        foreach ($filters->filters as $key => $filter) {
+            if ($filter instanceof Filter) {
+                if ($filter->value === '') {
+                    continue;
+                }
+
+                $flat_filters[] = [
+                    'property' => $filter->property,
+                    'value' => $filter->value,
+                    'operator' => $filter->operator->value,
+                ];
+
+                continue;
+            }
+
+            if (is_array($filter) && ($filter['value'] ?? '') !== '') {
+                $property = $filter['property'] ?? (is_string($key) ? $key : null);
+
+                if (is_string($property)) {
+                    $filter['property'] = $property;
+                    $flat_filters[] = $filter;
+                }
+            }
+        }
+
+        return $flat_filters;
+    }
+
+    /**
+     * @return array<int, \Modules\Core\Grids\Definitions\RelationInfo>|false
+     */
+    private function resolveRelationshipDeeply(string $relation): array|false
+    {
+        if (! Grid::useGridUtils($this->getModel())) {
+            return false;
+        }
+
+        $model_class = $this->getFullModelName();
+
+        /** @var callable(string): (array<int, \Modules\Core\Grids\Definitions\RelationInfo>|false) $resolver */
+        $resolver = [$model_class, 'getRelationshipDeeply'];
+
+        return $resolver($relation);
     }
 
     // endregion [EXECUTION]

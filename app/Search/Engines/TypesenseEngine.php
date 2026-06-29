@@ -7,6 +7,7 @@ namespace Modules\Core\Search\Engines;
 use Exception;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Date;
@@ -44,6 +45,8 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     #[Override]
     public function createIndex(mixed $name, array $options = [], bool $force = false): void
     {
+        $collection = is_string($name) ? $name : 'unknown';
+
         try {
             $matched = $this->matchModelToCollectionName($name);
 
@@ -88,6 +91,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         }
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     #[Override]
     public function search(Builder $builder): mixed
     {
@@ -100,29 +106,38 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         return parent::search($builder);
     }
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     #[Override]
     public function buildSearchFilters(array $filters): string
     {
-        $filterStrings = [];
+        $filter_strings = [];
 
         foreach ($filters as $field => $value) {
             if (is_array($value)) {
                 if (count($value) === 2 && is_numeric($value[0]) && is_numeric($value[1])) {
-                    // Range filter
-                    $filterStrings[] = sprintf('%s:>=%s && %s:<=%s', $field, $value[0], $field, $value[1]);
+                    $filter_strings[] = sprintf('%s:>=%s && %s:<=%s', $field, $value[0], $field, $value[1]);
                 } else {
-                    // IN filter
-                    $values = implode(',', array_map(static fn (mixed $val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
-                    $filterStrings[] = sprintf('%s:[%s]', $field, $values);
+                    $formatted_values = array_map(
+                        static function (mixed $val): string {
+                            if (is_string($val)) {
+                                return sprintf('"%s"', $val);
+                            }
+
+                            return is_scalar($val) ? (string) $val : '';
+                        },
+                        $value,
+                    );
+                    $filter_strings[] = sprintf('%s:[%s]', $field, implode(',', $formatted_values));
                 }
             } else {
-                // Exact match
-                $formattedValue = is_string($value) ? sprintf('"%s"', $value) : $value;
-                $filterStrings[] = sprintf('%s:=%s', $field, $formattedValue);
+                $formatted_value = is_string($value) ? sprintf('"%s"', $value) : (is_scalar($value) ? (string) $value : '');
+                $filter_strings[] = sprintf('%s:=%s', $field, $formatted_value);
             }
         }
 
-        return implode(' && ', $filterStrings);
+        return implode(' && ', $filter_strings);
     }
 
     #[Override]
@@ -133,7 +148,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
     #[Override]
     /**
-     * @param  class-string<Model>  $modelClass
+     * @param  class-string<Model&Searchable>  $modelClass
      *
      * @throws \Http\Client\Exception
      * @throws TypesenseClientError
@@ -143,12 +158,8 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     {
         $this->ensureIndex(new $modelClass());
 
-        $query = $modelClass::query();
-
-        // Support for soft delete
-        if (method_exists($modelClass, 'withTrashed')) {
-            $query->withTrashed();
-        }
+        $model_instance = new $modelClass();
+        $query = $this->newQueryIncludingTrashed($modelClass);
 
         // Filters
         if ($id !== null && $id !== 0) {
@@ -156,10 +167,10 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         } elseif (! in_array($from, [null, '', '0'], true)) {
             $query->where('updated_at', '>', Date::parse($from));
         } else {
-            $lastIndexed = new $modelClass()->getLastIndexedTimestamp();
+            $last_indexed = $this->getLastIndexedTimestamp($model_instance);
 
-            if ($lastIndexed) {
-                $query->where('updated_at', '>', $lastIndexed);
+            if ($last_indexed) {
+                $query->where('updated_at', '>', $last_indexed);
             }
         }
 
@@ -275,10 +286,10 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     //        return $this->getGroupedData($model, $field, $filters, 100);
     //    }
 
-    #[Override]
     /**
-     * @param  Model&Searchable  $model
+     * @return array<string, mixed>
      */
+    #[Override]
     public function getSearchMapping(Model $model): array
     {
         // Default mapping for Typesense
@@ -292,11 +303,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             ],
         ];
 
-        // Add a vector field if needed
-        // Use env to avoid tooling complaining about module config discovery
-        $vectorSearchEnabled = (bool) env('VECTOR_SEARCH_ENABLED', false);
+        $vector_search_enabled = (bool) config('search.vector_search.enabled', false);
 
-        if ($vectorSearchEnabled && $this->supportsVectorSearch()) {
+        if ($vector_search_enabled && $this->supportsVectorSearch()) {
             // Typesense vector field configuration
             // The embedding is pre-computed, so we just need to define it as float[]
             $mapping['fields']['embedding'] = [
@@ -330,9 +339,12 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     {
         try {
             if ($model instanceof Model) {
-                $this->ensureSearchable($model);
-                $collection = $model->searchableAs();
-            } elseif (is_string($model) && class_exists($model)) {
+                $collection = $this->resolveSearchableCollectionName($model);
+
+                if ($collection === null) {
+                    return false;
+                }
+            } elseif (class_exists($model)) {
                 $collection = new $model()->searchableAs();
             } else {
                 $collection = $model;
@@ -373,6 +385,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     //        return $response['grouped_hits'] ?? [];
     //    }
 
+    /**
+     * @return array<string, mixed>
+     */
     #[Override]
     public function health(): array
     {
@@ -385,6 +400,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     #[Override]
     public function stats(): array
     {
@@ -395,11 +413,22 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      * @throws \Http\Client\Exception
      * @throws TypesenseClientError
      */
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     private function performVectorSearch(Builder $builder): mixed
     {
-        /** @var Model&Searchable $model */
         $model = $builder->model;
-        $collection = $model->searchableAs();
+
+        if (! $model instanceof Model) {
+            return parent::search($builder);
+        }
+
+        $collection = $this->resolveSearchableCollectionName($model);
+
+        if ($collection === null) {
+            return parent::search($builder);
+        }
 
         // Extract the vector from the builder
         $vector = $this->extractVectorFromBuilder($builder);
@@ -434,10 +463,18 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             // Transform results to match Scout's expected format
             $hits = $response['hits'] ?? [];
 
-            return collect($hits)->map(static function (array $hit) {
-                $document = $hit['document'] ?? [];
-                $document['_id'] = $hit['document']['id'] ?? null;
-                $document['_score'] = $hit['text_match'] ?? 0;
+            if (! is_array($hits)) {
+                return collect();
+            }
+
+            /** @var list<array<string, mixed>> $normalized_hits */
+            $normalized_hits = array_values(array_filter($hits, is_array(...)));
+
+            return collect($normalized_hits)->map(static function (array $hit): array {
+                $document = is_array($hit['document'] ?? null) ? $hit['document'] : [];
+                $document_id = $document['id'] ?? null;
+                $document['_id'] = is_scalar($document_id) ? (string) $document_id : null;
+                $document['_score'] = is_numeric($hit['text_match'] ?? null) ? (float) $hit['text_match'] : 0.0;
 
                 return $document;
             });
@@ -451,19 +488,31 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         }
     }
 
-    private function buildFilter(string $fieldName, mixed $value): string
+    private function buildFilter(string $field_name, mixed $value): string
     {
         if (is_array($value)) {
-            $values = implode(',', array_map(static fn (mixed $val): mixed => is_string($val) ? sprintf('"%s"', $val) : $val, $value));
+            $formatted_values = array_map(
+                static function (mixed $val): string {
+                    if (is_string($val)) {
+                        return sprintf('"%s"', $val);
+                    }
 
-            return sprintf('%s:[%s]', $fieldName, $values);
+                    return is_scalar($val) ? (string) $val : '';
+                },
+                $value,
+            );
+
+            return sprintf('%s:[%s]', $field_name, implode(',', $formatted_values));
         }
 
-        $formattedValue = is_string($value) ? sprintf('"%s"', $value) : $value;
+        $formatted_value = is_string($value) ? sprintf('"%s"', $value) : (is_scalar($value) ? (string) $value : '');
 
-        return sprintf('%s:=%s', $fieldName, $formattedValue);
+        return sprintf('%s:=%s', $field_name, $formatted_value);
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     private function buildFiltersFromBuilder(Builder $builder): string
     {
         $filters = [];

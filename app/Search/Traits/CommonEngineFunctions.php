@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Traits;
 
 use Exception;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
+use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
+use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Override;
 
-/**
- * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
- */
 trait CommonEngineFunctions
 {
     public const string INDEXED_AT_FIELD = '_indexed_at';
@@ -31,6 +34,9 @@ trait CommonEngineFunctions
         return Str::of(static::class)->afterLast('\\')->replace('Engine', '')->toString();
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     public function isVectorSearch(Builder $builder): bool
     {
         return isset($builder->wheres['vector'])
@@ -74,6 +80,9 @@ trait CommonEngineFunctions
         return false;
     }
 
+    /**
+     * @phpstan-assert Model&Searchable $model
+     */
     #[Override]
     public function ensureSearchable(Model $model): void
     {
@@ -116,10 +125,48 @@ trait CommonEngineFunctions
     }
 
     /**
-     * @param  string|Model&Searchable|class-string<Model>  $name
-     * @return array{model:Model,collection:string}|null
+     * @param  class-string<Model>  $modelClass
+     * @return EloquentBuilder<Model>
      */
-    private function matchModelToCollectionName(string|Model $name): ?array
+    protected function newQueryIncludingTrashed(string $modelClass): EloquentBuilder
+    {
+        $query = $modelClass::query();
+        $traits = class_uses_recursive($modelClass);
+
+        if (in_array(CoreSoftDeletes::class, $traits, true)) {
+            $query->withoutGlobalScope(CustomSoftDeletingScope::class);
+
+            return $query;
+        }
+
+        if (in_array(EloquentSoftDeletes::class, $traits, true)) {
+            $query->withoutGlobalScope(SoftDeletingScope::class);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return non-empty-string|null
+     */
+    protected function resolveSearchableCollectionName(Model $model): ?string
+    {
+        $searchable_as = [$model, 'searchableAs'];
+
+        if (! is_callable($searchable_as)) {
+            return null;
+        }
+
+        $collection = $searchable_as();
+
+        return is_string($collection) && $collection !== '' ? $collection : null;
+    }
+
+    /**
+     * @param  string|Model&Searchable|class-string<Model&Searchable>  $name
+     * @return array{model: Model&Searchable, collection: string}|null
+     */
+    protected function matchModelToCollectionName(string|Model $name): ?array
     {
         $model = null;
         $collection = null;
@@ -152,8 +199,26 @@ trait CommonEngineFunctions
         ];
     }
 
-    private function extractVectorFromBuilder(Builder $builder): array
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return list<float>
+     */
+    protected function extractVectorFromBuilder(Builder $builder): array
     {
-        return $builder->wheres['vector'] ?? $builder->wheres['embedding'] ?? [];
+        $vector = $builder->wheres['vector'] ?? $builder->wheres['embedding'] ?? [];
+
+        if (! is_array($vector)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($vector as $value) {
+            if (is_int($value) || is_float($value)) {
+                $normalized[] = (float) $value;
+            }
+        }
+
+        return $normalized;
     }
 }

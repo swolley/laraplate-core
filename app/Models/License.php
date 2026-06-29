@@ -18,6 +18,8 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 
 /**
+ * @property string|null $uuid
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperLicense
  */

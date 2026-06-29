@@ -6,11 +6,11 @@ namespace Modules\Core\SoftDeletes;
 
 use function property_exists;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
-use Illuminate\Auth\Access\AuthorizationException;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Services\PerModelSettingResolver;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
@@ -31,15 +31,17 @@ trait SoftDeletes
     {
         $this->baseInitializeSoftDeletes();
 
-        if (! in_array($this->getIsDeletedColumn(), $this->guarded, true)) {
+        $guarded = $this->guarded;
+        if (is_array($guarded) && ! in_array($this->getIsDeletedColumn(), $guarded, true)) {
             $this->guarded[] = $this->getIsDeletedColumn();
         }
 
-        if (! in_array($this->getDeletedAtColumn(), $this->hidden, true)) {
+        $hidden = $this->hidden;
+        if (is_array($hidden) && ! in_array($this->getDeletedAtColumn(), $hidden, true)) {
             $this->hidden[] = $this->getDeletedAtColumn();
         }
 
-        if (! in_array($this->getIsDeletedColumn(), $this->hidden, true)) {
+        if (is_array($hidden) && ! in_array($this->getIsDeletedColumn(), $hidden, true)) {
             $this->hidden[] = $this->getIsDeletedColumn();
         }
     }
@@ -77,7 +79,7 @@ trait SoftDeletes
         );
     }
 
-    public function restore()
+    public function restore(): ?bool
     {
         if (! $this->softDeletesEnabledBySettings()) {
             return false;
@@ -128,24 +130,25 @@ trait SoftDeletes
         // composer package:discover / ide-helper when the resolver is not set yet.
         static::addGlobalScope(new CustomSoftDeletingScope());
 
-        static::updating(function (Model $model): void {
+        static::updating(function (self $model): void {
             throw_if($model->trashed(), AuthorizationException::class, 'Cannot update a softdeleted model');
         });
 
-        static::saving(function (Model $model): void {
+        static::saving(function (self $model): void {
             $is_deleted_column = $model->getIsDeletedColumn();
             unset($model->attributes[$is_deleted_column], $model->original[$is_deleted_column]);
         });
     }
 
-    protected function performDeleteOnModel(): mixed
+    protected function performDeleteOnModel(): void
     {
         if (! $this->softDeletesEnabledBySettings()) {
-            return tap($this->setKeysForSaveQuery($this->newModelQuery())->forceDelete(), function (): void {
-                $this->exists = false;
-            });
+            $this->setKeysForSaveQuery($this->newModelQuery())->forceDelete();
+            $this->exists = false;
+
+            return;
         }
 
-        return $this->basePerformDeleteOnModel();
+        $this->basePerformDeleteOnModel();
     }
 }

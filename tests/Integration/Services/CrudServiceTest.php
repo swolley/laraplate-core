@@ -6,6 +6,7 @@ use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\Filter;
@@ -86,7 +87,11 @@ it('clearModelCache clears cache for the given model and returns message', funct
         protected $table = 'items';
     };
 
-    Cache::shouldReceive('clearByEntity')
+    Cache::shouldReceive('store')
+        ->once()
+        ->andReturn($repository = \Mockery::mock(CacheRepository::class));
+
+    $repository->shouldReceive('clearByEntity')
         ->once()
         ->with($model);
 

@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Console\Concerns\HasBenchmark;
-use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\DynamicEntity;
 use Override;
 use ReflectionClass;
@@ -44,6 +43,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private bool $isNewClass = false;
 
+    /** @var list<class-string<Model>> */
     private array $availableClasses = [];
 
     /**
@@ -132,7 +132,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                         $class_code = $this->addPropertyIntoFillable($class_code, $fillable);
                     }
 
-                    $casts = $class->casts();
+                    $casts = $class->getCasts();
 
                     foreach ($casts as $property => $cast) {
                         $class_code = $this->addPropertyIntoCasts($class_code, $property, $cast);
@@ -145,23 +145,30 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                     $found_rules = [];
 
-                    if (class_uses_trait($class, HasValidations::class)) {
-                        foreach ($class->getRules() as $property => $rules) {
-                            $found_rules[$property] = $rules;
+                    if (method_exists($class, 'getRules')) {
+                        $rules = (new ReflectionMethod($class, 'getRules'))->invoke($class);
+
+                        if (is_array($rules)) {
+                            foreach ($rules as $property => $rule) {
+                                if (is_string($property)) {
+                                    $found_rules[$property] = $rule;
+                                }
+                            }
                         }
                     }
 
                     foreach ($class->getAppends() as $append) {
                         $type = $casts[$append] ?? 'text';
-                        $nullable = ! isset($found_rules[$append]) || ((gettype($found_rules[$append]) === 'string' ? Str::contains($found_rules[$append], 'required') : in_array('required', $found_rules[$append], true)));
+                        $nullable = ! isset($found_rules[$append])
+                            || ((is_string($found_rules[$append]) ? Str::contains($found_rules[$append], 'required') : (is_array($found_rules[$append]) && in_array('required', $found_rules[$append], true))));
                         $method_subfix = Str::studly($append) . 'Attribute';
 
                         if (method_exists($class, 'get' . $method_subfix)) {
                             $getter = new ReflectionMethod($class, 'get' . $method_subfix);
-                            $type = $getter->getReturnType() ?? 'text';
+                            $type = $this->normalizeReflectionType($getter->getReturnType());
                         } elseif (method_exists($class, 'set' . $method_subfix)) {
                             $setter = new ReflectionMethod($class, 'set' . $method_subfix);
-                            $type = $setter->getReturnType() ?? 'text';
+                            $type = $this->normalizeReflectionType($setter->getReturnType());
                         }
 
                         $class_code = $this->addPropertyIntoAccessorsMutators($class_code, $append, $type, $nullable, $all_types);
@@ -191,6 +198,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         // @codeCoverageIgnoreEnd
     }
 
+    /**
+     * @return list<class-string<Model>>
+     */
     #[Override]
     protected function possibleModels(): array
     {
@@ -201,7 +211,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     /**
      * @param  string  $name
      */
-    protected function qualifyClass($name): array|string // @pest-ignore-type
+    protected function qualifyClass($name): string // @pest-ignore-type
     {
         $name = mb_ltrim($name, '\\/');
 
@@ -251,10 +261,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             ->filter(fn (\Symfony\Component\Console\Input\InputArgument $argument): bool => $argument->isRequired() && is_null($input->getArgument($argument->getName())))
             ->filter(fn (\Symfony\Component\Console\Input\InputArgument $argument): bool => $argument->getName() !== 'command')
             ->each(function (\Symfony\Component\Console\Input\InputArgument $argument) use ($input): void {
-                $question = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst($argument->getDescription()) . '?';
+                $prompt = $this->promptForMissingArgumentsUsing()[$argument->getName()] ?? 'What is ' . lcfirst((string) $argument->getDescription()) . '?';
+                $question = is_string($prompt) ? $prompt : 'What is ' . lcfirst((string) $argument->getDescription()) . '?';
                 $arg_name = $argument->getName();
 
-                /** @psalm-suppress ArgumentTypeCoercion */
                 $cb = $arg_name === 'name'
                     ? $this->askPersistentlyWithCompletion($question, $this->availableClasses)
                     : text($question, required: true); // @codeCoverageIgnore
@@ -295,10 +305,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 default: $this->isNewClass ? ['migration'] : [],
             ),
         )
-            ->map(static fn (string $option): string => match ($option) {
+            ->map(static fn (mixed $option): string => match ((string) $option) {
                 'resource controller' => 'resource',
                 'form requests' => 'requests',
-                default => $option,
+                default => (string) $option,
             })
             ->each(function (string $option) use ($input): void {
                 /** @var string $option */
@@ -326,14 +336,21 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private function getModulesNamespace(): string
     {
-        return (string) (config('modules.namespace') ?: 'Modules\\');
+        $namespace = config('modules.namespace');
+
+        return is_string($namespace) && $namespace !== '' ? $namespace : 'Modules\\';
     }
 
     private function getModulesModelPath(): string
     {
-        return (string) (config('modules.paths.generator.model.path') ?: 'app/Models');
+        $path = config('modules.paths.generator.model.path');
+
+        return is_string($path) && $path !== '' ? $path : 'app/Models';
     }
 
+    /**
+     * @param  array<int, string>  $array
+     */
     private function array_last(string $needle, array $array): int|false
     {
         $reversed_array = array_reverse($array);
@@ -356,7 +373,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $pos = Str::position($classCode, 'class ' . $short_name);
 
         /** @var string $classCode */
-        $classCode = Str::substrReplace($classCode, "/**\n */\n", $pos, 0);
+        $classCode = $this->replaceInCode($classCode, "/**\n */\n", $pos);
 
         $injected_class_code = explode("\n", $classCode);
 
@@ -420,11 +437,11 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param  class-string<Model>  $className
+     * @param  class-string  $className
      *
      * @throws ReflectionException
      *
-     * @return array<int,mixed>
+     * @return list<string>
      */
     private function getClassFields(string $className): array
     {
@@ -438,37 +455,47 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         if ($ref->hasProperty('fillable')) {
             $prop = $ref->getProperty('fillable');
+            $default = $prop->getDefaultValue();
 
-            /** @psalm-suppress UnusedMethodCall */
-            array_push($already_existent_fields, ...$prop->getDefaultValue());
+            if (is_array($default)) {
+                array_push($already_existent_fields, ...array_values(array_filter($default, is_string(...))));
+            }
         }
 
         if ($ref->hasMethod('casts')) {
             $method = $ref->getMethod('casts');
+            $cast_values = $method->invoke($temp_instance);
 
-            /** @psalm-suppress UnusedMethodCall */
-            $already_existent_fields = array_merge($already_existent_fields, array_keys($method->invoke($temp_instance)));
+            if (is_array($cast_values)) {
+                $already_existent_fields = array_merge($already_existent_fields, array_keys($cast_values));
+            }
         }
 
         if ($ref->hasProperty('hidden')) {
             $prop = $ref->getProperty('hidden');
+            $default = $prop->getDefaultValue();
 
-            /** @psalm-suppress UnusedMethodCall */
-            $already_existent_fields = array_merge($already_existent_fields, $prop->getDefaultValue());
+            if (is_array($default)) {
+                $already_existent_fields = array_merge($already_existent_fields, array_values(array_filter($default, is_string(...))));
+            }
         }
 
         if ($ref->hasProperty('attributes')) {
             $prop = $ref->getProperty('attributes');
+            $default = $prop->getDefaultValue();
 
-            /** @psalm-suppress UnusedMethodCall */
-            $already_existent_fields = array_merge($already_existent_fields, array_keys($prop->getDefaultValue()));
+            if (is_array($default)) {
+                $already_existent_fields = array_merge($already_existent_fields, array_keys($default));
+            }
         }
 
         if ($ref->hasProperty('appends')) {
             $prop = $ref->getProperty('appends');
+            $default = $prop->getDefaultValue();
 
-            /** @psalm-suppress UnusedMethodCall */
-            $already_existent_fields = array_merge($already_existent_fields, $prop->getDefaultValue());
+            if (is_array($default)) {
+                $already_existent_fields = array_merge($already_existent_fields, array_values(array_filter($default, is_string(...))));
+            }
         }
 
         return $already_existent_fields;
@@ -491,6 +518,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 'OneToMany' => "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> relates to (has) <info>one</info> <comment>%s</comment>.",
                 'OneToOne' => "Each <comment>%s</comment> relates to (has) exactly <info>one</info> <comment>%s</comment>.\nEach <comment>%s</comment> also relates to (has) exactly <info>one</info> <comment>%s</comment>.",
                 'ManyToMany' => "Each <comment>%s</comment> can relate to (can have) <info>many</info> <comment>%s</comment> objects.\nEach <comment>%s</comment> can also relate to (can also have) <info>many</info> <comment>%s</comment> objects.",
+                default => '',
             };
 
             $key = Str::replace('relation\\', '', $key);
@@ -503,12 +531,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         return $this->askPersistentlyWithCompletion(sprintf('"%s" relation type:', $fieldName), array_keys($filtered_relation_types));
     }
 
-    /**
-     * @return string|array<string>
-     */
-    private function handleRelationDetailsChoice(string $className, string $fieldName, string &$fieldType): array|string
+    private function handleRelationDetailsChoice(string $className, string $fieldName, string &$fieldType): string
     {
-        /** @psalm-suppress ArgumentTypeCoercion */
         $related_class = $this->askPersistentlyWithCompletion('What class should this entity be related to?', $this->availableClasses);
 
         if ($fieldType === 'relation') {
@@ -552,10 +576,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         return Str::replaceLast('}', $codeSnippet . "\n\n}", $classCode);
     }
 
-    /**
-     * @return string|array<string>
-     */
-    private function addNewPropertyAnnotation(string $className, string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): array|string
+    private function addNewPropertyAnnotation(string $className, string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): string
     {
         /** @var int $pos */
         $pos = Str::position($classCode, 'class ' . $this->stripModelsNamespace($className));
@@ -563,13 +584,10 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         /** @var int $pos */
         $pos = Str::position($classCode, ' */', $pos - 20);
 
-        return Str::substrReplace($classCode, sprintf("\n * @property %s $%s\n", $this->getCodeTypeFromCast($fieldType) . ($fieldNullable ? '|null' : ''), $fieldName), $pos, 0);
+        return $this->replaceInCode($classCode, sprintf("\n * @property %s $%s\n", $this->getCodeTypeFromCast($fieldType) . ($fieldNullable ? '|null' : ''), $fieldName), $pos);
     }
 
-    /**
-     * @return string|array<string>
-     */
-    private function addPropertyIntoFillable(string $classCode, string $fieldName): array|string
+    private function addPropertyIntoFillable(string $classCode, string $fieldName): string
     {
         $search = 'protected $fillable = [';
         $pos = Str::position($classCode, $search);
@@ -579,28 +597,29 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
             /** @var int $pos */
             $pos = Str::position($classCode, '];', $pos);
-            $classCode = Str::substrReplace($classCode, sprintf("%s\t'%s',\n\t", $needs_newline ? "\n" : '', $fieldName), $pos, 0);
+            $classCode = $this->replaceInCode($classCode, sprintf("%s\t'%s',\n\t", $needs_newline ? "\n" : '', $fieldName), $pos);
         }
 
         return $classCode;
     }
 
-    /**
-     * @return string|array<string>
-     */
-    private function addPropertyIntoHidden(string $classCode, string $fieldName): array|string
+    private function addPropertyIntoHidden(string $classCode, string $fieldName): string
     {
         $search = 'protected $hidden = [';
         $pos = Str::position($classCode, $search);
 
         if ($pos !== false) {
             $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
+            $closing_pos = Str::position($classCode, '];', $pos);
 
-            $classCode = Str::substrReplace(
+            if ($closing_pos === false) {
+                return $classCode;
+            }
+
+            $classCode = $this->replaceInCode(
                 $classCode,
                 sprintf("%s\t'%s',\n\t", $needs_newline ? "\n" : '', $fieldName),
-                Str::position($classCode, '];', $pos),
-                0,
+                $closing_pos,
             );
         }
 
@@ -614,12 +633,16 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
         if ($pos !== false) {
             $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
+            $closing_pos = Str::position($classCode, '];', $pos);
 
-            return Str::substrReplace(
+            if ($closing_pos === false) {
+                return $classCode;
+            }
+
+            return $this->replaceInCode(
                 $classCode,
                 sprintf("%s\t'%s' => '%s',\n\t", $needs_newline ? "\n" : '', $fieldName, $fieldType),
-                Str::position($classCode, '];', $pos),
-                0,
+                $closing_pos,
             );
         }
 
@@ -644,13 +667,17 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
             /** @var int $pos */
             $pos = Str::position($classCode, "'always' => [", $pos);
-            $needs_newline = $classCode[$pos + mb_strlen($search)] === ']';
+            $needs_newline = $classCode[$pos + mb_strlen("'always' => [")] === ']';
+            $closing_pos = Str::position($classCode, '];', $pos);
 
-            return Str::substrReplace(
+            if ($closing_pos === false) {
+                return $classCode;
+            }
+
+            return $this->replaceInCode(
                 $classCode,
                 sprintf("%s\t'%s' => '%s%s',\n\t", $needs_newline ? "\n" : '', $fieldName, Str::startsWith($fieldType, 'date') ? 'date' : $fieldType, $fieldNullable ? '' : '|required'),
-                Str::position($classCode, '];', $pos),
-                0,
+                $closing_pos,
             );
         }
 
@@ -667,8 +694,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $relation_import_pos = Str::position($classCode, 'use ');
 
             if ($relation_import_pos !== false) {
-                /** @var string $classCode */
-                $classCode = Str::substrReplace($classCode, $search . "\n", $relation_import_pos, 0);
+                $classCode = $this->replaceInCode($classCode, $search . "\n", $relation_import_pos);
                 $classCode = $this->sortImports($classCode);
                 $added_import = true;
             }
@@ -680,14 +706,14 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param  array<string,array<string,string>>  $allTypes
+     * @param  array<string, string>  $allTypes
      */
     private function addPropertyIntoAccessorsMutators(string $classCode, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
         if (! $fieldNullable) {
             $search = '#region [ACCESSORS_MUTATORS]';
             $pos = Str::position($classCode, $search);
-            $field_real_type = $allTypes[$fieldType];
+            $field_real_type = $allTypes[$fieldType] ?? 'mixed';
             $method_name = Str::studly($fieldName);
 
             if ($field_real_type === 'datetime') {
@@ -695,6 +721,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
                 if (! $imported_carbon_class) {
                     $field_real_type = Carbon::class;
+                } else {
+                    $field_real_type = 'Carbon';
                 }
             }
 
@@ -711,8 +739,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
                 /** @var int $pos */
                 $pos = Str::position($classCode, '#endregion', $pos);
 
-                /** @var string $classCode */
-                $classCode = Str::substrReplace($classCode, $snippet, $pos, 0);
+                $classCode = $this->replaceInCode($classCode, $snippet, $pos);
             } else {
                 $classCode = $this->injectCodeAtTheEnd($classCode, $snippet);
             }
@@ -723,7 +750,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     /**
      * @param  class-string  $className
-     * @param  array<string,array<string,string>>  $allTypes
+     * @param  array<string, string>  $allTypes
      */
     private function updateClassWithNewProperty(string $className, string $classCode, string $classPath, string $fieldName, string $fieldType, bool $fieldNullable, array $allTypes): string
     {
@@ -764,8 +791,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param  class-string  $className
-     * @param  class-string  $relatedClass
      * @param  class-string  $fullRelatedClass
      */
     private function handleAskInverseRelation(string $className, string $relatedClass, string $fullRelatedClass, string $relationType): void
@@ -796,8 +821,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
     }
 
     /**
-     * @param  class-string  $className
-     * @param  class-string  $relatedClass
+     * @param  string  $className
+     * @param  string  $relatedClass
      */
     private function updateClassWithNewRelation(string $className, string $classCode, string $classPath, string $relationName, string $relationType, string $relatedClass, bool $isInversed = false): string
     {
@@ -837,7 +862,7 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $pos = Str::position($classCode, '#endregion', $pos);
 
             /** @var string $classCode */
-            $classCode = Str::substrReplace($classCode, $snippet, $pos, 0);
+            $classCode = $this->replaceInCode($classCode, $snippet, $pos);
         } else {
             $classCode = $this->injectCodeAtTheEnd($classCode, $snippet);
         }
@@ -916,8 +941,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             // TYPE
             $default_type = $this->recognizeDefaultFieldType($field_name);
 
-            $related_class = null;
-
             $field_type = suggest(
                 sprintf('"%s" field type [%s]:', $field_name, $default_type),
                 $all_input_types,
@@ -927,10 +950,8 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
             if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {
                 $related_class = $this->handleRelationDetailsChoice($className, $field_name, $field_type);
-            }
 
-            if (array_key_exists($field_type, $this->availableTypes['Relationships/Associations'])) {
-                throw_if(in_array($related_class, ['', '0', [], null], true), InvalidArgumentException::class, 'Missing related class attribute');
+                throw_if($related_class === '' || $related_class === '0', InvalidArgumentException::class, 'Missing related class attribute');
 
                 $classCode = $this->updateClassWithNewRelation($className, $classCode, $classPath, $field_name, $field_type, $related_class);
             } else {
@@ -956,5 +977,35 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             fn (string $value): array => array_filter($choices, fn (string $name): bool => Str::contains($name, $value, ignoreCase: true)),
             required: true,
         );
+    }
+
+    private function replaceInCode(string $classCode, string $replace, int $offset, int $length = 0): string
+    {
+        $result = Str::substrReplace($classCode, $replace, $offset, $length);
+
+        return is_string($result) ? $result : $classCode;
+    }
+
+    private function normalizeReflectionType(?\ReflectionType $type): string
+    {
+        if ($type instanceof \ReflectionNamedType) {
+            return $type->getName();
+        }
+
+        if ($type instanceof \ReflectionUnionType) {
+            foreach ($type->getTypes() as $union_type) {
+                if ($union_type instanceof \ReflectionNamedType && ! $union_type->isBuiltin()) {
+                    return $union_type->getName();
+                }
+            }
+
+            foreach ($type->getTypes() as $union_type) {
+                if ($union_type instanceof \ReflectionNamedType && $union_type->isBuiltin() && $union_type->getName() !== 'null') {
+                    return $union_type->getName();
+                }
+            }
+        }
+
+        return 'text';
     }
 }

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Config\Repository;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\DatabaseConfigOverlay;
+use Modules\Core\Services\PerModelSettingResolver;
 
 uses(Tests\TestCase::class);
 
@@ -88,4 +90,18 @@ it('overlays settings for modules not hardcoded in core', function (): void {
     ]));
 
     expect($config->get('billing.invoices.auto_post'))->toBeTrue();
+});
+
+it('swallows database errors while applying overlay from database', function (): void {
+    $config = new Repository([]);
+
+    Schema::shouldReceive('hasTable')
+        ->once()
+        ->andThrow(new RuntimeException('connection unavailable'));
+
+    $overlay = new DatabaseConfigOverlay($config);
+
+    $overlay->applyFromDatabase(Mockery::mock(PerModelSettingResolver::class));
+
+    expect($config->all())->toBe([]);
 });

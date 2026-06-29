@@ -26,23 +26,23 @@ class EnsembleSearchService
      */
     public function search(array $intent, ?array $vector, string $query, array $plan, string $index): array
     {
-        $retrieval = $plan['retrieval'] ?? [];
-        $ensemble_config = $plan['ensemble'] ?? [];
-        $ranking = $plan['ranking'] ?? [];
+        $retrieval = $this->planSection($plan, 'retrieval');
+        $ensemble_config = $this->planSection($plan, 'ensemble');
+        $ranking = $this->planSection($plan, 'ranking');
 
         $use_fulltext = (bool) ($retrieval['use_fulltext'] ?? true);
         $use_vector = (bool) ($retrieval['use_vector'] ?? false) && $vector !== null;
-        $size = (int) ($retrieval['size'] ?? 50);
+        $size = $this->planInt($retrieval, 'size', 50);
 
         $weights = [
-            'keyword' => (float) ($ensemble_config['keyword_weight'] ?? 0.35),
-            'vector' => (float) ($ensemble_config['vector_weight'] ?? 0.35),
-            'hybrid' => (float) ($ensemble_config['hybrid_weight'] ?? 0.30),
+            'keyword' => $this->planFloat($ensemble_config, 'keyword_weight', 0.35),
+            'vector' => $this->planFloat($ensemble_config, 'vector_weight', 0.35),
+            'hybrid' => $this->planFloat($ensemble_config, 'hybrid_weight', 0.30),
         ];
 
-        $agreement_boost = (float) ($ensemble_config['agreement_boost'] ?? 0.15);
-        $rrf_k = (int) ($ensemble_config['rrf_k'] ?? 60);
-        $rrf_weight = (float) ($ensemble_config['rrf_weight'] ?? 0.25);
+        $agreement_boost = $this->planFloat($ensemble_config, 'agreement_boost', 0.15);
+        $rrf_k = $this->planInt($ensemble_config, 'rrf_k', 60);
+        $rrf_weight = $this->planFloat($ensemble_config, 'rrf_weight', 0.25);
 
         $per_strategy = [];
 
@@ -77,21 +77,23 @@ class EnsembleSearchService
         $fused = $this->fuseStrategies($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
 
         $use_reranker = (bool) ($ranking['use_reranker'] ?? config('search.features.reranker', false));
-        $rerank_top_k = (int) ($ranking['rerank_top_k'] ?? config('search.reranker.top_k', 30));
+        $default_rerank_top_k = $this->configInt('search.reranker.top_k', 30);
+        $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
 
         if ($use_reranker && $fused !== []) {
             $fused = $this->rerankTopK($fused, $query, $rerank_top_k);
         }
 
-        $results = collect($fused)
-            ->sortByDesc('score')
-            ->values()
-            ->map(fn (array $item): array => [
-                'id' => $item['id'],
-                'score' => round($item['score'], 6),
-                'source' => $item['source'] ?? [],
-            ])
-            ->all();
+        $results = array_values(
+            collect($fused)
+                ->sortByDesc('score')
+                ->map(fn (array $item): array => [
+                    'id' => $item['id'],
+                    'score' => round($item['score'], 6),
+                    'source' => $item['source'] ?? [],
+                ])
+                ->all(),
+        );
 
         return [
             'results' => $results,
@@ -113,12 +115,7 @@ class EnsembleSearchService
     private function executeEsSearch(string $index, array $body): array
     {
         try {
-            $response = ElasticsearchService::getInstance()->client->search([
-                'index' => $index,
-                'body' => $body,
-            ]);
-
-            return $response->asArray();
+            return ElasticsearchService::getInstance()->search($index, $body);
         } catch (Throwable) {
             return [];
         }
@@ -132,7 +129,13 @@ class EnsembleSearchService
      */
     private function normalizeHits(array $response): array
     {
-        $hits = $response['hits']['hits'] ?? [];
+        $hits_container = $response['hits'] ?? null;
+
+        if (! is_array($hits_container)) {
+            return [];
+        }
+
+        $hits = $hits_container['hits'] ?? [];
 
         if (! is_array($hits)) {
             return [];
@@ -145,13 +148,15 @@ class EnsembleSearchService
             if (! is_array($hit)) {
                 continue;
             }
-            if (! isset($hit['_id'])) {
+            if (! isset($hit['_id']) || ! is_scalar($hit['_id'])) {
                 continue;
             }
+
             $id = (string) $hit['_id'];
+            $score = is_numeric($hit['_score'] ?? null) ? (float) $hit['_score'] : 0.0;
             $out[$id] = [
                 'id' => $id,
-                'score' => (float) ($hit['_score'] ?? 0.0),
+                'score' => $score,
                 'source' => is_array($hit['_source'] ?? null) ? $hit['_source'] : [],
                 'rank' => $rank,
             ];
@@ -337,10 +342,63 @@ class EnsembleSearchService
      */
     private function buildRerankerText(array $source): string
     {
-        $title = (string) ($source['title'] ?? $source['name'] ?? '');
-        $body = (string) ($source['body'] ?? $source['content'] ?? $source['description'] ?? '');
+        $title = $this->sourceScalarToString($source, 'title')
+            ?: $this->sourceScalarToString($source, 'name');
+        $body = $this->sourceScalarToString($source, 'body')
+            ?: $this->sourceScalarToString($source, 'content')
+            ?: $this->sourceScalarToString($source, 'description');
 
         return mb_trim($title . ' ' . $body);
+    }
+
+    /**
+     * @param  array<string, mixed>  $source
+     */
+    private function sourceScalarToString(array $source, string $key): string
+    {
+        if (! isset($source[$key]) || ! is_scalar($source[$key])) {
+            return '';
+        }
+
+        return (string) $source[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $plan
+     * @return array<string, mixed>
+     */
+    private function planSection(array $plan, string $key): array
+    {
+        $section = $plan[$key] ?? [];
+
+        return is_array($section) ? $section : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $section
+     */
+    private function planInt(array $section, string $key, int $default): int
+    {
+        $value = $section[$key] ?? $default;
+
+        return is_numeric($value) ? (int) $value : $default;
+    }
+
+    /**
+     * @param  array<string, mixed>  $section
+     */
+    private function planFloat(array $section, string $key, float $default): float
+    {
+        $value = $section[$key] ?? $default;
+
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
+    private function configInt(string $key, int $default): int
+    {
+        $value = config($key, $default);
+
+        return is_numeric($value) ? (int) $value : $default;
     }
 
     /**

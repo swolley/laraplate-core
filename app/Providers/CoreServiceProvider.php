@@ -27,6 +27,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
+use Modules\Core\Cache\Repository as CoreCacheRepository;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
@@ -163,17 +164,22 @@ final class CoreServiceProvider extends ModuleServiceProvider
     protected function registerCommands(): void
     {
         $module_commands_subpath = config('modules.paths.generator.command.path');
-        $commands = $this->inspectFolderCommands((string) $module_commands_subpath);
 
-        $locking_commands_subpath = (string) Str::replace('Console', 'Locking/Console', $module_commands_subpath);
+        if (! is_string($module_commands_subpath) || $module_commands_subpath === '') {
+            return;
+        }
+
+        $commands = $this->inspectFolderCommands($module_commands_subpath);
+
+        $locking_commands_subpath = Str::replace('Console', 'Locking/Console', $module_commands_subpath);
         $locking_commands = $this->inspectFolderCommands($locking_commands_subpath);
         array_push($commands, ...$locking_commands);
 
-        $search_commands_subpath = (string) Str::replace('Console', 'Search/Console', $module_commands_subpath);
+        $search_commands_subpath = Str::replace('Console', 'Search/Console', $module_commands_subpath);
         $search_commands = $this->inspectFolderCommands($search_commands_subpath);
         array_push($commands, ...$search_commands);
 
-        $soft_deletes_commands_subpath = (string) Str::replace('Console', 'SoftDeletes/Console', $module_commands_subpath);
+        $soft_deletes_commands_subpath = Str::replace('Console', 'SoftDeletes/Console', $module_commands_subpath);
         $soft_deletes_commands = $this->inspectFolderCommands($soft_deletes_commands_subpath);
         array_push($commands, ...$soft_deletes_commands);
 
@@ -192,14 +198,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
             $crons = [];
             $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
 
-            /** @var Illuminate\Cache\Repository $cache * */
             $cache = Cache::store();
 
-            if ($cache->supportsTags() && method_exists($cache, 'getCacheTags')) {
+            if ($cache instanceof CoreCacheRepository && $cache->supportsTags()) {
                 $cache_tags = $cache->getCacheTags();
 
                 if (Cache::tags($cache_tags)->has($cache_key)) {
-                    $crons = Cache::tags($cache_tags)->get($cache_key) ?? [];
+                    $crons = $this->normalizeCronJobs(Cache::tags($cache_tags)->get($cache_key));
                 } else {
                     $crons = $this->loadCronJobsFromDatabase($cache_key);
 
@@ -208,7 +213,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
                     }
                 }
             } elseif (Cache::has($cache_key)) {
-                $crons = Cache::get($cache_key) ?? [];
+                $crons = $this->normalizeCronJobs(Cache::get($cache_key));
             } else {
                 $crons = $this->loadCronJobsFromDatabase($cache_key);
 
@@ -224,8 +229,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * Load cron jobs from the database for the given table name.
-     *
      * @return array<int, array{command: string, schedule: string}>
      */
     private function loadCronJobsFromDatabase(string $cache_key): array
@@ -235,12 +238,65 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 return [];
             }
 
-            return CronJob::query()->active()->select(['command', 'schedule'])->get()->toArray();
+            $cron_jobs = CronJob::query()
+                ->active()
+                ->select(['command', 'schedule'])
+                ->get();
+
+            $normalized = [];
+
+            foreach ($cron_jobs as $cron_job) {
+                $command = $cron_job->getAttribute('command');
+                $schedule = $cron_job->getAttribute('schedule');
+
+                if (! is_scalar($command) || ! is_scalar($schedule)) {
+                    continue;
+                }
+
+                $normalized[] = [
+                    'command' => (string) $command,
+                    'schedule' => (string) $schedule,
+                ];
+            }
+
+            return $normalized;
         } catch (Exception $e) {
             report($e);
 
             return [];
         }
+    }
+
+    /**
+     * @return array<int, array{command: string, schedule: string}>
+     */
+    private function normalizeCronJobs(mixed $crons): array
+    {
+        if (! is_array($crons)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($crons as $cron) {
+            if (! is_array($cron)) {
+                continue;
+            }
+
+            $command = $cron['command'] ?? null;
+            $schedule = $cron['schedule'] ?? null;
+
+            if (! is_string($command) || ! is_string($schedule)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'command' => $command,
+                'schedule' => $schedule,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
@@ -250,9 +306,11 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         // Register Elasticsearch client
         $this->app->singleton(static function (Application $app): ElasticsearchClient {
-            $config = config('elastic.client.connections.' . config('elastic.client.default', 'default'));
+            $default_connection = config('elastic.client.default', 'default');
+            $default_connection = is_string($default_connection) ? $default_connection : 'default';
+            $config = config('elastic.client.connections.' . $default_connection);
 
-            return ClientBuilder::fromConfig((array) $config);
+            return ClientBuilder::fromConfig(is_array($config) ? $config : []);
         });
 
         // Register Typesense client
@@ -347,7 +405,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ]);
         }
 
-        config()?->set('fortify.features', $features);
+        config()->set('fortify.features', $features);
     }
 
     private function registerMigrationOverrides(): void

@@ -29,11 +29,11 @@ final readonly class DatabaseConfigOverlay
 
     public function applyFromDatabase(PerModelSettingResolver $settings): void
     {
-        if (! Schema::hasTable(CoreTables::Settings->value)) {
-            return;
-        }
-
         try {
+            if (! Schema::hasTable(CoreTables::Settings->value)) {
+                return;
+            }
+
             $this->applySettings($settings->collection());
         } catch (Throwable $exception) {
             report($exception);

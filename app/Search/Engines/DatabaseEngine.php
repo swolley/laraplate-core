@@ -16,54 +16,67 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 {
     use CommonEngineFunctions;
 
-    public function checkIndex(Model $model): bool
+    public function checkIndex(string|Model $model): bool
     {
         return true;
     }
 
-    public function createIndex(string $name, array $options = []): void
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    public function createIndex(string $name, array $options = [], bool $force = false): void
     {
         parent::createIndex($name, $options);
     }
 
-    // TODO: to be implemented
+    /**
+     * @return array<string, mixed>
+     */
     public function health(): array
     {
         return [];
     }
 
-    // TODO: to be implemented
+    /**
+     * @return array<string, mixed>
+     */
     public function stats(): array
     {
         return [];
     }
 
-    // TODO: to be implemented
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
         return 0;
     }
 
-    // TODO: to be implemented
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
     public function buildSearchFilters(array $filters): array
     {
         return [];
     }
 
-    // TODO: to be implemented
+    /**
+     * @return array<string, mixed>
+     */
     public function getSearchMapping(Model $model): array
     {
         return [];
     }
 
-    // TODO: to be implemented
     public function reindex(string $modelClass): void {}
 
     public function supportsVectorSearch(): bool
     {
-        return $this->getDatabaseDriver() !== 'sqlite'; // SQLite has limitations
+        return $this->getDatabaseDriver() !== 'sqlite';
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
     public function search(Builder $builder): mixed
     {
         if ($this->isVectorSearch($builder)) {
@@ -73,39 +86,53 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return parent::search($builder);
     }
 
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array<string, mixed>>
+     */
     private function performVectorSearch(Builder $builder): array
     {
-        $queryVector = $builder->getVector();
+        $query_vector = $this->extractVectorFromBuilder($builder);
         $model = $builder->model;
         $driver = $this->getDatabaseDriver();
 
         return match ($driver) {
-            'pgsql' => $this->performPostgreSQLVectorSearch($queryVector, $model, $builder),
-            'mysql', 'mariadb' => $this->performMySQLVectorSearch($queryVector, $model, $builder),
-            'sqlite' => $this->performSQLiteVectorSearch($queryVector, $model, $builder),
+            'pgsql' => $this->performPostgreSQLVectorSearch($query_vector, $model, $builder),
+            'mysql', 'mariadb' => $this->performMySQLVectorSearch($query_vector, $model, $builder),
+            'sqlite' => $this->performSQLiteVectorSearch($query_vector, $model, $builder),
             default => throw new InvalidArgumentException('Vector search not supported for driver: ' . $driver),
         };
     }
 
+    /**
+     * @param  list<float>  $queryVector
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array<string, mixed>>
+     */
     private function performPostgreSQLVectorSearch(array $queryVector, Model $model, Builder $builder): array
     {
-        // Usa l'estensione pgvector per performance ottimali
-        $vectorString = '[' . implode(',', $queryVector) . ']';
+        $vector_string = '[' . implode(',', $queryVector) . ']';
 
+        /** @var list<array<string, mixed>> */
         return ModelEmbedding::query()
             ->where('model_type', $model::class)
-            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vectorString])
-            ->orderByRaw('embedding <=> ?::vector', [$vectorString])
+            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vector_string])
+            ->orderByRaw('embedding <=> ?::vector', [$vector_string])
             ->limit($builder->limit ?? 10)
             ->get()
             ->toArray();
     }
 
+    /**
+     * @param  list<float>  $queryVector
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array<string, mixed>>
+     */
     private function performMySQLVectorSearch(array $queryVector, Model $model, Builder $builder): array
     {
-        // Implementazione con funzioni JSON di MySQL
-        $queryVectorJson = json_encode($queryVector);
+        $query_vector_json = json_encode($queryVector);
 
+        /** @var list<array<string, mixed>> */
         return ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->selectRaw(
@@ -116,7 +143,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                     FROM JSON_TABLE(?, '$[*]' COLUMNS (value DOUBLE PATH '$')) a,
                          JSON_TABLE(embedding, '$[*]' COLUMNS (value DOUBLE PATH '$')) b
                 ) AS similarity_score",
-                [$queryVectorJson],
+                [$query_vector_json],
             )
             ->having('similarity_score', '>', 0.7)
             ->orderBy('similarity_score', 'desc')
@@ -125,19 +152,36 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
             ->toArray();
     }
 
+    /**
+     * @param  list<float>  $queryVector
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array<string, mixed>>
+     */
     private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder): array
     {
-        // Implementazione base per SQLite (performance limitate)
-        return ModelEmbedding::query()
+        /** @var list<array<string, mixed>> $results */
+        $results = ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->get()
-            ->map(function (object $embedding) use ($queryVector): array {
-                $similarity = $this->calculateCosineSimilarity($queryVector, $embedding->embedding);
+            ->map(function (ModelEmbedding $embedding) use ($queryVector): array {
+                $stored_embedding = $embedding->embedding ?? [];
+
+                if (! is_array($stored_embedding)) {
+                    $stored_embedding = [];
+                }
+
+                /** @var list<float> $normalized_embedding */
+                $normalized_embedding = array_values(array_map(
+                    static fn (mixed $value): float => (float) $value,
+                    $stored_embedding,
+                ));
+
+                $similarity = $this->calculateCosineSimilarity($queryVector, $normalized_embedding);
 
                 return [
                     'id' => $embedding->id,
                     'similarity_score' => $similarity,
-                    'embedding' => $embedding->embedding,
+                    'embedding' => $normalized_embedding,
                 ];
             })
             ->filter(static fn (array $item): bool => $item['similarity_score'] > 0.7)
@@ -145,30 +189,42 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
             ->take($builder->limit ?? 10)
             ->values()
             ->all();
+
+        return $results;
     }
 
+    /**
+     * @param  list<float>  $a
+     * @param  list<float>  $b
+     */
     private function calculateCosineSimilarity(array $a, array $b): float
     {
-        if (count($a) !== count($b)) {
-            return 0;
+        if ($a === [] || $b === [] || count($a) !== count($b)) {
+            return 0.0;
         }
 
-        $dotProduct = 0;
-        $normA = 0;
-        $normB = 0;
+        $dot_product = 0.0;
+        $norm_a = 0.0;
+        $norm_b = 0.0;
         $counter = count($a);
 
         for ($i = 0; $i < $counter; $i++) {
-            $dotProduct += $a[$i] * $b[$i];
-            $normA += $a[$i] * $a[$i];
-            $normB += $b[$i] * $b[$i];
+            $dot_product += $a[$i] * $b[$i];
+            $norm_a += $a[$i] * $a[$i];
+            $norm_b += $b[$i] * $b[$i];
         }
 
-        return $dotProduct / (sqrt($normA) * sqrt($normB));
+        if ($norm_a === 0.0 || $norm_b === 0.0) {
+            return 0.0;
+        }
+
+        return $dot_product / (sqrt($norm_a) * sqrt($norm_b));
     }
 
     private function getDatabaseDriver(): string
     {
-        return config('database.default');
+        $default_connection = config('database.default');
+
+        return is_string($default_connection) ? $default_connection : 'mysql';
     }
 }

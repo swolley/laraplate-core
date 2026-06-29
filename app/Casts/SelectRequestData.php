@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Casts;
 
 use Illuminate\Support\Str;
+use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Http\Requests\SelectRequest;
 
 class SelectRequestData extends CrudRequestData
@@ -21,8 +22,9 @@ class SelectRequestData extends CrudRequestData
 
     /**
      * @param  string|array<string>  $primaryKey
+     * @param  array<string, mixed>  $validated
      */
-    public function __construct(SelectRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
+    public function __construct(SelectRequest|GridRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
         parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
         $this->columns = $this->conformColumns($validated['columns'] ?? []);

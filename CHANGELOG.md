@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- *(core)* Enhance PHPStan configuration and improve type handling
+
+## [1.55.1] - 2026-06-28
+
+### 🚜 Refactor
+
 - *(core)* Enhance type declarations and method visibility across models and traits
 
 ## [1.54.7] - 2026-06-27

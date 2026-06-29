@@ -91,7 +91,7 @@ if (! function_exists('modules')) {
 
         if (! in_array($onlyModule, [null, '', '0'], true)) {
             $onlyModule = ucfirst($onlyModule);
-            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule || $onlyModule === null, ARRAY_FILTER_USE_KEY);
+            $remapped_modules = array_filter($remapped_modules, fn (string $k): bool => $k === $onlyModule, ARRAY_FILTER_USE_KEY);
         }
 
         if ($prioritySort === true) {
@@ -176,12 +176,24 @@ if (! function_exists('connections')) {
         $connections = [];
 
         if (! $onlyActive) {
-            foreach (config('database.connections', []) as $connection) {
+            $db_connections = config('database.connections', []);
+
+            if (! is_array($db_connections)) {
+                $db_connections = [];
+            }
+
+            foreach ($db_connections as $connection) {
+                if (! is_object($connection) || ! method_exists($connection, 'getDriverName')) {
+                    continue;
+                }
+
                 $driver = $connection->getDriverName();
 
-                if (! in_array($driver, $connections, true)) {
-                    $connections[] = $driver;
+                if (! is_string($driver) || in_array($driver, $connections, true)) {
+                    continue;
                 }
+
+                $connections[] = $driver;
             }
 
             HelpersCache::setConnections($cache_key, $connections);
@@ -215,15 +227,18 @@ if (! function_exists('translations')) {
     function translations(bool $fullpath = false, bool $onlyActive = true): array
     {
         $app_dir = base_path('lang');
-        $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
-        $langs_subpath = config('modules.paths.generator.lang.path');
+        $app_languages = glob($app_dir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR) ?: [];
+        $configured_lang_path = config('modules.paths.generator.lang.path');
+        $langs_subpath = is_string($configured_lang_path) ? $configured_lang_path : '';
 
-        $modules_languages = $fullpath ? $app_languages : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
+        $modules_languages = $fullpath
+            ? $app_languages
+            : array_map(fn (string $l): string => str_replace($app_dir . DIRECTORY_SEPARATOR, '', $l), $app_languages);
 
         foreach (modules(false, true, $onlyActive) as $module) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $module);
             $path = $module . DIRECTORY_SEPARATOR . ($is_app ? 'lang' : $langs_subpath) . DIRECTORY_SEPARATOR;
-            $files = glob($path . '*', GLOB_ONLYDIR);
+            $files = glob($path . '*', GLOB_ONLYDIR) ?: [];
 
             foreach ($files as $file) {
                 if (! $fullpath) {
@@ -308,7 +323,8 @@ if (! function_exists('models')) {
 
             foreach ($all_modules as $m) {
                 $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
-                $modules_models_folder = config('modules.paths.generator.model.path');
+                $configured_model_path = config('modules.paths.generator.model.path');
+                $modules_models_folder = is_string($configured_model_path) ? $configured_model_path : '';
                 $models_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Models' : $modules_models_folder);
 
                 // In minimal or non-Laravel environments the filesystem component may not be bound.
@@ -331,7 +347,13 @@ if (! function_exists('models')) {
                     $namespace = 'App\\Models\\';
                 } else {
                     $module_name = basename($m);
-                    $namespace = sprintf('%s\\%s\\%s\\', config('modules.namespace'), $module_name, Str::replace(['app/', '/'], ['', '\\'], $modules_models_folder));
+                    $configured_namespace = config('modules.namespace');
+                    $namespace = sprintf(
+                        '%s\\%s\\%s\\',
+                        is_string($configured_namespace) ? $configured_namespace : 'Modules',
+                        $module_name,
+                        Str::replace(['app/', '/'], ['', '\\'], $modules_models_folder),
+                    );
                 }
 
                 foreach ($model_files as $model_file) {
@@ -389,7 +411,8 @@ if (! function_exists('controllers')) {
      */
     function controllers(bool $onlyActive = true, ?string $onlyModule = null): array
     {
-        $modules_controllers_folder = config('modules.paths.generator.controller.path');
+        $configured_controller_path = config('modules.paths.generator.controller.path');
+        $modules_controllers_folder = is_string($configured_controller_path) ? $configured_controller_path : '';
         $modules = modules(true, true, $onlyActive, $onlyModule);
         $controllers = [];
 
@@ -403,7 +426,13 @@ if (! function_exists('controllers')) {
                 $namespace = 'App\\Http\\Controllers\\';
             } else {
                 $module_name = basename($m);
-                $namespace = sprintf('%s\\%s\\%s\\', config('modules.namespace'), $module_name, str_replace(DIRECTORY_SEPARATOR, '\\', $modules_controllers_folder));
+                $configured_namespace = config('modules.namespace');
+                $namespace = sprintf(
+                    '%s\\%s\\%s\\',
+                    is_string($configured_namespace) ? $configured_namespace : 'Modules',
+                    $module_name,
+                    str_replace(DIRECTORY_SEPARATOR, '\\', $modules_controllers_folder),
+                );
             }
 
             foreach ($controllers_files as $controller_file) {
@@ -425,9 +454,7 @@ if (! function_exists('routes')) {
      *
      * @param  bool  $onlyActive  filter for only active modules
      * @param  string|null  $onlyModule  filter for specified module
-     * @return array<int,Route>
-     *
-     * @psalm-return list{0?: string,...}
+     * @return list<Route>
      */
     function routes(bool $onlyActive = true, ?string $onlyModule = null): array
     {
@@ -440,9 +467,13 @@ if (! function_exists('routes')) {
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
 
-            if (is_callable($reference)) {
-                $r = new ReflectionFunction($reference);
-                $reference = $r->getName();
+            if ($reference instanceof \Closure) {
+                $reference = (new ReflectionFunction($reference))->getName();
+            } elseif (is_string($reference) && is_callable($reference)) {
+                $reference = (new ReflectionFunction($reference))->getName();
+            } elseif (is_array($reference) && isset($reference[0], $reference[1])) {
+                $class = is_object($reference[0]) ? $reference[0]::class : (string) $reference[0];
+                $reference = $class . '::' . (string) $reference[1];
             }
 
             $exploded = explode('\\', (string) $reference);
@@ -454,7 +485,7 @@ if (! function_exists('routes')) {
             }
         }
 
-        return $routes;
+        return array_values($routes);
     }
 }
 
@@ -466,7 +497,19 @@ if (! function_exists('version')) {
     {
         $json = file_get_contents(base_path('composer.json'));
 
-        return json_decode($json, true)['version'] ?? '';
+        if ($json === false) {
+            return '';
+        }
+
+        $decoded = json_decode($json, true);
+
+        if (! is_array($decoded)) {
+            return '';
+        }
+
+        $version = $decoded['version'] ?? '';
+
+        return is_string($version) ? $version : '';
     }
 }
 
@@ -526,6 +569,10 @@ if (! function_exists('class_uses_trait')) {
         $class = is_string($class) ? $class : $class::class;
         $traits = $recursive ? class_uses_recursive($class) : class_uses($class);
 
+        if (! is_array($traits)) {
+            $traits = [];
+        }
+
         return in_array($uses, $traits, true);
     }
 }
@@ -549,7 +596,8 @@ if (! function_exists('array_sort_keys')) {
     /**
      * Sort the keys of an array.
      *
-     * @param  array  $array  l'array non deve avere chiavi numeriche
+     * @param  array<string, mixed>  $array
+     * @return array<string, mixed>
      */
     function array_sort_keys(array $array): array
     {
@@ -560,7 +608,17 @@ if (! function_exists('array_sort_keys')) {
         foreach ($keys as $key) {
             $value = $array[(string) $key];
 
-            $result[(string) $key] = is_array($value) ? array_sort_keys($value) : $value;
+            if (is_array($value)) {
+                $nested_array = [];
+
+                foreach ($value as $nested_key => $nested_value) {
+                    $nested_array[(string) $nested_key] = $nested_value;
+                }
+
+                $result[(string) $key] = array_sort_keys($nested_array);
+            } else {
+                $result[(string) $key] = $value;
+            }
         }
 
         return $result;
@@ -575,7 +633,17 @@ if (! function_exists('user_class')) {
      */
     function user_class(): string
     {
-        return config('auth.providers.users.model');
+        $model = config('auth.providers.users.model');
+
+        if (! is_string($model)) {
+            throw new InvalidArgumentException('User model class must be a string.');
+        }
+
+        if (! is_subclass_of($model, User::class)) {
+            throw new InvalidArgumentException('Configured user model must extend ' . User::class);
+        }
+
+        return $model;
     }
 }
 
@@ -590,12 +658,28 @@ if (! function_exists('cast_value')) {
     {
         if (! in_array($type, [null, '', '0'], true)) {
             return match (mb_strtolower($type)) {
-                'int', 'integer' => (int) $value,
-                'float', 'double', 'real' => (float) $value,
-                'string' => (string) $value,
+                'int', 'integer' => match (true) {
+                    is_int($value) => $value,
+                    is_float($value) => (int) $value,
+                    is_string($value) && is_numeric($value) => (int) $value,
+                    is_bool($value) => (int) $value,
+                    default => 0,
+                },
+                'float', 'double', 'real' => match (true) {
+                    is_float($value) => $value,
+                    is_int($value) => (float) $value,
+                    is_string($value) && is_numeric($value) => (float) $value,
+                    is_bool($value) => (float) (int) $value,
+                    default => 0.0,
+                },
+                'string' => match (true) {
+                    is_string($value) => $value,
+                    is_scalar($value) => (string) $value,
+                    default => '',
+                },
                 'bool', 'boolean' => (bool) $value,
-                'array' => (array) $value,
-                'object' => (object) $value,
+                'array' => is_array($value) ? $value : [],
+                'object' => is_object($value) ? $value : (object) [],
                 'null' => null,
                 default => throw new InvalidArgumentException('Unsupported type: ' . $type),
             };
@@ -605,37 +689,49 @@ if (! function_exists('cast_value')) {
             return null;
         }
 
-        if (is_numeric($value)) {
-            // Check if the value is an integer
+        if (is_int($value) || is_float($value)) {
+            if (is_int($value)) {
+                return $value;
+            }
+
+            return $value;
+        }
+
+        if (is_string($value) && is_numeric($value)) {
             if (filter_var($value, FILTER_VALIDATE_INT) !== false) {
                 return (int) $value;
             }
 
-            // Otherwise treat as float
             return (float) $value;
         }
 
-        if (mb_strtolower((string) $value) === 'true') {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (! is_string($value)) {
+            return '';
+        }
+
+        if (mb_strtolower($value) === 'true') {
             return true;
         }
 
-        if (mb_strtolower((string) $value) === 'false') {
+        if (mb_strtolower($value) === 'false') {
             return false;
         }
 
-        // JSON array or object
-        if ((mb_substr((string) $value, 0, 1) === '[' && mb_substr((string) $value, -1) === ']')
-            || (mb_substr((string) $value, 0, 1) === '{' && mb_substr((string) $value, -1) === '}')
+        if ((mb_substr($value, 0, 1) === '[' && mb_substr($value, -1) === ']')
+            || (mb_substr($value, 0, 1) === '{' && mb_substr($value, -1) === '}')
         ) {
-            $decoded = json_decode((string) $value, true);
+            $decoded = json_decode($value, true);
 
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $decoded;
             }
         }
 
-        // Default to string
-        return (string) $value;
+        return $value;
     }
 }
 

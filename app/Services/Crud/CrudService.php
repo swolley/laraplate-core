@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Foundation\Auth\User;
+use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
@@ -29,9 +32,13 @@ use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
+use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
+use Modules\Core\Models\User;
+use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
@@ -56,6 +63,7 @@ use UnexpectedValueException;
  */
 class CrudService
 {
+    /** @phpstan-use HasCrudOperations<\Illuminate\Database\Eloquent\Model> */
     use HasCrudOperations;
 
     public function __construct(
@@ -92,7 +100,7 @@ class CrudService
 
         $this->applyComputedMethods($data, $requestData);
 
-        if (isset($requestData->group_by) && $requestData->group_by !== []) {
+        if ($requestData->group_by !== [] && $data instanceof Collection) {
             $data = $this->applyGroupBy($data, $requestData->group_by);
         }
 
@@ -130,17 +138,26 @@ class CrudService
         );
 
         // 2. Constrain by primary key first (from validated/input/route so record-not-found can 404)
-        $key = $model->getKeyName();
-        $key_value = is_array($key)
-            ? array_map(fn (string $k) => $requestData->request->validated($k) ?? $requestData->request->input($k) ?? $requestData->request->route($k), $key)
-            : ($requestData->request->validated($key) ?? $requestData->request->input($key) ?? $requestData->request->route($key));
+        $key = $this->getModelPrimaryKeyName($model);
 
-        throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
+        if (is_array($key)) {
+            $key_value = array_map(
+                fn (string $k): mixed => $this->resolveKeyFromRequest($requestData->request, $k),
+                $key,
+            );
+            throw_if(
+                array_any($key_value, static fn (mixed $value): bool => $value === null || $value === ''),
+                ModelNotFoundException::class,
+                'Primary key is required for detail.',
+            );
+            $query = $model->newQuery()->where(array_combine($key, $key_value));
+        } else {
+            $key_value = $this->resolveKeyFromRequest($requestData->request, $key);
+            throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
+            $query = $model->newQuery()->where([$key => $key_value]);
+        }
 
         // 3. Build query and apply ACL filters
-        $query = is_array($key)
-            ? $model->newQuery()->where(array_combine($key, $key_value))
-            : $model->newQuery()->where([$key => $key_value]);
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareQuery($query, $requestData);
 
@@ -396,12 +413,12 @@ class CrudService
     {
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
-        $key = $requestData->primaryKey;
-        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn (int|string $k) => $requestData->{$k}, $key);
-        $where = is_array($key_value) ? $key_value : [$key => $key_value];
-        $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_record = $this->newQueryWithTrashed($model)
+            ->where($this->keyValueToWhereCondition($model, $key_value))
+            ->firstOrFail();
 
-        throw_if($operation === 'activate' && ! $found_record->restore(), LogicException::class, 'Record not activated');
+        throw_if($operation === 'activate' && (! method_exists($found_record, 'restore') || ! $found_record->restore()), LogicException::class, 'Record not activated');
 
         throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
 
@@ -446,7 +463,11 @@ class CrudService
     {
         $model = $requestData->model;
         $table = $model->getTable();
-        Cache::clearByEntity($model);
+        $cache = Cache::store();
+
+        if ($cache instanceof CacheRepository) {
+            $cache->clearByEntity($model);
+        }
 
         return new CrudResult(
             data: $table . ' cached cleared',
@@ -475,7 +496,7 @@ class CrudService
     private function getModelKeyValue(ModifyRequestData $filters): array|string|int
     {
         /** @var string|array<int,string> $key */
-        $key = $filters->model->getKeyName();
+        $key = $this->getModelPrimaryKeyName($filters->model);
 
         if (is_string($key)) {
             return $filters->{$key};
@@ -515,6 +536,9 @@ class CrudService
         return $unexpected === [] ? null : implode(', ', $unexpected);
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     private function translateFiltersToElasticsearch(FiltersGroup $filtersGroup): array
     {
         $mustClauses = [];
@@ -535,19 +559,22 @@ class CrudService
         return $mustClauses;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function translateFilterToElasticsearch(Filter $filter): array
     {
         return match ($filter->operator) {
             FilterOperator::Equals => ['term' => [$filter->property => $filter->value]],
             FilterOperator::NotEquals => ['bool' => ['must_not' => ['term' => [$filter->property => $filter->value]]]],
-            FilterOperator::Like => ['wildcard' => [$filter->property => '*' . $filter->value . '*']],
-            FilterOperator::NotLike => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $filter->value . '*']]]],
+            FilterOperator::Like => ['wildcard' => [$filter->property => '*' . $this->filterScalarValue($filter) . '*']],
+            FilterOperator::NotLike => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $this->filterScalarValue($filter) . '*']]]],
             FilterOperator::In => ['terms' => [$filter->property => $filter->value]],
             FilterOperator::Great => ['gt' => [$filter->property => $filter->value]],
             FilterOperator::GreatEquals => ['gte' => [$filter->property => $filter->value]],
             FilterOperator::Less => ['lt' => [$filter->property => $filter->value]],
             FilterOperator::LessEquals => ['lte' => [$filter->property => $filter->value]],
-            FilterOperator::Between => ['range' => [$filter->property => ['gte' => $filter->value[0], 'lte' => $filter->value[1]]]],
+            FilterOperator::Between => ['range' => [$filter->property => $this->filterBetweenBounds($filter)]],
         };
     }
 
@@ -556,17 +583,20 @@ class CrudService
         $model = $requestData->model;
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
-        /** @var string|array $key */
-        $key = $model->getKeyName();
-        $key_value = is_string($key) ? $requestData->{$key} : array_map(fn (int|string $k) => $requestData->{$k}, $key);
-        $where = is_array($key_value) ? $key_value : [$key => $key_value];
-        $found_record = $model->newQuery()->withTrashed()->where($where)->firstOrFail();
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_record = $this->newQueryWithTrashed($model)
+            ->where($this->keyValueToWhereCondition($model, $key_value))
+            ->firstOrFail();
 
-        /** @var User $user */
         $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
 
         if (isset($requestData->changes['modification'])) {
-            $modification = Modification::query()->where(['modifiable_type' => $model::class, 'modifiable_id' => $requestData->primaryKey])->findOrFail($requestData->changes['modification']);
+            $modification = Modification::query()
+                ->where('modifiable_type', $model::class)
+                ->where('modifiable_id', $requestData->primaryKey)
+                ->whereKey($requestData->changes['modification'])
+                ->sole();
 
             $reason = $requestData->changes['reason'] ?? null;
             $vote_reason = is_string($reason) ? $reason : null;
@@ -577,7 +607,12 @@ class CrudService
                 $user->disapprove($modification, $vote_reason);
             }
         } else {
-            $modifications = $model->newQuery()->findOrFail($requestData->primaryKey)->modifications()->activeOnly()->oldest()->cursor();
+            $modifications = Modification::query()
+                ->where('modifiable_type', $found_record::class)
+                ->where('modifiable_id', $found_record->getKey())
+                ->activeOnly()
+                ->oldest()
+                ->cursor();
 
             throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
@@ -608,18 +643,21 @@ class CrudService
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
 
-        /** @var Model&HasLocks $found_records */
         $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
 
         throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
-        $can_be_done = ($operation === 'lock' && $found_records->first()->isLocked()) || ! $found_records->first()->isLocked();
+
+        $first_record = $found_records->first();
+        throw_if($first_record === null, ModelNotFoundException::class, 'No model Found');
+
+        $can_be_done = ($operation === 'lock' && $this->recordIsLocked($first_record)) || ! $this->recordIsLocked($first_record);
 
         throw_if($found_records->count() === 1 && $requestData->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
         $locked_records = new Collection();
         DB::transaction(function () use ($found_records, $locked_records): void {
             foreach ($found_records as $found_record) {
-                /** @psalm-suppress InvalidArgument */
-                if (! $found_record->isLocked() && $found_record->lock()) {
+                if (! $this->recordIsLocked($found_record) && method_exists($found_record, 'lock')) {
+                    $found_record->lock();
                     $locked_records->add($found_record->fresh());
                 }
             }
@@ -668,6 +706,11 @@ class CrudService
 
             $index = str_replace($main_entity . '.', '', $column->name);
             $splitted = preg_split('/\.(?=[^.]*$)/', $index, 2);
+
+            if ($splitted === false) {
+                continue;
+            }
+
             $relation = $splitted[1] ?? null ? $splitted[0] : '';
             $method = $splitted[1] ?? $splitted[0];
 
@@ -728,14 +771,18 @@ class CrudService
 
                 $related = $target->{$segment};
 
-                if ($related instanceof \Illuminate\Support\Collection || $related instanceof Collection) {
+                if ($related instanceof Model) {
+                    $next_targets[] = $related;
+
+                    continue;
+                }
+
+                if (is_iterable($related)) {
                     foreach ($related as $item) {
                         if ($item instanceof Model) {
                             $next_targets[] = $item;
                         }
                     }
-                } elseif ($related instanceof Model) {
-                    $next_targets[] = $related;
                 }
             }
 
@@ -759,5 +806,78 @@ class CrudService
         throw_if($reflected_method->getNumberOfRequiredParameters() > 0, UnexpectedValueException::class, sprintf('Method %s requires parameters on %s', $method, $model::class));
 
         return $model->{$method}();
+    }
+
+    /**
+     * @return string|array<int, string>
+     */
+    private function getModelPrimaryKeyName(Model $model): array|string
+    {
+        /** @var string|array<int, string> $key */
+        $key = $model->getKeyName();
+
+        return $key;
+    }
+
+    private function resolveKeyFromRequest(Request $request, string $key): mixed
+    {
+        if ($request instanceof FormRequest) {
+            $validated = $request->validated($key);
+
+            if ($validated !== null && $validated !== '') {
+                return $validated;
+            }
+        }
+
+        return $request->input($key) ?? $request->route($key);
+    }
+
+    /**
+     * @return Builder<Model>
+     */
+    private function newQueryWithTrashed(Model $model): Builder
+    {
+        $query = $model->newQuery();
+        $traits = class_uses_recursive($model::class);
+
+        if (in_array(CoreSoftDeletes::class, $traits, true)) {
+            $query->withoutGlobalScope(CustomSoftDeletingScope::class);
+
+            return $query;
+        }
+
+        if (in_array(EloquentSoftDeletes::class, $traits, true)) {
+            $query->withoutGlobalScope(SoftDeletingScope::class);
+        }
+
+        return $query;
+    }
+
+    private function recordIsLocked(Model $model): bool
+    {
+        $locked_at_column = (new \Modules\Core\Locking\Locked())->lockedAtColumn();
+
+        return $model->getAttribute($locked_at_column) !== null;
+    }
+
+    private function filterScalarValue(Filter $filter): string
+    {
+        if (! is_scalar($filter->value)) {
+            throw new UnexpectedValueException(sprintf('Filter %s expects a scalar value.', $filter->property));
+        }
+
+        return (string) $filter->value;
+    }
+
+    /**
+     * @return array{gte: mixed, lte: mixed}
+     */
+    private function filterBetweenBounds(Filter $filter): array
+    {
+        if (! is_array($filter->value) || ! array_key_exists(0, $filter->value) || ! array_key_exists(1, $filter->value)) {
+            throw new UnexpectedValueException(sprintf('Between filter on %s requires a two-element array.', $filter->property));
+        }
+
+        return ['gte' => $filter->value[0], 'lte' => $filter->value[1]];
     }
 }

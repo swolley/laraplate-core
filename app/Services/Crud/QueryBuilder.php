@@ -21,6 +21,8 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionMethod;
 
 /**
@@ -47,6 +49,8 @@ final class QueryBuilder
      *
      * This applies columns, filters, sorts, and relations from the request.
      * ACL filters should already be injected into $request_data->filters.
+     *
+     * @param  Builder<Model>  $query
      *
      * @throws InvalidArgumentException
      */
@@ -179,6 +183,7 @@ final class QueryBuilder
      *
      * Useful when you need to apply filters outside of the normal request flow.
      *
+     * @param  Builder<Model>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = []): void
@@ -296,11 +301,17 @@ final class QueryBuilder
     }
 
     /**
-     * @return non-empty-array<array-key, string>
+     * @return list<string>
      */
     private function splitColumnNameOnLastDot(string $name): array
     {
-        return preg_split('/\.(?=[^.]*$)/', $name, 2);
+        $parts = preg_split('/\.(?=[^.]*$)/', $name, 2);
+
+        if (! is_array($parts) || $parts === []) {
+            return [$name];
+        }
+
+        return $parts;
     }
 
     /**
@@ -379,20 +390,22 @@ final class QueryBuilder
     }
 
     /**
-     * @return array{relation:string,connection:'default'|mixed,table:mixed,field:string|null}
+     * @param  Builder<Model>|Model  $model
+     * @return array{relation:string,connection:string,table:string,field:string|null}
      */
     private function splitProperty(Builder|Model $model, string $property): array
     {
+        $relation_model = $model instanceof Model ? $model : $model->getModel();
+
         /** @var array<int,string> $exploded */
         $exploded = explode('.', $property);
 
-        if ($exploded !== [] && $exploded[0] === $model->getTable()) {
+        if ($exploded !== [] && $exploded[0] === $relation_model->getTable()) {
             array_shift($exploded);
         }
 
         $field = array_pop($exploded);
         $relation = implode('.', $exploded);
-        $relation_model = $model instanceof Model ? $model : $model->getModel();
 
         foreach ($exploded as $relation_name) {
             $relation_model = $relation_model->{$relation_name}()->getModel();
@@ -400,13 +413,14 @@ final class QueryBuilder
 
         return [
             'relation' => $relation,
-            'connection' => $relation_model->connection ?? 'default',
+            'connection' => $relation_model->getConnection()->getName(),
             'table' => $relation_model->getTable(),
-            'field' => $field,
+            'field' => is_string($field) ? $field : null,
         ];
     }
 
     /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     private function applyFilter(Builder|Relation $query, Filter $filter, string $method, array &$relation_columns): void
@@ -416,21 +430,27 @@ final class QueryBuilder
         if ($path_length >= 1) {
             $splitted = $this->splitProperty($query->getModel(), $filter->property);
             $query_model = $query->getModel();
+            $field = $splitted['field'];
 
-            if (method_exists($query_model, $splitted['field'])) {
-                $reflected_method = new ReflectionMethod($query_model, $splitted['field']);
+            if ($field !== null && method_exists($query_model, $field)) {
+                $reflected_method = new ReflectionMethod($query_model, $field);
+                $return_type = $reflected_method->getReturnType();
 
-                if (is_a($reflected_method->getReturnType()->__toString(), Relation::class, true)) {
-                    $returned_relation_entity = $query_model->{$splitted['field']}()->getModel();
-                    $splitted['relation'] = $splitted['field'];
+                if ($return_type !== null && is_a($return_type->__toString(), Relation::class, true)) {
+                    $returned_relation_entity = $query_model->{$field}()->getModel();
+                    $splitted['relation'] = $field;
                     $splitted['table'] = $returned_relation_entity->getTable();
                     $splitted['field'] = $returned_relation_entity->getKeyName();
                     $splitted['connection'] = $returned_relation_entity->getConnection()->getName();
 
+                    $has_count = is_int($filter->value)
+                        ? $filter->value
+                        : (is_numeric($filter->value) ? (int) $filter->value : 1);
+
                     $query->has(
                         $splitted['relation'],
                         $filter->operator->value,
-                        $filter->value,
+                        $has_count,
                         Str::startsWith($method, 'or') ? 'or' : 'and',
                         static fn (Builder $q) => $q->withoutGlobalScope('global_ordered'),
                     );
@@ -447,15 +467,20 @@ final class QueryBuilder
                         $q->withoutGlobalScope('global_ordered');
 
                         if ($splitted['field'] === 'deleted_at') {
-                            $permission = sprintf('%s.%s.delete', $splitted['connection'], $splitted['table']);
+                            $permission = sprintf(
+                                '%s.%s.delete',
+                                $splitted['connection'],
+                                $splitted['table'],
+                            );
                             $user = Auth::user();
 
-                            if ($user && $user->can($permission)) {
-                                $q->withTrashed();
+                            if ($user && $user->can($permission) && in_array(SoftDeletes::class, class_uses_recursive($q->getModel()), true)) {
+                                $q->withoutGlobalScope(CustomSoftDeletingScope::class);
                             }
                         }
 
-                        $cloned_filter = new Filter($splitted['field'], $filter->value, $filter->operator);
+                        $filter_field = $splitted['field'] ?? $filter->property;
+                        $cloned_filter = new Filter($filter_field, $filter->value, $filter->operator);
                         // Inside relation subquery we must not propagate `orWhere`,
                         // otherwise the relation constraints can be bypassed.
                         $this->applyFilter($q, $cloned_filter, 'where', $relation_columns);
@@ -501,23 +526,31 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  FiltersGroup|array<int, Filter|FiltersGroup>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
     {
-        $iterable = is_array($filters) && Arr::isList($filters) ? $filters : $filters->filters;
-        $operator = $filters instanceof FiltersGroup ? $filters->operator : WhereClause::And;
+        if ($filters instanceof FiltersGroup) {
+            $iterable = $filters->filters;
+            $operator = $filters->operator;
+        } else {
+            $iterable = $filters;
+            $operator = WhereClause::And;
+        }
+
         $is_or = $operator === WhereClause::Or;
         $first = true;
 
         foreach ($iterable as $subfilter) {
             $method = $is_or && $first ? 'where' : ($is_or ? 'orWhere' : 'where');
 
-            if (isset($subfilter->filters)) {
+            if ($subfilter instanceof FiltersGroup) {
                 if (is_callable([$query, $method])) {
                     $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
-            } else {
+            } elseif ($subfilter instanceof Filter) {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
 
@@ -526,6 +559,7 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<int,Column>  $columns
      */
     private function sortColumns(Builder|Relation $query, array &$columns): void
@@ -549,6 +583,7 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<int,Column>  $relation_columns
      */
     private function applyColumnsToSelect(Builder|Relation $query, array &$relation_columns): void
@@ -570,6 +605,7 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relations_aggregates
      */
     private function applyAggregatesToQuery(Builder|Relation $query, array &$relations_aggregates, string $relation): void
@@ -600,7 +636,8 @@ final class QueryBuilder
     }
 
     /**
-     * @param  array<int,string>  $selectColumns
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  array<int, Column|string>  $selectColumns
      */
     private function addForeignKeysToSelectedColumns(Builder|Relation $query, array &$selectColumns, ?Model $model = null, ?string $table = null, bool $as_columns = false): void
     {
@@ -629,10 +666,36 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Relation<Model, Model, mixed>  $query
+     * @param  array<int, Column>  $relation_columns
+     */
+    private function addForeignKeysToRelationColumns(Relation $query, array &$relation_columns, ?Model $model = null): void
+    {
+        if (! $model instanceof Model) {
+            $model = $query->getModel();
+        }
+
+        $table = $model->getTable();
+        $existing_columns = array_map(static fn (Column $column): string => $column->name, $relation_columns);
+
+        foreach (SchemaInspector::getInstance()->foreignKeys($table, $model->getConnection()->getName()) as $foreign) {
+            foreach ($foreign->columns as $column) {
+                if (in_array($column, $existing_columns, true)) {
+                    continue;
+                }
+
+                $relation_columns[] = new Column($column);
+                $existing_columns[] = $column;
+            }
+        }
+    }
+
+    /**
+     * @param  Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relations_columns
      * @param  array<string,array<int,Sort>>  $relations_sorts
      * @param  array<string,array<int,Column>>  $relations_aggregates
-     * @param  array<string,array<int,Filter>>  $relations_filters
+     * @param  array<string,FiltersGroup>  $relations_filters
      * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
      */
     private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
@@ -656,7 +719,7 @@ final class QueryBuilder
         }
 
         if (array_key_exists($relation, $relations_columns) && $relations_columns[$relation] !== []) {
-            $this->addForeignKeysToSelectedColumns($query, $relations_columns[$relation], as_columns: true);
+            $this->addForeignKeysToRelationColumns($query, $relations_columns[$relation]);
             $this->applyColumnsToSelect($query, $relations_columns[$relation]);
         }
 
@@ -667,7 +730,7 @@ final class QueryBuilder
                 $relations_columns[$relation] = [];
             }
 
-            $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns[$relation]);
+            $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns);
         }
 
         if (array_key_exists($relation, $relations_sorts) && $relations_sorts[$relation] !== []) {
@@ -678,11 +741,12 @@ final class QueryBuilder
     }
 
     /**
+     * @param  Builder<Model>  $query
      * @param  array<int,string>  $relations
      * @param  array<string,array<int,Column>>  $relations_columns
      * @param  array<string,array<int,Sort>>  $relations_sorts
      * @param  array<string,array<int,Column>>  $relations_aggregates
-     * @param  array<string,array<int,Filter>>  $relations_filters
+     * @param  array<string,FiltersGroup>  $relations_filters
      * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
      */
     private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
@@ -711,12 +775,13 @@ final class QueryBuilder
             unset($relations_aggregates[$relation]);
         }
 
-        /** @var array<string,callable(Relation):void> $withs */
         $withs = [];
 
         foreach ($merged_relations as $relation) {
-            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations): void {
+            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations): mixed {
                 $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations);
+
+                return null;
             };
         }
 
@@ -814,7 +879,7 @@ final class QueryBuilder
             return $resolved;
         }
 
-        /** @var array<string,mixed> $dependencies_map */
+        /** @var array<string, array{columns?: array<int, string>|string, relations?: array<int, string>}|array<int, string>|string> $dependencies_map */
         $dependencies_map = $model->crudComputedDependencies();
         $table = $model->getTable();
 
@@ -827,10 +892,19 @@ final class QueryBuilder
                 continue;
             }
 
-            $dependency_columns = Arr::wrap($dependency['columns'] ?? $dependency);
-            $dependency_relations = Arr::wrap($dependency['relations'] ?? []);
+            if (is_array($dependency)) {
+                $dependency_columns = Arr::wrap($dependency['columns'] ?? $dependency);
+                $dependency_relations = Arr::wrap($dependency['relations'] ?? []);
+            } else {
+                $dependency_columns = Arr::wrap($dependency);
+                $dependency_relations = [];
+            }
 
             foreach ($dependency_columns as $dependency_column) {
+                if (! is_string($dependency_column) && ! is_numeric($dependency_column)) {
+                    continue;
+                }
+
                 $dependency_column = str_replace($table . '.', '', (string) $dependency_column);
 
                 if (! in_array($dependency_column, $resolved['columns'], true)) {
@@ -839,6 +913,10 @@ final class QueryBuilder
             }
 
             foreach ($dependency_relations as $dependency_relation) {
+                if (! is_string($dependency_relation) && ! is_numeric($dependency_relation)) {
+                    continue;
+                }
+
                 $dependency_relation = str_replace($table . '.', '', (string) $dependency_relation);
 
                 if (! in_array($dependency_relation, $resolved['relations'], true)) {

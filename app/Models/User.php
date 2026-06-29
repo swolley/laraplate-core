@@ -55,6 +55,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
 {
     use ApprovesChanges;
+    /** @use HasFactory<UserFactory> */
     use HasFactory;
     use HasLocks;
     use HasRoles {
@@ -77,7 +78,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string>
+     * @var list<string>
      *
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
@@ -100,7 +101,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var array<int, string>
+     * @var list<string>
      *
      * @psalm-suppress NonInvariantDocblockPropertyType
      */
@@ -121,7 +122,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
-        $this->dontVersionable = array_merge($this->dontVersionable ?? [], ['password', 'remember_token']);
+        $this->dontVersionable = array_merge($this->dontVersionable, ['password', 'remember_token']);
     }
 
     /**
@@ -135,7 +136,12 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
      */
     public function guardName(): array
     {
-        $guard_names = collect(config('auth.guards', []))
+        $guards = config('auth.guards', []);
+        if (! is_array($guards)) {
+            $guards = [];
+        }
+
+        $guard_names = collect($guards)
             ->keys()
             ->filter(function (string $guard_name): bool {
                 $provider = config("auth.guards.{$guard_name}.provider");
@@ -159,7 +165,9 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             return $guard_names;
         }
 
-        return [(string) config('auth.defaults.guard', 'web')];
+        $default_guard = config('auth.defaults.guard', 'web');
+
+        return [is_string($default_guard) ? $default_guard : 'web'];
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -205,7 +213,6 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     public function canImpersonate(): bool
     {
-        /** @phpstan-ignore staticMethod.notFound */
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -238,7 +245,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     /**
      * returns the saved custom grid configs for the user.
      *
-     * @return HasMany<UserGridConfig>
+     * @return HasMany<UserGridConfig, $this>
      */
     public function grid_configs(): HasMany
     {
@@ -248,7 +255,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     /**
      * returns the license currently related to the user.
      *
-     * @return BelongsTo<License>
+     * @return BelongsTo<License, $this>
      */
     public function license(): BelongsTo
     {
@@ -256,7 +263,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     }
 
     /**
-     * @return BelongsToMany<Role>
+     * @return BelongsToMany<Role, $this, ModelHasRole>
      */
     public function roles(): BelongsToMany
     {
@@ -272,6 +279,9 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         return $this->getPermissionsViaRolesTrait();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getRules(): array
     {
         $rules = $this->getRulesTrait();
@@ -357,12 +367,20 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         return UserFactory::new();
     }
 
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
     #[Scope]
     protected static function superAdmin(Builder $query): Builder
     {
         return $query->whereHas('roles', static fn ($query) => $query->where('name', config('permission.roles.superadmin'))); // @pest-ignore-type
     }
 
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
     #[Scope]
     protected static function admin(Builder $query): Builder
     {

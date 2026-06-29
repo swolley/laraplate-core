@@ -9,6 +9,7 @@ use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Concerns\HasTranslations;
@@ -70,6 +71,10 @@ class MakeModelTranslatableCommand extends Command
         $model_full_name = is_int($choice) ? ($available[$choice] ?? null) : $choice;
 
         if (! is_string($model_full_name) || $model_full_name === '') {
+            return Command::FAILURE;
+        }
+
+        if (! is_subclass_of($model_full_name, Model::class)) {
             return Command::FAILURE;
         }
 
@@ -151,6 +156,8 @@ class MakeModelTranslatableCommand extends Command
 
         $models_subpath = config('modules.paths.generator.model.path', 'Models');
         $migrations_subpath = config('modules.paths.generator.migration.path', 'database/migrations');
+        $models_subpath = is_string($models_subpath) ? $models_subpath : 'Models';
+        $migrations_subpath = is_string($migrations_subpath) ? $migrations_subpath : 'database/migrations';
 
         $is_module_model = Str::startsWith($model_full_name, 'Modules\\')
             && ($models_subpath !== 'Models' || $migrations_subpath !== 'database/migrations');
@@ -196,7 +203,8 @@ class MakeModelTranslatableCommand extends Command
         );
 
         $this->info('Adding HasTranslations trait to model...');
-        $this->addTraitToModel($model_full_name, $selected_names);
+        $selected_field_names = array_values(array_filter($selected_names, is_string(...)));
+        $this->addTraitToModel($model_full_name, $selected_field_names);
 
         $this->newLine();
         $this->info('All done! Review the generated files then run `php artisan migrate`.');
@@ -204,6 +212,9 @@ class MakeModelTranslatableCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * @param  array{name: string, type_name: string, type: string, nullable: bool, auto_increment: bool}  $column
+     */
     private function isTranslatableColumn(array $column): bool
     {
         if (in_array($column['name'], self::EXCLUDED_COLUMNS, true)) {
@@ -221,6 +232,9 @@ class MakeModelTranslatableCommand extends Command
         return in_array($column['type_name'], self::TRANSLATABLE_TYPE_NAMES, true);
     }
 
+    /**
+     * @param  array<int, array{name: string, type_name: string, type: string, nullable: bool, auto_increment: bool}>  $selected_columns
+     */
     private function createTranslationModel(
         string $table_name,
         string $model_full_name,
@@ -234,6 +248,12 @@ class MakeModelTranslatableCommand extends Command
     ): int {
         $stub_path = dirname(__DIR__, 2) . '/stubs/translation.stub';
         $stub = file_get_contents($stub_path);
+
+        if ($stub === false) {
+            $this->error('Could not read translation stub file.');
+
+            return Command::FAILURE;
+        }
 
         $translation_namespace = Str::beforeLast($translation_full_name, '\\');
         $fillable_names = array_map(fn (array $col) => $col['name'], $selected_columns);
@@ -265,13 +285,26 @@ class MakeModelTranslatableCommand extends Command
             $casts_str .= ',';
         }
 
+        if (! is_subclass_of($model_full_name, Model::class)) {
+            $this->error('Invalid model class selected.');
+
+            return Command::FAILURE;
+        }
+
         $reflection = new ReflectionClass($model_full_name);
         $model_hidden = $reflection->hasProperty('hidden')
             ? $reflection->getProperty('hidden')->getDefaultValue()
             : [];
-        $translation_hidden = array_intersect($model_hidden, $fillable_names);
+
+        if (! is_array($model_hidden)) {
+            $model_hidden = [];
+        }
+
+        $model_hidden = array_values(array_filter($model_hidden, is_string(...)));
+
+        $translation_hidden = array_values(array_intersect($model_hidden, $fillable_names));
         $hidden_str = implode(",\n        ", array_map(
-            fn ($h): string => "'{$h}'",
+            static fn (string $hidden): string => "'{$hidden}'",
             $translation_hidden,
         ));
 
@@ -372,34 +405,50 @@ class MakeModelTranslatableCommand extends Command
         $stub_path = dirname(__DIR__, 2) . '/stubs/make_model_translatable_migration.stub';
         $stub = file_get_contents($stub_path);
 
+        if ($stub === false) {
+            throw new TypeError('Could not read migration stub file.');
+        }
+
         $i3 = str_repeat(' ', 12);
         $i4 = str_repeat(' ', 16);
         $i5 = str_repeat(' ', 20);
         $i7 = str_repeat(' ', 28);
 
         $translated_fields = implode("\n", array_map(
-            fn (array $col): string => $i3 . $this->columnToBlueprintCode($col),
+            fn (array $col): string => $i3 . $this->columnToBlueprintCode($this->normalizeSchemaColumn($col)),
             $selected_columns,
         ));
 
         $insert_fields = implode("\n", array_map(
-            fn (array $col): string => "{$i5}'{$col['name']}' => \$row->{$col['name']},",
+            function (array $col) use ($i5): string {
+                $column = $this->normalizeSchemaColumn($col);
+
+                return "{$i5}'{$column['name']}' => \$row->{$column['name']},";
+            },
             $selected_columns,
         ));
 
         $col_names_list = implode("\n", array_map(
-            fn (array $col): string => "{$i4}'{$col['name']}',",
+            function (array $col) use ($i4): string {
+                $column = $this->normalizeSchemaColumn($col);
+
+                return "{$i4}'{$column['name']}',";
+            },
             $selected_columns,
         ));
         $drop_columns = "{$i3}\$table->dropColumn([\n{$col_names_list}\n{$i3}]);";
 
         $restore_columns = implode("\n", array_map(
-            fn (array $col): string => $i3 . $this->columnToBlueprintCode($col),
+            fn (array $col): string => $i3 . $this->columnToBlueprintCode($this->normalizeSchemaColumn($col)),
             $selected_columns,
         ));
 
         $restore_fields = implode("\n", array_map(
-            fn (array $col): string => "{$i7}'{$col['name']}' => \$translation->{$col['name']},",
+            function (array $col) use ($i7): string {
+                $column = $this->normalizeSchemaColumn($col);
+
+                return "{$i7}'{$column['name']}' => \$translation->{$column['name']},";
+            },
             $selected_columns,
         ));
 
@@ -423,18 +472,33 @@ class MakeModelTranslatableCommand extends Command
         $this->line("  Created: {$migration_path}{$migration_name}");
     }
 
+    /**
+     * @param  list<string>  $field_names
+     */
     private function addTraitToModel(string $model_full_name, array $field_names): void
     {
+        if (! is_subclass_of($model_full_name, Model::class)) {
+            $this->warn('Invalid model class. Please add HasTranslations trait manually.');
+
+            return;
+        }
+
         $reflection = new ReflectionClass($model_full_name);
         $file_path = $reflection->getFileName();
 
-        if (! $file_path || ! file_exists($file_path)) {
+        if (! is_string($file_path) || ! file_exists($file_path)) {
             $this->warn('Could not determine model file path. Please add HasTranslations trait manually.');
 
             return;
         }
 
         $content = file_get_contents($file_path);
+
+        if ($content === false) {
+            $this->warn('Could not read model file. Please add HasTranslations trait manually.');
+
+            return;
+        }
 
         $import_line = 'use Modules\\Core\\Models\\Concerns\\HasTranslations;';
 
@@ -488,6 +552,9 @@ class MakeModelTranslatableCommand extends Command
         $this->warn('  Please review the model for any remaining cleanup (hidden, appends, etc.).');
     }
 
+    /**
+     * @param  list<string>  $field_names
+     */
     private function removeFieldsFromModel(string $content, array $field_names): string
     {
         $lines = explode("\n", $content);
@@ -545,6 +612,9 @@ class MakeModelTranslatableCommand extends Command
         return implode("\n", $result);
     }
 
+    /**
+     * @param  array{name: string, type_name: string, type: string, nullable: bool, auto_increment: bool}  $column
+     */
     private function columnToBlueprintCode(array $column): string
     {
         $name = $column['name'];
@@ -579,5 +649,30 @@ class MakeModelTranslatableCommand extends Command
         $code .= ')->nullable(' . ($nullable ? 'true' : 'false') . ')';
 
         return $code . "->comment('The translated {$name}');";
+    }
+
+    /**
+     * @param  array<string, mixed>  $column
+     * @return array{name: string, type_name: string, type: string, nullable: bool, auto_increment: bool}
+     */
+    private function normalizeSchemaColumn(array $column): array
+    {
+        $name = $column['name'] ?? null;
+        $type_name = $column['type_name'] ?? null;
+        $type = $column['type'] ?? null;
+        $nullable = $column['nullable'] ?? false;
+        $auto_increment = $column['auto_increment'] ?? false;
+
+        if (! is_string($name) || ! is_string($type_name) || ! is_string($type) || ! is_bool($nullable) || ! is_bool($auto_increment)) {
+            throw new TypeError('Invalid schema column definition.');
+        }
+
+        return [
+            'name' => $name,
+            'type_name' => $type_name,
+            'type' => $type,
+            'nullable' => $nullable,
+            'auto_increment' => $auto_increment,
+        ];
     }
 }

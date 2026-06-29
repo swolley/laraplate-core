@@ -6,10 +6,12 @@ namespace Modules\Core\Services\Authorization;
 
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Auth\Access\AuthorizationException;
+use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\WhereClause;
@@ -199,6 +201,9 @@ final class AuthorizationService
      * @param  Builder  $query  The Eloquent query builder
      * @param  string  $permission_name  The permission name for ACL lookup
      */
+    /**
+     * @param  Builder<Model>  $query
+     */
     public function applyAclFiltersToQuery(Builder $query, string $permission_name): void
     {
         $acl_filters = $this->getAclFilters($permission_name);
@@ -228,6 +233,9 @@ final class AuthorizationService
     /**
      * Apply filters recursively to a query.
      */
+    /**
+     * @param  Builder<Model>  $query
+     */
     private function applyFiltersRecursively(Builder $query, FiltersGroup $filters): void
     {
         $method = $filters->operator === WhereClause::And ? 'where' : 'orWhere';
@@ -245,9 +253,9 @@ final class AuthorizationService
     }
 
     /**
-     * Apply a single filter to a query.
+     * @param  Builder<Model>  $query
      */
-    private function applySingleFilter(Builder $query, mixed $filter, string $method): void
+    private function applySingleFilter(Builder $query, Filter $filter, string $method): void
     {
         if ($filter->value === null) {
             $null_method = $filter->operator->value === '=' ? 'whereNull' : 'whereNotNull';
@@ -298,7 +306,9 @@ final class AuthorizationService
     private function resolvePermission(string $permission_name): Permission
     {
         if (! isset(self::$permission_model_cache[$permission_name])) {
-            self::$permission_model_cache[$permission_name] = Permission::findByName($permission_name);
+            self::$permission_model_cache[$permission_name] = Permission::query()
+                ->where('name', $permission_name)
+                ->firstOrFail();
         }
 
         return self::$permission_model_cache[$permission_name];
@@ -315,14 +325,10 @@ final class AuthorizationService
             return $user;
         }
 
-        if ($user !== null) {
-            return null;
-        }
-
         // Try to get anonymous user
         $anonymous = Cache::rememberForever(
             'anonymous_user',
-            static fn () => user_class()::whereName('anonymous')->first(),
+            static fn (): ?User => User::query()->where('name', 'anonymous')->first(),
         );
 
         if ($anonymous === null) {
@@ -330,7 +336,7 @@ final class AuthorizationService
         }
 
         Auth::login($anonymous);
-        $request->setUserResolver(fn () => $anonymous);
+        $request->setUserResolver(fn (): User => $anonymous);
 
         return $anonymous;
     }

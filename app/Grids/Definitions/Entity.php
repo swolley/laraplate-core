@@ -10,6 +10,7 @@ use Closure;
 use LogicException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation as EloquentRelation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -21,9 +22,11 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Grids\Components\Field;
 use Modules\Core\Grids\Components\Grid;
+use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\Traits\HasLocks;
 use UnexpectedValueException;
 
@@ -49,7 +52,7 @@ abstract class Entity
     protected Collection $relations;
 
     /**
-     * @param  Model|string  $model  related model name
+     * @param  class-string<Model>|Model  $model  related model name
      */
     public function __construct(Model|string $model)
     {
@@ -84,8 +87,6 @@ abstract class Entity
 
     /**
      * gets model object.
-     *
-     * @phpstan-return Model&HasGridUtils
      */
     final public function getModel(): Model
     {
@@ -148,7 +149,11 @@ abstract class Entity
             return null;
         }
 
-        $found_field = $this->getFields()->offsetGet($fieldname);
+        $found_field = $this->getFields()->get($fieldname);
+
+        if (! $found_field instanceof Field) {
+            return null;
+        }
 
         return $fullname === $found_field->getFullAlias() ? $found_field : null;
     }
@@ -184,11 +189,15 @@ abstract class Entity
 
         $top = array_shift($exploded_fieldpath);
 
-        if (! $this->getRelations()->offsetExists($top)) {
+        if (! is_string($top) || ! $this->getRelations()->offsetExists($top)) {
             return null;
         }
 
-        $subrelation = $this->getRelations()->offsetGet($top);
+        $subrelation = $this->getRelations()->get($top);
+
+        if (! $subrelation instanceof Relation) {
+            return null;
+        }
 
         return $subrelation->getFieldDeeply($field);
     }
@@ -305,8 +314,7 @@ abstract class Entity
             $field->setModel($this->getModel());
             $this->getFields()->offsetSet($field->getName(), $field);
             $checked = true;
-            // @phpstan-ignore method.notFound
-        } elseif ($relation = $this->getModel()->getRelationshipDeeply($field->getPath())) {
+        } elseif ($relation = $this->resolveRelationshipDeeply($field->getPath())) {
             $this->addRelationField($relation, $field);
         }
 
@@ -373,8 +381,8 @@ abstract class Entity
      */
     final public function getAllFullRelationsNames(): Collection
     {
-        $prefix = $this instanceof RelationInfo ? $this->getName() : lcfirst($this->getModelName());
-        $relations = collect($this instanceof RelationInfo ? [$prefix] : []);
+        $prefix = $this instanceof Relation ? $this->getName() : lcfirst($this->getModelName());
+        $relations = collect($this instanceof Relation ? [$prefix] : []);
 
         foreach ($this->getRelations() as $relation) {
             $thisname = $relation->getFullName();
@@ -445,7 +453,10 @@ abstract class Entity
         return false;
     }
 
-    final public function addRelationDeeply(array $relationList): Relation|static
+    /**
+     * @param  array<int, RelationInfo>  $relationList
+     */
+    final public function addRelationDeeply(array $relationList): Entity
     {
         $parent = $this;
 
@@ -511,6 +522,11 @@ abstract class Entity
 
         foreach ($keys as $key) {
             $relation = $this->getRelations()->get($key);
+
+            if (! $relation instanceof Relation) {
+                continue;
+            }
+
             $removed = $removed || $relation->removeUnusedRelations();
 
             if (! $relation->hasFields()) {
@@ -536,16 +552,20 @@ abstract class Entity
     /**
      * Convert the model instance to an array.
      *
-     * @return array[][]
-     *
-     * @psalm-return array{fields: array<string, array>}
+     * @return array{fields: array<string, array<string, mixed>>}
      */
     final public function toArray(): array
     {
         $mapped_fields = [];
 
         foreach ($this->getAllFields() as $f) {
-            $mapped_fields[$f->getFullAlias()] = $f->toArray();
+            $full_alias = $f->getFullAlias();
+
+            if ($full_alias === null) {
+                continue;
+            }
+
+            $mapped_fields[$full_alias] = $f->toArray();
         }
 
         return [
@@ -553,8 +573,15 @@ abstract class Entity
         ];
     }
 
-    protected static function applyCorrectWhereMethod(Builder|Relation $query, Field|string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::And): void
+    /**
+     * @param  Builder<Model>|EloquentRelation<*, *, *>  $query
+     */
+    protected static function applyCorrectWhereMethod(Builder|EloquentRelation $query, Field|string $field, FilterOperator $operator, mixed $value, WhereClause $clause = WhereClause::And): void
     {
+        if ($query instanceof EloquentRelation) {
+            $query = $query->getQuery();
+        }
+
         $fieldname = is_string($field) ? $field : $field->getName();
         $method = $clause === WhereClause::Or ? 'or' : '';
         $params = [$operator->value === 'like' ? DB::raw('LOWER(' . $fieldname . ')') : $fieldname];
@@ -615,6 +642,8 @@ abstract class Entity
 
     /**
      * gets primaryKey name.
+     *
+     * @return string|list<string>
      */
     protected function getPrimaryKey(): string|array
     {
@@ -623,6 +652,8 @@ abstract class Entity
 
     /**
      * gets full primaryKey name.
+     *
+     * @return string|list<string>
      */
     protected function getFullPrimaryKey(): string|array
     {
@@ -633,14 +664,13 @@ abstract class Entity
     {
         $model = $this->getModel();
 
-        // @phpstan-ignore  method.notFound
-        return ! class_uses_trait($model, SoftDeletes::class) || ! $model->isForceDeleting();
+        return ! class_uses_trait($model, SoftDeletes::class)
+            || ! method_exists($model, 'isForceDeleting')
+            || ! $model->isForceDeleting();
     }
 
     /**
-     * @return (string)[]
-     *
-     * @psalm-return list{0?: null|string, 1?: null|string, 2?: mixed, 3?: mixed}
+     * @return list<string>
      */
     protected function getTimestampsColumns(): array
     {
@@ -650,21 +680,28 @@ abstract class Entity
             return [];
         }
 
-        /** @var string[] $timestamps */
         $timestamps = [$model->getCreatedAtColumn(), $model->getUpdatedAtColumn()];
 
-        // @phpstan-ignore  method.notFound
-        if (class_uses_trait($model, SoftDeletes::class) && $model->isForceDeleting()) {
-            // @phpstan-ignore  method.notFound
+        if (class_uses_trait($model, SoftDeletes::class)
+            && method_exists($model, 'isForceDeleting')
+            && $model->isForceDeleting()
+            && method_exists($model, 'getDeletedAtColumn')) {
             $timestamps[] = $model->getDeletedAtColumn();
         }
 
         if (class_uses_trait($model, HasLocks::class)) {
-            // @phpstan-ignore  method.notFound
-            $timestamps[] = resolve('locked')->getLockedColumnName();
+            $timestamps[] = resolve(Locked::class)->lockedAtColumn();
         }
 
-        return $timestamps;
+        $result = [];
+
+        foreach ($timestamps as $column) {
+            if (is_string($column) && $column !== '') {
+                $result[] = $column;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -675,13 +712,19 @@ abstract class Entity
     protected function setFields(iterable $fields): void
     {
         if (! ($fields instanceof Collection)) {
-            $fields = collect($fields);
+            $fields = Collection::make($fields);
         }
 
         $this->fields = new Collection();
         $this->addFields($fields);
         $fields_keys = $this->getFields()->keys()->all();
-        $filtered = $fields->reject(fn (Field $field, string $key): bool => in_array($key, $fields_keys, true));
+        $filtered = new Collection();
+
+        foreach ($fields as $key => $field) {
+            if ($field instanceof Field && ! in_array((string) $key, $fields_keys, true)) {
+                $filtered->put((string) $key, $field);
+            }
+        }
 
         foreach ($this->getRelations() as $relation) {
             $relation->setFields($filtered);
@@ -691,7 +734,7 @@ abstract class Entity
     /**
      * adds deeply a list of fields to current ojbect.
      *
-     * @param  array<string,Field|Closure(string): Field>  $fields
+     * @param  iterable<string, Field|Closure(Model): Field>  $fields
      */
     protected function addFields(iterable $fields): void
     {
@@ -714,27 +757,35 @@ abstract class Entity
     }
 
     /**
-     * @return (mixed|string)[]
+     * @param  list<string>|null  $columns
      *
-     * @psalm-return array<mixed|string>
+     * @return list<string>
      */
     protected function checkColumnsOrGetDefaults(Model $model, string $value_column, ?array $columns): array
     {
         if ($columns === null || ($columns === [$value_column] && $columns[0] === $model->getKeyName())) {
             $connection = $model->getConnectionName();
             $indexes = SchemaInspector::getInstance()->indexes($model->getTable(), $connection)->all();
-            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn (\Modules\Core\Inspector\Entities\Index $idx) => $idx instanceof \Modules\Core\Inspector\Entities\Index ? $idx->columns->all() : $idx['columns'], $indexes))];
+            $columns = [...($columns === [$value_column] ? $columns : []), ...Arr::flatten(array_map(fn (Index $idx): array => $idx->columns->all(), $indexes))];
         }
 
         if (! in_array($value_column, $columns, true)) {
             array_unshift($columns, $value_column);
         }
 
-        return $columns;
+        return array_values($columns);
     }
 
-    protected function addSortsIntoQuery(Builder|Relation $query, array $sorts): void
+    /**
+     * @param  Builder<Model>|EloquentRelation<*, *, *>  $query
+     * @param  list<array{property: string, direction: string}>  $sorts
+     */
+    protected function addSortsIntoQuery(Builder|EloquentRelation $query, array $sorts): void
     {
+        if ($query instanceof EloquentRelation) {
+            $query = $query->getQuery();
+        }
+
         foreach ($sorts as $order) {
             if (Str::contains($order['property'], '.')) {
                 $exploded = explode('.', (string) $order['property']);
@@ -746,15 +797,18 @@ abstract class Entity
     }
 
     /**
-     * @return (mixed|string)[][]
+     * @param  list<string>  $columns
      *
-     * @psalm-return array<array{property: mixed, direction: 'asc'}>
+     * @return list<array{property: string, direction: 'asc'}>
      */
     protected function getDefaultSorts(array $columns, Model $model): array
     {
-        return array_map(fn (string $c): array => ['property' => $c, 'direction' => 'asc'], array_filter($columns, fn (string $c): bool => $c !== $model->getKeyName()));
+        return array_values(array_map(fn (string $c): array => ['property' => $c, 'direction' => 'asc'], array_filter($columns, fn (string $c): bool => $c !== $model->getKeyName())));
     }
 
+    /**
+     * @param  Collection<int, mixed>  $data
+     */
     protected function setDataIntoResponse(ResponseBuilder $responseBuilder, Collection $data, int $totalRecords): void
     {
         $responseBuilder->setData($data);
@@ -762,8 +816,8 @@ abstract class Entity
         $responseBuilder->setTotalRecords($totalRecords);
 
         if ($this->requestData->request->has('page') || $this->requestData->request->has('pagination')) {
-            $responseBuilder->setCurrentPage((int) ($this->requestData->request->get('page') ?? 1));
-            $responseBuilder->setPagination((int) $this->requestData->request->get('pagination'));
+            $responseBuilder->setCurrentPage($this->requestData->page ?? 1);
+            $responseBuilder->setPagination($this->requestData->pagination);
         } elseif ($this->requestData->request->has('from')) {
             $responseBuilder->setFrom($this->requestData->from);
             $responseBuilder->setTo($this->requestData->to);
@@ -788,11 +842,21 @@ abstract class Entity
 
             // TODO: da verificare, solo imbastito
             $class = $model::class;
-            $extended_class_name = Str::afterLast($class . config('core.extended_class_suffix'), '\\');
+            $extended_class_suffix = config('core.extended_class_suffix', '_extended');
+
+            if (! is_string($extended_class_suffix)) {
+                $extended_class_suffix = '_extended';
+            }
+
+            $extended_class_name = Str::afterLast($class . $extended_class_suffix, '\\');
             $grid_utils = HasGridUtils::class;
 
             if (! class_exists($extended_class_name)) {
                 eval(sprintf('class %s extends %s { use %s; }', $extended_class_name, $class, $grid_utils));
+            }
+
+            if (! is_subclass_of($extended_class_name, Model::class)) {
+                throw new UnexpectedValueException('Extended grid model class must extend ' . Model::class);
             }
 
             $model = new $extended_class_name;
@@ -804,7 +868,7 @@ abstract class Entity
     /**
      * add field the specified relation if not already exists.
      *
-     * @param  RelationInfo[]  $relationList  relation infos full path
+     * @param  array<int, RelationInfo>  $relationList  relation infos full path
      */
     private function addRelationField(array $relationList, Field $field): bool
     {
@@ -844,5 +908,23 @@ abstract class Entity
         }
 
         return isset($parent->name) ? $parent->getFullName() : lcfirst($parent->getModelName());
+    }
+
+    /**
+     * @return array<int, RelationInfo>|false
+     */
+    private function resolveRelationshipDeeply(string $relation): array|false
+    {
+        if (! Grid::useGridUtils($this->getModel())) {
+            return false;
+        }
+
+        $model_class = $this->getFullModelName();
+
+        if (! method_exists($model_class, 'getRelationshipDeeply')) {
+            return false;
+        }
+
+        return $model_class::getRelationshipDeeply($relation);
     }
 }
