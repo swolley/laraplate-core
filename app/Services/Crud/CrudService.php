@@ -417,6 +417,7 @@ class CrudService
     public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, $operation === 'activate' ? 'restore' : 'delete');
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
         $found_record = $this->newQueryWithTrashed($model)
@@ -593,6 +594,7 @@ class CrudService
     private function doApproveOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, $operation);
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
         $key_value = $this->getModelKeyValue($requestData);
@@ -650,6 +652,7 @@ class CrudService
     private function doLockOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, $operation);
 
         throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());

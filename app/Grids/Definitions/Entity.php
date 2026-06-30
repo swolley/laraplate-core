@@ -816,8 +816,12 @@ abstract class Entity
         $responseBuilder->setTotalRecords($totalRecords);
 
         if ($this->requestData->request->has('page') || $this->requestData->request->has('pagination')) {
-            $responseBuilder->setCurrentPage($this->requestData->page ?? 1);
-            $responseBuilder->setPagination($this->requestData->pagination);
+            $responseBuilder->setCurrentPage($this->requestData->page ?? $this->requestData->request->integer('page', 1));
+            $responseBuilder->setPagination(
+                $this->requestData->request->has('pagination')
+                    ? $this->requestData->request->integer('pagination')
+                    : $this->requestData->pagination,
+            );
         } elseif ($this->requestData->request->has('from')) {
             $responseBuilder->setFrom($this->requestData->from);
             $responseBuilder->setTo($this->requestData->to);

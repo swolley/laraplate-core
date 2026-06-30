@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use function modules;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -74,6 +76,15 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
         }
 
         $studly_module = Str::studly($module);
+        $registered_module = $this->resolveRegisteredModuleName($module, $studly_module);
+
+        if ($registered_module !== null) {
+            return $registered_module;
+        }
+
+        if (Module::has($module)) {
+            return $module;
+        }
 
         if (Module::has($studly_module)) {
             return $studly_module;
@@ -98,5 +109,23 @@ abstract class CrudRequest extends FormRequest implements IParsableRequest
             'entity' => $this->route('entity') ?? $entity,
             'module' => $module,
         ]);
+    }
+
+    private function resolveRegisteredModuleName(string $module, string $studly_module): ?string
+    {
+        if (! function_exists('modules')) {
+            return null;
+        }
+
+        /** @var list<string> $registered_modules */
+        $registered_modules = modules(false, false, false);
+
+        foreach ($registered_modules as $registered_module) {
+            if (strcasecmp($registered_module, $module) === 0 || strcasecmp($registered_module, $studly_module) === 0) {
+                return $registered_module;
+            }
+        }
+
+        return null;
     }
 }

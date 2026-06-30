@@ -351,6 +351,28 @@ final class Repository extends BaseRepository
 
             return 'R' . (is_scalar($key) ? (string) $key : '0');
         })->all();
+
+        foreach (['groups', 'user_groups', 'user_roles'] as $relation_name) {
+            if (! method_exists($user, $relation_name) || ! $user->relationLoaded($relation_name)) {
+                continue;
+            }
+
+            $related = $user->getRelation($relation_name);
+
+            if (! $related instanceof \Illuminate\Support\Collection) {
+                continue;
+            }
+
+            foreach ($related as $related_model) {
+                if (! $related_model instanceof Model) {
+                    continue;
+                }
+
+                $key = $related_model->getKey();
+                $role_tags[] = 'R' . (is_scalar($key) ? (string) $key : '0');
+            }
+        }
+
         sort($role_tags);
         array_push($tags, ...$role_tags);
 

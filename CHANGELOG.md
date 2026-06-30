@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🐛 Bug Fixes
+
+- *(core)* Harden CRUD module resolution and inspector caching
+
 ## [1.55.2] - 2026-06-30
 
 ### 🚜 Refactor

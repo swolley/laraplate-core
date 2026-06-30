@@ -578,13 +578,21 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private function addNewPropertyAnnotation(string $className, string $classCode, string $fieldName, string $fieldType, bool $fieldNullable): string
     {
-        /** @var int $pos */
-        $pos = Str::position($classCode, 'class ' . $this->stripModelsNamespace($className));
+        $class_search = 'class ' . $this->stripModelsNamespace($className);
+        $class_pos = Str::position($classCode, $class_search);
 
-        /** @var int $pos */
-        $pos = Str::position($classCode, ' */', $pos - 20);
+        if ($class_pos === false) {
+            return $classCode;
+        }
 
-        return $this->replaceInCode($classCode, sprintf("\n * @property %s $%s\n", $this->getCodeTypeFromCast($fieldType) . ($fieldNullable ? '|null' : ''), $fieldName), $pos);
+        $property_annotation = sprintf("\n * @property %s $%s\n", $this->getCodeTypeFromCast($fieldType) . ($fieldNullable ? '|null' : ''), $fieldName);
+        $doc_close_pos = Str::position($classCode, ' */', $class_pos - 20);
+
+        if ($doc_close_pos !== false) {
+            return $this->replaceInCode($classCode, $property_annotation, $doc_close_pos);
+        }
+
+        return $this->replaceInCode($classCode, "/**\n{$property_annotation} */\n", $class_pos);
     }
 
     private function addPropertyIntoFillable(string $classCode, string $fieldName): string

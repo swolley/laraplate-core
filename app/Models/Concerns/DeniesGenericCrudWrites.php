@@ -15,6 +15,6 @@ trait DeniesGenericCrudWrites
      */
     public function deniedCrudWrites(): array
     {
-        return ['insert', 'update', 'delete', 'forceDelete'];
+        return ['insert', 'update', 'delete', 'forceDelete', 'restore', 'approve', 'disapprove', 'lock', 'unlock'];
     }
 }

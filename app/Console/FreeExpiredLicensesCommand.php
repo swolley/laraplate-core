@@ -8,6 +8,7 @@ use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\Command;
 use Override;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class FreeExpiredLicensesCommand extends Command
@@ -21,7 +22,14 @@ final class FreeExpiredLicensesCommand extends Command
     public function handle(): int
     {
         $this->info('Freeing expired licenses...');
-        $user_class = user_class();
+
+        try {
+            $user_class = user_class();
+        } catch (InvalidArgumentException) {
+            $this->output->error('User class is not ' . User::class);
+
+            return BaseCommand::FAILURE;
+        }
 
         if ($user_class !== User::class && ! is_subclass_of($user_class, User::class)) {
             $this->output->error('User class is not ' . User::class);

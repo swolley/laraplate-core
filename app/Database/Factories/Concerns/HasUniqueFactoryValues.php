@@ -173,7 +173,7 @@ trait HasUniqueFactoryValues
             }
 
             return "{$base_value}_{$unique_id}";
-        } catch (Exception) {
+        } catch (Throwable) {
             // Ultimate fallback
             return "generated_{$timestamp}_{$random}_{$unique_id}";
         }

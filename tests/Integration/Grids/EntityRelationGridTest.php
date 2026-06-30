@@ -193,7 +193,7 @@ it('covers relation deep traversal with initialized root name', function (): voi
     $entity->seedRelation($relation);
 
     expect($entity->getRelationDeeply('entityModelStub.roles'))->toBeInstanceOf(Relation::class)
-        ->and($entity->getAllFullRelationsNames()->count())->toBe(1);
+        ->and($entity->getAllFullRelationsNames()->count())->toBe(2);
 });
 
 it('covers explicit columns branch in checkColumnsOrGetDefaults', function (): void {

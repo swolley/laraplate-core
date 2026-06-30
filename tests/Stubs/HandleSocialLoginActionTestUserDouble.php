@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Tests\Stubs;
 
+use Modules\Core\Models\User;
+
 /**
  * Stub used to cover the path where userUpserter is null.
  * user_class() is set to this class; query() returns the mock builder that updateOrCreate().
  */
-class HandleSocialLoginActionTestUserDouble
+class HandleSocialLoginActionTestUserDouble extends User
 {
     public static $queryBuilder;
 

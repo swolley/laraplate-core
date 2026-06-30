@@ -113,18 +113,24 @@ it('private helpers compute request key and duration variants', function (): voi
 
     $key_method = new ReflectionMethod(Repository::class, 'getKeyFromRequest');
     $key_method->setAccessible(true);
-    $key = $key_method->invoke($repository, $request);
+    $key_parts_method = new ReflectionMethod(Repository::class, 'getKeyPartsFromUser');
+    $key_parts_method->setAccessible(true);
+    $user_tags = $key_parts_method->invoke($repository, $user);
+    $key = $key_method->invoke($repository, $request, $user_tags);
 
-    $duration_method = new ReflectionMethod(Repository::class, 'getDuration');
-    $duration_method->setAccessible(true);
-    $duration = $duration_method->invoke($repository);
-
-    config()->set('cache.threshold', 0);
-    $duration_without_threshold = $duration_method->invoke($repository);
+    $threshold_method = new ReflectionMethod(Repository::class, 'getThreshold');
+    $threshold_method->setAccessible(true);
+    $resolve_default_method = new ReflectionMethod(Repository::class, 'resolveDefaultCacheSeconds');
+    $resolve_default_method->setAccessible(true);
 
     expect($key)->toBeString()
-        ->and($duration)->toBeArray()
-        ->and($duration_without_threshold)->toBe(120);
+        ->and($threshold_method->invoke($repository))->toBe(10)
+        ->and($resolve_default_method->invoke($repository))->toBe(120);
+
+    config()->set('cache.threshold', 0);
+
+    expect($threshold_method->invoke($repository))->toBe(0)
+        ->and($resolve_default_method->invoke($repository))->toBe(120);
 });
 
 it('remember supports flexible array ttl branch', function (): void {

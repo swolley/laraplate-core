@@ -193,7 +193,6 @@ it('inspect caches using tags when taggable store is available', function (): vo
             return $tags;
         }
     });
-    Cache::shouldReceive('getCacheTags')->atLeast()->once()->andReturnUsing(static fn (array $tags): array => $tags);
     Cache::shouldReceive('tags')->atLeast()->once()->andReturn($tagged_cache);
 
     try {

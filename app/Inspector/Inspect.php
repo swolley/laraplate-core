@@ -8,7 +8,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Cache\Repository as CoreCacheRepository;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
@@ -29,9 +28,9 @@ final class Inspect
         $key_name = self::keyName($name, $schema);
         $cache = Cache::store();
 
-        $use_tags = $cache->supportsTags() && method_exists($cache, 'getCacheTags');
+        $use_tags = self::supportsTaggedCache($cache);
 
-        $inspected_data = $use_tags && $cache instanceof CoreCacheRepository
+        $inspected_data = $use_tags
             ? Cache::tags($cache->getCacheTags(['inspector', $schema ?? 'default']))->get($key_name)
             : Cache::get(self::cacheKeyWithoutTags($key_name));
 
@@ -61,13 +60,35 @@ final class Inspect
             $schema,
         );
 
-        if ($use_tags && $cache instanceof CoreCacheRepository) {
+        if ($use_tags) {
             Cache::tags($cache->getCacheTags(['inspector', $schema ?? 'default']))->forever($key_name, $inspected_data);
         } else {
             Cache::forever(self::cacheKeyWithoutTags($key_name), $inspected_data);
         }
 
         return $inspected_data;
+    }
+
+    public static function forget(string $name, ?string $schema = null): void
+    {
+        $key_name = self::keyName($name, $schema);
+        $cache = Cache::store();
+
+        if (self::supportsTaggedCache($cache)) {
+            Cache::tags($cache->getCacheTags(['inspector', $schema ?? 'default']))->forget($key_name);
+
+            return;
+        }
+
+        Cache::forget(self::cacheKeyWithoutTags($key_name));
+    }
+
+    private static function supportsTaggedCache(mixed $cache): bool
+    {
+        return is_object($cache)
+            && method_exists($cache, 'supportsTags')
+            && $cache->supportsTags()
+            && method_exists($cache, 'getCacheTags');
     }
 
     /**

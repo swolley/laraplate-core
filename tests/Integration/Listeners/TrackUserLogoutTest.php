@@ -63,7 +63,7 @@ it('listener has proper type annotation', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('/** @var Model $user */');
+    expect($source)->toContain('/** @var User $user */');
 });
 
 it('listener handle deletes user license on logout when user has license', function (): void {

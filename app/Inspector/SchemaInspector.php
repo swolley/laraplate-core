@@ -149,6 +149,7 @@ final class SchemaInspector
     {
         $key = Inspect::keyName($table, $connection);
         unset($this->tables[$key]);
+        Inspect::forget($table, $connection);
     }
 
     /**

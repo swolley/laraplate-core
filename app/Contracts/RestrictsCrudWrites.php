@@ -16,7 +16,7 @@ interface RestrictsCrudWrites
     /**
      * Generic CRUD write operations denied for this model.
      *
-     * @return list<string> subset of "insert", "update", "delete", "forceDelete"
+     * @return list<string> subset of "insert", "update", "delete", "forceDelete", "restore", "approve", "disapprove", "lock", "unlock"
      */
     public function deniedCrudWrites(): array;
 }

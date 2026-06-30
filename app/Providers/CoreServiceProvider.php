@@ -6,6 +6,7 @@ namespace Modules\Core\Providers;
 
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use Carbon\CarbonImmutable;
+use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
@@ -203,7 +204,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
             $cache = Cache::store();
 
-            if ($cache instanceof CoreCacheRepository && $cache->supportsTags()) {
+            if ($this->cacheSupportsTags($cache)) {
                 $cache_tags = $cache->getCacheTags();
 
                 if (Cache::tags($cache_tags)->has($cache_key)) {
@@ -251,6 +252,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
             foreach ($cron_jobs as $cron_job) {
                 $command = $cron_job->getAttribute('command');
                 $schedule = $cron_job->getAttribute('schedule');
+
+                if ($schedule instanceof CronExpression) {
+                    $schedule = $schedule->getExpression();
+                }
 
                 if (! is_scalar($command) || ! is_scalar($schedule)) {
                     continue;
@@ -300,6 +305,14 @@ final class CoreServiceProvider extends ModuleServiceProvider
         }
 
         return $normalized;
+    }
+
+    private function cacheSupportsTags(mixed $cache): bool
+    {
+        return is_object($cache)
+            && method_exists($cache, 'supportsTags')
+            && $cache->supportsTags()
+            && method_exists($cache, 'getCacheTags');
     }
 
     /**

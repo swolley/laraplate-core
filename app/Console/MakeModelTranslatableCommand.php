@@ -285,7 +285,7 @@ class MakeModelTranslatableCommand extends Command
             $casts_str .= ',';
         }
 
-        if (! is_subclass_of($model_full_name, Model::class)) {
+        if (! class_exists($model_full_name)) {
             $this->error('Invalid model class selected.');
 
             return Command::FAILURE;
