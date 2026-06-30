@@ -10,7 +10,7 @@ use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
-use Modules\Core\Exceptions\ConfigurationException;
+use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Console\Migrations\StatusCommand as LaravelStatusCommand;
@@ -29,8 +29,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Cache\Repository as CoreCacheRepository;
 use Modules\Core\Console\WarmCacheCommand;
+use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -42,6 +42,7 @@ use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User as CoreUser;
+use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Overrides\RouteListCommand;
@@ -448,6 +449,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     private function registerConsoleCommandOverrides(): void
     {
+        ArtisanApplication::starting(static function (ArtisanApplication $artisan): void {
+            $artisan->add(new InternalListCommand());
+        });
+
         $this->app->booted(function (): void {
             $this->app->loadDeferredProvider(LaravelRouteListCommand::class);
 
