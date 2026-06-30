@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
 use Modules\Core\Casts\Filter;
@@ -31,17 +32,18 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
-use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
-use Modules\Core\Cache\Repository as CacheRepository;
+use Modules\Core\Contracts\RestrictsCrudWrites;
+use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
-use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Modules\Core\Services\Authorization\AuthorizationService;
+use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
+use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
@@ -338,6 +340,7 @@ class CrudService
     public function insert(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'insert');
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
         $changes = $requestData->changes;
         $discarded_values = $this->removeNonFillableProperties($model, $changes);
@@ -360,6 +363,7 @@ class CrudService
     public function update(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'update');
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
 
         $key_value = $this->getModelKeyValue($requestData);
@@ -389,6 +393,7 @@ class CrudService
     public function delete(ModifyRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'delete');
         $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
         $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
@@ -473,6 +478,13 @@ class CrudService
             data: $table . ' cached cleared',
             statusCode: Response::HTTP_OK,
         );
+    }
+
+    private function assertCrudWriteAllowed(Model $model, string $operation): void
+    {
+        if ($model instanceof RestrictsCrudWrites && in_array($operation, $model->deniedCrudWrites(), true)) {
+            throw CrudWriteNotAllowedException::for($model, $operation);
+        }
     }
 
     private function useRecursiveRelationships(Model $model): bool
@@ -814,9 +826,7 @@ class CrudService
     private function getModelPrimaryKeyName(Model $model): array|string
     {
         /** @var string|array<int, string> $key */
-        $key = $model->getKeyName();
-
-        return $key;
+        return $model->getKeyName();
     }
 
     private function resolveKeyFromRequest(Request $request, string $key): mixed

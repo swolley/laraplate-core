@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use BadMethodCallException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Auth\Access\AuthorizationException;
 use LogicException;
+use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\DetailRequest;
@@ -377,6 +378,15 @@ class CrudController extends Controller
                     data: null,
                     error: $ex->getMessage(),
                     statusCode: Response::HTTP_UNAUTHORIZED,
+                ),
+                $request,
+            );
+        } catch (CrudWriteNotAllowedException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_FORBIDDEN,
                 ),
                 $request,
             );
