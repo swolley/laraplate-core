@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Console\RouteListCommand as LaravelRouteListCommand;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
@@ -42,6 +43,7 @@ use Modules\Core\Models\License;
 use Modules\Core\Models\User as CoreUser;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
+use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
@@ -150,6 +152,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         }
 
         $this->registerMigrationOverrides();
+        $this->registerConsoleCommandOverrides();
     }
 
     public function registerAuths(): void
@@ -427,6 +430,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
             });
 
             $this->app->bind(LaravelMigrator::class, static fn (Application $app): Migrator => $app['migrator']);
+        });
+    }
+
+    private function registerConsoleCommandOverrides(): void
+    {
+        $this->app->booted(function (): void {
+            $this->app->loadDeferredProvider(LaravelRouteListCommand::class);
+
+            $this->app->singleton(LaravelRouteListCommand::class, static function (Application $app): RouteListCommand {
+                return new RouteListCommand($app['router']);
+            });
         });
     }
 
