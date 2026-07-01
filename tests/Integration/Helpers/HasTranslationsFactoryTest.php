@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Database\Factories\Concerns\HasTranslationsFactory;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
 
-
 beforeEach(function (): void {
     Schema::create('fake_translatable_models', function (Blueprint $table): void {
         $table->id();
@@ -27,6 +26,27 @@ beforeEach(function (): void {
         $table->json('components')->nullable();
         $table->timestamps();
     });
+});
+
+it('does not duplicate translations when only the default locale is available', function (): void {
+    config(['app.locale' => 'en', 'app.available_locales' => ['en']]);
+
+    $model = FakeTranslatableModel::query()->create([]);
+    $model->setTranslation('en', [
+        'title' => 'Default Title',
+        'slug' => 'default-slug',
+        'components' => [],
+    ]);
+    $model->save();
+
+    $duplicator = new class
+    {
+        use HasTranslationsFactory;
+    };
+
+    $duplicator->createTranslations($model);
+
+    expect($model->translations()->count())->toBe(1);
 });
 
 it('duplicates default translation into random locales, preserving components and allowing overrides', function (): void {
@@ -76,6 +96,29 @@ it('duplicates default translation into random locales, preserving components an
         expect($translation->title)->toBe('Title_' . $locale);
         expect($translation->slug)->toBe('default-slug');
     });
+});
+
+it('normalizes null default components when duplicating translations', function (): void {
+    config(['app.locale' => 'en', 'app.available_locales' => ['en', 'it']]);
+
+    $model = FakeTranslatableModel::query()->create([]);
+    $model->translations()->create([
+        'locale' => 'en',
+        'title' => 'Default Title',
+        'slug' => 'default-slug',
+        'components' => null,
+    ]);
+
+    $duplicator = new class
+    {
+        use HasTranslationsFactory;
+    };
+
+    $duplicator->createTranslations($model);
+
+    $translation = $model->translations()->where('locale', 'it')->firstOrFail();
+
+    expect($translation->components)->toBe([]);
 });
 
 it('throws when the default translation is missing', function (): void {

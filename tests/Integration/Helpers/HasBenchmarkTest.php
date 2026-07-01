@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
+use Illuminate\Container\Container;
 use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Log;
@@ -101,6 +102,26 @@ it('stepBenchmark tolerates missing benchmark table when counting rows', functio
     $cmd->testStepBenchmarkSurvivesInvalidBenchmarkTable();
 
     Log::shouldHaveReceived('debug');
+});
+
+it('skips starting when the database binding cannot be checked', function (): void {
+    $cmd = new BenchmarkHarness;
+    $cmd->setLaravel($this->app);
+    prepare_benchmark_command($cmd);
+    $cmd->testStartBenchmarkReturnsWhenDatabaseBindingThrows(Container::getInstance());
+});
+
+it('formats zero memory usage in benchmark output', function (): void {
+    Log::spy();
+
+    $cmd = new BenchmarkHarness;
+    $cmd->setLaravel($this->app);
+    prepare_benchmark_command($cmd);
+    $cmd->testComposeOutputHandlesZeroMemoryUsage();
+
+    Log::shouldHaveReceived('debug')
+        ->once()
+        ->withArgs(fn (string $message): bool => str_contains($message, 'MEM 0b'));
 });
 
 it('skips writing to console when command output is not set', function (): void {

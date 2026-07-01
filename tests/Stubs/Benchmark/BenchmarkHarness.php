@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Benchmark;
 
 use Illuminate\Console\Command;
+use Illuminate\Container\Container;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ use Mockery;
 use Modules\Core\Console\Concerns\HasBenchmark;
 use ReflectionMethod;
 use ReflectionProperty;
+use RuntimeException;
 
 final class BenchmarkHarness extends Command
 {
@@ -120,6 +122,31 @@ final class BenchmarkHarness extends Command
         $row_prop->setAccessible(true);
         $row_prop->setValue($this, 0);
         $this->stepBenchmark();
+    }
+
+    public function testStartBenchmarkReturnsWhenDatabaseBindingThrows(Container $original_container): void
+    {
+        Container::setInstance(new class extends Container
+        {
+            public function bound($abstract): bool
+            {
+                throw new RuntimeException('container unavailable');
+            }
+        });
+
+        try {
+            $this->startBenchmark();
+            expect($this->benchmarkStartTime)->toBeNull();
+        } finally {
+            Container::setInstance($original_container);
+        }
+    }
+
+    public function testComposeOutputHandlesZeroMemoryUsage(): void
+    {
+        $method = new ReflectionMethod(self::class, 'composeOutput');
+        $method->setAccessible(true);
+        $method->invoke($this, 0.01, 0, 0, 0, 0.0);
     }
 
     public function testQueryCountAccuracy(int $count): void

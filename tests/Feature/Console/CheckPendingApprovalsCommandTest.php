@@ -92,3 +92,28 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
     $no_recipients = checkPendingApprovalsCommandWithOutput(new CheckPendingApprovalsCommand());
     expect($no_recipients->run(new ArrayInput([]), new BufferedOutput()))->toBe(0);
 });
+
+it('reports when notifications are sent successfully', function (): void {
+    config(['core.notifications.approvals.enabled' => true]);
+
+    $service = Mockery::mock(ApprovalNotificationService::class);
+    $service->shouldReceive('getPendingApprovalsByEntity')
+        ->once()
+        ->andReturn(collect([
+            [
+                'entity' => 'User',
+                'table' => 'users',
+                'count' => 1,
+                'oldest_at' => '2026-01-01 00:00:00',
+            ],
+        ]));
+    $service->shouldReceive('checkAndNotify')
+        ->once()
+        ->andReturn(['sent' => true]);
+
+    $this->app->instance(ApprovalNotificationService::class, $service);
+
+    $command = checkPendingApprovalsCommandWithOutput(new CheckPendingApprovalsCommand());
+
+    expect($command->run(new ArrayInput([]), new BufferedOutput()))->toBe(0);
+});

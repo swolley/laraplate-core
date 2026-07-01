@@ -107,10 +107,6 @@ trait HasBenchmark
 
     private static function databaseIsAvailable(): bool
     {
-        if (! function_exists('app')) {
-            return false;
-        }
-
         try {
             return app()->bound('db');
         } catch (Throwable) {

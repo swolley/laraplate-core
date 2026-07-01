@@ -7,6 +7,7 @@ use Illuminate\Translation\Translator;
 use Illuminate\Validation\Factory;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Concurrency\BatchOutcome;
+use Modules\Core\Concurrency\Exceptions\BatchExecutionFailedException;
 
 it('builds a successful outcome', function (): void {
     $outcome = BatchOutcome::success(taskId: 'task_1', units: 50, duration: 0.42, output: 'ok');
@@ -32,6 +33,15 @@ it('builds a failure outcome from a generic throwable', function (): void {
     expect($outcome->error['class'])->toBe(\RuntimeException::class);
     expect($outcome->error)->toHaveKeys(['file', 'line', 'trace']);
     expect($outcome->queryCount)->toBe(0);
+});
+
+it('exposes failure trace through batch execution exception', function (): void {
+    $exception = new \RuntimeException('boom');
+    $outcome = BatchOutcome::failure(taskId: 'task_x', units: 0, duration: 0.1, e: $exception);
+
+    $batch_exception = new BatchExecutionFailedException($outcome);
+
+    expect($batch_exception->trace())->toBe($outcome->error['trace']);
 });
 
 it('formats validation errors with field, value and messages', function (): void {
