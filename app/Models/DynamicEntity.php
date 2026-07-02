@@ -25,7 +25,6 @@ use UnexpectedValueException;
 
 /**
  * @property string|Collection<int, string> $primaryKey
- *
  * @mixin \Eloquent
  * @mixin IdeHelperDynamicEntity
  */

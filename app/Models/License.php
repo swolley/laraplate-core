@@ -19,7 +19,6 @@ use Override;
 
 /**
  * @property string|null $uuid
- *
  * @mixin \Eloquent
  * @mixin IdeHelperLicense
  */

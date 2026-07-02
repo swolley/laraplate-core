@@ -17,7 +17,6 @@ use Override;
 /**
  * @property string $command
  * @property string|\Modules\Core\Casts\CronExpression $schedule
- *
  * @mixin \Eloquent
  * @mixin IdeHelperCronJob
  */
