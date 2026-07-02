@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\Stubs\Seeders\SeedersApprovalBulkStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationChildStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationParentStubModel;
 use Modules\Core\Tests\Stubs\Seeders\SeedersRelationTagStubModel;
@@ -14,6 +15,12 @@ use Modules\Core\Tests\Stubs\SeedersBulkStubModel;
 
 beforeEach(function (): void {
     Schema::create('seeders_bulk_stub', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->timestamps();
+    });
+
+    Schema::create('seeders_approval_bulk_stub', function (Blueprint $table): void {
         $table->id();
         $table->string('name');
         $table->timestamps();
@@ -56,6 +63,16 @@ it('create persists a user from attributes', function (): void {
         ->and(User::query()->whereKey($user->getKey())->exists())->toBeTrue();
 });
 
+it('create disables approval capture for approval models', function (): void {
+    $seeder = new SeedersUtilsTestSeeder;
+
+    $model = $seeder->runCreateWithApprovals();
+
+    expect($model)->toBeInstanceOf(SeedersApprovalBulkStubModel::class)
+        ->and($model->exists)->toBeTrue()
+        ->and(SeedersApprovalBulkStubModel::query()->whereKey($model->getKey())->exists())->toBeTrue();
+});
+
 it('createMany bulk inserts and assigns incrementing ids', function (): void {
     $seeder = new SeedersUtilsTestSeeder;
 
@@ -73,6 +90,15 @@ it('createMany returns empty collection for empty items', function (): void {
     $seeder = new SeedersUtilsTestSeeder;
 
     expect($seeder->runCreateManyEmpty())->toBeEmpty();
+});
+
+it('createMany disables approval capture for approval models', function (): void {
+    $seeder = new SeedersUtilsTestSeeder;
+
+    $models = $seeder->runCreateManyWithApprovals();
+
+    expect($models)->toHaveCount(1)
+        ->and(SeedersApprovalBulkStubModel::query()->count())->toBe(1);
 });
 
 it('create executes callable method relation fallback branch', function (): void {

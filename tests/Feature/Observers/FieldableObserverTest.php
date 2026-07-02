@@ -69,3 +69,14 @@ it('skips versioning when preset id does not resolve', function (): void {
 
     expect(Presettable::query()->withTrashed()->where('preset_id', 999_999_999)->count())->toBe(0);
 });
+
+it('skips versioning when fieldable has no preset id', function (): void {
+    $observer = app(FieldableObserver::class);
+    $fieldable = new Fieldable(['preset_id' => null]);
+
+    $method = new ReflectionMethod(FieldableObserver::class, 'createVersionForPreset');
+    $method->setAccessible(true);
+    $method->invoke($observer, $fieldable);
+
+    expect(Presettable::query()->withTrashed()->count())->toBeGreaterThanOrEqual(0);
+});

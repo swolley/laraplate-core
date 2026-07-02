@@ -9,6 +9,7 @@ use Illuminate\Database\Seeder as BaseSeeder;
 use Illuminate\Support\Collection;
 use Modules\Core\Database\Seeders\Concerns\HasSeedersUtils;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\Stubs\Seeders\SeedersApprovalBulkStubModel;
 use Modules\Core\Tests\Stubs\SeedersBulkStubModel;
 
 final class SeedersUtilsTestSeeder extends BaseSeeder
@@ -23,6 +24,14 @@ final class SeedersUtilsTestSeeder extends BaseSeeder
             'email' => 'seeded_' . uniqid('', true) . '@example.com',
             'password' => 'secret',
             'lang' => 'en',
+        ]);
+    }
+
+    public function runCreateWithApprovals(): SeedersApprovalBulkStubModel
+    {
+        /** @var SeedersApprovalBulkStubModel */
+        return $this->create(SeedersApprovalBulkStubModel::class, [
+            'name' => 'approval-create',
         ]);
     }
 
@@ -46,6 +55,16 @@ final class SeedersUtilsTestSeeder extends BaseSeeder
     public function runCreateManyEmpty(): Collection
     {
         return $this->createMany(SeedersBulkStubModel::class, []);
+    }
+
+    /**
+     * @return Collection<int, SeedersApprovalBulkStubModel>
+     */
+    public function runCreateManyWithApprovals(): Collection
+    {
+        return $this->createMany(SeedersApprovalBulkStubModel::class, [
+            ['name' => 'approval-bulk'],
+        ]);
     }
 
     public function runCreateWithCallableMethod(string $note): SeedersRelationChildStubModel

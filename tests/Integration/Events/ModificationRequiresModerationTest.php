@@ -5,6 +5,12 @@ declare(strict_types=1);
 use Modules\Core\Events\ModificationRequiresModeration;
 use Modules\Core\Models\Modification;
 
+it('treats missing pre-processing requirements as already complete', function (): void {
+    $event = new ModificationRequiresModeration(new Modification());
+
+    expect($event->allPreProcessingCompleted())->toBeTrue();
+});
+
 it('tracks pre-processing orchestration like model indexing', function (): void {
     $modification = new Modification();
     $event = new ModificationRequiresModeration($modification);

@@ -122,6 +122,10 @@ final class TranslationsCheckCommand extends Command
 
         // prima accumulo tutte le lingue
         foreach ($grouped_translations as $file => $langs) {
+            if (! is_array($langs)) {
+                continue;
+            }
+
             $all_labels = [];
 
             // prima accumulo tutte le labels

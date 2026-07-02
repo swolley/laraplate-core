@@ -32,6 +32,20 @@ it('buildPermissionName composes connection, entity and operation', function ():
     expect($service->buildPermissionName('orders', null, null))->toBe('default.orders.');
 });
 
+it('resetPermissionCache clears resolved permission models', function (): void {
+    $permission = Permission::query()->create([
+        'name' => 'default.orders.select',
+        'guard_name' => 'web',
+    ]);
+    $cache = new ReflectionProperty(AuthorizationService::class, 'permission_model_cache');
+    $cache->setAccessible(true);
+    $cache->setValue(null, [$permission->name => $permission]);
+
+    AuthorizationService::resetPermissionCache();
+
+    expect($cache->getValue())->toBe([]);
+});
+
 it('getAclFilters returns null for non authenticated user', function (): void {
     $service = new AuthorizationService(new AclResolverService());
 

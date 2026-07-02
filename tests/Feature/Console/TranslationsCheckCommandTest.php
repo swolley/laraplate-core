@@ -142,3 +142,29 @@ it('covers checkLabels ignored files missing labels missing languages and all ok
 
     expect(true)->toBeTrue();
 });
+
+it('skips non-array translation groups when checking missing language files', function (): void {
+    $command = translationsCheckCommandWithOutput(app(TranslationsCheckCommand::class));
+    $check = new ReflectionMethod(TranslationsCheckCommand::class, 'checkLabels');
+    $check->setAccessible(true);
+
+    $translations = [
+        DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . 'broken.php' => 'not-a-language-map',
+    ];
+    $ignored = [];
+
+    $check->invokeArgs($command, [&$translations, &$ignored]);
+
+    expect(true)->toBeTrue();
+});
+
+it('keeps translation file identifiers unchanged outside the language directory', function (): void {
+    $command = translationsCheckCommandWithOutput(app(TranslationsCheckCommand::class));
+    $method = new ReflectionMethod(TranslationsCheckCommand::class, 'buildTranslationFileIdentifier');
+    $method->setAccessible(true);
+
+    $file = DIRECTORY_SEPARATOR . 'outside' . DIRECTORY_SEPARATOR . 'messages.php';
+
+    expect($method->invoke($command, DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en' . DIRECTORY_SEPARATOR, $file))
+        ->toBe($file);
+});

@@ -137,7 +137,7 @@ it('authenticates via authentication service and stores license id when enabled'
     $this->provider->register();
     config(['auth.enable_user_licenses' => true]);
     $user = User::factory()->create();
-    $license = (object) ['id' => 99];
+    $license = (object) ['id' => 99, 'uuid' => 'license-uuid-99'];
     $service = new AuthenticationService([
         new class($user, $license) implements IAuthenticationProvider
         {
@@ -180,7 +180,8 @@ it('authenticates via authentication service and stores license id when enabled'
     $result = $callback($request);
 
     expect($result)->toBe($user)
-        ->and(session('license_id'))->toBe(99);
+        ->and(session('license_id'))->toBe(99)
+        ->and(session('license_uuid'))->toBe('license-uuid-99');
 });
 
 it('returns null when authentication service reports failure', function (): void {

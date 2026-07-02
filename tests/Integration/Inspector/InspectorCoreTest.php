@@ -167,6 +167,53 @@ it('inspect caches using no-tags cache path', function (): void {
     }
 });
 
+it('inspect forgets cached table using no-tags cache path', function (): void {
+    Cache::shouldReceive('store')->once()->andReturn(new class
+    {
+        public function supportsTags(): bool
+        {
+            return false;
+        }
+    });
+    Cache::shouldReceive('forget')
+        ->once()
+        ->with('inspector:' . Inspect::keyName('users', config('database.default')))
+        ->andReturnTrue();
+
+    Inspect::forget('users', config('database.default'));
+});
+
+it('inspect forgets cached table using tagged cache path', function (): void {
+    $tagged_cache = Mockery::mock();
+    $tagged_cache->shouldReceive('forget')
+        ->once()
+        ->with(Inspect::keyName('users', config('database.default')))
+        ->andReturnTrue();
+
+    Cache::shouldReceive('store')->once()->andReturn(new class
+    {
+        public function supportsTags(): bool
+        {
+            return true;
+        }
+
+        /**
+         * @param  array<int, string>  $tags
+         * @return array<int, string>
+         */
+        public function getCacheTags(array $tags): array
+        {
+            return $tags;
+        }
+    });
+    Cache::shouldReceive('tags')
+        ->once()
+        ->with(['inspector', config('database.default')])
+        ->andReturn($tagged_cache);
+
+    Inspect::forget('users', config('database.default'));
+});
+
 it('inspect caches using tags when taggable store is available', function (): void {
     $table = 'inspect_cache_tags_' . bin2hex(random_bytes(4));
     Schema::create($table, function (Blueprint $blueprint): void {
@@ -200,6 +247,41 @@ it('inspect caches using tags when taggable store is available', function (): vo
     } finally {
         Schema::dropIfExists($table);
     }
+});
+
+it('parses column collation and index type metadata defensively', function (): void {
+    $parse_columns = new ReflectionMethod(Inspect::class, 'parseColumns');
+    $parse_columns->setAccessible(true);
+    $parse_indexes = new ReflectionMethod(Inspect::class, 'parseIndexes');
+    $parse_indexes->setAccessible(true);
+
+    /** @var Illuminate\Support\Collection<int, Column> $columns */
+    $columns = $parse_columns->invoke(null, [[
+        'name' => 'title',
+        'type' => 'varchar',
+        'type_name' => 'string',
+        'collation' => 'utf8mb4_unicode_ci',
+        'nullable' => true,
+    ]]);
+
+    /** @var Illuminate\Support\Collection<int, Index> $indexes */
+    $indexes = $parse_indexes->invoke(null, [
+        [
+            'name' => 'idx_title',
+            'columns' => 'not-a-list',
+            'type' => 'btree',
+            'unique' => true,
+        ],
+        [
+            'name' => 'idx_compound',
+            'columns' => ['first', 'second'],
+        ],
+    ]);
+
+    expect($columns->first()->attributes->all())->toContain('nullable', 'utf8mb4_unicode_ci')
+        ->and($indexes->first()->attributes->all())->toContain('btree', 'unique')
+        ->and($indexes->first()->columns->all())->toBe([])
+        ->and($indexes->last()->attributes->all())->toContain('compound');
 });
 
 it('parseForeignKeys builds fallback names and keeps composite metadata', function (): void {

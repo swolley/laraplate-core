@@ -50,6 +50,23 @@ it('crud request prepareForValidation resolves model and updates primary key', f
     expect($request->getPrimaryKey())->toBe((new Modules\Core\Models\Setting())->getKeyName());
 });
 
+it('crud request resolves registered module names case insensitively', function (): void {
+    $request = new class() extends CrudRequest
+    {
+        public function exposedResolveModule(): ?string
+        {
+            return $this->resolveModule();
+        }
+    };
+
+    $route = new Route('GET', '/{module}/api/{entity}', fn (): null => null);
+    $route->bind($request);
+    $route->setParameter('module', 'core');
+    $request->setRouteResolver(fn (): Route => $route);
+
+    expect($request->exposedResolveModule())->toBe('Core');
+});
+
 it('select request decodes columns and relations strings during prepareForValidation', function (): void {
     $request = new class() extends SelectRequest
     {

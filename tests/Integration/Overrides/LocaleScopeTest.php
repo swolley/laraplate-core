@@ -429,3 +429,12 @@ it('applyLocaleConstraint uses single where when fallback is disabled', function
 
     expect(true)->toBeTrue();
 });
+
+it('defaults translation fallback to enabled when model has no setting hook', function (): void {
+    $method = new ReflectionMethod(LocaleScope::class, 'modelUsesTranslationFallback');
+    $method->setAccessible(true);
+
+    $model = new class extends Illuminate\Database\Eloquent\Model {};
+
+    expect($method->invoke($this->scope, $model))->toBeTrue();
+});

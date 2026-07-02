@@ -66,3 +66,11 @@ it('returns zero for empty query or text', function (): void {
     expect($scores[0])->toBe(0.0);
     expect($scores[1])->toBe(0.0);
 });
+
+it('returns zero keyword overlap when no query words are available', function (): void {
+    $reranker = new HeuristicReranker;
+    $method = new ReflectionMethod(HeuristicReranker::class, 'keywordOverlapScore');
+    $method->setAccessible(true);
+
+    expect($method->invoke($reranker, '', 'some text'))->toBe(0.0);
+});

@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Models\Modification;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Modification;
+use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
 
@@ -81,45 +84,72 @@ it('requires approval when not in console and user cannot bypass approval', func
 });
 
 it('does not require approval when modifications are empty', function (): void {
-    $originalApp = $this->app;
-    $app = Mockery::mock($this->app)->makePartial();
-    $app->shouldReceive('runningInConsole')->andReturn(false);
-    $this->app->instance('app', $app);
+    App::shouldReceive('runningInConsole')->andReturn(false);
+    Auth::shouldReceive('user')->andReturn(null);
 
-    try {
-        Auth::shouldReceive('user')->andReturn(null);
+    $model = new HasApprovalsStubModel;
+    $method = new ReflectionMethod($model, 'requiresApprovalWhen');
+    $method->setAccessible(true);
 
-        $model = new HasApprovalsStubModel;
-        $method = new ReflectionMethod($model, 'requiresApprovalWhen');
-        $method->setAccessible(true);
-
-        expect($method->invoke($model, []))->toBeFalse();
-    } finally {
-        $this->app->instance('app', $originalApp);
-    }
+    expect($method->invoke($model, []))->toBeFalse();
 });
 
 it('does not require approval when user is admin', function (): void {
-    $originalApp = $this->app;
-    $app = Mockery::mock($this->app)->makePartial();
-    $app->shouldReceive('runningInConsole')->andReturn(false);
-    $this->app->instance('app', $app);
+    App::shouldReceive('runningInConsole')->andReturn(false);
 
-    try {
-        $user = Mockery::mock(User::class)->makePartial();
-        $user->shouldReceive('isAdmin')->andReturn(true);
-        $user->shouldReceive('isSuperAdmin')->andReturn(false);
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdmin')->andReturn(true);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
-        Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('user')->andReturn($user);
 
-        $model = new HasApprovalsStubModel;
-        $method = new ReflectionMethod($model, 'requiresApprovalWhen');
-        $method->setAccessible(true);
+    $model = new HasApprovalsStubModel;
+    $method = new ReflectionMethod($model, 'requiresApprovalWhen');
+    $method->setAccessible(true);
 
-        expect($method->invoke($model, ['name' => 'change']))->toBeFalse();
-    } finally {
-        $this->app->instance('app', $originalApp);
-    }
+    expect($method->invoke($model, ['name' => 'change']))->toBeFalse();
+});
+
+it('does not require approval when user is superadmin and can approve the model', function (): void {
+    App::shouldReceive('runningInConsole')->andReturn(false);
+
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isSuperAdmin')->andReturn(true);
+    $user->shouldReceive('can')->with('approve.has_approvals_stub')->andReturn(true);
+
+    Auth::shouldReceive('user')->andReturn($user);
+
+    $model = new HasApprovalsStubModel;
+    $method = new ReflectionMethod($model, 'requiresApprovalWhen');
+    $method->setAccessible(true);
+
+    expect($method->invoke($model, ['name' => 'change']))->toBeFalse();
+});
+
+it('uses declared model property for ai moderation', function (): void {
+    $model = new class() extends Illuminate\Database\Eloquent\Model
+    {
+        use HasApprovals;
+
+        protected bool $ai_moderation_enabled = true;
+    };
+
+    expect($model->aiModerationEnabledBySettings())->toBeTrue();
+});
+
+it('reads ai moderation from per model settings', function (): void {
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'ai_moderation_has_approvals_stub',
+        'value' => true,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'moderation',
+        'description' => 'test',
+    ]);
+
+    app(PerModelSettingResolver::class)->flush();
+
+    expect((new HasApprovalsStubModel)->aiModerationEnabledBySettings())->toBeTrue();
 });
 
 it('merges preview into toArray when preview data exists', function (): void {
