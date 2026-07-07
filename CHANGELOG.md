@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🧪 Testing
 
+- *(core)* Handle non-array translation groups in TranslationsCheckCommand
+
+## [1.56.1] - 2026-07-01
+
+### 🧪 Testing
+
 - *(core)* Streamline database availability check and enhance benchmark tests
 
 ## [1.55.4] - 2026-06-30
