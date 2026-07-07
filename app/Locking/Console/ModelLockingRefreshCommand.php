@@ -8,8 +8,8 @@ use function Laravel\Prompts\confirm;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;
@@ -112,7 +112,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf('Model %s uses optimistic locking but column %s is missing. Would you like to create it into the schema?', $model, $optimistic_locking_column),
             $model,
-            fn (): int => $this->call('lock:optimistic-add', ['model' => $model]),
+            fn (): int => $this->callLockingCommand('model:optimistic-lock-add', $model),
         )) {
             $this->changes = true;
         }
@@ -126,7 +126,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf("Model %s doesn't use optimistic locking but column %s found. Would you like to remove it from the schema?", $model, $optimistic_locking_column),
             $model,
-            fn (): int => $this->call('lock:optimistic-remove', ['model' => $model]),
+            fn (): int => $this->callLockingCommand('model:optimistic-lock-remove', $model),
         )) {
             $this->changes = true;
         }
@@ -138,8 +138,8 @@ final class ModelLockingRefreshCommand extends Command
     private function lockableCheck(Model $instance, string $model, string $table): void
     {
         $locked_class = HasLocks::class;
-        $lock_at_column = method_exists($instance, 'lockedAtColumn') ? $instance->lockedAtColumn() : null;
-        $lock_by_column = method_exists($instance, 'lockedByColumn') ? $instance->lockedByColumn() : null;
+        $lock_at_column = method_exists($instance, 'getLockedAtColumn') ? $instance->getLockedAtColumn() : null;
+        $lock_by_column = method_exists($instance, 'getLockedByColumn') ? $instance->getLockedByColumn() : null;
         $has_locking = class_uses_trait($instance, $locked_class);
 
         $has_locked_at_column = $lock_at_column !== null && Schema::hasColumn($table, $lock_at_column);
@@ -160,7 +160,7 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf('Model %s uses locks but column %s is missing. Would you like to create it into the schema?', $model, $lock_at_column),
             $model,
-            fn (): int => $this->call('lock:add', ['model' => $model]),
+            fn (): int => $this->callLockingCommand('module:locked-add', $model),
         )) {
             $this->changes = true;
         }
@@ -174,10 +174,30 @@ final class ModelLockingRefreshCommand extends Command
         if ($this->askConfirmForOperation(
             sprintf("Model %s doesn't use locks but column %s found. Would you like to remove it from the schema?", $model, $lock_at_column),
             $model,
-            fn (): int => $this->call('lock:remove', ['model' => $model]),
+            fn (): int => $this->callLockingCommand('model:locked-remove', $model),
         )) {
             $this->changes = true;
         }
+    }
+
+    /**
+     * Invoke a locking add/remove command. Those commands expect the bare class
+     * name plus a --namespace option (they rebuild the FQCN themselves), so a full
+     * class-string must be split to avoid a doubled namespace.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private function callLockingCommand(string $command, string $model): int
+    {
+        $separator_position = mb_strrpos($model, '\\');
+
+        $arguments = ['model' => $separator_position === false ? $model : mb_substr($model, $separator_position + 1)];
+
+        if ($separator_position !== false) {
+            $arguments['--namespace'] = mb_substr($model, 0, $separator_position);
+        }
+
+        return $this->call($command, $arguments);
     }
 
     /**

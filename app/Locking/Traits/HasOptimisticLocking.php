@@ -21,6 +21,17 @@ trait HasOptimisticLocking
     protected $lock = true;
 
     /**
+     * Name of the lock version column.
+     *
+     * Public so tooling (e.g. the model:lock-refresh command) can resolve the
+     * column name from a model instance, mirroring HasLocks' public accessors.
+     */
+    public static function lockVersionColumn(): string
+    {
+        return config('core.locking.lock_version_column');
+    }
+
+    /**
      * Current lock version value.
      */
     public function currentLockVersion(): int
@@ -53,14 +64,6 @@ trait HasOptimisticLocking
 
             return $model;
         });
-    }
-
-    /**
-     * Name of the lock version column.
-     */
-    protected static function lockVersionColumn(): string
-    {
-        return config('core.locking.lock_version_column');
     }
 
     /**

@@ -89,6 +89,20 @@ trait SoftDeletes
     }
 
     /**
+     * Revive a soft-deleted instance in memory so the next save() persists the
+     * restoration in a single write, without tripping the "Cannot update a
+     * softdeleted model" guard. Both soft-delete columns are cleared because
+     * {@see trashed()} inspects is_deleted first, and the saving hook alone does
+     * not run early enough for every persistence path (e.g. optimistic locking).
+     */
+    public function reviveInMemory(): void
+    {
+        unset($this->attributes[$this->getIsDeletedColumn()], $this->original[$this->getIsDeletedColumn()]);
+
+        $this->{$this->getDeletedAtColumn()} = null;
+    }
+
+    /**
      * Determine if the model instance has been soft-deleted.
      *
      * Uses is_deleted / deleted_at from attributes or original so updates work when

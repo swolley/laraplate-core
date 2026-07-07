@@ -8,25 +8,27 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
-		$table_name = "$ModelTable";
-        Schema::table($table_name, function (Blueprint $table) {
-			$lock_version_column = config('core.locking.lock_version_column');
-			if (!Schema::hasColumn($table_name, $lock_version_column) {
-				$table->integer($lock_version_column)->unsigned()->nullable();
-			}
+        $table_name = '$ModelTable$';
+        $column = config('core.locking.lock_version_column');
+
+        Schema::table($table_name, function (Blueprint $table) use ($table_name, $column): void {
+            if (! Schema::hasColumn($table_name, $column)) {
+                $table->integer($column)->unsigned()->nullable();
+            }
         });
     }
 
-    public function down()
+    public function down(): void
     {
-        $table_name = "$ModelTable";
-        Schema::table($table_name, function (Blueprint $table) {
-			$lock_version_column = config('core.locking.lock_version_column');
-			if (Schema::hasColumn($table_name, $lock_version_column) {
-				$table->dropColumn($lock_version_column);
-			}
+        $table_name = '$ModelTable$';
+        $column = config('core.locking.lock_version_column');
+
+        Schema::table($table_name, function (Blueprint $table) use ($table_name, $column): void {
+            if (Schema::hasColumn($table_name, $column)) {
+                $table->dropColumn($column);
+            }
         });
     }
 };

@@ -62,7 +62,13 @@ class LockedAddCommand extends Command
         ]);
 
         $filePath = now()->format('Y_m_d_His') . $this->generateMigrationPath($instance);
-        $path = App::databasePath('migrations/' . $filePath);
+        $directory = $this->migrationDirectoryForNamespace($namespace);
+
+        if (! $this->files->isDirectory($directory)) {
+            $this->files->makeDirectory($directory, 0755, true);
+        }
+
+        $path = $directory . DIRECTORY_SEPARATOR . $filePath;
 
         if (! $this->files->exists($path)) {
             $this->files->put($path, $fileContents);
@@ -73,21 +79,8 @@ class LockedAddCommand extends Command
         $this->updateSettingsTable($table);
 
         $this->info('Done. Review the generated migration and run `php artisan migrate`.');
-        
+
         return BaseCommand::SUCCESS;
-    }
-
-    protected function updateSettingsTable(string $table): void
-    {
-        $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
-
-        Setting::query()->insertOrIgnore([
-            'name' => $key_name,
-            'value' => true,
-            'type' => SettingTypeEnum::Boolean,
-            'group_name' => 'locking',
-            'description' => "Lock status for {$table}",
-        ]);
     }
 
     public function generateMigrationPath(Model $instance): string
@@ -116,6 +109,34 @@ class LockedAddCommand extends Command
      */
     public function getStubPath(): string
     {
-        return module_path('Core', sprintf('Locking/Stubs/%s_locked_column_to_table.php.stub', $this->operation));
+        return module_path('Core', sprintf('app/Locking/Stubs/%s_locked_column_to_table.stub', $this->operation));
+    }
+
+    protected function updateSettingsTable(string $table): void
+    {
+        $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
+
+        Setting::query()->insertOrIgnore([
+            'name' => $key_name,
+            'value' => json_encode(true),
+            'type' => SettingTypeEnum::Boolean->value,
+            'group_name' => 'locking',
+            'description' => "Lock status for {$table}",
+        ]);
+    }
+
+    /**
+     * The migration must live in the same module as the model. When the model
+     * is not modular (e.g. App\Models\*), it falls back to the app migrations.
+     */
+    private function migrationDirectoryForNamespace(string $namespace): string
+    {
+        $segments = explode('\\', $namespace);
+
+        if (($segments[0] ?? null) === 'Modules' && isset($segments[1]) && $segments[1] !== '') {
+            return module_path($segments[1], 'database/migrations');
+        }
+
+        return App::databasePath('migrations');
     }
 }

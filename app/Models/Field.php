@@ -11,6 +11,7 @@ use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasActivation;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;
@@ -18,6 +19,7 @@ use Override;
 
 /**
  * @property-read object $options
+ *
  * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin \Eloquent
  * @mixin IdeHelperField
@@ -29,6 +31,7 @@ final class Field extends Model
     use HasActivation {
         HasActivation::casts as private activationCasts;
     }
+    use HasApprovals;
     // endregion
 
     /**

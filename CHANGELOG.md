@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(core)* Enhance locking commands and migration stubs
+
+## [1.57.0] - 2026-07-07
+
 ### 🚀 Features
 
 - *(core)* Add polymorphic record origins registry

@@ -30,7 +30,7 @@ class OptimisticLockAddCommand extends LockedAddCommand
     #[Override]
     public function getStubPath(): string
     {
-        return module_path('Core', sprintf('Locking/Stubs/%s_optimistic_column_to_table.php.stub', $this->operation));
+        return module_path('Core', sprintf('app/Locking/Stubs/%s_optimistic_lock_column_to_table.stub', $this->operation));
     }
 
     #[Override]
@@ -40,8 +40,8 @@ class OptimisticLockAddCommand extends LockedAddCommand
 
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
-            'value' => true,
-            'type' => SettingTypeEnum::Boolean,
+            'value' => json_encode(true),
+            'type' => SettingTypeEnum::Boolean->value,
             'group_name' => 'locking',
             'description' => "Lock status for {$table}",
         ]);
