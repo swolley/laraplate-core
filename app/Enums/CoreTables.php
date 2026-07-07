@@ -19,6 +19,7 @@ enum CoreTables: string
     case UsersGridConfigs = 'core_users_grid_configs';
     case Settings = 'core_settings';
     case ModelEmbeddings = 'core_model_embeddings';
+    case RecordOrigins = 'core_record_origins';
 
     // generic or vendors models
     case Roles = 'vend_roles';

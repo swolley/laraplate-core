@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Add polymorphic record origins registry
+
+## [1.56.2] - 2026-07-07
+
 ### 🧪 Testing
 
 - *(core)* Handle non-array translation groups in TranslationsCheckCommand
