@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\CrudExecutor;
+use Modules\Core\Overrides\ContextualValidationException;
+use Modules\Core\Overrides\ContextualValidator;
 
 /**
  * Trait per aggiungere validazioni ai modelli.
@@ -48,6 +50,15 @@ trait HasValidations
     private static array $permission_existence_cache = [];
 
     /**
+     * Reset the in-memory permission existence cache.
+     * Used in tests and long-running processes to clear stale state.
+     */
+    public static function resetPermissionExistenceCache(): void
+    {
+        self::$permission_existence_cache = [];
+    }
+
+    /**
      * Imposta il flag per saltare le validazioni.
      */
     public function setSkipValidation(bool $skip = true): void
@@ -72,7 +83,30 @@ trait HasValidations
      */
     public function getAttributesForValidation(): array
     {
-        return $this->getAttributes();
+        $attributes = $this->getAttributes();
+
+        foreach ($this->getCasts() as $key => $cast) {
+            if (! array_key_exists($key, $attributes) || ! $this->shouldUseCastedAttributeForValidation($cast)) {
+                continue;
+            }
+
+            $attributes[$key] = $this->getAttribute($key);
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Whether a casted attribute should be passed to the validator using its cast value.
+     */
+    protected function shouldUseCastedAttributeForValidation(mixed $cast): bool
+    {
+        if (! is_string($cast)) {
+            return false;
+        }
+
+        return in_array($cast, ['array', 'object', 'collection', 'encrypted:array'], true)
+            || str_starts_with($cast, 'array:');
     }
 
     public function getRules(): array
@@ -94,8 +128,20 @@ trait HasValidations
     public function getOperationRules(?string $operation = null): array
     {
         $rules = $this->getRules();
+        $operation = $this->normalizeValidationOperation($operation);
 
         return $operation && array_key_exists($operation, $rules) ? array_merge($rules[self::DEFAULT_RULE] ?? [], $rules[$operation]) : $rules[self::DEFAULT_RULE] ?? [];
+    }
+
+    /**
+     * Maps legacy operation aliases to the rule-set keys used by models.
+     */
+    protected function normalizeValidationOperation(?string $operation): ?string
+    {
+        return match ($operation) {
+            'save' => 'update',
+            default => $operation,
+        };
     }
 
     public function validateWithRules(string $operation): void
@@ -139,7 +185,19 @@ trait HasValidations
                 }
             }
 
-            Validator::make($attributes, $rules)->validate();
+            $validator = Validator::make($attributes, $rules);
+
+            if ($validator instanceof ContextualValidator) {
+                $validator->withLogContext([
+                    'entity' => $this->getTable(),
+                    'model' => static::class,
+                    'operation' => $operation,
+                    'id' => $this->getKey(),
+                ]);
+            }
+
+            $validator->setException(ContextualValidationException::class);
+            $validator->validate();
         }
     }
 
@@ -180,15 +238,6 @@ trait HasValidations
                 throw_unless(static::checkUserCanDo($model, 'restore'), AuthorizationException::class, 'User cannot restore ' . $model->getTable());
             });
         }
-    }
-
-    /**
-     * Reset the in-memory permission existence cache.
-     * Used in tests and long-running processes to clear stale state.
-     */
-    public static function resetPermissionExistenceCache(): void
-    {
-        self::$permission_existence_cache = [];
     }
 
     protected static function checkUserCanDo(Model $model, string $operation): bool

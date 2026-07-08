@@ -14,7 +14,7 @@ final class CrudExecutor
 
     public const string INSERT = 'create';
 
-    public const string UPDATE = 'save';
+    public const string UPDATE = 'update';
 
     public const string DELETE = 'delete';
 

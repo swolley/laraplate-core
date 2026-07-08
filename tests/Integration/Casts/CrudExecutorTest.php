@@ -36,3 +36,7 @@ it('recognizes write and read actions', function (): void {
         ->and(CrudExecutor::isReadAction(CrudExecutor::COUNT))->toBeTrue()
         ->and(CrudExecutor::isReadAction(CrudExecutor::UPDATE))->toBeFalse();
 });
+
+it('uses update as the update operation key', function (): void {
+    expect(CrudExecutor::UPDATE)->toBe('update');
+});

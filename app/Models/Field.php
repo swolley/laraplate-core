@@ -19,7 +19,6 @@ use Override;
 
 /**
  * @property-read object $options
- *
  * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin \Eloquent
  * @mixin IdeHelperField

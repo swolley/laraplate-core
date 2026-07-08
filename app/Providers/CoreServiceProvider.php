@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
@@ -42,6 +43,7 @@ use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User as CoreUser;
+use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
@@ -111,6 +113,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->configureModels();
         $this->configureDates();
         $this->configureUrls();
+        $this->registerValidationOverrides();
         $this->registerCacheWarmOnBoot();
     }
 
@@ -513,6 +516,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->booted(function (): void {
             $this->app->make(WarmCacheCommand::class)->handle();
         });
+    }
+
+    private function registerValidationOverrides(): void
+    {
+        Validator::resolver(static fn ($translator, $data, $rules, $messages, $attributes) => new ContextualValidator(
+            $translator,
+            $data,
+            $rules,
+            $messages,
+            $attributes,
+        ));
     }
 
     private function registerMiddlewares(): void

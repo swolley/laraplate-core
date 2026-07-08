@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(core)* Update CRUD operation constants and enhance validation context handling
+
+## [1.58.0] - 2026-07-08
+
 ### 🚀 Features
 
 - *(core)* Implement search mode functionality in CRUD operations
