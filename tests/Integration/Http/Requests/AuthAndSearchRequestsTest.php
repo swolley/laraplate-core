@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Routing\Route;
+use Modules\Core\Casts\SearchMode;
 use Modules\Core\Http\Requests\LoginRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TranslationsRequest;
@@ -56,5 +57,27 @@ it('search request parsed returns expected DTO values', function (): void {
 
     expect($parsed->mainEntity)->toBe('settings')
         ->and($parsed->primaryKey)->toBe('id')
-        ->and($parsed->qs)->toBe('john');
+        ->and($parsed->qs)->toBe('john')
+        ->and($parsed->mode)->toBe(SearchMode::Auto);
+});
+
+it('search request parsed casts mode to enum', function (): void {
+    $request = SearchRequest::create('/core/api/search/settings', 'GET', [
+        'qs' => 'john',
+        'mode' => 'orchestrated',
+    ]);
+    $route = new Route('GET', '/core/api/search/{entity}', fn (): null => null);
+    $route->bind($request);
+    $route->setParameter('entity', 'settings');
+    $request->setRouteResolver(fn (): Route => $route);
+    $validator = Mockery::mock(Illuminate\Contracts\Validation\Validator::class);
+    $validator->shouldReceive('validated')->andReturn([
+        'qs' => 'john',
+        'mode' => 'orchestrated',
+    ]);
+    $request->setValidator($validator);
+
+    $parsed = $request->parsed();
+
+    expect($parsed->mode)->toBe(SearchMode::Orchestrated);
 });

@@ -29,6 +29,7 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\HistoryRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
+use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Casts\WhereClause;
@@ -39,6 +40,7 @@ use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
@@ -108,18 +110,7 @@ class CrudService
 
         $current_records = is_numeric($data) ? $data : $data->count();
 
-        $meta = new CrudMeta(
-            totalRecords: $total_records,
-            currentRecords: $current_records,
-            currentPage: $requestData->page,
-            totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
-            pagination: $requestData->pagination,
-            from: $requestData->from,
-            to: $requestData->to,
-            class: $model::class,
-            table: $model->getTable(),
-            cachedAt: Date::now(),
-        );
+        $meta = $this->searchMeta($requestData, $total_records, $current_records);
 
         return new CrudResult(
             data: $data,
@@ -179,55 +170,37 @@ class CrudService
         );
     }
 
-    // TODO: Implementare funzionalità di search senza creare dipendenze con il modulo AI
-    // public function search(SearchRequestData $requestData): CrudResult
-    // {
-    //     $is_searchable_class = class_uses_trait($requestData->model, Searchable::class);
+    public function search(SearchRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
 
-    //     if (! isset($requestData->model) || ! $is_searchable_class) {
-    //         return new CrudResult(
-    //             data: null,
-    //             error: 'Full-search operation can be done only on Searchable entities',
-    //             statusCode: Response::HTTP_BAD_REQUEST,
-    //         );
-    //     }
+        $is_searchable_class = class_uses_trait($model, Searchable::class);
 
-    //     $embeddedDocument = null;
-    //     $search_text = Str::of($requestData->qs)->trim()->toString();
+        if (! $is_searchable_class) {
+            return new CrudResult(
+                data: null,
+                error: 'Full-search operation can be done only on Searchable entities',
+                statusCode: Response::HTTP_BAD_REQUEST,
+            );
+        }
 
-    //     if (property_exists($requestData->model, 'embed') && $requestData->model->embed !== null && $requestData->model->embed !== [] && Str::wordCount($search_text) > 10) {
-    //         // Use EmbeddingService from AI module if available
-    //         $embedding_service = class_exists(EmbeddingService::class)
-    //             ? app(EmbeddingService::class)
-    //             : null;
+        // 2. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
 
-    //         if ($embedding_service) {
-    //             $embeddedDocument = $embedding_service->embedText($search_text);
-    //         } else {
-    //             $embeddedDocument = null;
-    //         }
-    //     }
-
-    //     $elastic_query = $this->getElasticSearchQuery($requestData, $embeddedDocument);
-
-    //     $client = ClientBuilder::create()->build();
-    //     $response = $client->search($elastic_query);
-    //     $totalRecords = $response['hits']['total']['value'] ?? 0;
-    //     $data = $response['hits']['hits'] ?? [];
-
-    //     $meta = new CrudMeta(
-    //         totalRecords: $totalRecords,
-    //         currentRecords: count($data),
-    //         pagination: $requestData->pagination,
-    //         currentPage: $requestData->page,
-    //         totalPages: $requestData->calculateTotalPages($totalRecords),
-    //     );
-
-    //     return new CrudResult(
-    //         data: $data,
-    //         meta: $meta,
-    //     );
-    // }
+        return match ($requestData->mode) {
+            SearchMode::Orchestrated => new CrudResult(
+                data: null,
+                error: 'Orchestrated search pipeline is not available from Core yet.',
+                statusCode: Response::HTTP_NOT_IMPLEMENTED,
+            ),
+            SearchMode::Auto, SearchMode::Basic => $this->searchWithScout($requestData, $permission_name),
+        };
+    }
 
     public function history(HistoryRequestData $requestData): CrudResult
     {
@@ -547,6 +520,91 @@ class CrudService
         $unexpected = array_filter($discardedMessages, static fn (string $msg): bool => array_all($expected, fn (string|int $key): bool => ! str_contains($msg, "'{$key}'")));
 
         return $unexpected === [] ? null : implode(', ', $unexpected);
+    }
+
+    private function searchWithScout(SearchRequestData $requestData, string $permissionName): CrudResult
+    {
+        $model = $requestData->model;
+
+        if (is_array($model->getKeyName())) {
+            return new CrudResult(
+                data: null,
+                error: 'Full-search operation does not support composite primary keys yet.',
+                statusCode: Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        /** @var class-string<Model> $model_class */
+        $model_class = $model::class;
+        $builder = $model_class::search($requestData->qs);
+
+        if ($requestData->page !== null) {
+            $paginator = $builder->paginate($requestData->pagination, 'page', $requestData->page);
+            $search_results = $paginator->getCollection();
+        } else {
+            $search_results = $builder->take($requestData->limit)->get();
+        }
+
+        $ids = $search_results
+            ->map(static fn (Model $record): mixed => $record->getKey())
+            ->filter(static fn (mixed $key): bool => $key !== null && $key !== '')
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return new CrudResult(
+                data: new Collection(),
+                meta: $this->searchMeta($requestData, 0, 0),
+            );
+        }
+
+        $this->auth->injectAclFilters($requestData, $permissionName);
+
+        $query = $model->newQuery()->whereKey($ids->all());
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        $records = $query->get();
+
+        if ($requestData->sort === []) {
+            $records_by_key = $records->keyBy(static fn (Model $record): string => (string) $record->getKey());
+            $records = new Collection(
+                $ids
+                    ->map(static fn (mixed $id): ?Model => $records_by_key->get((string) $id))
+                    ->filter()
+                    ->values()
+                    ->all(),
+            );
+        }
+
+        $this->applyComputedMethods($records, $requestData);
+
+        $data = $requestData->group_by !== []
+            ? $this->applyGroupBy($records, $requestData->group_by)
+            : $records;
+
+        $current_records = $data->count();
+
+        return new CrudResult(
+            data: $data,
+            meta: $this->searchMeta($requestData, $current_records, $current_records),
+        );
+    }
+
+    private function searchMeta(SearchRequestData $requestData, int $totalRecords, int $currentRecords): CrudMeta
+    {
+        $model = $requestData->model;
+
+        return new CrudMeta(
+            totalRecords: $totalRecords,
+            currentRecords: $currentRecords,
+            currentPage: $requestData->page,
+            totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($totalRecords) : null,
+            pagination: $requestData->pagination,
+            from: $requestData->from,
+            to: $requestData->to,
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
     }
 
     /**

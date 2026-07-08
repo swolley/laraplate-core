@@ -6,6 +6,7 @@ namespace Modules\Core\Http\Controllers;
 
 use BadMethodCallException;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -64,17 +65,17 @@ class CrudController extends Controller
         );
     }
 
-    // public function search(SearchRequest $request): Response
-    // {
-    //     $requestData = $request->parsed();
+    public function search(SearchRequest $request): Response
+    {
+        $requestData = $request->parsed();
 
-    //     return $this->handleServiceCall(
-    //         fn () => $this->crudService->search($requestData),
-    //         $request,
-    //         $requestData->model,
-    //         shouldCache: false, // Search uses ElasticSearch, cache handled differently
-    //     );
-    // }
+        return $this->handleServiceCall(
+            fn (): CrudResult => $this->crudService->search($requestData),
+            $request,
+            $requestData->model,
+            shouldCache: false, // Search uses ElasticSearch, cache handled differently
+        );
+    }
 
     final public function history(HistoryRequest $request): Response
     {

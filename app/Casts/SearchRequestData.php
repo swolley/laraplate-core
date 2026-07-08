@@ -10,6 +10,8 @@ final class SearchRequestData extends ListRequestData
 {
     public readonly string $qs;
 
+    public readonly SearchMode $mode;
+
     /**
      * @param  string|array<string>  $primaryKey
      */
@@ -18,5 +20,6 @@ final class SearchRequestData extends ListRequestData
         parent::__construct($request, $mainEntity ?? '', $validated, $primaryKey, $module);
 
         $this->qs = $validated['qs'];
+        $this->mode = SearchMode::from($validated['mode'] ?? SearchMode::Auto->value);
     }
 }

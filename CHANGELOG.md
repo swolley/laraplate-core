@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Implement search mode functionality in CRUD operations
+
+## [1.57.1] - 2026-07-07
+
 ### 🐛 Bug Fixes
 
 - *(core)* Enhance locking commands and migration stubs

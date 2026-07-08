@@ -14,16 +14,20 @@ use Modules\Core\Casts\DetailRequestData;
 use Modules\Core\Casts\HistoryRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
+use Modules\Core\Casts\SearchMode;
+use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
+use Modules\Core\Search\Traits\Searchable as CoreSearchable;
 use App\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
+use Symfony\Component\HttpFoundation\Response;
 
 
 function crud_cov_set(object $obj, string $prop, mixed $value): void
@@ -182,6 +186,44 @@ it('detail throws when primary key is missing', function (): void {
 
     $service->detail($data);
 })->throws(Illuminate\Database\Eloquent\ModelNotFoundException::class, 'Primary key is required for detail.');
+
+it('search rejects models without core searchable trait', function (): void {
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $model = new User();
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Basic);
+
+    $result = $service->search($data);
+
+    expect($result->statusCode)->toBe(Response::HTTP_BAD_REQUEST)
+        ->and($result->error)->toBe('Full-search operation can be done only on Searchable entities');
+});
+
+it('search returns a controlled result for orchestrated mode until advanced pipeline is wired', function (): void {
+    $superadmin = crud_cov_login_superadmin();
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new class extends Model
+    {
+        use CoreSearchable;
+
+        protected $table = 'users';
+    };
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Orchestrated);
+
+    $result = $service->search($data);
+
+    expect($result->statusCode)->toBe(Response::HTTP_NOT_IMPLEMENTED)
+        ->and($result->error)->toBe('Orchestrated search pipeline is not available from Core yet.');
+});
 
 it('getModelKeyValue handles composite key request data', function (): void {
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
