@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $table_name = '$ModelTable$';
+        $table_name = $ModelTable$;
         $column = config('core.locking.lock_version_column');
 
         Schema::table($table_name, function (Blueprint $table) use ($table_name, $column): void {
@@ -22,7 +22,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $table_name = '$ModelTable$';
+        $table_name = $ModelTable$;
         $column = config('core.locking.lock_version_column');
 
         Schema::table($table_name, function (Blueprint $table) use ($table_name, $column): void {

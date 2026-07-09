@@ -29,6 +29,7 @@ return new class() extends Migration
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
+                hasLocks: true,
             );
         });
     }

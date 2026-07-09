@@ -56,7 +56,26 @@ class LockedAddCommand extends Command
 
         $instance = new ReflectionClass($className)->newInstanceWithoutConstructor();
         assert($instance instanceof Model);
+
         $table = $instance->getTable();
+        $module = class_module($instance);
+
+        if ($module !== 'App') {
+            $enum_class = "Modules\\{$module}\\Enums\\{$module}Tables";
+
+            if (class_exists($enum_class)) {
+                $enum_case = $enum_class::tryFrom($table)?->name;
+
+                if ($enum_case) {
+                    $table = "{$enum_class}::{$enum_case}->value";
+                }
+            }
+        }
+
+        if (! Str::contains($table, '\\')) {
+            $table = "'{$table}'";
+        }
+
         $fileContents = $this->getStubContents($this->getStubPath(), [
             'ModelTable' => $table,
         ]);
@@ -76,7 +95,7 @@ class LockedAddCommand extends Command
             $this->info(sprintf('File : %s already exists', $path));
         }
 
-        $this->updateSettingsTable($table);
+        $this->updateSettingsTable($instance->getTable(), true);
 
         $this->info('Done. Review the generated migration and run `php artisan migrate`.');
 
@@ -112,17 +131,21 @@ class LockedAddCommand extends Command
         return module_path('Core', sprintf('app/Locking/Stubs/%s_locked_column_to_table.stub', $this->operation));
     }
 
-    protected function updateSettingsTable(string $table): void
+    protected function updateSettingsTable(string $table, bool $enabled): void
     {
         $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
 
-        Setting::query()->insertOrIgnore([
-            'name' => $key_name,
-            'value' => json_encode(true),
-            'type' => SettingTypeEnum::Boolean->value,
-            'group_name' => 'locking',
-            'description' => "Lock status for {$table}",
-        ]);
+        Setting::query()->updateOrCreate(
+            ['name' => $key_name],
+            [
+                'name' => $key_name,
+                'value' => $enabled,
+                'encrypted' => false,
+                'type' => SettingTypeEnum::Boolean,
+                'group_name' => 'locking',
+                'description' => "Lock status for {$table}",
+            ],
+        );
     }
 
     /**

@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $table_name = '$ModelTable$';
+        $table_name = $ModelTable$;
         $lock_at_column = config('core.locking.lock_at_column');
         $lock_by_column = config('core.locking.lock_by_column');
 
@@ -27,7 +27,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $table_name = '$ModelTable$';
+        $table_name = $ModelTable$;
         $lock_at_column = config('core.locking.lock_at_column');
         $lock_by_column = config('core.locking.lock_by_column');
 

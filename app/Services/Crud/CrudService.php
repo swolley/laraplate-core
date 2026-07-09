@@ -110,7 +110,18 @@ class CrudService
 
         $current_records = is_numeric($data) ? $data : $data->count();
 
-        $meta = $this->searchMeta($requestData, $total_records, $current_records);
+        $meta = new CrudMeta(
+            totalRecords: $total_records,
+            currentRecords: $current_records,
+            currentPage: $requestData->page,
+            totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+            pagination: $requestData->pagination,
+            from: $requestData->from,
+            to: $requestData->to,
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
 
         return new CrudResult(
             data: $data,
@@ -538,11 +549,21 @@ class CrudService
         $model_class = $model::class;
         $builder = $model_class::search($requestData->qs);
 
+        $this->auth->injectAclFilters($requestData, $permissionName);
+
+        $constraint_error = $this->applyScoutSearchConstraints($builder, $requestData);
+
+        if ($constraint_error instanceof CrudResult) {
+            return $constraint_error;
+        }
+
         if ($requestData->page !== null) {
             $paginator = $builder->paginate($requestData->pagination, 'page', $requestData->page);
             $search_results = $paginator->getCollection();
+            $total_records = $paginator->total();
         } else {
             $search_results = $builder->take($requestData->limit)->get();
+            $total_records = $search_results->count();
         }
 
         $ids = $search_results
@@ -553,27 +574,26 @@ class CrudService
         if ($ids->isEmpty()) {
             return new CrudResult(
                 data: new Collection(),
-                meta: $this->searchMeta($requestData, 0, 0),
+                meta: $this->buildSearchMeta($requestData, 0, 0),
             );
         }
 
-        $this->auth->injectAclFilters($requestData, $permissionName);
-
         $query = $model->newQuery()->whereKey($ids->all());
-        $this->query_builder->prepareQuery($query, $requestData);
+
+        if ($requestData->relations !== []) {
+            $query->with($requestData->relations);
+        }
 
         $records = $query->get();
 
-        if ($requestData->sort === []) {
-            $records_by_key = $records->keyBy(static fn (Model $record): string => (string) $record->getKey());
-            $records = new Collection(
-                $ids
-                    ->map(static fn (mixed $id): ?Model => $records_by_key->get((string) $id))
-                    ->filter()
-                    ->values()
-                    ->all(),
-            );
-        }
+        $records_by_key = $records->keyBy(static fn (Model $record): string => (string) $record->getKey());
+        $records = new Collection(
+            $ids
+                ->map(static fn (mixed $id): ?Model => $records_by_key->get((string) $id))
+                ->filter()
+                ->values()
+                ->all(),
+        );
 
         $this->applyComputedMethods($records, $requestData);
 
@@ -585,11 +605,93 @@ class CrudService
 
         return new CrudResult(
             data: $data,
-            meta: $this->searchMeta($requestData, $current_records, $current_records),
+            meta: $this->buildSearchMeta($requestData, $total_records, $current_records),
         );
     }
 
-    private function searchMeta(SearchRequestData $requestData, int $totalRecords, int $currentRecords): CrudMeta
+    private function applyScoutSearchConstraints(mixed $builder, SearchRequestData $requestData): ?CrudResult
+    {
+        if ($requestData->filters instanceof FiltersGroup && ! $this->applyScoutFilters($builder, $requestData->filters, $requestData->model)) {
+            return $this->invalidSearchConstraintsResult('Search filters must be applied by the search engine to keep pagination consistent.');
+        }
+
+        foreach ($requestData->sort as $sort) {
+            $field = $this->scoutFieldName($requestData->model, $sort->property);
+
+            if ($field === null) {
+                return $this->invalidSearchConstraintsResult('Search sort must be applied by the search engine to keep pagination consistent.');
+            }
+
+            $builder->orderBy($field, $sort->direction->value);
+        }
+
+        return null;
+    }
+
+    private function applyScoutFilters(mixed $builder, FiltersGroup $filters, Model $model): bool
+    {
+        if ($filters->operator !== WhereClause::And) {
+            return false;
+        }
+
+        foreach ($filters->filters as $filter) {
+            if ($filter instanceof FiltersGroup) {
+                if (! $this->applyScoutFilters($builder, $filter, $model)) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (! $this->applyScoutFilter($builder, $filter, $model)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function applyScoutFilter(mixed $builder, Filter $filter, Model $model): bool
+    {
+        $field = $this->scoutFieldName($model, $filter->property);
+
+        if ($field === null) {
+            return false;
+        }
+
+        return match ($filter->operator) {
+            FilterOperator::Equals => (bool) $builder->where($field, $filter->value),
+            FilterOperator::In => (bool) $builder->whereIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
+            FilterOperator::NotEquals => (bool) $builder->whereNotIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
+            default => false,
+        };
+    }
+
+    private function scoutFieldName(Model $model, string $property): ?string
+    {
+        $table_prefix = $model->getTable() . '.';
+
+        if (str_starts_with($property, $table_prefix)) {
+            return mb_substr($property, mb_strlen($table_prefix));
+        }
+
+        if (str_contains($property, '.')) {
+            return null;
+        }
+
+        return $property;
+    }
+
+    private function invalidSearchConstraintsResult(string $message): CrudResult
+    {
+        return new CrudResult(
+            data: null,
+            error: $message,
+            statusCode: Response::HTTP_BAD_REQUEST,
+        );
+    }
+
+    private function buildSearchMeta(SearchRequestData $requestData, int $totalRecords, int $currentRecords): CrudMeta
     {
         $model = $requestData->model;
 

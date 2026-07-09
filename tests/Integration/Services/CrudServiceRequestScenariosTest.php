@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\DetailRequestData;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\HistoryRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
@@ -223,6 +226,32 @@ it('search returns a controlled result for orchestrated mode until advanced pipe
 
     expect($result->statusCode)->toBe(Response::HTTP_NOT_IMPLEMENTED)
         ->and($result->error)->toBe('Orchestrated search pipeline is not available from Core yet.');
+});
+
+it('search rejects filters that cannot be pushed into scout pagination', function (): void {
+    $superadmin = crud_cov_login_superadmin();
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new class extends Model
+    {
+        use CoreSearchable;
+
+        protected $table = 'users';
+    };
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Basic);
+    crud_cov_set($data, 'filters', new FiltersGroup([
+        new Filter('name', 'needle', FilterOperator::Like),
+    ]));
+
+    $result = $service->search($data);
+
+    expect($result->statusCode)->toBe(Response::HTTP_BAD_REQUEST)
+        ->and($result->error)->toBe('Search filters must be applied by the search engine to keep pagination consistent.');
 });
 
 it('getModelKeyValue handles composite key request data', function (): void {

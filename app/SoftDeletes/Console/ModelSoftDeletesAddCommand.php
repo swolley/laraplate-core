@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\SettingTypeEnum;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
@@ -75,7 +75,7 @@ final class ModelSoftDeletesAddCommand extends Command
     private function updateSettingsTable(string $table): void
     {
         $key_name = CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX . ".{$table}";
-        
+
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
             'value' => true,
@@ -179,4 +179,3 @@ final class ModelSoftDeletesAddCommand extends Command
         return true;
     }
 }
-
