@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use Filament\Schemas\Schema;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
+use Modules\Core\Filament\Resources\Fields\FieldResource;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
+use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
@@ -139,6 +142,46 @@ it('configures cron job resource table without throwing', function (): void {
     $table->query(fn () => CronJobResource::getModel()::query());
 
     CronJobResource::table($table);
+
+    expect($table->getQuery())->not->toBeNull();
+});
+
+it('configures modification resource table with eager loaded relations', function (): void {
+    $this->actingAs($this->admin);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => ModificationResource::getModel()::query());
+
+    ModificationResource::table($table);
+
+    $query = $table->getQuery();
+    expect($query)->not->toBeNull();
+    expect($query->getEagerLoads())->toHaveKeys(['modifier', 'approvals', 'disapprovals']);
+});
+
+it('configures core resource forms without throwing', function (): void {
+    $this->actingAs($this->admin);
+
+    expect(UserResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(RoleResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(ACLResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(FieldResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(PermissionResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(SettingResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(LicenseResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(CronJobResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+    expect(ModificationResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
+});
+
+it('configures field resource table without throwing', function (): void {
+    $this->actingAs($this->admin);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => FieldResource::getModel()::query());
+
+    FieldResource::table($table);
 
     expect($table->getQuery())->not->toBeNull();
 });

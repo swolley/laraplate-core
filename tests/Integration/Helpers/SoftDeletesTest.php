@@ -71,6 +71,38 @@ it('restores soft deleted models when soft deletes persistence is enabled', func
         ->and($model->fresh()->trashed())->toBeFalse();
 });
 
+it('detects trashed state from current is_deleted attribute', function (): void {
+    $model = new SoftDeletesStubModel;
+    $model->setRawAttributes(['is_deleted' => true]);
+
+    expect($model->trashed())->toBeTrue();
+});
+
+it('detects trashed state from current deleted_at attribute', function (): void {
+    $model = new SoftDeletesStubModel;
+    $model->setRawAttributes(['deleted_at' => now()->toDateTimeString()]);
+
+    expect($model->trashed())->toBeTrue();
+});
+
+it('revives soft deleted state in memory for the next save', function (): void {
+    $model = SoftDeletesStubModel::create(['name' => 'revive']);
+    $model->delete();
+    expect($model->trashed())->toBeTrue();
+
+    $model->reviveInMemory();
+
+    expect($model->trashed())->toBeFalse();
+    $model->save();
+    expect($model->fresh()->trashed())->toBeFalse();
+});
+
+it('uses per-model settings when softDeletesEnabled property is absent', function (): void {
+    $model = new SoftDeletesStubModel;
+
+    expect($model->softDeletesEnabledBySettings())->toBeTrue();
+});
+
 it('throws when updating a trashed model', function (): void {
     $model = SoftDeletesStubModel::create(['name' => 'a']);
     $model->delete();

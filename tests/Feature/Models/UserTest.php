@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\AuthorizationException;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Models\License;
+use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
@@ -344,4 +345,84 @@ it('getRules unique username and email callbacks apply deleted_at scope', functi
     expect_unique_rules_apply_deleted_at_scope($rules['create']['username']);
     expect_unique_rules_apply_deleted_at_scope($rules['update']['username']);
     expect_unique_rules_apply_deleted_at_scope($rules['update']['email']);
+});
+
+it('guardName falls back to default guard when no matching provider is configured', function (): void {
+    config(['auth.guards' => 'invalid']);
+
+    $user = User::factory()->create();
+
+    expect($user->guardName())->toBe([config('auth.defaults.guard', 'web')]);
+});
+
+it('guardName ignores guards whose provider model is unrelated', function (): void {
+    config([
+        'auth.guards' => [
+            'web' => ['provider' => 'users', 'driver' => 'session'],
+            'api' => ['provider' => 'missing', 'driver' => 'token'],
+        ],
+        'auth.providers' => [
+            'users' => ['driver' => 'eloquent', 'model' => User::class],
+            'missing' => ['driver' => 'eloquent', 'model' => 'App\\Models\\Missing'],
+        ],
+    ]);
+
+    $user = User::factory()->create();
+
+    expect($user->guardName())->toContain('web');
+});
+
+it('getPermissionsViaRoles delegates to role permissions for regular users', function (): void {
+    $permission = new Permission(['name' => 'default.editor.select', 'guard_name' => 'web']);
+    $permission->setSkipValidation(true);
+    $permission->save();
+
+    $role = Role::factory()->create(['name' => 'editor']);
+    $role->givePermissionTo($permission);
+
+    $user = User::factory()->create();
+    $user->assignRole($role);
+
+    expect($user->getPermissionsViaRoles()->pluck('name')->all())->toContain('default.editor.select');
+});
+
+it('license relationship resolves the assigned license', function (): void {
+    $license = License::factory()->create();
+    $user = User::factory()->create(['license_id' => $license->id]);
+
+    expect($user->license?->is($license))->toBeTrue();
+});
+
+it('getImpersonator returns self when not impersonating', function (): void {
+    $user = User::factory()->create();
+
+    expect($user->getImpersonator()->is($user))->toBeTrue();
+});
+
+it('resolves approval permission from modifiable type when relation is missing', function (): void {
+    $user = User::factory()->create();
+    $modification = Modification::query()->create([
+        'modifiable_type' => User::class,
+        'modifiable_id' => null,
+        'modifier_id' => $user->id,
+        'modifier_type' => User::class,
+        'active' => true,
+        'is_update' => false,
+        'md5' => md5('approval-perm'),
+        'modifications' => [],
+    ]);
+
+    $method = new ReflectionMethod(User::class, 'approvalPermissionFor');
+    $method->setAccessible(true);
+    $permission = $method->invoke($user, $modification, 'approve');
+
+    expect($permission)->toContain($user->getTable());
+    expect($permission)->toEndWith('.approve');
+});
+
+it('uses web as default guard name for permission checks', function (): void {
+    $method = new ReflectionMethod(User::class, 'getDefaultGuardName');
+    $method->setAccessible(true);
+
+    expect($method->invoke(User::factory()->create()))->toBe('web');
 });

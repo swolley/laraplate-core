@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(rules)* Add database guidelines and supported drivers to module context
+- *(tests)* Add integration tests for module service providers and preset versioning service
+
+### 🧪 Testing
+
+- *(core)* Close >=60% coverage tier with behavioral tests
+
+## [1.58.5] - 2026-07-09
+
+### 🚀 Features
+
 - *(core)* Enhance CRUD service and locking commands
 
 ### 🐛 Bug Fixes

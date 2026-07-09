@@ -121,6 +121,29 @@ it('resolves update rules when validating with the crud executor update operatio
     expect(array_keys($legacy_save_rules))->toBe(array_keys($update_rules));
 });
 
+it('returns attached log context from contextual validator', function (): void {
+    $validator = Validator::make(['name' => 'test'], ['name' => 'required']);
+
+    expect($validator)->toBeInstanceOf(ContextualValidator::class);
+    expect($validator->getLogContext())->toBe([]);
+
+    $validator->withLogContext([
+        'entity' => CoreTables::CronJobs->value,
+        'model' => CronJob::class,
+        'operation' => CrudExecutor::INSERT,
+        'id' => null,
+        'ignored' => '',
+    ]);
+
+    expect($validator->getLogContext())->toMatchArray([
+        'entity' => CoreTables::CronJobs->value,
+        'model' => CronJob::class,
+        'operation' => CrudExecutor::INSERT,
+    ]);
+    expect($validator->getLogContext())->not->toHaveKey('id');
+    expect($validator->getLogContext())->not->toHaveKey('ignored');
+});
+
 it('applies update validation rules during model update', function (): void {
     $cron_job = CronJob::factory()->create();
 
