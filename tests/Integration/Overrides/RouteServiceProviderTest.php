@@ -29,6 +29,17 @@ it('getModuleNamespace returns namespace derived from Providers replacement', fu
     expect($namespace)->not->toContain('Providers');
 });
 
+it('base route service provider resolves module controller namespace', function (): void {
+    $provider = new class(app()) extends Modules\Core\Overrides\RouteServiceProvider
+    {
+        protected string $name = 'AI';
+    };
+
+    $namespace = (new ReflectionClass($provider))->getMethod('getModuleNamespace')->invoke($provider);
+
+    expect($namespace)->toBe('Modules\Core\Overrides');
+});
+
 it('mapApiRoutes registers default api v1 group without throwing', function (): void {
     $provider = new class(app()) extends Modules\Core\Overrides\RouteServiceProvider
     {

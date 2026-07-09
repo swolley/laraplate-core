@@ -59,5 +59,32 @@ it('embeddings limiter returns 10 per minute', function (): void {
     $limiter = RateLimiter::limiter('embeddings');
     $result = $limiter();
 
-    expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class);
+    expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class)
+        ->and($result->maxAttempts)->toBe(10);
+});
+
+it('versions limiter caps at 120 jobs per minute', function (): void {
+    $this->provider->boot();
+
+    $result = RateLimiter::limiter('versions')(new stdClass());
+
+    expect($result->maxAttempts)->toBe(120);
+});
+
+it('translations limiter caps at 30 jobs per minute', function (): void {
+    $this->provider->boot();
+
+    $result = RateLimiter::limiter('translations')(new stdClass());
+
+    expect($result->maxAttempts)->toBe(30);
+});
+
+it('indexing limiter uses production throughput in production environment', function (): void {
+    app()->detectEnvironment(fn (): string => 'production');
+    $this->provider->boot();
+
+    $limits = RateLimiter::limiter('indexing')();
+
+    expect($limits)->toBeArray()
+        ->and(collect($limits)->every(fn ($limit): bool => $limit instanceof Illuminate\Cache\RateLimiting\Limit))->toBeTrue();
 });

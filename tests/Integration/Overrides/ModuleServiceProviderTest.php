@@ -5,6 +5,38 @@ declare(strict_types=1);
 use Modules\Core\Overrides\ModuleServiceProvider;
 
 
+it('registerDefaultTranslationPath registers translator paths after resolution', function (): void {
+    $lang_path = resource_path('lang/modules/core');
+    $created = false;
+
+    if (! is_dir($lang_path)) {
+        @mkdir($lang_path, 0755, true);
+        $created = true;
+    }
+
+    try {
+        $provider = new class(app()) extends ModuleServiceProvider
+        {
+            public string $name = 'Core';
+
+            public string $nameLower = 'core';
+
+            public function publicRegisterDefaultTranslationPath(string $path): void
+            {
+                $this->registerDefaultTranslationPath($path);
+            }
+        };
+
+        $provider->publicRegisterDefaultTranslationPath($lang_path);
+
+        expect(app('translator')->getLoader()->paths())->toContain($lang_path);
+    } finally {
+        if ($created) {
+            @rmdir($lang_path);
+        }
+    }
+});
+
 it('provides returns empty array', function (): void {
     $provider = new class(app()) extends ModuleServiceProvider
     {
