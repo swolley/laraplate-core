@@ -34,13 +34,13 @@ class OptimisticLockAddCommand extends LockedAddCommand
     }
 
     #[Override]
-    protected function updateSettingsTable(string $table): void
+    protected function updateSettingsTable(string $table, bool $enabled): void
     {
         $key_name = CoreDatabaseSeeder::OPTIMISTIC_LOCK_NAME_PREFIX . ".{$table}";
 
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
-            'value' => json_encode(true),
+            'value' => json_encode($enabled),
             'type' => SettingTypeEnum::Boolean->value,
             'group_name' => 'locking',
             'description' => "Lock status for {$table}",

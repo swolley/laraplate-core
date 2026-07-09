@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Enhance CRUD service and locking commands
+
+### 🐛 Bug Fixes
+
+- *(locking)* Update updateSettingsTable method to accept enabled parameter
+
+## [1.58.4] - 2026-07-09
+
 ### ⚙️ Miscellaneous Tasks
 
 - *(tests)* Add unit tests for extendable module models to ensure they remain non-final

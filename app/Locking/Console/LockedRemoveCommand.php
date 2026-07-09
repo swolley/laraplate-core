@@ -20,10 +20,10 @@ final class LockedRemoveCommand extends LockedAddCommand
     protected string $operation = 'remove';
 
     #[Override]
-    protected function updateSettingsTable(string $table): void
+    protected function updateSettingsTable(string $table, bool $enabled): void
     {
         $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
-        
+
         Setting::query()->where('name', $key_name)->forceDelete();
     }
 }
