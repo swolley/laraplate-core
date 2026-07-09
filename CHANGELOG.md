@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- *(tests)* Add unit tests for extendable module models to ensure they remain non-final
+
+## [1.58.3] - 2026-07-09
+
 ### 🐛 Bug Fixes
 
 - *(core)* Keep exception context callback safe for all throwables
