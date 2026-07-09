@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(core)* Keep exception context callback safe for all throwables
+
+## [1.58.2] - 2026-07-09
+
 ### 🚀 Features
 
 - *(core)* Unify validation errors and translation registration
