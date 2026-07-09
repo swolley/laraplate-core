@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 
 final class ContextualValidator extends Validator
 {
+    /**
+     * @var class-string<ValidationException>
+     */
+    protected $exception = ContextualValidationException::class;
+
     /**
      * Optional metadata attached to validation failures for logging.
      *

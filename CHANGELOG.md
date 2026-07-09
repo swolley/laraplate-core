@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Unify validation errors and translation registration
+
+## [1.58.1] - 2026-07-08
+
 ### 🚜 Refactor
 
 - *(core)* Update CRUD operation constants and enhance validation context handling

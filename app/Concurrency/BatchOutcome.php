@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Concurrency;
 
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Overrides\ContextualValidationException;
+use Modules\Core\Helpers\ValidationExceptionDescriber;
 use Throwable;
 
 /**
@@ -74,52 +74,10 @@ final readonly class BatchOutcome
      */
     private static function extractMessage(Throwable $e): string
     {
-        if (! $e instanceof ValidationException) {
-            return $e->getMessage();
+        if ($e instanceof ValidationException) {
+            return ValidationExceptionDescriber::describe($e);
         }
 
-        $errors = $e->errors();
-        $failed_field = (string) (array_key_first($errors) ?? 'unknown');
-        $failed_messages = $errors[$failed_field] ?? [];
-        $data = method_exists($e->validator, 'getData') ? $e->validator->getData() : [];
-        $failed_value = $data[$failed_field] ?? 'N/A';
-        $context_suffix = self::formatValidationContextSuffix($e);
-
-        return sprintf(
-            'Validation failed for field "%s": %s (value: %s)%s',
-            $failed_field,
-            implode(', ', $failed_messages),
-            is_scalar($failed_value) ? (string) $failed_value : 'N/A',
-            $context_suffix,
-        );
-    }
-
-    private static function formatValidationContextSuffix(ValidationException $e): string
-    {
-        if (! $e instanceof ContextualValidationException) {
-            return '';
-        }
-
-        $context = $e->context();
-
-        if ($context === []) {
-            return '';
-        }
-
-        $parts = [];
-
-        foreach (['entity', 'model', 'operation', 'id'] as $key) {
-            if (! array_key_exists($key, $context) || $context[$key] === '' || $context[$key] === null) {
-                continue;
-            }
-
-            $parts[] = $key . '=' . $context[$key];
-        }
-
-        if ($parts === []) {
-            return '';
-        }
-
-        return ' [' . implode(', ', $parts) . ']';
+        return $e->getMessage();
     }
 }

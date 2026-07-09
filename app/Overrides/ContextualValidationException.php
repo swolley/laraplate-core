@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use Exception;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Helpers\ValidationExceptionDescriber;
 
 final class ContextualValidationException extends ValidationException
 {
@@ -16,11 +18,15 @@ final class ContextualValidationException extends ValidationException
 
     public function __construct(Validator $validator, $response = null, $errorBag = 'default')
     {
-        parent::__construct($validator, $response, $errorBag);
+        $this->validator = $validator;
+        $this->response = $response;
+        $this->errorBag = $errorBag;
 
         if ($validator instanceof ContextualValidator) {
             $this->log_context = $validator->getLogContext();
         }
+
+        Exception::__construct(ValidationExceptionDescriber::describe($this));
     }
 
     /**

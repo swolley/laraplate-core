@@ -44,20 +44,33 @@ class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register translations.
+     * Register translations on Laravel's default namespace (filename = group prefix).
+     *
+     * Module-specific strings belong in lang/{locale}/{module}.php (e.g. core.php).
+     * Shared Laravel groups (validation, auth, pagination, …) use their standard filenames.
      */
     public function registerTranslations(): void
     {
         $langPath = $this->getResourcePath('lang');
 
         if (is_dir($langPath)) {
-            $this->loadTranslationsFrom($langPath, $this->nameLower);
+            $this->registerDefaultTranslationPath($langPath);
             $this->loadJsonTranslationsFrom($langPath);
         } else {
             $lang_path = module_path($this->name, 'lang');
-            $this->loadTranslationsFrom($lang_path, $this->nameLower);
-            $this->loadJsonTranslationsFrom($lang_path);
+
+            if (is_dir($lang_path)) {
+                $this->registerDefaultTranslationPath($lang_path);
+                $this->loadJsonTranslationsFrom($lang_path);
+            }
         }
+    }
+
+    protected function registerDefaultTranslationPath(string $lang_path): void
+    {
+        $this->callAfterResolving('translator', function ($translator) use ($lang_path): void {
+            $translator->addPath($lang_path);
+        });
     }
 
     /**
