@@ -13,3 +13,9 @@ alwaysApply: false
 - Keep Core generic, stable, backward friendly.
 - No module-specific business logic in Core.
 - If breaking change risk: stop, warn, ask user.
+
+## Search / database
+
+- Supported drivers: MySQL, MariaDB, PostgreSQL, Oracle, SQLite (SQLite = tests default).
+- Migration and index rules: `.cursor/rules/09-database-guidelines.mdc`.
+- `DatabaseTranslator` must not assign `fulltext` to identifiers or short label fields.
