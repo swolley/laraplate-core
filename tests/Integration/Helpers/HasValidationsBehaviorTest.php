@@ -99,6 +99,33 @@ it('encodes dynamic json components before validating json rules', function (): 
     expect(fn () => $model->validateWithRules(CrudExecutor::INSERT))->not->toThrow(ContextualValidationException::class);
 });
 
+it('encodes array-cast attributes before validating json rules', function (): void {
+    $model = new class extends Model
+    {
+        protected $table = 'json_cast_validation_table';
+
+        protected function casts(): array
+        {
+            return [
+                'payload' => 'array',
+            ];
+        }
+
+        public function getRules(): array
+        {
+            return [
+                'always' => [],
+                'create' => ['payload' => ['required', 'json']],
+                'update' => [],
+            ];
+        }
+    };
+
+    $model->setAttribute('payload', ['days' => 30, 'percent' => 100]);
+
+    expect(fn () => $model->validateWithRules(CrudExecutor::INSERT))->not->toThrow(ContextualValidationException::class);
+});
+
 it('authorizes force delete and restore lifecycle hooks', function (): void {
     HasValidations::resetPermissionExistenceCache();
 

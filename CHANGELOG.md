@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(core)* Encode array attributes before json validation rules
+
+## [1.58.7] - 2026-07-10
+
 ### 🧪 Testing
 
 - *(tests)* Add test-only models for PresetVersioningService coverage

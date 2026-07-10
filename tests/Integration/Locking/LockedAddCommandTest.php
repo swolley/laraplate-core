@@ -39,6 +39,7 @@ it('locked add command handles namespaced model input branch', function (): void
 
 it('locked add command handles existing model and keeps file when migration exists', function (): void {
     $files = Mockery::mock(Filesystem::class);
+    $files->shouldReceive('isDirectory')->once()->andReturnTrue();
     $files->shouldReceive('exists')->once()->andReturnTrue();
     $files->shouldReceive('put')->never();
 
@@ -55,6 +56,7 @@ it('locked add command handles existing model and keeps file when migration exis
 
 it('locked add command writes migration file when target does not exist', function (): void {
     $files = Mockery::mock(Filesystem::class);
+    $files->shouldReceive('isDirectory')->once()->andReturnTrue();
     $files->shouldReceive('exists')->once()->andReturnFalse();
     $files->shouldReceive('put')->once()->andReturnTrue();
 
@@ -74,11 +76,11 @@ it('locked add command helper methods build migration path and stub contents', f
     $model = new Modules\Core\Models\Setting;
     $path = $command->generateMigrationPath($model);
     $stub = $command->getStubPath();
-    $contents = $command->getStubContents($stub, ['ModelTable' => 'settings']);
+    $contents = $command->getStubContents($stub, ['ModelTable' => "'settings'"]);
 
     expect($path)->toContain('_add_locked_columns_to_')
         ->and($path)->toContain('settings.php')
-        ->and($contents)->toContain('$ModelTable');
+        ->and($contents)->toContain("\$table_name = 'settings';");
 });
 
 it('locked add command default stub path includes locking stubs folder', function (): void {

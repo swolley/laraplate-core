@@ -59,7 +59,7 @@ it('returns the target class unchanged when local and target share the same modu
 });
 
 it('throws when the resolved class is not autoloadable', function (): void {
-    dynamic_contents_invoke_get_module_model_class(User::class, Preset::class);
+    dynamic_contents_invoke_get_module_model_class(User::class, 'Modules\Core\Models\NonExistentPresetStub');
 })->throws(UnexpectedValueException::class, 'Target class not found');
 
 it('uses distinct memo cache keys for different module Presettable classes', function (): void {

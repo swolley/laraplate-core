@@ -154,28 +154,12 @@ trait HasValidations
 
         if ($rules !== []) {
             $attributes = $this->getAttributesForValidation();
+            $attributes = $this->prepareJsonRuleAttributes($attributes, $rules);
 
             if (class_uses_trait($this, HasDynamicContents::class)) {
                 /** @phpstan-ignore method.notFound */
                 $components = $this->getComponentsAttribute();
-
-                // Convert JSON rule fields (OBJECT/EDITOR) to JSON strings for validation
-                // Laravel's 'json' rule only accepts JSON strings, not PHP objects/arrays
-                foreach ($components as $key => $value) {
-                    if (! isset($rules[$key])) {
-                        continue;
-                    }
-
-                    if (! str_contains((string) $rules[$key], 'json')) {
-                        continue;
-                    }
-
-                    // Convert objects/arrays to JSON string for validation
-                    if (! is_object($value) && ! is_array($value)) {
-                        continue;
-                    }
-                    $components[$key] = json_encode($value);
-                }
+                $components = $this->prepareJsonRuleAttributes($components, $rules);
 
                 $attributes = array_merge($attributes, $components);
 
@@ -199,6 +183,49 @@ trait HasValidations
             $validator->setException(ContextualValidationException::class);
             $validator->validate();
         }
+    }
+
+    /**
+     * Laravel's `json` rule only accepts JSON strings, not PHP arrays or objects.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $rules
+     * @return array<string, mixed>
+     */
+    protected function prepareJsonRuleAttributes(array $attributes, array $rules): array
+    {
+        foreach ($attributes as $key => $value) {
+            if (! isset($rules[$key]) || ! $this->validationRulesContainJson($rules[$key])) {
+                continue;
+            }
+
+            if (! is_array($value) && ! is_object($value)) {
+                continue;
+            }
+
+            $attributes[$key] = json_encode($value);
+        }
+
+        return $attributes;
+    }
+
+    protected function validationRulesContainJson(mixed $rules): bool
+    {
+        if (is_string($rules)) {
+            return str_contains($rules, 'json');
+        }
+
+        if (! is_array($rules)) {
+            return false;
+        }
+
+        foreach ($rules as $rule) {
+            if (is_string($rule) && $rule === 'json') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected static function bootHasValidations(): void
