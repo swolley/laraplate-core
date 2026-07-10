@@ -2,7 +2,7 @@
   "name": "swolley/laraplate-core",
   "vendor": "swolley",
   "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
-  "version": "v1.58.6",
+  "version": "v1.58.7",
   "keywords": [
     "laravel",
     "laraplate",
@@ -149,7 +149,10 @@
   "autoload-dev": {
     "psr-4": {
       "Modules\\Core\\Tests\\": "tests/"
-    }
+    },
+    "classmap": [
+      "stubs/App/"
+    ]
   },
   "config": {
     "platform": {

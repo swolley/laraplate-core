@@ -17,9 +17,6 @@ it('uses default core preset and entity classes on the base pivot', function ():
 });
 
 it('creates versions using the App presettable class for app-level presets', function (): void {
-    require_once __DIR__ . '/../../Stubs/App/Models/Pivot/Presettable.php';
-    require_once __DIR__ . '/../../Stubs/App/Models/Preset.php';
-
     $entity = Entity::query()->create([
         'name' => 'app_entity_' . uniqid(),
         'type' => EntityType::Contents,

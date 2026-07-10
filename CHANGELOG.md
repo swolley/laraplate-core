@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🧪 Testing
+
+- *(tests)* Add test-only models for PresetVersioningService coverage
+
+## [1.58.6] - 2026-07-09
+
 ### 🚀 Features
 
 - *(rules)* Add database guidelines and supported drivers to module context
