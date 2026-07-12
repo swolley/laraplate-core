@@ -25,7 +25,7 @@ final class LicenseResource extends Resource
     protected static ?string $model = License::class;
 
     #[Override]
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFingerPrint;
 
     #[Override]
     protected static string|UnitEnum|null $navigationGroup = 'Core';

@@ -138,7 +138,7 @@ trait HasTable
 
     private static function loadUserPermissionsForTable(?User $user): void
     {
-        if (!$user instanceof \App\Models\User) {
+        if (! $user instanceof User) {
             return;
         }
 
@@ -151,7 +151,7 @@ trait HasTable
 
     private static function checkPermissionCached(?User $user, string $permission): bool
     {
-        if (!$user instanceof \App\Models\User) {
+        if (! $user instanceof User) {
             return false;
         }
 
@@ -201,7 +201,9 @@ trait HasTable
                     ->extraImgAttributes(['loading' => 'lazy'])
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->checkFileExistence(false)
-                    ->imageHeight('1rem'),
+                    ->imageHeight('1rem')
+                    ->alignCenter()
+                    ->grow(false),
             );
         }
 

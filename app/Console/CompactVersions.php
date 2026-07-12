@@ -26,8 +26,12 @@ final class CompactVersions extends Command
     protected $signature = 'versions:compact {modelClass? : Fully-qualified model class (must use HasVersions)} {id? : Primary key of a single record}';
 
     #[Override]
-    protected $description = 'Create a snapshot version per record and purge older version rows. Optionally restrict by model class and/or id. <fg=green>(⚡ Modules\Core)</fg=green>';
+    protected $description = 'Create a snapshot version per record and purge older version rows. <fg=green>(⚡ Modules\Core)</fg=green>';
 
+    /**
+     * Create a snapshot version per record and purge older version rows.
+     * Optionally restrict by model class and/or id.
+     */
     public function handle(): int
     {
         $modelClass = $this->argument('modelClass');
@@ -154,7 +158,7 @@ final class CompactVersions extends Command
     {
         $model = $this->resolveTargetModel($className, $versionableId, $connectionRef, $tableRef);
 
-        if (!$model instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $model instanceof Model) {
             $this->warn("Could not resolve model {$className}#{$versionableId}.");
 
             return false;
