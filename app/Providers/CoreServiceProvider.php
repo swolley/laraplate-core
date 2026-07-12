@@ -32,6 +32,8 @@ use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Exceptions\ConfigurationException;
+use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
+use Modules\Core\Graph\GraphProviderRegistry;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
@@ -139,6 +141,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->singleton(DynamicContentsService::class, DynamicContentsService::getInstance(...));
 
         $this->app->register(GeocodingServiceProvider::class);
+
+        $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
 
         // Register search clients
         $this->registerSearchClients();
