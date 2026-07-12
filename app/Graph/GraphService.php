@@ -24,6 +24,7 @@ final class GraphService
         private readonly GraphProviderRegistryInterface $providers,
         private readonly CrudService $crud,
         private readonly GraphNodeSerializer $serializer,
+        private readonly GraphStatsCalculator $stats,
     ) {}
 
     public function expand(ExpandGraphRequestData $requestData): CrudResult
@@ -77,6 +78,23 @@ final class GraphService
         return new CrudResult(
             data: $data,
             meta: $result->meta,
+        );
+    }
+
+    public function stats(ExpandGraphRequestData $requestData): CrudResult
+    {
+        $result = $this->expand($requestData);
+        $graph = is_array($result->data) ? $result->data : [];
+
+        return new CrudResult(
+            data: [
+                'center' => $graph['center'] ?? null,
+                'stats' => $this->stats->fromGraph($graph)->toArray(),
+                'graphMeta' => $graph['graphMeta'] ?? [],
+            ],
+            meta: $result->meta,
+            error: $result->error,
+            statusCode: $result->statusCode,
         );
     }
 
