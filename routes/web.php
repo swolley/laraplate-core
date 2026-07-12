@@ -19,6 +19,7 @@ use Modules\Core\Http\Controllers\GridsController;
 
 Route::name('crud.')->prefix('/crud')->group(function (): void {
     require __DIR__ . '/crud.php';
+    require __DIR__ . '/graph.php';
 
     Route::controller(CrudController::class)->group(function (): void {
         Route::patch('/lock/{module}/{entity}', 'lock')->name('lock');
