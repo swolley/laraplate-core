@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Graph;
 
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
@@ -100,31 +99,27 @@ final class GraphTraversal
         $this->assertNotExcluded($source, $relationName);
 
         $relation = $this->relations->inspect($source, $relationName);
-        $query = $relation->relation->getQuery();
-        $related = $relation->relation->getRelated();
 
-        if (! $this->canSeeRelated($request, $related)) {
-            $this->filteredByAcl = true;
+        if ($relation->isMorphTo) {
+            $result = $relation->relation->getResults();
 
-            return;
-        }
+            if (! $result instanceof Model) {
+                return;
+            }
 
-        $permissionName = $this->auth->buildPermissionName($related->getTable(), 'select', $related->getConnectionName());
-        $visibleBeforeAcl = (clone $query)->count();
-        $this->auth->applyAclFiltersToQuery($query, $permissionName);
-        $visibleAfterAcl = (clone $query)->count();
-
-        if ($visibleAfterAcl < $visibleBeforeAcl) {
-            $this->filteredByAcl = true;
-        }
-
-        if ($relation->isMultiple) {
-            $targets = $query->limit($relationLimit + 1)->get();
+            $query = $result->newQuery()->whereKey($result->getKey());
+            $targets = $this->visibleTargets($query, $result, $request)->get();
         } else {
-            $result = $relation->relation instanceof BelongsTo || $relation->relation instanceof HasOne
-                ? $relation->relation->getResults()
-                : $query->first();
-            $targets = new EloquentCollection($result instanceof Model ? [$result] : []);
+            $query = $relation->relation->getQuery();
+            $related = $relation->relation->getRelated();
+            $query = $this->visibleTargets($query, $related, $request);
+
+            if ($relation->isMultiple) {
+                $targets = $query->limit($relationLimit + 1)->get();
+            } else {
+                $result = $query->first();
+                $targets = new EloquentCollection($result instanceof Model ? [$result] : []);
+            }
         }
 
         if ($targets->count() > $relationLimit) {
@@ -195,6 +190,30 @@ final class GraphTraversal
     private function canSeeRelated(Request $request, Model $related): bool
     {
         return $this->auth->checkPermission($request, $related->getTable(), 'select', $related->getConnectionName());
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @return Builder<Model>
+     */
+    private function visibleTargets(Builder $query, Model $related, Request $request): Builder
+    {
+        if (! $this->canSeeRelated($request, $related)) {
+            $this->filteredByAcl = true;
+
+            return $query->whereRaw('1 = 0');
+        }
+
+        $permissionName = $this->auth->buildPermissionName($related->getTable(), 'select', $related->getConnectionName());
+        $visibleBeforeAcl = (clone $query)->count();
+        $this->auth->applyAclFiltersToQuery($query, $permissionName);
+        $visibleAfterAcl = (clone $query)->count();
+
+        if ($visibleAfterAcl < $visibleBeforeAcl) {
+            $this->filteredByAcl = true;
+        }
+
+        return $query;
     }
 
     private function markTruncated(string $reason): void

@@ -17,5 +17,6 @@ readonly class GraphRelation
         public Relation $relation,
         public string $relatedClass,
         public bool $isMultiple,
+        public bool $isMorphTo = false,
     ) {}
 }

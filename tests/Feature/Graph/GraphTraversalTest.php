@@ -39,6 +39,18 @@ final class GraphTraversalChild extends Model
     }
 }
 
+final class GraphTraversalActivity extends Model
+{
+    protected $table = 'graph_traversal_activities';
+
+    protected $guarded = [];
+
+    public function subject()
+    {
+        return $this->morphTo();
+    }
+}
+
 beforeEach(function (): void {
     Schema::create('graph_traversal_parents', function (Blueprint $table): void {
         $table->id();
@@ -49,6 +61,13 @@ beforeEach(function (): void {
     Schema::create('graph_traversal_children', function (Blueprint $table): void {
         $table->id();
         $table->foreignId('parent_id');
+        $table->string('name');
+        $table->timestamps();
+    });
+
+    Schema::create('graph_traversal_activities', function (Blueprint $table): void {
+        $table->id();
+        $table->nullableMorphs('subject');
         $table->string('name');
         $table->timestamps();
     });
@@ -176,4 +195,31 @@ it('deduplicates repeated nodes and marks cycles', function (): void {
     expect($data->edges)->toHaveCount(2);
     expect($data->graphMeta->hasCycles)->toBeTrue();
     expect($data->graphMeta->deduplicatedNodeCount)->toBe(1);
+});
+
+it('traverses morph to relations when the concrete target is authorized', function (): void {
+    $parent = GraphTraversalParent::query()->create(['name' => 'Parent']);
+    $child = GraphTraversalChild::query()->create(['parent_id' => $parent->getKey(), 'name' => 'Child A']);
+    $activity = GraphTraversalActivity::query()->create(['name' => 'Activity']);
+    $activity->subject()->associate($child);
+    $activity->save();
+
+    $auth = Mockery::mock(AuthorizationService::class);
+    $auth->shouldReceive('checkPermission')->andReturnTrue();
+    $auth->shouldReceive('buildPermissionName')->andReturn('default.graph_traversal_children.select');
+    $auth->shouldReceive('applyAclFiltersToQuery')->zeroOrMoreTimes();
+
+    $traversal = new GraphTraversal(
+        new GraphRelationInspector(),
+        new GraphNodeSerializer(new GraphEntityResolver(), new GraphProviderRegistry()),
+        new GraphEntityResolver(),
+        new GraphProviderRegistry(),
+        $auth,
+    );
+
+    $data = $traversal->expand($activity, ['subject'], 1, 10, 25, 'summary', request());
+
+    expect($data->nodes)->toHaveCount(2);
+    expect($data->edges)->toHaveCount(1);
+    expect($data->edges[0]->target)->toBe('app:graph_traversal_children:' . $child->getKey());
 });

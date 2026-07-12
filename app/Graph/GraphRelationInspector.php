@@ -41,12 +41,6 @@ final class GraphRelationInspector
             ]);
         }
 
-        if ($relation instanceof MorphTo) {
-            throw ValidationException::withMessages([
-                'relations' => sprintf("MorphTo relation '%s' is not supported in Phase 1.", $relationName),
-            ]);
-        }
-
         $related = $relation->getRelated();
 
         return new GraphRelation(
@@ -57,6 +51,7 @@ final class GraphRelationInspector
                 || $relation instanceof BelongsToMany
                 || $relation instanceof MorphMany
                 || $relation instanceof MorphToMany,
+            isMorphTo: $relation instanceof MorphTo,
         );
     }
 }
