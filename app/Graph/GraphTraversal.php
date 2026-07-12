@@ -53,7 +53,7 @@ final class GraphTraversal
     /**
      * @param  list<string>  $relationPaths
      */
-    public function expand(Model $center, array $relationPaths, int $depth, int $limit, int $relationLimit, string $nodeDetail, Request $request): GraphData
+    public function expand(Model $center, array $relationPaths, int $depth, int $limit, int $relationLimit, string $nodeDetail, Request $request, bool $defaultRelationsApplied = false): GraphData
     {
         $this->reset();
 
@@ -76,6 +76,7 @@ final class GraphTraversal
             graphMeta: new GraphMeta(
                 depth: $depth,
                 requestedRelations: $relationPaths,
+                defaultRelationsApplied: $defaultRelationsApplied,
                 truncated: $this->truncated,
                 truncatedBy: array_values(array_unique($this->truncatedBy)),
                 filteredByAcl: $this->filteredByAcl,
@@ -109,7 +110,13 @@ final class GraphTraversal
         }
 
         $permissionName = $this->auth->buildPermissionName($related->getTable(), 'select', $related->getConnectionName());
+        $visibleBeforeAcl = (clone $query)->count();
         $this->auth->applyAclFiltersToQuery($query, $permissionName);
+        $visibleAfterAcl = (clone $query)->count();
+
+        if ($visibleAfterAcl < $visibleBeforeAcl) {
+            $this->filteredByAcl = true;
+        }
 
         if ($relation->isMultiple) {
             $targets = $query->limit($relationLimit + 1)->get();

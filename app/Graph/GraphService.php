@@ -33,7 +33,7 @@ final class GraphService
         );
 
         $center = $this->findCenter($requestData, $permissionName);
-        $relations = $this->relationsFor($requestData);
+        [$relations, $defaultRelationsApplied] = $this->relationsFor($requestData);
 
         $data = $this->traversal->expand(
             $center,
@@ -43,6 +43,7 @@ final class GraphService
             $requestData->relationLimit,
             $requestData->nodeDetail,
             $requestData->request,
+            $defaultRelationsApplied,
         );
 
         return new CrudResult(
@@ -69,17 +70,18 @@ final class GraphService
     }
 
     /**
-     * @return list<string>
+     * @return array{0: list<string>, 1: bool}
      */
     private function relationsFor(ExpandGraphRequestData $requestData): array
     {
         if ($requestData->graphRelations !== []) {
-            return $requestData->graphRelations;
+            return [$requestData->graphRelations, false];
         }
 
         $module = strtolower((string) $requestData->module);
         $provider = $this->providers->providerFor($module, $requestData->mainEntity);
+        $relations = $provider?->defaultRelations($module, $requestData->mainEntity) ?? [];
 
-        return $provider?->defaultRelations($module, $requestData->mainEntity) ?? [];
+        return [$relations, $relations !== []];
     }
 }
