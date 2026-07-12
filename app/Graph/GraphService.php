@@ -173,6 +173,10 @@ final class GraphService
 
             foreach ($graph['nodes'] as $node) {
                 if (is_array($node) && isset($node['id']) && is_string($node['id'])) {
+                    if (isset($nodes[$node['id']])) {
+                        $deduplicatedNodeCount++;
+                    }
+
                     $nodes[$node['id']] = $node;
                 }
             }

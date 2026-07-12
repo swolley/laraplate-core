@@ -7,7 +7,9 @@ use Modules\Core\Casts\ExpandGraphRequestData;
 use Modules\Core\Casts\SearchGraphRequestData;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\DTOs\GraphData;
+use Modules\Core\Graph\DTOs\GraphEdge;
 use Modules\Core\Graph\DTOs\GraphMeta;
+use Modules\Core\Graph\DTOs\GraphNode;
 use Modules\Core\Graph\GraphNodeSerializer;
 use Modules\Core\Graph\GraphService;
 use Modules\Core\Graph\GraphTraversal;
@@ -87,4 +89,115 @@ it('builds a graph from crud search results without graph relations', function (
         ->and($result->data['edges'])->toBe([])
         ->and($result->data['graphMeta']['requestedRelations'])->toBe([])
         ->and($result->data['searchMeta']['resultCount'])->toBe(1);
+});
+
+it('aggregates expanded search graphs and counts cross result deduplicated nodes', function (): void {
+    $first = User::factory()->create(['name' => 'Alice One']);
+    $second = User::factory()->create(['name' => 'Alice Two']);
+
+    $request = SearchGraphRequest::create('/graph/search/Core/users', 'GET', [
+        'module' => 'Core',
+        'entity' => 'users',
+        'qs' => 'alice',
+        'relations' => ['roles'],
+    ]);
+
+    $data = new SearchGraphRequestData($request, 'users', [
+        'qs' => 'alice',
+        'relations' => ['roles'],
+    ], 'id', 'Core');
+
+    $sharedNode = new GraphNode(
+        id: 'core:roles:1',
+        module: 'core',
+        entity: 'roles',
+        key: 1,
+        label: 'Editor',
+    );
+
+    $auth = Mockery::mock(AuthorizationService::class);
+    $crud = Mockery::mock(CrudService::class);
+    $crud->shouldReceive('search')->once()->with($data)->andReturn(new CrudResult(collect([$first, $second])));
+
+    $traversal = Mockery::mock(GraphTraversal::class);
+    $traversal->shouldReceive('expand')->once()->with(
+        $first,
+        ['roles'],
+        1,
+        100,
+        25,
+        'summary',
+        $request,
+    )->andReturn(new GraphData(
+        center: 'core:users:' . $first->getKey(),
+        nodes: [
+            new GraphNode('core:users:' . $first->getKey(), 'core', 'users', $first->getKey(), 'Alice One'),
+            $sharedNode,
+        ],
+        edges: [
+            new GraphEdge('edge:one', 'core:users:' . $first->getKey(), 'core:roles:1', 'roles'),
+        ],
+        graphMeta: new GraphMeta(depth: 1, requestedRelations: ['roles']),
+    ));
+
+    $traversal->shouldReceive('expand')->once()->with(
+        $second,
+        ['roles'],
+        1,
+        100,
+        25,
+        'summary',
+        $request,
+    )->andReturn(new GraphData(
+        center: 'core:users:' . $second->getKey(),
+        nodes: [
+            new GraphNode('core:users:' . $second->getKey(), 'core', 'users', $second->getKey(), 'Alice Two'),
+            $sharedNode,
+        ],
+        edges: [
+            new GraphEdge('edge:two', 'core:users:' . $second->getKey(), 'core:roles:1', 'roles'),
+        ],
+        graphMeta: new GraphMeta(depth: 1, requestedRelations: ['roles'], truncated: true, truncatedBy: ['relation_limit'], filteredByAcl: true),
+    ));
+
+    $result = (new GraphService($auth, $traversal, app(GraphProviderRegistryInterface::class), $crud, app(GraphNodeSerializer::class)))->search($data);
+
+    expect($result->data['nodes'])->toHaveCount(3)
+        ->and($result->data['edges'])->toHaveCount(2)
+        ->and($result->data['graphMeta']['requestedRelations'])->toBe(['roles'])
+        ->and($result->data['graphMeta']['truncated'])->toBeTrue()
+        ->and($result->data['graphMeta']['truncatedBy'])->toBe(['relation_limit'])
+        ->and($result->data['graphMeta']['filteredByAcl'])->toBeTrue()
+        ->and($result->data['graphMeta']['deduplicatedNodeCount'])->toBe(1)
+        ->and($result->data['searchMeta']['resultCount'])->toBe(2);
+});
+
+it('returns crud search errors without building a graph', function (): void {
+    $request = SearchGraphRequest::create('/graph/search/Core/users', 'GET', [
+        'module' => 'Core',
+        'entity' => 'users',
+        'qs' => 'alice',
+    ]);
+
+    $data = new SearchGraphRequestData($request, 'users', [
+        'qs' => 'alice',
+        'relations' => [],
+    ], 'id', 'Core');
+
+    $auth = Mockery::mock(AuthorizationService::class);
+    $traversal = Mockery::mock(GraphTraversal::class);
+    $traversal->shouldNotReceive('expand');
+
+    $crud = Mockery::mock(CrudService::class);
+    $crud->shouldReceive('search')->once()->with($data)->andReturn(new CrudResult(
+        data: null,
+        error: 'Search failed',
+        statusCode: 400,
+    ));
+
+    $result = (new GraphService($auth, $traversal, app(GraphProviderRegistryInterface::class), $crud, app(GraphNodeSerializer::class)))->search($data);
+
+    expect($result->data)->toBeNull()
+        ->and($result->error)->toBe('Search failed')
+        ->and($result->statusCode)->toBe(400);
 });
