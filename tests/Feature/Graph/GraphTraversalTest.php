@@ -6,9 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+use Modules\Core\Graph\Contracts\GraphProviderInterface;
+use Modules\Core\Graph\Contracts\GraphProviderRulesInterface;
 use Modules\Core\Graph\GraphEntityResolver;
 use Modules\Core\Graph\GraphNodeSerializer;
 use Modules\Core\Graph\GraphProviderRegistry;
+use Modules\Core\Graph\GraphProviderRuleEnforcer;
 use Modules\Core\Graph\GraphRelationInspector;
 use Modules\Core\Graph\GraphTraversal;
 use Modules\Core\Services\Authorization\AuthorizationService;
@@ -48,6 +52,44 @@ final class GraphTraversalActivity extends Model
     public function subject()
     {
         return $this->morphTo();
+    }
+}
+
+final class GraphTraversalRulesProvider implements GraphProviderInterface, GraphProviderRulesInterface
+{
+    public function defaultRelations(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function summaryFields(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function edgeType(string $module, string $entity, string $relation): ?string
+    {
+        return null;
+    }
+
+    public function excludedRelations(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function allowedRelationPaths(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function maxDepth(string $module, string $entity): ?int
+    {
+        return null;
+    }
+
+    public function maxRelationLimit(string $module, string $entity, string $relation): ?int
+    {
+        return $relation === 'children' ? 1 : null;
     }
 }
 
@@ -122,6 +164,29 @@ it('marks relation limit truncation', function (): void {
     expect($data->nodes)->toHaveCount(2);
     expect($data->graphMeta->truncated)->toBeTrue();
     expect($data->graphMeta->truncatedBy)->toContain('relation_limit');
+});
+
+it('rejects relation limits above provider relation maximum during traversal', function (): void {
+    $parent = GraphTraversalParent::query()->create(['name' => 'Parent']);
+
+    $auth = Mockery::mock(AuthorizationService::class);
+    $auth->shouldReceive('checkPermission')->andReturnTrue();
+
+    $registry = new GraphProviderRegistry();
+    $registry->register(new GraphTraversalRulesProvider(), 'app', 'graph_traversal_parents');
+    $entities = new GraphEntityResolver();
+
+    $traversal = new GraphTraversal(
+        new GraphRelationInspector(),
+        new GraphNodeSerializer($entities, $registry),
+        $entities,
+        $registry,
+        $auth,
+        new GraphProviderRuleEnforcer($entities, $registry),
+    );
+
+    expect(fn () => $traversal->expand($parent, ['children'], 1, 10, 2, 'summary', request()))
+        ->toThrow(ValidationException::class, "Relation 'children' relation_limit exceeds provider maximum.");
 });
 
 it('marks provider defaults as applied when traversal receives default relations', function (): void {

@@ -18,6 +18,8 @@ use Modules\Core\Services\Crud\DTOs\CrudResult;
 
 final class GraphService
 {
+    private readonly GraphProviderRuleEnforcer $rules;
+
     public function __construct(
         private readonly AuthorizationService $auth,
         private readonly GraphTraversal $traversal,
@@ -25,7 +27,10 @@ final class GraphService
         private readonly CrudService $crud,
         private readonly GraphNodeSerializer $serializer,
         private readonly GraphStatsCalculator $stats,
-    ) {}
+        ?GraphProviderRuleEnforcer $rules = null,
+    ) {
+        $this->rules = $rules ?? new GraphProviderRuleEnforcer(new GraphEntityResolver(), $this->providers);
+    }
 
     public function expand(ExpandGraphRequestData $requestData): CrudResult
     {
@@ -40,6 +45,7 @@ final class GraphService
 
         $center = $this->findCenter($requestData, $permissionName);
         [$relations, $defaultRelationsApplied] = $this->relationsFor($requestData);
+        $this->rules->assertRequestAllowed($center, $relations, $requestData->depth, $requestData->relationLimit);
 
         $data = $this->traversal->expand(
             $center,
@@ -179,6 +185,8 @@ final class GraphService
         $limit = (int) config('graph.default_limit', 100);
 
         foreach ($models as $model) {
+            $this->rules->assertRequestAllowed($model, $requestData->graphRelations, $requestData->depth, $requestData->relationLimit);
+
             $graph = $this->traversal->expand(
                 $model,
                 $requestData->graphRelations,

@@ -18,6 +18,8 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 
 final class GraphTraversal
 {
+    private readonly GraphProviderRuleEnforcer $rules;
+
     /**
      * @var array<string, GraphNode>
      */
@@ -47,7 +49,10 @@ final class GraphTraversal
         private readonly GraphEntityResolver $entities,
         private readonly GraphProviderRegistryInterface $providers,
         private readonly AuthorizationService $auth,
-    ) {}
+        ?GraphProviderRuleEnforcer $rules = null,
+    ) {
+        $this->rules = $rules ?? new GraphProviderRuleEnforcer($this->entities, $this->providers);
+    }
 
     /**
      * @param  list<string>  $relationPaths
@@ -97,6 +102,7 @@ final class GraphTraversal
 
         $relationName = array_shift($segments);
         $this->assertNotExcluded($source, $relationName);
+        $this->rules->assertRelationAllowed($source, $relationName, $relationLimit);
 
         $relation = $this->relations->inspect($source, $relationName);
 

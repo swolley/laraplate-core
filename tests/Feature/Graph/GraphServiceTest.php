@@ -3,14 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Casts\ExpandGraphRequestData;
 use Modules\Core\Casts\SearchGraphRequestData;
+use Modules\Core\Graph\Contracts\GraphProviderInterface;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
+use Modules\Core\Graph\Contracts\GraphProviderRulesInterface;
 use Modules\Core\Graph\DTOs\GraphData;
 use Modules\Core\Graph\DTOs\GraphEdge;
 use Modules\Core\Graph\DTOs\GraphMeta;
 use Modules\Core\Graph\DTOs\GraphNode;
+use Modules\Core\Graph\GraphEntityResolver;
 use Modules\Core\Graph\GraphNodeSerializer;
+use Modules\Core\Graph\GraphProviderRegistry;
+use Modules\Core\Graph\GraphProviderRuleEnforcer;
 use Modules\Core\Graph\GraphService;
 use Modules\Core\Graph\GraphStatsCalculator;
 use Modules\Core\Graph\GraphTraversal;
@@ -22,6 +28,44 @@ use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 
 uses(RefreshDatabase::class);
+
+final class GraphServiceRulesProvider implements GraphProviderInterface, GraphProviderRulesInterface
+{
+    public function defaultRelations(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function summaryFields(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function edgeType(string $module, string $entity, string $relation): ?string
+    {
+        return null;
+    }
+
+    public function excludedRelations(string $module, string $entity): array
+    {
+        return [];
+    }
+
+    public function allowedRelationPaths(string $module, string $entity): array
+    {
+        return ['permissions'];
+    }
+
+    public function maxDepth(string $module, string $entity): ?int
+    {
+        return 1;
+    }
+
+    public function maxRelationLimit(string $module, string $entity, string $relation): ?int
+    {
+        return null;
+    }
+}
 
 it('loads the center record through detail semantics and returns a crud result', function (): void {
     $user = User::factory()->create(['name' => 'Center']);
@@ -254,4 +298,44 @@ it('builds stats from the same graph data used by expand', function (): void {
         ])
         ->and($result->data['graphMeta']['truncated'])->toBeTrue()
         ->and($result->data['graphMeta']['truncatedBy'])->toBe(['relation_limit']);
+});
+
+it('rejects expand relation paths denied by provider rules before traversal', function (): void {
+    $user = User::factory()->create(['name' => 'Center']);
+
+    $request = ExpandGraphRequest::create('/graph/Core/users/' . $user->getKey(), 'GET', [
+        'module' => 'Core',
+        'entity' => 'users',
+        'id' => $user->getKey(),
+        'relations' => ['roles'],
+    ]);
+
+    $data = new ExpandGraphRequestData($request, 'users', [
+        'id' => $user->getKey(),
+        'relations' => ['roles'],
+    ], 'id', 'Core');
+
+    $auth = Mockery::mock(AuthorizationService::class);
+    $auth->shouldReceive('ensurePermission')->once()->andReturn('default.core_users.select');
+    $auth->shouldReceive('applyAclFiltersToQuery')->once();
+
+    $traversal = Mockery::mock(GraphTraversal::class);
+    $traversal->shouldNotReceive('expand');
+
+    $crud = Mockery::mock(CrudService::class);
+    $registry = new GraphProviderRegistry();
+    $registry->register(new GraphServiceRulesProvider(), 'core', 'users');
+
+    $service = new GraphService(
+        $auth,
+        $traversal,
+        $registry,
+        $crud,
+        app(GraphNodeSerializer::class),
+        app(GraphStatsCalculator::class),
+        new GraphProviderRuleEnforcer(new GraphEntityResolver(), $registry),
+    );
+
+    expect(fn () => $service->expand($data))
+        ->toThrow(ValidationException::class, "Relation path 'roles' is not allowed by provider.");
 });
