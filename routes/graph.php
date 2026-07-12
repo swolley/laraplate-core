@@ -6,5 +6,6 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\GraphController;
 
 Route::controller(GraphController::class)->prefix('graph')->name('graph.')->group(function (): void {
+    Route::get('/search/{module}/{entity}', 'search')->name('search');
     Route::get('/expand/{module}/{entity}/{id}', 'expand')->name('expand');
 });

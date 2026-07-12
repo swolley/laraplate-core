@@ -11,6 +11,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Graph\GraphService;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\ExpandGraphRequest;
+use Modules\Core\Http\Requests\SearchGraphRequest;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,6 +29,21 @@ final class GraphController extends Controller
             throw $exception;
         } catch (ModelNotFoundException $exception) {
             return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_NOT_FOUND), $request);
+        } catch (AuthorizationException $exception) {
+            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_UNAUTHORIZED), $request);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_INTERNAL_SERVER_ERROR), $request);
+        }
+    }
+
+    public function search(SearchGraphRequest $request): Response
+    {
+        try {
+            return $this->buildResponse($this->graphs->search($request->parsed()), $request);
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (AuthorizationException $exception) {
             return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_UNAUTHORIZED), $request);
         } catch (Throwable $exception) {

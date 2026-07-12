@@ -13,7 +13,7 @@ use Override;
 /**
  * @property string $qs
  */
-final class SearchRequest extends ListRequest
+class SearchRequest extends ListRequest
 {
     /**
      * Get the validation rules that apply to the request.

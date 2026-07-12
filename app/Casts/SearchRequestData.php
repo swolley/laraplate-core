@@ -6,7 +6,7 @@ namespace Modules\Core\Casts;
 
 use Modules\Core\Http\Requests\SearchRequest;
 
-final class SearchRequestData extends ListRequestData
+class SearchRequestData extends ListRequestData
 {
     public readonly string $qs;
 
