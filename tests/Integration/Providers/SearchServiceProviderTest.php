@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Providers\SearchServiceProvider;
 use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\Services\AdvancedSearchService;
 
 
 beforeEach(function (): void {
@@ -15,6 +16,12 @@ it('registers ISearchEngine singleton and search alias', function (): void {
 
     expect(app()->bound(ISearchEngine::class))->toBeTrue();
     expect(app()->bound('search'))->toBeTrue();
+});
+
+it('registers advanced search coordinator', function (): void {
+    $this->provider->register();
+
+    expect(app()->bound(AdvancedSearchService::class))->toBeTrue();
 });
 
 it('binds Scout engine implementations', function (): void {

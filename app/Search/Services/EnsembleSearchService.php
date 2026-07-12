@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Services;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Laravel\Scout\Builder as ScoutBuilder;
+use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Search\Contracts\IReranker;
-use Modules\Core\Services\ElasticsearchService;
-use Throwable;
+use Modules\Core\Search\DTOs\AdvancedSearchResult;
 
 /**
  * Ensemble search service that combines keyword, vector and hybrid retrieval
@@ -14,17 +17,19 @@ use Throwable;
  */
 class EnsembleSearchService
 {
-    public function __construct(private readonly IReranker $reranker) {}
+    public function __construct(
+        private readonly IReranker $reranker,
+        private readonly ?ScoutSearchConstraintApplier $constraint_applier = null,
+    ) {}
 
     /**
      * Execute an ensemble search across multiple retrieval strategies.
      *
-     * @param  array{keywords: list<string>, date_range: ?array<string, string>, query: array{expanded: string}}  $intent
-     * @param  list<float>|null  $vector
      * @param  array<string, mixed>  $plan
-     * @return array{results: list<array{id: string, score: float, source: array<string, mixed>}>, meta: array<string, mixed>}
+     * @param  list<float>|null  $vector
+     * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    public function search(array $intent, ?array $vector, string $query, array $plan, string $index): array
+    public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = []): AdvancedSearchResult
     {
         $retrieval = $this->planSection($plan, 'retrieval');
         $ensemble_config = $this->planSection($plan, 'ensemble');
@@ -32,7 +37,7 @@ class EnsembleSearchService
 
         $use_fulltext = (bool) ($retrieval['use_fulltext'] ?? true);
         $use_vector = (bool) ($retrieval['use_vector'] ?? false) && $vector !== null;
-        $size = $this->planInt($retrieval, 'size', 50);
+        $window = max(1, $page * $perPage);
 
         $weights = [
             'keyword' => $this->planFloat($ensemble_config, 'keyword_weight', 0.35),
@@ -45,27 +50,28 @@ class EnsembleSearchService
         $rrf_weight = $this->planFloat($ensemble_config, 'rrf_weight', 0.25);
 
         $per_strategy = [];
+        $strategy_results = [];
 
         if ($use_fulltext) {
-            $keyword_body = $this->buildKeywordOnlyBody($intent, $size);
-            $raw = $this->executeEsSearch($index, $keyword_body);
-            $per_strategy['keyword'] = $this->normalizeHits($raw);
+            $result = $this->executeScoutSearch($model, $query, null, $filters, $sort, $window, $page, $perPage, 'keyword');
+            $strategy_results[] = $result;
+            $per_strategy['keyword'] = $this->hitsById($result);
         }
 
-        if ($use_vector && $vector !== null) {
-            $vector_body = $this->buildVectorOnlyBody($vector, $size);
-            $raw = $this->executeEsSearch($index, $vector_body);
-            $per_strategy['vector'] = $this->normalizeHits($raw);
+        if ($use_vector) {
+            $result = $this->executeScoutSearch($model, '*', $vector, $filters, $sort, $window, $page, $perPage, 'vector');
+            $strategy_results[] = $result;
+            $per_strategy['vector'] = $this->hitsById($result);
         }
 
-        if ($use_fulltext && $use_vector && $vector !== null) {
-            $hybrid_body = $this->buildHybridBody($intent, $vector, $size);
-            $raw = $this->executeEsSearch($index, $hybrid_body);
-            $per_strategy['hybrid'] = $this->normalizeHits($raw);
+        if ($use_fulltext && $use_vector) {
+            $result = $this->executeScoutSearch($model, $query, $vector, $filters, $sort, $window, $page, $perPage, 'hybrid');
+            $strategy_results[] = $result;
+            $per_strategy['hybrid'] = $this->hitsById($result);
         }
 
         if ($per_strategy === []) {
-            return ['results' => [], 'meta' => ['strategies_executed' => 0]];
+            return AdvancedSearchResult::empty($page, $perPage, ['strategies_executed' => 0]);
         }
 
         $adjusted_weights = $this->renormalizeWeightsForExecutedStrategies(
@@ -84,9 +90,10 @@ class EnsembleSearchService
             $fused = $this->rerankTopK($fused, $query, $rerank_top_k);
         }
 
-        $results = array_values(
+        $hits = array_values(
             collect($fused)
                 ->sortByDesc('score')
+                ->slice(max(0, ($page - 1) * $perPage), $perPage)
                 ->map(fn (array $item): array => [
                     'id' => $item['id'],
                     'score' => round($item['score'], 6),
@@ -94,70 +101,109 @@ class EnsembleSearchService
                 ])
                 ->all(),
         );
+        $total = max(array_map(static fn (AdvancedSearchResult $result): int => $result->total, $strategy_results) ?: [count($hits)]);
 
-        return [
-            'results' => $results,
-            'meta' => [
+        return new AdvancedSearchResult(
+            hits: $hits,
+            total: $total,
+            page: $page,
+            perPage: $perPage,
+            totalPages: (int) ceil($total / max(1, $perPage)),
+            meta: [
+                'driver' => method_exists($model->searchableUsing(), 'getName') ? $model->searchableUsing()->getName() : $model->searchableUsing()::class,
                 'strategies_executed' => count($per_strategy),
                 'strategies' => array_keys($per_strategy),
                 'reranked' => $use_reranker,
-                'total_results' => count($results),
+                'total_results' => count($hits),
             ],
-        ];
+        );
     }
 
     /**
-     * Execute an Elasticsearch search and return the raw array response.
-     *
-     * @param  array<string, mixed>  $body
-     * @return array<string, mixed>
+     * @param  list<float>|null  $vector
+     * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    private function executeEsSearch(string $index, array $body): array
+    private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy): AdvancedSearchResult
     {
-        try {
-            return ElasticsearchService::getInstance()->search($index, $body);
-        } catch (Throwable) {
-            return [];
+        /** @var class-string<Model> $model_class */
+        $model_class = $model::class;
+        /** @var ScoutBuilder<Model> $builder */
+        $builder = $model_class::search($query)->take($window);
+
+        if ($vector !== null) {
+            $builder->where('vector', $vector);
         }
+
+        $this->constraintApplier()->apply($builder, $model, $filters, $sort);
+
+        $paginator = $builder->paginate($window, 'page', 1);
+        $results = $paginator->getCollection();
+
+        return $this->normalizeScoutResults($results, $page, $perPage, $strategy, $paginator->total());
     }
 
     /**
-     * Extract and normalize hits from an Elasticsearch response array.
-     *
-     * @param  array<string, mixed>  $response
+     * @param  Collection<int, mixed>  $results
+     */
+    private function normalizeScoutResults(Collection $results, int $page, int $perPage, string $strategy, ?int $total = null): AdvancedSearchResult
+    {
+        $hits = [];
+
+        foreach ($results as $result) {
+            if ($result instanceof Model) {
+                $hits[] = [
+                    'id' => (string) $result->getKey(),
+                    'score' => is_numeric($result->getAttribute('_score')) ? (float) $result->getAttribute('_score') : 1.0,
+                    'source' => $result->getAttributes(),
+                ];
+
+                continue;
+            }
+
+            if (is_array($result)) {
+                $id = $result['_id'] ?? $result['id'] ?? null;
+
+                if (is_scalar($id)) {
+                    $hits[] = [
+                        'id' => (string) $id,
+                        'score' => is_numeric($result['_score'] ?? null) ? (float) $result['_score'] : 1.0,
+                        'source' => $result,
+                    ];
+                }
+            }
+        }
+
+        $total ??= count($hits);
+
+        return new AdvancedSearchResult(
+            hits: $hits,
+            total: $total,
+            page: $page,
+            perPage: $perPage,
+            totalPages: (int) ceil($total / max(1, $perPage)),
+            meta: ['strategy' => $strategy],
+        );
+    }
+
+    private function constraintApplier(): ScoutSearchConstraintApplier
+    {
+        return $this->constraint_applier ?? app(ScoutSearchConstraintApplier::class);
+    }
+
+    /**
      * @return array<string, array{id: string, score: float, source: array<string, mixed>, rank: int}>
      */
-    private function normalizeHits(array $response): array
+    private function hitsById(AdvancedSearchResult $result): array
     {
-        $hits_container = $response['hits'] ?? null;
-
-        if (! is_array($hits_container)) {
-            return [];
-        }
-
-        $hits = $hits_container['hits'] ?? [];
-
-        if (! is_array($hits)) {
-            return [];
-        }
-
         $out = [];
         $rank = 1;
 
-        foreach ($hits as $hit) {
-            if (! is_array($hit)) {
-                continue;
-            }
-            if (! isset($hit['_id']) || ! is_scalar($hit['_id'])) {
-                continue;
-            }
-
-            $id = (string) $hit['_id'];
-            $score = is_numeric($hit['_score'] ?? null) ? (float) $hit['_score'] : 0.0;
+        foreach ($result->hits as $hit) {
+            $id = $hit['id'];
             $out[$id] = [
-                'id' => $id,
-                'score' => $score,
-                'source' => is_array($hit['_source'] ?? null) ? $hit['_source'] : [],
+                'id' => $hit['id'],
+                'score' => $hit['score'],
+                'source' => $hit['source'],
                 'rank' => $rank,
             ];
             $rank++;
@@ -399,153 +445,5 @@ class EnsembleSearchService
         $value = config($key, $default);
 
         return is_numeric($value) ? (int) $value : $default;
-    }
-
-    /**
-     * Build an Elasticsearch keyword-only (full-text) query body.
-     *
-     * @param  array{keywords: list<string>, date_range: ?array<string, string>, query: array{expanded: string}}  $intent
-     * @return array<string, mixed>
-     */
-    private function buildKeywordOnlyBody(array $intent, int $size): array
-    {
-        $expanded_query = $intent['query']['expanded'] ?? '';
-        $keywords = $intent['keywords'] ?? [];
-
-        $must = [];
-
-        if ($expanded_query !== '') {
-            $must[] = [
-                'multi_match' => [
-                    'query' => $expanded_query,
-                    'fields' => ['title^3', 'body', 'content', 'description', 'name^2'],
-                    'type' => 'best_fields',
-                    'fuzziness' => 'AUTO',
-                ],
-            ];
-        }
-
-        $should = [];
-
-        foreach ($keywords as $keyword) {
-            $should[] = [
-                'match_phrase' => [
-                    'title' => [
-                        'query' => $keyword,
-                        'boost' => 2.0,
-                    ],
-                ],
-            ];
-        }
-
-        $body = [
-            'size' => $size,
-            'query' => [
-                'bool' => [
-                    'must' => $must !== [] ? $must : [['match_all' => (object) []]],
-                    'should' => $should,
-                ],
-            ],
-        ];
-
-        $date_filter = $this->buildDateFilter($intent['date_range'] ?? null);
-
-        if ($date_filter !== null) {
-            $body['query']['bool']['filter'] = [$date_filter];
-        }
-
-        return $body;
-    }
-
-    /**
-     * Build an Elasticsearch vector-only (kNN) query body.
-     *
-     * @param  list<float>  $vector
-     * @return array<string, mixed>
-     */
-    private function buildVectorOnlyBody(array $vector, int $size): array
-    {
-        return [
-            'size' => $size,
-            'knn' => [
-                'field' => 'embedding',
-                'query_vector' => $vector,
-                'k' => $size,
-                'num_candidates' => $size * 2,
-            ],
-        ];
-    }
-
-    /**
-     * Build an Elasticsearch hybrid (keyword + kNN) query body.
-     *
-     * @param  array{keywords: list<string>, date_range: ?array<string, string>, query: array{expanded: string}}  $intent
-     * @param  list<float>  $vector
-     * @return array<string, mixed>
-     */
-    private function buildHybridBody(array $intent, array $vector, int $size): array
-    {
-        $expanded_query = $intent['query']['expanded'] ?? '';
-
-        $body = [
-            'size' => $size,
-            'query' => [
-                'bool' => [
-                    'must' => [
-                        [
-                            'multi_match' => [
-                                'query' => $expanded_query,
-                                'fields' => ['title^3', 'body', 'content', 'description', 'name^2'],
-                                'type' => 'best_fields',
-                                'fuzziness' => 'AUTO',
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-            'knn' => [
-                'field' => 'embedding',
-                'query_vector' => $vector,
-                'k' => $size,
-                'num_candidates' => $size * 2,
-            ],
-        ];
-
-        $date_filter = $this->buildDateFilter($intent['date_range'] ?? null);
-
-        if ($date_filter !== null) {
-            $body['query']['bool']['filter'] = [$date_filter];
-        }
-
-        return $body;
-    }
-
-    /**
-     * Build an Elasticsearch date range filter clause.
-     *
-     * @param  array<string, string>|null  $date_range
-     * @return array<string, mixed>|null
-     */
-    private function buildDateFilter(?array $date_range): ?array
-    {
-        if ($date_range === null) {
-            return null;
-        }
-
-        $range = [];
-
-        if (isset($date_range['from'])) {
-            $range['gte'] = $date_range['from'];
-        }
-
-        if (isset($date_range['to'])) {
-            $range['lte'] = $date_range['to'];
-        }
-
-        if ($range === []) {
-            return null;
-        }
-
-        return ['range' => ['published_at' => $range]];
     }
 }

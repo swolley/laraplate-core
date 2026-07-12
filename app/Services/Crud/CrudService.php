@@ -19,20 +19,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
-use Modules\Core\Casts\Filter;
-use Modules\Core\Casts\FilterOperator;
-use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\HistoryRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
-use Modules\Core\Casts\WhereClause;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
@@ -40,6 +37,9 @@ use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Services\AdvancedSearchService;
+use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
@@ -73,6 +73,8 @@ class CrudService
     public function __construct(
         private readonly AuthorizationService $auth,
         private readonly QueryBuilder $query_builder,
+        private readonly ?AdvancedSearchService $advanced_search = null,
+        private readonly ?ScoutSearchConstraintApplier $search_constraint_applier = null,
     ) {}
 
     public function list(ListRequestData $requestData): CrudResult
@@ -204,12 +206,11 @@ class CrudService
         );
 
         return match ($requestData->mode) {
-            SearchMode::Orchestrated => new CrudResult(
-                data: null,
-                error: 'Orchestrated search pipeline is not available from Core yet.',
-                statusCode: Response::HTTP_NOT_IMPLEMENTED,
-            ),
-            SearchMode::Auto, SearchMode::Basic => $this->searchWithScout($requestData, $permission_name),
+            SearchMode::Orchestrated => $this->searchWithAdvanced($requestData, $permission_name),
+            SearchMode::Auto => ($this->advanced_search ?? app(AdvancedSearchService::class))->available($model)
+                ? $this->searchWithAdvanced($requestData, $permission_name)
+                : $this->searchWithScout($requestData, $permission_name),
+            SearchMode::Basic => $this->searchWithScout($requestData, $permission_name),
         };
     }
 
@@ -551,10 +552,10 @@ class CrudService
 
         $this->auth->injectAclFilters($requestData, $permissionName);
 
-        $constraint_error = $this->applyScoutSearchConstraints($builder, $requestData);
-
-        if ($constraint_error instanceof CrudResult) {
-            return $constraint_error;
+        try {
+            $this->searchConstraintApplier()->apply($builder, $model, $requestData->filters, $requestData->sort);
+        } catch (InvalidArgumentException $exception) {
+            return $this->invalidSearchConstraintsResult($exception->getMessage());
         }
 
         if ($requestData->page !== null) {
@@ -609,77 +610,79 @@ class CrudService
         );
     }
 
-    private function applyScoutSearchConstraints(mixed $builder, SearchRequestData $requestData): ?CrudResult
+    private function searchWithAdvanced(SearchRequestData $requestData, string $permissionName): CrudResult
     {
-        if ($requestData->filters instanceof FiltersGroup && ! $this->applyScoutFilters($builder, $requestData->filters, $requestData->model)) {
-            return $this->invalidSearchConstraintsResult('Search filters must be applied by the search engine to keep pagination consistent.');
+        $advanced_search = $this->advanced_search ?? app(AdvancedSearchService::class);
+
+        if (! $advanced_search->available($requestData->model)) {
+            return new CrudResult(
+                data: null,
+                error: 'Orchestrated search pipeline is not available for the configured search driver.',
+                statusCode: Response::HTTP_NOT_IMPLEMENTED,
+            );
         }
 
-        foreach ($requestData->sort as $sort) {
-            $field = $this->scoutFieldName($requestData->model, $sort->property);
-
-            if ($field === null) {
-                return $this->invalidSearchConstraintsResult('Search sort must be applied by the search engine to keep pagination consistent.');
-            }
-
-            $builder->orderBy($field, $sort->direction->value);
+        if ($requestData->group_by !== []) {
+            return $this->invalidSearchConstraintsResult('Orchestrated search does not support CRUD group_by yet.');
         }
 
-        return null;
+        $this->auth->injectAclFilters($requestData, $permissionName);
+
+        try {
+            $result = $advanced_search->search(
+                $requestData->model,
+                $requestData->qs,
+                $requestData->page ?? 1,
+                max(1, $requestData->page !== null ? $requestData->pagination : $requestData->limit),
+                $requestData->filters,
+                $requestData->sort,
+            );
+        } catch (InvalidArgumentException $exception) {
+            return $this->invalidSearchConstraintsResult($exception->getMessage());
+        }
+
+        return $this->searchResultFromAdvancedResult($requestData, $result);
     }
 
-    private function applyScoutFilters(mixed $builder, FiltersGroup $filters, Model $model): bool
+    private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result): CrudResult
     {
-        if ($filters->operator !== WhereClause::And) {
-            return false;
+        $model = $requestData->model;
+        $ids = $result->ids();
+
+        if ($ids === []) {
+            return new CrudResult(
+                data: new Collection(),
+                meta: $this->buildAdvancedSearchMeta($requestData, $result, 0),
+            );
         }
 
-        foreach ($filters->filters as $filter) {
-            if ($filter instanceof FiltersGroup) {
-                if (! $this->applyScoutFilters($builder, $filter, $model)) {
-                    return false;
-                }
+        $query = $model->newQuery()->whereKey($ids);
 
-                continue;
-            }
-
-            if (! $this->applyScoutFilter($builder, $filter, $model)) {
-                return false;
-            }
+        if ($requestData->relations !== []) {
+            $query->with($requestData->relations);
         }
 
-        return true;
+        $records = $query->get();
+        $records_by_key = $records->keyBy(static fn (Model $record): string => (string) $record->getKey());
+        $data = new Collection(
+            collect($ids)
+                ->map(static fn (string $id): ?Model => $records_by_key->get($id))
+                ->filter()
+                ->values()
+                ->all(),
+        );
+
+        $this->applyComputedMethods($data, $requestData);
+
+        return new CrudResult(
+            data: $data,
+            meta: $this->buildAdvancedSearchMeta($requestData, $result, $data->count()),
+        );
     }
 
-    private function applyScoutFilter(mixed $builder, Filter $filter, Model $model): bool
+    private function searchConstraintApplier(): ScoutSearchConstraintApplier
     {
-        $field = $this->scoutFieldName($model, $filter->property);
-
-        if ($field === null) {
-            return false;
-        }
-
-        return match ($filter->operator) {
-            FilterOperator::Equals => (bool) $builder->where($field, $filter->value),
-            FilterOperator::In => (bool) $builder->whereIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
-            FilterOperator::NotEquals => (bool) $builder->whereNotIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
-            default => false,
-        };
-    }
-
-    private function scoutFieldName(Model $model, string $property): ?string
-    {
-        $table_prefix = $model->getTable() . '.';
-
-        if (str_starts_with($property, $table_prefix)) {
-            return mb_substr($property, mb_strlen($table_prefix));
-        }
-
-        if (str_contains($property, '.')) {
-            return null;
-        }
-
-        return $property;
+        return $this->search_constraint_applier ?? app(ScoutSearchConstraintApplier::class);
     }
 
     private function invalidSearchConstraintsResult(string $message): CrudResult
@@ -709,46 +712,22 @@ class CrudService
         );
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function translateFiltersToElasticsearch(FiltersGroup $filtersGroup): array
+    private function buildAdvancedSearchMeta(SearchRequestData $requestData, AdvancedSearchResult $result, int $currentRecords): CrudMeta
     {
-        $mustClauses = [];
+        $model = $requestData->model;
 
-        foreach ($filtersGroup->filters as $filter) {
-            if ($filter instanceof Filter) {
-                $mustClauses[] = $this->translateFilterToElasticsearch($filter);
-            } elseif ($filter instanceof FiltersGroup) {
-                $clause = $filter->operator === WhereClause::And ? 'must' : 'should';
-                $mustClauses[] = [
-                    'bool' => [
-                        $clause => $this->translateFiltersToElasticsearch($filter),
-                    ],
-                ];
-            }
-        }
-
-        return $mustClauses;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function translateFilterToElasticsearch(Filter $filter): array
-    {
-        return match ($filter->operator) {
-            FilterOperator::Equals => ['term' => [$filter->property => $filter->value]],
-            FilterOperator::NotEquals => ['bool' => ['must_not' => ['term' => [$filter->property => $filter->value]]]],
-            FilterOperator::Like => ['wildcard' => [$filter->property => '*' . $this->filterScalarValue($filter) . '*']],
-            FilterOperator::NotLike => ['bool' => ['must_not' => ['wildcard' => [$filter->property => '*' . $this->filterScalarValue($filter) . '*']]]],
-            FilterOperator::In => ['terms' => [$filter->property => $filter->value]],
-            FilterOperator::Great => ['gt' => [$filter->property => $filter->value]],
-            FilterOperator::GreatEquals => ['gte' => [$filter->property => $filter->value]],
-            FilterOperator::Less => ['lt' => [$filter->property => $filter->value]],
-            FilterOperator::LessEquals => ['lte' => [$filter->property => $filter->value]],
-            FilterOperator::Between => ['range' => [$filter->property => $this->filterBetweenBounds($filter)]],
-        };
+        return new CrudMeta(
+            totalRecords: $result->total,
+            currentRecords: $currentRecords,
+            currentPage: $result->page,
+            totalPages: $result->totalPages,
+            pagination: $result->perPage,
+            from: $requestData->from,
+            to: $requestData->to,
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
     }
 
     private function doApproveOperation(ModifyRequestData $requestData, string $operation): CrudResult
@@ -1033,24 +1012,4 @@ class CrudService
         return $model->getAttribute($locked_at_column) !== null;
     }
 
-    private function filterScalarValue(Filter $filter): string
-    {
-        if (! is_scalar($filter->value)) {
-            throw new UnexpectedValueException(sprintf('Filter %s expects a scalar value.', $filter->property));
-        }
-
-        return (string) $filter->value;
-    }
-
-    /**
-     * @return array{gte: mixed, lte: mixed}
-     */
-    private function filterBetweenBounds(Filter $filter): array
-    {
-        if (! is_array($filter->value) || ! array_key_exists(0, $filter->value) || ! array_key_exists(1, $filter->value)) {
-            throw new UnexpectedValueException(sprintf('Between filter on %s requires a two-element array.', $filter->property));
-        }
-
-        return ['gte' => $filter->value[0], 'lte' => $filter->value[1]];
-    }
 }

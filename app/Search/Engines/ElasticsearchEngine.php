@@ -40,6 +40,12 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         return true;
     }
 
+    #[Override]
+    public function supportsOrchestratedSearch(): bool
+    {
+        return true;
+    }
+
     /**
      * @throws Exception
      * @throws \Http\Client\Exception
@@ -48,7 +54,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      * @param  array<string, mixed>  $options
      */
     #[Override]
-    public function createIndex($name, array $options = [], bool $force = false): void // @pest-ignore-type
+    public function createIndex(mixed $name, array $options = [], bool $force = false): void
     {
         $collection = is_string($name) ? $name : 'unknown';
 
@@ -696,7 +702,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         // Build the vector search query using knn (more efficient than script_score)
         $query = [
             'knn' => [
-                'field' => 'embedding',
+                'field' => $this->resolveVectorField($model),
                 'query_vector' => $vector,
                 'k' => $builder->limit ?: 10,
                 'num_candidates' => min(($builder->limit ?: 10) * 10, 100),
@@ -704,8 +710,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         ];
 
         // Add filters if any are present
-        if (! empty($builder->wheres)) {
-            $filters = $this->buildSearchFilters($builder->wheres);
+        $filter_wheres = array_diff_key($builder->wheres, array_flip(['vector', 'embedding', $this->resolveVectorField($model)]));
+
+        if ($filter_wheres !== []) {
+            $filters = $this->buildSearchFilters($filter_wheres);
 
             if ($filters !== []) {
                 $query['knn']['filter'] = [

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Scout\Engines\Engine as ScoutEngine;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\DetailRequestData;
@@ -23,8 +24,14 @@ use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
+use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\Traits\Searchable as CoreSearchable;
 use App\Models\User;
+use Modules\Core\Search\Services\AdvancedSearchService;
+use Modules\Core\Search\Services\EnsembleSearchService;
+use Modules\Core\Search\Services\FallbackSearchPlanner;
+use Modules\Core\Search\Services\SimpleQueryIntentParser;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
@@ -121,6 +128,27 @@ function crud_cov_login_superadmin(): User
     return $user;
 }
 
+function crud_cov_advanced_search_returning(int|string $id): AdvancedSearchService
+{
+    $ensemble = Mockery::mock(EnsembleSearchService::class);
+    $ensemble
+        ->shouldReceive('search')
+        ->andReturnUsing(static fn (Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage): AdvancedSearchResult => new AdvancedSearchResult(
+            hits: [['id' => (string) $id, 'score' => 1.0, 'source' => []]],
+            total: 1,
+            page: $page,
+            perPage: $perPage,
+            totalPages: 1,
+        ));
+
+    return new AdvancedSearchService(
+        new SimpleQueryIntentParser(),
+        new FallbackSearchPlanner(),
+        $ensemble,
+        app(),
+    );
+}
+
 function crud_cov_make_modify_data(Model $model, Request $request, array $changes = [], string|array|int $primary_key = 'id'): ModifyRequestData
 {
     $modify_ref = new ReflectionClass(ModifyRequestData::class);
@@ -205,17 +233,28 @@ it('search rejects models without core searchable trait', function (): void {
         ->and($result->error)->toBe('Full-search operation can be done only on Searchable entities');
 });
 
-it('search returns a controlled result for orchestrated mode until advanced pipeline is wired', function (): void {
+it('search returns a controlled result for orchestrated mode when the model does not use a core search engine', function (): void {
     $superadmin = crud_cov_login_superadmin();
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+    $engine = Mockery::mock(ScoutEngine::class);
 
     $request = crud_cov_validated_request(['qs' => 'needle']);
     $request->setUserResolver(fn () => $superadmin);
-    $model = new class extends Model
+    $model = new class($engine) extends Model
     {
         use CoreSearchable;
 
         protected $table = 'users';
+
+        public function __construct(private readonly mixed $engine = null)
+        {
+            parent::__construct();
+        }
+
+        public function searchableUsing(): mixed
+        {
+            return $this->engine;
+        }
     };
 
     $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
@@ -225,7 +264,104 @@ it('search returns a controlled result for orchestrated mode until advanced pipe
     $result = $service->search($data);
 
     expect($result->statusCode)->toBe(Response::HTTP_NOT_IMPLEMENTED)
-        ->and($result->error)->toBe('Orchestrated search pipeline is not available from Core yet.');
+        ->and($result->error)->toBe('Orchestrated search pipeline is not available for the configured search driver.');
+});
+
+it('search orchestrated mode hydrates advanced search ids', function (): void {
+    config()->set('scout.driver', 'elasticsearch');
+
+    $superadmin = crud_cov_login_superadmin();
+    $target = User::factory()->create([
+        'username' => 'advanced_target_' . uniqid(),
+        'email' => 'advanced_target_' . uniqid() . '@example.com',
+    ]);
+
+    $advanced_search = crud_cov_advanced_search_returning($target->getKey());
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), $advanced_search);
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new class($engine) extends User
+    {
+        use CoreSearchable;
+
+        public function __construct(private readonly mixed $engine = null)
+        {
+            parent::__construct();
+        }
+
+        public function searchableUsing(): mixed
+        {
+            return $this->engine;
+        }
+    };
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Orchestrated);
+    crud_cov_set($data, 'page', null);
+    crud_cov_set($data, 'limit', 5);
+    crud_cov_set($data, 'pagination', 5);
+    crud_cov_set($data, 'from', null);
+    crud_cov_set($data, 'to', null);
+    crud_cov_set($data, 'count', false);
+
+    $result = $service->search($data);
+
+    expect($result->data)->toBeInstanceOf(Illuminate\Database\Eloquent\Collection::class)
+        ->and($result->data->first()?->getKey())->toBe($target->getKey())
+        ->and($result->meta?->totalRecords)->toBe(1)
+        ->and($result->meta?->currentRecords)->toBe(1);
+});
+
+it('search auto mode uses orchestrated search when current driver supports it', function (): void {
+    config()->set('scout.driver', 'elasticsearch');
+
+    $superadmin = crud_cov_login_superadmin();
+    $target = User::factory()->create([
+        'username' => 'auto_target_' . uniqid(),
+        'email' => 'auto_target_' . uniqid() . '@example.com',
+    ]);
+    $advanced_search = crud_cov_advanced_search_returning($target->getKey());
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), $advanced_search);
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new class($engine) extends User
+    {
+        use CoreSearchable;
+
+        public function __construct(private readonly mixed $engine = null)
+        {
+            parent::__construct();
+        }
+
+        public function searchableUsing(): mixed
+        {
+            return $this->engine;
+        }
+    };
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Auto);
+    crud_cov_set($data, 'page', 1);
+    crud_cov_set($data, 'limit', 5);
+    crud_cov_set($data, 'pagination', 5);
+    crud_cov_set($data, 'from', 1);
+    crud_cov_set($data, 'to', 6);
+    crud_cov_set($data, 'count', false);
+
+    $result = $service->search($data);
+
+    expect($result->data)->toBeInstanceOf(Illuminate\Database\Eloquent\Collection::class)
+        ->and($result->data->first()?->getKey())->toBe($target->getKey())
+        ->and($result->meta?->currentPage)->toBe(1)
+        ->and($result->meta?->pagination)->toBe(5);
 });
 
 it('search rejects filters that cannot be pushed into scout pagination', function (): void {

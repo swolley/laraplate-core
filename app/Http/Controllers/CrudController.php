@@ -73,7 +73,7 @@ class CrudController extends Controller
             fn (): CrudResult => $this->crudService->search($requestData),
             $request,
             $requestData->model,
-            shouldCache: false, // Search uses ElasticSearch, cache handled differently
+            shouldCache: false,
         );
     }
 

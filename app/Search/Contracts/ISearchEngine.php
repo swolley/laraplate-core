@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Contracts;
 
+use Illuminate\Database\Eloquent\Model;
+use Laravel\Scout\Builder;
+
 /**
  * Interface that defines methods for search engines
  * Extends ISearchable to include engine-specific functionality.
@@ -21,13 +24,25 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
     public function supportsVectorSearch(): bool;
 
     /**
+     * Check if the engine supports the Core orchestrated search pipeline.
+     */
+    public function supportsOrchestratedSearch(): bool;
+
+    /**
+     * Perform the Scout search for the given builder.
+     *
+     * @param  Builder<covariant Model>  $builder
+     */
+    public function search(Builder $builder): mixed;
+
+    /**
      * Create an index.
      *
-     * @param  string|Model&Searchable|class-string<Model>  $name
+     * @param  mixed  $name  string index name, model instance, or model class-string depending on the engine
      * @param  array<string,mixed>  $options  Index options
      * @param  bool  $force  Force index creation even if it already exists
      */
-    public function createIndex(string $name, array $options = [], bool $force = false): void;
+    public function createIndex(mixed $name, array $options = [], bool $force = false): void;
 
     public function health(): array;
 

@@ -15,8 +15,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
+use Modules\Core\Search\Schema\FieldDefinition;
+use Modules\Core\Search\Schema\FieldType;
+use Modules\Core\Search\Schema\IndexType;
+use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Override;
+use ReflectionMethod;
 
 trait CommonEngineFunctions
 {
@@ -41,6 +46,7 @@ trait CommonEngineFunctions
     {
         return isset($builder->wheres['vector'])
             || isset($builder->wheres['embedding'])
+            || isset($builder->wheres[$this->resolveVectorField($builder->model)])
             || method_exists($builder->model, 'getVectorField');
     }
 
@@ -205,7 +211,8 @@ trait CommonEngineFunctions
      */
     protected function extractVectorFromBuilder(Builder $builder): array
     {
-        $vector = $builder->wheres['vector'] ?? $builder->wheres['embedding'] ?? [];
+        $vector_field = $this->resolveVectorField($builder->model);
+        $vector = $builder->wheres['vector'] ?? $builder->wheres[$vector_field] ?? $builder->wheres['embedding'] ?? [];
 
         if (! is_array($vector)) {
             return [];
@@ -220,5 +227,73 @@ trait CommonEngineFunctions
         }
 
         return $normalized;
+    }
+
+    protected function resolveVectorField(mixed $model): string
+    {
+        if ($model instanceof Model && method_exists($model, 'getVectorField')) {
+            $field = $model->getVectorField();
+
+            if (is_string($field) && $field !== '') {
+                return $field;
+            }
+        }
+
+        if ($model instanceof Model && method_exists($model, 'getSchemaDefinition') && (new ReflectionMethod($model, 'getSchemaDefinition'))->isPublic()) {
+            $schema = $model->getSchemaDefinition();
+
+            if ($schema instanceof SchemaDefinition) {
+                foreach ($schema->getFields() as $field) {
+                    if ($field instanceof FieldDefinition && ($field->type === FieldType::Vector || $field->hasIndexType(IndexType::Vector))) {
+                        return $field->name;
+                    }
+                }
+            }
+        }
+
+        if ($model instanceof Model && method_exists($model, 'getSearchMapping')) {
+            $mapping = $model->getSearchMapping();
+            $field = $this->resolveVectorFieldFromMapping(is_array($mapping) ? $mapping : []);
+
+            if ($field !== null) {
+                return $field;
+            }
+        }
+
+        return 'embedding';
+    }
+
+    /**
+     * @param  array<string, mixed>  $mapping
+     */
+    private function resolveVectorFieldFromMapping(array $mapping): ?string
+    {
+        $properties = $mapping['mappings']['properties'] ?? null;
+
+        if (is_array($properties)) {
+            foreach ($properties as $name => $definition) {
+                if (is_string($name) && is_array($definition) && ($definition['type'] ?? null) === 'dense_vector') {
+                    return $name;
+                }
+            }
+        }
+
+        $fields = $mapping['fields'] ?? null;
+
+        if (is_array($fields)) {
+            foreach ($fields as $field) {
+                if (! is_array($field) || ! is_string($field['name'] ?? null)) {
+                    continue;
+                }
+
+                $type = $field['type'] ?? null;
+
+                if ($type === 'float[]' || $type === 'vector' || array_key_exists('num_dim', $field)) {
+                    return $field['name'];
+                }
+            }
+        }
+
+        return null;
     }
 }

@@ -35,6 +35,12 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         return true;
     }
 
+    #[Override]
+    public function supportsOrchestratedSearch(): bool
+    {
+        return true;
+    }
+
     /**
      * @param  array<string,mixed>  $options  Index options
      * @param  bool  $force  Force index creation even if it already exists
@@ -444,7 +450,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
 
         $searchParams = [
             'q' => $builder->query ?: '*',
-            'vector_query' => sprintf('embedding:(%s)', $vectorString),
+            'vector_query' => sprintf('%s:(%s)', $this->resolveVectorField($model), $vectorString),
             'per_page' => $builder->limit ?: 10,
         ];
 
@@ -518,7 +524,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         $filters = [];
 
         foreach ($builder->wheres as $field => $value) {
-            if ($field === 'vector' || $field === 'embedding') {
+            if ($field === 'vector' || $field === 'embedding' || $field === $this->resolveVectorField($builder->model)) {
                 continue; // Skip vector fields
             }
 

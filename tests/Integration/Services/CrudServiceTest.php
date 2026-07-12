@@ -9,11 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
-use Modules\Core\Casts\Filter;
-use Modules\Core\Casts\FilterOperator;
-use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\SelectRequestData;
-use Modules\Core\Casts\WhereClause;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
@@ -21,7 +17,6 @@ use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelChild;
 use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelParent;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
-
 
 it('normalizes scalar and array key values to where condition', function (): void {
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
@@ -106,65 +101,6 @@ it('clearModelCache clears cache for the given model and returns message', funct
     $result = $service->clearModelCache($requestData);
 
     expect($result->data)->toBe('items cached cleared');
-});
-
-it('translates elastic filters for less/less-equals/between operators', function (): void {
-    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
-
-    $ref = new ReflectionClass(CrudService::class);
-    $method = $ref->getMethod('translateFilterToElasticsearch');
-    $method->setAccessible(true);
-
-    $less = $method->invoke($service, new Filter('users.id', 10, FilterOperator::Less));
-    $less_equals = $method->invoke($service, new Filter('users.id', 10, FilterOperator::LessEquals));
-    $between = $method->invoke($service, new Filter('users.id', [5, 15], FilterOperator::Between));
-
-    expect($less)->toBe(['lt' => ['users.id' => 10]])
-        ->and($less_equals)->toBe(['lte' => ['users.id' => 10]])
-        ->and($between)->toBe(['range' => ['users.id' => ['gte' => 5, 'lte' => 15]]]);
-});
-
-it('translates elastic filters for remaining operators and nested groups', function (): void {
-    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
-
-    $ref = new ReflectionClass(CrudService::class);
-    $translate_filter = $ref->getMethod('translateFilterToElasticsearch');
-    $translate_filter->setAccessible(true);
-    $translate_group = $ref->getMethod('translateFiltersToElasticsearch');
-    $translate_group->setAccessible(true);
-
-    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::Equals)))
-        ->toBe(['term' => ['a' => 1]]);
-    expect($translate_filter->invoke($service, new Filter('a', 1, FilterOperator::NotEquals)))
-        ->toBe(['bool' => ['must_not' => ['term' => ['a' => 1]]]]);
-    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::Like)))
-        ->toBe(['wildcard' => ['a' => '*x*']]);
-    expect($translate_filter->invoke($service, new Filter('a', 'x', FilterOperator::NotLike)))
-        ->toBe(['bool' => ['must_not' => ['wildcard' => ['a' => '*x*']]]]);
-    expect($translate_filter->invoke($service, new Filter('a', [1, 2], FilterOperator::In)))
-        ->toBe(['terms' => ['a' => [1, 2]]]);
-    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::Great)))
-        ->toBe(['gt' => ['a' => 5]]);
-    expect($translate_filter->invoke($service, new Filter('a', 5, FilterOperator::GreatEquals)))
-        ->toBe(['gte' => ['a' => 5]]);
-
-    $nested_or = new FiltersGroup(
-        filters: [new Filter('x', 1, FilterOperator::Equals)],
-        operator: WhereClause::Or,
-    );
-    $root = new FiltersGroup(
-        filters: [
-            new Filter('root', 'v', FilterOperator::Equals),
-            $nested_or,
-        ],
-        operator: WhereClause::And,
-    );
-
-    $group_result = $translate_group->invoke($service, $root);
-
-    expect($group_result)->toHaveCount(2);
-    expect($group_result[1])->toHaveKey('bool');
-    expect($group_result[1]['bool']['should'])->toBeArray();
 });
 
 it('extracts method columns grouped by relation and without duplicates', function (): void {

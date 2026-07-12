@@ -24,7 +24,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
     /**
      * @param  array<string, mixed>  $options
      */
-    public function createIndex(string $name, array $options = [], bool $force = false): void
+    public function createIndex(mixed $name, array $options = [], bool $force = false): void
     {
         parent::createIndex($name, $options);
     }
@@ -72,6 +72,11 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
     public function supportsVectorSearch(): bool
     {
         return $this->getDatabaseDriver() !== 'sqlite';
+    }
+
+    public function supportsOrchestratedSearch(): bool
+    {
+        return false;
     }
 
     /**

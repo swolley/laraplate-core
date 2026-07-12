@@ -14,6 +14,7 @@ use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
@@ -44,5 +45,6 @@ final class SearchServiceProvider extends ServiceProvider
         $this->app->singletonIf(IReranker::class, HeuristicReranker::class);
         $this->app->singletonIf(ISearchPlanner::class, FallbackSearchPlanner::class);
         $this->app->singletonIf(IQueryIntentParser::class, SimpleQueryIntentParser::class);
+        $this->app->singleton(AdvancedSearchService::class);
     }
 }
