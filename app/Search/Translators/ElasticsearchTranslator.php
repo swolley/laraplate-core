@@ -93,6 +93,7 @@ class ElasticsearchTranslator implements ISchemaTranslator
 
         if ($field->hasIndexType(IndexType::Filterable)) {
             $esField['index'] = true;
+            $esField['meta']['filterable'] = true;
         }
 
         return $esField;

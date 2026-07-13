@@ -67,7 +67,7 @@ class TypesenseTranslator implements ISchemaTranslator
             $tsField['index'] = true;
         }
 
-        if ($field->hasIndexType(IndexType::Facetable)) {
+        if ($field->hasIndexType(IndexType::Filterable) || $field->hasIndexType(IndexType::Facetable)) {
             $tsField['facet'] = true;
         }
 

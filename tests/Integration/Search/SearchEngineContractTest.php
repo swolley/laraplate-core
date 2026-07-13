@@ -9,6 +9,11 @@ use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Search\Schema\FieldDefinition;
+use Modules\Core\Search\Schema\FieldType;
+use Modules\Core\Search\Schema\IndexType;
+use Modules\Core\Search\Schema\SchemaDefinition;
+use Modules\Core\Search\Schema\SchemaManager;
 
 it('declares the scout search signature on the core search engine contract', function (): void {
     $method = new ReflectionMethod(ISearchEngine::class, 'search');
@@ -161,4 +166,19 @@ it('adds advanced portable filters to typesense keyword search parameters', func
     expect($parameters['filter_by'])->toBe('id:>=10 && (status:="draft" || status:="published")')
         ->and($parameters['page'])->toBe(2)
         ->and($parameters['per_page'])->toBe(15);
+});
+
+it('preserves filterable field metadata across search schema translations', function (): void {
+    $schema = new SchemaDefinition('users');
+    $schema->addField(new FieldDefinition('status', FieldType::Keyword, [IndexType::Searchable, IndexType::Filterable]));
+    $schema->addField(new FieldDefinition('title', FieldType::Text, [IndexType::Searchable]));
+
+    $manager = new SchemaManager();
+    $typesense_fields = collect($manager->translateForEngine($schema, 'typesense')['fields'])->keyBy('name');
+
+    expect($typesense_fields->get('status')['facet'] ?? null)->toBeTrue()
+        ->and($typesense_fields->get('title')['facet'] ?? null)->toBeNull()
+        ->and($manager->translateForEngine($schema, 'elasticsearch')['mappings']['properties']['status']['meta']['filterable'] ?? null)->toBeTrue()
+        ->and($manager->translateForEngine($schema, 'database')['columns']['status']['filterable'] ?? null)->toBeTrue()
+        ->and($manager->translateForEngine($schema, 'database')['columns']['title']['filterable'] ?? null)->toBeFalse();
 });

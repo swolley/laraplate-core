@@ -10,6 +10,11 @@ use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
+use Modules\Core\Search\Schema\FieldDefinition;
+use Modules\Core\Search\Schema\IndexType;
+use Modules\Core\Search\Schema\SchemaDefinition;
+use ReflectionMethod;
 
 final readonly class ScoutSearchConstraintApplier
 {
@@ -63,7 +68,7 @@ final readonly class ScoutSearchConstraintApplier
 
     private function applyFilter(mixed $builder, Filter $filter, Model $model): void
     {
-        $field = $this->fieldName($model, $filter->property);
+        $field = $this->filterFieldName($model, $filter->property);
 
         if ($field === null) {
             throw new InvalidArgumentException(self::FILTER_ERROR);
@@ -106,7 +111,7 @@ final readonly class ScoutSearchConstraintApplier
      */
     private function normalizeFilter(Filter $filter, Model $model): array
     {
-        $field = $this->fieldName($model, $filter->property);
+        $field = $this->filterFieldName($model, $filter->property);
 
         if ($field === null) {
             throw new InvalidArgumentException(self::FILTER_ERROR);
@@ -240,5 +245,123 @@ final readonly class ScoutSearchConstraintApplier
         }
 
         return $property;
+    }
+
+    private function filterFieldName(Model $model, string $property): ?string
+    {
+        $field = $this->fieldName($model, $property);
+
+        if ($field === null) {
+            return null;
+        }
+
+        $filterable_fields = $this->filterableFields($model);
+
+        if ($filterable_fields === null) {
+            return $field;
+        }
+
+        return in_array($field, $filterable_fields, true) ? $field : null;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function filterableFields(Model $model): ?array
+    {
+        if (method_exists($model, 'getSchemaDefinition')) {
+            $method = new ReflectionMethod($model, 'getSchemaDefinition');
+
+            if ($method->isPublic()) {
+                $schema = $model->getSchemaDefinition();
+
+                if ($schema instanceof SchemaDefinition) {
+                    return $this->filterableFieldsFromSchema($schema);
+                }
+            }
+        }
+
+        if (! method_exists($model, 'getSearchMapping')) {
+            return null;
+        }
+
+        try {
+            $mapping = $model->getSearchMapping();
+        } catch (UnsupportedSearchEngineException) {
+            return null;
+        }
+
+        return is_array($mapping) ? $this->filterableFieldsFromMapping($mapping) : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function filterableFieldsFromSchema(SchemaDefinition $schema): array
+    {
+        $fields = [];
+
+        foreach ($schema->getFields() as $field) {
+            if (! $field instanceof FieldDefinition) {
+                continue;
+            }
+
+            if ($field->hasIndexType(IndexType::Filterable) || $field->hasIndexType(IndexType::Facetable)) {
+                $fields[] = $field->name;
+            }
+        }
+
+        return array_values(array_unique($fields));
+    }
+
+    /**
+     * @param  array<string, mixed>  $mapping
+     * @return list<string>
+     */
+    private function filterableFieldsFromMapping(array $mapping): array
+    {
+        $fields = [];
+
+        foreach (($mapping['fields'] ?? []) as $field) {
+            if (! is_array($field) || ! is_string($field['name'] ?? null)) {
+                continue;
+            }
+
+            if (($field['filterable'] ?? false) === true || ($field['facet'] ?? false) === true) {
+                $fields[] = $field['name'];
+            }
+        }
+
+        $properties = $mapping['mappings']['properties'] ?? null;
+
+        if (is_array($properties)) {
+            foreach ($properties as $name => $definition) {
+                if (! is_string($name) || ! is_array($definition)) {
+                    continue;
+                }
+
+                $meta = $definition['meta'] ?? null;
+
+                if (($definition['filterable'] ?? false) === true || (is_array($meta) && ($meta['filterable'] ?? false) === true)) {
+                    $fields[] = $name;
+                }
+            }
+        }
+
+        $columns = $mapping['columns'] ?? null;
+
+        if (is_array($columns)) {
+            foreach ($columns as $name => $definition) {
+                if (! is_string($name) || ! is_array($definition)) {
+                    continue;
+                }
+
+                if (($definition['filterable'] ?? false) === true) {
+                    $fields[] = $name;
+                }
+            }
+        }
+
+        return array_values(array_unique($fields));
     }
 }

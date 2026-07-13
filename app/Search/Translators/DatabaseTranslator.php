@@ -40,7 +40,7 @@ class DatabaseTranslator implements ISchemaTranslator
 
     private function getColumnDefinition(FieldDefinition $field): array
     {
-        return match ($field->type) {
+        $definition = match ($field->type) {
             FieldType::Text, FieldType::Keyword => [
                 'type' => 'text',
                 'nullable' => ! $field->required,
@@ -77,6 +77,10 @@ class DatabaseTranslator implements ISchemaTranslator
                 'nullable' => ! $field->required,
             ],
         };
+
+        $definition['filterable'] = $field->hasIndexType(IndexType::Filterable) || $field->hasIndexType(IndexType::Facetable);
+
+        return $definition;
     }
 
     private function getIndexes(SchemaDefinition $schema): array

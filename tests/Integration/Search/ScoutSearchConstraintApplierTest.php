@@ -9,6 +9,7 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\SortDirection;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
 
 function scout_constraint_fake_builder(): object
@@ -120,6 +121,77 @@ it('records advanced portable filters for engine-owned translation', function ()
                 ],
             ],
         ]);
+});
+
+it('limits filters to explicitly filterable searchable schema fields when declared', function (): void {
+    $builder = scout_constraint_fake_builder();
+    $model = new class extends Model
+    {
+        protected $table = 'users';
+
+        /**
+         * @return array<string, mixed>
+         */
+        public function getSearchMapping(): array
+        {
+            return [
+                'fields' => [
+                    ['name' => 'status', 'type' => 'string', 'facet' => true],
+                    ['name' => 'author_name', 'type' => 'string', 'filterable' => true],
+                    ['name' => 'title', 'type' => 'string'],
+                ],
+            ];
+        }
+    };
+
+    (new ScoutSearchConstraintApplier())->apply(
+        builder: $builder,
+        model: $model,
+        filters: new FiltersGroup([
+            new Filter('status', 'published', FilterOperator::Equals),
+            new Filter('author_name', 'Alice', FilterOperator::Equals),
+        ]),
+    );
+
+    expect($builder->calls)->toBe([
+        ['method' => 'where', 'field' => 'status', 'value' => 'published'],
+        ['method' => 'where', 'field' => 'author_name', 'value' => 'Alice'],
+    ]);
+
+    expect(fn () => (new ScoutSearchConstraintApplier())->apply(
+        builder: scout_constraint_fake_builder(),
+        model: $model,
+        filters: new FiltersGroup([new Filter('title', 'needle', FilterOperator::Equals)]),
+    ))->toThrow(
+        InvalidArgumentException::class,
+        'Search filters must be applied by the search engine to keep pagination consistent.',
+    );
+});
+
+it('keeps legacy scalar filter behavior when searchable mapping cannot be translated for the active scout engine', function (): void {
+    $builder = scout_constraint_fake_builder();
+    $model = new class extends Model
+    {
+        protected $table = 'users';
+
+        /**
+         * @return array<string, mixed>
+         */
+        public function getSearchMapping(): array
+        {
+            throw new UnsupportedSearchEngineException('Unsupported engine Laravel\Scout\Engines\CollectionEngine');
+        }
+    };
+
+    (new ScoutSearchConstraintApplier())->apply(
+        builder: $builder,
+        model: $model,
+        filters: new FiltersGroup([new Filter('status', 'published', FilterOperator::Equals)]),
+    );
+
+    expect($builder->calls)->toBe([
+        ['method' => 'where', 'field' => 'status', 'value' => 'published'],
+    ]);
 });
 
 it('rejects non portable search filters and relation path sorts', function (FiltersGroup $filters, array $sort, string $message): void {
