@@ -115,6 +115,45 @@ it('translates advanced portable filters to elasticsearch query clauses', functi
     ]);
 });
 
+it('translates indexed relation field filters to elasticsearch nested clauses', function (): void {
+    $engine = (new ReflectionClass(ElasticsearchEngine::class))->newInstanceWithoutConstructor();
+
+    $filters = $engine->buildSearchFilters([
+        'operator' => 'and',
+        'filters' => [
+            ['field' => 'tags.id', 'operator' => '=', 'value' => 10, 'relation' => 'tags', 'relation_field' => 'id'],
+            ['field' => 'tags.slug', 'operator' => '!=', 'value' => ['draft', 'archived'], 'relation' => 'tags', 'relation_field' => 'slug'],
+        ],
+    ]);
+
+    expect($filters)->toMatchArray([
+        [
+            'bool' => [
+                'must' => [
+                    [
+                        'nested' => [
+                            'path' => 'tags',
+                            'query' => ['term' => ['tags.id' => 10]],
+                        ],
+                    ],
+                    [
+                        'bool' => [
+                            'must_not' => [
+                                [
+                                    'nested' => [
+                                        'path' => 'tags',
+                                        'query' => ['terms' => ['tags.slug' => ['draft', 'archived']]],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+});
+
 it('translates advanced portable filters to typesense filter syntax', function (): void {
     $engine = (new ReflectionClass(TypesenseEngine::class))->newInstanceWithoutConstructor();
 
@@ -135,6 +174,20 @@ it('translates advanced portable filters to typesense filter syntax', function (
     ]);
 
     expect($filters)->toBe('id:>=10 && id:<20 && created_at:>="2024-01-01" && created_at:<="2024-01-31" && (status:="draft" || status:="published")');
+});
+
+it('translates indexed relation field filters to typesense nested filter syntax', function (): void {
+    $engine = (new ReflectionClass(TypesenseEngine::class))->newInstanceWithoutConstructor();
+
+    $filters = $engine->buildSearchFilters([
+        'operator' => 'and',
+        'filters' => [
+            ['field' => 'tags.id', 'operator' => '=', 'value' => 10, 'relation' => 'tags', 'relation_field' => 'id'],
+            ['field' => 'tags.slug', 'operator' => '!=', 'value' => ['draft', 'archived'], 'relation' => 'tags', 'relation_field' => 'slug'],
+        ],
+    ]);
+
+    expect($filters)->toBe('tags.id:=10 && tags.slug:!=["draft","archived"]');
 });
 
 it('adds advanced portable filters to typesense keyword search parameters', function (): void {
@@ -172,13 +225,28 @@ it('preserves filterable field metadata across search schema translations', func
     $schema = new SchemaDefinition('users');
     $schema->addField(new FieldDefinition('status', FieldType::Keyword, [IndexType::Searchable, IndexType::Filterable]));
     $schema->addField(new FieldDefinition('title', FieldType::Text, [IndexType::Searchable]));
+    $schema->addField(new FieldDefinition('tags', FieldType::Array, [IndexType::Searchable, IndexType::Filterable], [
+        'relation' => 'tags',
+        'properties' => [
+            'id' => ['type' => FieldType::Integer, 'filterable' => true],
+            'name' => FieldType::Text,
+        ],
+    ]));
 
     $manager = new SchemaManager();
     $typesense_fields = collect($manager->translateForEngine($schema, 'typesense')['fields'])->keyBy('name');
 
     expect($typesense_fields->get('status')['facet'] ?? null)->toBeTrue()
         ->and($typesense_fields->get('title')['facet'] ?? null)->toBeNull()
+        ->and($typesense_fields->get('tags')['type'] ?? null)->toBe('object[]')
+        ->and($typesense_fields->get('tags.id')['type'] ?? null)->toBe('int32[]')
+        ->and($typesense_fields->get('tags.id')['facet'] ?? null)->toBeTrue()
         ->and($manager->translateForEngine($schema, 'elasticsearch')['mappings']['properties']['status']['meta']['filterable'] ?? null)->toBeTrue()
+        ->and($manager->translateForEngine($schema, 'elasticsearch')['mappings']['properties']['tags']['type'] ?? null)->toBe('nested')
+        ->and($manager->translateForEngine($schema, 'elasticsearch')['mappings']['properties']['tags']['meta']['relation'] ?? null)->toBe('tags')
+        ->and($manager->translateForEngine($schema, 'elasticsearch')['mappings']['properties']['tags']['properties']['id']['meta']['filterable'] ?? null)->toBeTrue()
         ->and($manager->translateForEngine($schema, 'database')['columns']['status']['filterable'] ?? null)->toBeTrue()
+        ->and($manager->translateForEngine($schema, 'database')['columns']['tags']['relation'] ?? null)->toBe('tags')
+        ->and($manager->translateForEngine($schema, 'database')['columns']['tags']['properties']['id']['filterable'] ?? null)->toBeTrue()
         ->and($manager->translateForEngine($schema, 'database')['columns']['title']['filterable'] ?? null)->toBeFalse();
 });

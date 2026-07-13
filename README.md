@@ -202,6 +202,12 @@ class ... extends Model
 }
 ```
 
+### Advanced search filters
+
+Core search applies filters inside the active engine before pagination. When a model exposes a searchable schema, public filters are accepted only on fields declared filterable or facetable.
+
+Indexed relation fields use schema-declared dot paths such as `tags.id`. Elasticsearch receives nested queries, Typesense receives nested-field filter syntax, and the database driver uses the schema field option `relation` to translate the same filter to `whereHas` / `whereDoesntHave`. On relation fields, `!=` and `not in` mean anti-exists: no related indexed row may match the value/list.
+
 ### Elasticsearch configuration
 
 ```php
@@ -583,5 +589,4 @@ This section tracks all pending tasks and issues that need to be addressed in th
 - Several items require testing with different database systems
 - Some components need completion of implementation details
 - Priority should be given to high-priority items that affect core functionality
-
 

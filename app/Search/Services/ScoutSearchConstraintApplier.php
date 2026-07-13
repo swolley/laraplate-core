@@ -68,16 +68,24 @@ final readonly class ScoutSearchConstraintApplier
 
     private function applyFilter(mixed $builder, Filter $filter, Model $model): void
     {
-        $field = $this->filterFieldName($model, $filter->property);
+        $field = $this->filterField($model, $filter->property);
 
         if ($field === null) {
             throw new InvalidArgumentException(self::FILTER_ERROR);
         }
 
+        if (isset($field['relation'])) {
+            $this->appendAdvancedFilter($builder, $this->normalizeFilter($filter, $model));
+
+            return;
+        }
+
+        $field_name = $field['name'];
+
         match ($filter->operator) {
-            FilterOperator::Equals => $builder->where($field, $filter->value),
-            FilterOperator::In => $builder->whereIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
-            FilterOperator::NotEquals => $builder->whereNotIn($field, is_array($filter->value) ? $filter->value : [$filter->value]),
+            FilterOperator::Equals => $builder->where($field_name, $filter->value),
+            FilterOperator::In => $builder->whereIn($field_name, is_array($filter->value) ? $filter->value : [$filter->value]),
+            FilterOperator::NotEquals => $builder->whereNotIn($field_name, is_array($filter->value) ? $filter->value : [$filter->value]),
             FilterOperator::Great,
             FilterOperator::GreatEquals,
             FilterOperator::Less,
@@ -111,7 +119,7 @@ final readonly class ScoutSearchConstraintApplier
      */
     private function normalizeFilter(Filter $filter, Model $model): array
     {
-        $field = $this->filterFieldName($model, $filter->property);
+        $field = $this->filterField($model, $filter->property);
 
         if ($field === null) {
             throw new InvalidArgumentException(self::FILTER_ERROR);
@@ -125,11 +133,18 @@ final readonly class ScoutSearchConstraintApplier
             throw new InvalidArgumentException(self::FILTER_ERROR);
         }
 
-        return [
-            'field' => $field,
+        $normalized = [
+            'field' => $field['name'],
             'operator' => $filter->operator->value,
             'value' => $filter->value,
         ];
+
+        if (isset($field['relation'], $field['relation_field'])) {
+            $normalized['relation'] = $field['relation'];
+            $normalized['relation_field'] = $field['relation_field'];
+        }
+
+        return $normalized;
     }
 
     /**
@@ -211,6 +226,12 @@ final readonly class ScoutSearchConstraintApplier
      */
     private static function applyAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
     {
+        if (is_string($filter['relation'] ?? null) && is_string($filter['relation_field'] ?? null)) {
+            self::applyRelationAdvancedFilterToEloquent($query, $filter, $boolean);
+
+            return;
+        }
+
         $field = (string) ($filter['field'] ?? '');
         $operator = (string) ($filter['operator'] ?? '');
         $value = $filter['value'] ?? null;
@@ -232,6 +253,44 @@ final readonly class ScoutSearchConstraintApplier
         };
     }
 
+    /**
+     * @param  array<string, mixed>  $filter
+     */
+    private static function applyRelationAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
+    {
+        $relation = (string) $filter['relation'];
+        $relation_field = (string) $filter['relation_field'];
+        $operator = (string) ($filter['operator'] ?? '');
+        $value = $filter['value'] ?? null;
+        $negative = $operator === FilterOperator::NotEquals->value;
+        $method = match (true) {
+            $negative && $boolean === WhereClause::Or->value => 'orWhereDoesntHave',
+            $negative => 'whereDoesntHave',
+            $boolean === WhereClause::Or->value => 'orWhereHas',
+            default => 'whereHas',
+        };
+
+        $query->{$method}($relation, static function (mixed $relation_query) use ($relation_field, $operator, $value): void {
+            if ($operator === FilterOperator::NotEquals->value) {
+                if (is_array($value)) {
+                    $relation_query->whereIn($relation_field, $value);
+
+                    return;
+                }
+
+                $relation_query->where($relation_field, '=', $value);
+
+                return;
+            }
+
+            self::applyAdvancedFilterToEloquent($relation_query, [
+                'field' => $relation_field,
+                'operator' => $operator,
+                'value' => $value,
+            ], WhereClause::And->value);
+        });
+    }
+
     private function fieldName(Model $model, string $property): ?string
     {
         $table_prefix = $model->getTable() . '.';
@@ -247,25 +306,35 @@ final readonly class ScoutSearchConstraintApplier
         return $property;
     }
 
-    private function filterFieldName(Model $model, string $property): ?string
+    /**
+     * @return array{name: string, relation?: string, relation_field?: string}|null
+     */
+    private function filterField(Model $model, string $property): ?array
     {
-        $field = $this->fieldName($model, $property);
-
-        if ($field === null) {
-            return null;
-        }
+        $field = $this->filterPropertyName($model, $property);
 
         $filterable_fields = $this->filterableFields($model);
 
         if ($filterable_fields === null) {
-            return $field;
+            return str_contains($field, '.') ? null : ['name' => $field];
         }
 
-        return in_array($field, $filterable_fields, true) ? $field : null;
+        return $filterable_fields[$field] ?? null;
+    }
+
+    private function filterPropertyName(Model $model, string $property): string
+    {
+        $table_prefix = $model->getTable() . '.';
+
+        if (str_starts_with($property, $table_prefix)) {
+            return mb_substr($property, mb_strlen($table_prefix));
+        }
+
+        return $property;
     }
 
     /**
-     * @return list<string>|null
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>|null
      */
     private function filterableFields(Model $model): ?array
     {
@@ -295,7 +364,7 @@ final readonly class ScoutSearchConstraintApplier
     }
 
     /**
-     * @return list<string>
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
      */
     private function filterableFieldsFromSchema(SchemaDefinition $schema): array
     {
@@ -307,16 +376,20 @@ final readonly class ScoutSearchConstraintApplier
             }
 
             if ($field->hasIndexType(IndexType::Filterable) || $field->hasIndexType(IndexType::Facetable)) {
-                $fields[] = $field->name;
+                $fields[$field->name] = ['name' => $field->name];
+            }
+
+            foreach ($this->filterableNestedFieldsFromFieldDefinition($field) as $path => $metadata) {
+                $fields[$path] = $metadata;
             }
         }
 
-        return array_values(array_unique($fields));
+        return $fields;
     }
 
     /**
      * @param  array<string, mixed>  $mapping
-     * @return list<string>
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
      */
     private function filterableFieldsFromMapping(array $mapping): array
     {
@@ -328,7 +401,11 @@ final readonly class ScoutSearchConstraintApplier
             }
 
             if (($field['filterable'] ?? false) === true || ($field['facet'] ?? false) === true) {
-                $fields[] = $field['name'];
+                $fields[$field['name']] = ['name' => $field['name']];
+            }
+
+            foreach ($this->filterableNestedFieldsFromTypesenseField($field) as $path => $metadata) {
+                $fields[$path] = $metadata;
             }
         }
 
@@ -343,7 +420,11 @@ final readonly class ScoutSearchConstraintApplier
                 $meta = $definition['meta'] ?? null;
 
                 if (($definition['filterable'] ?? false) === true || (is_array($meta) && ($meta['filterable'] ?? false) === true)) {
-                    $fields[] = $name;
+                    $fields[$name] = ['name' => $name];
+                }
+
+                foreach ($this->filterableNestedFieldsFromElasticsearchProperty($name, $definition) as $path => $metadata) {
+                    $fields[$path] = $metadata;
                 }
             }
         }
@@ -357,11 +438,165 @@ final readonly class ScoutSearchConstraintApplier
                 }
 
                 if (($definition['filterable'] ?? false) === true) {
-                    $fields[] = $name;
+                    $fields[$name] = ['name' => $name];
+                }
+
+                foreach ($this->filterableNestedFieldsFromDatabaseColumn($name, $definition) as $path => $metadata) {
+                    $fields[$path] = $metadata;
                 }
             }
         }
 
-        return array_values(array_unique($fields));
+        return $fields;
+    }
+
+    /**
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
+     */
+    private function filterableNestedFieldsFromFieldDefinition(FieldDefinition $field): array
+    {
+        if (! isset($field->options['properties']) || ! is_array($field->options['properties'])) {
+            return [];
+        }
+
+        $fields = [];
+        $relation = is_string($field->options['relation'] ?? null) ? $field->options['relation'] : null;
+
+        foreach ($field->options['properties'] as $name => $definition) {
+            if (! is_string($name) || ! $this->nestedDefinitionFilterable($definition)) {
+                continue;
+            }
+
+            $path = $field->name . '.' . $name;
+            $fields[$path] = ['name' => $path];
+
+            if ($relation !== null) {
+                $fields[$path]['relation'] = $relation;
+                $fields[$path]['relation_field'] = $name;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
+     */
+    private function filterableNestedFieldsFromTypesenseField(array $field): array
+    {
+        $parent = $field['name'] ?? null;
+
+        if (! is_string($parent)) {
+            return [];
+        }
+
+        $fields = [];
+        $relation = is_string($field['relation'] ?? null) ? $field['relation'] : null;
+
+        foreach (($field['fields'] ?? []) as $nested) {
+            if (! is_array($nested) || ! is_string($nested['name'] ?? null)) {
+                continue;
+            }
+
+            if (($nested['filterable'] ?? false) !== true && ($nested['facet'] ?? false) !== true) {
+                continue;
+            }
+
+            $path = $parent . '.' . $nested['name'];
+            $fields[$path] = ['name' => $path];
+
+            if ($relation !== null) {
+                $fields[$path]['relation'] = $relation;
+                $fields[$path]['relation_field'] = $nested['name'];
+            }
+        }
+
+        if (str_contains($parent, '.') && (($field['filterable'] ?? false) === true || ($field['facet'] ?? false) === true)) {
+            $fields[$parent] = ['name' => $parent];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
+     */
+    private function filterableNestedFieldsFromElasticsearchProperty(string $name, array $definition): array
+    {
+        $properties = $definition['properties'] ?? null;
+
+        if (! is_array($properties)) {
+            return [];
+        }
+
+        $fields = [];
+        $meta = $definition['meta'] ?? [];
+        $relation = is_array($meta) && is_string($meta['relation'] ?? null) ? $meta['relation'] : null;
+
+        foreach ($properties as $property => $property_definition) {
+            if (! is_string($property) || ! is_array($property_definition)) {
+                continue;
+            }
+
+            $property_meta = $property_definition['meta'] ?? [];
+
+            if (! is_array($property_meta) || ($property_meta['filterable'] ?? false) !== true) {
+                continue;
+            }
+
+            $path = $name . '.' . $property;
+            $fields[$path] = ['name' => $path];
+
+            if ($relation !== null) {
+                $fields[$path]['relation'] = $relation;
+                $fields[$path]['relation_field'] = $property;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return array<string, array{name: string, relation?: string, relation_field?: string}>
+     */
+    private function filterableNestedFieldsFromDatabaseColumn(string $name, array $definition): array
+    {
+        $properties = $definition['properties'] ?? null;
+
+        if (! is_array($properties)) {
+            return [];
+        }
+
+        $fields = [];
+        $relation = is_string($definition['relation'] ?? null) ? $definition['relation'] : null;
+
+        foreach ($properties as $property => $property_definition) {
+            if (! is_string($property) || ! is_array($property_definition)) {
+                continue;
+            }
+
+            if (($property_definition['filterable'] ?? false) !== true) {
+                continue;
+            }
+
+            $path = $name . '.' . $property;
+            $fields[$path] = ['name' => $path];
+
+            if ($relation !== null) {
+                $fields[$path]['relation'] = $relation;
+                $fields[$path]['relation_field'] = $property;
+            }
+        }
+
+        return $fields;
+    }
+
+    private function nestedDefinitionFilterable(mixed $definition): bool
+    {
+        return is_array($definition)
+            && (($definition['filterable'] ?? false) === true || ($definition['facet'] ?? false) === true);
     }
 }

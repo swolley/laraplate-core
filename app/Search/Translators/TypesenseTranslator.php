@@ -28,6 +28,10 @@ class TypesenseTranslator implements ISchemaTranslator
             if ($translated['type'] === 'object' || $translated['type'] === 'object[]') {
                 $requires_nested = true;
             }
+
+            foreach ($this->translateNestedFields($field) as $nestedField) {
+                $collection['fields'][] = $nestedField;
+            }
         }
 
         if ($requires_nested) {
@@ -49,19 +53,6 @@ class TypesenseTranslator implements ISchemaTranslator
             'type' => $this->getTypesenseType($field->type, $field->options),
         ];
 
-        // Nested fields for object/object[] types
-        if (isset($field->options['properties']) && is_array($field->options['properties'])) {
-            $tsField['fields'] = [];
-
-            foreach ($field->options['properties'] as $name => $type) {
-                $resolvedType = $type instanceof FieldType ? $type : FieldType::fromValue($type);
-                $tsField['fields'][] = [
-                    'name' => $name,
-                    'type' => $this->getTypesenseType($resolvedType),
-                ];
-            }
-        }
-
         // Add index-specific options
         if ($field->hasIndexType(IndexType::Searchable)) {
             $tsField['index'] = true;
@@ -76,6 +67,61 @@ class TypesenseTranslator implements ISchemaTranslator
         }
 
         return $tsField;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function translateNestedFields(FieldDefinition $field): array
+    {
+        if (! isset($field->options['properties']) || ! is_array($field->options['properties'])) {
+            return [];
+        }
+
+        $fields = [];
+        $isArray = $field->type === FieldType::Array;
+
+        foreach ($field->options['properties'] as $name => $definition) {
+            if (! is_string($name)) {
+                continue;
+            }
+
+            [$type, $filterable] = $this->nestedPropertyDefinition($definition);
+            $translated = [
+                'name' => $field->name . '.' . $name,
+                'type' => $this->getTypesenseType($type) . ($isArray && ! str_ends_with($this->getTypesenseType($type), '[]') ? '[]' : ''),
+                'optional' => true,
+            ];
+
+            if ($filterable) {
+                $translated['facet'] = true;
+            }
+
+            $fields[] = $translated;
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @return array{0: FieldType, 1: bool}
+     */
+    private function nestedPropertyDefinition(mixed $definition): array
+    {
+        if ($definition instanceof FieldType) {
+            return [$definition, false];
+        }
+
+        if (is_array($definition)) {
+            $type = $definition['type'] ?? FieldType::Text;
+
+            return [
+                $type instanceof FieldType ? $type : FieldType::fromValue($type),
+                ($definition['filterable'] ?? false) === true || ($definition['facet'] ?? false) === true,
+            ];
+        }
+
+        return [FieldType::fromValue($definition), false];
     }
 
     private function getTypesenseType(FieldType $type, array $options = []): string

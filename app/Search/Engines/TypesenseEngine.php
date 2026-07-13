@@ -203,7 +203,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         return match ($operator) {
             '=' => sprintf('%s:=%s', $field, $this->formatTypesenseFilterValue($value)),
             'in' => sprintf('%s:[%s]', $field, implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), is_array($value) ? $value : [$value]))),
-            '!=' => sprintf('%s:!=%s', $field, $this->formatTypesenseFilterValue($value)),
+            '!=' => sprintf('%s:!=%s', $field, is_array($value) ? '[' . implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), $value)) . ']' : $this->formatTypesenseFilterValue($value)),
             '>' => sprintf('%s:>%s', $field, $this->formatTypesenseFilterValue($value)),
             '>=' => sprintf('%s:>=%s', $field, $this->formatTypesenseFilterValue($value)),
             '<' => sprintf('%s:<%s', $field, $this->formatTypesenseFilterValue($value)),

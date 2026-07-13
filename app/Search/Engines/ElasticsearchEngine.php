@@ -239,6 +239,37 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         $field = (string) ($filter['field'] ?? '');
         $operator = (string) ($filter['operator'] ?? '=');
         $value = $filter['value'] ?? null;
+        $relation = $filter['relation'] ?? null;
+
+        if (is_string($relation) && $relation !== '') {
+            $positive = match ($operator) {
+                '=' => ['term' => [$field => $value]],
+                'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
+                '!=' => is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]],
+                '>' => ['range' => [$field => ['gt' => $value]]],
+                '>=' => ['range' => [$field => ['gte' => $value]]],
+                '<' => ['range' => [$field => ['lt' => $value]]],
+                '<=' => ['range' => [$field => ['lte' => $value]]],
+                'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
+                default => ['term' => [$field => $value]],
+            };
+            $nested = [
+                'nested' => [
+                    'path' => $relation,
+                    'query' => $positive,
+                ],
+            ];
+
+            if ($operator === '!=') {
+                return [
+                    'bool' => [
+                        'must_not' => [$nested],
+                    ],
+                ];
+            }
+
+            return $nested;
+        }
 
         return match ($operator) {
             '=' => ['term' => [$field => $value]],

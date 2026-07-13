@@ -90,6 +90,8 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **SchemaDefinition**  | Describes indexable fields and analyzers for a model.           |
 | **ISearchEngine**     | Contract for Elasticsearch, Typesense, or database translator backends. |
 | **ModelEmbedding**    | Persisted embedding vectors linked to searchable models.        |
+| **Indexed relation-field filter** | Search filter using a schema-declared dot path such as `tags.id`; it targets relation data already stored in the search document. |
+| **Relation anti-exists filter** | `!=` / `not in` on an indexed relation field; means no related indexed row matches the value/list. |
 
 
 ## Internationalization

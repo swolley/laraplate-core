@@ -83,7 +83,11 @@ class ElasticsearchTranslator implements ISchemaTranslator
 
         if ($field->type === FieldType::Array && isset($field->options['properties'])) {
             $esField['type'] = 'nested';
-            $esField['properties'] = $field->options['properties'];
+            $esField['properties'] = $this->translateNestedProperties($field);
+        }
+
+        if (is_string($field->options['relation'] ?? null)) {
+            $esField['meta']['relation'] = $field->options['relation'];
         }
 
         // Add index-specific options
@@ -97,5 +101,51 @@ class ElasticsearchTranslator implements ISchemaTranslator
         }
 
         return $esField;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function translateNestedProperties(FieldDefinition $field): array
+    {
+        $properties = [];
+
+        foreach (($field->options['properties'] ?? []) as $name => $definition) {
+            if (! is_string($name)) {
+                continue;
+            }
+
+            [$type, $filterable] = $this->nestedPropertyDefinition($definition);
+            $property = $this->translateField(new FieldDefinition($name, $type, $filterable ? [IndexType::Filterable] : []));
+
+            if ($filterable) {
+                $property['meta']['filterable'] = true;
+            }
+
+            $properties[$name] = $property;
+        }
+
+        return $properties;
+    }
+
+    /**
+     * @return array{0: FieldType, 1: bool}
+     */
+    private function nestedPropertyDefinition(mixed $definition): array
+    {
+        if ($definition instanceof FieldType) {
+            return [$definition, false];
+        }
+
+        if (is_array($definition)) {
+            $type = $definition['type'] ?? FieldType::Text;
+
+            return [
+                $type instanceof FieldType ? $type : FieldType::fromValue($type),
+                ($definition['filterable'] ?? false) === true || ($definition['facet'] ?? false) === true,
+            ];
+        }
+
+        return [FieldType::fromValue($definition), false];
     }
 }

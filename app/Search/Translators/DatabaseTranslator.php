@@ -80,7 +80,58 @@ class DatabaseTranslator implements ISchemaTranslator
 
         $definition['filterable'] = $field->hasIndexType(IndexType::Filterable) || $field->hasIndexType(IndexType::Facetable);
 
+        if (is_string($field->options['relation'] ?? null)) {
+            $definition['relation'] = $field->options['relation'];
+        }
+
+        if (isset($field->options['properties']) && is_array($field->options['properties'])) {
+            $definition['properties'] = $this->getNestedProperties($field);
+        }
+
         return $definition;
+    }
+
+    /**
+     * @return array<string, array{type: string, filterable: bool}>
+     */
+    private function getNestedProperties(FieldDefinition $field): array
+    {
+        $properties = [];
+
+        foreach (($field->options['properties'] ?? []) as $name => $definition) {
+            if (! is_string($name)) {
+                continue;
+            }
+
+            [$type, $filterable] = $this->nestedPropertyDefinition($definition);
+            $properties[$name] = [
+                'type' => $type->value,
+                'filterable' => $filterable,
+            ];
+        }
+
+        return $properties;
+    }
+
+    /**
+     * @return array{0: FieldType, 1: bool}
+     */
+    private function nestedPropertyDefinition(mixed $definition): array
+    {
+        if ($definition instanceof FieldType) {
+            return [$definition, false];
+        }
+
+        if (is_array($definition)) {
+            $type = $definition['type'] ?? FieldType::Text;
+
+            return [
+                $type instanceof FieldType ? $type : FieldType::fromValue($type),
+                ($definition['filterable'] ?? false) === true || ($definition['facet'] ?? false) === true,
+            ];
+        }
+
+        return [FieldType::fromValue($definition), false];
     }
 
     private function getIndexes(SchemaDefinition $schema): array
