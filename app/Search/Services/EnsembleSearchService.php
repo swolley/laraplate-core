@@ -151,10 +151,12 @@ class EnsembleSearchService
 
         foreach ($results as $result) {
             if ($result instanceof Model) {
+                $attributes = $result->getAttributes();
+
                 $hits[] = [
                     'id' => (string) $result->getKey(),
-                    'score' => is_numeric($result->getAttribute('_score')) ? (float) $result->getAttribute('_score') : 1.0,
-                    'source' => $result->getAttributes(),
+                    'score' => is_numeric($attributes['_score'] ?? null) ? (float) $attributes['_score'] : 1.0,
+                    'source' => $attributes,
                 ];
 
                 continue;

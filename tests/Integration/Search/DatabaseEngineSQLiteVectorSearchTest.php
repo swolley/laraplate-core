@@ -2,12 +2,42 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Laravel\Scout\Builder as ScoutBuilder;
+use Laravel\Scout\Searchable;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Engines\DatabaseEngine;
+use Modules\Core\Search\Services\EnsembleSearchService;
+use Modules\Core\Search\Services\HeuristicReranker;
+
+final class DatabaseEngineSQLiteVectorSearchUser extends Model
+{
+    use Searchable;
+
+    protected $table = 'users';
+
+    protected $guarded = [];
+
+    public function searchableUsing(): DatabaseEngine
+    {
+        return new DatabaseEngine();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (string) $this->getKey(),
+            'username' => (string) $this->getAttribute('username'),
+            'email' => (string) $this->getAttribute('email'),
+        ];
+    }
+}
 
 it('returns the top sqlite vector search matches without changing the result shape', function (): void {
     config()->set('database.default', 'sqlite');
@@ -47,7 +77,83 @@ it('keeps sqlite vector search off full collection map pipelines', function (): 
     $source = file_get_contents(base_path('Modules/Core/app/Search/Engines/DatabaseEngine.php'));
 
     expect($source)->not->toContain("->get()\n            ->map(")
-        ->and($source)->toContain('->lazy(100)');
+        ->and($source)->not->toContain('vectorModels($builder, PHP_INT_MAX)')
+        ->and($source)->toContain('->lazy(100)')
+        ->and($source)->toContain('filterVectorMatchesByModelConstraints');
+});
+
+it('builds the postgresql vector query with pgvector distance bindings without executing it', function (): void {
+    $method = new ReflectionMethod(DatabaseEngine::class, 'postgreSQLVectorSearchQuery');
+    $method->setAccessible(true);
+
+    $query = $method->invoke(new DatabaseEngine(), [1.0, 0.5, 0.0], new DatabaseEngineSQLiteVectorSearchUser(), [101, 202]);
+
+    expect($query->toSql())->toContain('embedding <=> ?::vector AS distance')
+        ->and($query->toSql())->toContain('"model_id" in (?, ?)')
+        ->and($query->toSql())->toContain('order by embedding <=> ?::vector')
+        ->and($query->getBindings())->toBe([
+            '[1,0.5,0]',
+            DatabaseEngineSQLiteVectorSearchUser::class,
+            101,
+            202,
+            '[1,0.5,0]',
+        ]);
+});
+
+it('builds the mysql vector query with json table cosine scoring without executing it', function (): void {
+    $method = new ReflectionMethod(DatabaseEngine::class, 'mySQLVectorSearchQuery');
+    $method->setAccessible(true);
+
+    $query = $method->invoke(new DatabaseEngine(), [1.0, 0.5, 0.0], new DatabaseEngineSQLiteVectorSearchUser(), [101, 202]);
+
+    expect($query->toSql())->toContain("JSON_TABLE(?, '$[*]' COLUMNS")
+        ->and($query->toSql())->toContain('AS similarity_score')
+        ->and($query->toSql())->toContain('"model_id" in (?, ?)')
+        ->and($query->toSql())->toContain('having "similarity_score" > ?')
+        ->and($query->toSql())->toContain('order by "similarity_score" desc')
+        ->and($query->getBindings())->toBe([
+            '[1,0.5,0]',
+            DatabaseEngineSQLiteVectorSearchUser::class,
+            101,
+            202,
+            0.7,
+        ]);
+});
+
+it('prefilters sqlite vector candidates from keyword constraints before scoring', function (): void {
+    config()->set('database.default', 'sqlite');
+
+    $matched = User::factory()->create([
+        'username' => 'prefilter_alpha_' . uniqid(),
+        'email' => 'prefilter_alpha_' . uniqid() . '@example.test',
+    ]);
+    $vector_only = User::factory()->create([
+        'username' => 'prefilter_vector_' . uniqid(),
+        'email' => 'prefilter_vector_' . uniqid() . '@example.test',
+    ]);
+    $now = now();
+    $table = CoreTables::ModelEmbeddings->value;
+
+    $insert_embedding = static fn (int $model_id): int => (int) DB::table($table)->insertGetId([
+        'model_type' => DatabaseEngineSQLiteVectorSearchUser::class,
+        'model_id' => $model_id,
+        'embedding' => json_encode([1.0, 0.0, 0.0], JSON_THROW_ON_ERROR),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $insert_embedding((int) $matched->getKey());
+    $insert_embedding((int) $vector_only->getKey());
+
+    $builder = new ScoutBuilder(new DatabaseEngineSQLiteVectorSearchUser(), 'prefilter_alpha');
+    $builder->where('vector', [1.0, 0.0, 0.0]);
+
+    $method = new ReflectionMethod(DatabaseEngine::class, 'performSQLiteVectorSearch');
+    $method->setAccessible(true);
+
+    $results = $method->invoke(new DatabaseEngine(), [1.0, 0.0, 0.0], new DatabaseEngineSQLiteVectorSearchUser(), $builder);
+
+    expect(array_column($results, 'model_id'))->toBe([$matched->getKey()]);
 });
 
 it('paginates sqlite vector search as matching models ordered by similarity', function (): void {
@@ -78,9 +184,113 @@ it('paginates sqlite vector search as matching models ordered by similarity', fu
 
     $paginator = (new DatabaseEngine())->paginateUsingDatabase($builder, 2, 'page', 1);
     $models = $paginator->getCollection();
+    $second_page = (new DatabaseEngine())->paginateUsingDatabase($builder, 1, 'page', 2);
 
     expect($paginator->total())->toBe(2)
         ->and($models)->toHaveCount(2)
         ->and($models->pluck('id')->all())->toBe([$best->getKey(), $second->getKey()])
-        ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan($models->last()?->getAttribute('_score'));
+        ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan($models->last()?->getAttribute('_score'))
+        ->and($second_page->total())->toBe(2)
+        ->and($second_page->getCollection())->toHaveCount(1)
+        ->and($second_page->getCollection()->first()?->getKey())->toBe($second->getKey());
+});
+
+it('applies keyword constraints when sqlite vector search is used as a hybrid database search', function (): void {
+    config()->set('database.default', 'sqlite');
+
+    $matched = User::factory()->create([
+        'username' => 'hybrid_alpha_' . uniqid(),
+        'email' => 'alpha_' . uniqid() . '@example.test',
+    ]);
+    $vector_only = User::factory()->create([
+        'username' => 'vector_only_' . uniqid(),
+        'email' => 'vector_' . uniqid() . '@example.test',
+    ]);
+    $low_keyword_match = User::factory()->create([
+        'username' => 'hybrid_alpha_low_' . uniqid(),
+        'email' => 'low_' . uniqid() . '@example.test',
+    ]);
+    $now = now();
+    $table = CoreTables::ModelEmbeddings->value;
+
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+        'model_type' => $model_type,
+        'model_id' => $model_id,
+        'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $matched->getKey(), [1.0, 0.0, 0.0]);
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $vector_only->getKey(), [1.0, 0.0, 0.0]);
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $low_keyword_match->getKey(), [0.6, 0.8, 0.0]);
+
+    $builder = new ScoutBuilder(new DatabaseEngineSQLiteVectorSearchUser(), 'hybrid_alpha');
+    $builder->where('vector', [1.0, 0.0, 0.0]);
+
+    $paginator = (new DatabaseEngine())->paginateUsingDatabase($builder, 10, 'page', 1);
+    $models = $paginator->getCollection();
+
+    expect($paginator->total())->toBe(1)
+        ->and($models)->toHaveCount(1)
+        ->and($models->first()?->getKey())->toBe($matched->getKey())
+        ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan(0.99);
+});
+
+it('executes keyword vector and hybrid strategies through the database engine ensemble path', function (): void {
+    config()->set('database.default', 'sqlite');
+
+    $matched = User::factory()->create([
+        'username' => 'ensemble_alpha_' . uniqid(),
+        'email' => 'ensemble_alpha_' . uniqid() . '@example.test',
+    ]);
+    $keyword_only = User::factory()->create([
+        'username' => 'ensemble_alpha_keyword_' . uniqid(),
+        'email' => 'ensemble_keyword_' . uniqid() . '@example.test',
+    ]);
+    $vector_only = User::factory()->create([
+        'username' => 'ensemble_vector_' . uniqid(),
+        'email' => 'ensemble_vector_' . uniqid() . '@example.test',
+    ]);
+    $now = now();
+    $table = CoreTables::ModelEmbeddings->value;
+
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+        'model_type' => $model_type,
+        'model_id' => $model_id,
+        'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $matched->getKey(), [1.0, 0.0, 0.0]);
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $keyword_only->getKey(), [0.6, 0.8, 0.0]);
+    $insert_embedding(DatabaseEngineSQLiteVectorSearchUser::class, (int) $vector_only->getKey(), [1.0, 0.0, 0.0]);
+
+    $result = (new EnsembleSearchService(new HeuristicReranker()))->search(
+        model: new DatabaseEngineSQLiteVectorSearchUser(),
+        query: 'ensemble_alpha',
+        plan: [
+            'retrieval' => [
+                'use_fulltext' => true,
+                'use_vector' => true,
+            ],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => false],
+        ],
+        vector: [1.0, 0.0, 0.0],
+        page: 1,
+        perPage: 10,
+    );
+
+    $hit_ids = array_column($result->hits, 'id');
+
+    expect($result->meta['strategies'])->toBe(['keyword', 'vector', 'hybrid'])
+        ->and($result->meta['strategies_executed'])->toBe(3)
+        ->and($result->hits)->not->toBeEmpty()
+        ->and($hit_ids)->toContain((string) $matched->getKey())
+        ->and($hit_ids)->toContain((string) $keyword_only->getKey())
+        ->and($hit_ids)->toContain((string) $vector_only->getKey())
+        ->and($result->hits[0])->toHaveKeys(['id', 'score', 'source'])
+        ->and($result->hits[0]['score'])->toBeFloat();
 });

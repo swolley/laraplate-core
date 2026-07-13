@@ -113,14 +113,15 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
         $page = (int) ($page ?: Paginator::resolveCurrentPage($pageName));
         $perPage = (int) ($perPage ?: $builder->model->getPerPage());
-        $models = $this->vectorModels($builder, PHP_INT_MAX);
-        $items = $models
-            ->slice(max(0, ($page - 1) * $perPage), $perPage)
-            ->values();
+        $matches = $this->filterVectorMatchesByModelConstraints(
+            $builder,
+            $this->vectorMatches($builder, PHP_INT_MAX),
+        );
+        $page_matches = array_slice($matches, max(0, ($page - 1) * $perPage), $perPage);
 
         return new LengthAwarePaginator(
-            items: $builder->model->newCollection($items->all()),
-            total: $models->count(),
+            items: $this->vectorModelsFromMatches($builder, $page_matches),
+            total: count($matches),
             perPage: $perPage,
             currentPage: $page,
             options: [
@@ -139,11 +140,12 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         $query_vector = $this->extractVectorFromBuilder($builder);
         $model = $builder->model;
         $driver = $this->getDatabaseDriver();
+        $candidate_ids = $this->vectorCandidateIds($builder);
 
         return match ($driver) {
-            'pgsql' => $this->performPostgreSQLVectorSearch($query_vector, $model, $builder, $limit),
-            'mysql', 'mariadb' => $this->performMySQLVectorSearch($query_vector, $model, $builder, $limit),
-            'sqlite' => $this->performSQLiteVectorSearch($query_vector, $model, $builder, $limit),
+            'pgsql' => $this->performPostgreSQLVectorSearch($query_vector, $model, $builder, $limit, $candidate_ids),
+            'mysql', 'mariadb' => $this->performMySQLVectorSearch($query_vector, $model, $builder, $limit, $candidate_ids),
+            'sqlite' => $this->performSQLiteVectorSearch($query_vector, $model, $builder, $limit, $candidate_ids),
             default => throw new InvalidArgumentException('Vector search not supported for driver: ' . $driver),
         };
     }
@@ -154,7 +156,16 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      */
     private function vectorModels(Builder $builder, ?int $limit = null): EloquentCollection
     {
-        $matches = $this->vectorMatches($builder, $limit);
+        return $this->vectorModelsFromMatches($builder, $this->vectorMatches($builder, $limit));
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @param  list<array{model_id: mixed, score: float}>  $matches
+     * @return EloquentCollection<int, Model>
+     */
+    private function vectorModelsFromMatches(Builder $builder, array $matches): EloquentCollection
+    {
         $ids = array_values(array_unique(array_map(static fn (array $match): mixed => $match['model_id'], $matches)));
 
         if ($ids === []) {
@@ -178,6 +189,36 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         }
 
         return $builder->model->newCollection($ordered);
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @param  list<array{model_id: mixed, score: float}>  $matches
+     * @return list<array{model_id: mixed, score: float}>
+     */
+    private function filterVectorMatchesByModelConstraints(Builder $builder, array $matches): array
+    {
+        $ids = array_values(array_unique(array_map(static fn (array $match): mixed => $match['model_id'], $matches)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $valid_ids = array_flip(array_map(
+            static fn (mixed $id): string => (string) $id,
+            $this->constrainedVectorModelQuery($builder, $ids)
+                ->pluck($builder->model->getKeyName())
+                ->all(),
+        ));
+
+        if ($valid_ids === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $matches,
+            static fn (array $match): bool => isset($valid_ids[(string) $match['model_id']]),
+        ));
     }
 
     /**
@@ -218,27 +259,101 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      */
     private function constrainedVectorModelQuery(Builder $builder, array $ids): EloquentBuilder
     {
-        /** @var EloquentBuilder<Model> $query */
-        $query = $builder->model->newQuery()->whereKey($ids);
+        return $this->constrainedVectorCandidateQuery($builder)->whereKey($ids);
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return EloquentBuilder<Model>
+     */
+    private function constrainedVectorCandidateQuery(Builder $builder): EloquentBuilder
+    {
+        $query = $this->baseVectorModelQuery($builder);
         $vector_fields = array_flip(['vector', 'embedding', $this->resolveVectorField($builder->model)]);
 
-        foreach (array_diff_key($builder->wheres, $vector_fields) as $key => $value) {
-            if ($key === '__soft_deleted') {
-                continue;
+        if ($builder->callback !== null) {
+            call_user_func($builder->callback, $query, $builder, $builder->query);
+        } else {
+            foreach (array_diff_key($builder->wheres, $vector_fields) as $key => $value) {
+                if ($key === '__soft_deleted') {
+                    continue;
+                }
+
+                $query->where($key, '=', $value);
             }
 
-            $query->where($key, '=', $value);
+            foreach ($builder->whereIns as $key => $values) {
+                $query->whereIn($key, $values);
+            }
+
+            foreach ($builder->whereNotIns as $key => $values) {
+                $query->whereNotIn($key, $values);
+            }
         }
 
-        foreach ($builder->whereIns as $key => $values) {
-            $query->whereIn($key, $values);
-        }
-
-        foreach ($builder->whereNotIns as $key => $values) {
-            $query->whereNotIn($key, $values);
+        if ($builder->queryCallback !== null) {
+            call_user_func($builder->queryCallback, $query);
         }
 
         return $this->constrainForSoftDeletes($builder, $query);
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return EloquentBuilder<Model>
+     */
+    private function baseVectorModelQuery(Builder $builder): EloquentBuilder
+    {
+        if ($builder->query === '*' || blank($builder->query) || ! method_exists($builder->model, 'toSearchableArray')) {
+            /** @var EloquentBuilder<Model> */
+            return $builder->model->newQuery();
+        }
+
+        /** @var array<string, mixed> $searchable */
+        $searchable = $builder->model->toSearchableArray();
+
+        /** @var EloquentBuilder<Model> */
+        return $this->initializeSearchQuery(
+            $builder,
+            array_keys($searchable),
+            $this->getPrefixColumns($builder),
+            $this->getFullTextColumns($builder),
+        );
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return list<mixed>|null
+     */
+    private function vectorCandidateIds(Builder $builder): ?array
+    {
+        if (! $this->hasVectorCandidateConstraints($builder)) {
+            return null;
+        }
+
+        return $this->constrainedVectorCandidateQuery($builder)
+            ->pluck($builder->model->getKeyName())
+            ->all();
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private function hasVectorCandidateConstraints(Builder $builder): bool
+    {
+        if ($builder->callback !== null || $builder->queryCallback !== null) {
+            return true;
+        }
+
+        if ($builder->query !== '*' && ! blank($builder->query) && method_exists($builder->model, 'toSearchableArray')) {
+            return true;
+        }
+
+        $vector_fields = array_flip(['vector', 'embedding', $this->resolveVectorField($builder->model)]);
+
+        return array_diff_key($builder->wheres, $vector_fields) !== []
+            || $builder->whereIns !== []
+            || $builder->whereNotIns !== [];
     }
 
     /**
@@ -246,13 +361,15 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performPostgreSQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
+    private function performPostgreSQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null, ?array $candidateIds = null): array
     {
-        $vector_string = '[' . implode(',', $queryVector) . ']';
-        $query = ModelEmbedding::query()
-            ->where('model_type', $model::class)
-            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vector_string])
-            ->orderByRaw('embedding <=> ?::vector', [$vector_string]);
+        $candidateIds ??= $this->vectorCandidateIds($builder);
+
+        if ($candidateIds === []) {
+            return [];
+        }
+
+        $query = $this->postgreSQLVectorSearchQuery($queryVector, $model, $candidateIds);
 
         if ($limit !== null) {
             $query->limit($limit);
@@ -266,12 +383,57 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
     /**
      * @param  list<float>  $queryVector
+     * @return EloquentBuilder<ModelEmbedding>
+     */
+    private function postgreSQLVectorSearchQuery(array $queryVector, Model $model, ?array $candidateIds = null): EloquentBuilder
+    {
+        $vector_string = '[' . implode(',', $queryVector) . ']';
+
+        $query = ModelEmbedding::query()
+            ->where('model_type', $model::class)
+            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vector_string])
+            ->orderByRaw('embedding <=> ?::vector', [$vector_string]);
+
+        if ($candidateIds !== null) {
+            $query->whereIn('model_id', $candidateIds);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  list<float>  $queryVector
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performMySQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
+    private function performMySQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null, ?array $candidateIds = null): array
     {
-        $query_vector_json = json_encode($queryVector);
+        $candidateIds ??= $this->vectorCandidateIds($builder);
+
+        if ($candidateIds === []) {
+            return [];
+        }
+
+        $query = $this->mySQLVectorSearchQuery($queryVector, $model, $candidateIds);
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $query
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * @param  list<float>  $queryVector
+     * @return EloquentBuilder<ModelEmbedding>
+     */
+    private function mySQLVectorSearchQuery(array $queryVector, Model $model, ?array $candidateIds = null): EloquentBuilder
+    {
+        $query_vector_json = json_encode($queryVector, JSON_THROW_ON_ERROR);
+
         $query = ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->selectRaw(
@@ -287,14 +449,11 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
             ->having('similarity_score', '>', 0.7)
             ->orderBy('similarity_score', 'desc');
 
-        if ($limit !== null) {
-            $query->limit($limit);
+        if ($candidateIds !== null) {
+            $query->whereIn('model_id', $candidateIds);
         }
 
-        /** @var list<array<string, mixed>> */
-        return $query
-            ->get()
-            ->toArray();
+        return $query;
     }
 
     /**
@@ -302,20 +461,24 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
+    private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null, ?array $candidateIds = null): array
     {
+        $candidateIds ??= $this->vectorCandidateIds($builder);
         $limit ??= (int) ($builder->limit ?? 10);
 
-        if ($limit <= 0) {
+        if ($limit <= 0 || $candidateIds === []) {
             return [];
         }
 
         /** @var list<array{id: int|null, similarity_score: float, embedding: list<float>}> $results */
         $results = [];
+        $query = ModelEmbedding::query()->where('model_type', $model::class);
 
-        foreach (ModelEmbedding::query()
-            ->where('model_type', $model::class)
-            ->lazy(100) as $embedding) {
+        if ($candidateIds !== null) {
+            $query->whereIn('model_id', $candidateIds);
+        }
+
+        foreach ($query->lazy(100) as $embedding) {
             $stored_embedding = $embedding->embedding ?? [];
 
             if (! is_array($stored_embedding)) {
