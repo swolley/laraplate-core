@@ -506,7 +506,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
             usort($results, static fn (array $left, array $right): int => $right['similarity_score'] <=> $left['similarity_score']);
 
-            if (count($results) > $limit) {
+            if ($limit < count($results)) {
                 array_pop($results);
             }
         }

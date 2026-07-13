@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\License;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Throwable;
@@ -115,7 +115,7 @@ final class HandleLicensesCommand extends Command
 
     private function listLicenses(): void
     {
-        $licenses = License::with('user')->get();
+        $licenses = License::with('user')->lazy(100);
         $remapped = [];
 
         foreach ($licenses as $license) {

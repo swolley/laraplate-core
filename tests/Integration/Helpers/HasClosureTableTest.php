@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\TreeCollection;
 use Modules\Core\Tests\Stubs\ClosureTreeStubModel;
 
-
 beforeEach(function (): void {
     Schema::dropIfExists('closure_tree_nodes_closure');
     Schema::dropIfExists('closure_tree_nodes');
@@ -170,4 +169,23 @@ it('aggregates bloodline collections', function (): void {
 
     expect($bloodline->count())->toBeGreaterThan(0)
         ->and($bloodline_self->count())->toBeGreaterThan(0);
+});
+
+it('rebuilds a larger closure tree without eager loading recursive children', function (): void {
+    $root = ClosureTreeStubModel::query()->create(['parent_id' => null]);
+    $parent_id = $root->id;
+
+    for ($i = 0; $i < 120; $i++) {
+        $node = ClosureTreeStubModel::query()->create(['parent_id' => $parent_id]);
+        $parent_id = $node->id;
+    }
+
+    DB::enableQueryLog();
+
+    ClosureTreeStubModel::rebuildClosure();
+
+    $queries = collect(DB::getQueryLog())->pluck('query')->implode("\n");
+
+    expect(DB::table('closure_tree_nodes_closure')->count())->toBeGreaterThan(120)
+        ->and($queries)->not->toContain('select * from "closure_tree_nodes" where "closure_tree_nodes"."parent_id" in');
 });

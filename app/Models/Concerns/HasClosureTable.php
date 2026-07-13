@@ -32,13 +32,14 @@ trait HasClosureTable
         $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
         DB::table($table_name)->truncate();
 
-        // Process only root nodes (nodes without parent) to avoid loading entire tree
-        // Then recursively process children as needed
-        $root_nodes = static::whereNull('parent_id')->with('children')->get();
-
-        foreach ($root_nodes as $root) {
-            self::insertClosures($root);
-        }
+        static::query()
+            ->whereNull('parent_id')
+            ->orderBy('id')
+            ->chunkById(100, static function (Collection $rootNodes): void {
+                foreach ($rootNodes as $root) {
+                    self::insertClosures($root);
+                }
+            });
     }
 
     /**
@@ -264,9 +265,7 @@ trait HasClosureTable
             DB::table($table_name)->insert($rows);
         }
 
-        // Load children only when needed (lazy loading)
-        // This prevents loading entire tree in memory at once
-        $children = $model->children()->with('children')->get();
+        $children = $model->children()->orderBy('id')->get();
 
         foreach ($children as $child) {
             self::insertClosures($child, array_merge([$model], $ancestors));

@@ -268,7 +268,10 @@ it('covers listLicenses private method output path', function (): void {
     ]);
 
     $list->invoke($command);
-    expect(true)->toBeTrue();
+
+    $source = file_get_contents((new ReflectionClass(HandleLicensesCommand::class))->getFileName());
+    expect($source)->toContain("License::with('user')->lazy(100)")
+        ->and($source)->not->toContain("License::with('user')->get()");
 });
 
 it('handles add action through handle flow', function (): void {

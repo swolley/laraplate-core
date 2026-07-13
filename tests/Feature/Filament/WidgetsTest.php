@@ -35,15 +35,22 @@ it('builds core stats widget data', function (): void {
     $widget = new CoreStatsWidget();
     $method = new ReflectionMethod(CoreStatsWidget::class, 'getStats');
     $method->setAccessible(true);
+    $property = new ReflectionProperty(CoreStatsWidget::class, 'isLazy');
+    $property->setAccessible(true);
 
     if (config('database.default') === 'sqlite') {
-        expect(fn () => $method->invoke($widget))->toThrow(QueryException::class);
+        expect($property->getDeclaringClass()->getName())->toBe(CoreStatsWidget::class)
+            ->and($property->getValue())->toBeTrue()
+            ->and(fn () => $method->invoke($widget))->toThrow(QueryException::class);
 
         return;
     }
 
     $stats = $method->invoke($widget);
-    expect($stats)->toHaveCount(3);
+
+    expect($stats)->toHaveCount(3)
+        ->and($property->getDeclaringClass()->getName())->toBe(CoreStatsWidget::class)
+        ->and($property->getValue())->toBeTrue();
 });
 
 it('returns horizon canView based on service provider availability', function (): void {
