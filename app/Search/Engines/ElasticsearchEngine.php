@@ -121,7 +121,21 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             return $this->performVectorSearch($builder);
         }
 
+        if ($this->hasAdvancedFilters($builder)) {
+            return $this->performKeywordSearch($builder, $builder->limit ?: 10, 1);
+        }
+
         return parent::search($builder);
+    }
+
+    #[Override]
+    public function paginate(Builder $builder, $perPage, $page): SearchResult
+    {
+        if ($this->hasAdvancedFilters($builder)) {
+            return $this->performKeywordSearch($builder, (int) $perPage, (int) $page);
+        }
+
+        return parent::paginate($builder, $perPage, $page);
     }
 
     /**
@@ -807,6 +821,63 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         $response = $client->search($params);
 
         return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private function performKeywordSearch(Builder $builder, int $perPage, int $page): SearchResult
+    {
+        $model = $builder->model;
+        $index = $this->resolveSearchableCollectionName($model);
+
+        if ($index === null) {
+            return parent::search($builder);
+        }
+
+        $filters = $this->filtersFromBuilder($builder, $model);
+        $bool = [
+            'must' => [],
+        ];
+
+        if ($builder->query && $builder->query !== '*') {
+            $bool['must'][] = [
+                'multi_match' => [
+                    'query' => $builder->query,
+                    'fields' => ['*'],
+                    'type' => 'best_fields',
+                ],
+            ];
+        } else {
+            $bool['must'][] = ['match_all' => new stdClass()];
+        }
+
+        if ($filters !== []) {
+            $bool['filter'] = $filters;
+        }
+
+        $params = [
+            'index' => $index,
+            'body' => [
+                'query' => [
+                    'bool' => $bool,
+                ],
+            ],
+            'from' => max(0, ($page - 1) * $perPage),
+            'size' => $perPage,
+        ];
+
+        $response = ElasticsearchService::getInstance()->client->search($params);
+
+        return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private function hasAdvancedFilters(Builder $builder): bool
+    {
+        return is_array($builder->options['advanced_filters'] ?? null);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Laravel\Scout\Builder as ScoutBuilder;
 use Laravel\Scout\Engines\Engine as ScoutEngine;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
@@ -129,4 +130,35 @@ it('translates advanced portable filters to typesense filter syntax', function (
     ]);
 
     expect($filters)->toBe('id:>=10 && id:<20 && created_at:>="2024-01-01" && created_at:<="2024-01-31" && (status:="draft" || status:="published")');
+});
+
+it('adds advanced portable filters to typesense keyword search parameters', function (): void {
+    $engine = (new ReflectionClass(TypesenseEngine::class))->newInstanceWithoutConstructor();
+    $model = new class extends Model
+    {
+        public function searchableAs(): string
+        {
+            return 'users';
+        }
+    };
+    $builder = new ScoutBuilder($model, 'alpha');
+    $builder->options['advanced_filters'] = [
+        'operator' => 'and',
+        'filters' => [
+            ['field' => 'id', 'operator' => '>=', 'value' => 10],
+            [
+                'operator' => 'or',
+                'filters' => [
+                    ['field' => 'status', 'operator' => '=', 'value' => 'draft'],
+                    ['field' => 'status', 'operator' => '=', 'value' => 'published'],
+                ],
+            ],
+        ],
+    ];
+
+    $parameters = $engine->buildSearchParameters($builder, 2, 15);
+
+    expect($parameters['filter_by'])->toBe('id:>=10 && (status:="draft" || status:="published")')
+        ->and($parameters['page'])->toBe(2)
+        ->and($parameters['per_page'])->toBe(15);
 });

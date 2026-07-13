@@ -156,6 +156,30 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         return implode(' && ', $filter_strings);
     }
 
+    #[Override]
+    public function buildSearchParameters(Builder $builder, int $page, ?int $perPage): array
+    {
+        $parameters = parent::buildSearchParameters($builder, $page, $perPage);
+        $advanced_filters = $builder->options['advanced_filters'] ?? null;
+
+        if (! is_array($advanced_filters)) {
+            return $parameters;
+        }
+
+        $advanced_filter = $this->buildSearchFilters($advanced_filters);
+
+        if ($advanced_filter === '') {
+            return $parameters;
+        }
+
+        $existing_filter = is_string($parameters['filter_by'] ?? null) ? $parameters['filter_by'] : '';
+        $parameters['filter_by'] = $existing_filter !== ''
+            ? $existing_filter . ' && ' . $advanced_filter
+            : $advanced_filter;
+
+        return $parameters;
+    }
+
     /**
      * @param  array<string, mixed>  $filter
      */
