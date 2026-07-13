@@ -67,3 +67,66 @@ it('exposes orchestrated vector support per engine', function (string $engine, b
     [TypesenseEngine::class, true],
     [DatabaseEngine::class, true],
 ]);
+
+it('translates advanced portable filters to elasticsearch query clauses', function (): void {
+    $engine = (new ReflectionClass(ElasticsearchEngine::class))->newInstanceWithoutConstructor();
+
+    $filters = $engine->buildSearchFilters([
+        'operator' => 'and',
+        'filters' => [
+            ['field' => 'id', 'operator' => '>=', 'value' => 10],
+            ['field' => 'id', 'operator' => '<', 'value' => 20],
+            ['field' => 'created_at', 'operator' => 'between', 'value' => ['2024-01-01', '2024-01-31']],
+            [
+                'operator' => 'or',
+                'filters' => [
+                    ['field' => 'status', 'operator' => '=', 'value' => 'draft'],
+                    ['field' => 'status', 'operator' => '=', 'value' => 'published'],
+                ],
+            ],
+        ],
+    ]);
+
+    expect($filters)->toMatchArray([
+        [
+            'bool' => [
+                'must' => [
+                    ['range' => ['id' => ['gte' => 10]]],
+                    ['range' => ['id' => ['lt' => 20]]],
+                    ['range' => ['created_at' => ['gte' => '2024-01-01', 'lte' => '2024-01-31']]],
+                    [
+                        'bool' => [
+                            'should' => [
+                                ['term' => ['status' => 'draft']],
+                                ['term' => ['status' => 'published']],
+                            ],
+                            'minimum_should_match' => 1,
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+});
+
+it('translates advanced portable filters to typesense filter syntax', function (): void {
+    $engine = (new ReflectionClass(TypesenseEngine::class))->newInstanceWithoutConstructor();
+
+    $filters = $engine->buildSearchFilters([
+        'operator' => 'and',
+        'filters' => [
+            ['field' => 'id', 'operator' => '>=', 'value' => 10],
+            ['field' => 'id', 'operator' => '<', 'value' => 20],
+            ['field' => 'created_at', 'operator' => 'between', 'value' => ['2024-01-01', '2024-01-31']],
+            [
+                'operator' => 'or',
+                'filters' => [
+                    ['field' => 'status', 'operator' => '=', 'value' => 'draft'],
+                    ['field' => 'status', 'operator' => '=', 'value' => 'published'],
+                ],
+            ],
+        ],
+    ]);
+
+    expect($filters)->toBe('id:>=10 && id:<20 && created_at:>="2024-01-01" && created_at:<="2024-01-31" && (status:="draft" || status:="published")');
+});

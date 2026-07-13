@@ -7,11 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Laravel\Scout\Searchable;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\WhereClause;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\HeuristicReranker;
+use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
 
 final class DatabaseEngineSQLiteVectorSearchUser extends Model
 {
@@ -237,6 +242,57 @@ it('applies keyword constraints when sqlite vector search is used as a hybrid da
         ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan(0.99);
 });
 
+it('applies advanced range and or filters before sqlite vector pagination', function (): void {
+    config()->set('database.default', 'sqlite');
+
+    $best = User::factory()->create([
+        'username' => 'advanced_filter_best_' . uniqid(),
+        'email' => 'advanced_best_' . uniqid() . '@example.test',
+    ]);
+    $second = User::factory()->create([
+        'username' => 'advanced_filter_second_' . uniqid(),
+        'email' => 'advanced_second_' . uniqid() . '@example.test',
+    ]);
+    $outside_or = User::factory()->create([
+        'username' => 'advanced_filter_outside_' . uniqid(),
+        'email' => 'advanced_outside_' . uniqid() . '@example.test',
+    ]);
+    $now = now();
+    $table = CoreTables::ModelEmbeddings->value;
+
+    $insert_embedding = static fn (int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+        'model_type' => DatabaseEngineSQLiteVectorSearchUser::class,
+        'model_id' => $model_id,
+        'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $insert_embedding((int) $best->getKey(), [1.0, 0.0, 0.0]);
+    $insert_embedding((int) $second->getKey(), [0.95, 0.05, 0.0]);
+    $insert_embedding((int) $outside_or->getKey(), [1.0, 0.0, 0.0]);
+
+    $builder = new ScoutBuilder(new DatabaseEngineSQLiteVectorSearchUser(), '*');
+    $builder->where('vector', [1.0, 0.0, 0.0]);
+
+    (new ScoutSearchConstraintApplier())->apply(
+        builder: $builder,
+        model: new DatabaseEngineSQLiteVectorSearchUser(),
+        filters: new FiltersGroup([
+            new Filter('id', $second->getKey(), FilterOperator::GreatEquals),
+            new FiltersGroup([
+                new Filter('username', $best->username, FilterOperator::Equals),
+                new Filter('username', $second->username, FilterOperator::Equals),
+            ], WhereClause::Or),
+        ]),
+    );
+
+    $paginator = (new DatabaseEngine())->paginateUsingDatabase($builder, 10, 'page', 1);
+
+    expect($paginator->total())->toBe(1)
+        ->and($paginator->getCollection()->pluck('id')->all())->toBe([$second->getKey()]);
+});
+
 it('executes keyword vector and hybrid strategies through the database engine ensemble path', function (): void {
     config()->set('database.default', 'sqlite');
 
@@ -291,6 +347,7 @@ it('executes keyword vector and hybrid strategies through the database engine en
         ->and($hit_ids)->toContain((string) $matched->getKey())
         ->and($hit_ids)->toContain((string) $keyword_only->getKey())
         ->and($hit_ids)->toContain((string) $vector_only->getKey())
-        ->and($result->hits[0])->toHaveKeys(['id', 'score', 'source'])
-        ->and($result->hits[0]['score'])->toBeFloat();
+        ->and($result->hits[0])->toHaveKeys(['id', 'score', 'raw_score', 'score_details', 'source'])
+        ->and($result->hits[0]['score'])->toBeFloat()
+        ->and($result->hits[0]['score_details'])->toHaveKeys(['normalized_score', 'strategies']);
 });

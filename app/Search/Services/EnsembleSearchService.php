@@ -38,6 +38,7 @@ class EnsembleSearchService
         $use_fulltext = (bool) ($retrieval['use_fulltext'] ?? true);
         $use_vector = (bool) ($retrieval['use_vector'] ?? false) && $vector !== null;
         $window = max(1, $page * $perPage);
+        $driver = $this->driverName($model);
 
         $weights = [
             'keyword' => $this->planFloat($ensemble_config, 'keyword_weight', 0.35),
@@ -53,19 +54,19 @@ class EnsembleSearchService
         $strategy_results = [];
 
         if ($use_fulltext) {
-            $result = $this->executeScoutSearch($model, $query, null, $filters, $sort, $window, $page, $perPage, 'keyword');
+            $result = $this->executeScoutSearch($model, $query, null, $filters, $sort, $window, $page, $perPage, 'keyword', $driver);
             $strategy_results[] = $result;
             $per_strategy['keyword'] = $this->hitsById($result);
         }
 
         if ($use_vector) {
-            $result = $this->executeScoutSearch($model, '*', $vector, $filters, $sort, $window, $page, $perPage, 'vector');
+            $result = $this->executeScoutSearch($model, '*', $vector, $filters, $sort, $window, $page, $perPage, 'vector', $driver);
             $strategy_results[] = $result;
             $per_strategy['vector'] = $this->hitsById($result);
         }
 
         if ($use_fulltext && $use_vector) {
-            $result = $this->executeScoutSearch($model, $query, $vector, $filters, $sort, $window, $page, $perPage, 'hybrid');
+            $result = $this->executeScoutSearch($model, $query, $vector, $filters, $sort, $window, $page, $perPage, 'hybrid', $driver);
             $strategy_results[] = $result;
             $per_strategy['hybrid'] = $this->hitsById($result);
         }
@@ -94,11 +95,19 @@ class EnsembleSearchService
             collect($fused)
                 ->sortByDesc('score')
                 ->slice(max(0, ($page - 1) * $perPage), $perPage)
-                ->map(fn (array $item): array => [
-                    'id' => $item['id'],
-                    'score' => round($item['score'], 6),
-                    'source' => $item['source'] ?? [],
-                ])
+                ->map(function (array $item): array {
+                    $score = round($item['score'], 6);
+                    $score_details = $item['score_details'] ?? [];
+                    $score_details['normalized_score'] = $score;
+
+                    return [
+                        'id' => $item['id'],
+                        'score' => $score,
+                        'raw_score' => $item['raw_score'] ?? null,
+                        'score_details' => $score_details,
+                        'source' => $item['source'] ?? [],
+                    ];
+                })
                 ->all(),
         );
         $total = max(array_map(static fn (AdvancedSearchResult $result): int => $result->total, $strategy_results) ?: [count($hits)]);
@@ -110,7 +119,7 @@ class EnsembleSearchService
             perPage: $perPage,
             totalPages: (int) ceil($total / max(1, $perPage)),
             meta: [
-                'driver' => method_exists($model->searchableUsing(), 'getName') ? $model->searchableUsing()->getName() : $model->searchableUsing()::class,
+                'driver' => $driver,
                 'strategies_executed' => count($per_strategy),
                 'strategies' => array_keys($per_strategy),
                 'reranked' => $use_reranker,
@@ -123,7 +132,7 @@ class EnsembleSearchService
      * @param  list<float>|null  $vector
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy): AdvancedSearchResult
+    private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy, string $driver): AdvancedSearchResult
     {
         /** @var class-string<Model> $model_class */
         $model_class = $model::class;
@@ -139,25 +148,31 @@ class EnsembleSearchService
         $paginator = $builder->paginate($window, 'page', 1);
         $results = $paginator->getCollection();
 
-        return $this->normalizeScoutResults($results, $page, $perPage, $strategy, $paginator->total());
+        return $this->normalizeScoutResults($results, $page, $perPage, $strategy, $driver, $paginator->total());
     }
 
     /**
      * @param  Collection<int, mixed>  $results
      */
-    private function normalizeScoutResults(Collection $results, int $page, int $perPage, string $strategy, ?int $total = null): AdvancedSearchResult
+    private function normalizeScoutResults(Collection $results, int $page, int $perPage, string $strategy, string $driver, ?int $total = null): AdvancedSearchResult
     {
         $hits = [];
+        $rank = 1;
 
         foreach ($results as $result) {
             if ($result instanceof Model) {
                 $attributes = $result->getAttributes();
+                $raw_score = is_numeric($attributes['_score'] ?? null) ? (float) $attributes['_score'] : 1.0;
+                $defaulted = ! is_numeric($attributes['_score'] ?? null);
 
                 $hits[] = [
                     'id' => (string) $result->getKey(),
-                    'score' => is_numeric($attributes['_score'] ?? null) ? (float) $attributes['_score'] : 1.0,
+                    'score' => $raw_score,
+                    'raw_score' => $raw_score,
+                    'score_details' => $this->scoreDetails($driver, $strategy, $rank, $raw_score, $raw_score, $defaulted),
                     'source' => $attributes,
                 ];
+                $rank++;
 
                 continue;
             }
@@ -166,11 +181,17 @@ class EnsembleSearchService
                 $id = $result['_id'] ?? $result['id'] ?? null;
 
                 if (is_scalar($id)) {
+                    $raw_score = is_numeric($result['_score'] ?? null) ? (float) $result['_score'] : 1.0;
+                    $defaulted = ! is_numeric($result['_score'] ?? null);
+
                     $hits[] = [
                         'id' => (string) $id,
-                        'score' => is_numeric($result['_score'] ?? null) ? (float) $result['_score'] : 1.0,
+                        'score' => $raw_score,
+                        'raw_score' => $raw_score,
+                        'score_details' => $this->scoreDetails($driver, $strategy, $rank, $raw_score, $raw_score, $defaulted, $result),
                         'source' => $result,
                     ];
+                    $rank++;
                 }
             }
         }
@@ -185,6 +206,37 @@ class EnsembleSearchService
             totalPages: (int) ceil($total / max(1, $perPage)),
             meta: ['strategy' => $strategy],
         );
+    }
+
+    private function driverName(Model $model): string
+    {
+        $engine = $model->searchableUsing();
+
+        return method_exists($engine, 'getName') ? $engine->getName() : $engine::class;
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    private function scoreDetails(string $driver, string $strategy, int $rank, float $rawScore, float $normalizedScore, bool $defaulted, array $extra = []): array
+    {
+        $details = [
+            'driver' => $driver,
+            'strategy' => $strategy,
+            'rank' => $rank,
+            'raw_score' => $rawScore,
+            'normalized_score' => $normalizedScore,
+            'defaulted' => $defaulted,
+        ];
+
+        foreach (['distance', 'similarity', 'similarity_score', 'text_match'] as $key) {
+            if (is_numeric($extra[$key] ?? null)) {
+                $details[$key] = (float) $extra[$key];
+            }
+        }
+
+        return $details;
     }
 
     private function constraintApplier(): ScoutSearchConstraintApplier
@@ -205,6 +257,8 @@ class EnsembleSearchService
             $out[$id] = [
                 'id' => $hit['id'],
                 'score' => $hit['score'],
+                'raw_score' => $hit['raw_score'] ?? $hit['score'],
+                'score_details' => $hit['score_details'] ?? [],
                 'source' => $hit['source'],
                 'rank' => $rank,
             ];
@@ -235,6 +289,7 @@ class EnsembleSearchService
             $hit['score'] = $range > 0.0
                 ? ($hit['score'] - $min_score) / $range
                 : 1.0;
+            $hit['score_details']['normalized_score'] = $hit['score'];
         }
 
         return $hits;
@@ -275,6 +330,10 @@ class EnsembleSearchService
             $rrf_score = 0.0;
             $appearances = 0;
             $source = [];
+            $raw_score = null;
+            $score_details = [
+                'strategies' => [],
+            ];
 
             foreach ($normalized_strategies as $strategy_name => $hits) {
                 if (! isset($hits[$id])) {
@@ -289,6 +348,12 @@ class EnsembleSearchService
                 if ($source === []) {
                     $source = $hits[$id]['source'];
                 }
+
+                if ($raw_score === null) {
+                    $raw_score = $hits[$id]['raw_score'] ?? null;
+                }
+
+                $score_details['strategies'][$strategy_name] = $hits[$id]['score_details'] ?? [];
             }
 
             $strategy_count = count($normalized_strategies);
@@ -301,6 +366,16 @@ class EnsembleSearchService
             $fused[] = [
                 'id' => (string) $id,
                 'score' => $final_score,
+                'raw_score' => $raw_score,
+                'score_details' => array_merge(
+                    $appearances === 1 && count($score_details['strategies']) === 1
+                        ? reset($score_details['strategies'])
+                        : [],
+                    [
+                        'normalized_score' => $final_score,
+                        'strategies' => $score_details['strategies'],
+                    ],
+                ),
                 'source' => $source,
             ];
         }

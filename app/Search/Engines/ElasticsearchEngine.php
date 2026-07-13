@@ -131,6 +131,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     #[Override]
     public function buildSearchFilters(array $filters): array
     {
+        if (isset($filters['operator'], $filters['filters'])) {
+            return [$this->buildAdvancedSearchFilter($filters)];
+        }
+
         $esFilters = [];
 
         foreach ($filters as $field => $value) {
@@ -188,6 +192,51 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
 
         return $esFilters;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     * @return array<string, mixed>
+     */
+    private function buildAdvancedSearchFilter(array $filter): array
+    {
+        if (isset($filter['filters']) && is_array($filter['filters'])) {
+            $clauses = array_values(array_map(
+                fn (array $item): array => $this->buildAdvancedSearchFilter($item),
+                array_filter($filter['filters'], is_array(...)),
+            ));
+
+            if (($filter['operator'] ?? 'and') === 'or') {
+                return [
+                    'bool' => [
+                        'should' => $clauses,
+                        'minimum_should_match' => 1,
+                    ],
+                ];
+            }
+
+            return [
+                'bool' => [
+                    'must' => $clauses,
+                ],
+            ];
+        }
+
+        $field = (string) ($filter['field'] ?? '');
+        $operator = (string) ($filter['operator'] ?? '=');
+        $value = $filter['value'] ?? null;
+
+        return match ($operator) {
+            '=' => ['term' => [$field => $value]],
+            'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
+            '!=' => ['bool' => ['must_not' => [is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]]]]],
+            '>' => ['range' => [$field => ['gt' => $value]]],
+            '>=' => ['range' => [$field => ['gte' => $value]]],
+            '<' => ['range' => [$field => ['lt' => $value]]],
+            '<=' => ['range' => [$field => ['lte' => $value]]],
+            'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
+            default => ['term' => [$field => $value]],
+        };
     }
 
     #[Override]
@@ -715,19 +764,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             ],
         ];
 
-        // Add filters if any are present
-        $filter_wheres = array_diff_key($builder->wheres, array_flip(['vector', 'embedding', $this->resolveVectorField($model)]));
+        $filters = $this->filtersFromBuilder($builder, $model);
 
-        if ($filter_wheres !== []) {
-            $filters = $this->buildSearchFilters($filter_wheres);
-
-            if ($filters !== []) {
-                $query['knn']['filter'] = [
-                    'bool' => [
-                        'must' => $filters,
-                    ],
-                ];
-            }
+        if ($filters !== []) {
+            $query['knn']['filter'] = [
+                'bool' => [
+                    'must' => $filters,
+                ],
+            ];
         }
 
         // Combine with text search if query is provided
@@ -763,6 +807,23 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         $response = $client->search($params);
 
         return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array<string, mixed>>
+     */
+    private function filtersFromBuilder(Builder $builder, Model $model): array
+    {
+        $filter_wheres = array_diff_key($builder->wheres, array_flip(['vector', 'embedding', $this->resolveVectorField($model)]));
+        $filters = $filter_wheres !== [] ? $this->buildSearchFilters($filter_wheres) : [];
+        $advanced_filters = $builder->options['advanced_filters'] ?? null;
+
+        if (is_array($advanced_filters)) {
+            $filters = array_merge($filters, $this->buildSearchFilters($advanced_filters));
+        }
+
+        return $filters;
     }
 
     /**

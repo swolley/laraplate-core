@@ -124,6 +124,10 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     #[Override]
     public function buildSearchFilters(array $filters): string
     {
+        if (isset($filters['operator'], $filters['filters'])) {
+            return $this->buildAdvancedSearchFilter($filters);
+        }
+
         $filter_strings = [];
 
         foreach ($filters as $field => $value) {
@@ -150,6 +154,54 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         }
 
         return implode(' && ', $filter_strings);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     */
+    private function buildAdvancedSearchFilter(array $filter): string
+    {
+        if (isset($filter['filters']) && is_array($filter['filters'])) {
+            $joiner = ($filter['operator'] ?? 'and') === 'or' ? ' || ' : ' && ';
+            $parts = array_values(array_filter(array_map(
+                fn (mixed $item): string => is_array($item) ? $this->buildAdvancedSearchFilter($item) : '',
+                $filter['filters'],
+            )));
+            $joined = implode($joiner, $parts);
+
+            return ($filter['operator'] ?? 'and') === 'or' ? sprintf('(%s)', $joined) : $joined;
+        }
+
+        $field = (string) ($filter['field'] ?? '');
+        $operator = (string) ($filter['operator'] ?? '=');
+        $value = $filter['value'] ?? null;
+
+        return match ($operator) {
+            '=' => sprintf('%s:=%s', $field, $this->formatTypesenseFilterValue($value)),
+            'in' => sprintf('%s:[%s]', $field, implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), is_array($value) ? $value : [$value]))),
+            '!=' => sprintf('%s:!=%s', $field, $this->formatTypesenseFilterValue($value)),
+            '>' => sprintf('%s:>%s', $field, $this->formatTypesenseFilterValue($value)),
+            '>=' => sprintf('%s:>=%s', $field, $this->formatTypesenseFilterValue($value)),
+            '<' => sprintf('%s:<%s', $field, $this->formatTypesenseFilterValue($value)),
+            '<=' => sprintf('%s:<=%s', $field, $this->formatTypesenseFilterValue($value)),
+            'between' => sprintf(
+                '%s:>=%s && %s:<=%s',
+                $field,
+                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[0] ?? null : null),
+                $field,
+                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[1] ?? null : null),
+            ),
+            default => '',
+        };
+    }
+
+    private function formatTypesenseFilterValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            return sprintf('"%s"', $value);
+        }
+
+        return is_scalar($value) ? (string) $value : '';
     }
 
     #[Override]
@@ -535,6 +587,16 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             }
 
             $filters[] = $this->buildFilter($field, $value);
+        }
+
+        $advanced_filters = $builder->options['advanced_filters'] ?? null;
+
+        if (is_array($advanced_filters)) {
+            $advanced_filter = $this->buildSearchFilters($advanced_filters);
+
+            if ($advanced_filter !== '') {
+                $filters[] = $advanced_filter;
+            }
         }
 
         return implode(' && ', $filters);

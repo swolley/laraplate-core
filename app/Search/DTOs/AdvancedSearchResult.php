@@ -7,7 +7,7 @@ namespace Modules\Core\Search\DTOs;
 final readonly class AdvancedSearchResult
 {
     /**
-     * @param  list<array{id: string, score: float, source: array<string, mixed>}>  $hits
+     * @param  list<array{id: string, score: float, raw_score?: float|null, score_details?: array<string, mixed>, source: array<string, mixed>}>  $hits
      * @param  array<string, mixed>  $meta
      */
     public function __construct(

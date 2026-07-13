@@ -175,3 +175,41 @@ it('uses scout pagination total for strategy totals while fetching the fusion wi
         ->and(EnsembleSearchPaginatorTestModel::$lastBuilder?->paginatedPerPage)->toBe(15)
         ->and(EnsembleSearchPaginatorTestModel::$lastBuilder?->paginatedPage)->toBe(1);
 });
+
+it('exposes normalized raw and diagnostic score metadata for fused hits', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+
+    $result = $this->service->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => [
+                'use_fulltext' => true,
+                'use_vector' => false,
+            ],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => false],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    expect($result->hits)->not->toBeEmpty();
+
+    $hit = $result->hits[0];
+
+    expect($hit)->toHaveKeys(['id', 'score', 'raw_score', 'score_details', 'source'])
+        ->and($hit['score'])->toBeFloat()
+        ->and($hit['raw_score'])->toBeFloat()
+        ->and($hit['score_details'])->toMatchArray([
+            'driver' => 'fake',
+            'strategy' => 'keyword',
+            'rank' => 1,
+            'raw_score' => 1.0,
+            'normalized_score' => $hit['score'],
+        ])
+        ->and($hit['score_details']['defaulted'])->toBeFalse()
+        ->and($hit['score_details']['strategies'])->toHaveKey('keyword')
+        ->and($hit['score_details']['strategies']['keyword']['normalized_score'])->toBe(1.0);
+});
