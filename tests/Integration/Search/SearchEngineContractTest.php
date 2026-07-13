@@ -65,5 +65,5 @@ it('exposes orchestrated vector support per engine', function (string $engine, b
 })->with([
     [ElasticsearchEngine::class, true],
     [TypesenseEngine::class, true],
-    [DatabaseEngine::class, false],
+    [DatabaseEngine::class, true],
 ]);

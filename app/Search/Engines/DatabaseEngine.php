@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Engines;
 
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\DatabaseEngine as BaseDatabaseEngine;
@@ -71,7 +75,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
     public function supportsVectorSearch(): bool
     {
-        return $this->getDatabaseDriver() !== 'sqlite';
+        return true;
     }
 
     public function supportsOrchestratedSearch(): bool
@@ -81,7 +85,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
     public function supportsOrchestratedVectorSearch(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -90,28 +94,151 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
     public function search(Builder $builder): mixed
     {
         if ($this->isVectorSearch($builder)) {
-            return $this->performVectorSearch($builder);
+            $models = $this->vectorModels($builder, $builder->limit);
+
+            return [
+                'results' => $models,
+                'total' => $models->count(),
+            ];
         }
 
         return parent::search($builder);
+    }
+
+    public function paginateUsingDatabase(Builder $builder, $perPage, $pageName, $page): LengthAwarePaginator
+    {
+        if (! $this->isVectorSearch($builder)) {
+            return parent::paginateUsingDatabase($builder, $perPage, $pageName, $page);
+        }
+
+        $page = (int) ($page ?: Paginator::resolveCurrentPage($pageName));
+        $perPage = (int) ($perPage ?: $builder->model->getPerPage());
+        $models = $this->vectorModels($builder, PHP_INT_MAX);
+        $items = $models
+            ->slice(max(0, ($page - 1) * $perPage), $perPage)
+            ->values();
+
+        return new LengthAwarePaginator(
+            items: $builder->model->newCollection($items->all()),
+            total: $models->count(),
+            perPage: $perPage,
+            currentPage: $page,
+            options: [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => $pageName,
+            ],
+        );
     }
 
     /**
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performVectorSearch(Builder $builder): array
+    private function performVectorSearch(Builder $builder, ?int $limit = null): array
     {
         $query_vector = $this->extractVectorFromBuilder($builder);
         $model = $builder->model;
         $driver = $this->getDatabaseDriver();
 
         return match ($driver) {
-            'pgsql' => $this->performPostgreSQLVectorSearch($query_vector, $model, $builder),
-            'mysql', 'mariadb' => $this->performMySQLVectorSearch($query_vector, $model, $builder),
-            'sqlite' => $this->performSQLiteVectorSearch($query_vector, $model, $builder),
+            'pgsql' => $this->performPostgreSQLVectorSearch($query_vector, $model, $builder, $limit),
+            'mysql', 'mariadb' => $this->performMySQLVectorSearch($query_vector, $model, $builder, $limit),
+            'sqlite' => $this->performSQLiteVectorSearch($query_vector, $model, $builder, $limit),
             default => throw new InvalidArgumentException('Vector search not supported for driver: ' . $driver),
         };
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return EloquentCollection<int, Model>
+     */
+    private function vectorModels(Builder $builder, ?int $limit = null): EloquentCollection
+    {
+        $matches = $this->vectorMatches($builder, $limit);
+        $ids = array_values(array_unique(array_map(static fn (array $match): mixed => $match['model_id'], $matches)));
+
+        if ($ids === []) {
+            return $builder->model->newCollection();
+        }
+
+        $models = $this->constrainedVectorModelQuery($builder, $ids)
+            ->get()
+            ->keyBy(static fn (Model $model): string => (string) $model->getKey());
+        $ordered = [];
+
+        foreach ($matches as $match) {
+            $model = $models->get((string) $match['model_id']);
+
+            if (! $model instanceof Model) {
+                continue;
+            }
+
+            $model->setAttribute('_score', $match['score']);
+            $ordered[] = $model;
+        }
+
+        return $builder->model->newCollection($ordered);
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @return list<array{model_id: mixed, score: float}>
+     */
+    private function vectorMatches(Builder $builder, ?int $limit = null): array
+    {
+        $rows = $this->performVectorSearch($builder, $limit);
+        $matches = [];
+
+        foreach ($rows as $row) {
+            $model_id = $row['model_id'] ?? null;
+
+            if (! is_scalar($model_id)) {
+                continue;
+            }
+
+            $score = match (true) {
+                is_numeric($row['similarity_score'] ?? null) => (float) $row['similarity_score'],
+                is_numeric($row['distance'] ?? null) => 1.0 / (1.0 + (float) $row['distance']),
+                default => 1.0,
+            };
+
+            $matches[] = [
+                'model_id' => $model_id,
+                'score' => $score,
+            ];
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     * @param  list<mixed>  $ids
+     * @return EloquentBuilder<Model>
+     */
+    private function constrainedVectorModelQuery(Builder $builder, array $ids): EloquentBuilder
+    {
+        /** @var EloquentBuilder<Model> $query */
+        $query = $builder->model->newQuery()->whereKey($ids);
+        $vector_fields = array_flip(['vector', 'embedding', $this->resolveVectorField($builder->model)]);
+
+        foreach (array_diff_key($builder->wheres, $vector_fields) as $key => $value) {
+            if ($key === '__soft_deleted') {
+                continue;
+            }
+
+            $query->where($key, '=', $value);
+        }
+
+        foreach ($builder->whereIns as $key => $values) {
+            $query->whereIn($key, $values);
+        }
+
+        foreach ($builder->whereNotIns as $key => $values) {
+            $query->whereNotIn($key, $values);
+        }
+
+        return $this->constrainForSoftDeletes($builder, $query);
     }
 
     /**
@@ -119,16 +246,20 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performPostgreSQLVectorSearch(array $queryVector, Model $model, Builder $builder): array
+    private function performPostgreSQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
     {
         $vector_string = '[' . implode(',', $queryVector) . ']';
-
-        /** @var list<array<string, mixed>> */
-        return ModelEmbedding::query()
+        $query = ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->selectRaw('*, embedding <=> ?::vector AS distance', [$vector_string])
-            ->orderByRaw('embedding <=> ?::vector', [$vector_string])
-            ->limit($builder->limit ?? 10)
+            ->orderByRaw('embedding <=> ?::vector', [$vector_string]);
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $query
             ->get()
             ->toArray();
     }
@@ -138,12 +269,10 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performMySQLVectorSearch(array $queryVector, Model $model, Builder $builder): array
+    private function performMySQLVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
     {
         $query_vector_json = json_encode($queryVector);
-
-        /** @var list<array<string, mixed>> */
-        return ModelEmbedding::query()
+        $query = ModelEmbedding::query()
             ->where('model_type', $model::class)
             ->selectRaw(
                 "*, 
@@ -156,8 +285,14 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                 [$query_vector_json],
             )
             ->having('similarity_score', '>', 0.7)
-            ->orderBy('similarity_score', 'desc')
-            ->limit($builder->limit ?? 10)
+            ->orderBy('similarity_score', 'desc');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $query
             ->get()
             ->toArray();
     }
@@ -167,9 +302,9 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      * @param  Builder<covariant Model>  $builder
      * @return list<array<string, mixed>>
      */
-    private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder): array
+    private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder, ?int $limit = null): array
     {
-        $limit = (int) ($builder->limit ?? 10);
+        $limit ??= (int) ($builder->limit ?? 10);
 
         if ($limit <= 0) {
             return [];
@@ -201,6 +336,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
             $results[] = [
                 'id' => $embedding->id,
+                'model_id' => $embedding->model_id,
                 'similarity_score' => $similarity,
                 'embedding' => $normalized_embedding,
             ];

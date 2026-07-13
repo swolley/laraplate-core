@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\ModelEmbedding;
@@ -47,4 +48,39 @@ it('keeps sqlite vector search off full collection map pipelines', function (): 
 
     expect($source)->not->toContain("->get()\n            ->map(")
         ->and($source)->toContain('->lazy(100)');
+});
+
+it('paginates sqlite vector search as matching models ordered by similarity', function (): void {
+    config()->set('database.default', 'sqlite');
+
+    $best = User::factory()->create(['username' => 'vector_best_' . uniqid()]);
+    $second = User::factory()->create(['username' => 'vector_second_' . uniqid()]);
+    $low = User::factory()->create(['username' => 'vector_low_' . uniqid()]);
+    $other = User::factory()->create(['username' => 'vector_other_' . uniqid()]);
+    $now = now();
+    $table = CoreTables::ModelEmbeddings->value;
+
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+        'model_type' => $model_type,
+        'model_id' => $model_id,
+        'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $insert_embedding(User::class, (int) $best->getKey(), [1.0, 0.0, 0.0]);
+    $insert_embedding(User::class, (int) $second->getKey(), [0.9, 0.1, 0.0]);
+    $insert_embedding(User::class, (int) $low->getKey(), [0.6, 0.8, 0.0]);
+    $insert_embedding(ModelEmbedding::class, (int) $other->getKey(), [1.0, 0.0, 0.0]);
+
+    $builder = new ScoutBuilder(new User(), '*');
+    $builder->where('vector', [1.0, 0.0, 0.0]);
+
+    $paginator = (new DatabaseEngine())->paginateUsingDatabase($builder, 2, 'page', 1);
+    $models = $paginator->getCollection();
+
+    expect($paginator->total())->toBe(2)
+        ->and($models)->toHaveCount(2)
+        ->and($models->pluck('id')->all())->toBe([$best->getKey(), $second->getKey()])
+        ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan($models->last()?->getAttribute('_score'));
 });
