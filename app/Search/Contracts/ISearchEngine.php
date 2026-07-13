@@ -29,6 +29,11 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
     public function supportsOrchestratedSearch(): bool;
 
     /**
+     * Check if the engine supports vector retrieval inside the Core orchestrated search pipeline.
+     */
+    public function supportsOrchestratedVectorSearch(): bool;
+
+    /**
      * Perform the Scout search for the given builder.
      *
      * @param  Builder<covariant Model>  $builder

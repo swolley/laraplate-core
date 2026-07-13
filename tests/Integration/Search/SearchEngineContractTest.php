@@ -25,6 +25,13 @@ it('declares orchestrated search support on the core search engine contract', fu
         ->and((string) $method->getReturnType())->toBe('bool');
 });
 
+it('declares orchestrated vector search support on the core search engine contract', function (): void {
+    $method = new ReflectionMethod(ISearchEngine::class, 'supportsOrchestratedVectorSearch');
+
+    expect($method->getNumberOfRequiredParameters())->toBe(0)
+        ->and((string) $method->getReturnType())->toBe('bool');
+});
+
 it('keeps core search engine createIndex signatures compatible with Laravel Scout', function (string $engine): void {
     $base = new ReflectionMethod(ScoutEngine::class, 'createIndex');
     $method = new ReflectionMethod($engine, 'createIndex');
@@ -41,6 +48,17 @@ it('keeps core search engine createIndex signatures compatible with Laravel Scou
 
 it('exposes orchestrated search support per engine', function (string $engine, bool $expected): void {
     $method = new ReflectionMethod($engine, 'supportsOrchestratedSearch');
+    $instance = $method->isStatic() ? null : (new ReflectionClass($engine))->newInstanceWithoutConstructor();
+
+    expect($method->invoke($instance))->toBe($expected);
+})->with([
+    [ElasticsearchEngine::class, true],
+    [TypesenseEngine::class, true],
+    [DatabaseEngine::class, true],
+]);
+
+it('exposes orchestrated vector support per engine', function (string $engine, bool $expected): void {
+    $method = new ReflectionMethod($engine, 'supportsOrchestratedVectorSearch');
     $instance = $method->isStatic() ? null : (new ReflectionClass($engine))->newInstanceWithoutConstructor();
 
     expect($method->invoke($instance))->toBe($expected);

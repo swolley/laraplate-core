@@ -46,6 +46,12 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         return true;
     }
 
+    #[Override]
+    public function supportsOrchestratedVectorSearch(): bool
+    {
+        return true;
+    }
+
     /**
      * @throws Exception
      * @throws \Http\Client\Exception

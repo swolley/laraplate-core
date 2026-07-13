@@ -26,6 +26,7 @@ use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Engines\DatabaseEngine as CoreDatabaseEngine;
 use Modules\Core\Search\Traits\Searchable as CoreSearchable;
 use App\Models\User;
 use Modules\Core\Search\Services\AdvancedSearchService;
@@ -328,6 +329,53 @@ it('search auto mode uses orchestrated search when current driver supports it', 
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), $advanced_search);
     $engine = Mockery::mock(ISearchEngine::class);
     $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new class($engine) extends User
+    {
+        use CoreSearchable;
+
+        public function __construct(private readonly mixed $engine = null)
+        {
+            parent::__construct();
+        }
+
+        public function searchableUsing(): mixed
+        {
+            return $this->engine;
+        }
+    };
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Auto);
+    crud_cov_set($data, 'page', 1);
+    crud_cov_set($data, 'limit', 5);
+    crud_cov_set($data, 'pagination', 5);
+    crud_cov_set($data, 'from', 1);
+    crud_cov_set($data, 'to', 6);
+    crud_cov_set($data, 'count', false);
+
+    $result = $service->search($data);
+
+    expect($result->data)->toBeInstanceOf(Illuminate\Database\Eloquent\Collection::class)
+        ->and($result->data->first()?->getKey())->toBe($target->getKey())
+        ->and($result->meta?->currentPage)->toBe(1)
+        ->and($result->meta?->pagination)->toBe(5);
+});
+
+it('search auto mode uses orchestrated keyword search with the database engine', function (): void {
+    config()->set('scout.driver', 'database');
+
+    $superadmin = crud_cov_login_superadmin();
+    $target = User::factory()->create([
+        'username' => 'database_auto_target_' . uniqid(),
+        'email' => 'database_auto_target_' . uniqid() . '@example.com',
+    ]);
+    $advanced_search = crud_cov_advanced_search_returning($target->getKey());
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), $advanced_search);
+    $engine = new CoreDatabaseEngine();
 
     $request = crud_cov_validated_request(['qs' => 'needle']);
     $request->setUserResolver(fn () => $superadmin);

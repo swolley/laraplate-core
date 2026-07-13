@@ -76,6 +76,11 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
     public function supportsOrchestratedSearch(): bool
     {
+        return true;
+    }
+
+    public function supportsOrchestratedVectorSearch(): bool
+    {
         return false;
     }
 
@@ -164,36 +169,48 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
      */
     private function performSQLiteVectorSearch(array $queryVector, Model $model, Builder $builder): array
     {
-        /** @var list<array<string, mixed>> $results */
-        $results = ModelEmbedding::query()
+        $limit = (int) ($builder->limit ?? 10);
+
+        if ($limit <= 0) {
+            return [];
+        }
+
+        /** @var list<array{id: int|null, similarity_score: float, embedding: list<float>}> $results */
+        $results = [];
+
+        foreach (ModelEmbedding::query()
             ->where('model_type', $model::class)
-            ->get()
-            ->map(function (ModelEmbedding $embedding) use ($queryVector): array {
-                $stored_embedding = $embedding->embedding ?? [];
+            ->lazy(100) as $embedding) {
+            $stored_embedding = $embedding->embedding ?? [];
 
-                if (! is_array($stored_embedding)) {
-                    $stored_embedding = [];
-                }
+            if (! is_array($stored_embedding)) {
+                $stored_embedding = [];
+            }
 
-                /** @var list<float> $normalized_embedding */
-                $normalized_embedding = array_values(array_map(
-                    static fn (mixed $value): float => (float) $value,
-                    $stored_embedding,
-                ));
+            /** @var list<float> $normalized_embedding */
+            $normalized_embedding = array_values(array_map(
+                static fn (mixed $value): float => (float) $value,
+                $stored_embedding,
+            ));
 
-                $similarity = $this->calculateCosineSimilarity($queryVector, $normalized_embedding);
+            $similarity = $this->calculateCosineSimilarity($queryVector, $normalized_embedding);
 
-                return [
-                    'id' => $embedding->id,
-                    'similarity_score' => $similarity,
-                    'embedding' => $normalized_embedding,
-                ];
-            })
-            ->filter(static fn (array $item): bool => $item['similarity_score'] > 0.7)
-            ->sortByDesc('similarity_score')
-            ->take($builder->limit ?? 10)
-            ->values()
-            ->all();
+            if ($similarity <= 0.7) {
+                continue;
+            }
+
+            $results[] = [
+                'id' => $embedding->id,
+                'similarity_score' => $similarity,
+                'embedding' => $normalized_embedding,
+            ];
+
+            usort($results, static fn (array $left, array $right): int => $right['similarity_score'] <=> $left['similarity_score']);
+
+            if (count($results) > $limit) {
+                array_pop($results);
+            }
+        }
 
         return $results;
     }

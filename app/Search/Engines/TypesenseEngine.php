@@ -41,6 +41,12 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         return true;
     }
 
+    #[Override]
+    public function supportsOrchestratedVectorSearch(): bool
+    {
+        return true;
+    }
+
     /**
      * @param  array<string,mixed>  $options  Index options
      * @param  bool  $force  Force index creation even if it already exists
