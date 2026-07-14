@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Enums;
 
+use Modules\Core\Enums\Concerns\HasModuleTablesUtils;
+
 enum CoreTables: string
 {
+    use HasModuleTablesUtils;
+
     // core models
     case Entities = 'core_entities';
     case Taxonomies = 'core_taxonomies';
