@@ -2,11 +2,11 @@
 
 ## Purpose
 
-`Core` is the platform runtime for Laraplate. It owns identity and authentication (Fortify + Sanctum + social + 2FA + impersonation + license), authorization (Spatie roles/permissions + row-level ACLs), the record lifecycle stack (`SoftDeletes`, `HasVersions`, `HasApprovals`, `HasValidity`, `HasLocks`, `HasOptimisticLocking`), the dynamic-entity infrastructure (`Entity`/`Preset`/`Presettable`/`Field`), the schema inspector + `DynamicEntity` runtime, the CRUD pipeline (`CrudService` + `AuthorizationService` + `QueryBuilder`), the translations stack (`HasTranslations` + `LocaleContext` + `LocaleScope`), the search abstractions (`Searchable` + `SchemaDefinition` + `ISearchEngine`), the canonical `Place` + geocoding contracts, and the settings-backed module activator. Other modules (`AI`, `CMS`, `ERP`, `MES`) consume these primitives instead of reinventing them.
+`Core` is the platform runtime for Laraplate. It owns identity and authentication (Fortify + Sanctum + social + 2FA + impersonation + license), authorization (Spatie roles/permissions + row-level ACLs), the record lifecycle stack (`SoftDeletes`, `HasVersions`, `HasApprovals`, `HasValidity`, `HasLocks`, `HasOptimisticLocking`), the dynamic-entity infrastructure (`Entity`/`Preset`/`Presettable`/`Field`), the schema inspector + `DynamicEntity` runtime, the CRUD pipeline (`CrudService` + `AuthorizationService` + `QueryBuilder`), the translations stack (`HasTranslations` + `LocaleContext` + `LocaleScope`), the search abstractions (`Searchable` + `SchemaDefinition` + `ISearchEngine`), the Core Graph framework (`GraphService`, graph requests, traversal, providers, and stats), the canonical `Place` + geocoding contracts, and the settings-backed module activator. Other modules (`AI`, `CMS`, `ERP`, `MES`) consume these primitives instead of reinventing them.
 
 ### Module boundaries
 
-Every other module in Laraplate depends on Core. HTTP/Filament/Artisan entry points pass through Fortify/Sanctum and Core middleware; controllers and services use `CrudService` (or directly Eloquent on `Core\Overrides\Model`) which consumes `AuthorizationService` + `AclResolverService` + `QueryBuilder` to enforce permissions and ACL filters. The dynamic-entity stack (`Entity`/`Preset`/`Presettable`/`Field`) is shared across CMS/ERP. Search routes through `Searchable` + `ISearchEngine`, with optional AI overrides (`IReranker`, `ISearchPlanner`, `IQueryIntentParser`). Geocoding goes via `IGeocodingService` (Nominatim or Google Maps). Module activation is driven by `ModuleDatabaseActivator` reading the `backendModules` setting.
+Every other module in Laraplate depends on Core. HTTP/Filament/Artisan entry points pass through Fortify/Sanctum and Core middleware; controllers and services use `CrudService` (or directly Eloquent on `Core\Overrides\Model`) which consumes `AuthorizationService` + `AclResolverService` + `QueryBuilder` to enforce permissions and ACL filters. The dynamic-entity stack (`Entity`/`Preset`/`Presettable`/`Field`) is shared across CMS/ERP. Search routes through `Searchable` + `ISearchEngine`, with optional AI overrides (`IReranker`, `ISearchPlanner`, `IQueryIntentParser`). Graph routes live under `/crud/graph/*` and reuse CRUD entity resolution, request semantics, authorization, and response conventions. Geocoding goes via `IGeocodingService` (Nominatim or Google Maps). Module activation is driven by `ModuleDatabaseActivator` reading the `backendModules` setting.
 
 ```mermaid
 flowchart TB
@@ -57,6 +57,11 @@ flowchart TB
     Schema[SchemaDefinition]
     Engines[ISearchEngine impls]
   end
+  subgraph graph [Graph]
+    GraphSvc[GraphService]
+    Traversal[GraphTraversal]
+    Providers[GraphProviderRegistry]
+  end
   subgraph place [Geo]
     PlaceM[Place]
     Geo[IGeocodingService]
@@ -74,6 +79,9 @@ flowchart TB
   Modules --> dyn
   Modules --> i18n
   Modules --> search
+  Modules --> GraphSvc
+  GraphSvc --> Traversal
+  GraphSvc --> Providers
   Modules --> place
   Settings -.->|toggles| lifecycle
   Settings -.->|backendModules| Modules
@@ -305,6 +313,32 @@ flowchart LR
   Auth --> Ensure --> Inject --> QB --> Exec --> Comp --> Group --> Result
 ```
 
+### Graph framework
+
+Core Graph is a CRUD extension, not a CMS-only subsystem. Routes are mounted under `/crud/graph`: `expand/{module}/{entity}/{id}` extends detail, `search/{module}/{entity}` extends CRUD search, and `stats/{module}/{entity}/{id}` derives analytics from the same authorized expansion returned by `expand`. `ExpandGraphRequest` extends `DetailRequest`; `SearchGraphRequest` extends `SearchRequest` and keeps `qs`, `mode`, pagination, filters, sorts, and `limit` with their CRUD meanings. Graph adds only `relations[]`, `depth`, `relation_limit`, and `node_detail`.
+
+Traversal is explicit. Requested `relations[]` are the only traversed paths; without explicit relations Core asks an optional provider for defaults, otherwise it returns only the center/search seed nodes. Authorization uses `AuthorizationService`: inaccessible centers fail like CRUD detail, while inaccessible neighbor nodes are omitted and reported through `graphMeta.filteredByAcl`. Cross-module nodes keep their own `{module}:{entity}:{id}` identity and their own CRUD permission checks.
+
+Providers are optional. `GraphProviderInterface` supplies default relations, summary fields, edge labels, and exclusions. `GraphProviderRulesInterface` can narrow allowed paths, max depth, and per-relation limits. Runtime traversal remains the source of truth for `expand`, `search`, and `stats`; materialized edges are deferred until real benchmarks and an invalidation/freshness strategy justify storage. Stable developer reference: [GRAPH_SYSTEM.md](../GRAPH_SYSTEM.md).
+
+```mermaid
+flowchart LR
+  Req[Graph request]
+  Crud[CRUD request semantics]
+  Auth[AuthorizationService]
+  Service[GraphService]
+  Registry[GraphProviderRegistry]
+  Rules[GraphProviderRuleEnforcer]
+  Traversal[GraphTraversal]
+  Serializer[GraphNodeSerializer]
+  Response[GraphData / stats / search graph]
+
+  Req --> Crud --> Auth --> Service
+  Service --> Registry
+  Service --> Rules
+  Service --> Traversal --> Serializer --> Response
+```
+
 ### Translations and locale
 
 `HasTranslations` keeps translatable fields in a sibling table (auto-resolved as `Models\Translations\{Model}Translation` and required to implement `ITranslated`). Setting a translatable attribute stores it under `pending_translations[locale][field]` until the model fires `saved`, at which point translations are upserted in batch. Reads consult: pending values, the loaded `translation` relation, then the loaded `translations` collection, then a targeted DB query — with optional fallback to default locale when `LocaleContext::isFallbackEnabled()` is true. A `LocaleScope` global scope eagerly loads the right `translation` per the active `LocaleContext`. After create/update of the default-locale translation the trait emits `TranslatedModelSaved`, which the AI module listens to in order to enqueue automatic translations for other locales.
@@ -434,6 +468,7 @@ Core exposes reusable primitives for module authors:
 - Dynamic-entity primitives (`Entity`, `Preset`, `Presettable`, `Field`, `DynamicEntity`).
 - CRUD/Grid request DTOs and `CrudService`/`AuthorizationService`/`AclResolverService`.
 - Searchable trait + `SchemaDefinition` + `ISearchEngine`/`IReranker`/`ISearchPlanner`/`IQueryIntentParser`.
+- Graph providers and traversal services (`GraphService`, `GraphTraversal`, `GraphProviderInterface`, `GraphProviderRulesInterface`).
 - Geocoding contracts and providers (`IGeocodingService`, `NominatimService`, `GoogleMapsService`).
 - Settings infrastructure and module activation.
 
@@ -492,6 +527,7 @@ When building new module features, reuse these primitives instead of re-implemen
 ### For API/front-end teams
 
 - Use `/crud` and `/crud/grid` with permission-aware query behavior.
+- Use `/crud/graph/expand`, `/crud/graph/search`, and `/crud/graph/stats` when clients need graph-shaped entity data; request relations explicitly unless a module provider defines defaults.
 - Handle lock/version conflicts explicitly in UX (retry/reload patterns).
 - Consume Swagger docs generated by Core as source of API contract.
 

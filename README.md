@@ -22,6 +22,13 @@
 
 The Core Module contains all the necessary functionalities to build a new Laravel application.
 
+## Documentation
+
+-   [Graph system](docs/GRAPH_SYSTEM.md): CRUD-aligned graph expand/search/stats framework for every CRUD-resolvable entity.
+-   [Event orchestration](docs/EVENT_ORCHESTRATION.md): cross-module indexing and moderation events.
+-   [ACL system](docs/ACL_SYSTEM.md): permission and row-level access control behavior.
+-   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior.
+
 ## Installation
 
 If you want to add this module to your project, you can use the `joshbrw/laravel-module-installer` package.
@@ -435,6 +442,7 @@ The Core Module includes built-in features such as:
 -   Dynamic entities for non mapped models
 -   Dynamic gridutils for non mapped models
 -   CRUD API for non mapped models
+-   CRUD-aligned graph expand/search/stats endpoints for every CRUD-resolvable entity ([docs/GRAPH_SYSTEM.md](docs/GRAPH_SYSTEM.md)).
 -   User licenses
 -   Locking system for models
 -   Graylog logging
