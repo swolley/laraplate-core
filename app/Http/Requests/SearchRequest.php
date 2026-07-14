@@ -36,7 +36,7 @@ class SearchRequest extends ListRequest
             'mode' => ['sometimes', Rule::enum(SearchMode::class)],
             'matching' => ['sometimes', Rule::enum(TextMatchPreference::class)],
             'matching_options' => ['sometimes', 'array'],
-            'matching_options.max_edits' => ['sometimes', 'integer', 'between:0,2'],
+            'matching_options.max_edits' => ['sometimes', 'integer', 'between:0,1'],
             'matching_options.prefix' => ['sometimes', 'boolean'],
             'matching_options.operator' => ['sometimes', Rule::in(['and', 'or'])],
             'matching_options.minimum_should_match' => ['sometimes', 'integer', 'between:1,100'],

@@ -31,7 +31,7 @@ final readonly class TextMatchOptions
 
         return new self(
             typoTolerance: self::boolValue($options['typo_tolerance'] ?? null, $defaults->typoTolerance),
-            maxEdits: self::boundedInt($options['max_edits'] ?? null, $defaults->maxEdits, 0, 2),
+            maxEdits: self::boundedInt($options['max_edits'] ?? null, $defaults->maxEdits, 0, 1),
             prefix: self::boolValue($options['prefix'] ?? null, $defaults->prefix),
             prefixLength: self::boundedInt($options['prefix_length'] ?? null, $defaults->prefixLength, 0, 10),
             minimumTermLength: self::boundedInt($options['minimum_term_length'] ?? null, $defaults->minimumTermLength, 1, 50),

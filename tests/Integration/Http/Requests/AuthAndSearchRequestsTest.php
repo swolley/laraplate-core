@@ -90,7 +90,7 @@ it('search request validates and parses adaptive matching controls', function ()
         'qs' => 'Mario Rossi',
         'matching' => 'tolerant',
         'matching_options' => [
-            'max_edits' => 2,
+            'max_edits' => 1,
             'minimum_should_match' => 80,
             'identifier_typos' => false,
         ],
@@ -104,7 +104,7 @@ it('search request validates and parses adaptive matching controls', function ()
         'qs' => 'Mario Rossi',
         'matching' => 'tolerant',
         'matching_options' => [
-            'max_edits' => 2,
+            'max_edits' => 1,
             'minimum_should_match' => 80,
             'identifier_typos' => false,
         ],
@@ -119,5 +119,5 @@ it('search request validates and parses adaptive matching controls', function ()
         'matching_options.minimum_should_match',
         'matching_options.identifier_typos',
     ])->and($parsed->matching)->toBe(TextMatchPreference::Tolerant)
-        ->and($parsed->matching_options['max_edits'])->toBe(2);
+        ->and($parsed->matching_options['max_edits'])->toBe(1);
 });

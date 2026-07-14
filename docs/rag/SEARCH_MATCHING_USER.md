@@ -15,8 +15,9 @@ When `matching` is omitted or set to `auto`:
 | One acronym/code/number/email/UUID | Strict; no typo expansion |
 | One ordinary word | Exact results first; prefix matching; at most one typo when long enough |
 | Two meaningful words | Both words required; exact phrase preferred; limited typo expansion |
-| Three to five meaningful words | Approximately 75% of meaningful words required |
-| Six or more meaningful words | Approximately 65% of meaningful words required |
+| Three or four keyword-like words | Conservative end of the automatic range |
+| Five or more keyword-like words | 70% down to 65% as the query grows |
+| Natural-language sentence | 65% down to 60%; up to two eligible typo corrections |
 
 Italian and English stopwords are ignored only when deciding how many meaningful words the query contains. They remain part of the original engine query where appropriate.
 
@@ -27,7 +28,7 @@ Examples:
 - `Mario Rossi` requires both meaningful words.
 - `fatture fornitori italiane scadute giugno` can match documents containing most, rather than necessarily all, meaningful words.
 
-A mixed query containing a protected identifier, such as `ACME fatture`, is conservative and disables typo expansion for the complete keyword query by default. This guarantees comparable behavior across engines.
+A mixed query containing a protected identifier, such as `ACME fatture`, is conservative: it requires complete token coverage and disables typo expansion for the complete keyword query by default. This guarantees that the identifier cannot be the term discarded by a percentage threshold and keeps behavior comparable across engines.
 
 ## Matching preferences
 
@@ -41,9 +42,11 @@ matching=tolerant
 ```
 
 - `auto` selects behavior from the query.
-- `strict` disables typo tolerance and requires strict token matching.
-- `balanced` provides moderate typo tolerance for eligible words.
-- `tolerant` permits greater recall for long eligible words and longer queries, but does not weaken identifiers automatically.
+- `strict` requires every meaningful word and permits at most one one-character correction on one eligible word.
+- `balanced` requires all words through three, then 75% at four, 65% at five-to-eight, and 60% at nine or more; at most two eligible words may be corrected.
+- `tolerant` requires all words through two, two of three, three of four, 55% at five-to-eight, and 50% at nine or more; at most three eligible words may be corrected.
+
+All percentages are applied conservatively as whole required terms. Exact and complete matches remain ahead of partial or fuzzy candidates. Set `matching_options[typo_tolerance]=false` when even the controlled strict correction is not wanted.
 
 Preferences are adaptive hints. They do not bypass identifier protection.
 
@@ -52,7 +55,8 @@ Preferences are adaptive hints. They do not bypass identifier protection.
 Advanced callers may provide:
 
 ```text
-matching_options[max_edits]=0|1|2
+matching_options[typo_tolerance]=true|false
+matching_options[max_edits]=0|1
 matching_options[prefix]=true|false
 matching_options[operator]=and|or
 matching_options[minimum_should_match]=1..100
@@ -72,6 +76,7 @@ GET /app/core/search/invoices?qs=INV-1042&mode=orchestrated&matching=tolerant&ma
 ```
 
 Use identifier typo expansion sparingly because it can return incorrect codes or records.
+UUIDs remain exact even when identifier typo expansion is requested.
 
 ## Response metadata
 
@@ -106,4 +111,3 @@ Orchestrated search responses expose the effective decision under `meta.search.m
 - PostgreSQL can provide typo similarity when `pg_trgm` is installed and enabled.
 - MySQL, MariaDB, SQLite, and the current Oracle database fallback use case-insensitive prefix/substring matching and report unsupported typo semantics as degraded.
 - Oracle Text `CONTEXT` integration is a separate schema-aware feature and is not enabled by the portable database fallback.
-

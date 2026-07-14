@@ -37,7 +37,17 @@ HTTP parameters never reach an engine directly. Engines consume only validated `
 6. Clamp values in `TextMatchOptions`.
 7. Translate through the active engine and report degradation.
 
-The current cross-engine safety rule disables typo expansion for a complete mixed keyword query when any protected token is present. Set `identifier_typos=true` only when the caller explicitly accepts fuzzy identifiers.
+The current cross-engine safety rule forces `AND`/100% coverage and disables typo expansion for a complete mixed keyword query when any protected token is present. This conservative translation makes the protected token mandatory even on engines without per-token required clauses. Set `identifier_typos=true` only when the caller explicitly accepts fuzzy identifiers; UUIDs remain exact regardless.
+
+Coverage and edit distance are separate. `minimum_should_match` controls how many significant tokens participate; `fuzzy_token_limit` controls how many eligible tokens may contain a correction; `max_edits` controls the character distance within each corrected token. The portable contract currently clamps `max_edits` to one. UUIDs are always exact.
+
+| Profile | 1–2 | 3 | 4 | 5–8 | 9+ | Fuzzy-token limit |
+|---------|-----|---|---|-----|----|-------------------|
+| strict | 100% | 100% | 100% | 100% | 100% | 1 |
+| balanced | 100% | 100% | 75% | 65% | 60% | 2 |
+| tolerant | 100% | 66% | 75% | 55% | 50% | 3 |
+
+Auto uses the conservative side for keyword-like input and relaxes toward 65%/60% when at least two stopwords indicate natural-language input. This is intentionally deterministic and can later be replaced by a richer query-shape classifier.
 
 ## Configuration
 
@@ -65,7 +75,7 @@ Defaults and replaceable presets live in `Modules/Core/config/search.php`:
 ],
 ```
 
-Preferences must remain configuration presets. Engine code must not branch on preference names.
+Preferences remain configuration presets plus resolver policy. Engine code must not branch on preference names; it consumes only resolved granular options. Elasticsearch and Typesense cannot fully enforce a maximum count of fuzzy tokens in one native multi-term query, so capability metadata must continue to describe this semantic as approximate where applicable.
 
 Direct Scout callers can pass effective or override options through:
 

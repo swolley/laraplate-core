@@ -18,7 +18,7 @@ it('normalizes portable text match options without binding callers to named prof
         'prefix' => false,
     ]);
 
-    expect($options->maxEdits)->toBe(2)
+    expect($options->maxEdits)->toBe(1)
         ->and($options->operator)->toBe('and')
         ->and($options->similarityThreshold)->toBe(0.0)
         ->and($options->prefix)->toBeFalse();
@@ -55,14 +55,14 @@ it('does not enable elasticsearch fuzziness below the configured minimum length'
 it('translates portable text matching to typesense', function (): void {
     $engine = (new ReflectionClass(TypesenseEngine::class))->newInstanceWithoutConstructor();
     $parameters = $engine->buildTextMatchParameters(TextMatchOptions::fromArray([
-        'max_edits' => 2,
+        'max_edits' => 1,
         'minimum_term_length' => 5,
         'two_edit_minimum_term_length' => 9,
         'prefix' => false,
     ]));
 
     expect($parameters)->toMatchArray([
-        'num_typos' => 2,
+        'num_typos' => 1,
         'prefix' => false,
         'min_len_1typo' => 5,
         'min_len_2typo' => 9,
@@ -133,12 +133,35 @@ it('keeps protected-only short queries strict in automatic and tolerant modes', 
 it('allows explicit identifier typo opt in', function (): void {
     $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve('INV-1042', 'tolerant', [
         'identifier_typos' => true,
-        'max_edits' => 2,
+        'max_edits' => 1,
     ]);
 
     expect($resolved->options->typoTolerance)->toBeTrue()
         ->and($resolved->options->identifierTypos)->toBeTrue()
-        ->and($resolved->options->maxEdits)->toBe(2);
+        ->and($resolved->options->maxEdits)->toBe(1);
+});
+
+it('requires complete coverage for mixed protected-token queries', function (): void {
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve(
+        'fattura INV-1042 cliente Rossi scaduta giugno',
+        'tolerant',
+    );
+
+    expect($resolved->options->operator)->toBe('and')
+        ->and($resolved->options->minimumShouldMatch)->toBe(100)
+        ->and($resolved->options->typoTolerance)->toBeFalse();
+});
+
+it('keeps UUIDs exact even with explicit identifier typo opt in', function (): void {
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'tolerant',
+        ['identifier_typos' => true],
+    );
+
+    expect($resolved->options->typoTolerance)->toBeFalse()
+        ->and($resolved->options->maxEdits)->toBe(0)
+        ->and($resolved->options->fuzzyTokenLimit)->toBe(0);
 });
 
 it('uses strict two-token matching and relaxes token coverage for longer queries', function (): void {
@@ -151,28 +174,76 @@ it('uses strict two-token matching and relaxes token coverage for longer queries
         ->and($name->options->minimumShouldMatch)->toBe(100)
         ->and($name->options->fuzzyTokenLimit)->toBe(1)
         ->and($medium->options->operator)->toBe('or')
-        ->and($medium->options->minimumShouldMatch)->toBe(75)
-        ->and($long->options->minimumShouldMatch)->toBe(65);
+        ->and($medium->options->minimumShouldMatch)->toBe(70)
+        ->and($long->options->minimumShouldMatch)->toBe(70);
 });
 
 it('lets granular caller options override the preference within portable bounds', function (): void {
     $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve('fattura giugno', 'balanced', [
-        'max_edits' => 2,
+        'max_edits' => 1,
         'prefix' => false,
         'minimum_should_match' => 80,
     ]);
 
-    expect($resolved->options->maxEdits)->toBe(2)
+    expect($resolved->options->maxEdits)->toBe(1)
         ->and($resolved->options->prefix)->toBeFalse()
         ->and($resolved->options->minimumShouldMatch)->toBe(80);
 });
 
-it('keeps explicit strict non fuzzy for ordinary unicode names', function (): void {
+it('keeps strict at full coverage with one controlled fuzzy token', function (): void {
     $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve('Giuseppe D’Angiò', 'strict');
+
+    expect($resolved->options->typoTolerance)->toBeTrue()
+        ->and($resolved->options->maxEdits)->toBe(1)
+        ->and($resolved->options->minimumShouldMatch)->toBe(100)
+        ->and($resolved->options->fuzzyTokenLimit)->toBe(1);
+});
+
+it('makes strict fully literal when typo tolerance is disabled explicitly', function (): void {
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve(
+        'Giuseppe Verdi',
+        'strict',
+        ['typo_tolerance' => false],
+    );
 
     expect($resolved->options->typoTolerance)->toBeFalse()
         ->and($resolved->options->maxEdits)->toBe(0)
-        ->and($resolved->options->fuzzyTokenLimit)->toBe(0);
+        ->and($resolved->options->fuzzyTokenLimit)->toBe(0)
+        ->and($resolved->options->minimumShouldMatch)->toBe(100);
+});
+
+it('applies the agreed dynamic coverage matrix', function (
+    string $preference,
+    string $query,
+    int $coverage,
+    int $fuzzyTokenLimit,
+): void {
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve($query, $preference);
+
+    expect($resolved->options->minimumShouldMatch)->toBe($coverage)
+        ->and($resolved->options->fuzzyTokenLimit)->toBe($fuzzyTokenLimit)
+        ->and($resolved->options->maxEdits)->toBe(1);
+})->with([
+    'balanced three' => ['balanced', 'alpha bravo charlie', 100, 2],
+    'balanced four' => ['balanced', 'alpha bravo charlie delta', 75, 2],
+    'balanced eight' => ['balanced', 'alpha bravo charlie delta echo foxtrot golf hotel', 65, 2],
+    'balanced nine' => ['balanced', 'alpha bravo charlie delta echo foxtrot golf hotel india', 60, 2],
+    'tolerant three' => ['tolerant', 'alpha bravo charlie', 66, 3],
+    'tolerant four' => ['tolerant', 'alpha bravo charlie delta', 75, 3],
+    'tolerant eight' => ['tolerant', 'alpha bravo charlie delta echo foxtrot golf hotel', 55, 3],
+    'tolerant nine' => ['tolerant', 'alpha bravo charlie delta echo foxtrot golf hotel india', 50, 3],
+    'strict nine' => ['strict', 'alpha bravo charlie delta echo foxtrot golf hotel india', 100, 1],
+]);
+
+it('keeps automatic keyword queries conservative and relaxes natural language', function (): void {
+    $resolver = new TextMatchOptionsResolver(new SearchQueryAnalyzer());
+    $keywords = $resolver->resolve('fatture clienti scadute giugno corrente');
+    $sentence = $resolver->resolve('mostra le fatture dei clienti scadute giugno corrente');
+
+    expect($keywords->options->minimumShouldMatch)->toBe(70)
+        ->and($keywords->options->fuzzyTokenLimit)->toBe(1)
+        ->and($sentence->options->minimumShouldMatch)->toBe(65)
+        ->and($sentence->options->fuzzyTokenLimit)->toBe(2);
 });
 
 it('resolves empty and stopword-only queries conservatively', function (string $query): void {

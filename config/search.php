@@ -75,8 +75,8 @@ return [
         ],
         'preferences' => [
             'strict' => [
-                'typo_tolerance' => false,
-                'max_edits' => 0,
+                'typo_tolerance' => true,
+                'max_edits' => 1,
             ],
             'balanced' => [
                 'typo_tolerance' => true,
@@ -84,7 +84,7 @@ return [
             ],
             'tolerant' => [
                 'typo_tolerance' => true,
-                'max_edits' => 2,
+                'max_edits' => 1,
             ],
         ],
         'database' => [
