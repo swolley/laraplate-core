@@ -62,7 +62,7 @@ it('walks requested relations with deterministic nodes and edges', function (): 
 
     $data = $traversal->expand($parent, ['children'], 1, 10, 25, 'summary', request());
 
-    expect($data->center)->toBe('app:graph_traversal_parents:' . $parent->getKey());
+    expect($data->center)->toBe('core:graph_traversal_parents:' . $parent->getKey());
     expect($data->nodes)->toHaveCount(3);
     expect($data->edges)->toHaveCount(2);
     expect($data->graphMeta->truncated)->toBeFalse();
@@ -100,7 +100,7 @@ it('rejects relation limits above provider relation maximum during traversal', f
     $auth->shouldReceive('checkPermission')->andReturnTrue();
 
     $registry = new GraphProviderRegistry();
-    $registry->register(new GraphTraversalRulesProvider(), 'app', 'graph_traversal_parents');
+    $registry->register(new GraphTraversalRulesProvider(), 'core', 'graph_traversal_parents');
     $entities = new GraphEntityResolver();
 
     $traversal = new GraphTraversal(
@@ -213,5 +213,5 @@ it('traverses morph to relations when the concrete target is authorized', functi
 
     expect($data->nodes)->toHaveCount(2);
     expect($data->edges)->toHaveCount(1);
-    expect($data->edges[0]->target)->toBe('app:graph_traversal_children:' . $child->getKey());
+    expect($data->edges[0]->target)->toBe('core:graph_traversal_children:' . $child->getKey());
 });
