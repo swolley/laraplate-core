@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Search\Services\DatabaseTextMatchCompiler;
 use Modules\Core\Search\Services\SearchQueryAnalyzer;
+use Modules\Core\Search\Services\SearchQuerySyntaxParser;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
+use Modules\Core\Tests\Stubs\Search\DatabaseEngineSQLiteVectorSearchUser;
 
 it('normalizes portable text match options without binding callers to named profiles', function (): void {
     $options = TextMatchOptions::fromArray([
@@ -120,6 +123,83 @@ it('classifies names acronyms and identifiers without losing original query sign
     ])->and($analysis->significantTokenCount)->toBe(6)
         ->and($analysis->protectedTokenCount)->toBe(4)
         ->and($analysis->eligibleTokenCount)->toBe(2);
+});
+
+it('parses required terms and required phrases from familiar query syntax', function (): void {
+    $parsed = (new SearchQuerySyntaxParser())->parse('consulente +Milano "Mario Rossi" software');
+
+    expect($parsed->freeText)->toBe('consulente software')
+        ->and($parsed->requiredTerms)->toBe(['Milano'])
+        ->and($parsed->requiredPhrases)->toBe(['Mario Rossi']);
+});
+
+it('accepts redundant plus phrases and preserves unicode and escaped quotes', function (): void {
+    $parsed = (new SearchQuerySyntaxParser())->parse('+"D’Angiò José" +città \\"citazione\\"');
+
+    expect($parsed->freeText)->toBe('"citazione"')
+        ->and($parsed->requiredTerms)->toBe(['città'])
+        ->and($parsed->requiredPhrases)->toBe(['D’Angiò José']);
+});
+
+it('treats unmatched quotes and standalone plus as ordinary free text', function (): void {
+    $parser = new SearchQuerySyntaxParser();
+    $unmatched = $parser->parse('manuale "configurazione avanzata');
+    $standalone = $parser->parse('manuale + configurazione');
+
+    expect($unmatched->freeText)->toBe('manuale configurazione avanzata')
+        ->and($unmatched->requiredPhrases)->toBe([])
+        ->and($standalone->freeText)->toBe('manuale + configurazione')
+        ->and($standalone->requiredTerms)->toBe([]);
+});
+
+it('keeps required syntax out of adaptive fuzziness and exposes counts only', function (): void {
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve(
+        'consulente +Milano "Mario Rossi" software',
+        'tolerant',
+    );
+    $meta = $resolved->toMeta();
+
+    expect($resolved->analysis->significantTokenCount)->toBe(2)
+        ->and($resolved->options->query)->toBe('consulente software')
+        ->and($resolved->options->requiredTerms)->toBe(['Milano'])
+        ->and($resolved->options->requiredPhrases)->toBe(['Mario Rossi'])
+        ->and($meta['required_term_count'])->toBe(1)
+        ->and($meta['required_phrase_count'])->toBe(1)
+        ->and($meta['options'])->not->toHaveKeys(['query', 'required_terms', 'required_phrases']);
+});
+
+it('translates required syntax to literal elasticsearch must clauses', function (): void {
+    $engine = (new ReflectionClass(ElasticsearchEngine::class))->newInstanceWithoutConstructor();
+    $query = $engine->buildTextMatchQuery('ignored', TextMatchOptions::fromArray([
+        'query' => 'consulente software',
+        'required_terms' => ['Milano'],
+        'required_phrases' => ['Mario Rossi'],
+    ]));
+
+    expect($query['bool']['must'])->toHaveCount(3)
+        ->and($query['bool']['must'][1]['multi_match'])->toMatchArray([
+            'query' => 'Milano',
+            'type' => 'best_fields',
+            'operator' => 'and',
+        ])->and($query['bool']['must'][1]['multi_match'])->not->toHaveKey('fuzziness')
+        ->and($query['bool']['must'][2]['multi_match'])->toMatchArray([
+            'query' => 'Mario Rossi',
+            'type' => 'phrase',
+        ]);
+});
+
+it('translates required syntax to bound portable database clauses', function (): void {
+    config()->set('database.default', 'sqlite');
+    $resolver = new TextMatchOptionsResolver(new SearchQueryAnalyzer());
+    $resolved = $resolver->resolve('consulente +Milano "Mario Rossi"', 'tolerant');
+    $builder = new ScoutBuilder(new DatabaseEngineSQLiteVectorSearchUser(), 'consulente +Milano "Mario Rossi"');
+    $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = $resolved->options->toEngineArray();
+    $method = new ReflectionMethod(DatabaseEngine::class, 'initializeSearchQuery');
+    $method->setAccessible(true);
+    $query = $method->invoke(new DatabaseEngine(), $builder, ['username', 'email'], [], []);
+
+    expect($query->toSql())->toContain('LOWER("users"."username") LIKE LOWER(?)')
+        ->and($query->getBindings())->toContain('consulente%', '%Milano%', '%Mario Rossi%');
 });
 
 it('keeps protected-only short queries strict in automatic and tolerant modes', function (string $preference): void {

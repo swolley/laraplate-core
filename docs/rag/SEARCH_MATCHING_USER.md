@@ -50,6 +50,28 @@ All percentages are applied conservatively as whole required terms. Exact and co
 
 Preferences are adaptive hints. They do not bypass identifier protection.
 
+## Required terms and exact phrases
+
+The free-text `qs` parameter accepts familiar search operators:
+
+```text
+"Mario Rossi"      required exact phrase
++Mario +Rossi       both terms required, in any order and position
++Mario Rossi        only Mario is required
+```
+
+A quoted phrase is mandatory, adjacent, and ordered. `"Mario Rossi"` matches `incontro con Mario Rossi`, but not `Mario Antonio Rossi` or `Rossi Mario`. A plus-prefixed term is mandatory without imposing order or adjacency. `+"Mario Rossi"` is accepted and means the same as `"Mario Rossi"` because quoted phrases are already mandatory.
+
+Required phrases and terms are case-insensitive under normal search normalization, but they are never fuzzy. They must be satisfied before `strict`, `balanced`, `tolerant`, or `auto` applies its coverage threshold to the remaining free terms.
+
+Example:
+
+```http
+GET /app/core/search/customers?qs=%22Mario%20Rossi%22%20%2BMilano%20consulente%20software&mode=orchestrated&matching=balanced
+```
+
+This requires the phrase `Mario Rossi` and the term `Milano`; `balanced` applies only to `consulente software`. Use `\"` for a literal quote. An unmatched quote and a standalone `+` are treated as ordinary text rather than rejected.
+
 ## Granular controls
 
 Advanced callers may provide:
@@ -92,6 +114,8 @@ Orchestrated search responses expose the effective decision under `meta.search.m
     "protected_token_count": 0,
     "eligible_token_count": 2,
     "fuzzy_token_limit": 1,
+    "required_term_count": 0,
+    "required_phrase_count": 0,
     "options": {
       "max_edits": 1,
       "operator": "and",

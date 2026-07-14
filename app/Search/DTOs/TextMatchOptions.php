@@ -20,6 +20,11 @@ final readonly class TextMatchOptions
         public float $similarityThreshold = 0.6,
         public int $fuzzyTokenLimit = 1,
         public bool $identifierTypos = false,
+        public string $query = '',
+        /** @var list<string> */
+        public array $requiredTerms = [],
+        /** @var list<string> */
+        public array $requiredPhrases = [],
     ) {}
 
     /**
@@ -43,6 +48,9 @@ final readonly class TextMatchOptions
             similarityThreshold: self::boundedFloat($options['similarity_threshold'] ?? null, $defaults->similarityThreshold, 0.0, 1.0),
             fuzzyTokenLimit: self::boundedInt($options['fuzzy_token_limit'] ?? null, $defaults->fuzzyTokenLimit, 0, 100),
             identifierTypos: self::boolValue($options['identifier_typos'] ?? null, $defaults->identifierTypos),
+            query: is_string($options['query'] ?? null) ? $options['query'] : '',
+            requiredTerms: self::stringList($options['required_terms'] ?? null),
+            requiredPhrases: self::stringList($options['required_phrases'] ?? null),
         );
     }
 
@@ -68,6 +76,21 @@ final readonly class TextMatchOptions
         ];
     }
 
+    /**
+     * Include parsed syntax values for trusted internal engine propagation.
+     *
+     * @return array<string, bool|float|int|string|list<string>>
+     */
+    public function toEngineArray(): array
+    {
+        return [
+            ...$this->toArray(),
+            'query' => $this->query,
+            'required_terms' => $this->requiredTerms,
+            'required_phrases' => $this->requiredPhrases,
+        ];
+    }
+
     private static function boolValue(mixed $value, bool $default): bool
     {
         return is_bool($value) ? $value : $default;
@@ -81,5 +104,17 @@ final readonly class TextMatchOptions
     private static function boundedFloat(mixed $value, float $default, float $minimum, float $maximum): float
     {
         return is_numeric($value) ? max($minimum, min($maximum, (float) $value)) : $default;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter($value, static fn (mixed $item): bool => is_string($item) && $item !== ''));
     }
 }

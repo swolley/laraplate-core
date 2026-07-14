@@ -29,6 +29,8 @@ final readonly class ResolvedTextMatch
             'protected_token_count' => $this->analysis->protectedTokenCount,
             'eligible_token_count' => $this->analysis->eligibleTokenCount,
             'fuzzy_token_limit' => $this->options->fuzzyTokenLimit,
+            'required_term_count' => count($this->options->requiredTerms),
+            'required_phrase_count' => count($this->options->requiredPhrases),
             'options' => $this->options->toArray(),
             'degraded' => $degraded,
         ];

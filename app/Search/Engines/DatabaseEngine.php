@@ -98,6 +98,8 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                 'prefix' => true,
                 'exact_match_boost' => false,
                 'operator' => false,
+                'required_terms' => true,
+                'required_phrases' => true,
             ],
             'pgsql_pg_trgm' => [
                 'typo_tolerance' => true,
@@ -155,33 +157,53 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         $use_pg_trgm = $driver === 'pgsql' && (bool) config('search.text_matching.database.pgsql_trigram_enabled', false);
 
         return $query->where(function (EloquentBuilder $query) use ($builder, $columns, $fullTextColumns, $driver, $options, $compiler, $use_pg_trgm): void {
-            $can_search_primary_key = ctype_digit($builder->query)
+            $free_query = $options->query !== '' || $options->requiredTerms !== [] || $options->requiredPhrases !== []
+                ? $options->query
+                : $builder->query;
+            $can_search_primary_key = ctype_digit($free_query)
                 && in_array($builder->model->getKeyType(), ['int', 'integer'], true)
-                && ($driver !== 'pgsql' || $builder->query <= PHP_INT_MAX)
+                && ($driver !== 'pgsql' || $free_query <= PHP_INT_MAX)
                 && in_array($builder->model->getScoutKeyName(), $columns, true);
 
-            if ($can_search_primary_key) {
-                $query->orWhere($builder->model->getQualifiedKeyName(), $builder->query);
+            if ($free_query !== '') {
+                $query->where(function (EloquentBuilder $free) use ($builder, $columns, $fullTextColumns, $driver, $options, $compiler, $use_pg_trgm, $free_query, $can_search_primary_key): void {
+                    if ($can_search_primary_key) {
+                        $free->orWhere($builder->model->getQualifiedKeyName(), $free_query);
+                    }
+
+                    foreach ($columns as $column) {
+                        if (in_array($column, $fullTextColumns, true)
+                            || ($can_search_primary_key && $column === $builder->model->getScoutKeyName())) {
+                            continue;
+                        }
+
+                        $qualified = $builder->model->qualifyColumn($column);
+                        $wrapped = $free->getQuery()->getGrammar()->wrap($qualified);
+                        $compiled = $compiler->compile($use_pg_trgm ? 'pgsql' : $driver, $wrapped, $free_query, $options);
+                        $free->orWhereRaw($compiled['sql'], $compiled['bindings']);
+                    }
+
+                    if ($fullTextColumns !== []) {
+                        $free->orWhereFullText(
+                            array_map(fn (string $column): string => $builder->model->qualifyColumn($column), $fullTextColumns),
+                            $free_query,
+                            $this->getFullTextOptions($builder),
+                        );
+                    }
+                });
             }
 
-            foreach ($columns as $column) {
-                if (in_array($column, $fullTextColumns, true)
-                    || ($can_search_primary_key && $column === $builder->model->getScoutKeyName())) {
-                    continue;
-                }
-
-                $qualified = $builder->model->qualifyColumn($column);
-                $wrapped = $query->getQuery()->getGrammar()->wrap($qualified);
-                $compiled = $compiler->compile($use_pg_trgm ? 'pgsql' : $driver, $wrapped, $builder->query, $options);
-                $query->orWhereRaw($compiled['sql'], $compiled['bindings']);
-            }
-
-            if ($fullTextColumns !== []) {
-                $query->orWhereFullText(
-                    array_map(fn (string $column): string => $builder->model->qualifyColumn($column), $fullTextColumns),
-                    $builder->query,
-                    $this->getFullTextOptions($builder),
-                );
+            foreach ([...$options->requiredTerms, ...$options->requiredPhrases] as $required) {
+                $query->where(function (EloquentBuilder $required_query) use ($builder, $columns, $required): void {
+                    foreach ($columns as $column) {
+                        $qualified = $builder->model->qualifyColumn($column);
+                        $wrapped = $required_query->getQuery()->getGrammar()->wrap($qualified);
+                        $required_query->orWhereRaw(
+                            sprintf('LOWER(%s) LIKE LOWER(?)', $wrapped),
+                            ['%' . $required . '%'],
+                        );
+                    }
+                });
             }
         });
     }

@@ -125,7 +125,7 @@ class EnsembleSearchService
                 'strategies' => array_keys($per_strategy),
                 'reranked' => $use_reranker,
                 'total_results' => count($hits),
-                'matching' => $textMatch?->toMeta($this->textMatchDegradations($model)) ?? [],
+                'matching' => $textMatch?->toMeta($this->textMatchDegradations($model, $textMatch)) ?? [],
             ],
         );
     }
@@ -142,7 +142,7 @@ class EnsembleSearchService
         $builder = $model_class::search($query)->take($window);
 
         if ($textMatch instanceof ResolvedTextMatch) {
-            $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = $textMatch->options->toArray();
+            $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = $textMatch->options->toEngineArray();
         }
 
         if ($vector !== null) {
@@ -224,7 +224,7 @@ class EnsembleSearchService
     /**
      * @return list<string>
      */
-    private function textMatchDegradations(Model $model): array
+    private function textMatchDegradations(Model $model, ResolvedTextMatch $textMatch): array
     {
         $engine = $model->searchableUsing();
 
@@ -238,9 +238,16 @@ class EnsembleSearchService
             return [$degraded];
         }
 
-        return is_array($degraded)
-            ? array_values(array_filter($degraded, is_string(...)))
-            : [];
+        if (! is_array($degraded)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $degraded,
+            static fn (mixed $capability): bool => is_string($capability)
+                && ($capability !== 'required_terms' || $textMatch->options->requiredTerms !== [])
+                && ($capability !== 'required_phrases' || $textMatch->options->requiredPhrases !== []),
+        ));
     }
 
     /**

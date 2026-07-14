@@ -8,6 +8,7 @@ Adaptive matching is resolved once before retrieval:
 SearchRequest
   -> SearchRequestData
   -> AdvancedSearchService
+  -> SearchQuerySyntaxParser
   -> SearchQueryAnalyzer
   -> TextMatchOptionsResolver
   -> ResolvedTextMatch
@@ -23,6 +24,7 @@ HTTP parameters never reach an engine directly. Engines consume only validated `
 - `TextMatchPreference`: `auto`, `strict`, `balanced`, `tolerant`.
 - `SearchTokenKind`: numeric, UUID, email, structured identifier, acronym, short token, or word.
 - `SearchQueryAnalyzer`: preserves original case/punctuation while producing normalized classifications.
+- `SearchQuerySyntaxParser`: separates free text, `+required` terms, and `"required phrases"` before adaptive analysis.
 - `SearchQueryAnalysis`: counts meaningful, protected, and typo-eligible tokens.
 - `TextMatchOptionsResolver`: applies defaults, preference presets, adaptive rules, granular overrides, and protected-token invariants.
 - `ResolvedTextMatch`: carries analysis, requested/effective preference, effective options, and response metadata.
@@ -48,6 +50,21 @@ Coverage and edit distance are separate. `minimum_should_match` controls how man
 | tolerant | 100% | 66% | 75% | 55% | 50% | 3 |
 
 Auto uses the conservative side for keyword-like input and relaxes toward 65%/60% when at least two stopwords indicate natural-language input. This is intentionally deterministic and can later be replaced by a richer query-shape classifier.
+
+## Required-query syntax contract
+
+`SearchQuerySyntaxParser` is the only component that interprets operators in `qs`. It returns an immutable `ParsedSearchQuery` containing free text, required terms, and required phrases. Adaptive token counting and fuzziness use only free text. Required values are copied into trusted engine options with `toEngineArray()`; public metadata uses `toArray()` and exposes counts only.
+
+Rules:
+
+- `"phrase"` is mandatory, ordered, adjacent, and non-fuzzy;
+- `+term` is mandatory anywhere and non-fuzzy;
+- `+"phrase"` is accepted as an equivalent redundant form;
+- `\"` escapes a literal quote;
+- unmatched quotes and standalone `+` degrade to free text without validation errors;
+- parsing applies only to `qs`, never filters or other parameters.
+
+Elasticsearch emits separate literal `must` clauses (`best_fields` for terms and `phrase` for phrases). The database engine emits an `AND` group per required value and bound case-insensitive `LIKE` alternatives across declared searchable columns. Typesense receives a cleaned candidate query but currently reports `required_terms` and/or `required_phrases` degradation because native cross-field mandatory adjacency parity is not proven. Degradation entries are emitted only when the corresponding syntax is used.
 
 ## Configuration
 

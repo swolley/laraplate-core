@@ -63,6 +63,8 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             'prefix' => true,
             'exact_match_boost' => true,
             'operator' => true,
+            'required_terms' => true,
+            'required_phrases' => true,
             'degraded' => false,
         ];
     }
@@ -912,6 +914,47 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      * @return array<string, mixed>
      */
     public function buildTextMatchQuery(string $query, TextMatchOptions $options): array
+    {
+        $has_parsed_syntax = $options->requiredTerms !== [] || $options->requiredPhrases !== [];
+        $free_query = ($options->query !== '' || $has_parsed_syntax) ? $options->query : $query;
+        $must = [];
+
+        if ($free_query !== '') {
+            $must[] = $this->buildFreeTextMatchQuery($free_query, $options);
+        }
+
+        foreach ($options->requiredTerms as $term) {
+            $must[] = [
+                'multi_match' => [
+                    'query' => $term,
+                    'fields' => ['*'],
+                    'type' => 'best_fields',
+                    'operator' => 'and',
+                ],
+            ];
+        }
+
+        foreach ($options->requiredPhrases as $phrase) {
+            $must[] = [
+                'multi_match' => [
+                    'query' => $phrase,
+                    'fields' => ['*'],
+                    'type' => 'phrase',
+                ],
+            ];
+        }
+
+        if (count($must) === 1) {
+            return $must[0];
+        }
+
+        return ['bool' => ['must' => $must]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildFreeTextMatchQuery(string $query, TextMatchOptions $options): array
     {
         $analysis = app(SearchQueryAnalyzer::class)->analyze($query, $options->minimumTermLength);
         $match = [

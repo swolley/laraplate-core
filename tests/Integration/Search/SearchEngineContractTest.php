@@ -199,7 +199,7 @@ it('adds advanced portable filters to typesense keyword search parameters', func
             return 'users';
         }
     };
-    $builder = new ScoutBuilder($model, 'alpha');
+    $builder = new ScoutBuilder($model, 'alpha +Milano "Mario Rossi"');
     $builder->options['advanced_filters'] = [
         'operator' => 'and',
         'filters' => [
@@ -217,6 +217,7 @@ it('adds advanced portable filters to typesense keyword search parameters', func
     $parameters = $engine->buildSearchParameters($builder, 2, 15);
 
     expect($parameters['filter_by'])->toBe('id:>=10 && (status:="draft" || status:="published")')
+        ->and($parameters['q'])->toBe('alpha Milano Mario Rossi')
         ->and($parameters['page'])->toBe(2)
         ->and($parameters['per_page'])->toBe(15);
 });

@@ -58,7 +58,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             'exact_match_boost' => false,
             'exact_match_priority' => true,
             'operator' => false,
-            'degraded' => ['exact_match_boost', 'operator'],
+            'required_terms' => false,
+            'required_phrases' => false,
+            'degraded' => ['exact_match_boost', 'operator', 'required_terms', 'required_phrases'],
         ];
     }
 
@@ -175,10 +177,20 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     public function buildSearchParameters(Builder $builder, int $page, ?int $perPage): array
     {
         $parameters = parent::buildSearchParameters($builder, $page, $perPage);
+        $text_match = app(TextMatchOptionsResolver::class)->forBuilder($builder);
         $parameters = array_merge(
             $parameters,
-            $this->buildTextMatchParameters(app(TextMatchOptionsResolver::class)->forBuilder($builder)),
+            $this->buildTextMatchParameters($text_match),
         );
+
+        if ($text_match->requiredTerms !== [] || $text_match->requiredPhrases !== []) {
+            $parameters['q'] = implode(' ', array_filter([
+                $text_match->query,
+                ...$text_match->requiredTerms,
+                ...$text_match->requiredPhrases,
+            ], static fn (string $value): bool => $value !== ''));
+        }
+
         $advanced_filters = $builder->options['advanced_filters'] ?? null;
 
         if (! is_array($advanced_filters)) {

@@ -14,7 +14,10 @@ final readonly class TextMatchOptionsResolver
 {
     public const string BUILDER_OPTION = 'text_match';
 
-    public function __construct(private SearchQueryAnalyzer $analyzer) {}
+    public function __construct(
+        private SearchQueryAnalyzer $analyzer,
+        private SearchQuerySyntaxParser $syntaxParser = new SearchQuerySyntaxParser(),
+    ) {}
 
     public function forBuilder(Builder $builder): TextMatchOptions
     {
@@ -38,11 +41,20 @@ final readonly class TextMatchOptionsResolver
         $minimum_length = is_numeric($defaults['minimum_term_length'] ?? null)
             ? (int) $defaults['minimum_term_length']
             : 4;
-        $analysis = $this->analyzer->analyze($query, $minimum_length);
+        $parsed_query = $this->syntaxParser->parse($query);
+        $analysis = $this->analyzer->analyze($parsed_query->freeText, $minimum_length);
         $effective = $this->effectivePreference($analysis, $requested);
         $preset = $this->configArray('search.text_matching.preferences.' . $effective->value);
         $adaptive = $this->adaptiveOptions($analysis, $requested, $effective);
-        $merged = [...$defaults, ...$preset, ...$adaptive, ...$overrides];
+        $merged = [
+            ...$defaults,
+            ...$preset,
+            ...$adaptive,
+            ...$overrides,
+            'query' => $parsed_query->freeText,
+            'required_terms' => $parsed_query->requiredTerms,
+            'required_phrases' => $parsed_query->requiredPhrases,
+        ];
 
         $contains_uuid = in_array('uuid', $analysis->tokenKinds(), true);
 
