@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Scout\Builder as ScoutBuilder;
-use Laravel\Scout\Searchable;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -17,32 +15,7 @@ use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
-
-final class DatabaseEngineSQLiteVectorSearchUser extends Model
-{
-    use Searchable;
-
-    protected $table = 'users';
-
-    protected $guarded = [];
-
-    public function searchableUsing(): DatabaseEngine
-    {
-        return new DatabaseEngine();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function toSearchableArray(): array
-    {
-        return [
-            'id' => (string) $this->getKey(),
-            'username' => (string) $this->getAttribute('username'),
-            'email' => (string) $this->getAttribute('email'),
-        ];
-    }
-}
+use Modules\Core\Tests\Stubs\Search\DatabaseEngineSQLiteVectorSearchUser;
 
 it('returns the top sqlite vector search matches without changing the result shape', function (): void {
     config()->set('database.default', 'sqlite');
@@ -193,11 +166,11 @@ it('paginates sqlite vector search as matching models ordered by similarity', fu
 
     expect($paginator->total())->toBe(2)
         ->and($models)->toHaveCount(2)
-        ->and($models->pluck('id')->all())->toBe([$best->getKey(), $second->getKey()])
-        ->and($models->first()?->getAttribute('_score'))->toBeGreaterThan($models->last()?->getAttribute('_score'))
+        ->and($models->pluck('id')->map(fn ($id) => (int) $id)->all())->toBe([(int) $best->getKey(), (int) $second->getKey()])
+        ->and((float) $models->first()?->getAttribute('_score'))->toBeGreaterThan((float) $models->last()?->getAttribute('_score'))
         ->and($second_page->total())->toBe(2)
         ->and($second_page->getCollection())->toHaveCount(1)
-        ->and($second_page->getCollection()->first()?->getKey())->toBe($second->getKey());
+        ->and((int) $second_page->getCollection()->first()?->getKey())->toBe((int) $second->getKey());
 });
 
 it('applies keyword constraints when sqlite vector search is used as a hybrid database search', function (): void {

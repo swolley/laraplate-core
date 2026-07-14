@@ -3,85 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Laravel\Scout\Builder as ScoutBuilder;
-use Modules\Core\Search\Contracts\ISearchable;
 use Modules\Core\Search\Contracts\IReranker;
+use Modules\Core\Search\Contracts\ISearchable;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
-
-class EnsembleSearchPaginatorTestBuilder extends ScoutBuilder
-{
-    public bool $getCalled = false;
-
-    public ?int $paginatedPerPage = null;
-
-    public ?int $paginatedPage = null;
-
-    /**
-     * @param  Collection<int, Model>  $items
-     */
-    public function __construct(Model $model, string $query, private readonly Collection $items, private readonly int $total)
-    {
-        parent::__construct($model, $query);
-    }
-
-    public function get(): Collection
-    {
-        $this->getCalled = true;
-
-        return $this->items;
-    }
-
-    public function paginate($perPage = null, $pageName = 'page', $page = null): LengthAwarePaginator
-    {
-        $this->paginatedPerPage = (int) $perPage;
-        $this->paginatedPage = (int) ($page ?? 1);
-
-        return new LengthAwarePaginator(
-            items: $this->items,
-            total: $this->total,
-            perPage: (int) $perPage,
-            currentPage: $this->paginatedPage,
-        );
-    }
-}
-
-class EnsembleSearchPaginatorTestModel extends Model
-{
-    public static ?EnsembleSearchPaginatorTestBuilder $lastBuilder = null;
-
-    protected $guarded = [];
-
-    /**
-     * @return EnsembleSearchPaginatorTestBuilder
-     */
-    public static function search($query = '', $callback = null): mixed
-    {
-        $items = collect(range(1, 15))->map(static function (int $id): self {
-            $model = new self();
-            $model->forceFill(['id' => $id, '_score' => 1.0]);
-            $model->exists = true;
-
-            return $model;
-        });
-
-        return self::$lastBuilder = new EnsembleSearchPaginatorTestBuilder(new self(), (string) $query, $items, 27);
-    }
-
-    public function searchableUsing(): object
-    {
-        return new class
-        {
-            public function getName(): string
-            {
-                return 'fake';
-            }
-        };
-    }
-}
+use Modules\Core\Tests\Integration\Search\EnsembleSearchPaginatorTestModel;
 
 beforeEach(function (): void {
     $this->reranker = new HeuristicReranker();

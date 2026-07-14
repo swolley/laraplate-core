@@ -2,13 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Graph\Contracts\GraphProviderInterface;
-use Modules\Core\Graph\Contracts\GraphProviderRulesInterface;
 use Modules\Core\Graph\GraphEntityResolver;
 use Modules\Core\Graph\GraphNodeSerializer;
 use Modules\Core\Graph\GraphProviderRegistry;
@@ -16,82 +13,12 @@ use Modules\Core\Graph\GraphProviderRuleEnforcer;
 use Modules\Core\Graph\GraphRelationInspector;
 use Modules\Core\Graph\GraphTraversal;
 use Modules\Core\Services\Authorization\AuthorizationService;
+use Modules\Core\Tests\Stubs\Graphs\GraphTraversalActivity;
+use Modules\Core\Tests\Stubs\Graphs\GraphTraversalChild;
+use Modules\Core\Tests\Stubs\Graphs\GraphTraversalParent;
+use Modules\Core\Tests\Stubs\Graphs\GraphTraversalRulesProvider;
 
 uses(RefreshDatabase::class);
-
-final class GraphTraversalParent extends Model
-{
-    protected $table = 'graph_traversal_parents';
-
-    protected $guarded = [];
-
-    public function children()
-    {
-        return $this->hasMany(GraphTraversalChild::class, 'parent_id');
-    }
-}
-
-final class GraphTraversalChild extends Model
-{
-    protected $table = 'graph_traversal_children';
-
-    protected $guarded = [];
-
-    public function parent()
-    {
-        return $this->belongsTo(GraphTraversalParent::class, 'parent_id');
-    }
-}
-
-final class GraphTraversalActivity extends Model
-{
-    protected $table = 'graph_traversal_activities';
-
-    protected $guarded = [];
-
-    public function subject()
-    {
-        return $this->morphTo();
-    }
-}
-
-final class GraphTraversalRulesProvider implements GraphProviderInterface, GraphProviderRulesInterface
-{
-    public function defaultRelations(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function summaryFields(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function edgeType(string $module, string $entity, string $relation): ?string
-    {
-        return null;
-    }
-
-    public function excludedRelations(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function allowedRelationPaths(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function maxDepth(string $module, string $entity): ?int
-    {
-        return null;
-    }
-
-    public function maxRelationLimit(string $module, string $entity, string $relation): ?int
-    {
-        return $relation === 'children' ? 1 : null;
-    }
-}
 
 beforeEach(function (): void {
     Schema::create('graph_traversal_parents', function (Blueprint $table): void {
