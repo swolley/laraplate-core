@@ -11,6 +11,11 @@ use Modules\Core\Search\DTOs\ParsedSearchQuery;
  *
  * Quoted text is a required adjacent phrase. A leading plus makes one term
  * required. Both constructs are literal and must never enter fuzzy expansion.
+ *
+ * We deliberately keep the familiar Google-style syntax at the public boundary,
+ * then convert it once into a structured contract. This gives users predictable
+ * operators while preventing Elasticsearch, Typesense, and SQL from assigning
+ * different meanings to the same raw punctuation.
  */
 final readonly class SearchQuerySyntaxParser
 {
