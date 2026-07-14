@@ -11,4 +11,7 @@ enum IndexType: string
     case Sortable = 'sortable';
     case Facetable = 'facetable';
     case Vector = 'vector';
+    case FullText = 'fulltext';
+    case Fuzzy = 'fuzzy';
+    case Prefix = 'prefix';
 }

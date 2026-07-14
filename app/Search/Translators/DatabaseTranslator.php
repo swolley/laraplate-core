@@ -139,11 +139,36 @@ class DatabaseTranslator implements ISchemaTranslator
         $indexes = [];
 
         foreach ($schema->getFields() as $field) {
-            if ($field->hasIndexType(IndexType::Searchable) || $field->hasIndexType(IndexType::Filterable)) {
+            if ($field->hasIndexType(IndexType::FullText)) {
+                $indexes[] = [
+                    'name' => sprintf('idx_%s_%s_fulltext', $schema->name, $field->name),
+                    'columns' => [$field->name],
+                    'type' => 'fulltext',
+                ];
+            }
+
+            if ($field->hasIndexType(IndexType::Fuzzy)) {
+                $indexes[] = [
+                    'name' => sprintf('idx_%s_%s_fuzzy', $schema->name, $field->name),
+                    'columns' => [$field->name],
+                    'type' => 'fuzzy',
+                ];
+            }
+
+            if ($field->hasIndexType(IndexType::Prefix)) {
+                $indexes[] = [
+                    'name' => sprintf('idx_%s_%s_prefix', $schema->name, $field->name),
+                    'columns' => [$field->name],
+                    'type' => 'prefix',
+                ];
+            }
+
+            if ($field->hasIndexType(IndexType::Filterable)
+                || ($field->type === FieldType::Keyword && $field->hasIndexType(IndexType::Searchable))) {
                 $indexes[] = [
                     'name' => sprintf('idx_%s_%s', $schema->name, $field->name),
                     'columns' => [$field->name],
-                    'type' => $field->type === FieldType::Text ? 'fulltext' : 'btree',
+                    'type' => 'btree',
                 ];
             }
 

@@ -79,6 +79,9 @@ return new class extends Migration
             $table->index('city', "{$places_table}_city_IDX");
             $table->index('province', "{$places_table}_province_IDX");
         });
+
+        MigrateUtils::fuzzyIndex($places_table, 'address');
+        MigrateUtils::fuzzyIndex($places_table, 'city');
     }
 
     /**

@@ -15,6 +15,76 @@ use Modules\Core\Models\Concerns\HasValidity;
 final class MigrateUtils
 {
     /**
+     * Add a portable B-tree index intended for exact and prefix matching.
+     *
+     * @param  string|list<string>  $columns
+     */
+    public static function prefixIndex(Blueprint $table, string|array $columns, ?string $name = null): void
+    {
+        $normalized_columns = self::normalizeColumns($columns);
+        $index_name = $name ?? self::searchIndexName($table->getTable(), $normalized_columns, 'prefix');
+        self::assertIdentifier($index_name);
+
+        $table->index($normalized_columns, $index_name);
+    }
+
+    public static function fuzzyIndex(string $table, string $column, ?string $name = null, string $oracleSync = 'on_commit'): void
+    {
+        self::assertIdentifier($table);
+        self::assertIdentifier($column);
+        self::assertOracleSync($oracleSync);
+        $index_name = $name ?? self::searchIndexName($table, [$column], 'fuzzy');
+        self::assertIdentifier($index_name);
+
+        match (DB::connection()->getDriverName()) {
+            'pgsql' => self::createPostgresFuzzyIndex($table, $column, $index_name),
+            'oracle' => self::createOracleContextIndex($table, $column, $index_name, $oracleSync),
+            default => null,
+        };
+    }
+
+    /**
+     * @param  string|list<string>  $columns
+     */
+    public static function fullTextIndex(
+        string $table,
+        string|array $columns,
+        string $language = 'simple',
+        ?string $name = null,
+        string $oracleSync = 'manual',
+    ): void {
+        self::assertIdentifier($table);
+        self::assertIdentifier($language);
+        self::assertOracleSync($oracleSync);
+        $normalized_columns = self::normalizeColumns($columns);
+        $index_name = $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext');
+        self::assertIdentifier($index_name);
+
+        match (DB::connection()->getDriverName()) {
+            'pgsql' => self::createPostgresFullTextIndex($table, $normalized_columns, $language, $index_name),
+            'mysql', 'mariadb' => self::createMysqlFullTextIndex($table, $normalized_columns, $index_name),
+            'oracle' => count($normalized_columns) === 1
+                ? self::createOracleContextIndex($table, $normalized_columns[0], $index_name, $oracleSync)
+                : throw new InvalidArgumentException('Oracle CONTEXT indexes require one normalized search-text column.'),
+            default => null,
+        };
+    }
+
+    public static function dropFuzzyIndex(string $table, string $column, ?string $name = null): void
+    {
+        self::dropSpecializedSearchIndex($table, $name ?? self::searchIndexName($table, [$column], 'fuzzy'));
+    }
+
+    /**
+     * @param  string|list<string>  $columns
+     */
+    public static function dropFullTextIndex(string $table, string|array $columns, ?string $name = null): void
+    {
+        $normalized_columns = self::normalizeColumns($columns);
+        self::dropSpecializedSearchIndex($table, $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext'));
+    }
+
+    /**
      * Add common timestamp columns to a table.
      *
      * @param  Blueprint  $table  The table blueprint
@@ -324,5 +394,126 @@ final class MigrateUtils
         // MySQL and Oracle are not able to handle DESC indexes through Blueprint; to avoid
         // race conditions during table creation we use a standard index created along with the table.
         $table->index($column, $index_name);
+    }
+
+    /**
+     * @param  string|list<string>  $columns
+     * @return list<string>
+     */
+    private static function normalizeColumns(string|array $columns): array
+    {
+        $normalized = is_string($columns) ? [$columns] : array_values($columns);
+
+        throw_if($normalized === [], InvalidArgumentException::class, 'At least one search index column is required.');
+
+        foreach ($normalized as $column) {
+            throw_unless(is_string($column), InvalidArgumentException::class, 'Search index columns must be strings.');
+            self::assertIdentifier($column);
+        }
+
+        return $normalized;
+    }
+
+    private static function assertIdentifier(string $identifier): void
+    {
+        throw_unless(
+            preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $identifier) === 1,
+            InvalidArgumentException::class,
+            sprintf('Invalid database identifier [%s].', $identifier),
+        );
+    }
+
+    private static function assertOracleSync(string $sync): void
+    {
+        throw_unless(
+            in_array($sync, ['manual', 'on_commit'], true),
+            InvalidArgumentException::class,
+            'Oracle Text sync must be [manual] or [on_commit].',
+        );
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private static function searchIndexName(string $table, array $columns, string $suffix): string
+    {
+        self::assertIdentifier($table);
+        $base = mb_strtolower(implode('_', [$table, ...$columns, $suffix, 'idx']));
+        $limit = match (DB::connection()->getDriverName()) {
+            'oracle' => 30,
+            'pgsql' => 63,
+            default => 64,
+        };
+
+        if (mb_strlen($base) <= $limit) {
+            return $base;
+        }
+
+        $hash = mb_substr(sha1($base), 0, 8);
+
+        return mb_substr($base, 0, $limit - 9) . '_' . $hash;
+    }
+
+    private static function createPostgresFuzzyIndex(string $table, string $column, string $indexName): void
+    {
+        DB::unprepared('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+        DB::statement(sprintf('CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)', $indexName, $table, $column));
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private static function createPostgresFullTextIndex(string $table, array $columns, string $language, string $indexName): void
+    {
+        $document = implode(" || ' ' || ", array_map(
+            static fn (string $column): string => sprintf("coalesce(%s, '')", $column),
+            $columns,
+        ));
+
+        DB::statement(sprintf(
+            "CREATE INDEX %s ON %s USING GIN (to_tsvector('%s', %s))",
+            $indexName,
+            $table,
+            $language,
+            $document,
+        ));
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private static function createMysqlFullTextIndex(string $table, array $columns, string $indexName): void
+    {
+        DB::statement(sprintf(
+            'ALTER TABLE %s ADD FULLTEXT INDEX %s (%s)',
+            $table,
+            $indexName,
+            implode(', ', $columns),
+        ));
+    }
+
+    private static function createOracleContextIndex(string $table, string $column, string $indexName, string $sync): void
+    {
+        $parameters = $sync === 'on_commit' ? " PARAMETERS ('SYNC (ON COMMIT)')" : '';
+
+        DB::statement(sprintf(
+            'CREATE INDEX %s ON %s (%s) INDEXTYPE IS CTXSYS.CONTEXT%s',
+            $indexName,
+            $table,
+            $column,
+            $parameters,
+        ));
+    }
+
+    private static function dropSpecializedSearchIndex(string $table, string $indexName): void
+    {
+        self::assertIdentifier($table);
+        self::assertIdentifier($indexName);
+
+        match (DB::connection()->getDriverName()) {
+            'mysql', 'mariadb' => DB::statement(sprintf('ALTER TABLE %s DROP INDEX %s', $table, $indexName)),
+            'pgsql', 'oracle' => DB::statement(sprintf('DROP INDEX %s', $indexName)),
+            default => null,
+        };
     }
 }

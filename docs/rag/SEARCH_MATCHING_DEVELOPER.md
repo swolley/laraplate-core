@@ -104,9 +104,21 @@ The database must also have:
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
 
-For production performance, add field-specific trigram GIN/GiST indexes. A future schema change will distinguish `Fuzzy` from `FullText` fields; do not add trigram or full-text indexes indiscriminately to codes, UUIDs, emails, enums, or short labels.
+For production performance, schema fields now declare their physical intent explicitly with `IndexType::Fuzzy`, `IndexType::FullText`, or `IndexType::Prefix`. Plain searchable text no longer implies a full-text database index.
 
-Oracle remains on the portable fallback. Do not apply `UTL_MATCH` to arbitrary long columns. Oracle Text support requires declared searchable fields, `CTXSYS.CONTEXT` DDL, `CONTAINS`/`SCORE` query translation, language preferences, privileges, synchronization policy, rebuild handling, and driver-specific tests.
+Migration DDL is centralized in the existing `MigrateUtils`:
+
+```php
+MigrateUtils::prefixIndex($table, 'slug');
+MigrateUtils::fuzzyIndex($tableName, 'name');
+MigrateUtils::fullTextIndex($tableName, 'search_text', language: 'italian');
+```
+
+Call `prefixIndex()` inside `Schema::create()` and specialized methods after the table exists. PostgreSQL fuzzy indexes install `pg_trgm` and use GIN `gin_trgm_ops`; PostgreSQL full-text indexes use GIN `to_tsvector`. MySQL/MariaDB supports declared full-text indexes but intentionally degrades fuzzy DDL. SQLite keeps prefix B-trees and safely skips specialized DDL. Do not apply fuzzy/full-text indexes indiscriminately to codes, UUIDs, emails, enums, or short machine identifiers.
+
+Oracle DDL maps a single declared fuzzy or full-text column to `CTXSYS.CONTEXT`. Short mutable labels default to `SYNC (ON COMMIT)`; prose defaults to manual synchronization. Query execution still remains on the portable fallback until the schema-aware `CONTAINS`/`SCORE` adapter, lexer/stoplist preferences, privilege checks, synchronization jobs, and rebuild handling are implemented. Never apply `UTL_MATCH` to arbitrary long columns.
+
+Initial migration policy is deliberately conservative: names and short human titles use fuzzy indexes; slugs retain their existing B-tree indexes; prose requires a normalized physical `search_text` column before receiving full-text DDL. JSON component payloads are not indexed as database full text directly.
 
 ## Capabilities and degradation
 
@@ -137,4 +149,3 @@ php artisan test --compact Modules/Core/tests/Integration/Search
 php artisan test --compact Modules/Core/tests/Integration/Http/Requests/AuthAndSearchRequestsTest.php
 vendor/bin/pint --dirty
 ```
-

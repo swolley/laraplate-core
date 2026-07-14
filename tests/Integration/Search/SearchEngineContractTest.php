@@ -225,6 +225,9 @@ it('preserves filterable field metadata across search schema translations', func
     $schema = new SchemaDefinition('users');
     $schema->addField(new FieldDefinition('status', FieldType::Keyword, [IndexType::Searchable, IndexType::Filterable]));
     $schema->addField(new FieldDefinition('title', FieldType::Text, [IndexType::Searchable]));
+    $schema->addField(new FieldDefinition('name', FieldType::Text, [IndexType::Searchable, IndexType::Fuzzy]));
+    $schema->addField(new FieldDefinition('slug', FieldType::Keyword, [IndexType::Searchable, IndexType::Prefix]));
+    $schema->addField(new FieldDefinition('body', FieldType::Text, [IndexType::Searchable, IndexType::FullText]));
     $schema->addField(new FieldDefinition('tags', FieldType::Array, [IndexType::Searchable, IndexType::Filterable], [
         'relation' => 'tags',
         'properties' => [
@@ -235,6 +238,8 @@ it('preserves filterable field metadata across search schema translations', func
 
     $manager = new SchemaManager();
     $typesense_fields = collect($manager->translateForEngine($schema, 'typesense')['fields'])->keyBy('name');
+
+    $database_indexes = collect($manager->translateForEngine($schema, 'database')['indexes']);
 
     expect($typesense_fields->get('status')['facet'] ?? null)->toBeTrue()
         ->and($typesense_fields->get('title')['facet'] ?? null)->toBeNull()
@@ -248,5 +253,9 @@ it('preserves filterable field metadata across search schema translations', func
         ->and($manager->translateForEngine($schema, 'database')['columns']['status']['filterable'] ?? null)->toBeTrue()
         ->and($manager->translateForEngine($schema, 'database')['columns']['tags']['relation'] ?? null)->toBe('tags')
         ->and($manager->translateForEngine($schema, 'database')['columns']['tags']['properties']['id']['filterable'] ?? null)->toBeTrue()
+        ->and($database_indexes->where('type', 'fulltext')->pluck('columns')->all())->toBe([['body']])
+        ->and($database_indexes->where('type', 'fuzzy')->pluck('columns')->all())->toBe([['name']])
+        ->and($database_indexes->where('type', 'prefix')->pluck('columns')->all())->toBe([['slug']])
+        ->and($database_indexes->where('type', 'btree')->pluck('columns')->contains(['title']))->toBeFalse()
         ->and($manager->translateForEngine($schema, 'database')['columns']['title']['filterable'] ?? null)->toBeFalse();
 });
