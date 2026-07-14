@@ -25,5 +25,7 @@ readonly class CrudMeta
         public ?string $class = null,
         public ?string $table = null,
         public ?CarbonInterface $cachedAt = null,
+        /** @var array<string, mixed> */
+        public array $search = [],
     ) {}
 }

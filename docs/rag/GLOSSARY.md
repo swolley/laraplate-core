@@ -92,6 +92,11 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **ModelEmbedding**    | Persisted embedding vectors linked to searchable models.        |
 | **Indexed relation-field filter** | Search filter using a schema-declared dot path such as `tags.id`; it targets relation data already stored in the search document. |
 | **Relation anti-exists filter** | `!=` / `not in` on an indexed relation field; means no related indexed row matches the value/list. |
+| **TextMatchPreference** | Adaptive caller preference: `auto`, `strict`, `balanced`, or `tolerant`; resolved before engine translation. |
+| **TextMatchOptions** | Granular effective text matching contract shared by all engines. |
+| **Protected search token** | Acronym, code, UUID, email, number, or short token that remains non-fuzzy unless explicitly enabled. |
+| **SearchQueryAnalyzer** | Classifies original query tokens and selects significant/protected/eligible counts for matching policy. |
+| **Matching degradation** | Requested portable semantic that the active engine cannot represent exactly. |
 
 
 ## Internationalization

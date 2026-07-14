@@ -7,6 +7,7 @@ use Modules\Core\Casts\SearchMode;
 use Modules\Core\Http\Requests\LoginRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TranslationsRequest;
+use Modules\Core\Search\Enums\TextMatchPreference;
 
 
 it('login request defines expected validation rules', function (): void {
@@ -58,7 +59,9 @@ it('search request parsed returns expected DTO values', function (): void {
     expect($parsed->mainEntity)->toBe('settings')
         ->and($parsed->primaryKey)->toBe('id')
         ->and($parsed->qs)->toBe('john')
-        ->and($parsed->mode)->toBe(SearchMode::Auto);
+        ->and($parsed->mode)->toBe(SearchMode::Auto)
+        ->and($parsed->matching)->toBe(TextMatchPreference::Auto)
+        ->and($parsed->matching_options)->toBe([]);
 });
 
 it('search request parsed casts mode to enum', function (): void {
@@ -80,4 +83,41 @@ it('search request parsed casts mode to enum', function (): void {
     $parsed = $request->parsed();
 
     expect($parsed->mode)->toBe(SearchMode::Orchestrated);
+});
+
+it('search request validates and parses adaptive matching controls', function (): void {
+    $request = SearchRequest::create('/core/api/search/settings', 'GET', [
+        'qs' => 'Mario Rossi',
+        'matching' => 'tolerant',
+        'matching_options' => [
+            'max_edits' => 2,
+            'minimum_should_match' => 80,
+            'identifier_typos' => false,
+        ],
+    ]);
+    $route = new Route('GET', '/core/api/search/{entity}', fn (): null => null);
+    $route->bind($request);
+    $route->setParameter('entity', 'settings');
+    $request->setRouteResolver(fn (): Route => $route);
+    $validator = Mockery::mock(Illuminate\Contracts\Validation\Validator::class);
+    $validator->shouldReceive('validated')->andReturn([
+        'qs' => 'Mario Rossi',
+        'matching' => 'tolerant',
+        'matching_options' => [
+            'max_edits' => 2,
+            'minimum_should_match' => 80,
+            'identifier_typos' => false,
+        ],
+    ]);
+    $request->setValidator($validator);
+
+    $parsed = $request->parsed();
+
+    expect($request->rules())->toHaveKeys([
+        'matching',
+        'matching_options.max_edits',
+        'matching_options.minimum_should_match',
+        'matching_options.identifier_typos',
+    ])->and($parsed->matching)->toBe(TextMatchPreference::Tolerant)
+        ->and($parsed->matching_options['max_edits'])->toBe(2);
 });

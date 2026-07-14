@@ -18,6 +18,9 @@ use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\DTOs\TextMatchOptions;
+use Modules\Core\Search\Services\TextMatchOptionsResolver;
+use Modules\Core\Search\Services\SearchQueryAnalyzer;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\ElasticsearchService;
@@ -50,6 +53,18 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     public function supportsOrchestratedVectorSearch(): bool
     {
         return true;
+    }
+
+    #[Override]
+    public function textMatchCapabilities(): array
+    {
+        return [
+            'typo_tolerance' => true,
+            'prefix' => true,
+            'exact_match_boost' => true,
+            'operator' => true,
+            'degraded' => false,
+        ];
     }
 
     /**
@@ -121,21 +136,13 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             return $this->performVectorSearch($builder);
         }
 
-        if ($this->hasAdvancedFilters($builder)) {
-            return $this->performKeywordSearch($builder, $builder->limit ?: 10, 1);
-        }
-
-        return parent::search($builder);
+        return $this->performKeywordSearch($builder, $builder->limit ?: 10, 1);
     }
 
     #[Override]
     public function paginate(Builder $builder, $perPage, $page): SearchResult
     {
-        if ($this->hasAdvancedFilters($builder)) {
-            return $this->performKeywordSearch($builder, (int) $perPage, (int) $page);
-        }
-
-        return parent::paginate($builder, $perPage, $page);
+        return $this->performKeywordSearch($builder, (int) $perPage, (int) $page);
     }
 
     /**
@@ -828,13 +835,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             $body['query'] = [
                 'bool' => [
                     'should' => [
-                        [
-                            'multi_match' => [
-                                'query' => $builder->query,
-                                'fields' => ['*'],
-                                'type' => 'best_fields',
-                            ],
-                        ],
+                        $this->buildTextMatchQuery($builder->query, app(TextMatchOptionsResolver::class)->forBuilder($builder)),
                     ],
                 ],
             ];
@@ -872,13 +873,10 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         ];
 
         if ($builder->query && $builder->query !== '*') {
-            $bool['must'][] = [
-                'multi_match' => [
-                    'query' => $builder->query,
-                    'fields' => ['*'],
-                    'type' => 'best_fields',
-                ],
-            ];
+            $bool['must'][] = $this->buildTextMatchQuery(
+                $builder->query,
+                app(TextMatchOptionsResolver::class)->forBuilder($builder),
+            );
         } else {
             $bool['must'][] = ['match_all' => new stdClass()];
         }
@@ -898,9 +896,67 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             'size' => $perPage,
         ];
 
+        if ($builder->orders !== []) {
+            $params['body']['sort'] = array_map(
+                static fn (array $order): array => [$order['column'] => $order['direction']],
+                $builder->orders,
+            );
+        }
+
         $response = ElasticsearchService::getInstance()->client->search($params);
 
         return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildTextMatchQuery(string $query, TextMatchOptions $options): array
+    {
+        $analysis = app(SearchQueryAnalyzer::class)->analyze($query, $options->minimumTermLength);
+        $match = [
+            'query' => $query,
+            'fields' => ['*'],
+            'type' => $options->prefix ? 'bool_prefix' : 'best_fields',
+            'operator' => $options->operator,
+        ];
+
+        if ($options->operator === 'or' && $options->minimumShouldMatch < 100) {
+            $match['minimum_should_match'] = $options->minimumShouldMatch . '%';
+        }
+
+        if ($options->typoTolerance
+            && $options->maxEdits > 0
+            && $options->fuzzyTokenLimit > 0
+            && (! $analysis->protectedOnly() || $options->identifierTypos)
+            && mb_strlen($query) >= $options->minimumTermLength) {
+            $match['fuzziness'] = $options->maxEdits === 1
+                ? 1
+                : sprintf('AUTO:%d,%d', $options->minimumTermLength, $options->twoEditMinimumTermLength);
+            $match['prefix_length'] = $options->prefixLength;
+            $match['fuzzy_transpositions'] = $options->transpositions;
+        }
+
+        if ($options->exactMatchBoost <= 0.0) {
+            return ['multi_match' => $match];
+        }
+
+        return [
+            'bool' => [
+                'should' => [
+                    ['multi_match' => $match],
+                    [
+                        'multi_match' => [
+                            'query' => $query,
+                            'fields' => ['*'],
+                            'type' => 'phrase',
+                            'boost' => $options->exactMatchBoost,
+                        ],
+                    ],
+                ],
+                'minimum_should_match' => 1,
+            ],
+        ];
     }
 
     /**

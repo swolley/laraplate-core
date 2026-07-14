@@ -636,6 +636,8 @@ class CrudService
                 max(1, $requestData->page !== null ? $requestData->pagination : $requestData->limit),
                 $requestData->filters,
                 $requestData->sort,
+                $requestData->matching,
+                $requestData->matching_options,
             );
         } catch (InvalidArgumentException $exception) {
             return $this->invalidSearchConstraintsResult($exception->getMessage());
@@ -727,6 +729,7 @@ class CrudService
             class: $model::class,
             table: $model->getTable(),
             cachedAt: Date::now(),
+            search: $result->meta,
         );
     }
 

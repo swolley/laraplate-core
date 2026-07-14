@@ -16,6 +16,8 @@ use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\DTOs\TextMatchOptions;
+use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
 use Override;
@@ -45,6 +47,19 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     public function supportsOrchestratedVectorSearch(): bool
     {
         return true;
+    }
+
+    #[Override]
+    public function textMatchCapabilities(): array
+    {
+        return [
+            'typo_tolerance' => true,
+            'prefix' => true,
+            'exact_match_boost' => false,
+            'exact_match_priority' => true,
+            'operator' => false,
+            'degraded' => ['exact_match_boost', 'operator'],
+        ];
     }
 
     /**
@@ -160,6 +175,10 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     public function buildSearchParameters(Builder $builder, int $page, ?int $perPage): array
     {
         $parameters = parent::buildSearchParameters($builder, $page, $perPage);
+        $parameters = array_merge(
+            $parameters,
+            $this->buildTextMatchParameters(app(TextMatchOptionsResolver::class)->forBuilder($builder)),
+        );
         $advanced_filters = $builder->options['advanced_filters'] ?? null;
 
         if (! is_array($advanced_filters)) {
@@ -178,6 +197,20 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             : $advanced_filter;
 
         return $parameters;
+    }
+
+    /**
+     * @return array<string, bool|int>
+     */
+    public function buildTextMatchParameters(TextMatchOptions $options): array
+    {
+        return [
+            'num_typos' => $options->typoTolerance && $options->fuzzyTokenLimit > 0 ? $options->maxEdits : 0,
+            'prefix' => $options->prefix,
+            'min_len_1typo' => $options->minimumTermLength,
+            'min_len_2typo' => $options->twoEditMinimumTermLength,
+            'prioritize_exact_match' => $options->exactMatchBoost > 0.0,
+        ];
     }
 
     /**

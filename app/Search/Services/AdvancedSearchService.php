@@ -12,6 +12,7 @@ use Modules\Core\Search\Contracts\IQueryIntentParser;
 use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Contracts\ITextEmbedder;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Enums\TextMatchPreference;
 
 final readonly class AdvancedSearchService
 {
@@ -36,7 +37,16 @@ final readonly class AdvancedSearchService
     /**
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    public function search(Model $model, string $query, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = []): AdvancedSearchResult
+    public function search(
+        Model $model,
+        string $query,
+        int $page,
+        int $perPage,
+        ?FiltersGroup $filters = null,
+        array $sort = [],
+        TextMatchPreference|string|null $matching = null,
+        array $matchingOptions = [],
+    ): AdvancedSearchResult
     {
         $engine = $this->engineFor($model);
 
@@ -51,6 +61,7 @@ final readonly class AdvancedSearchService
         $plan['retrieval']['size'] = $perPage;
         $plan = $this->applyEngineCapabilities($engine, $plan);
         $vector = $this->resolveVector($query, $plan);
+        $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
 
         return $this->ensemble_search->search(
             model: $model,
@@ -61,6 +72,7 @@ final readonly class AdvancedSearchService
             perPage: $perPage,
             filters: $filters,
             sort: $sort,
+            textMatch: $text_match,
         );
     }
 

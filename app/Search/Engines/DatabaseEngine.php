@@ -14,6 +14,8 @@ use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\DatabaseEngine as BaseDatabaseEngine;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\Services\DatabaseTextMatchCompiler;
+use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 
 final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
@@ -88,6 +90,30 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return true;
     }
 
+    public function textMatchCapabilities(): array
+    {
+        return [
+            'portable' => [
+                'typo_tolerance' => false,
+                'prefix' => true,
+                'exact_match_boost' => false,
+                'operator' => false,
+            ],
+            'pgsql_pg_trgm' => [
+                'typo_tolerance' => true,
+                'prefix' => true,
+                'similarity_threshold' => true,
+                'requires' => 'pg_trgm extension and SEARCH_DATABASE_PG_TRGM_ENABLED=true',
+            ],
+            'oracle' => [
+                'typo_tolerance' => false,
+                'prefix' => true,
+                'degraded' => ['typo_tolerance', 'exact_match_boost', 'operator'],
+                'future_adapter' => 'Oracle Text CONTEXT index',
+            ],
+        ];
+    }
+
     /**
      * @param  Builder<covariant Model>  $builder
      */
@@ -103,6 +129,61 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         }
 
         return parent::search($builder);
+    }
+
+    /**
+     * @param  list<string>  $columns
+     * @param  list<string>  $prefixColumns
+     * @param  list<string>  $fullTextColumns
+     * @return EloquentBuilder<Model>
+     */
+    #[Override]
+    protected function initializeSearchQuery(Builder $builder, array $columns, array $prefixColumns = [], array $fullTextColumns = []): EloquentBuilder
+    {
+        /** @var EloquentBuilder<Model> $query */
+        $query = method_exists($builder->model, 'newScoutQuery')
+            ? $builder->model->newScoutQuery($builder)
+            : $builder->model->newQuery();
+
+        if (blank($builder->query)) {
+            return $query;
+        }
+
+        $driver = $builder->modelConnectionType();
+        $options = app(TextMatchOptionsResolver::class)->forBuilder($builder);
+        $compiler = app(DatabaseTextMatchCompiler::class);
+        $use_pg_trgm = $driver === 'pgsql' && (bool) config('search.text_matching.database.pgsql_trigram_enabled', false);
+
+        return $query->where(function (EloquentBuilder $query) use ($builder, $columns, $fullTextColumns, $driver, $options, $compiler, $use_pg_trgm): void {
+            $can_search_primary_key = ctype_digit($builder->query)
+                && in_array($builder->model->getKeyType(), ['int', 'integer'], true)
+                && ($driver !== 'pgsql' || $builder->query <= PHP_INT_MAX)
+                && in_array($builder->model->getScoutKeyName(), $columns, true);
+
+            if ($can_search_primary_key) {
+                $query->orWhere($builder->model->getQualifiedKeyName(), $builder->query);
+            }
+
+            foreach ($columns as $column) {
+                if (in_array($column, $fullTextColumns, true)
+                    || ($can_search_primary_key && $column === $builder->model->getScoutKeyName())) {
+                    continue;
+                }
+
+                $qualified = $builder->model->qualifyColumn($column);
+                $wrapped = $query->getQuery()->getGrammar()->wrap($qualified);
+                $compiled = $compiler->compile($use_pg_trgm ? 'pgsql' : $driver, $wrapped, $builder->query, $options);
+                $query->orWhereRaw($compiled['sql'], $compiled['bindings']);
+            }
+
+            if ($fullTextColumns !== []) {
+                $query->orWhereFullText(
+                    array_map(fn (string $column): string => $builder->model->qualifyColumn($column), $fullTextColumns),
+                    $builder->query,
+                    $this->getFullTextOptions($builder),
+                );
+            }
+        });
     }
 
     public function paginateUsingDatabase(Builder $builder, $perPage, $pageName, $page): LengthAwarePaginator

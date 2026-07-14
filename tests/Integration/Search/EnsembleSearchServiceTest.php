@@ -8,6 +8,8 @@ use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\Contracts\ISearchable;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\HeuristicReranker;
+use Modules\Core\Search\Services\SearchQueryAnalyzer;
+use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Tests\Integration\Search\EnsembleSearchPaginatorTestModel;
 
@@ -140,4 +142,38 @@ it('exposes normalized raw and diagnostic score metadata for fused hits', functi
         ->and($hit['score_details']['defaulted'])->toBeFalse()
         ->and($hit['score_details']['strategies'])->toHaveKey('keyword')
         ->and($hit['score_details']['strategies']['keyword']['normalized_score'])->toBe(1.0);
+});
+
+it('propagates one resolved text match decision and exposes matching metadata', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+    $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve('Mario Rossi');
+
+    $result = $this->service->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'Mario Rossi',
+        plan: [
+            'retrieval' => ['use_fulltext' => true, 'use_vector' => false],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => false],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+        textMatch: $resolved,
+    );
+
+    expect(EnsembleSearchPaginatorTestModel::$lastBuilder?->options['text_match'])
+        ->toMatchArray([
+            'max_edits' => 1,
+            'operator' => 'and',
+            'minimum_should_match' => 100,
+            'fuzzy_token_limit' => 1,
+        ])->and($result->meta['matching'])->toMatchArray([
+            'requested_preference' => 'auto',
+            'effective_preference' => 'balanced',
+            'significant_token_count' => 2,
+            'protected_token_count' => 0,
+            'fuzzy_token_limit' => 1,
+            'degraded' => ['capabilities'],
+        ]);
 });

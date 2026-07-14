@@ -10,6 +10,7 @@ use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\DTOs\ResolvedTextMatch;
 
 /**
  * Ensemble search service that combines keyword, vector and hybrid retrieval
@@ -29,7 +30,7 @@ class EnsembleSearchService
      * @param  list<float>|null  $vector
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = []): AdvancedSearchResult
+    public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = [], ?ResolvedTextMatch $textMatch = null): AdvancedSearchResult
     {
         $retrieval = $this->planSection($plan, 'retrieval');
         $ensemble_config = $this->planSection($plan, 'ensemble');
@@ -54,7 +55,7 @@ class EnsembleSearchService
         $strategy_results = [];
 
         if ($use_fulltext) {
-            $result = $this->executeScoutSearch($model, $query, null, $filters, $sort, $window, $page, $perPage, 'keyword', $driver);
+            $result = $this->executeScoutSearch($model, $query, null, $filters, $sort, $window, $page, $perPage, 'keyword', $driver, $textMatch);
             $strategy_results[] = $result;
             $per_strategy['keyword'] = $this->hitsById($result);
         }
@@ -66,7 +67,7 @@ class EnsembleSearchService
         }
 
         if ($use_fulltext && $use_vector) {
-            $result = $this->executeScoutSearch($model, $query, $vector, $filters, $sort, $window, $page, $perPage, 'hybrid', $driver);
+            $result = $this->executeScoutSearch($model, $query, $vector, $filters, $sort, $window, $page, $perPage, 'hybrid', $driver, $textMatch);
             $strategy_results[] = $result;
             $per_strategy['hybrid'] = $this->hitsById($result);
         }
@@ -124,6 +125,7 @@ class EnsembleSearchService
                 'strategies' => array_keys($per_strategy),
                 'reranked' => $use_reranker,
                 'total_results' => count($hits),
+                'matching' => $textMatch?->toMeta($this->textMatchDegradations($model)) ?? [],
             ],
         );
     }
@@ -132,12 +134,16 @@ class EnsembleSearchService
      * @param  list<float>|null  $vector
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
-    private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy, string $driver): AdvancedSearchResult
+    private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy, string $driver, ?ResolvedTextMatch $textMatch = null): AdvancedSearchResult
     {
         /** @var class-string<Model> $model_class */
         $model_class = $model::class;
         /** @var ScoutBuilder<Model> $builder */
         $builder = $model_class::search($query)->take($window);
+
+        if ($textMatch instanceof ResolvedTextMatch) {
+            $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = $textMatch->options->toArray();
+        }
 
         if ($vector !== null) {
             $builder->where('vector', $vector);
@@ -213,6 +219,28 @@ class EnsembleSearchService
         $engine = $model->searchableUsing();
 
         return method_exists($engine, 'getName') ? $engine->getName() : $engine::class;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function textMatchDegradations(Model $model): array
+    {
+        $engine = $model->searchableUsing();
+
+        if (! method_exists($engine, 'textMatchCapabilities')) {
+            return ['capabilities'];
+        }
+
+        $degraded = $engine->textMatchCapabilities()['degraded'] ?? [];
+
+        if (is_string($degraded)) {
+            return [$degraded];
+        }
+
+        return is_array($degraded)
+            ? array_values(array_filter($degraded, is_string(...)))
+            : [];
     }
 
     /**

@@ -140,6 +140,7 @@ function crud_cov_advanced_search_returning(int|string $id): AdvancedSearchServi
             page: $page,
             perPage: $perPage,
             totalPages: 1,
+            meta: ['matching' => ['effective_preference' => 'balanced']],
         ));
 
     return new AdvancedSearchService(
@@ -314,7 +315,8 @@ it('search orchestrated mode hydrates advanced search ids', function (): void {
     expect($result->data)->toBeInstanceOf(Illuminate\Database\Eloquent\Collection::class)
         ->and($result->data->first()?->getKey())->toBe($target->getKey())
         ->and($result->meta?->totalRecords)->toBe(1)
-        ->and($result->meta?->currentRecords)->toBe(1);
+        ->and($result->meta?->currentRecords)->toBe(1)
+        ->and($result->meta?->search['matching']['effective_preference'])->toBe('balanced');
 });
 
 it('search auto mode uses orchestrated search when current driver supports it', function (): void {

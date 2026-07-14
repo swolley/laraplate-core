@@ -50,6 +50,50 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Portable text matching
+    |--------------------------------------------------------------------------
+    |
+    | Engine adapters translate these semantics to native parameters. Named
+    | profiles are presets only; callers may override individual values.
+    |
+    */
+    'text_matching' => [
+        'defaults' => [
+            'typo_tolerance' => true,
+            'max_edits' => 1,
+            'prefix' => true,
+            'prefix_length' => 2,
+            'minimum_term_length' => 4,
+            'two_edit_minimum_term_length' => 8,
+            'exact_match_boost' => 2.0,
+            'operator' => 'and',
+            'minimum_should_match' => 100,
+            'transpositions' => true,
+            'similarity_threshold' => 0.6,
+            'fuzzy_token_limit' => 1,
+            'identifier_typos' => false,
+        ],
+        'preferences' => [
+            'strict' => [
+                'typo_tolerance' => false,
+                'max_edits' => 0,
+            ],
+            'balanced' => [
+                'typo_tolerance' => true,
+                'max_edits' => 1,
+            ],
+            'tolerant' => [
+                'typo_tolerance' => true,
+                'max_edits' => 2,
+            ],
+        ],
+        'database' => [
+            'pgsql_trigram_enabled' => env('SEARCH_DATABASE_PG_TRGM_ENABLED', false),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Vector Search
     |--------------------------------------------------------------------------
     |

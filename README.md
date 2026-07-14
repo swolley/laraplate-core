@@ -116,6 +116,7 @@ SCOUT_DRIVER=typesense                          #actually supperted drivers with
 VECTOR_SEARCH_ENABLED=true                      #create embeddings with ai functionalities before indexing in search engine
 EMBEDDING_PROVIDER=openai                       #actually supported embedding generator provider (openai, ollama)
 SEARCH_ENGINE=elasticsearch						#default search engine
+SEARCH_DATABASE_PG_TRGM_ENABLED=false             #enable PostgreSQL pg_trgm matching for the database Scout driver
 VECTOR_DIMENSION=768							#vector dimension for embeddings
 VECTOR_SIMILARITY=cosine						#vector similarity metric (cosine, dot_product, euclidean)
 VECTOR_DIMENSIONS=1536							#vector dimensions for OpenAI default
@@ -214,6 +215,12 @@ class ... extends Model
 Core search applies filters inside the active engine before pagination. When a model exposes a searchable schema, public filters are accepted only on fields declared filterable or facetable.
 
 Indexed relation fields use schema-declared dot paths such as `tags.id`. Elasticsearch receives nested queries, Typesense receives nested-field filter syntax, and the database driver uses the schema field option `relation` to translate the same filter to `whereHas` / `whereDoesntHave`. On relation fields, `!=` and `not in` mean anti-exists: no related indexed row may match the value/list.
+
+### Portable text matching
+
+Text matching is configured under `search.text_matching.defaults` and translated by each engine adapter. The options are granular so named profiles can remain replaceable presets instead of becoming part of the engine contract.
+
+The database engine always provides case-insensitive prefix or substring matching. PostgreSQL can additionally use `strict_word_similarity()` after installing the trusted `pg_trgm` extension and setting `SEARCH_DATABASE_PG_TRGM_ENABLED=true`. Other database drivers report typo tolerance as degraded. Oracle intentionally uses the portable fallback: `UTL_MATCH` is not index-backed for generic retrieval over long text, while Oracle Text requires explicit `CONTEXT` indexes and a schema-aware adapter.
 
 ### Elasticsearch configuration
 
@@ -428,6 +435,7 @@ The Core Module includes built-in features such as:
 -   Redis caching for improved performance.
 -   Automatic indexing of entities with Elasticsearch (embeddings generation requires AI module).
 -   **Event orchestration** for search indexing and modification moderation ([docs/EVENT_ORCHESTRATION.md](docs/EVENT_ORCHESTRATION.md)).
+-   **Adaptive search matching** user/API behavior ([docs/rag/SEARCH_MATCHING_USER.md](docs/rag/SEARCH_MATCHING_USER.md)) and developer/operator integration ([docs/rag/SEARCH_MATCHING_DEVELOPER.md](docs/rag/SEARCH_MATCHING_DEVELOPER.md)).
 -   Enhanced Swagger documentation generation.
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.
@@ -597,4 +605,3 @@ This section tracks all pending tasks and issues that need to be addressed in th
 - Several items require testing with different database systems
 - Some components need completion of implementation details
 - Priority should be given to high-priority items that affect core functionality
-

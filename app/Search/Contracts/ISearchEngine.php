@@ -34,6 +34,13 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
     public function supportsOrchestratedVectorSearch(): bool;
 
     /**
+     * Describe native and degraded portable text matching support.
+     *
+     * @return array<string, mixed>
+     */
+    public function textMatchCapabilities(): array;
+
+    /**
      * Perform the Scout search for the given builder.
      *
      * @param  Builder<covariant Model>  $builder
