@@ -6,9 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Casts\ExpandGraphRequestData;
 use Modules\Core\Casts\SearchGraphRequestData;
-use Modules\Core\Graph\Contracts\GraphProviderInterface;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
-use Modules\Core\Graph\Contracts\GraphProviderRulesInterface;
 use Modules\Core\Graph\DTOs\GraphData;
 use Modules\Core\Graph\DTOs\GraphEdge;
 use Modules\Core\Graph\DTOs\GraphMeta;
@@ -26,46 +24,9 @@ use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
+use Modules\Core\Tests\Stubs\Graphs\GraphServiceRulesProvider;
 
 uses(RefreshDatabase::class);
-
-final class GraphServiceRulesProvider implements GraphProviderInterface, GraphProviderRulesInterface
-{
-    public function defaultRelations(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function summaryFields(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function edgeType(string $module, string $entity, string $relation): ?string
-    {
-        return null;
-    }
-
-    public function excludedRelations(string $module, string $entity): array
-    {
-        return [];
-    }
-
-    public function allowedRelationPaths(string $module, string $entity): array
-    {
-        return ['permissions'];
-    }
-
-    public function maxDepth(string $module, string $entity): ?int
-    {
-        return 1;
-    }
-
-    public function maxRelationLimit(string $module, string $entity, string $relation): ?int
-    {
-        return null;
-    }
-}
 
 it('loads the center record through detail semantics and returns a crud result', function (): void {
     $user = User::factory()->create(['name' => 'Center']);
@@ -92,7 +53,7 @@ it('loads the center record through detail semantics and returns a crud result',
             nodes: [],
             edges: [],
             graphMeta: new GraphMeta(depth: 1, requestedRelations: []),
-        )
+        ),
     );
 
     $crud = Mockery::mock(CrudService::class);

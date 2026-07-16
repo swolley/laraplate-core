@@ -2,25 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Graph\GraphRelationInspector;
-
-final class GraphInspectorParent extends Model
-{
-    protected $table = 'graph_inspector_parents';
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(GraphInspectorChild::class, 'parent_id');
-    }
-}
-
-final class GraphInspectorChild extends Model
-{
-    protected $table = 'graph_inspector_children';
-}
+use Modules\Core\Tests\Stubs\Graphs\GraphInspectorChild;
+use Modules\Core\Tests\Stubs\Graphs\GraphInspectorParent;
 
 it('inspects normal eloquent relations', function (): void {
     $relation = (new GraphRelationInspector())->inspect(new GraphInspectorParent(), 'children');

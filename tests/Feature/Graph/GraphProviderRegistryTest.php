@@ -2,34 +2,9 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Graph\Contracts\GraphProviderInterface;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\GraphProviderRegistry;
-
-final class RegistryTestProvider implements GraphProviderInterface
-{
-    public function __construct(private readonly string $name) {}
-
-    public function defaultRelations(string $module, string $entity): array
-    {
-        return [$this->name];
-    }
-
-    public function summaryFields(string $module, string $entity): array
-    {
-        return ['name'];
-    }
-
-    public function edgeType(string $module, string $entity, string $relation): ?string
-    {
-        return $this->name . ':' . $relation;
-    }
-
-    public function excludedRelations(string $module, string $entity): array
-    {
-        return [];
-    }
-}
+use Modules\Core\Tests\Stubs\Graphs\RegistryTestProvider;
 
 it('resolves entity providers before module providers', function (): void {
     $registry = new GraphProviderRegistry();
