@@ -9,4 +9,8 @@ return [
     'default_relation_limit' => 25,
     'max_relation_limit' => 100,
     'default_node_detail' => 'summary',
+    'assistant_safe_fields' => [
+        'default' => ['title', 'name', 'label', 'slug', 'status', 'type', 'code'],
+        'core.users' => ['name'],
+    ],
 ];
