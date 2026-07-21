@@ -248,7 +248,7 @@ flowchart TB
 
 ### Dynamic entities, presets and fields
 
-The dynamic-entity stack lets modules describe domain objects without writing one table per type. `Core\Models\Entity` is **abstract**: each module subclass pins an `EntityType` enum (CMS uses `CONTENTS|CONTRIBUTORS|CATEGORIES`). `Core\Models\Preset` is also abstract and hosts `BelongsToMany Field` via the `fieldables` pivot (with `is_required`, `default`, `order_column`). When a preset's fields change, `Preset::createFieldsVersion()` (delegated to `PresetVersioningService`) writes a new `Presettable` row with a `fields_snapshot` and an incremented `version`. Each domain row carries `entity_id` + `presettable_id`, so editorial changes to the schema do not break older rows: `Preset::migrateRelatedModelsToLastVersion()` reassigns related rows to the active presettable when ready.
+The dynamic-entity stack lets modules describe domain objects without writing one table per type. `Core\Models\Entity` is **abstract**: each module subclass pins an `EntityType` enum (CMS uses `CONTENTS|CONTRIBUTORS|CATEGORIES`). `Core\Models\Preset` is also abstract and hosts `BelongsToMany Field` via the `fieldables` pivot (with `is_required`, `default`, `order_column`). When a preset's fields change, `Preset::createFieldsVersion()` (delegated to `PresetVersioningService`) writes a new `Presettable` row with a `fields_snapshot` and an incremented `version`. Each domain row carries `entity_id` + `presettable_id`, so schema changes do not break older rows: `Preset::migrateRelatedModelsToLastVersion()` reassigns related rows to the active presettable when ready.
 
 ```mermaid
 flowchart LR
@@ -338,6 +338,21 @@ flowchart LR
   Service --> Rules
   Service --> Traversal --> Serializer --> Response
 ```
+
+### Application content retrieval contract
+
+Application content retrieval is a neutral Core extension boundary for read-only, AI-consumable evidence. It is separate from documentation RAG and Core Graph. `ApplicationContentRetrievalProviderInterface` exposes a typed source descriptor and a retrieval method; `ApplicationContentRetrievalProviderRegistryInterface` stores explicitly registered providers under deterministic normalized source keys. Duplicate sources fail during registration. Core does not discover providers through events, reflection, class names, or container scans, and it does not depend on the AI module.
+
+`ApplicationContentRetrievalService` is the only production gateway. It requires the same authenticated Core user in both the request resolver and the active guard, verifies that the provider module is enabled, enforces the source entity's `select` permission, resolves row ACL filters, calls the provider, and validates result invariants. Unknown sources, identity disagreement, permission denial, provider failure, invalid locale, and malformed evidence all become the same generic unavailable failure.
+
+The public DTO boundary is deliberately small:
+
+- source descriptors contain module/entity identity, supported locales, bounded capabilities, and intent categories;
+- queries contain only source, natural-language query, locale, and a bounded limit;
+- authorization contains the server-resolved permission and optional `FiltersGroup` and never enters an AI payload;
+- hits contain safe plain-text evidence, a user-facing label, a canonical `/app/...` reference, locale, strategy, revision, and truncation state.
+
+Providers must apply ACL constraints before or during candidate lookup, rehydrate candidates through an authorized query, and project allowlisted fields. They must never return raw engine `_source`, Eloquent arrays, storage paths, permission names, ACL expressions, class names, table names, or connection/index identifiers. Events remain suitable for indexing, invalidation, deletion, and freshness notifications after explicit registration; they are not a provider injection mechanism.
 
 ### Translations and locale
 

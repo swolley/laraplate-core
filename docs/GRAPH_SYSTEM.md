@@ -2,6 +2,8 @@
 
 Core Graph is the CRUD-aligned graph layer for Laraplate. It is owned by the Core module and is available for every CRUD-resolvable entity unless normal CRUD resolution, authorization, validation, or optional provider rules reject the request. CMS is the first provider and consumer, but it does not own traversal, authorization, request parsing, or response contracts.
 
+Core Graph, an AI Graph tool, and a RAG knowledge graph are different concepts. Core Graph is the authorized relation API described here. The AI module may expose read-only wrappers around these operations to the authenticated in-app assistant, preserving the request user's permission and row ACL checks. Graphify/GraphRAG-style knowledge graphs would instead be retrieval storage or preprocessing choices; they are not required by Core Graph and are not selected dependencies.
+
 ## Public Routes
 
 API routes are mounted under the CRUD namespace because graph operations extend the CRUD model rather than introducing a separate module API surface:
@@ -62,6 +64,12 @@ Node details are controlled by `node_detail`. Summary serialization uses provide
 ## Performance Boundary
 
 Runtime traversal is the correctness baseline for expand, search, and stats. Do not add materialized edge storage until a real workflow shows runtime traversal is too expensive and the affected module/entity/relation set has an accepted invalidation and freshness strategy. Any future materialized layer must preserve the public response contract and fall back to runtime traversal whenever freshness cannot be proven.
+
+## AI Tool Boundary
+
+The in-app assistant receives request-local `graph_search`, `graph_expand`, and `graph_stats` tools only under the `InAppAssistance` profile and only when the compiled server policy allows them. These tools call the authorized Core Graph gateway directly; they do not accept user ids, tenant ids, roles, permissions, ACL filters, model classes, table names, or system instructions. They are read-only and cannot create action requests or mutations.
+
+Application content retrieval is a second, independent read-only tool surface. It finds bounded textual evidence owned by a module, while Core Graph expands known authorized relations. An assistant turn may use both, but neither surface bypasses the other's authorization rules and neither is documentation RAG.
 
 ## Tests
 
