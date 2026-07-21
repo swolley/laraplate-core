@@ -47,6 +47,17 @@ final class ApplicationContentRetrievalProviderRegistry implements ApplicationCo
         return $this->providers[$source] ?? null;
     }
 
+    public function descriptorFor(string $source): ?ApplicationContentSourceDescriptor
+    {
+        try {
+            $source = ApplicationContentSourceDescriptor::normalizeSource($source);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->source_descriptors[$source] ?? null;
+    }
+
     public function descriptors(): array
     {
         $descriptors = $this->source_descriptors;

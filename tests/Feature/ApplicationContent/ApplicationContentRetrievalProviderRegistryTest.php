@@ -65,6 +65,7 @@ it('normalizes source lookup and rejects duplicate registration', function (): v
     $registry->register($provider);
 
     expect($registry->providerFor(' CMS.CONTENTS '))->toBe($provider)
+        ->and($registry->descriptorFor(' CMS.CONTENTS ')?->source)->toBe('cms.contents')
         ->and(fn () => $registry->register(
             new RegistryFakeApplicationContentProvider(applicationContentDescriptor('CMS.CONTENTS')),
         ))->toThrow(DuplicateApplicationContentSourceException::class);

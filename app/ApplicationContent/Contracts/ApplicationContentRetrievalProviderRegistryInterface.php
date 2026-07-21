@@ -12,6 +12,8 @@ interface ApplicationContentRetrievalProviderRegistryInterface
 
     public function providerFor(string $source): ?ApplicationContentRetrievalProviderInterface;
 
+    public function descriptorFor(string $source): ?ApplicationContentSourceDescriptor;
+
     /**
      * @return list<ApplicationContentSourceDescriptor>
      */
