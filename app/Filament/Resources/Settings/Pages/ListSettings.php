@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\ForcedVersionStrategySettings;
 use Override;
 
 final class ListSettings extends ListRecords
@@ -22,7 +23,8 @@ final class ListSettings extends ListRecords
 
     public function getTabs(): array
     {
-        $counts_by_group = Setting::query()->select('group_name')->distinct()->pluck('group_name')->countBy()->toArray();
+        $counts_by_group = SettingResource::getEloquentQuery()
+            ->select('group_name')->pluck('group_name')->countBy()->toArray();
 
         if (count($counts_by_group) < 2) {
             return [];

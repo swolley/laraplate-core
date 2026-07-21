@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
+use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Casts\SettingTypeEnum;
 
 final class SettingsTable
@@ -100,7 +101,7 @@ final class SettingsTable
         return Cache::remember(
             'filament_settings_distinct_group_name',
             $ttl,
-            static fn (): array => Setting::query()
+            static fn (): array => SettingResource::getEloquentQuery()
                 ->select('group_name')
                 ->distinct()
                 ->orderBy('group_name')

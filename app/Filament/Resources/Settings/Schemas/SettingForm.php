@@ -24,6 +24,7 @@ final class SettingForm
             ->components([
                 TextInput::make('name')
                     ->required()
+                    ->notIn(resolve(\Modules\Core\Services\ForcedVersionStrategySettings::class)->names())
                     ->maxLength(255),
                 Select::make('group_name')
                     ->required()

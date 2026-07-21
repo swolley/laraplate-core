@@ -16,6 +16,8 @@ use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
 use Modules\Core\Filament\Resources\Settings\Schemas\SettingForm;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\ForcedVersionStrategySettings;
+use Illuminate\Database\Eloquent\Builder;
 use Override;
 use UnitEnum;
 
@@ -46,6 +48,12 @@ final class SettingResource extends Resource
     public static function table(Table $table): Table
     {
         return SettingsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereNotIn('name', resolve(ForcedVersionStrategySettings::class)->names());
     }
 
     public static function getRelations(): array
