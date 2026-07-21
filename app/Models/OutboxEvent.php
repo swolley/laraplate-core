@@ -21,6 +21,8 @@ use Override;
  * @property \Carbon\CarbonImmutable|null $published_at
  * @property int $publish_attempts
  * @property string|null $last_error
+ * @mixin \Eloquent
+ * @mixin IdeHelperOutboxEvent
  */
 final class OutboxEvent extends Model
 {
