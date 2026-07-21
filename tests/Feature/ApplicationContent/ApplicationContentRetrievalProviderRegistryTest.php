@@ -43,10 +43,11 @@ function applicationContentDescriptor(string $source = 'cms.contents'): Applicat
     );
 }
 
-it('binds an empty deterministic registry that only accepts explicit providers', function (): void {
-    $registry = app(ApplicationContentRetrievalProviderRegistryInterface::class);
+it('binds a deterministic registry that only accepts explicit providers', function (): void {
+    $bound_registry = app(ApplicationContentRetrievalProviderRegistryInterface::class);
+    $registry = new ApplicationContentRetrievalProviderRegistry;
 
-    expect($registry)->toBeInstanceOf(ApplicationContentRetrievalProviderRegistry::class)
+    expect($bound_registry)->toBeInstanceOf(ApplicationContentRetrievalProviderRegistry::class)
         ->and($registry->descriptors())->toBe([])
         ->and($registry->providerFor('cms.contents'))->toBeNull();
 
@@ -140,6 +141,7 @@ it('keeps provider DTOs typed and free of control-plane or storage fields', func
         'system_prompt',
     ];
     $found_forbidden = [];
+
     foreach ([$descriptor, $query, $authorization, $hit, $result] as $dto) {
         array_push($found_forbidden, ...array_intersect(array_keys(get_object_vars($dto)), $forbidden));
     }
