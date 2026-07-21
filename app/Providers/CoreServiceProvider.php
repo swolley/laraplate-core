@@ -31,6 +31,8 @@ use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Console\WarmCacheCommand;
+use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
+use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\Contracts\GraphToolGatewayInterface;
@@ -146,6 +148,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);
+        $this->app->singleton(
+            ApplicationContentRetrievalProviderRegistryInterface::class,
+            ApplicationContentRetrievalProviderRegistry::class,
+        );
 
         // Register search clients
         $this->registerSearchClients();
