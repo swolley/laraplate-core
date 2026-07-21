@@ -2,8 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
+use Illuminate\Cache\DatabaseStore;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
@@ -12,13 +18,16 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use App\Models\User;
 use Modules\Core\Services\AclResolverService;
-
 
 beforeEach(function (): void {
     Cache::flush();
 });
+
+function acl_test_cache_key(string $connection, int|string $user_id, int|string $permission_id): string
+{
+    return CacheManager::key('acl', 'connection', $connection, 'user', (string) $user_id, 'perm', (string) $permission_id);
+}
 
 it('getEffectiveAcls caches the resolved ACLs per user and permission', function (): void {
     /** @var User $user */
@@ -37,6 +46,267 @@ it('getEffectiveAcls caches the resolved ACLs per user and permission', function
     $aclsSecond = $service->getEffectiveAcls($user, $permission);
 
     expect($aclsSecond)->toBeInstanceOf(Collection::class);
+});
+
+it('rejects mixed user and permission connections before returning a cache hit', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('affinity');
+
+    try {
+        $user = User::factory()->create();
+        $permission = Permission::factory()->create();
+        $service = new AclResolverService;
+
+        $service->getEffectiveAcls($user, $permission);
+        $permission->setConnection('affinity');
+
+        expect(fn (): Collection => $service->getEffectiveAcls($user, $permission))
+            ->toThrow(LogicException::class, 'ACL resolution requires user and permission models on the same database connection.');
+    } finally {
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+    }
+});
+
+it('keeps ACL cache entries isolated by resolved connection', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('affinity');
+
+    $role_table = config('permission.table_names.roles');
+    $model_role_table = config('permission.table_names.model_has_roles');
+    $model_key = config('permission.column_names.model_morph_key', 'model_id');
+
+    Schema::connection('affinity')->create($role_table, function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('guard_name');
+        $table->boolean('is_deleted')->default(false);
+    });
+    Schema::connection('affinity')->create($model_role_table, function (Blueprint $table) use ($model_key): void {
+        $table->unsignedBigInteger('role_id');
+        $table->string('model_type');
+        $table->unsignedBigInteger($model_key);
+    });
+
+    try {
+        $role = Role::factory()->create(['name' => config('permission.roles.superadmin'), 'guard_name' => 'web']);
+        $default_user = User::factory()->create();
+        $default_user->assignRole($role);
+        $default_permission = Permission::factory()->create();
+        $service = new AclResolverService;
+
+        $default_acls = $service->getEffectiveAcls($default_user, $default_permission);
+
+        $affinity_user = (new User)->setConnection('affinity');
+        $affinity_user->forceFill(['id' => $default_user->id]);
+        $affinity_user->exists = true;
+        $affinity_user->syncOriginal();
+
+        $affinity_permission = (new Permission)->setConnection('affinity');
+        $affinity_permission->forceFill([
+            'id' => $default_permission->id,
+            'name' => $default_permission->name,
+            'guard_name' => $default_permission->guard_name,
+        ]);
+        $affinity_permission->exists = true;
+        $affinity_permission->syncOriginal();
+
+        $affinity_acls = $service->getEffectiveAcls($affinity_user, $affinity_permission);
+
+        expect($default_acls)->toHaveCount(1)
+            ->and($affinity_acls)->toBeEmpty()
+            ->and($service->getEffectiveAcls($default_user, $default_permission))->toHaveCount(1);
+    } finally {
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+    }
+});
+
+it('clears ACL cache entries for direct and role permissions on the permission connection', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('affinity');
+
+    $permission_table = config('permission.table_names.permissions');
+    $direct_table = config('permission.table_names.model_has_permissions');
+    $role_permission_table = config('permission.table_names.role_has_permissions');
+    $model_role_table = config('permission.table_names.model_has_roles');
+    $model_key = config('permission.column_names.model_morph_key', 'model_id');
+    $user_model = config('auth.providers.users.model', User::class);
+
+    Schema::connection('affinity')->create($permission_table, function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('guard_name');
+    });
+    Schema::connection('affinity')->create($direct_table, function (Blueprint $table) use ($model_key): void {
+        $table->unsignedBigInteger('permission_id');
+        $table->string('model_type');
+        $table->unsignedBigInteger($model_key);
+    });
+    Schema::connection('affinity')->create($role_permission_table, function (Blueprint $table): void {
+        $table->unsignedBigInteger('permission_id');
+        $table->unsignedBigInteger('role_id');
+    });
+    Schema::connection('affinity')->create($model_role_table, function (Blueprint $table) use ($model_key): void {
+        $table->unsignedBigInteger('role_id');
+        $table->string('model_type');
+        $table->unsignedBigInteger($model_key);
+    });
+
+    try {
+        $permission = (new Permission)->setConnection('affinity');
+        $permission->forceFill(['id' => 1, 'name' => 'affinity.users.select', 'guard_name' => 'web']);
+        $permission->exists = true;
+        $permission->syncOriginal();
+
+        DB::connection('affinity')->table($direct_table)->insert([
+            'permission_id' => $permission->id,
+            'model_type' => $user_model,
+            $model_key => 999_991,
+        ]);
+        DB::connection('affinity')->table($role_permission_table)->insert([
+            'permission_id' => $permission->id,
+            'role_id' => 10,
+        ]);
+        DB::connection('affinity')->table($model_role_table)->insert([
+            'role_id' => 10,
+            'model_type' => $user_model,
+            $model_key => 999_992,
+        ]);
+
+        $direct_key = acl_test_cache_key('affinity', 999_991, $permission->id);
+        $role_key = acl_test_cache_key('affinity', 999_992, $permission->id);
+        Cache::put($direct_key, true);
+        Cache::put($role_key, true);
+
+        (new AclResolverService)->clearCacheForPermission($permission);
+
+        expect(Cache::has($direct_key))->toBeFalse()
+            ->and(Cache::has($role_key))->toBeFalse();
+    } finally {
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+    }
+});
+
+it('flushes prefixed ACL entries on the database cache store connection', function (): void {
+    $default_cache_repository = Cache::getFacadeRoot();
+    $default_cache_driver = config('cache.default');
+    $database_cache_store = config('cache.stores.database');
+    $cache_prefix = config('cache.prefix');
+    $clear_threshold = config('core.acl.clear_threshold');
+
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    config()->set('database.connections.cache_affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    config()->set('cache.default', 'database');
+    config()->set('cache.prefix', 'tenant:');
+    config()->set('cache.stores.database', [
+        'driver' => 'database',
+        'connection' => 'cache_affinity',
+        'table' => 'cache',
+        'lock_connection' => 'cache_affinity',
+        'lock_table' => 'cache_locks',
+    ]);
+    config()->set('core.acl.clear_threshold', -1);
+    DB::purge('affinity');
+    DB::purge('cache_affinity');
+    Cache::setDefaultDriver('database');
+    app('cache')->forgetDriver('database');
+    Cache::swap(new CacheRepository(new DatabaseStore(
+        DB::connection('cache_affinity'),
+        'cache',
+        'tenant:',
+    )));
+
+    $direct_table = config('permission.table_names.model_has_permissions');
+    $role_permission_table = config('permission.table_names.role_has_permissions');
+    $model_key = config('permission.column_names.model_morph_key', 'model_id');
+    $user_model = config('auth.providers.users.model', User::class);
+
+    Schema::connection('affinity')->create($direct_table, function (Blueprint $table) use ($model_key): void {
+        $table->unsignedBigInteger('permission_id');
+        $table->string('model_type');
+        $table->unsignedBigInteger($model_key);
+    });
+    Schema::connection('affinity')->create($role_permission_table, function (Blueprint $table): void {
+        $table->unsignedBigInteger('permission_id');
+        $table->unsignedBigInteger('role_id');
+    });
+    Schema::connection('affinity')->create('cache', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+        $table->integer('expiration');
+    });
+    Schema::connection('cache_affinity')->create('cache', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+        $table->integer('expiration');
+    });
+
+    try {
+        $permission = (new Permission)->setConnection('affinity');
+        $permission->forceFill(['id' => 1]);
+        $permission->exists = true;
+        $permission->syncOriginal();
+
+        DB::connection('affinity')->table($direct_table)->insert([
+            'permission_id' => $permission->id,
+            'model_type' => $user_model,
+            $model_key => 999_993,
+        ]);
+
+        $key = acl_test_cache_key('affinity', 999_993, $permission->id);
+        Cache::put($key, 'cached', 600);
+        DB::connection('affinity')->table('cache')->insert([
+            'key' => CacheManager::key('acl', 'permission-store-sentinel'),
+            'value' => 'sentinel',
+            'expiration' => now()->addHour()->timestamp,
+        ]);
+
+        expect(Cache::getStore())->toBeInstanceOf(DatabaseStore::class);
+
+        (new AclResolverService)->clearCacheForPermission($permission);
+
+        expect(Cache::has($key))->toBeFalse()
+            ->and(DB::connection('affinity')->table('cache')->count())->toBe(1);
+    } finally {
+        Cache::swap($default_cache_repository);
+        app('cache')->forgetDriver('database');
+        config()->set('cache.default', $default_cache_driver);
+        config()->set('cache.stores.database', $database_cache_store);
+        config()->set('cache.prefix', $cache_prefix);
+        config()->set('core.acl.clear_threshold', $clear_threshold);
+        Cache::setDefaultDriver($default_cache_driver);
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+        DB::disconnect('cache_affinity');
+        DB::purge('cache_affinity');
+    }
 });
 
 it('getCombinedFilters returns null when there are no contributing ACLs', function (): void {
@@ -64,7 +334,7 @@ it('clearCacheForUser forgets cached ACL entries for that user', function (): vo
     $user = User::factory()->create();
     $permission = Permission::factory()->create();
 
-    $key = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $permission->id);
+    $key = acl_test_cache_key($user->getConnection()->getName(), $user->id, $permission->id);
     Cache::put($key, 'dummy', 600);
     expect(Cache::get($key))->toBe('dummy');
 
@@ -83,7 +353,7 @@ it('clearCacheForPermission flushes all acl related cache', function (): void {
     $role->givePermissionTo($permission);
     $user->assignRole($role);
 
-    $key = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $permission->id);
+    $key = acl_test_cache_key($user->getConnection()->getName(), $user->id, $permission->id);
     Cache::put($key, 'dummy', 600);
     expect(Cache::get($key))->toBe('dummy');
 
@@ -335,8 +605,8 @@ it('clearCacheForPermission leaves cache entries for other permissions intact', 
     $role->givePermissionTo($perm_a);
     $user->assignRole($role);
 
-    $key_a = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $perm_a->id);
-    $key_b = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $perm_b->id);
+    $key_a = acl_test_cache_key($user->getConnection()->getName(), $user->id, $perm_a->id);
+    $key_b = acl_test_cache_key($user->getConnection()->getName(), $user->id, $perm_b->id);
 
     Cache::put($key_a, 'value_a', 600);
     Cache::put($key_b, 'value_b', 600);
@@ -364,6 +634,7 @@ it('clearCacheForPermission uses prefix flush when user count exceeds threshold'
 
     // Create 3 users with this permission via roles (exceeds threshold of 2)
     $users = User::factory()->count(3)->create();
+
     foreach ($users as $user) {
         $role = Role::factory()->create(['name' => 'acl_thresh_' . uniqid(), 'guard_name' => 'web']);
         $role->givePermissionTo($permission);
@@ -372,7 +643,7 @@ it('clearCacheForPermission uses prefix flush when user count exceeds threshold'
 
     // Put ACL cache entries for each user
     foreach ($users as $user) {
-        $key = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $permission->id);
+        $key = acl_test_cache_key($user->getConnection()->getName(), $user->id, $permission->id);
         Cache::put($key, 'cached_value', 600);
     }
 
@@ -385,7 +656,7 @@ it('clearCacheForPermission uses prefix flush when user count exceeds threshold'
 
     // All ACL entries for this permission should be cleared (via prefix flush)
     foreach ($users as $user) {
-        $key = CacheManager::key('acl', 'user', (string) $user->id, 'perm', (string) $permission->id);
+        $key = acl_test_cache_key($user->getConnection()->getName(), $user->id, $permission->id);
         expect(Cache::get($key))->toBeNull();
     }
 });
@@ -423,7 +694,7 @@ it('resolveAcls issues at most one DB query to load ACLs for a user with multipl
     DB::disableQueryLog();
 
     // Filter only ACL-related queries (SELECT from acls table)
-    $acl_queries = array_filter($queries, static fn (array $q): bool => str_contains(strtolower($q['query']), 'from') && str_contains(strtolower($q['query']), 'acl'));
+    $acl_queries = array_filter($queries, static fn (array $q): bool => str_contains(mb_strtolower($q['query']), 'from') && str_contains(mb_strtolower($q['query']), 'acl'));
 
     // At most one query should hit the acls table (the batch whereIn query)
     expect(count($acl_queries))->toBeLessThanOrEqual(1);

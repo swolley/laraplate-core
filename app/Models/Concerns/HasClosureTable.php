@@ -11,9 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use LogicException;
 use Modules\Core\Helpers\TreeCollection;
-use ReflectionClass;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
@@ -29,8 +28,8 @@ trait HasClosureTable
 
     public static function rebuildClosure(): void
     {
-        $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
-        DB::table($table_name)->truncate();
+        $model = new static;
+        $model->getConnection()->table($model->getClosureTable())->truncate();
 
         static::query()
             ->whereNull('parent_id')
@@ -92,6 +91,7 @@ trait HasClosureTable
     public function closure(): BelongsToMany
     {
         $closureTable = $this->getClosureTable();
+        $modelTable = $this->getModelTable();
 
         return $this->belongsToMany(
             static::class,
@@ -100,7 +100,7 @@ trait HasClosureTable
             'ancestor_id',
         )
             ->withPivot('depth')
-            ->from('categories as closure_categories')
+            ->from($modelTable . ' as closure_categories')
             ->select('closure_categories.*');
     }
 
@@ -155,7 +155,7 @@ trait HasClosureTable
 
     public function getDepth(): int
     {
-        $cache_key = sprintf('%s.%s.depth', $this->getTable(), $this->id);
+        $cache_key = $this->depthCacheKey();
 
         // Check in-memory cache first
         if (isset(self::$depth_cache[$cache_key])) {
@@ -167,7 +167,7 @@ trait HasClosureTable
         $depth = Cache::remember(
             $cache_key,
             now()->addHours(24),
-            fn () => DB::table($closureTable)
+            fn () => $this->getConnection()->table($closureTable)
                 ->where($this->qualifyTreeColumn('ancestor_id', $closureTable), $this->id)
                 ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
                 ->value($this->qualifyTreeColumn('depth', $closureTable)) ?? 0,
@@ -193,7 +193,7 @@ trait HasClosureTable
     {
         $closureTable = $this->getClosureTable();
 
-        return DB::table($closureTable)
+        return $this->getConnection()->table($closureTable)
             ->where($this->qualifyTreeColumn('ancestor_id', $closureTable), $ancestor->id)
             ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
             ->where($this->qualifyTreeColumn('depth', $closureTable), '>', 0)
@@ -204,7 +204,7 @@ trait HasClosureTable
     {
         $closureTable = $this->getClosureTable();
 
-        return DB::table($closureTable)
+        return $this->getConnection()->table($closureTable)
             ->where($this->qualifyTreeColumn('ancestor_id', $closureTable), $this->id)
             ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $descendant->id)
             ->where($this->qualifyTreeColumn('depth', $closureTable), '>', 0)
@@ -218,11 +218,17 @@ trait HasClosureTable
 
     public function moveTo(self $newParent): bool
     {
+        throw_if(
+            $this->getConnection()->getName() !== $newParent->getConnection()->getName(),
+            LogicException::class,
+            'Cannot move tree nodes across multiple database connections.',
+        );
+
         if ($newParent->isDescendantOf($this)) {
             return false;
         }
 
-        DB::transaction(function () use ($newParent): void {
+        $this->getConnection()->transaction(function () use ($newParent): void {
             $this->parent_id = $newParent->id;
             $this->save();
             $this->updateClosureTable();
@@ -258,11 +264,9 @@ trait HasClosureTable
             ];
         }
 
-        $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
-
         // Batch insert for better performance
         if ($rows !== []) {
-            DB::table($table_name)->insert($rows);
+            $model->getConnection()->table($model->getClosureTable())->insert($rows);
         }
 
         $children = $model->children()->orderBy('id')->get();
@@ -285,8 +289,7 @@ trait HasClosureTable
         });
 
         static::deleted(function ($model): void {
-            $table_name = new ReflectionClass(static::class)->newInstanceWithoutConstructor()->getTable() . '_closure';
-            DB::table($table_name)
+            $model->getConnection()->table($model->getClosureTable())
                 ->where('descendant_id', $model->id)
                 ->orWhere('ancestor_id', $model->id)
                 ->delete();
@@ -362,7 +365,7 @@ trait HasClosureTable
         $closureTable = $this->getClosureTable();
 
         // Delete old closure entries for this node
-        DB::table($closureTable)
+        $this->getConnection()->table($closureTable)
             ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
             ->delete();
 
@@ -379,7 +382,7 @@ trait HasClosureTable
 
         // Insert records for all ancestors (batch insert for better performance)
         if ($this->parent_id) {
-            $ancestors = DB::table($closureTable)
+            $ancestors = $this->getConnection()->table($closureTable)
                 ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->parent_id)
                 ->get();
 
@@ -396,7 +399,7 @@ trait HasClosureTable
 
         // Batch insert all rows at once (more efficient than multiple inserts)
         if ($rows !== []) {
-            DB::table($closureTable)->insert($rows);
+            $this->getConnection()->table($closureTable)->insert($rows);
         }
 
         // Note: When a node moves, its descendants' closure entries also need to be updated
@@ -404,10 +407,15 @@ trait HasClosureTable
         // optimized in the future with a more efficient SQL-based approach
 
         // Clear in-memory cache for this model
-        $cache_key = sprintf('%s.%s.depth', $this->getTable(), $this->id);
+        $cache_key = $this->depthCacheKey();
         unset(self::$depth_cache[$cache_key]);
 
         // Clear external cache
         Cache::forget($cache_key);
+    }
+
+    private function depthCacheKey(): string
+    {
+        return sprintf('%s.%s.%s.depth', $this->getConnection()->getName(), $this->getTable(), $this->id);
     }
 }

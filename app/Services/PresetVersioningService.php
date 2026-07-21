@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
@@ -27,15 +26,19 @@ final class PresetVersioningService
             $presettable_class = str_replace('Modules\\Core', $module, Presettable::class);
         }
 
-        return DB::transaction(function () use ($preset, $presettable_class): Presettable {
-            $presettable_class::query()
+        /** @var Presettable $presettable_model */
+        $presettable_model = new $presettable_class;
+        $presettable_model->setConnection($preset->getConnection()->getName());
+
+        return $preset->getConnection()->transaction(function () use ($preset, $presettable_model): Presettable {
+            $presettable_model->newQuery()
                 ->where('preset_id', $preset->id)
                 ->where('entity_id', $preset->entity_id)
                 ->whereNull('deleted_at')
                 ->update(['deleted_at' => now()]);
 
             /** @var Presettable $presettable */
-            $presettable = $presettable_class::query()->forceCreate([
+            $presettable = $presettable_model->newQuery()->forceCreate([
                 'preset_id' => $preset->id,
                 'entity_id' => $preset->entity_id,
                 'fields_snapshot' => $this->captureFieldsSnapshot($preset),

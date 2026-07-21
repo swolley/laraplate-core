@@ -18,7 +18,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Cache\Repository as CacheRepository;
@@ -356,16 +355,19 @@ class CrudService
         $changes = $requestData->changes;
         $discarded_values = $this->removeNonFillableProperties($model, $changes);
 
-        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
         $updated_records = new Collection();
-        DB::transaction(function () use ($found_records, $updated_records, $changes): void {
+        $found_count = 0;
+        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, &$found_count): void {
             foreach ($found_records as $found_record) {
+                $found_count++;
+
                 /** @psalm-suppress InvalidArgument */
                 if ($found_record->update($changes)) {
                     $updated_records->add($found_record->fresh());
                 }
             }
         });
+        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
 
         $error = $this->filterExpectedDiscardedForError($discarded_values, $requestData);
 
@@ -383,15 +385,18 @@ class CrudService
         $key_value = $this->getModelKeyValue($requestData);
         $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
 
-        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+        $found_count = 0;
         $deleted_count = 0;
-        DB::transaction(function () use ($found_records, &$deleted_count): void {
+        $model->getConnection()->transaction(function () use ($found_records, &$found_count, &$deleted_count): void {
             foreach ($found_records as $found_record) {
+                $found_count++;
+
                 if ($found_record->forceDelete()) {
                     $deleted_count++;
                 }
             }
         });
+        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
 
         return new CrudResult(
             data: ['deleted' => $deleted_count],
@@ -801,24 +806,25 @@ class CrudService
         $key_value = $this->getModelKeyValue($requestData);
 
         $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
-
-        throw_if($found_records->isEmpty() && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
-
-        $first_record = $found_records->first();
-        throw_if($first_record === null, ModelNotFoundException::class, 'No model Found');
-
-        $can_be_done = ($operation === 'lock' && $this->recordIsLocked($first_record)) || ! $this->recordIsLocked($first_record);
-
-        throw_if($found_records->count() === 1 && $requestData->request->has('id') && $can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
+        $found_count = 0;
         $locked_records = new Collection();
-        DB::transaction(function () use ($found_records, $locked_records): void {
+        $model->getConnection()->transaction(function () use ($found_records, $locked_records, $operation, $requestData, &$found_count): void {
             foreach ($found_records as $found_record) {
+                $found_count++;
+
+                if ($requestData->request->has('id')) {
+                    $can_be_done = ($operation === 'lock' && $this->recordIsLocked($found_record)) || ! $this->recordIsLocked($found_record);
+
+                    throw_if($can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
+                }
+
                 if (! $this->recordIsLocked($found_record) && method_exists($found_record, 'lock')) {
                     $found_record->lock();
                     $locked_records->add($found_record->fresh());
                 }
             }
         });
+        throw_if($found_count === 0, ModelNotFoundException::class, 'No model Found');
 
         return new CrudResult(
             data: $locked_records,
@@ -1014,5 +1020,4 @@ class CrudService
 
         return $model->getAttribute($locked_at_column) !== null;
     }
-
 }

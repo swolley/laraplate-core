@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,19 +29,18 @@ use Modules\Core\Models\Role;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\Engines\DatabaseEngine as CoreDatabaseEngine;
-use Modules\Core\Search\Traits\Searchable as CoreSearchable;
-use App\Models\User;
 use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
+use Modules\Core\Search\Traits\Searchable as CoreSearchable;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
+use Modules\Core\Tests\Stubs\ActivationStubModel;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
-
 
 function crud_cov_set(object $obj, string $prop, mixed $value): void
 {
@@ -602,6 +603,62 @@ it('insert, update and delete cover core mutation flows', function (): void {
 
     $delete_result = $service->delete($delete_data);
     expect($delete_result->data)->toBe(['deleted' => 1]);
+});
+
+it('updates affinity models inside the affinity transaction', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('affinity');
+
+    Schema::connection('affinity')->create('activation_stub', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    try {
+        $model = (new ActivationStubModel)->setConnection('affinity');
+        $record = $model->newQuery()->create(['name' => 'before']);
+        $superadmin = crud_cov_login_superadmin();
+        $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+        $request = Request::create('/modify', 'POST', ['id' => $record->getKey()]);
+        $request->request->set('id', $record->getKey());
+        $request->setUserResolver(fn () => $superadmin);
+        $request_data = crud_cov_make_modify_data($model, $request, ['name' => 'after']);
+
+        $affinity_transaction_started = false;
+        $default_transaction_started = false;
+        DB::connection('affinity')->beforeStartingTransaction(static function () use (&$affinity_transaction_started): void {
+            $affinity_transaction_started = true;
+        });
+        DB::connection()->beforeStartingTransaction(static function () use (&$default_transaction_started): void {
+            $default_transaction_started = true;
+        });
+        $select_transaction_level = null;
+        $select_sql = null;
+        DB::connection('affinity')->listen(static function (QueryExecuted $query) use (&$select_transaction_level, &$select_sql): void {
+            if ($select_transaction_level === null && str_starts_with($query->sql, 'select') && str_contains($query->sql, 'activation_stub')) {
+                $select_transaction_level = $query->connection->transactionLevel();
+                $select_sql = $query->sql;
+            }
+        });
+
+        $result = $service->update($request_data);
+
+        expect($result->data->first()?->name)->toBe('after')
+            ->and($affinity_transaction_started)->toBeTrue()
+            ->and($default_transaction_started)->toBeFalse()
+            ->and($select_transaction_level)->toBe(1)
+            ->and($select_sql)->toContain('limit 100');
+    } finally {
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+    }
 });
 
 it('history and tree throw on unsupported models', function (): void {

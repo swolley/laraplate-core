@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Observers;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Field;
@@ -56,7 +55,7 @@ final class FieldObserver
 
     private function isLinkedToPreset(Field $model): bool
     {
-        return DB::table(CoreTables::Fieldables->value)
+        return $model->getConnection()->table(CoreTables::Fieldables->value)
             ->where('field_id', $model->getKey())
             ->exists();
     }

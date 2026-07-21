@@ -8,7 +8,7 @@ use FilesystemIterator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use LogicException;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
@@ -61,7 +61,8 @@ final class AclResolverService
      */
     public function getEffectiveAcls(User $user, Permission $permission): Collection
     {
-        $cache_key = $this->buildCacheKey($user->id, $permission->id);
+        $connection_name = $this->assertSharedConnection($user, $permission);
+        $cache_key = $this->buildCacheKey($connection_name, $user->id, $permission->id);
 
         return Cache::remember($cache_key, self::CACHE_TTL, fn (): Collection => $this->resolveAcls($user, $permission));
     }
@@ -144,10 +145,14 @@ final class AclResolverService
     public function clearCacheForUser(User $user): void
     {
         // Get all permissions and clear cache for each
-        $permissions = Permission::query()->select('id')->get();
+        $permissions = (new Permission)
+            ->setConnection($user->getConnection()->getName())
+            ->newQuery()
+            ->select('id')
+            ->get();
 
         foreach ($permissions as $permission) {
-            Cache::forget($this->buildCacheKey($user->id, $permission->id));
+            Cache::forget($this->buildCacheKey($user->getConnection()->getName(), $user->id, $permission->id));
         }
     }
 
@@ -172,16 +177,16 @@ final class AclResolverService
         }
 
         foreach ($user_ids as $user_id) {
-            Cache::forget($this->buildCacheKey($user_id, $permission->id));
+            Cache::forget($this->buildCacheKey($permission->getConnection()->getName(), $user_id, $permission->id));
         }
     }
 
     /**
      * Build the ACL cache key for a specific user and permission.
      */
-    private function buildCacheKey(int|string $user_id, int|string $perm_id): string
+    private function buildCacheKey(string $connection_name, int|string $user_id, int|string $perm_id): string
     {
-        return CacheManager::key('acl', 'user', (string) $user_id, 'perm', (string) $perm_id);
+        return CacheManager::key('acl', 'connection', $connection_name, 'user', (string) $user_id, 'perm', (string) $perm_id);
     }
 
     /**
@@ -193,22 +198,23 @@ final class AclResolverService
     private function getUserIdsForPermission(Permission $permission): Collection
     {
         $user_model = config('auth.providers.users.model', \App\Models\User::class);
+        $connection = $permission->getConnection();
 
         // Users with the permission assigned directly
-        $direct_ids = DB::table(config('permission.table_names.model_has_permissions'))
+        $direct_ids = $connection->table(config('permission.table_names.model_has_permissions'))
             ->where('permission_id', $permission->id)
             ->where('model_type', $user_model)
             ->pluck('model_id');
 
         // Users with a role that has this permission
-        $role_ids = DB::table(config('permission.table_names.role_has_permissions'))
+        $role_ids = $connection->table(config('permission.table_names.role_has_permissions'))
             ->where('permission_id', $permission->id)
             ->pluck('role_id');
 
         $via_role_ids = collect();
 
         if ($role_ids->isNotEmpty()) {
-            $via_role_ids = DB::table(config('permission.table_names.model_has_roles'))
+            $via_role_ids = $connection->table(config('permission.table_names.model_has_roles'))
                 ->whereIn('role_id', $role_ids)
                 ->where('model_type', $user_model)
                 ->pluck('model_id');
@@ -249,8 +255,8 @@ final class AclResolverService
         if ($store instanceof \Illuminate\Cache\DatabaseStore) {
             $acl_prefix = CacheManager::key('acl');
             $cache_table = (string) config('cache.stores.database.table', 'cache');
-            DB::table($cache_table)
-                ->where('key', 'like', $acl_prefix . '%')
+            $store->getConnection()->table($cache_table)
+                ->where('key', 'like', $store->getPrefix() . $acl_prefix . '%')
                 ->delete();
 
             return;
@@ -342,9 +348,8 @@ final class AclResolverService
         // that are associated with any of the user's roles (direct or ancestor).
         // Eager-load permission.roles to avoid N+1 in the matching logic below.
         /** @var Collection<int, ACL> $batch_acls */
-        $batch_acls = ACL::query()
+        $batch_acls = $permission->acls()
             ->active()
-            ->forPermission($permission->id)
             ->byPriority()
             ->with(['permission.roles'])
             ->whereHas('permission.roles', static function (Builder $query) use ($all_role_ids): void {
@@ -415,12 +420,25 @@ final class AclResolverService
      */
     private function createUnrestrictedAcl(Permission $permission): ACL
     {
-        $acl = new ACL();
+        $acl = (new ACL)->setConnection($permission->getConnection()->getName());
         $acl->permission_id = $permission->id;
         $acl->unrestricted = true;
         $acl->is_active = true;
         $acl->priority = PHP_INT_MAX;
 
         return $acl;
+    }
+
+    private function assertSharedConnection(User $user, Permission $permission): string
+    {
+        $user_connection_name = $user->getConnection()->getName();
+
+        throw_if(
+            $user_connection_name !== $permission->getConnection()->getName(),
+            LogicException::class,
+            'ACL resolution requires user and permission models on the same database connection.',
+        );
+
+        return $user_connection_name;
     }
 }
