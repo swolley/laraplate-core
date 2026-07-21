@@ -33,6 +33,7 @@ use Laravel\Scout\EngineManager;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
+use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\Contracts\GraphToolGatewayInterface;
@@ -61,6 +62,7 @@ use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
@@ -152,6 +154,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ApplicationContentRetrievalProviderRegistryInterface::class,
             ApplicationContentRetrievalProviderRegistry::class,
         );
+        $this->app->bind(OutboxPublisher::class, StubOutboxPublisher::class);
 
         // Register search clients
         $this->registerSearchClients();
