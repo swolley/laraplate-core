@@ -4,6 +4,10 @@
 
 Core is the **event bus** between domain modules (CMS, ERP, …) and optional AI capabilities. Modules do not import each other for these pipelines; they use Core events, registries, and per-model settings.
 
+## Transactional outbox
+
+`OutboxRecorder` writes `core_outbox_events` inside the caller transaction and queues `PublishOutboxEventJob` after commit. Rows carry UUID `event_id`, event/aggregate identity, JSON payload, timestamps, attempts, and the last error. Rollbacks remove the row; missing/already-published rows are harmless no-ops. `OutboxPublisher` is replaceable. The default `StubOutboxPublisher` performs no external I/O and marks delivery complete, so production broker/webhook delivery requires an application binding and idempotent consumers keyed by `event_id`.
+
 This document covers two orchestration patterns:
 
 1. **Search indexing** — `ModelRequiresIndexing` (embeddings + optional translation → Elasticsearch/Typesense)

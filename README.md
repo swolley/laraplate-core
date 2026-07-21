@@ -26,6 +26,7 @@ The Core Module contains all the necessary functionalities to build a new Larave
 
 -   [Graph system](docs/GRAPH_SYSTEM.md): CRUD-aligned graph expand/search/stats framework for every CRUD-resolvable entity.
 -   [Event orchestration](docs/EVENT_ORCHESTRATION.md): cross-module indexing and moderation events.
+-   Transactional outbox: durable cross-system integration events with an application-replaceable publisher and queued delivery.
 -   [ACL system](docs/ACL_SYSTEM.md): permission and row-level access control behavior.
 -   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior.
 

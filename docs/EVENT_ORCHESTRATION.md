@@ -4,6 +4,12 @@
 
 Core owns the **contract** between domain modules (CMS, ERP, …) and optional capabilities (AI, search). Modules never import each other for these pipelines; they communicate through Core events, registries, and settings.
 
+## Transactional outbox
+
+`OutboxRecorder` persists a `core_outbox_events` row in the caller's database transaction and schedules `PublishOutboxEventJob` with `afterCommit()`. A rollback therefore removes the event together with the domain change. Each row has a stable UUID `event_id`, event and aggregate identifiers, JSON payload, occurrence/publication timestamps, attempt count, and last error.
+
+The queued job is unique per outbox row, skips missing or already published rows, records failures, and calls the `OutboxPublisher` contract. Core binds `StubOutboxPublisher` by default: it performs no external I/O and the job marks the row published. Deployments that need broker, webhook, or event-stream delivery must replace that binding; consumers must use `event_id` as their idempotency key because delivery transports can be at least once.
+
 This document describes two orchestration patterns:
 
 1. **Search indexing** — `ModelRequiresIndexing` (embeddings + optional translation sync → Elasticsearch/Typesense)
