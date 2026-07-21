@@ -106,6 +106,8 @@ Canonical English names for Core platform entities. Use these terms in code, API
 
 ## Platform settings
 
+| **ForcedVersionStrategySettings** | Discovers models declaring class-level `VersionStrategy::DIFF` and hides/rejects their stale runtime setting names in Filament without deleting database rows. |
+
 | Term | Meaning |
 |------|---------|
 | **Setting** | Key/value store (often JSON) for runtime configuration. |

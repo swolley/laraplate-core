@@ -195,6 +195,8 @@ SOCIALITE_REDIRECT= 							#socialite redirect
 
 ### Versioning configuration
 
+`version_strategy_{table}` settings are runtime controls only for models that do not pin a strategy in code. When a model declares `versionStrategy = VersionStrategy::DIFF`, `ForcedVersionStrategySettings` excludes any historical matching row from the Settings resource and prevents recreating it through that form. The row is not deleted automatically.
+
 ```php
 <?php
 namespace App\Models;

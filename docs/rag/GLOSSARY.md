@@ -124,6 +124,8 @@ Canonical English names for Core platform entities. Use these terms in code, API
 
 ## Platform settings
 
+| **ForcedVersionStrategySettings** | Core resolver for `version_strategy_{table}` names made non-configurable by a concrete model's hardcoded DIFF property. |
+
 
 | Term                         | Meaning                                                   |
 | ---------------------------- | --------------------------------------------------------- |

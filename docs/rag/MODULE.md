@@ -191,6 +191,8 @@ stateDiagram-v2
 
 `HasVersions` (extends `Overtrue\LaravelVersionable\Versionable`) controls whether a save creates a new version using `getVersionStrategy()`. The strategy is read with two-level caching: an L1 in-memory map per request and an L2 persistent cache fed by the `version_strategy_{table}` setting in group `versioning`. When versioning is enabled, the trait emits `ModelVersioningRequested` and dispatches `CreateVersionJob` (after-commit) so the `VersioningService` writes a `Core\Models\Version` row with `contents` (DIFF) or full snapshot (SNAPSHOT). Reverts use `Version::revertWithoutSaving()`, replaying previous versions for DIFF or applying the initial snapshot for SNAPSHOT. `createSnapshotVersion()` plus `purgeOldVersionsAfterCreate` enables history compaction.
 
+If a concrete model declares its own `versionStrategy = VersionStrategy::DIFF`, that class property takes precedence and is not runtime-configurable. `ForcedVersionStrategySettings` discovers those models across active/inactive modules; `SettingResource`, tabs, filters, and form validation hide/reject matching historical `version_strategy_{table}` rows without deleting them.
+
 ```mermaid
 flowchart LR
   Save[Model.save]
@@ -454,6 +456,8 @@ flowchart LR
 ### Settings and module activation
 
 Runtime configuration lives in `Setting` (`Core\Models\Setting` with `HasApprovals` + `HasCache`). Three setting groups drive behaviour: `soft_deletes` (toggles `SoftDeletes` per table via `soft_deletes_{table}`), `versioning` (`version_strategy_{table}`), and `modules` (the `backendModules` JSON array consumed by `ModuleDatabaseActivator`). The activator implements the Nwidart `ActivatorInterface` and reads/writes `backendModules` straight via `DB::table('settings')` (so it works during boot when Eloquent isn't ready), with optional cache. Editing `Setting` triggers `SettingObserver` and Approval flows on any non-`description` field.
+
+The Settings UI exposes only genuinely configurable rows. Class-forced DIFF strategies are intentionally absent even if stale rows remain in the database.
 
 ```mermaid
 flowchart LR
