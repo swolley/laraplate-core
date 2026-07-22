@@ -88,6 +88,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | --------------------- | --------------------------------------------------------------- |
 | **Searchable**        | Trait: `queueMakeSearchable()`, `$embed`, vector search hooks.  |
 | **Transactional outbox** | `OutboxRecorder` stores durable integration events in `core_outbox_events` within the domain transaction; `PublishOutboxEventJob` delivers them through the replaceable `OutboxPublisher` contract after commit. |
+| **Module import framework** | Core `AbstractImportCommand` and neutral runner/resolver/discovery contracts used by destination-specific module commands; Core exposes no runnable generic import command. |
 | **SchemaDefinition**  | Describes indexable fields and analyzers for a model.           |
 | **ISearchEngine**     | Contract for Elasticsearch, Typesense, or database translator backends. |
 | **ModelEmbedding**    | Persisted embedding vectors linked to searchable models.        |

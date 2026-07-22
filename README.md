@@ -29,6 +29,7 @@ The Core Module contains all the necessary functionalities to build a new Larave
 -   Transactional outbox: durable cross-system integration events with an application-replaceable publisher and queued delivery.
 -   [ACL system](docs/ACL_SYSTEM.md): permission and row-level access control behavior.
 -   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior.
+-   [Module import framework](docs/IMPORT_FRAMEWORK.md): abstract command and neutral services for module-owned external importers.
 
 ## Installation
 
