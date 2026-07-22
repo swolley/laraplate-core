@@ -13,7 +13,7 @@ use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
-use Modules\Core\Versioning\Exceptions\DirtyActiveVersionSetRootException;
+use Modules\Core\Versioning\Exceptions\DistinctVersionSetRootInstanceException;
 use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
@@ -93,6 +93,11 @@ final class VersionSetManager implements VersionSetManagerInterface
             throw VersionSetRootMismatchException::between($active_root, $root);
         }
 
+        // Nested scopes share in-process model state, not only a database identity.
+        if ($active_root->model() !== $root->model()) {
+            throw new DistinctVersionSetRootInstanceException;
+        }
+
         if ($options !== null && ! $this->active->options()->semanticallyEquals($options)) {
             throw new VersionSetOptionsMismatchException;
         }
@@ -103,7 +108,6 @@ final class VersionSetManager implements VersionSetManagerInterface
             $this->validateRevertedFrom($root, $options);
         }
 
-        $this->synchronizeNestedRoot($root);
         $this->active->enterNested();
 
         try {
@@ -134,28 +138,6 @@ final class VersionSetManager implements VersionSetManagerInterface
         $model->setRawAttributes($locked->getAttributes(), true);
         $model->setRawAttributes(array_replace($model->getAttributes(), $dirty_attributes));
         $model->unsetRelations();
-    }
-
-    private function synchronizeNestedRoot(VersionSetRoot $root): void
-    {
-        $active_model = $this->active->root()->model();
-        $nested_model = $root->model();
-
-        if ($active_model === $nested_model) {
-            return;
-        }
-
-        if ($active_model->isDirty()) {
-            throw new DirtyActiveVersionSetRootException;
-        }
-
-        $nested_dirty_attributes = $nested_model->getDirty();
-        $nested_model->setRawAttributes($active_model->getRawOriginal(), true);
-        $nested_model->setRawAttributes(array_replace(
-            $active_model->getAttributes(),
-            $nested_dirty_attributes,
-        ));
-        $nested_model->unsetRelations();
     }
 
     private function validateRevertedFrom(VersionSetRoot $root, VersionSetOptions $options): void

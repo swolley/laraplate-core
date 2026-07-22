@@ -18,7 +18,7 @@ use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
-use Modules\Core\Versioning\Exceptions\DirtyActiveVersionSetRootException;
+use Modules\Core\Versioning\Exceptions\DistinctVersionSetRootInstanceException;
 use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
 use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
@@ -340,7 +340,7 @@ it('accepts semantically equivalent explicit options in a nested scope', functio
     expect($nested_ran)->toBeTrue();
 });
 
-it('synchronizes a distinct nested root instance while preserving only its intentional dirty values', function (): void {
+it('rejects a distinct model instance for a nested call to the same root', function (): void {
     $article = VersionSetManagerArticle::query()->create([
         'title' => 'Before',
         'status' => 'draft',
@@ -352,45 +352,11 @@ it('synchronizes a distinct nested root instance while preserving only its inten
     $nested_root = $article->fresh()->load('children');
     $nested_root->setAttribute('status', 'review');
     $manager = app(VersionSetManagerInterface::class);
-
-    $manager->run(VersionSetRoot::forModel($article), function () use (
-        $article,
-        $manager,
-        $nested_root,
-    ): void {
-        $article->updateOrFail([
-            'title' => 'Outer current',
-            'status' => 'published',
-        ]);
-        VersionSetManagerArticle::query()->create([
-            'parent_id' => $article->getKey(),
-            'title' => 'Second child',
-        ]);
-
-        $manager->run(VersionSetRoot::forModel($nested_root), function () use ($nested_root): void {
-            expect($nested_root->title)->toBe('Outer current')
-                ->and($nested_root->getRawOriginal('title'))->toBe('Outer current')
-                ->and($nested_root->isDirty('title'))->toBeFalse()
-                ->and($nested_root->status)->toBe('review')
-                ->and($nested_root->getRawOriginal('status'))->toBe('published')
-                ->and($nested_root->isDirty('status'))->toBeTrue()
-                ->and($nested_root->relationLoaded('children'))->toBeFalse()
-                ->and($nested_root->children)->toHaveCount(2);
-        });
-    });
-});
-
-it('rejects a distinct nested instance while the active root has unsaved changes', function (): void {
-    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
-    $nested_root = $article->fresh();
-    $manager = app(VersionSetManagerInterface::class);
     $nested_ran = false;
 
     expect(fn () => $manager->run(
         VersionSetRoot::forModel($article),
-        function () use ($article, $manager, $nested_root, &$nested_ran): void {
-            $article->setAttribute('title', 'Unsaved outer change');
-
+        function () use ($manager, $nested_root, &$nested_ran): void {
             $manager->run(
                 VersionSetRoot::forModel($nested_root),
                 function () use (&$nested_ran): void {
@@ -398,10 +364,12 @@ it('rejects a distinct nested instance while the active root has unsaved changes
                 },
             );
         },
-    ))->toThrow(DirtyActiveVersionSetRootException::class);
+    ))->toThrow(DistinctVersionSetRootInstanceException::class);
 
     expect($nested_ran)->toBeFalse()
-        ->and($article->fresh()->title)->toBe('Before')
+        ->and($nested_root->title)->toBe('Before')
+        ->and($nested_root->status)->toBe('review')
+        ->and($nested_root->relationLoaded('children'))->toBeTrue()
         ->and($manager->current())->toBeNull();
 });
 
@@ -690,6 +658,24 @@ it('counts a soft deleted extra row as an unconfirmed persisted sequence', funct
                 'version_strategy' => VersionStrategy::DIFF,
             ])->saveOrFail();
             $version->deleteOrFail();
+        },
+    ))->toThrow(VersionSequenceMismatchException::class);
+
+    expect($article->fresh()->title)->toBe('Before')
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::withTrashed()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and($manager->current())->toBeNull();
+});
+
+it('rolls back when a confirmed version row is soft deleted before finish', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            recordManagerTestVersion($active, $article)->deleteOrFail();
         },
     ))->toThrow(VersionSequenceMismatchException::class);
 

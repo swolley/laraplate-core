@@ -161,14 +161,25 @@ final class ActiveVersionSet
 
         $persisted_sequences = $this->version_set->versions()
             ->withTrashed()
+            ->reorder('sequence')
+            ->pluck('sequence')
+            ->map(static fn (mixed $sequence): int => (int) $sequence)
+            ->values()
+            ->all();
+        $visible_sequences = $this->version_set->versions()
+            ->reorder('sequence')
             ->pluck('sequence')
             ->map(static fn (mixed $sequence): int => (int) $sequence)
             ->values()
             ->all();
         $confirmed_sequences = $this->sequence === 0 ? [] : range(1, $this->sequence);
 
-        if ($persisted_sequences !== $confirmed_sequences) {
-            throw new VersionSequenceMismatchException($confirmed_sequences, $persisted_sequences);
+        if ($persisted_sequences !== $confirmed_sequences || $visible_sequences !== $confirmed_sequences) {
+            throw new VersionSequenceMismatchException(
+                $confirmed_sequences,
+                $persisted_sequences,
+                $visible_sequences,
+            );
         }
 
         if (! $this->version_written) {

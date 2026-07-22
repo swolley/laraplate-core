@@ -6,12 +6,12 @@ namespace Modules\Core\Versioning\Exceptions;
 
 use LogicException;
 
-final class DirtyActiveVersionSetRootException extends LogicException
+final class DistinctVersionSetRootInstanceException extends LogicException
 {
     public function __construct()
     {
         parent::__construct(
-            'A distinct nested root cannot join while the active root has unsaved changes.',
+            'A nested version set must reuse the active aggregate root model instance.',
         );
     }
 }
