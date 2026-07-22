@@ -8,9 +8,12 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\Rules\Unique;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
+use ReflectionProperty;
 
 /**
  * Trait per aggiungere validazioni ai modelli.
@@ -42,7 +45,7 @@ trait HasValidations
 
     /**
      * In-memory cache for permission existence checks.
-     * Keyed by permission name, value is whether the permission row exists in DB.
+     * Keyed by connection and permission name, value is whether the permission row exists in DB.
      * Populated on first access; reset between requests naturally by PHP-FPM.
      *
      * @var array<string, bool>
@@ -96,19 +99,6 @@ trait HasValidations
         return $attributes;
     }
 
-    /**
-     * Whether a casted attribute should be passed to the validator using its cast value.
-     */
-    protected function shouldUseCastedAttributeForValidation(mixed $cast): bool
-    {
-        if (! is_string($cast)) {
-            return false;
-        }
-
-        return in_array($cast, ['array', 'object', 'collection', 'encrypted:array'], true)
-            || str_starts_with($cast, 'array:');
-    }
-
     public function getRules(): array
     {
         $primary_key = $this->getKeyName();
@@ -130,18 +120,11 @@ trait HasValidations
         $rules = $this->getRules();
         $operation = $this->normalizeValidationOperation($operation);
 
-        return $operation && array_key_exists($operation, $rules) ? array_merge($rules[self::DEFAULT_RULE] ?? [], $rules[$operation]) : $rules[self::DEFAULT_RULE] ?? [];
-    }
+        $operation_rules = $operation && array_key_exists($operation, $rules)
+            ? array_merge($rules[self::DEFAULT_RULE] ?? [], $rules[$operation])
+            : $rules[self::DEFAULT_RULE] ?? [];
 
-    /**
-     * Maps legacy operation aliases to the rule-set keys used by models.
-     */
-    protected function normalizeValidationOperation(?string $operation): ?string
-    {
-        return match ($operation) {
-            'save' => 'update',
-            default => $operation,
-        };
+        return $this->qualifyDatabaseValidationRules($operation_rules);
     }
 
     public function validateWithRules(string $operation): void
@@ -183,49 +166,6 @@ trait HasValidations
             $validator->setException(ContextualValidationException::class);
             $validator->validate();
         }
-    }
-
-    /**
-     * Laravel's `json` rule only accepts JSON strings, not PHP arrays or objects.
-     *
-     * @param  array<string, mixed>  $attributes
-     * @param  array<string, mixed>  $rules
-     * @return array<string, mixed>
-     */
-    protected function prepareJsonRuleAttributes(array $attributes, array $rules): array
-    {
-        foreach ($attributes as $key => $value) {
-            if (! isset($rules[$key]) || ! $this->validationRulesContainJson($rules[$key])) {
-                continue;
-            }
-
-            if (! is_array($value) && ! is_object($value)) {
-                continue;
-            }
-
-            $attributes[$key] = json_encode($value);
-        }
-
-        return $attributes;
-    }
-
-    protected function validationRulesContainJson(mixed $rules): bool
-    {
-        if (is_string($rules)) {
-            return str_contains($rules, 'json');
-        }
-
-        if (! is_array($rules)) {
-            return false;
-        }
-
-        foreach ($rules as $rule) {
-            if (is_string($rule) && $rule === 'json') {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     protected static function bootHasValidations(): void
@@ -271,14 +211,20 @@ trait HasValidations
     {
         $permission = $model->getTable() . '.' . $operation;
         $permission_class = config('permission.models.permission');
+        $connection = $model->getConnection()->getName();
+        $cache_key = $connection . ':' . $permission;
 
         // L1: check static in-memory cache first to avoid repeated DB queries
         // for the same permission name within the same request lifecycle
-        if (! array_key_exists($permission, self::$permission_existence_cache)) {
-            self::$permission_existence_cache[$permission] = (bool) $permission_class::whereName($permission)->count();
+        if (! array_key_exists($cache_key, self::$permission_existence_cache)) {
+            /** @var Model $permission_model */
+            $permission_model = new $permission_class;
+            $permission_model->setConnection($connection);
+
+            self::$permission_existence_cache[$cache_key] = $permission_model->newQuery()->where('name', $permission)->exists();
         }
 
-        if (! self::$permission_existence_cache[$permission]) {
+        if (! self::$permission_existence_cache[$cache_key]) {
             return true;
         }
 
@@ -293,5 +239,135 @@ trait HasValidations
         }
 
         return true;
+    }
+
+    /**
+     * Whether a casted attribute should be passed to the validator using its cast value.
+     */
+    protected function shouldUseCastedAttributeForValidation(mixed $cast): bool
+    {
+        if (! is_string($cast)) {
+            return false;
+        }
+
+        return in_array($cast, ['array', 'object', 'collection', 'encrypted:array'], true)
+            || str_starts_with($cast, 'array:');
+    }
+
+    /**
+     * @param  array<string, mixed>  $rules
+     * @return array<string, mixed>
+     */
+    protected function qualifyDatabaseValidationRules(array $rules): array
+    {
+        foreach ($rules as $attribute => $attribute_rules) {
+            $rules[$attribute] = $this->qualifyDatabaseValidationRule($attribute_rules);
+        }
+
+        return $rules;
+    }
+
+    protected function qualifyDatabaseValidationRule(mixed $rule): mixed
+    {
+        if (is_array($rule)) {
+            return array_map(fn (mixed $item): mixed => $this->qualifyDatabaseValidationRule($item), $rule);
+        }
+
+        if ($rule instanceof Exists || $rule instanceof Unique) {
+            $rule = clone $rule;
+            $table = new ReflectionProperty($rule, 'table');
+            $table->setValue($rule, $this->qualifyDatabaseRuleTable((string) $table->getValue($rule)));
+
+            return $rule;
+        }
+
+        if (! is_string($rule)) {
+            return $rule;
+        }
+
+        return preg_replace_callback(
+            '/(^|\\|)(exists|unique):([^|]+)/',
+            fn (array $matches): string => $matches[1] . $matches[2] . ':' . $this->qualifyDatabaseRuleParameters($matches[3]),
+            $rule,
+        ) ?? $rule;
+    }
+
+    protected function qualifyDatabaseRuleParameters(string $parameters): string
+    {
+        $parameters = explode(',', $parameters);
+        $parameters[0] = $this->qualifyDatabaseRuleTable($parameters[0]);
+
+        return implode(',', $parameters);
+    }
+
+    protected function qualifyDatabaseRuleTable(string $table): string
+    {
+        if (str_contains($table, '.')) {
+            return $table;
+        }
+
+        if (class_exists($table) && is_a($table, Model::class, true)) {
+            /** @var Model $related */
+            $related = new $table;
+            $related->setConnection($this->getConnection()->getName());
+
+            $table = $related->getTable();
+        }
+
+        return $this->getConnection()->getName() . '.' . $table;
+    }
+
+    /**
+     * Maps legacy operation aliases to the rule-set keys used by models.
+     */
+    protected function normalizeValidationOperation(?string $operation): ?string
+    {
+        return match ($operation) {
+            'save' => 'update',
+            default => $operation,
+        };
+    }
+
+    /**
+     * Laravel's `json` rule only accepts JSON strings, not PHP arrays or objects.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $rules
+     * @return array<string, mixed>
+     */
+    protected function prepareJsonRuleAttributes(array $attributes, array $rules): array
+    {
+        foreach ($attributes as $key => $value) {
+            if (! isset($rules[$key]) || ! $this->validationRulesContainJson($rules[$key])) {
+                continue;
+            }
+
+            if (! is_array($value) && ! is_object($value)) {
+                continue;
+            }
+
+            $attributes[$key] = json_encode($value);
+        }
+
+        return $attributes;
+    }
+
+    protected function validationRulesContainJson(mixed $rules): bool
+    {
+        if (is_string($rules)) {
+            return str_contains($rules, 'json');
+        }
+
+        if (! is_array($rules)) {
+            return false;
+        }
+
+        foreach ($rules as $rule) {
+            if (is_string($rule) && $rule === 'json') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

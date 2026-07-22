@@ -5,8 +5,10 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Stubs\Versioning\VersionedArticle;
@@ -48,6 +50,46 @@ it('writes essential explicit history synchronously without dispatching a job', 
         ]);
     } finally {
         Schema::dropIfExists(VersionedArticle::TABLE);
+    }
+});
+
+it('reads version users from the user model connection independently of the versioned model connection', function (): void {
+    $connection_name = 'version_user_affinity';
+
+    config()->set("database.connections.{$connection_name}", [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge($connection_name);
+
+    try {
+        $central_user = User::factory()->create();
+
+        $queried_connections = [];
+        DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use (&$queried_connections): void {
+            $queried_connections[] = $query->connectionName;
+        });
+
+        $model = new class extends Model
+        {
+            use HasVersions;
+
+            protected $table = 'version_user_affinity_records';
+        };
+        $model->setConnection($connection_name);
+
+        $method = new ReflectionMethod($model, 'getUser');
+        $user = $method->invoke($model, $central_user->getKey());
+
+        expect($user)->toBeInstanceOf(User::class)
+            ->and($user?->getKey())->toBe($central_user->getKey())
+            ->and($queried_connections)->toContain(DB::getDefaultConnection())
+            ->and($queried_connections)->not->toContain($connection_name);
+    } finally {
+        DB::disconnect($connection_name);
+        DB::purge($connection_name);
     }
 });
 
@@ -97,7 +139,7 @@ it('does not query DB or persistent cache on second call for same model class', 
     $model->setConnection(config('database.default'));
 
     $query_count = 0;
-    Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
+    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
         if (str_contains(mb_strtolower($event->sql), 'settings') || str_contains(mb_strtolower($event->sql), 'setting')) {
             $query_count++;
         }
@@ -134,7 +176,7 @@ it('resets L1 cache so next call re-resolves from persistent cache', function ()
     HasVersions::resetVersionStrategyCache();
 
     $query_count = 0;
-    Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
+    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
         if (str_contains(mb_strtolower($event->sql), 'setting')) {
             $query_count++;
         }
@@ -286,16 +328,16 @@ it('does not query DB or access persistent cache on second call for any model cl
     $model->setConnection(config('database.default'));
 
     // Warm the L1 cache with the first call (cold path: may hit L2 persistent cache or L3 DB)
-    Illuminate\Support\Facades\DB::enableQueryLog();
+    DB::enableQueryLog();
     $model->getVersionStrategy();
-    $count_after_first = count(Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_first = count(DB::getQueryLog());
 
     // Spy on Cache AFTER the first call so we only capture accesses during the second call
     Illuminate\Support\Facades\Cache::spy();
 
     // Second call — must be served entirely from the L1 static map
     $model->getVersionStrategy();
-    $count_after_second = count(Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_second = count(DB::getQueryLog());
 
     // No new DB queries were issued after the first call
     expect($count_after_second)->toBe($count_after_first);

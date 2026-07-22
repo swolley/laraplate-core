@@ -179,13 +179,13 @@ it('does not issue a second DB query for the same permission name', function ():
     $query_count = 0;
 
     // Intercept DB queries to count permission existence checks
-    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $event) use ($permission_name, &$query_count): void {
+    Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use ($permission_name, &$query_count): void {
         if (str_contains($event->sql, 'permissions') && str_contains(implode(',', array_map('strval', $event->bindings)), $permission_name)) {
             $query_count++;
         }
     });
 
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
 
@@ -193,7 +193,7 @@ it('does not issue a second DB query for the same permission name', function ():
     };
 
     // Call checkUserCanDo twice with the same permission — second call must not hit DB
-    $method = new \ReflectionMethod(HasValidations::class, 'checkUserCanDo');
+    $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
     $method->invoke(null, $model, 'select');
     $after_first = $query_count;
     $method->invoke(null, $model, 'select');
@@ -203,24 +203,85 @@ it('does not issue a second DB query for the same permission name', function ():
     expect($after_second)->toBe($after_first);
 });
 
+it('uses the permission model connection independently of the authorized model connection', function (): void {
+    HasValidations::resetPermissionExistenceCache();
+
+    $connection_name = 'permission_affinity';
+    $permission_table = Modules\Core\Enums\CoreTables::Permissions->value;
+    $table_name = 'permission_affinity_records_' . uniqid();
+    $permission_name = "{$table_name}.select";
+
+    config()->set("database.connections.{$connection_name}", [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    Illuminate\Support\Facades\DB::purge($connection_name);
+
+    try {
+        Illuminate\Support\Facades\DB::table($permission_table)->insert([
+            'name' => $permission_name,
+            'guard_name' => 'web',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $user = Mockery::mock(Modules\Core\Models\User::class)->makePartial();
+        $user->shouldReceive('isSuperAdmin')->andReturn(false);
+        $user->shouldReceive('hasPermission')->with($permission_name)->andReturn(false);
+        Illuminate\Support\Facades\Auth::login($user);
+
+        $queried_connections = [];
+        Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use (&$queried_connections): void {
+            $queried_connections[] = $query->connectionName;
+        });
+
+        $model = new class extends Illuminate\Database\Eloquent\Model
+        {
+            use HasValidations;
+        };
+        $model->setTable($table_name);
+
+        $affinity_model = new class extends Illuminate\Database\Eloquent\Model
+        {
+            use HasValidations;
+        };
+        $affinity_model->setTable($table_name);
+        $affinity_model->setConnection($connection_name);
+
+        $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
+
+        expect($method->invoke(null, $model, 'select'))->toBeFalse()
+            ->and($method->invoke(null, $affinity_model, 'select'))->toBeFalse()
+            ->and($queried_connections)->toContain(Illuminate\Support\Facades\DB::getDefaultConnection())
+            ->and($queried_connections)->not->toContain($connection_name);
+    } finally {
+        Illuminate\Support\Facades\Auth::logout();
+        HasValidations::resetPermissionExistenceCache();
+        Illuminate\Support\Facades\DB::disconnect($connection_name);
+        Illuminate\Support\Facades\DB::purge($connection_name);
+    }
+});
+
 it('resets permission existence cache to empty state', function (): void {
     HasValidations::resetPermissionExistenceCache();
 
     // After reset the static cache is empty — next call will query DB again
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
 
         protected $table = 'reset_test_table';
     };
 
-    $method = new \ReflectionMethod(HasValidations::class, 'checkUserCanDo');
+    $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
     $method->invoke(null, $model, 'select');
 
     HasValidations::resetPermissionExistenceCache();
 
     $query_count = 0;
-    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
+    Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
         if (str_contains($event->sql, 'permissions')) {
             $query_count++;
         }
@@ -247,22 +308,22 @@ it('does not query DB on warm cache for any permission name (property test)', fu
     $table = fake()->unique()->word();
     $operation = fake()->randomElement(['select', 'insert', 'update', 'delete']);
 
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
     };
     $model->setTable($table);
 
-    $method = new \ReflectionMethod(HasValidations::class, 'checkUserCanDo');
+    $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
 
     // Cold cache: first call populates the static cache and may issue a DB query
-    \Illuminate\Support\Facades\DB::enableQueryLog();
+    Illuminate\Support\Facades\DB::enableQueryLog();
     $method->invoke(null, $model, $operation);
-    $count_after_first = count(\Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_first = count(Illuminate\Support\Facades\DB::getQueryLog());
 
     // Warm cache: second call with the same permission name must not add any new queries
     $method->invoke(null, $model, $operation);
-    $count_after_second = count(\Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_second = count(Illuminate\Support\Facades\DB::getQueryLog());
 
     expect($count_after_second)->toBe($count_after_first);
 })->repeat(10);
