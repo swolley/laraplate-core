@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\Date;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Versioning\Contracts\VersionWriterInterface;
+use Modules\Core\Versioning\Data\VersionChange;
 use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -54,39 +55,12 @@ final class Version extends OvertrueVersion
     #[Override]
     public static function createForModel(Model $model, array $replacements = [], mixed $time = null, ?VersionStrategy $strategyUsed = null): self
     {
-        // parent logic because it's not possible to bypass the save action
-
-        $versionClass = $model->getVersionModel();
-        $versionConnection = $model->getConnectionName();
-        $userForeignKeyName = $model->getUserForeignKeyName();
-
-        $strategy = $strategyUsed ?? self::resolveStrategyFromModel($model);
-
-        $version = new $versionClass();
-        $version->setConnection($versionConnection);
-
-        $version->versionable_id = $model->getKey();
-        $version->versionable_type = $model->getMorphClass();
-        $version->{$userForeignKeyName} = $model->getVersionUserId();
-        $version->version_strategy = $strategy;
-        $version->contents = $model->getVersionableAttributes($strategy, $replacements);
-        $version->original_contents = method_exists($model, 'getOriginalVersionableAttributes')
-            ? $model->getOriginalVersionableAttributes($strategy, $replacements)
-            : [];
-
-        if ($time) {
-            $version->created_at = Date::parse($time);
-        }
-
-        if (self::isDynamicEntity($model)) {
-            $version->connection_ref = $model->getConnectionName();
-            $version->table_ref = $model->getTable();
-        }
-
-        $version->save();
-
-        /** @psalm-suppress LessSpecificReturnStatement */
-        return $version;
+        return resolve(VersionWriterInterface::class)->write(VersionChange::forModel(
+            model: $model,
+            replacements: $replacements,
+            time: $time,
+            strategy: $strategyUsed,
+        ));
     }
 
     /**
@@ -246,31 +220,6 @@ final class Version extends OvertrueVersion
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
-    }
-
-    private static function resolveStrategyFromModel(Model $model): VersionStrategy
-    {
-        if (! method_exists($model, 'getVersionStrategy')) {
-            return VersionStrategy::DIFF;
-        }
-
-        /** @var VersionStrategy|false|string $strategy */
-        $strategy = $model->getVersionStrategy();
-
-        if ($strategy instanceof VersionStrategy) {
-            return $strategy;
-        }
-
-        if (in_array($strategy, [false, null, ''], true)) {
-            return VersionStrategy::DIFF;
-        }
-
-        return VersionStrategy::from((string) $strategy);
-    }
-
-    private static function isDynamicEntity(Model $model): bool
-    {
-        return class_exists(DynamicEntity::class) && $model instanceof DynamicEntity;
     }
 
     private function getCompleteVersionable(): ?Model

@@ -21,4 +21,17 @@ final class VersionedArticle extends Model
     protected array $versionable = ['title'];
 
     protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+
+    public function useVersionStrategy(VersionStrategy $strategy): void
+    {
+        $this->versionStrategy = $strategy;
+    }
+
+    /**
+     * @param  list<string>  $attributes
+     */
+    public function encryptVersionAttributes(array $attributes): void
+    {
+        $this->encryptedVersionable = $attributes;
+    }
 }

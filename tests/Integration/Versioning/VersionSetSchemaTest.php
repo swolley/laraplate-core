@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Enums\CoreTables;
@@ -143,15 +145,31 @@ it('defines ordered version membership with cascading set deletion', function ()
         ->and(mb_strtolower((string) $version_set_foreign_key['on_delete']))->toBe('cascade');
 });
 
-it('keeps compatibility and optional version columns nullable', function (): void {
+it('requires ordered set membership while keeping relation metadata optional', function (): void {
     $columns = collect(Schema::getColumns(CoreTables::Versions->value))
         ->keyBy(static fn (array $column): string => mb_strtolower($column['name']));
 
-    expect($columns['version_set_id']['nullable'])->toBeTrue()
-        ->and($columns['sequence']['nullable'])->toBeTrue()
-        ->and($columns['change_type']['nullable'])->toBeTrue()
+    expect($columns['version_set_id']['nullable'])->toBeFalse()
+        ->and($columns['sequence']['nullable'])->toBeFalse()
+        ->and($columns['change_type']['nullable'])->toBeFalse()
         ->and($columns['relation_path']['nullable'])->toBeTrue()
         ->and($columns['subject_key']['nullable'])->toBeTrue();
+});
+
+it('rejects raw version rows without ordered set membership on sqlite', function (): void {
+    if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    expect(fn (): bool => DB::table(CoreTables::Versions->value)->insert([
+        'versionable_type' => VersionSet::class,
+        'versionable_id' => 1,
+        'version_strategy' => VersionStrategy::DIFF->value,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]))->toThrow(QueryException::class);
 });
 
 it('casts version set and version attributes to their domain types', function (): void {

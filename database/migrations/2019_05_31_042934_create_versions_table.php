@@ -22,12 +22,12 @@ return new class() extends Migration
             $uuid = config('versionable.uuid');
 
             $uuid ? $table->uuid('id')->primary() : $table->bigIncrements('id');
-            $table->unsignedBigInteger('version_set_id')->nullable();
-            $table->unsignedInteger('sequence')->nullable();
+            $table->unsignedBigInteger('version_set_id');
+            $table->unsignedInteger('sequence');
             $table->enum(
                 'change_type',
                 array_map(static fn (VersionChangeType $case): string => $case->value, VersionChangeType::cases()),
-            )->nullable();
+            );
             $table->string('relation_path')->nullable();
             $table->json('subject_key')->nullable();
             $table->string('connection_ref')->nullable()->comment('The connection reference of the version');

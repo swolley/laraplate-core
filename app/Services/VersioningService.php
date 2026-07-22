@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Version;
+use Modules\Core\Versioning\Contracts\VersionWriterInterface;
+use Modules\Core\Versioning\Data\VersionChange;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class VersioningService
 {
+    public function __construct(private readonly VersionWriterInterface $writer) {}
+
     /**
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $replacements
-     * @param  array<int, string>  $encryptedVersionable
+     * @param  int|string|array<array-key, mixed>|null  $modelId
+     * @param  list<string>  $encryptedVersionable
      */
     public function createVersion(
         string $modelClass,
@@ -27,9 +32,9 @@ final class VersioningService
         int $keepVersionsCount = 0,
         array $encryptedVersionable = [],
         VersionStrategy|string|null $versionStrategy = null,
-        mixed $time = null,
+        string|DateTimeInterface|null $time = null,
         bool $purgeOldVersionsAfterCreate = false,
-    ): ?Version {
+    ): Version {
         /** @var Model&object $model */
         $model = resolve($modelClass);
 
@@ -41,77 +46,24 @@ final class VersioningService
         $model->setRawAttributes($attributes);
         $model->syncOriginal();
 
+        if ($model->getKey() === null && ! is_array($modelId)) {
+            $model->setAttribute($model->getKeyName(), $modelId);
+            $model->syncOriginalAttribute($model->getKeyName());
+        }
+
         if ($versionStrategy !== null) {
             $model->versionStrategy = is_string($versionStrategy) && enum_exists(VersionStrategy::class)
                 ? VersionStrategy::from($versionStrategy)
                 : $versionStrategy;
         }
 
-        /** @var class-string<Version> $versionModel */
-        $versionModel = config('versionable.version_model');
-
-        /** @var Version $version */
-        $version = $versionModel::createForModel($model, $replacements, $time);
-        $needsSave = false;
-
-        if ($userId !== null) {
-            $version->{$model->getUserForeignKeyName()} = $userId;
-            $needsSave = true;
-        }
-
-        if ($encryptedVersionable !== []) {
-            $contents = $version->contents;
-
-            foreach ($encryptedVersionable as $field) {
-                if (array_key_exists($field, $contents)) {
-                    $contents[$field] = encrypt($contents[$field]);
-                }
-            }
-
-            $version->contents = $contents;
-            $needsSave = true;
-        }
-
-        if ($needsSave) {
-            $version->save();
-        }
-
-        if ($purgeOldVersionsAfterCreate) {
-            $this->purgeAllVersionRowsExcept($model, $version);
-        }
-
-        if ($keepVersionsCount > 0) {
-            $model->versions()
-                ->latest()
-                ->skip($keepVersionsCount)
-                ->get()
-                ->each->delete();
-        }
-
-        return $version;
-    }
-
-    private function purgeAllVersionRowsExcept(Model $model, Version $keepVersion): void
-    {
-        /** @var class-string<Version> $versionModelClass */
-        $versionModelClass = config('versionable.version_model');
-        $keyName = (new $versionModelClass)->getKeyName();
-
-        $query = $versionModelClass::query()
-            ->withTrashed()
-            ->where('versionable_type', $model->getMorphClass())
-            ->where('versionable_id', $model->getKey())
-            ->where($keyName, '!=', $keepVersion->getKey());
-
-        if (class_exists(DynamicEntity::class) && $model instanceof DynamicEntity) {
-            $query->where('connection_ref', $model->getConnectionName())
-                ->where('table_ref', $model->getTable());
-        } else {
-            $query->whereNull('connection_ref')->whereNull('table_ref');
-        }
-
-        $query->get()->each(static function (Version $row): void {
-            $row->forceDelete();
-        });
+        return $this->writer->write(VersionChange::forModel(
+            model: $model,
+            replacements: $replacements,
+            time: $time,
+            strategy: $model->versionStrategy instanceof VersionStrategy ? $model->versionStrategy : null,
+            userId: $userId,
+            encryptedAttributes: $encryptedVersionable,
+        ));
     }
 }

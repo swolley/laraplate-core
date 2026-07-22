@@ -6,9 +6,8 @@ use Modules\Core\Models\Version;
 use Modules\Core\Services\VersioningService;
 use Modules\Core\Tests\Stubs\FakeVersionedModel;
 
-
 it('can be instantiated', function (): void {
-    $service = new VersioningService();
+    $service = app(VersioningService::class);
 
     expect($service)->toBeInstanceOf(VersioningService::class);
 });
@@ -16,7 +15,7 @@ it('can be instantiated', function (): void {
 it('creates a version with basic attributes and no extras', function (): void {
     config()->set('versionable.version_model', Version::class);
 
-    $service = new VersioningService();
+    $service = app(VersioningService::class);
 
     $version = $service->createVersion(
         FakeVersionedModel::class,
@@ -33,7 +32,7 @@ it('creates a version with basic attributes and no extras', function (): void {
 it('sets version strategy from string', function (): void {
     config()->set('versionable.version_model', Version::class);
 
-    $service = new VersioningService();
+    $service = app(VersioningService::class);
 
     $version = $service->createVersion(
         FakeVersionedModel::class,
@@ -51,7 +50,7 @@ it('sets version strategy from string', function (): void {
 it('sets user id and encrypts selected fields and trims older versions', function (): void {
     config()->set('versionable.version_model', Version::class);
 
-    $service = new VersioningService();
+    $service = app(VersioningService::class);
 
     $version = $service->createVersion(
         FakeVersionedModel::class,

@@ -10,13 +10,12 @@ use DateTimeInterface;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
-use Modules\Core\Events\ModelVersioningRequested;
-use Modules\Core\Jobs\CreateVersionJob;
+use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Services\PerModelSettingResolver;
-use Modules\Core\Services\VersioningService;
+use Modules\Core\Versioning\Contracts\VersionWriterInterface;
+use Modules\Core\Versioning\Data\VersionChange;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -32,10 +31,7 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 trait HasVersions
 {
-    use Versionable {
-        Versionable::shouldBeVersioning as private internalShouldBeVersioning;
-        Versionable::createInitialVersion as private internalCreateInitialVersion;
-    }
+    use Versionable;
 
     protected ?User $_creator;
 
@@ -48,6 +44,16 @@ trait HasVersions
     protected bool $asyncVersioning = true;
 
     protected array $encryptedVersionable = [];
+
+    /**
+     * @var array{strategy: VersionStrategy, keys: list<string>, original: array<string, mixed>}|null
+     */
+    private ?array $pending_version_update = null;
+
+    /**
+     * @var array{strategy: VersionStrategy, original: array<string, mixed>}|null
+     */
+    private ?array $pending_version_delete = null;
 
     /**
      * L1 in-memory cache for version strategy resolution.
@@ -65,6 +71,15 @@ trait HasVersions
     public static function resetVersionStrategyCache(): void
     {
         self::$version_strategy_cache = [];
+    }
+
+    /**
+     * Laravel boots recursively imported traits. This override keeps vendor
+     * helpers and relations while preventing its independent writer and purge.
+     */
+    public static function bootVersionable(): void
+    {
+        // Lifecycle persistence is owned by bootHasVersions().
     }
 
     public function shouldBeVersioning(): bool
@@ -127,28 +142,14 @@ trait HasVersions
             return null;
         }
 
-        if ($this->asyncVersioning) {
-            event(new ModelVersioningRequested(static::class, $this->getKey(), $this->getConnectionName(), $this->getTable(), $this->getAttributes(), $replacements, $this->getVersionUserId(), (int) $this->getKeepVersionsCount(), $this->encryptedVersionable, $effective_strategy, $time, $purgeOldVersionsAfterCreate));
-
-            dispatch(new CreateVersionJob(modelClass: static::class, modelId: $this->getKey(), modelConnection: $this->getConnectionName(), table: $this->getTable(), attributes: $this->getAttributes(), replacements: $replacements, userId: $this->getVersionUserId(), keepVersionsCount: (int) $this->getKeepVersionsCount(), encryptedVersionable: $this->encryptedVersionable, versionStrategy: $effective_strategy, time: $time, purgeOldVersionsAfterCreate: $purgeOldVersionsAfterCreate))->afterCommit();
-
-            return null;
-        }
-
-        return resolve(VersioningService::class)->createVersion(
-            modelClass: static::class,
-            modelId: $this->getKey(),
-            connection: $this->getConnectionName(),
-            table: $this->getTable(),
-            attributes: $this->getAttributes(),
+        return resolve(VersionWriterInterface::class)->write(VersionChange::forModel(
+            model: $this,
             replacements: $replacements,
-            userId: $this->getVersionUserId(),
-            keepVersionsCount: (int) $this->getKeepVersionsCount(),
-            encryptedVersionable: $this->encryptedVersionable,
-            versionStrategy: $effective_strategy,
             time: $time,
-            purgeOldVersionsAfterCreate: $purgeOldVersionsAfterCreate,
-        );
+            strategy: $effective_strategy,
+            userId: $this->getVersionUserId(),
+            encryptedAttributes: $this->encryptedVersionable,
+        ));
     }
 
     /**
@@ -187,22 +188,19 @@ trait HasVersions
         //     return $model->firstVersion()->first();
         // }
 
-        /** @var Versionable|Model $refreshedModel */
-        $refreshedModel = static::query()->withoutGlobalScopes()->findOrFail($model->getKey());
+        /** @var Model&HasVersions $model */
+        $contents = $model->filterVersionableImage($model->getAttributes());
 
-        /**
-         * As initial version should include all $versionable fields,
-         * we need to get the latest version from database.
-         * so we force to create a snapshot version.
-         */
-        $attributes = $refreshedModel->getVersionableAttributes(VersionStrategy::SNAPSHOT);
-
-        return config('versionable.version_model')::createForModel(
-            $refreshedModel,
-            $attributes,
-            $refreshedModel->updated_at,
-            VersionStrategy::SNAPSHOT,
-        );
+        return resolve(VersionWriterInterface::class)->write(new VersionChange(
+            model: $model,
+            type: VersionChangeType::Created,
+            originalContents: [],
+            contents: VersionChange::encryptSelected($contents, $model->encryptedVersionable),
+            strategy: VersionStrategy::SNAPSHOT,
+            time: $model->updated_at,
+            userId: $model->getVersionUserId(),
+            encryptedAttributes: $model->encryptedVersionable,
+        ));
     }
 
     public function getVersionUserId()
@@ -250,19 +248,32 @@ trait HasVersions
 
     protected static function bootHasVersions(): void
     {
-        static::deleted(function (Model $model): void {
-            /** @var Versionable|Version $model */
-            if (method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting()) {
-                $model->createVersion(['deleted_at' => $model->deleted_at]);
+        static::created(function (Model $model): void {
+            /** @var Model&HasVersions $model */
+            if (static::$versioning) {
+                $model->createInitialVersion($model);
             }
         });
 
-        if (class_uses_trait(static::class, SoftDeletes::class)) {
-            /** @phpstan-ignore staticMethod.notFound */
-            static::restored(function (Model $model): void {
-                $model->createVersion(['deleted_at' => null]);
-            });
-        }
+        static::updating(function (Model $model): void {
+            /** @var Model&HasVersions $model */
+            $model->capturePendingVersionUpdate();
+        });
+
+        static::updated(function (Model $model): void {
+            /** @var Model&HasVersions $model */
+            $model->writePendingVersionUpdate();
+        });
+
+        static::deleting(function (Model $model): void {
+            /** @var Model&HasVersions $model */
+            $model->capturePendingVersionDelete();
+        });
+
+        static::deleted(function (Model $model): void {
+            /** @var Model&HasVersions $model */
+            $model->writePendingVersionDelete();
+        });
     }
 
     // public function getCreatorAttribute(): ?User
@@ -310,11 +321,125 @@ trait HasVersions
         );
     }
 
+    private function capturePendingVersionUpdate(): void
+    {
+        $this->pending_version_update = null;
+        $strategy = $this->getVersionStrategy();
+
+        if (! static::$versioning || ! $strategy instanceof VersionStrategy) {
+            return;
+        }
+
+        if (method_exists($this, 'shouldVersioning') && ! $this->shouldVersioning()) {
+            return;
+        }
+
+        $keys = $this->filterVersionableKeys(array_keys($this->getDirty()), includeDeletedAt: true);
+
+        if ($keys === []) {
+            return;
+        }
+
+        $original = $strategy === VersionStrategy::SNAPSHOT
+            ? $this->filterVersionableImage($this->getRawOriginal())
+            : Arr::only($this->getRawOriginal(), $keys);
+
+        $this->pending_version_update = compact('strategy', 'keys', 'original');
+    }
+
+    private function writePendingVersionUpdate(): void
+    {
+        $pending = $this->pending_version_update;
+        $this->pending_version_update = null;
+
+        if ($pending === null) {
+            return;
+        }
+
+        $contents = $pending['strategy'] === VersionStrategy::SNAPSHOT
+            ? $this->filterVersionableImage($this->getAttributes())
+            : Arr::only($this->getAttributes(), $pending['keys']);
+
+        resolve(VersionWriterInterface::class)->write(new VersionChange(
+            model: $this,
+            type: VersionChangeType::Updated,
+            originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
+            contents: VersionChange::encryptSelected($contents, $this->encryptedVersionable),
+            strategy: $pending['strategy'],
+            userId: $this->getVersionUserId(),
+            encryptedAttributes: $this->encryptedVersionable,
+        ));
+    }
+
+    private function capturePendingVersionDelete(): void
+    {
+        $this->pending_version_delete = null;
+        $strategy = $this->getVersionStrategy();
+
+        if (! static::$versioning || ! $strategy instanceof VersionStrategy) {
+            return;
+        }
+
+        $this->pending_version_delete = [
+            'strategy' => $strategy,
+            'original' => $this->filterVersionableImage($this->getRawOriginal()),
+        ];
+    }
+
+    private function writePendingVersionDelete(): void
+    {
+        $pending = $this->pending_version_delete;
+        $this->pending_version_delete = null;
+
+        if ($pending === null) {
+            return;
+        }
+
+        resolve(VersionWriterInterface::class)->write(new VersionChange(
+            model: $this,
+            type: VersionChangeType::Deleted,
+            originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
+            contents: [],
+            strategy: $pending['strategy'],
+            userId: $this->getVersionUserId(),
+            encryptedAttributes: $this->encryptedVersionable,
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function filterVersionableImage(array $attributes): array
+    {
+        return Arr::only($attributes, $this->filterVersionableKeys(array_keys($attributes)));
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    private function filterVersionableKeys(array $keys, bool $includeDeletedAt = false): array
+    {
+        $versionable = $this->getVersionable();
+
+        if ($versionable !== []) {
+            $allowed = $includeDeletedAt ? [...$versionable, 'deleted_at'] : $versionable;
+            $keys = array_values(array_intersect($keys, $allowed));
+        }
+
+        return array_values(array_diff($keys, $this->getDontVersionable()));
+    }
+
     private function getUser(int $userId): ?User
     {
         $user_class = user_class();
 
-        return $user_class::query()->withoutGlobalScopes()->find($userId);
+        /** @var User $user */
+        $user = new $user_class;
+        $user->setConnection($this->getConnection()->getName());
+
+        return $user->newQueryWithoutScopes()->find($userId);
     }
 
     // // TODO: sarà sicuramente da overridare per via delle primary key multiple

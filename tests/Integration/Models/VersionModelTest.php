@@ -5,12 +5,31 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
+use Modules\Core\Models\VersionSet;
 use Modules\Core\Services\DynamicEntityService;
 use Modules\Core\Tests\Stubs\FakeVersionedModel;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
+function persistVersionModelFixture(Version $version): void
+{
+    $version_set = VersionSet::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'root_type' => $version->versionable_type,
+        'root_id' => (string) $version->versionable_id,
+        'kind' => VersionSetKind::Change,
+    ]);
+
+    $version->forceFill([
+        'version_set_id' => $version_set->getKey(),
+        'sequence' => 1,
+        'change_type' => VersionChangeType::Updated,
+    ])->saveOrFail();
+}
 
 it('revertWithoutSaving returns null when versionable cannot be resolved', function (): void {
     $version = new Version();
@@ -88,9 +107,9 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
     $base_user = User::factory()->create(['name' => 'Live']);
     $user = new class extends User
     {
-        protected $table = 'users';
-
         public VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+
+        protected $table = 'users';
     };
     $user->setConnection(config('database.default'));
     $user->exists = true;
@@ -103,7 +122,7 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
         'contents' => ['name' => 'FromPrev'],
     ]);
     $v1->created_at = now()->subMinutes(5);
-    $v1->save();
+    persistVersionModelFixture($v1);
 
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
@@ -112,7 +131,7 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
         'contents' => ['name' => 'Head'],
     ]);
     $v2->created_at = now()->subMinute();
-    $v2->save();
+    persistVersionModelFixture($v2);
 
     $v2->setRelation('versionable', $user->fresh());
 
@@ -126,9 +145,9 @@ it('revertWithoutSaving applies snapshot strategy using first version and curren
     $base_user = User::factory()->create(['name' => 'Live']);
     $user = new class extends User
     {
-        protected $table = 'users';
-
         public VersionStrategy $versionStrategy = VersionStrategy::SNAPSHOT;
+
+        protected $table = 'users';
     };
     $user->setConnection(config('database.default'));
     $user->exists = true;
@@ -141,7 +160,7 @@ it('revertWithoutSaving applies snapshot strategy using first version and curren
         'contents' => ['name' => 'SnapshotInit'],
     ]);
     $v1->created_at = now()->subMinutes(2);
-    $v1->save();
+    persistVersionModelFixture($v1);
 
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
@@ -150,7 +169,7 @@ it('revertWithoutSaving applies snapshot strategy using first version and curren
         'contents' => ['name' => 'SnapshotTip'],
     ]);
     $v2->created_at = now()->subMinute();
-    $v2->save();
+    persistVersionModelFixture($v2);
 
     $versionable = $user->fresh();
 
@@ -166,9 +185,9 @@ it('revertWithoutSaving snapshot skips merge when first version has empty conten
     $base_user = User::factory()->create(['name' => 'Live']);
     $user = new class extends User
     {
-        protected $table = 'users';
-
         public VersionStrategy $versionStrategy = VersionStrategy::SNAPSHOT;
+
+        protected $table = 'users';
     };
     $user->setConnection(config('database.default'));
     $user->exists = true;
@@ -181,7 +200,7 @@ it('revertWithoutSaving snapshot skips merge when first version has empty conten
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(2);
-    $v1->save();
+    persistVersionModelFixture($v1);
 
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
@@ -190,7 +209,7 @@ it('revertWithoutSaving snapshot skips merge when first version has empty conten
         'contents' => ['name' => 'OnlyTip'],
     ]);
     $v2->created_at = now()->subMinute();
-    $v2->save();
+    persistVersionModelFixture($v2);
 
     $versionable = $user->fresh();
 
@@ -212,7 +231,7 @@ it('previousVersions returns earlier versions for the same versionable', functio
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(3);
-    $v1->save();
+    persistVersionModelFixture($v1);
 
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
@@ -221,7 +240,7 @@ it('previousVersions returns earlier versions for the same versionable', functio
         'contents' => [],
     ]);
     $v2->created_at = now()->subMinutes(2);
-    $v2->save();
+    persistVersionModelFixture($v2);
 
     $v2->setRelation('versionable', $user->fresh());
 
@@ -240,7 +259,7 @@ it('nextVersion returns the following version when one exists', function (): voi
         'contents' => [],
     ]);
     $v1->created_at = now()->subMinutes(2);
-    $v1->save();
+    persistVersionModelFixture($v1);
 
     $v2 = new Version([
         'versionable_id' => $user->getKey(),
@@ -249,7 +268,7 @@ it('nextVersion returns the following version when one exists', function (): voi
         'contents' => [],
     ]);
     $v2->created_at = now()->subMinute();
-    $v2->save();
+    persistVersionModelFixture($v2);
 
     $v1->setRelation('versionable', $user->fresh());
 

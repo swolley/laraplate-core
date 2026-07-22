@@ -67,7 +67,9 @@ use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
+use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\VersionSetManager;
+use Modules\Core\Versioning\VersionWriter;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -160,6 +162,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->bind(OutboxPublisher::class, StubOutboxPublisher::class);
         $this->app->scoped(ActiveVersionSet::class);
         $this->app->scoped(VersionSetManagerInterface::class, VersionSetManager::class);
+        $this->app->scoped(VersionWriterInterface::class, VersionWriter::class);
 
         // Register search clients
         $this->registerSearchClients();
