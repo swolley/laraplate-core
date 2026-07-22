@@ -8,6 +8,7 @@ Core provides reusable infrastructure for module-owned bulk import commands. It 
 |---|---|
 | `AbstractImportCommand` | Common command execution, options, bootstrap loading, interactive plugin selection, output, and exit codes |
 | `BulkImporterInterface` | Neutral executable contract returning the imported root-record count |
+| `ConnectionAwareBulkImporterInterface` | Optional contract selecting the destination database connection for dry-run isolation |
 | `BulkImporterResolverInterface` | Module-supplied validation and container resolution boundary |
 | `ImportPluginDiscoveryInterface` | Module-supplied external plugin discovery boundary |
 | `ContainerBulkImporterResolver` | Reusable container resolver parameterized by the accepted importer marker interface |
@@ -34,7 +35,7 @@ Do not declare `$signature`. Core defines the shared options through `getOptions
 - `--importer=`: concrete importer FQCN;
 - `--bootstrap=`: optional external Composer autoloader;
 - `--arg=*`: repeatable importer constructor argument in `key=value` form;
-- `--dry-run`: roll back writes on the default database connection;
+- `--dry-run`: roll back writes on the connection declared by the importer, or the default connection;
 - `--limit=`: non-negative import limit passed to the importer;
 - `--no-search`: disable Scout indexing for the process.
 
@@ -48,7 +49,7 @@ Importers must call module services for protected domain mutations. They must no
 
 ## Dry-run guarantee
 
-`BulkImportRunner` opens a transaction on the current default connection and restores its previous transaction nesting level. This rolls back database writes made on that connection only.
+`BulkImportRunner` opens a transaction on the connection returned by an optional `ConnectionAwareBulkImporterInterface`, falling back to the current default connection, and restores its previous transaction nesting level. This rolls back database writes made on that connection only.
 
 It does not roll back other connections, files, object storage, queued work, HTTP calls, or other external side effects. Importers receive `dryRun` as a named constructor parameter and are responsible for suppressing non-transactional effects. The command disables Scout when dry-run is active.
 
