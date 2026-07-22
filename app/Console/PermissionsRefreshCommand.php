@@ -10,9 +10,9 @@ use function models;
 use function user_class;
 
 use Approval\Traits\RequiresApproval;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\DynamicEntity;
@@ -88,13 +88,15 @@ final class PermissionsRefreshCommand extends Command
 
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
+        $permission_model = new $permission_class();
+        $connection = $permission_model->getConnection();
 
         if ($pretend_mode) {
             $this->info('Running in pretend mode, no changes will be made');
             $this->newLine();
         }
 
-        DB::beginTransaction();
+        $connection->beginTransaction();
 
         foreach ($all_models as $model) {
             if (! is_string($model)) {
@@ -114,18 +116,24 @@ final class PermissionsRefreshCommand extends Command
                 continue;
             }
 
-            $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
+            $reflection = new ReflectionClass($model);
 
-            $connection = $instance->getConnectionName() ?? 'default';
+            if (! $reflection->isSubclassOf(Model::class)) {
+                continue;
+            }
+
+            $instance = $reflection->newInstance();
+
+            $connection_name = $instance->getConnectionName() ?? $instance->getConnection()->getName();
             $table = $instance->getTable();
             $permission_class::flushEventListeners();
 
             /** @var array<int,string> $found_permissions */
-            $found_permissions = $permission_class::query()->where(['connection_name' => $connection, 'table_name' => $table])->pluck('name')->toArray();
+            $found_permissions = $permission_class::query()->where(['connection_name' => $connection_name, 'table_name' => $table])->pluck('name')->toArray();
             $new_model_suffix = $found_permissions !== [] ? ' for new model ' . $model : '';
 
             foreach ($common_permissions as $permission) {
-                $permission_name = $connection . '.' . $table . '.' . $permission->value;
+                $permission_name = $connection_name . '.' . $table . '.' . $permission->value;
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
@@ -185,7 +193,7 @@ final class PermissionsRefreshCommand extends Command
 
             if ($model === $user_class) {
                 // solo per gli utenti aggiungo l'impersonificazione
-                $permission_name = sprintf('%s.%s.', $connection, $table) . ActionEnum::Impersonate->value;
+                $permission_name = sprintf('%s.%s.', $connection_name, $table) . ActionEnum::Impersonate->value;
                 $all_permissions[] = $permission_name;
 
                 if (! in_array($permission_name, $found_permissions, true)) {
@@ -231,9 +239,9 @@ final class PermissionsRefreshCommand extends Command
         }
 
         if (! $pretend_mode) {
-            DB::commit();
+            $connection->commit();
         } else {
-            DB::rollBack();
+            $connection->rollBack();
         }
     }
 

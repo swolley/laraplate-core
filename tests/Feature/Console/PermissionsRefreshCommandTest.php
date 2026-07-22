@@ -14,6 +14,17 @@ use Symfony\Component\Console\Application as SymfonyConsoleApplication;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
+class ConstructorConfiguredPermissionsModel extends Illuminate\Database\Eloquent\Model
+{
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $this->setConnection('permissions_constructor_connection');
+        $this->setTable('permissions_constructor_table');
+    }
+}
+
 afterEach(function (): void {
     HelpersCache::clearModels();
 });
@@ -35,6 +46,17 @@ function runPermissionsRefreshForCoverage(array $options = []): string
     $command->run($input, $output);
 
     return $output->fetch();
+}
+
+/**
+ * @param  class-string<Illuminate\Database\Eloquent\Model>  $model_class
+ */
+function permissionNameForModel(string $model_class, ActionEnum $action): string
+{
+    $model = new $model_class();
+    $connection = $model->getConnectionName() ?? $model->getConnection()->getName();
+
+    return "{$connection}.{$model->getTable()}.{$action->value}";
 }
 
 it('command exists and has correct signature', function (): void {
@@ -177,10 +199,7 @@ it('command handles permission deletion', function (): void {
 });
 
 it('does not duplicate permissions when they already exist for the model table', function (): void {
-    $instance = new ReflectionClass(ActionRequest::class)->newInstanceWithoutConstructor();
-    $connection = $instance->getConnectionName() ?? 'default';
-    $table = $instance->getTable();
-    $permission_name = "{$connection}.{$table}." . ActionEnum::Select->value;
+    $permission_name = permissionNameForModel(ActionRequest::class, ActionEnum::Select);
 
     Permission::query()->firstOrCreate(
         ['name' => $permission_name],
@@ -193,6 +212,16 @@ it('does not duplicate permissions when they already exist for the model table',
 
     expect(Permission::query()->where('name', $permission_name)->count())->toBe(1)
         ->and($output)->not->toContain("Created '{$permission_name}' permission");
+});
+
+it('uses connection and table configured by the model constructor', function (): void {
+    $permission_name = 'permissions_constructor_connection.permissions_constructor_table.select';
+    Permission::query()->where('name', $permission_name)->delete();
+    HelpersCache::setModels('active', [ConstructorConfiguredPermissionsModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $permission_name)->exists())->toBeTrue();
 });
 
 it('command handles connection and table names', function (): void {
@@ -295,9 +324,9 @@ it('skips non-string and missing model entries and prints bypass for blacklisted
 });
 
 it('removes delete approve and publish permissions when the model does not support those features', function (): void {
-    $delete_name = 'default.perm_refresh_plain.delete';
-    $approve_name = 'default.perm_refresh_plain.approve';
-    $publish_name = 'default.perm_refresh_plain.publish';
+    $delete_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Delete);
+    $approve_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Approve);
+    $publish_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Publish);
 
     Permission::query()->whereIn('name', [$delete_name, $approve_name, $publish_name])->delete();
 
@@ -317,7 +346,7 @@ it('removes delete approve and publish permissions when the model does not suppo
 });
 
 it('drops permissions that no longer match any inspected model', function (): void {
-    $orphan_name = 'default.zz_' . bin2hex(random_bytes(4)) . '.select';
+    $orphan_name = (new Permission)->getConnection()->getName() . '.zz_' . bin2hex(random_bytes(4)) . '.select';
 
     Permission::create(['name' => $orphan_name, 'guard_name' => 'web']);
 
@@ -342,11 +371,7 @@ it('reports no changes when a second run finds the permission set already in syn
 
 it('creates impersonate permission for the configured user model when missing', function (): void {
     $user_class = user_class();
-    $reflection = new ReflectionClass($user_class);
-    $instance = $reflection->newInstanceWithoutConstructor();
-    $connection = $instance->getConnectionName() ?? 'default';
-    $table = $instance->getTable();
-    $impersonate_name = sprintf('%s.%s.%s', $connection, $table, ActionEnum::Impersonate->value);
+    $impersonate_name = permissionNameForModel($user_class, ActionEnum::Impersonate);
 
     Permission::query()->where('name', $impersonate_name)->delete();
 

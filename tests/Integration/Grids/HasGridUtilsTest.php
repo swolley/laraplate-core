@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsBreakDeepRootStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsChildModelStub;
@@ -20,7 +22,6 @@ use Modules\Core\Tests\Stubs\Grids\HasGridUtilsPivotRoleStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsPrivateRelationStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsThroughCountryStub;
 use Modules\Core\Tests\Stubs\Grids\HasGridUtilsWithoutBelongsStub;
-
 
 it('returns hidden, fillable and append fields', function (): void {
     $model = new HasGridUtilsModelStub();
@@ -74,6 +75,48 @@ it('resolves relationships and deep relationship helpers', function (): void {
         ->and(HasGridUtilsModelWithRelationsStub::hasRelation('roles'))->toBeTrue()
         ->and(HasGridUtilsModelWithRelationsStub::hasRelationDeeply('hasGridUtilsModelWithRelationsStub.roles'))->toBeTrue()
         ->and(HasGridUtilsModelWithRelationsStub::isDeepRelation('hasGridUtilsModelWithRelationsStub.roles'))->toBeFalse();
+});
+
+it('inspects relationships inside the owning model connection transaction', function (): void {
+    config()->set('database.connections.grid_affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('grid_affinity');
+
+    $model = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use Modules\Core\Grids\Traits\HasGridUtils;
+
+        protected $connection = 'grid_affinity';
+
+        public function parent(): BelongsTo
+        {
+            return $this->belongsTo(self::class, 'parent_id');
+        }
+    };
+    $model_class = $model::class;
+    $affinity_transaction_started = false;
+    $default_transaction_started = false;
+
+    DB::connection('grid_affinity')->beforeStartingTransaction(static function () use (&$affinity_transaction_started): void {
+        $affinity_transaction_started = true;
+    });
+    DB::connection()->beforeStartingTransaction(static function () use (&$default_transaction_started): void {
+        $default_transaction_started = true;
+    });
+
+    try {
+        $model_class::getRelationships();
+
+        expect($affinity_transaction_started)->toBeTrue()
+            ->and($default_transaction_started)->toBeFalse();
+    } finally {
+        DB::disconnect('grid_affinity');
+        DB::purge('grid_affinity');
+    }
 });
 
 it('returns columns in plain and typed format', function (): void {

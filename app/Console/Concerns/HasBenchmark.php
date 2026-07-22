@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Console\Concerns;
 
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,15 +26,27 @@ trait HasBenchmark
 
     protected ?string $benchmarkTable = null;
 
+    protected ?Connection $benchmarkConnection = null;
+
     public function cancelBenchmark(): void
     {
+        if ($this->benchmarkConnection instanceof Connection) {
+            $this->benchmarkConnection->disableQueryLog();
+            $this->benchmarkConnection->flushQueryLog();
+        }
+
         $this->benchmarkStartTime = null;
+        $this->benchmarkStartMemory = null;
+        $this->startQueries = null;
+        $this->startRowCount = null;
+        $this->benchmarkTable = null;
+        $this->benchmarkConnection = null;
     }
 
     /**
      * Start the benchmark.
      */
-    protected function startBenchmark(?string $table = null): void
+    protected function startBenchmark(?string $table = null, ?Connection $connection = null): void
     {
         if (! self::databaseIsAvailable()) {
             return;
@@ -46,14 +59,15 @@ trait HasBenchmark
         $this->benchmarkStartTime = microtime(true);
         $this->benchmarkTable = $table;
         $this->benchmarkStartMemory = memory_get_usage();
+        $this->benchmarkConnection = $connection ?? DB::connection();
 
         if (! in_array($table, [null, '', '0'], true)) {
-            $this->startRowCount = DB::table($table)->count();
+            $this->startRowCount = $this->benchmarkConnection->table($table)->count();
         }
 
-        DB::enableQueryLog();
+        $this->benchmarkConnection->enableQueryLog();
 
-        $this->startQueries = self::getQueryCount();
+        $this->startQueries = $this->getQueryCount($this->benchmarkConnection);
     }
 
     protected function stepBenchmark(): void
@@ -68,19 +82,21 @@ trait HasBenchmark
         try {
             if (isset($this->startQueries)) {
                 // Get row count after we've stopped tracking queries
-                $queriesCount = self::getQueryCount() - $this->startQueries + ($this->startQueries > 0 ? -1 : 0); // Subtract the Questions query itself
+                $queriesCount = $this->getQueryCount($this->benchmarkConnection) - $this->startQueries + ($this->startQueries > 0 ? -1 : 0); // Subtract the Questions query itself
             } else {
                 $queriesCount = 0;
             }
 
-            $rowDiff = $this->benchmarkTable && isset($this->startRowCount) ? DB::table($this->benchmarkTable)->count() - $this->startRowCount : 0;
+            $rowDiff = $this->benchmarkTable && isset($this->startRowCount) && $this->benchmarkConnection instanceof Connection
+                ? $this->benchmarkConnection->table($this->benchmarkTable)->count() - $this->startRowCount
+                : 0;
         } catch (Throwable) {
             $queriesCount = 0;
             $rowDiff = 0;
         }
 
-        if (self::databaseIsAvailable()) {
-            DB::flushQueryLog();
+        if ($this->benchmarkConnection instanceof Connection) {
+            $this->benchmarkConnection->flushQueryLog();
         }
 
         $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime);
@@ -89,7 +105,7 @@ trait HasBenchmark
     protected function stepBenchmarkAndRestart(): void
     {
         $this->stepBenchmark();
-        $this->startBenchmark();
+        $this->startBenchmark(connection: $this->benchmarkConnection);
     }
 
     /**
@@ -100,9 +116,23 @@ trait HasBenchmark
         $this->stepBenchmark();
 
         // $this->cancelBenchmark();
-        if (self::databaseIsAvailable()) {
-            DB::disableQueryLog();
+        if ($this->benchmarkConnection instanceof Connection) {
+            $this->benchmarkConnection->disableQueryLog();
         }
+    }
+
+    protected function getQueryCount(Connection $connection): int
+    {
+        return match ($connection->getDriverName()) {
+            'mysql', 'sqlite' => count($connection->getQueryLog()), // Requires Connection::enableQueryLog()
+            'pgsql' => (int) $connection->select(
+                'SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count',
+            )[0]->count,
+            'oracle' => (int) $connection->select(
+                "SELECT value AS count FROM v\$sesstat WHERE statistic# = (SELECT statistic# FROM v\$statname WHERE name = 'execute count') AND sid = (SELECT sid FROM v\$mystat WHERE ROWNUM = 1)",
+            )[0]->count ?? 0,
+            default => 0,
+        };
     }
 
     private static function databaseIsAvailable(): bool
@@ -112,20 +142,6 @@ trait HasBenchmark
         } catch (Throwable) {
             return false;
         }
-    }
-
-    private static function getQueryCount(): int
-    {
-        return match (DB::connection()->getDriverName()) {
-            'mysql', 'sqlite' => count(DB::getQueryLog()), // Requires DB::enableQueryLog()
-            'pgsql' => (int) DB::select(
-                'SELECT pg_stat_get_db_xact_commit(pg_backend_pid()) + pg_stat_get_db_xact_rollback(pg_backend_pid()) as count',
-            )[0]->count,
-            'oracle' => (int) DB::select(
-                "SELECT value AS count FROM v\$sesstat WHERE statistic# = (SELECT statistic# FROM v\$statname WHERE name = 'execute count') AND sid = (SELECT sid FROM v\$mystat WHERE ROWNUM = 1)",
-            )[0]->count ?? 0,
-            default => 0,
-        };
     }
 
     private static function formatTime(float $time): string

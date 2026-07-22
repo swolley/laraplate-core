@@ -9,11 +9,8 @@ use function Laravel\Prompts\confirm;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
@@ -44,16 +41,16 @@ final class ModelSoftDeletesRemoveCommand extends Command
         }
 
         $reflection = new ReflectionClass($model_class);
-        $instance = $reflection->newInstanceWithoutConstructor();
+        $instance = $this->instantiateModel($reflection);
 
-        if (! $instance instanceof Model) {
+        if ($instance === null) {
             $this->error(sprintf('Class %s is not an Eloquent model.', $model_class));
 
             return BaseCommand::INVALID;
         }
 
         $table = $instance->getTable();
-        $soft_deleted_count = $this->countSoftDeletedRows($table);
+        $soft_deleted_count = $this->countSoftDeletedRows($instance);
 
         if ($soft_deleted_count > 0) {
             $this->warn(sprintf('Found %d logical-deleted records on `%s`.', $soft_deleted_count, $table));
@@ -64,7 +61,7 @@ final class ModelSoftDeletesRemoveCommand extends Command
                 return BaseCommand::FAILURE;
             }
 
-            $purged = DB::table($table)->whereNotNull('deleted_at')->delete();
+            $purged = $instance->getConnection()->table($table)->whereNotNull('deleted_at')->delete();
             $this->info(sprintf('Purged %d record(s).', $purged));
         }
 
@@ -107,13 +104,27 @@ final class ModelSoftDeletesRemoveCommand extends Command
         return $namespace . '\\' . $model;
     }
 
-    private function countSoftDeletedRows(string $table): int
+    private function instantiateModel(ReflectionClass $reflection): ?Model
     {
-        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'deleted_at')) {
+        if (! $reflection->isSubclassOf(Model::class)) {
+            return null;
+        }
+
+        $instance = $reflection->newInstance();
+
+        return $instance instanceof Model ? $instance : null;
+    }
+
+    private function countSoftDeletedRows(Model $model): int
+    {
+        $table = $model->getTable();
+        $schema = $model->getConnection()->getSchemaBuilder();
+
+        if (! $schema->hasTable($table) || ! $schema->hasColumn($table, 'deleted_at')) {
             return 0;
         }
 
-        return (int) DB::table($table)->whereNotNull('deleted_at')->count();
+        return (int) $model->getConnection()->table($table)->whereNotNull('deleted_at')->count();
     }
 
     private function removeSoftDeletesTrait(ReflectionClass $reflection): bool
@@ -173,13 +184,16 @@ final class ModelSoftDeletesRemoveCommand extends Command
 
     private function upsertSoftDeletesSetting(string $table, bool $enabled): bool
     {
-        if (! Schema::hasTable(CoreTables::Settings->value)) {
+        $settings = new Setting;
+        $settings_table = $settings->getTable();
+
+        if (! $settings->getConnection()->getSchemaBuilder()->hasTable($settings_table)) {
             $this->warn('Settings table not found; runtime flag was not updated.');
 
             return false;
         }
 
-        Setting::query()->updateOrCreate(
+        $settings->newQuery()->updateOrCreate(
             ['name' => "soft_deletes_{$table}"],
             [
                 'value' => $enabled,
@@ -194,4 +208,3 @@ final class ModelSoftDeletesRemoveCommand extends Command
         return true;
     }
 }
-

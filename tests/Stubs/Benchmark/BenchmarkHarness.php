@@ -50,9 +50,18 @@ final class BenchmarkHarness extends Command
 
     public function testCancelBenchmark(): void
     {
-        $this->benchmarkStartTime = microtime(true);
+        $this->startBenchmark();
+        $connection = $this->benchmarkConnection;
+        $connection?->select('select 1');
+
+        expect($connection?->logging())->toBeTrue()
+            ->and($connection?->getQueryLog())->not->toBeEmpty();
+
         $this->cancelBenchmark();
-        expect($this->benchmarkStartTime)->toBeNull();
+
+        expect($this->benchmarkStartTime)->toBeNull()
+            ->and($connection?->logging())->toBeFalse()
+            ->and($connection?->getQueryLog())->toBeEmpty();
     }
 
     public function testStartEndWithoutTable(): void
@@ -73,6 +82,13 @@ final class BenchmarkHarness extends Command
         $this->endBenchmark();
     }
 
+    public function testStartEndWithConnection(Connection $connection): void
+    {
+        $this->startBenchmark('bench_affinity_rows', $connection);
+        $connection->table('bench_affinity_rows')->insert(['id' => 2]);
+        $this->endBenchmark();
+    }
+
     public function testStepBenchmarkWithoutStartIsNoOp(): void
     {
         $this->benchmarkStartTime = null;
@@ -89,9 +105,7 @@ final class BenchmarkHarness extends Command
 
     public function testGetQueryCountUsesSqliteBranch(): void
     {
-        $method = new ReflectionMethod(HasBenchmark::class, 'getQueryCount');
-        $method->setAccessible(true);
-        expect($method->invoke(null))->toBeInt();
+        expect($this->queryCountForTest(DB::connection()))->toBeInt();
     }
 
     public function testFormatTimeBranches(): void
@@ -170,9 +184,7 @@ final class BenchmarkHarness extends Command
         DB::swap(self::fakeDbManager($connection));
 
         try {
-            $method = new ReflectionMethod(HasBenchmark::class, 'getQueryCount');
-            $method->setAccessible(true);
-            expect($method->invoke(null))->toBe(0);
+            expect($this->queryCountForTest($connection))->toBe(0);
         } finally {
             DB::swap($original);
         }
@@ -188,9 +200,7 @@ final class BenchmarkHarness extends Command
         DB::swap(self::fakeDbManager($connection));
 
         try {
-            $method = new ReflectionMethod(HasBenchmark::class, 'getQueryCount');
-            $method->setAccessible(true);
-            expect($method->invoke(null))->toBe(11);
+            expect($this->queryCountForTest($connection))->toBe(11);
         } finally {
             DB::swap($original);
         }
@@ -206,11 +216,14 @@ final class BenchmarkHarness extends Command
         DB::swap(self::fakeDbManager($connection));
 
         try {
-            $method = new ReflectionMethod(HasBenchmark::class, 'getQueryCount');
-            $method->setAccessible(true);
-            expect($method->invoke(null))->toBe(4);
+            expect($this->queryCountForTest($connection))->toBe(4);
         } finally {
             DB::swap($original);
         }
+    }
+
+    private function queryCountForTest(Connection $connection): int
+    {
+        return $this->getQueryCount($connection);
     }
 }

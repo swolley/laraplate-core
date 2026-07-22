@@ -32,7 +32,9 @@ final class HandleLicensesCommand extends Command
     public function handle(): int
     {
         try {
-            return DB::transaction(function (): int {
+            $connection = (new License)->getConnection();
+
+            return $connection->transaction(function (): int {
                 $number = 0;
                 $valid_to = null;
 
@@ -101,8 +103,6 @@ final class HandleLicensesCommand extends Command
 
                         break;
                 }
-
-                DB::commit();
 
                 return BaseCommand::SUCCESS;
             });

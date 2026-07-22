@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
 use Illuminate\Container\Container;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\Concerns\HasBenchmark;
@@ -13,7 +15,6 @@ use Modules\Core\Tests\Stubs\Benchmark\BenchmarkHarness;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkSeederHarness;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
-
 
 function prepare_benchmark_command(BenchmarkHarness $command): void
 {
@@ -56,6 +57,38 @@ it('counts rows when benchmark table is set', function (): void {
     Log::shouldHaveReceived('debug');
 });
 
+it('keeps benchmark row counts and query logging on the supplied connection', function (): void {
+    config()->set('database.connections.benchmark_affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge('benchmark_affinity');
+    $connection = DB::connection('benchmark_affinity');
+
+    $connection->getSchemaBuilder()->create('bench_affinity_rows', function (Blueprint $table): void {
+        $table->id();
+    });
+    $connection->table('bench_affinity_rows')->insert(['id' => 1]);
+
+    Log::spy();
+    $cmd = new BenchmarkHarness;
+    $cmd->setLaravel($this->app);
+    prepare_benchmark_command($cmd);
+
+    try {
+        $cmd->testStartEndWithConnection($connection);
+
+        Log::shouldHaveReceived('debug')
+            ->once()
+            ->withArgs(fn (string $message): bool => str_contains($message, 'ROWS 1'));
+    } finally {
+        DB::disconnect('benchmark_affinity');
+        DB::purge('benchmark_affinity');
+    }
+});
+
 it('stepBenchmark returns early when not started', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
@@ -80,6 +113,10 @@ it('exposes sqlite query count and time formatting', function (): void {
     prepare_benchmark_command($cmd);
     $cmd->testGetQueryCountUsesSqliteBranch();
     $cmd->testFormatTimeBranches();
+});
+
+it('does not expose the query-count test helper in production', function (): void {
+    expect((new ReflectionClass(HasBenchmark::class))->hasMethod('queryCountFor'))->toBeFalse();
 });
 
 it('treats missing startQueries as zero in stepBenchmark', function (): void {

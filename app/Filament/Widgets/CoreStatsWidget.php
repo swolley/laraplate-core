@@ -10,6 +10,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Models\License;
 use Override;
 
 final class CoreStatsWidget extends BaseWidget
@@ -26,7 +27,7 @@ final class CoreStatsWidget extends BaseWidget
         $users_table = CoreTables::Users->value;
 
         $data = Cache::remember('filament.dashboard.core_stats', 60, static function () use ($licenses_table, $users_table): array {
-            $licenses = DB::table($licenses_table)->select([
+            $licenses = (new License)->getConnection()->table($licenses_table)->select([
                 DB::raw('count(*) as total'),
                 DB::raw("coalesce(sum(case when {$licenses_table}.valid_to >= now() or {$licenses_table}.valid_to is null then 1 else 0 end), 0) as active"),
                 DB::raw("coalesce(sum(case when {$users_table}.id is not null then 1 else 0 end), 0) as occupied"),

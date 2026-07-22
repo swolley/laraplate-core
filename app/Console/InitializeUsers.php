@@ -7,7 +7,6 @@ namespace Modules\Core\Console;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
@@ -32,7 +31,9 @@ class InitializeUsers extends Command
 
         $groups = Role::all()->keyBy('name');
 
-        DB::transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
+        $user = new $user_class();
+
+        $user->getConnection()->transaction(function () use ($admin, $root, $anonymous, $user_class, $groups): void {
             if (! $user_class::query()->where('name', $root)->exists()) {
                 $credentials = $this->promptRootUserCredentials();
                 $email = $credentials['email'];

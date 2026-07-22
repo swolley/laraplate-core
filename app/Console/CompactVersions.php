@@ -12,9 +12,9 @@ use function is_subclass_of;
 use Generator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;
@@ -102,7 +102,7 @@ final class CompactVersions extends Command
         $morph = $prototype->getMorphClass();
 
         $versions_table = CoreTables::Versions->value;
-        $refs = DB::table($versions_table)
+        $refs = $prototype->getConnection()->table($versions_table)
             ->whereNull('deleted_at')
             ->where('versionable_type', $morph)
             ->where('versionable_id', $id)
@@ -134,8 +134,13 @@ final class CompactVersions extends Command
      */
     private function iterateDistinctVersionTargets(?string $modelClass): Generator
     {
-        $versions_table = CoreTables::Versions->value;
-        $query = DB::table($versions_table)
+        $version = new Version;
+
+        if ($modelClass !== null) {
+            $version->setConnection((new $modelClass())->getConnectionName());
+        }
+
+        $query = $version->getConnection()->table($version->getTable())
             ->select(['versionable_type', 'versionable_id', 'connection_ref', 'table_ref'])
             ->whereNull('deleted_at')
             ->distinct()

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Grids\Traits;
 
-use Modules\Core\Exceptions\AmbiguousModelException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Exceptions\AmbiguousModelException;
 use Modules\Core\Grids\Components\Grid;
 use Modules\Core\Grids\Definitions\PivotRelationInfo;
 use Modules\Core\Grids\Definitions\RelationInfo;
@@ -42,21 +41,24 @@ trait HasGridUtils
                 ),
         );
 
-        DB::beginTransaction();
+        $connection = $instance->getConnection();
+        $connection->beginTransaction();
 
         /** @var array<string, RelationInfo> $relations */
         $relations = [];
 
-        foreach ($methods as $method) {
-            $methodName = $method->getName();
-            $relation = static::getRelationData($instance, $methodName);
+        try {
+            foreach ($methods as $method) {
+                $methodName = $method->getName();
+                $relation = static::getRelationData($instance, $methodName);
 
-            if ($relation) {
-                $relations[$methodName] = $relation;
+                if ($relation) {
+                    $relations[$methodName] = $relation;
+                }
             }
+        } finally {
+            $connection->rollBack();
         }
-
-        DB::rollBack();
 
         return $relations;
     }

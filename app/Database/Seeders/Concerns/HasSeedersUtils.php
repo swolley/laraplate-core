@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use LogicException;
 use Modules\Core\Models\Concerns\HasApprovals;
 use ReflectionClass;
 
@@ -125,15 +125,29 @@ trait HasSeedersUtils
             $models[] = $model;
         }
 
-        // Esegui una singola query di insert
-        $class::query()->insert($records);
+        $connection = $models[0]->getConnection();
 
-        // Se il model ha un incrementing ID, aggiorna gli ID dei model
+        foreach ($models as $model) {
+            if ($connection !== $model->getConnection()) {
+                throw new LogicException('All models must use the same resolved database connection.');
+            }
+        }
+
         if ($models[0]->getIncrementing()) {
-            $firstId = DB::getPdo()->lastInsertId();
+            $connection->transaction(function () use ($models, $records): void {
+                foreach ($models as $index => $model) {
+                    $id = $model->newQuery()->insertGetId($records[$index], $model->getKeyName());
 
-            foreach ($models as $index => $model) {
-                $model->setAttribute($model->getKeyName(), $firstId + $index);
+                    $model->setAttribute($model->getKeyName(), $id);
+                    $model->exists = true;
+                    $model->syncOriginal();
+                }
+            });
+        } else {
+            $models[0]->newQuery()->insert($records);
+
+            foreach ($models as $model) {
+                $model->exists = true;
                 $model->syncOriginal();
             }
         }

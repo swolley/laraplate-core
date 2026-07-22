@@ -12,10 +12,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation as EloquentRelation;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\LazyCollection;
-use Modules\Core\Cache\Repository as CacheRepository;
-use Modules\Core\Casts\Filter;
-use Modules\Core\Casts\FiltersGroup;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,12 +22,15 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Concurrency;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Cache\Repository as CacheRepository;
+use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Grids\Casts\GridAction;
 use Modules\Core\Grids\Casts\GridRequestData;
 use Modules\Core\Grids\Definitions\Entity;
@@ -47,6 +46,7 @@ use PHPUnit\Framework\Exception;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\UnknownClassOrInterfaceException;
 use RuntimeException;
+use stdClass;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
 use Throwable;
@@ -78,8 +78,6 @@ final class Grid extends Entity
     }
 
     /**
-     * @return array{fields: array<string, array<string, mixed>>}
-     *
      * @throws \Exception
      * @throws Exception
      * @throws ExpectationFailedException
@@ -87,6 +85,8 @@ final class Grid extends Entity
      * @throws DBALException
      * @throws UnexpectedValueException
      * @throws InvalidArgumentException
+     *
+     * @return array{fields: array<string, array<string, mixed>>}
      */
     public function getConfigs(): array
     {
@@ -242,7 +242,7 @@ final class Grid extends Entity
             }
         }
 
-        if (($filters = $this->requestData->filters) instanceof \Modules\Core\Casts\FiltersGroup) {
+        if (($filters = $this->requestData->filters) instanceof FiltersGroup) {
             foreach (array_keys($filters->filters) as $column) {
                 $this->appendFieldIntoList($necessary_fields, $column, true);
             }
@@ -299,6 +299,7 @@ final class Grid extends Entity
 
                 $necessary_fields = array_filter($necessary_fields, fn (Field|string $name): bool => ! $this->hasField($name), ARRAY_FILTER_USE_KEY);
                 $this->initFieldsByConfigs($necessary_fields);
+
                 /** @var array<string, Closure(Model): Field> $field_generators */
                 $field_generators = $necessary_fields;
                 $generated_fields = array_map(fn (Closure $generator): Field => $generator($this->getModel()), $field_generators);
@@ -460,6 +461,7 @@ final class Grid extends Entity
         $this->addAppendFieldsToDefaults($all_fields);
         $this->addNecessaryFields($all_fields);
         $this->initFieldsByConfigs($all_fields);
+
         /** @var array<string, Closure(Model): Field> $field_generators */
         $field_generators = $all_fields;
         $generated_fields = array_map(fn (Closure $generator): Field => $generator($this->getModel()), $field_generators);
@@ -558,6 +560,7 @@ final class Grid extends Entity
             if (! is_string($name)) {
                 continue;
             }
+
             if (! array_key_exists($name, $allFields)) {
                 $allFields[lcfirst($this->getModelName()) . '.' . $name] = ['validation' => [], 'readable' => true, 'writable' => false];
             }
@@ -863,7 +866,8 @@ final class Grid extends Entity
      */
     private function checkGridLayoutsTableExists(): bool
     {
-        $exists = SchemaInspector::getInstance()->hasTable(self::LAYOUTS_TABLE);
+        $connection = $this->getModel()->getConnection()->getName();
+        $exists = SchemaInspector::getInstance()->hasTable(self::LAYOUTS_TABLE, $connection);
 
         if (! $exists) {
             Log::warning('No ' . self::LAYOUTS_TABLE . ' table found');
@@ -873,7 +877,7 @@ final class Grid extends Entity
     }
 
     /**
-     * @return Collection<int, \stdClass>
+     * @return Collection<int, stdClass>
      */
     private function getUserLayouts(): Collection
     {
@@ -881,7 +885,7 @@ final class Grid extends Entity
             return new Collection();
         }
 
-        return DB::table(self::LAYOUTS_TABLE)->where(function (\Illuminate\Database\Query\Builder $query): void {
+        return $this->getModel()->getConnection()->table(self::LAYOUTS_TABLE)->where(function (\Illuminate\Database\Query\Builder $query): void {
             $user = Auth::user();
 
             if ($user) {
@@ -1208,7 +1212,6 @@ final class Grid extends Entity
 
     private function createRecord(): bool
     {
-        // DB::beginTransaction();
         $primary_key = $this->getPrimaryKey();
         $primary_value = is_string($primary_key) ? $this->requestData->request->get($primary_key) : array_map($this->requestData->request->get(...), $primary_key);
 
@@ -1230,10 +1233,8 @@ final class Grid extends Entity
 
         if ($created = $this->getModel()->insert($data)) {
             // $records_total = $this->setModifiedData(collect([$created]), Response::HTTP_CREATED);
-            // DB::commit();
         }
 
-        // DB::rollBack();
         // $this->setNotModifiedData();
 
         throw new BadMethodCallException('Not implemented');
@@ -1349,7 +1350,7 @@ final class Grid extends Entity
      */
     private function resolveRelationshipDeeply(string $relation): array|false
     {
-        if (! Grid::useGridUtils($this->getModel())) {
+        if (! self::useGridUtils($this->getModel())) {
             return false;
         }
 

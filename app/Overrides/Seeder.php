@@ -6,7 +6,6 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Seeder as BaseSeeder;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Database\Seeders\Concerns\HasSeedersUtils;
 use Modules\Core\Models\Setting;
@@ -72,7 +71,7 @@ class Seeder extends BaseSeeder
             return;
         }
 
-        DB::transaction(function () use ($newDefinitions): void {
+        (new Setting)->getConnection()->transaction(function () use ($newDefinitions): void {
             foreach ($newDefinitions as $definition) {
                 Setting::factory()->persistedWithoutApprovalCapture()->create($definition);
                 $this->command?->line("    - {$definition['name']} <fg=green>created</>");

@@ -34,6 +34,8 @@ abstract class BatchSeeder extends Seeder
 
     private const int RETRY_DELAY = 1; // seconds
 
+    private ?string $childDatabaseConnectionName = null;
+
     /**
      * Put the logic of the seeder here.
      */
@@ -68,17 +70,20 @@ abstract class BatchSeeder extends Seeder
      *
      * Forked workers inherit a copy of this seeder instance (including HasBenchmark
      * state). Child processes share STDOUT with the parent; without cancelling the
-     * benchmark here, {@see \Modules\Core\Overrides\Seeder::__destruct} could emit
+     * benchmark here, {@see Seeder::__destruct} could emit
      * duplicate benchmark lines (one per worker) when the child exits.
      *
-     * Sets {@see \Modules\Core\Overrides\Seeder::PARALLEL_BATCH_WORKER_ENV} so the
+     * Sets {@see Seeder::PARALLEL_BATCH_WORKER_ENV} so the
      * destructor can skip benchmark output even if timing state was inconsistent.
      */
     protected function bootstrapChildProcess(): void
     {
         putenv(self::PARALLEL_BATCH_WORKER_ENV . '=1');
         $this->cancelBenchmark();
-        DB::reconnect();
+
+        if ($this->childDatabaseConnectionName !== null) {
+            DB::reconnect($this->childDatabaseConnectionName);
+        }
     }
 
     /**
@@ -157,8 +162,9 @@ abstract class BatchSeeder extends Seeder
     ): int {
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
-        $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
-        $db_connection_name = new $modelClass()->getConnectionName() ?? config('database.default');
+        $model = new $modelClass();
+        $entity_name = $model->getTable();
+        $db_connection_name = $model->getConnection()->getName();
 
         if ($count_to_create <= 0) {
             $this->command->info($entity_name . ' already at target count.');
@@ -168,6 +174,7 @@ abstract class BatchSeeder extends Seeder
 
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
+        $this->childDatabaseConnectionName = $db_connection_name;
 
         $tasks = $this->buildSeederTasks($modelClass, $count_to_create, $effective_batch_size, $total_batches);
 
@@ -321,8 +328,9 @@ abstract class BatchSeeder extends Seeder
             return;
         }
 
+        $model = new $modelClass();
         $connections = [
-            'database' => new $modelClass()->getConnectionName() ?? config('database.default'),
+            'database' => $model->getConnection()->getName(),
             'cache' => $this->getCacheConnectionName($modelClass),
         ];
 
@@ -432,9 +440,9 @@ abstract class BatchSeeder extends Seeder
             'database.connections.' . $tmp_connection_name => config('database.connections.' . $connection_name),
         ]);
 
-        DB::purge();
+        DB::purge($tmp_connection_name);
         DB::setDefaultConnection($tmp_connection_name);
-        DB::reconnect();
+        DB::reconnect($tmp_connection_name);
 
         return $tmp_connection_name;
     }

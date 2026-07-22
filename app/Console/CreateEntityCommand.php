@@ -10,7 +10,6 @@ use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
@@ -51,13 +50,13 @@ final class CreateEntityCommand extends Command
      */
     public function handle(): void
     {
-        DB::transaction(function (): void {
-            $module = $this->resolveModule();
+        $module = $this->resolveModule();
 
-            /** @var class-string<Entity> $entity_model_class */
-            $entity_model_class = "Modules\\{$module}\\Models\\Entity";
-            $entity = new $entity_model_class();
+        /** @var class-string<Entity> $entity_model_class */
+        $entity_model_class = "Modules\\{$module}\\Models\\Entity";
+        $entity = new $entity_model_class();
 
+        $entity->getConnection()->transaction(function () use ($entity, $entity_model_class): void {
             /** @var class-string<IDynamicEntityTypable> $entity_type_class */
             $entity_type_class = $this->resolveEntityTypeClass($entity_model_class);
 

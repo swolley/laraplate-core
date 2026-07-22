@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Illuminate\Container\Container;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 use Nwidart\Modules\Module;
@@ -49,8 +48,6 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     public static function checkSettingTable(): bool
     {
-        $settings_table = CoreTables::Settings->value;
-
         try {
             $cache_key = 'modules_db_activator_checked';
 
@@ -59,7 +56,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             }
 
             // Cached "table exists" can be stale after migrate:fresh / drop-all; always verify.
-            if (Cache::get($cache_key) === true && Schema::hasTable($settings_table)) {
+            [$settings_table, $connection] = self::settingsTableAndConnection();
+
+            if (Cache::get($cache_key) === true && $connection->getSchemaBuilder()->hasTable($settings_table)) {
                 return true;
             }
 
@@ -67,7 +66,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 Cache::forget($cache_key);
             }
 
-            if (! Schema::hasTable($settings_table)) {
+            if (! $connection->getSchemaBuilder()->hasTable($settings_table)) {
                 return false;
             }
 
@@ -181,13 +180,30 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
+     * @return array{string, Connection}
+     */
+    private static function settingsTableAndConnection(): array
+    {
+        $model = self::$MODEL_NAME;
+        $prototype = new $model();
+
+        /** @var DatabaseManager $database_manager */
+        $database_manager = app()->make('db');
+
+        return [
+            $prototype->getTable(),
+            $database_manager->connection($prototype->getConnectionName()),
+        ];
+    }
+
+    /**
      * Ensures the backendModules row exists (query builder only, no Eloquent).
      */
     private function ensureBackendModulesRecord(): void
     {
-        $settings_table = CoreTables::Settings->value;
+        [$settings_table, $connection] = self::settingsTableAndConnection();
 
-        $exists = DB::table($settings_table)
+        $exists = $connection->table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->exists();
@@ -199,7 +215,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $all_modules = self::getAllModulesNames();
         $now = now();
 
-        DB::table($settings_table)->insertOrIgnore([
+        $connection->table($settings_table)->insertOrIgnore([
             'name' => self::$RECORD_NAME,
             'value' => json_encode($all_modules),
             'choices' => json_encode($all_modules),
@@ -216,9 +232,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     private function updateRecordValue(array $value): void
     {
-        $settings_table = CoreTables::Settings->value;
+        [$settings_table, $connection] = self::settingsTableAndConnection();
 
-        DB::table($settings_table)
+        $connection->table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->update([
@@ -232,13 +248,13 @@ final class ModuleDatabaseActivator implements ActivatorInterface
      */
     private function readSettings(): array
     {
-        $settings_table = CoreTables::Settings->value;
+        [$settings_table, $connection] = self::settingsTableAndConnection();
 
-        if (! Schema::hasTable($settings_table)) {
+        if (! $connection->getSchemaBuilder()->hasTable($settings_table)) {
             return self::getAllModulesNames();
         }
 
-        $raw = DB::table($settings_table)
+        $raw = $connection->table($settings_table)
             ->where('name', self::$RECORD_NAME)
             ->whereNull('deleted_at')
             ->value('value');
