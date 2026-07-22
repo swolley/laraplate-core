@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,9 +18,11 @@ use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\Exceptions\DirtyActiveVersionSetRootException;
 use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
 use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
+use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -31,6 +34,14 @@ final class VersionSetManagerArticle extends Model
     protected $table = self::TABLE;
 
     protected $guarded = [];
+
+    /**
+     * @return HasMany<VersionSetManagerArticle>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
 }
 
 final class VersionSetManagerUuidArticle extends Model
@@ -70,6 +81,7 @@ final class ObserveVersionSetStateJob implements ShouldQueue
 beforeEach(function (): void {
     Schema::create(VersionSetManagerArticle::TABLE, function (Blueprint $table): void {
         $table->id();
+        $table->unsignedBigInteger('parent_id')->nullable();
         $table->string('title');
         $table->string('status')->default('draft');
         $table->timestamps();
@@ -196,6 +208,30 @@ it('synchronizes the root from its locked snapshot while preserving intentional 
     );
 });
 
+it('invalidates relations loaded before locking and reloads their current state', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Root']);
+    VersionSetManagerArticle::query()->create([
+        'parent_id' => $article->getKey(),
+        'title' => 'First child',
+    ]);
+    $stale = $article->fresh()->load('children');
+    VersionSetManagerArticle::query()->create([
+        'parent_id' => $article->getKey(),
+        'title' => 'Second child',
+    ]);
+
+    expect($stale->relationLoaded('children'))->toBeTrue()
+        ->and($stale->children)->toHaveCount(1);
+
+    app(VersionSetManagerInterface::class)->run(
+        VersionSetRoot::forModel($stale),
+        function () use ($stale): void {
+            expect($stale->relationLoaded('children'))->toBeFalse()
+                ->and($stale->children)->toHaveCount(2);
+        },
+    );
+});
+
 it('commits business data and one version set on the root connection', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
     $manager = app(VersionSetManagerInterface::class);
@@ -302,6 +338,71 @@ it('accepts semantically equivalent explicit options in a nested scope', functio
     );
 
     expect($nested_ran)->toBeTrue();
+});
+
+it('synchronizes a distinct nested root instance while preserving only its intentional dirty values', function (): void {
+    $article = VersionSetManagerArticle::query()->create([
+        'title' => 'Before',
+        'status' => 'draft',
+    ]);
+    VersionSetManagerArticle::query()->create([
+        'parent_id' => $article->getKey(),
+        'title' => 'First child',
+    ]);
+    $nested_root = $article->fresh()->load('children');
+    $nested_root->setAttribute('status', 'review');
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($article), function () use (
+        $article,
+        $manager,
+        $nested_root,
+    ): void {
+        $article->updateOrFail([
+            'title' => 'Outer current',
+            'status' => 'published',
+        ]);
+        VersionSetManagerArticle::query()->create([
+            'parent_id' => $article->getKey(),
+            'title' => 'Second child',
+        ]);
+
+        $manager->run(VersionSetRoot::forModel($nested_root), function () use ($nested_root): void {
+            expect($nested_root->title)->toBe('Outer current')
+                ->and($nested_root->getRawOriginal('title'))->toBe('Outer current')
+                ->and($nested_root->isDirty('title'))->toBeFalse()
+                ->and($nested_root->status)->toBe('review')
+                ->and($nested_root->getRawOriginal('status'))->toBe('published')
+                ->and($nested_root->isDirty('status'))->toBeTrue()
+                ->and($nested_root->relationLoaded('children'))->toBeFalse()
+                ->and($nested_root->children)->toHaveCount(2);
+        });
+    });
+});
+
+it('rejects a distinct nested instance while the active root has unsaved changes', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $nested_root = $article->fresh();
+    $manager = app(VersionSetManagerInterface::class);
+    $nested_ran = false;
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function () use ($article, $manager, $nested_root, &$nested_ran): void {
+            $article->setAttribute('title', 'Unsaved outer change');
+
+            $manager->run(
+                VersionSetRoot::forModel($nested_root),
+                function () use (&$nested_ran): void {
+                    $nested_ran = true;
+                },
+            );
+        },
+    ))->toThrow(DirtyActiveVersionSetRootException::class);
+
+    expect($nested_ran)->toBeFalse()
+        ->and($article->fresh()->title)->toBe('Before')
+        ->and($manager->current())->toBeNull();
 });
 
 it('rejects differing explicit options in a nested scope before its operation runs', function (): void {
@@ -512,6 +613,89 @@ it('rolls back when a saved version sequence is left unconfirmed', function (): 
     expect($article->fresh()->title)->toBe('Before')
         ->and(VersionSet::query()->count())->toBe(0)
         ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and($manager->current())->toBeNull();
+});
+
+it('rolls back when a confirmed sequence has no corresponding version row', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            recordManagerTestVersion($active, $article);
+            $active->nextSequence();
+            $active->markVersionWritten();
+        },
+    ))->toThrow(VersionSequenceMismatchException::class);
+
+    expect($article->fresh()->title)->toBe('Before')
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and($manager->current())->toBeNull();
+});
+
+it('rolls back when an extra version row has no confirmed sequence', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            recordManagerTestVersion($active, $article);
+
+            $version = new Version;
+            $version->setConnection($active->connectionName());
+            $version->forceFill([
+                'version_set_id' => $active->versionSet()->getKey(),
+                'sequence' => 2,
+                'change_type' => VersionChangeType::Updated,
+                'versionable_type' => $article->getMorphClass(),
+                'versionable_id' => $article->getKey(),
+                'original_contents' => ['title' => 'After'],
+                'contents' => ['title' => 'Unexpected'],
+                'version_strategy' => VersionStrategy::DIFF,
+            ])->saveOrFail();
+        },
+    ))->toThrow(VersionSequenceMismatchException::class);
+
+    expect($article->fresh()->title)->toBe('Before')
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and($manager->current())->toBeNull();
+});
+
+it('counts a soft deleted extra row as an unconfirmed persisted sequence', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            recordManagerTestVersion($active, $article);
+
+            $version = new Version;
+            $version->setConnection($active->connectionName());
+            $version->forceFill([
+                'version_set_id' => $active->versionSet()->getKey(),
+                'sequence' => 2,
+                'change_type' => VersionChangeType::Updated,
+                'versionable_type' => $article->getMorphClass(),
+                'versionable_id' => $article->getKey(),
+                'original_contents' => ['title' => 'After'],
+                'contents' => ['title' => 'Unexpected'],
+                'version_strategy' => VersionStrategy::DIFF,
+            ])->saveOrFail();
+            $version->deleteOrFail();
+        },
+    ))->toThrow(VersionSequenceMismatchException::class);
+
+    expect($article->fresh()->title)->toBe('Before')
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::withTrashed()->whereNotNull('version_set_id')->count())->toBe(0)
         ->and($manager->current())->toBeNull();
 });
 

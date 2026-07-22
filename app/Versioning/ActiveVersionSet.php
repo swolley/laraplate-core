@@ -9,6 +9,7 @@ use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
 use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
+use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 
 final class ActiveVersionSet
 {
@@ -158,7 +159,19 @@ final class ActiveVersionSet
             return;
         }
 
-        if (! $this->version_written || ! $this->version_set->versions()->exists()) {
+        $persisted_sequences = $this->version_set->versions()
+            ->withTrashed()
+            ->pluck('sequence')
+            ->map(static fn (mixed $sequence): int => (int) $sequence)
+            ->values()
+            ->all();
+        $confirmed_sequences = $this->sequence === 0 ? [] : range(1, $this->sequence);
+
+        if ($persisted_sequences !== $confirmed_sequences) {
+            throw new VersionSequenceMismatchException($confirmed_sequences, $persisted_sequences);
+        }
+
+        if (! $this->version_written) {
             $this->version_set->deleteOrFail();
             $this->version_set = null;
 
