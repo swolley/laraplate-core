@@ -29,6 +29,7 @@ enum CoreTables: string
     // generic or vendors models
     case Roles = 'vend_roles';
     case Permissions = 'vend_permissions';
+    case VersionSets = 'vend_versions_sets';
     case Versions = 'vend_versions';
     case Modifications = 'vend_modifications';
     case Approvals = 'vend_approvals';

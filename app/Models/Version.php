@@ -7,9 +7,11 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Date;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Enums\VersionChangeType;
 use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -96,6 +98,14 @@ final class Version extends OvertrueVersion
         return $this->version_strategy instanceof VersionStrategy
             ? $this->version_strategy
             : VersionStrategy::DIFF;
+    }
+
+    /**
+     * @return BelongsTo<VersionSet, Version>
+     */
+    public function versionSet(): BelongsTo
+    {
+        return $this->belongsTo(VersionSet::class);
     }
 
     /**
@@ -228,8 +238,10 @@ final class Version extends OvertrueVersion
     protected function casts(): array
     {
         return [
+            'change_type' => VersionChangeType::class,
             'contents' => 'json',
             'original_contents' => 'json',
+            'subject_key' => 'json',
             'version_strategy' => VersionStrategy::class,
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
