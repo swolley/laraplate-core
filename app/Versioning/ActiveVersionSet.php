@@ -8,6 +8,7 @@ use LogicException;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
 
 final class ActiveVersionSet
 {
@@ -149,6 +150,10 @@ final class ActiveVersionSet
 
     public function finish(): void
     {
+        if ($this->sequence_allocated) {
+            throw new PendingVersionSequenceException;
+        }
+
         if (! $this->version_set instanceof VersionSet) {
             return;
         }

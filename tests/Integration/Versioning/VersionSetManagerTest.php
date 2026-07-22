@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Models\Version;
@@ -16,7 +17,10 @@ use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
+use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
+use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
@@ -42,6 +46,17 @@ final class VersionSetManagerUuidArticle extends Model
     protected $guarded = [];
 }
 
+final class VersionSetManagerAffinityArticle extends Model
+{
+    public const string TABLE = 'core_test_affinity_version_set_articles';
+
+    protected $connection = 'version_set_affinity';
+
+    protected $table = self::TABLE;
+
+    protected $guarded = [];
+}
+
 final class ObserveVersionSetStateJob implements ShouldQueue
 {
     public static ?bool $sawActiveSet = null;
@@ -56,6 +71,7 @@ beforeEach(function (): void {
     Schema::create(VersionSetManagerArticle::TABLE, function (Blueprint $table): void {
         $table->id();
         $table->string('title');
+        $table->string('status')->default('draft');
         $table->timestamps();
     });
 
@@ -72,15 +88,68 @@ beforeEach(function (): void {
         'foreign_key_constraints' => true,
     ]);
     DB::purge('version_set_affinity');
+    createManagerTestAffinitySchema();
     ObserveVersionSetStateJob::$sawActiveSet = null;
 });
 
 afterEach(function (): void {
     Schema::dropIfExists(VersionSetManagerUuidArticle::TABLE);
     Schema::dropIfExists(VersionSetManagerArticle::TABLE);
+    Schema::connection('version_set_affinity')->dropIfExists(CoreTables::Versions->value);
+    Schema::connection('version_set_affinity')->dropIfExists(CoreTables::VersionSets->value);
+    Schema::connection('version_set_affinity')->dropIfExists(VersionSetManagerAffinityArticle::TABLE);
     DB::disconnect('version_set_affinity');
     DB::purge('version_set_affinity');
 });
+
+function createManagerTestAffinitySchema(): void
+{
+    $schema = Schema::connection('version_set_affinity');
+
+    $schema->create(VersionSetManagerAffinityArticle::TABLE, function (Blueprint $table): void {
+        $table->id();
+        $table->string('title');
+        $table->timestamps();
+    });
+
+    $schema->create(CoreTables::VersionSets->value, function (Blueprint $table): void {
+        $table->id();
+        $table->uuid('uuid')->unique();
+        $table->string('root_type')->nullable();
+        $table->string('root_id')->nullable();
+        $table->string('root_connection_ref')->nullable();
+        $table->string('root_table_ref')->nullable();
+        $table->unsignedBigInteger(config('versionable.user_foreign_key', 'user_id'))->nullable();
+        $table->string('kind');
+        $table->string('reason')->nullable();
+        $table->unsignedBigInteger('reverted_from_set_id')->nullable();
+        $table->timestamps();
+    });
+
+    $schema->create(CoreTables::Versions->value, function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('version_set_id')->nullable();
+        $table->unsignedInteger('sequence')->nullable();
+        $table->string('change_type')->nullable();
+        $table->string('relation_path')->nullable();
+        $table->json('subject_key')->nullable();
+        $table->string('connection_ref')->nullable();
+        $table->string('table_ref')->nullable();
+        $table->unsignedBigInteger(config('versionable.user_foreign_key', 'user_id'))->nullable();
+        $table->unsignedBigInteger('versionable_id');
+        $table->string('versionable_type');
+        $table->json('original_contents')->nullable();
+        $table->json('contents')->nullable();
+        $table->string('version_strategy');
+        $table->timestamps();
+        $table->softDeletes();
+        $table->unique(['version_set_id', 'sequence']);
+        $table->foreign('version_set_id')
+            ->references('id')
+            ->on(CoreTables::VersionSets->value)
+            ->cascadeOnDelete();
+    });
+}
 
 function recordManagerTestVersion(ActiveVersionSet $active, Model $root): Version
 {
@@ -101,6 +170,31 @@ function recordManagerTestVersion(ActiveVersionSet $active, Model $root): Versio
 
     return $version;
 }
+
+it('synchronizes the root from its locked snapshot while preserving intentional dirty values', function (): void {
+    $article = VersionSetManagerArticle::query()->create([
+        'title' => 'Before',
+        'status' => 'draft',
+    ]);
+    $stale = $article->fresh();
+    VersionSetManagerArticle::query()->whereKey($article)->update([
+        'title' => 'Concurrent',
+        'status' => 'published',
+    ]);
+    $stale->setAttribute('status', 'review');
+
+    app(VersionSetManagerInterface::class)->run(
+        VersionSetRoot::forModel($stale),
+        function () use ($stale): void {
+            expect($stale->title)->toBe('Concurrent')
+                ->and($stale->getRawOriginal('title'))->toBe('Concurrent')
+                ->and($stale->status)->toBe('review')
+                ->and($stale->getRawOriginal('status'))->toBe('published')
+                ->and($stale->isDirty('status'))->toBeTrue()
+                ->and($stale->isDirty('title'))->toBeFalse();
+        },
+    );
+});
 
 it('commits business data and one version set on the root connection', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
@@ -187,6 +281,50 @@ it('joins nested calls for the same root and allocates one ordered set', functio
         ->and($manager->current())->toBeNull();
 });
 
+it('accepts semantically equivalent explicit options in a nested scope', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+    $outer_options = new VersionSetOptions(reason: 'nested', actor: 42);
+    $nested_ran = false;
+
+    $manager->run(
+        VersionSetRoot::forModel($article),
+        function () use ($article, $manager, &$nested_ran): void {
+            $manager->run(
+                VersionSetRoot::forModel($article),
+                function () use (&$nested_ran): void {
+                    $nested_ran = true;
+                },
+                new VersionSetOptions(reason: 'nested', actor: 42),
+            );
+        },
+        $outer_options,
+    );
+
+    expect($nested_ran)->toBeTrue();
+});
+
+it('rejects differing explicit options in a nested scope before its operation runs', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+    $nested_ran = false;
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        fn () => $manager->run(
+            VersionSetRoot::forModel($article),
+            function () use (&$nested_ran): void {
+                $nested_ran = true;
+            },
+            new VersionSetOptions(reason: 'different'),
+        ),
+        new VersionSetOptions(reason: 'outer'),
+    ))->toThrow(VersionSetOptionsMismatchException::class);
+
+    expect($nested_ran)->toBeFalse()
+        ->and($manager->current())->toBeNull();
+});
+
 it('rejects a nested different root before its operation runs', function (): void {
     $first = VersionSetManagerArticle::query()->create(['title' => 'First']);
     $second = VersionSetManagerArticle::query()->create(['title' => 'Second']);
@@ -259,6 +397,65 @@ it('persists revert metadata on the new forward version set', function (): void 
         ->and($revert->revertedFrom->is($target))->toBeTrue();
 });
 
+it('rejects an integer revert target owned by another root', function (): void {
+    $source = VersionSetManagerArticle::query()->create(['title' => 'Source']);
+    $other = VersionSetManagerArticle::query()->create(['title' => 'Other']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($source), function (ActiveVersionSet $active) use ($source): void {
+        $source->updateOrFail(['title' => 'Source changed']);
+        recordManagerTestVersion($active, $source);
+    });
+    $target_id = VersionSet::query()->sole()->getKey();
+    $operation_ran = false;
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($other),
+        function () use (&$operation_ran): void {
+            $operation_ran = true;
+        },
+        new VersionSetOptions(kind: VersionSetKind::Revert, revertedFrom: $target_id),
+    ))->toThrow(InvalidRevertedVersionSetException::class);
+
+    expect($operation_ran)->toBeFalse()
+        ->and(VersionSet::query()->count())->toBe(1);
+});
+
+it('rejects a revert model loaded from another connection despite a matching local id', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($article), function (ActiveVersionSet $active) use ($article): void {
+        $article->updateOrFail(['title' => 'After']);
+        recordManagerTestVersion($active, $article);
+    });
+    $local_target = VersionSet::query()->sole();
+
+    $foreign_target = new VersionSet;
+    $foreign_target->setConnection('version_set_affinity');
+    $foreign_target->forceFill([
+        'id' => $local_target->getKey(),
+        'uuid' => (string) Str::uuid(),
+        'root_type' => $local_target->root_type,
+        'root_id' => $local_target->root_id,
+        'root_connection_ref' => $local_target->root_connection_ref,
+        'root_table_ref' => $local_target->root_table_ref,
+        'kind' => VersionSetKind::Change,
+    ])->saveOrFail();
+    $operation_ran = false;
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function () use (&$operation_ran): void {
+            $operation_ran = true;
+        },
+        new VersionSetOptions(kind: VersionSetKind::Revert, revertedFrom: $foreign_target),
+    ))->toThrow(InvalidRevertedVersionSetException::class);
+
+    expect($operation_ran)->toBeFalse()
+        ->and(VersionSet::query()->count())->toBe(1);
+});
+
 it('does not persist a set for an empty scope', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
     $manager = app(VersionSetManagerInterface::class);
@@ -282,6 +479,77 @@ it('removes a lazily materialized set when no version row was written', function
         ->and($manager->current())->toBeNull();
 });
 
+it('rolls back when a saved version sequence is left unconfirmed', function (): void {
+    $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            $version_set = $active->versionSet();
+            $version = new Version;
+            $version->setConnection($active->connectionName());
+            $version->forceFill([
+                'version_set_id' => $version_set->getKey(),
+                'sequence' => $active->nextSequence(),
+                'change_type' => VersionChangeType::Updated,
+                'versionable_type' => $article->getMorphClass(),
+                'versionable_id' => $article->getKey(),
+                'original_contents' => ['title' => 'Before'],
+                'contents' => ['title' => 'After'],
+                'version_strategy' => VersionStrategy::DIFF,
+            ])->saveOrFail();
+
+            try {
+                throw new RuntimeException('intercepted after save');
+            } catch (RuntimeException) {
+                // The missing mark must still invalidate the outer scope.
+            }
+        },
+    ))->toThrow(PendingVersionSequenceException::class);
+
+    expect($article->fresh()->title)->toBe('Before')
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and($manager->current())->toBeNull();
+});
+
+it('commits root set and version rows on a real secondary connection', function (): void {
+    $article = VersionSetManagerAffinityArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($article), function (ActiveVersionSet $active) use ($article): void {
+        $article->updateOrFail(['title' => 'After']);
+        recordManagerTestVersion($active, $article);
+    });
+
+    expect(VersionSetManagerAffinityArticle::query()->sole()->title)->toBe('After')
+        ->and(VersionSet::on('version_set_affinity')->count())->toBe(1)
+        ->and(Version::on('version_set_affinity')->count())->toBe(1)
+        ->and(VersionSet::query()->count())->toBe(0)
+        ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0);
+});
+
+it('rolls back root set and version rows on a real secondary connection', function (): void {
+    $article = VersionSetManagerAffinityArticle::query()->create(['title' => 'Before']);
+    $manager = app(VersionSetManagerInterface::class);
+
+    expect(fn () => $manager->run(
+        VersionSetRoot::forModel($article),
+        function (ActiveVersionSet $active) use ($article): void {
+            $article->updateOrFail(['title' => 'After']);
+            recordManagerTestVersion($active, $article);
+
+            throw new RuntimeException('abort affinity');
+        },
+    ))->toThrow(RuntimeException::class, 'abort affinity');
+
+    expect(VersionSetManagerAffinityArticle::query()->sole()->title)->toBe('Before')
+        ->and(VersionSet::on('version_set_affinity')->count())->toBe(0)
+        ->and(Version::on('version_set_affinity')->count())->toBe(0);
+});
+
 it('rejects a second pre-enlisted connection before its callback first query', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
     $manager = app(VersionSetManagerInterface::class);
@@ -298,7 +566,7 @@ it('rejects a second pre-enlisted connection before its callback first query', f
         function () use ($manager, &$second_callback_ran): void {
             $manager->enlist('version_set_affinity');
             $second_callback_ran = true;
-            DB::connection('version_set_affinity')->table('never_queried')->count();
+            VersionSetManagerAffinityArticle::query()->count();
         },
     ))->toThrow(MultipleVersionConnectionsNotSupportedException::class);
 

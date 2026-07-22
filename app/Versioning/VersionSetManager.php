@@ -8,10 +8,14 @@ use Closure;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
+use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
+use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 use Override;
 
@@ -29,18 +33,20 @@ final class VersionSetManager implements VersionSetManagerInterface
         ?VersionSetOptions $options = null,
     ): mixed {
         if ($this->active->isActive()) {
-            return $this->runNested($root, $operation);
+            return $this->runNested($root, $operation, $options);
         }
 
         $connection = $root->model()->getConnection();
         $connection_name = $connection->getName();
-        $this->active->activate($root, $connection_name, $options ?? new VersionSetOptions);
+        $resolved_options = $options ?? new VersionSetOptions;
+        $this->active->activate($root, $connection_name, $resolved_options);
 
         try {
             $this->enlist($connection_name);
 
-            return $connection->transaction(function () use ($root, $operation): mixed {
+            return $connection->transaction(function () use ($root, $operation, $resolved_options): mixed {
                 $this->lockExistingRoot($root);
+                $this->validateRevertedFrom($root, $resolved_options);
                 $result = $operation($this->active);
                 $this->enlist($root->connectionName());
                 $this->active->finish();
@@ -75,15 +81,27 @@ final class VersionSetManager implements VersionSetManagerInterface
         return $this->active->isActive() ? $this->active : null;
     }
 
-    private function runNested(VersionSetRoot $root, Closure $operation): mixed
-    {
+    private function runNested(
+        VersionSetRoot $root,
+        Closure $operation,
+        ?VersionSetOptions $options,
+    ): mixed {
         $active_root = $this->active->root();
 
         if (! $active_root->matches($root)) {
             throw VersionSetRootMismatchException::between($active_root, $root);
         }
 
+        if ($options !== null && ! $this->active->options()->semanticallyEquals($options)) {
+            throw new VersionSetOptionsMismatchException;
+        }
+
         $this->enlist($root->connectionName());
+
+        if ($options !== null) {
+            $this->validateRevertedFrom($root, $options);
+        }
+
         $this->active->enterNested();
 
         try {
@@ -101,6 +119,7 @@ final class VersionSetManager implements VersionSetManagerInterface
             return;
         }
 
+        $dirty_attributes = $model->getDirty();
         $locked = $model->newQueryWithoutScopes()
             ->whereKey($model->getKey())
             ->lockForUpdate()
@@ -108,6 +127,56 @@ final class VersionSetManager implements VersionSetManagerInterface
 
         if ($locked === null) {
             throw (new ModelNotFoundException)->setModel($model::class, [$model->getKey()]);
+        }
+
+        $model->setRawAttributes($locked->getAttributes(), true);
+        $model->setRawAttributes(array_replace($model->getAttributes(), $dirty_attributes));
+    }
+
+    private function validateRevertedFrom(VersionSetRoot $root, VersionSetOptions $options): void
+    {
+        if ($options->kind !== VersionSetKind::Revert) {
+            return;
+        }
+
+        $target_id = $options->revertedFromId();
+
+        if ($target_id === null || $root->id() === null || $root->id() === '') {
+            if ($target_id !== null) {
+                throw InvalidRevertedVersionSetException::wrongRoot($target_id);
+            }
+
+            return;
+        }
+
+        $connection_name = $this->active->connectionName();
+        $input_target = $options->revertedFrom;
+
+        if ($input_target instanceof VersionSet) {
+            $target_connection = $input_target->getConnection()->getName();
+
+            if ($target_connection !== $connection_name) {
+                throw InvalidRevertedVersionSetException::wrongConnection(
+                    $target_id,
+                    $connection_name,
+                    $target_connection,
+                );
+            }
+        }
+
+        $version_set = new VersionSet;
+        $version_set->setConnection($connection_name);
+        $target = $version_set->newQuery()->find($target_id);
+
+        if (! $target instanceof VersionSet) {
+            throw InvalidRevertedVersionSetException::notFound($target_id, $connection_name);
+        }
+
+        if ($target->root_type !== $root->type()
+            || $target->root_id !== $root->id()
+            || $target->root_connection_ref !== $root->connectionName()
+            || $target->root_table_ref !== $root->tableName()) {
+            throw InvalidRevertedVersionSetException::wrongRoot($target_id);
         }
     }
 }

@@ -43,6 +43,14 @@ final readonly class VersionSetOptions
         return $this->normalizePositiveId($this->revertedFrom, 'reverted-from set');
     }
 
+    public function semanticallyEquals(self $other): bool
+    {
+        return $this->kind === $other->kind
+            && $this->reason === $other->reason
+            && $this->actorId() === $other->actorId()
+            && $this->revertedFromId() === $other->revertedFromId();
+    }
+
     private function normalizePositiveId(Model|int|null $value, string $label): ?int
     {
         if ($value === null) {
