@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Nwidart\Modules\Facades\Module;
 use Nwidart\Modules\Traits\PathNamespace;
 use Override;
+use ReflectionClass;
 
 class ModuleServiceProvider extends ServiceProvider
 {
@@ -130,7 +131,8 @@ class ModuleServiceProvider extends ServiceProvider
         // type errors when Artisan boots.
         return array_values(array_filter(
             $classes,
-            static fn (string $class): bool => is_subclass_of($class, Command::class),
+            static fn (string $class): bool => is_subclass_of($class, Command::class)
+                && (new ReflectionClass($class))->isInstantiable(),
         ));
     }
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Overrides\ModuleServiceProvider;
+use Modules\Core\Console\AbstractImportCommand;
 
 
 it('registerDefaultTranslationPath registers translator paths after resolution', function (): void {
@@ -64,7 +65,8 @@ it('inspectFolderCommands returns array of command class names', function (): vo
     $path = config('modules.paths.generator.command.path', 'Console');
     $commands = $provider->publicInspectFolderCommands($path);
 
-    expect($commands)->toBeArray();
+    expect($commands)->toBeArray()
+        ->not->toContain(AbstractImportCommand::class);
 });
 
 it('boot registers commands, translations, views and migrations without throwing', function (): void {
