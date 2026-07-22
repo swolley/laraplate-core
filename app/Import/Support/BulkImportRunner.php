@@ -21,13 +21,17 @@ final readonly class BulkImportRunner
     /**
      * @param  callable(): int  $import
      */
-    public function run(bool $dryRun, callable $import): int
+    public function run(
+        bool $dryRun,
+        callable $import,
+        ?ConnectionInterface $connection = null,
+    ): int
     {
         if (! $dryRun) {
             return $import();
         }
 
-        $connection = $this->database->connection();
+        $connection ??= $this->database->connection();
         $initial_level = $connection->transactionLevel();
         $connection->beginTransaction();
 

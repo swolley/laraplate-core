@@ -10,6 +10,7 @@ use Modules\Core\Import\Support\BulkImportRunner;
 use Modules\Core\Import\Support\ContainerBulkImporterResolver;
 use Modules\Core\Tests\Stubs\Import\FakeBulkImporter;
 use Modules\Core\Tests\Stubs\Import\FakeBulkImporterResolver;
+use Modules\Core\Tests\Stubs\Import\FakeConnectionAwareBulkImporter;
 use Modules\Core\Tests\Stubs\Import\FakeImportPluginDiscovery;
 use Modules\Core\Tests\Stubs\Import\TestImportCommand;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -86,10 +87,46 @@ it('rolls back default connection writes in dry run', function (): void {
     ]);
 
     expect($status)->toBe(TestImportCommand::SUCCESS)
-        ->and($output)->toContain('default database transaction will be rolled back')
+        ->and($output)->toContain('selected database transaction will be rolled back')
         ->and($output)->toContain('Search indexing disabled')
         ->and(DB::table(FakeBulkImporter::TABLE)->count())->toBe(0)
         ->and(FakeBulkImporter::$arguments['dryRun'])->toBeTrue();
+});
+
+it('rolls back writes on the connection declared by the importer', function (): void {
+    config([
+        'database.connections.import_affinity' => [
+            ...config('database.connections.sqlite'),
+            'database' => ':memory:',
+        ],
+    ]);
+    DB::purge('import_affinity');
+    Schema::connection('import_affinity')->create(FakeBulkImporter::TABLE, static function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+    });
+
+    try {
+        $command = new TestImportCommand(
+            app(BulkImportRunner::class),
+            new FakeBulkImporterResolver(app()),
+            new FakeImportPluginDiscovery,
+        );
+        [$status] = runCoreImportCommand($command, [
+            '--importer' => FakeConnectionAwareBulkImporter::class,
+            '--arg' => [
+                'connectionName=import_affinity',
+                'table='.FakeBulkImporter::TABLE,
+            ],
+            '--dry-run' => true,
+        ]);
+
+        expect($status)->toBe(TestImportCommand::SUCCESS)
+            ->and(DB::connection('import_affinity')->table(FakeBulkImporter::TABLE)->count())->toBe(0);
+    } finally {
+        Schema::connection('import_affinity')->dropIfExists(FakeBulkImporter::TABLE);
+        DB::purge('import_affinity');
+    }
 });
 
 it('validates importer classes through the injected resolver contract', function (): void {

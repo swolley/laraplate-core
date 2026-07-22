@@ -6,6 +6,7 @@ namespace Modules\Core\Console;
 
 use Illuminate\Console\Command;
 use Modules\Core\Import\Contracts\BulkImporterResolverInterface;
+use Modules\Core\Import\Contracts\ConnectionAwareBulkImporterInterface;
 use Modules\Core\Import\Contracts\ImportPluginDiscoveryInterface;
 use Modules\Core\Import\Support\BulkImportRunner;
 use Override;
@@ -60,7 +61,7 @@ abstract class AbstractImportCommand extends Command
         }
 
         if ($dry_run) {
-            $this->warn('Dry-run enabled: the default database transaction will be rolled back.');
+            $this->warn('Dry-run enabled: the selected database transaction will be rolled back.');
         }
 
         if ((bool) $this->option('no-search') || $dry_run) {
@@ -68,7 +69,14 @@ abstract class AbstractImportCommand extends Command
             $this->warn('Search indexing disabled for this import.');
         }
 
-        $imported = $this->runner->run($dry_run, static fn (): int => $importer->import());
+        $connection = $importer instanceof ConnectionAwareBulkImporterInterface
+            ? $importer->importConnection()
+            : null;
+        $imported = $this->runner->run(
+            $dry_run,
+            static fn (): int => $importer->import(),
+            $connection,
+        );
 
         $this->info("Imported {$imported} record(s)".($dry_run ? ' (dry-run, rolled back).' : '.'));
 
