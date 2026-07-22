@@ -78,7 +78,7 @@ abstract class AbstractImportCommand extends Command
             $connection,
         );
 
-        $this->info("Imported {$imported} record(s)".($dry_run ? ' (dry-run, rolled back).' : '.'));
+        $this->info("Imported {$imported} record(s)" . ($dry_run ? ' (dry-run, rolled back).' : '.'));
 
         return self::SUCCESS;
     }
@@ -93,7 +93,7 @@ abstract class AbstractImportCommand extends Command
             ['importer', null, InputOption::VALUE_OPTIONAL, 'Fully-qualified importer class name'],
             ['bootstrap', null, InputOption::VALUE_OPTIONAL, 'Path to an external Composer autoloader'],
             ['arg', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Importer argument as key=value', []],
-            ['dry-run', null, InputOption::VALUE_NONE, 'Roll back default-connection database writes'],
+            ['dry-run', null, InputOption::VALUE_NONE, 'Roll back writes on the importer-selected or default database connection'],
             ['limit', null, InputOption::VALUE_OPTIONAL, 'Maximum number of records to import'],
             ['no-search', null, InputOption::VALUE_NONE, 'Disable search indexing for the duration of the import'],
         ];

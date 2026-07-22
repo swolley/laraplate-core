@@ -49,6 +49,7 @@ it('defines the shared module import command contract without a signature', func
         )
         ->and($definition->getOption('arg')->isArray())->toBeTrue()
         ->and($definition->getOption('dry-run')->acceptValue())->toBeFalse()
+        ->and($definition->getOption('dry-run')->getDescription())->toContain('importer-selected or default')
         ->and($definition->getOption('limit')->isValueOptional())->toBeTrue();
 });
 
@@ -116,7 +117,7 @@ it('rolls back writes on the connection declared by the importer', function (): 
             '--importer' => FakeConnectionAwareBulkImporter::class,
             '--arg' => [
                 'connectionName=import_affinity',
-                'table='.FakeBulkImporter::TABLE,
+                'table=' . FakeBulkImporter::TABLE,
             ],
             '--dry-run' => true,
         ]);
