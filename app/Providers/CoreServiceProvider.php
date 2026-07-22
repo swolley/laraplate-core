@@ -30,9 +30,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
-use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
+use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
@@ -62,9 +62,12 @@ use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\PerModelSettingResolver;
-use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\Services\SettingsCacheCoordinator;
+use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Versioning\ActiveVersionSet;
+use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
+use Modules\Core\Versioning\VersionSetManager;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -155,6 +158,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ApplicationContentRetrievalProviderRegistry::class,
         );
         $this->app->bind(OutboxPublisher::class, StubOutboxPublisher::class);
+        $this->app->scoped(ActiveVersionSet::class);
+        $this->app->scoped(VersionSetManagerInterface::class, VersionSetManager::class);
 
         // Register search clients
         $this->registerSearchClients();
