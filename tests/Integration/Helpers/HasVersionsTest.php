@@ -7,7 +7,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\Concerns\HasVersions;
-use Modules\Core\Jobs\CreateVersionJob;
 use Modules\Core\Models\Version;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Stubs\Versioning\VersionedArticle;
@@ -20,7 +19,6 @@ it('exposes the versioning entrypoint', function (): void {
 });
 
 it('writes essential explicit history synchronously without dispatching a job', function (): void {
-    Bus::fake();
     config()->set('versionable.version_model', Version::class);
 
     Schema::create(VersionedArticle::TABLE, function (Blueprint $table): void {
@@ -33,22 +31,21 @@ it('writes essential explicit history synchronously without dispatching a job', 
         $article = VersionedArticle::query()->create(['title' => 'First']);
         $version_count_before_explicit_write = $article->versions()->count();
 
+        Bus::fake();
         $article->createVersion(['title' => 'Second'], force: true);
+
+        Bus::assertNothingDispatched();
 
         $latest_version = $article->versions()->latest('id')->first();
         $observed = [
             'new_history_rows' => $article->versions()->count() - $version_count_before_explicit_write,
             'latest_history_title' => $latest_version?->contents['title'] ?? null,
-            'dispatched_history_jobs' => Bus::dispatched(CreateVersionJob::class)->count(),
         ];
 
         expect($observed)->toBe([
             'new_history_rows' => 1,
             'latest_history_title' => 'Second',
-            'dispatched_history_jobs' => 0,
         ]);
-
-        Bus::assertNotDispatched(CreateVersionJob::class);
     } finally {
         Schema::dropIfExists(VersionedArticle::TABLE);
     }
