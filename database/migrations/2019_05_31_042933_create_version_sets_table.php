@@ -34,7 +34,11 @@ return new class() extends Migration
             $table->string('reason', 255)->nullable();
             $table->unsignedBigInteger('reverted_from_set_id')->nullable();
 
-            MigrateUtils::timestamps($table, hasCreateUpdate: true);
+            MigrateUtils::timestamps(
+                $table,
+                hasCreateUpdate: true,
+                createdAtIndexName: 'vsets_created_IDX',
+            );
 
             $table->unique('uuid', 'vsets_uuid_UN');
             $table->index(['root_type', 'root_id'], 'vsets_root_IDX');

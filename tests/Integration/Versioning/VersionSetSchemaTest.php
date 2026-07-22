@@ -85,6 +85,7 @@ it('defines portable version set indexes and foreign keys', function (): void {
         ->and($uuid_index['unique'])->toBeTrue()
         ->and($root_index)->not->toBeNull()
         ->and($root_index['name'])->toBe('vsets_root_idx')
+        ->and($indexes->pluck('name'))->toContain('vsets_created_idx')
         ->and($reverted_from_foreign_key)->not->toBeNull()
         ->and($reverted_from_foreign_key['foreign_table'])->toBe($table_name)
         ->and($reverted_from_foreign_key['foreign_columns'])->toBe(['id'])
@@ -94,6 +95,31 @@ it('defines portable version set indexes and foreign keys', function (): void {
         ->and($foreign_keys->contains(
             static fn (array $foreign_key): bool => $foreign_key['columns'] === [$user_foreign_key],
         ))->toBeFalse();
+});
+
+it('keeps every new explicit index and foreign key name within portable limits', function (): void {
+    $version_sets_migration = file_get_contents(
+        dirname(__DIR__, 3) . '/database/migrations/2019_05_31_042933_create_version_sets_table.php',
+    );
+    $versions_migration = file_get_contents(
+        dirname(__DIR__, 3) . '/database/migrations/2019_05_31_042934_create_versions_table.php',
+    );
+    $constraint_names = [
+        'vsets_uuid_UN',
+        'vsets_root_IDX',
+        'vsets_created_IDX',
+        'vsets_reverted_FK',
+        'versions_set_sequence_UN',
+        'versions_set_FK',
+    ];
+
+    expect($version_sets_migration)->toBeString()
+        ->and($versions_migration)->toBeString();
+
+    foreach ($constraint_names as $constraint_name) {
+        expect(mb_strlen($constraint_name))->toBeLessThanOrEqual(30)
+            ->and($version_sets_migration . $versions_migration)->toContain("'{$constraint_name}'");
+    }
 });
 
 it('defines ordered version membership with cascading set deletion', function (): void {
@@ -151,6 +177,18 @@ it('casts version set and version attributes to their domain types', function ()
         ->and($version_set->fresh()->created_at)->toBeInstanceOf(DateTimeImmutable::class)
         ->and($version->fresh()->change_type)->toBe(VersionChangeType::Updated)
         ->and($version->fresh()->subject_key)->toBe(['locale' => 'en', 'term_id' => 42]);
+});
+
+it('mass assigns the configured version actor column', function (): void {
+    $user_foreign_key = config('versionable.user_foreign_key', 'user_id');
+    $version_set = VersionSet::query()->create([
+        'uuid' => (string) Str::uuid(),
+        'kind' => VersionSetKind::Change,
+        $user_foreign_key => 42,
+    ]);
+
+    expect((new VersionSet())->getFillable())->toContain($user_foreign_key)
+        ->and($version_set->fresh()->getAttribute($user_foreign_key))->toBe(42);
 });
 
 it('orders versions by sequence and exposes both belongs-to relations', function (): void {

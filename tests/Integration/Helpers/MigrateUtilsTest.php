@@ -16,6 +16,19 @@ it('timestamps adds created_at and updated_at when missing', function (): void {
         ->and(Schema::hasColumn('migrate_utils_ts', 'updated_at'))->toBeTrue();
 });
 
+it('timestamps accepts an explicit created-at index name', function (): void {
+    Schema::create('migrate_utils_named_ts', function (Blueprint $table): void {
+        $table->id();
+        MigrateUtils::timestamps(
+            $table,
+            hasCreateUpdate: true,
+            createdAtIndexName: 'mu_created_IDX',
+        );
+    });
+
+    expect(Schema::hasIndex('migrate_utils_named_ts', 'mu_created_idx'))->toBeTrue();
+});
+
 it('dropTimestamps removes created_at and updated_at', function (): void {
     Schema::create('migrate_utils_drop', function (Blueprint $table): void {
         $table->id();
@@ -46,7 +59,13 @@ it('creates portable prefix indexes and safely degrades specialized indexes on s
 
 it('rejects unsafe search index identifiers and unsupported oracle sync modes', function (): void {
     expect(fn () => MigrateUtils::fuzzyIndex('unsafe-table', 'name'))
-        ->toThrow(\InvalidArgumentException::class)
+        ->toThrow(InvalidArgumentException::class)
+        ->and(function (): void {
+            Schema::create('migrate_utils_unsafe_ts', function (Blueprint $table): void {
+                MigrateUtils::timestamps($table, createdAtIndexName: 'unsafe index');
+            });
+        })
+        ->toThrow(InvalidArgumentException::class)
         ->and(fn () => MigrateUtils::fullTextIndex('safe_table', 'body', oracleSync: 'hourly'))
-        ->toThrow(\InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class);
 });

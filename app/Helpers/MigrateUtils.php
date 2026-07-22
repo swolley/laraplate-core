@@ -93,6 +93,7 @@ final class MigrateUtils
      * @param  bool  $hasLocks  Add locking columns
      * @param  bool  $hasValidity  Add validity period columns
      * @param  bool  $isValidityRequired  Make valid_from required
+     * @param  string|null  $createdAtIndexName  Override the created_at index name
      *
      * @throws InvalidArgumentException When invalid parameter combination
      */
@@ -103,6 +104,7 @@ final class MigrateUtils
         bool $hasLocks = false,
         bool $hasValidity = false,
         bool $isValidityRequired = true,
+        ?string $createdAtIndexName = null,
     ): void {
         $table_name = $table->getTable();
 
@@ -115,7 +117,7 @@ final class MigrateUtils
                 $table->timestamp(Model::UPDATED_AT)->nullable(false)->useCurrent()->useCurrentOnUpdate();
             }
 
-            self::createDateIndex($table, Model::CREATED_AT);
+            self::createDateIndex($table, Model::CREATED_AT, $createdAtIndexName);
         }
 
         if ($hasSoftDelete) {
@@ -374,9 +376,13 @@ final class MigrateUtils
         }
     }
 
-    private static function createDateIndex(Blueprint $table, string $column): void
+    private static function createDateIndex(Blueprint $table, string $column, ?string $indexName = null): void
     {
-        $index_name = $table->getTable() . '_' . $column . '_idx';
+        if ($indexName !== null) {
+            self::assertIdentifier($indexName);
+        }
+
+        $index_name = $indexName ?? $table->getTable() . '_' . $column . '_idx';
         $driver_name = DB::connection()->getDriverName();
 
         if (Schema::hasIndex($table->getTable(), $column) || Schema::hasIndex($table->getTable(), $index_name)) {
@@ -445,7 +451,7 @@ final class MigrateUtils
             default => 64,
         };
 
-        if (mb_strlen($base) <= $limit) {
+        if ($limit >= mb_strlen($base)) {
             return $base;
         }
 

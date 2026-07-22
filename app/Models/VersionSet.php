@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionSetKind;
 use Override;
@@ -41,6 +42,21 @@ final class VersionSet extends Model
         'reason',
         'reverted_from_set_id',
     ];
+
+    /**
+     * @return list<string>
+     */
+    #[Override]
+    public function getFillable(): array
+    {
+        $user_foreign_key = config('versionable.user_foreign_key', 'user_id');
+
+        if (! is_string($user_foreign_key) || $user_foreign_key === '') {
+            throw new InvalidArgumentException('The versionable user foreign key must be a non-empty string.');
+        }
+
+        return array_values(array_unique([...parent::getFillable(), $user_foreign_key]));
+    }
 
     /**
      * @return HasMany<Version>
