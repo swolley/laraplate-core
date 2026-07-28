@@ -311,6 +311,57 @@ it('clones database rule objects while preserving callbacks and soft delete cons
     }
 });
 
+it('preserves explicitly qualified string and object database rule tables', function (): void {
+    $connection_name = 'validation_explicit_affinity';
+    config()->set("database.connections.{$connection_name}", [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    DB::purge($connection_name);
+
+    try {
+        $explicit_string_rule = 'exists:sqlite.explicit_validation_records,id';
+        $explicit_object_rule = Rule::unique('sqlite.explicit_validation_records', 'slug')->withoutTrashed();
+
+        $model = new class extends Model
+        {
+            public mixed $explicit_object_rule;
+
+            public string $explicit_string_rule;
+
+            protected $table = 'validation_explicit_hosts';
+
+            public function getRules(): array
+            {
+                return [
+                    'always' => [],
+                    'create' => [
+                        'record_id' => [$this->explicit_string_rule],
+                        'slug' => [$this->explicit_object_rule],
+                    ],
+                    'update' => [],
+                ];
+            }
+        };
+        $model->explicit_string_rule = $explicit_string_rule;
+        $model->explicit_object_rule = $explicit_object_rule;
+        $model->setConnection($connection_name);
+
+        $qualified_rules = $model->getOperationRules(CrudExecutor::INSERT);
+        $qualified_object_rule = $qualified_rules['slug'][0];
+
+        expect($qualified_rules['record_id'][0])->toBe($explicit_string_rule)
+            ->and($qualified_object_rule)->not->toBe($explicit_object_rule)
+            ->and((string) $qualified_object_rule)->toContain('unique:sqlite.explicit_validation_records,slug')
+            ->and((string) $qualified_object_rule)->toContain('deleted_at,"NULL"');
+    } finally {
+        DB::disconnect($connection_name);
+        DB::purge($connection_name);
+    }
+});
+
 it('authorizes force delete and restore lifecycle hooks', function (): void {
     HasValidations::resetPermissionExistenceCache();
 

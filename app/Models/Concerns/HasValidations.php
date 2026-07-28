@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
+use LogicException;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
+use ReflectionException;
 use ReflectionProperty;
 
 /**
@@ -211,16 +213,15 @@ trait HasValidations
     {
         $permission = $model->getTable() . '.' . $operation;
         $permission_class = config('permission.models.permission');
-        $connection = $model->getConnection()->getName();
-        $cache_key = $connection . ':' . $permission;
+
+        /** @var Model $permission_model */
+        $permission_model = new $permission_class;
+        $permission_connection = $permission_model->getConnection()->getName();
+        $cache_key = $permission_connection . ':' . $permission;
 
         // L1: check static in-memory cache first to avoid repeated DB queries
         // for the same permission name within the same request lifecycle
         if (! array_key_exists($cache_key, self::$permission_existence_cache)) {
-            /** @var Model $permission_model */
-            $permission_model = new $permission_class;
-            $permission_model->setConnection($connection);
-
             self::$permission_existence_cache[$cache_key] = $permission_model->newQuery()->where('name', $permission)->exists();
         }
 
@@ -275,8 +276,7 @@ trait HasValidations
 
         if ($rule instanceof Exists || $rule instanceof Unique) {
             $rule = clone $rule;
-            $table = new ReflectionProperty($rule, 'table');
-            $table->setValue($rule, $this->qualifyDatabaseRuleTable((string) $table->getValue($rule)));
+            $this->replaceDatabaseRuleTable($rule, $this->qualifyDatabaseRuleTable($this->databaseRuleTable($rule)));
 
             return $rule;
         }
@@ -309,12 +309,54 @@ trait HasValidations
         if (class_exists($table) && is_a($table, Model::class, true)) {
             /** @var Model $related */
             $related = new $table;
-            $related->setConnection($this->getConnection()->getName());
 
-            $table = $related->getTable();
+            return $related->getConnection()->getName() . '.' . $related->getTable();
         }
 
         return $this->getConnection()->getName() . '.' . $table;
+    }
+
+    /**
+     * Laravel has no public setter for a database rule table; cloning preserves its callbacks and where clauses.
+     */
+    protected function databaseRuleTable(Exists|Unique $rule): string
+    {
+        try {
+            if (! property_exists($rule, 'table')) {
+                throw new LogicException(sprintf(
+                    'Unsupported database validation rule [%s]: missing internal table property.',
+                    $rule::class,
+                ));
+            }
+
+            $table = (new ReflectionProperty($rule, 'table'))->getValue($rule);
+        } catch (ReflectionException $exception) {
+            throw new LogicException(sprintf(
+                'Unsupported database validation rule [%s]: internal table property is inaccessible.',
+                $rule::class,
+            ), previous: $exception);
+        }
+
+        if (! is_string($table)) {
+            throw new LogicException(sprintf(
+                'Unsupported database validation rule [%s]: internal table property must be a string.',
+                $rule::class,
+            ));
+        }
+
+        return $table;
+    }
+
+    protected function replaceDatabaseRuleTable(Exists|Unique $rule, string $table): void
+    {
+        try {
+            (new ReflectionProperty($rule, 'table'))->setValue($rule, $table);
+        } catch (ReflectionException $exception) {
+            throw new LogicException(sprintf(
+                'Unsupported database validation rule [%s]: internal table property is inaccessible.',
+                $rule::class,
+            ), previous: $exception);
+        }
     }
 
     /**

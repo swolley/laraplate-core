@@ -437,7 +437,6 @@ trait HasVersions
 
         /** @var User $user */
         $user = new $user_class;
-        $user->setConnection($this->getConnection()->getName());
 
         return $user->newQueryWithoutScopes()->find($userId);
     }

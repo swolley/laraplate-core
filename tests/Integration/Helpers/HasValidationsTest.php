@@ -203,7 +203,7 @@ it('does not issue a second DB query for the same permission name', function ():
     expect($after_second)->toBe($after_first);
 });
 
-it('uses the permission model connection independently of the authorized model connection', function (): void {
+it('uses and caches the permission model connection independently of the authorized model connection', function (): void {
     HasValidations::resetPermissionExistenceCache();
 
     $connection_name = 'permission_affinity';
@@ -233,8 +233,13 @@ it('uses the permission model connection independently of the authorized model c
         Illuminate\Support\Facades\Auth::login($user);
 
         $queried_connections = [];
-        Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use (&$queried_connections): void {
+        $permission_query_count = 0;
+        Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use ($permission_name, $permission_table, &$permission_query_count, &$queried_connections): void {
             $queried_connections[] = $query->connectionName;
+
+            if (str_contains($query->sql, $permission_table) && in_array($permission_name, $query->bindings, true)) {
+                $permission_query_count++;
+            }
         });
 
         $model = new class extends Illuminate\Database\Eloquent\Model
@@ -254,6 +259,7 @@ it('uses the permission model connection independently of the authorized model c
 
         expect($method->invoke(null, $model, 'select'))->toBeFalse()
             ->and($method->invoke(null, $affinity_model, 'select'))->toBeFalse()
+            ->and($permission_query_count)->toBe(1)
             ->and($queried_connections)->toContain(Illuminate\Support\Facades\DB::getDefaultConnection())
             ->and($queried_connections)->not->toContain($connection_name);
     } finally {
