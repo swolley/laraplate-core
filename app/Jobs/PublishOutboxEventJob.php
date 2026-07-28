@@ -23,22 +23,29 @@ final class PublishOutboxEventJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 5;
 
-    /** @var list<int> */
+    /**
+     * @var list<int>
+     */
     public array $backoff = [30, 60, 120, 300];
 
-    public function __construct(public readonly int $outboxEventId)
-    {
+    public function __construct(
+        public readonly int $outboxEventId,
+        public readonly string $connectionName,
+    ) {
         $this->onQueue('outbox');
     }
 
     public function uniqueId(): string
     {
-        return (string) $this->outboxEventId;
+        return $this->connectionName . ':' . $this->outboxEventId;
     }
 
     public function handle(OutboxPublisher $publisher): void
     {
-        $event = OutboxEvent::query()->find($this->outboxEventId);
+        $event = (new OutboxEvent)
+            ->setConnection($this->connectionName)
+            ->newQuery()
+            ->find($this->outboxEventId);
 
         if ($event === null || $event->published_at !== null) {
             return;
