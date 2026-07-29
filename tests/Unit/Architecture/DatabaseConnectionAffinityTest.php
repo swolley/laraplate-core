@@ -10,6 +10,8 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
+use PhpParser\Node\Scalar\Float_;
+use PhpParser\Node\Scalar\Int_;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\NodeFinder;
@@ -255,11 +257,26 @@ function database_connection_affinity_has_explicit_argument(StaticCall $call): b
 
     $argument = $call->args[0]->value;
 
-    if ($argument instanceof ConstFetch && strcasecmp($argument->name->toString(), 'null') === 0) {
+    if (
+        $argument instanceof ConstFetch
+        && in_array(mb_strtolower($argument->name->toString()), ['null', 'false'], true)
+    ) {
         return false;
     }
 
-    return ! ($argument instanceof String_ && $argument->value === '');
+    if ($argument instanceof String_) {
+        return ! in_array($argument->value, ['', '0'], true);
+    }
+
+    if ($argument instanceof Int_) {
+        return $argument->value !== 0;
+    }
+
+    if ($argument instanceof Float_) {
+        return $argument->value !== 0.0;
+    }
+
+    return true;
 }
 
 /**
@@ -437,6 +454,13 @@ it('detects every DB-hitting facade operation and implicit default connection re
         ->toHaveCount(1)
         ->and(database_connection_affinity_facade_calls('<?php DB::raw("count(*)");'))
         ->toBe([]);
+
+    foreach (['false', '"0"', '0', '0.0'] as $falsy_literal) {
+        expect(database_connection_affinity_facade_calls("<?php DB::connection({$falsy_literal});"))
+            ->toHaveCount(1)
+            ->and(database_connection_affinity_facade_calls("<?php DB::reconnect({$falsy_literal});"))
+            ->toHaveCount(1);
+    }
 });
 
 it('detects implicit database Schema facade operations', function (): void {
@@ -487,6 +511,11 @@ PHP;
         ->toHaveCount(1)
         ->and(database_connection_affinity_schema_calls('<?php Schema::connection($connection);'))
         ->toBe([]);
+
+    foreach (['false', '"0"', '0', '0.0'] as $falsy_literal) {
+        expect(database_connection_affinity_schema_calls("<?php Schema::connection({$falsy_literal});"))
+            ->toHaveCount(1);
+    }
 });
 
 it('conservatively detects dynamic DB and Schema facade methods', function (): void {

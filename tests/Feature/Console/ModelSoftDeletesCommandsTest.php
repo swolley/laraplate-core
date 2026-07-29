@@ -81,7 +81,8 @@ it('refresh inspects schema through the constructor-configured model connection'
     try {
         $method->invoke($command, ConstructorConfiguredSoftDeleteModel::class);
 
-        expect($connection->getQueryLog())->not->toBeEmpty();
+        expect(json_encode($connection->getQueryLog(), JSON_THROW_ON_ERROR))
+            ->toContain('soft_delete_constructor_table');
     } finally {
         DB::disconnect('soft_delete_constructor_connection');
         DB::purge('soft_delete_constructor_connection');

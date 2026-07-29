@@ -36,7 +36,8 @@ it('inspects schema through the constructor-configured model connection', functi
     try {
         $method->invoke($command, ConstructorConfiguredLockingModel::class);
 
-        expect($connection->getQueryLog())->not->toBeEmpty();
+        expect(json_encode($connection->getQueryLog(), JSON_THROW_ON_ERROR))
+            ->toContain('locking_refresh_constructor_table');
     } finally {
         DB::disconnect('locking_refresh_constructor_connection');
         DB::purge('locking_refresh_constructor_connection');
