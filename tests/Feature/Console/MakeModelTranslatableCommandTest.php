@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Prompts\ConfirmPrompt;
@@ -54,6 +56,18 @@ function sampleColumns(): array
     ];
 }
 
+function bindTranslatableModelSchema(object $schema): void
+{
+    Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+
+    $connection = Mockery::mock(ConnectionInterface::class);
+    $connection->shouldReceive('getSchemaBuilder')->andReturn($schema);
+
+    $resolver = Mockery::mock(ConnectionResolverInterface::class);
+    $resolver->shouldReceive('connection')->withAnyArgs()->andReturn($connection);
+    Model::setConnectionResolver($resolver);
+}
+
 // ---------------------------------------------------------------------------
 // Structural tests
 // ---------------------------------------------------------------------------
@@ -94,12 +108,13 @@ it('command uses Laravel Prompts', function (): void {
     expect($source)->toContain('Laravel\\Prompts\\select');
 });
 
-it('command uses Schema for database inspection', function (): void {
+it('command uses the selected model connection for database inspection', function (): void {
     $reflection = new ReflectionClass(MakeModelTranslatableCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('Schema::getColumns');
-    expect($source)->toContain('Schema::hasTable');
+    expect($source)->toContain('$model_instance->getConnection()->getSchemaBuilder()');
+    expect($source)->toContain('$schema->getColumns');
+    expect($source)->toContain('$schema->hasTable');
 });
 
 it('command references HasTranslations trait', function (): void {
@@ -566,14 +581,14 @@ describe('command validates preconditions', function (): void {
     it('checks source table exists', function (): void {
         $source = file_get_contents((new ReflectionClass(MakeModelTranslatableCommand::class))->getFileName());
 
-        expect($source)->toContain('Schema::hasTable($table_name)')
+        expect($source)->toContain('$schema->hasTable($table_name)')
             ->toContain('does not exist. Run migrations first');
     });
 
     it('checks translation table does not already exist', function (): void {
         $source = file_get_contents((new ReflectionClass(MakeModelTranslatableCommand::class))->getFileName());
 
-        expect($source)->toContain('Schema::hasTable($translation_table)')
+        expect($source)->toContain('$schema->hasTable($translation_table)')
             ->toContain('already exists');
     });
 
@@ -1177,6 +1192,7 @@ describe('addTraitToModel', function (): void {
 
 describe('handle', function (): void {
     beforeEach(function (): void {
+        $this->model_connection_resolver = Model::getConnectionResolver();
         $this->command = commandWithOutput();
         HandleTestContext::$models = [];
         HandleTestContext::$models_from_global_helpers = false;
@@ -1188,6 +1204,7 @@ describe('handle', function (): void {
     });
 
     afterEach(function (): void {
+        Model::setConnectionResolver($this->model_connection_resolver);
         Prompt::interactive(true);
 
         // Reset Prompt fallback state
@@ -1260,7 +1277,7 @@ describe('handle', function (): void {
                 return [];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);
@@ -1287,7 +1304,7 @@ describe('handle', function (): void {
                 ];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);
@@ -1312,7 +1329,7 @@ describe('handle', function (): void {
                 ];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);
@@ -1341,7 +1358,7 @@ describe('handle', function (): void {
                 ];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);
@@ -1382,7 +1399,7 @@ describe('handle', function (): void {
                 ];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);
@@ -1441,7 +1458,7 @@ describe('handle', function (): void {
                 ];
             }
         };
-        Illuminate\Container\Container::getInstance()->instance('db.schema', $schema);
+        bindTranslatableModelSchema($schema);
 
         SelectPrompt::fallbackWhen(true);
         SelectPrompt::fallbackUsing(fn () => 1);

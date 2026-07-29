@@ -18,6 +18,7 @@ use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter\Standard;
 
 const DATABASE_FACADE_CLASS = 'Illuminate\\Support\\Facades\\DB';
+const DATABASE_SCHEMA_FACADE_CLASS = 'Illuminate\\Support\\Facades\\Schema';
 
 /**
  * @return list<string>
@@ -46,7 +47,7 @@ function database_connection_affinity_facade_calls(string $source, string $relat
         if (
             ! $call->class instanceof Name
             || ! $call->name instanceof Identifier
-            || ! database_connection_affinity_is_guarded_method($call->name->toString())
+            || ! database_connection_affinity_is_guarded_call($call)
             || ! database_connection_affinity_is_facade_class($call->class, $declared_classes)
         ) {
             continue;
@@ -56,6 +57,50 @@ function database_connection_affinity_facade_calls(string $source, string $relat
         $fingerprint = database_connection_affinity_call_fingerprint($call);
         $fingerprint_ordinals[$fingerprint] = ($fingerprint_ordinals[$fingerprint] ?? 0) + 1;
         $location = "DB::{$method}:{$fingerprint}:{$fingerprint_ordinals[$fingerprint]}";
+
+        $calls[] = $relative_path === '' ? $location : "{$relative_path}:{$location}";
+    }
+
+    return $calls;
+}
+
+/**
+ * @return list<string>
+ */
+function database_connection_affinity_schema_calls(string $source, string $relative_path = ''): array
+{
+    $statements = (new ParserFactory)->createForNewestSupportedVersion()->parse($source) ?? [];
+    $traverser = new NodeTraverser;
+    $traverser->addVisitor(new NameResolver);
+    $traverser->addVisitor(new ParentConnectingVisitor);
+    $statements = $traverser->traverse($statements);
+
+    $finder = new NodeFinder;
+    $declared_classes = [];
+
+    foreach ($finder->findInstanceOf($statements, ClassLike::class) as $class) {
+        if ($class->namespacedName !== null) {
+            $declared_classes[mb_strtolower($class->namespacedName->toString())] = true;
+        }
+    }
+
+    $calls = [];
+    $fingerprint_ordinals = [];
+
+    foreach ($finder->findInstanceOf($statements, StaticCall::class) as $call) {
+        if (
+            ! $call->class instanceof Name
+            || ! $call->name instanceof Identifier
+            || ! database_connection_affinity_is_guarded_schema_call($call)
+            || ! database_connection_affinity_is_schema_facade_class($call->class, $declared_classes)
+        ) {
+            continue;
+        }
+
+        $method = mb_strtolower($call->name->toString());
+        $fingerprint = database_connection_affinity_schema_call_fingerprint($call);
+        $fingerprint_ordinals[$fingerprint] = ($fingerprint_ordinals[$fingerprint] ?? 0) + 1;
+        $location = "Schema::{$method}:{$fingerprint}:{$fingerprint_ordinals[$fingerprint]}";
 
         $calls[] = $relative_path === '' ? $location : "{$relative_path}:{$location}";
     }
@@ -78,11 +123,39 @@ function database_connection_affinity_is_facade_class(Name $class, array $declar
         && ! isset($declared_classes['db']);
 }
 
+/**
+ * @param  array<string, true>  $declared_classes
+ */
+function database_connection_affinity_is_schema_facade_class(Name $class, array $declared_classes): bool
+{
+    $resolved_class = $class->toString();
+
+    if (strcasecmp($resolved_class, DATABASE_SCHEMA_FACADE_CLASS) === 0) {
+        return true;
+    }
+
+    return strcasecmp($resolved_class, 'Schema') === 0
+        && ! isset($declared_classes['schema']);
+}
+
 function database_connection_affinity_call_fingerprint(StaticCall $call): string
 {
     $expression = database_connection_affinity_fluent_expression($call);
     $original_class = $call->class;
     $call->class = new FullyQualified(DATABASE_FACADE_CLASS);
+
+    $normalized_call = (new Standard)->prettyPrintExpr($expression);
+
+    $call->class = $original_class;
+
+    return mb_substr(hash('sha256', $normalized_call), 0, 16);
+}
+
+function database_connection_affinity_schema_call_fingerprint(StaticCall $call): string
+{
+    $expression = database_connection_affinity_fluent_expression($call);
+    $original_class = $call->class;
+    $call->class = new FullyQualified(DATABASE_SCHEMA_FACADE_CLASS);
 
     $normalized_call = (new Standard)->prettyPrintExpr($expression);
 
@@ -105,9 +178,70 @@ function database_connection_affinity_fluent_expression(StaticCall $call): Expr
     return $expression;
 }
 
-function database_connection_affinity_is_guarded_method(string $method): bool
+function database_connection_affinity_is_guarded_call(StaticCall $call): bool
 {
-    return in_array(mb_strtolower($method), ['table', 'transaction', 'begintransaction', 'commit', 'rollback'], true);
+    if (! $call->name instanceof Identifier) {
+        return false;
+    }
+
+    $method = mb_strtolower($call->name->toString());
+
+    if ($method === 'connection') {
+        return $call->args === [];
+    }
+
+    return in_array($method, [
+        'table',
+        'select',
+        'selectone',
+        'scalar',
+        'insert',
+        'update',
+        'delete',
+        'statement',
+        'unprepared',
+        'affectingstatement',
+        'transaction',
+        'begintransaction',
+        'commit',
+        'rollback',
+    ], true);
+}
+
+function database_connection_affinity_is_guarded_schema_call(StaticCall $call): bool
+{
+    if (! $call->name instanceof Identifier) {
+        return false;
+    }
+
+    $method = mb_strtolower($call->name->toString());
+
+    if ($method === 'connection') {
+        return $call->args === [];
+    }
+
+    return in_array($method, [
+        'create',
+        'table',
+        'drop',
+        'dropifexists',
+        'rename',
+        'hastable',
+        'hascolumn',
+        'hascolumns',
+        'getcolumns',
+        'getcolumnlisting',
+        'getcolumntype',
+        'getindexes',
+        'getindexlisting',
+        'hasindex',
+        'getforeignkeys',
+        'getviews',
+        'hasview',
+        'enableforeignkeyconstraints',
+        'disableforeignkeyconstraints',
+        'withoutforeignkeyconstraints',
+    ], true);
 }
 
 /**
@@ -133,6 +267,37 @@ function database_connection_affinity_repository_calls(string $project_root): ar
             $relative_path = str_replace(DIRECTORY_SEPARATOR, '/', mb_substr($path, mb_strlen($project_root) + 1));
 
             $files = [...$files, ...database_connection_affinity_facade_calls((string) file_get_contents($path), $relative_path)];
+        }
+    }
+
+    sort($files);
+
+    return $files;
+}
+
+/**
+ * @return list<string>
+ */
+function database_connection_affinity_repository_schema_calls(string $project_root): array
+{
+    $files = [];
+    $directories = array_filter([
+        $project_root . '/app',
+        ...glob($project_root . '/Modules/*/app'),
+    ], is_dir(...));
+
+    foreach ($directories as $directory) {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $path = $file->getPathname();
+            $relative_path = str_replace(DIRECTORY_SEPARATOR, '/', mb_substr($path, mb_strlen($project_root) + 1));
+
+            $files = [...$files, ...database_connection_affinity_schema_calls((string) file_get_contents($path), $relative_path)];
         }
     }
 
@@ -216,11 +381,84 @@ PHP;
     expect(database_connection_affinity_facade_calls($source))->toBe([]);
 });
 
-it('does not add DB facade connection-affinity violations to the baseline', function (): void {
+it('detects every DB-hitting facade operation and implicit default connection resolution', function (): void {
+    $expressions = [
+        'connection' => 'DB::connection();',
+        'select' => 'DB::select("select 1");',
+        'selectone' => 'DB::selectOne("select 1");',
+        'scalar' => 'DB::scalar("select 1");',
+        'insert' => 'DB::insert("insert into examples values (1)");',
+        'update' => 'DB::update("update examples set id = 1");',
+        'delete' => 'DB::delete("delete from examples");',
+        'statement' => 'DB::statement("vacuum");',
+        'unprepared' => 'DB::unprepared("vacuum");',
+        'affectingstatement' => 'DB::affectingStatement("update examples set id = 1");',
+        'table' => 'DB::table("examples")->count();',
+        'transaction' => 'DB::transaction(fn () => null);',
+        'begintransaction' => 'DB::beginTransaction();',
+        'commit' => 'DB::commit();',
+        'rollback' => 'DB::rollBack();',
+    ];
+
+    foreach ($expressions as $method => $expression) {
+        $calls = database_connection_affinity_facade_calls("<?php {$expression}");
+
+        expect($calls)->toHaveCount(1)
+            ->and($calls[0])->toStartWith("DB::{$method}:");
+    }
+
+    expect(database_connection_affinity_facade_calls('<?php DB::connection("explicit");'))
+        ->toBe([])
+        ->and(database_connection_affinity_facade_calls('<?php DB::raw("count(*)");'))
+        ->toBe([]);
+});
+
+it('detects implicit database Schema facade operations', function (): void {
+    $expressions = [
+        'connection' => 'Schema::connection();',
+        'create' => 'Schema::create("examples", fn ($table) => null);',
+        'table' => 'Schema::table("examples", fn ($table) => null);',
+        'drop' => 'Schema::drop("examples");',
+        'dropifexists' => 'Schema::dropIfExists("examples");',
+        'hastable' => 'Schema::hasTable("examples");',
+        'hascolumn' => 'Schema::hasColumn("examples", "id");',
+        'hascolumns' => 'Schema::hasColumns("examples", ["id"]);',
+        'getcolumns' => 'Schema::getColumns("examples");',
+        'getcolumnlisting' => 'Schema::getColumnListing("examples");',
+        'getcolumntype' => 'Schema::getColumnType("examples", "id");',
+        'getindexes' => 'Schema::getIndexes("examples");',
+        'hasindex' => 'Schema::hasIndex("examples", ["id"]);',
+        'getforeignkeys' => 'Schema::getForeignKeys("examples");',
+        'getviews' => 'Schema::getViews();',
+    ];
+
+    foreach ($expressions as $method => $expression) {
+        $calls = database_connection_affinity_schema_calls("<?php {$expression}");
+
+        expect($calls)->toHaveCount(1)
+            ->and($calls[0])->toStartWith("Schema::{$method}:");
+    }
+
+    $aliases = <<<'PHP'
+<?php
+use Illuminate\Support\Facades\Schema as DatabaseSchema;
+use Filament\Schemas\Schema;
+
+\Illuminate\Support\Facades\Schema::hasTable('one');
+DatabaseSchema::getColumns('two');
+Schema::make();
+PHP;
+
+    expect(database_connection_affinity_schema_calls($aliases))->toHaveCount(2)
+        ->and(database_connection_affinity_schema_calls('<?php Schema::connection("explicit")->hasTable("examples");'))
+        ->toBe([]);
+});
+
+it('keeps the runtime DB facade connection-affinity baseline empty', function (): void {
     $project_root = dirname(__DIR__, 5);
     $baseline = require $project_root . '/Modules/Core/tests/Fixtures/Architecture/database-connection-affinity-baseline.php';
 
-    $new_violations = array_values(array_diff(database_connection_affinity_repository_calls($project_root), $baseline));
-
-    expect($new_violations)->toBe([]);
+    expect($baseline)->toBe([])
+        ->and(database_connection_affinity_repository_calls($project_root))->toBe([])
+        ->and(database_connection_affinity_repository_schema_calls($project_root))->toBe([]);
 });

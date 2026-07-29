@@ -6,10 +6,10 @@ namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use MatanYadaev\EloquentSpatial\Objects\Point;
 use Modules\Core\Models\Place;
+use TypeError;
 
 /**
  * Transparent read/write of geographic fields through {@see Place}, same pattern as {@see HasTranslations}
@@ -68,6 +68,7 @@ trait HasPlace
 
         if (! empty($attributes['place_id'] ?? null)) {
             $place = $this->resolvePlace();
+
             if ($place instanceof Place) {
                 foreach ($this->placeBridgedAttributeKeys() as $key) {
                     $attributes[$key] = $place->getAttribute($key);
@@ -285,7 +286,7 @@ trait HasPlace
      */
     protected function shouldPersistPlaceGeolocationGeometry(): bool
     {
-        return in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true);
+        return in_array($this->getConnection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true);
     }
 
     /**
@@ -371,7 +372,7 @@ trait HasPlace
     private function setGeolocationThroughPlace(mixed $value): self
     {
         if ($value !== null && ! $value instanceof Point) {
-            throw new \TypeError(sprintf('Geolocation must be null or an instance of %s.', Point::class));
+            throw new TypeError(sprintf('Geolocation must be null or an instance of %s.', Point::class));
         }
 
         if (($this->attributes['place_id'] ?? null) === null) {
@@ -458,6 +459,7 @@ trait HasPlace
     private function extraPlaceAttributesPendingForValidation(): array
     {
         $extra = [];
+
         foreach ($this->placeBridgedAttributeKeys() as $key) {
             if (array_key_exists((string) $key, $this->pending_place_bridged_scalars)) {
                 $extra[$key] = $this->pending_place_bridged_scalars[$key];

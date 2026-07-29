@@ -7,6 +7,7 @@ namespace Modules\Core\Concurrency;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Modules\Core\Concurrency\Contracts\BatchReporter;
 use Modules\Core\Concurrency\Exceptions\BatchExecutionFailedException;
 use Modules\Core\Concurrency\Reporters\NullReporter;
@@ -179,6 +180,7 @@ final class ParallelTaskRunner
 
         /** @var list<BatchOutcome> $outcomes */
         $outcomes = [];
+
         /** @var list<BatchOutcome> $failures */
         $failures = [];
         $total_units_processed = 0;
@@ -188,11 +190,11 @@ final class ParallelTaskRunner
         $start_time = microtime(true);
         $fork = Fork::new()->concurrent($effective_concurrent);
 
-        if ($this->beforeChild instanceof \Closure) {
+        if ($this->beforeChild instanceof Closure) {
             $fork = $fork->before(child: $this->beforeChild);
         }
 
-        if ($this->afterChild instanceof \Closure) {
+        if ($this->afterChild instanceof Closure) {
             $fork = $fork->after(child: $this->afterChild);
         }
 
@@ -225,7 +227,7 @@ final class ParallelTaskRunner
             $total_query_count += $result->queryCount;
             $this->safeReport(fn () => $this->reporter->failure($result));
 
-            if ($this->errorPolicy === ErrorPolicy::FailFast && !$first_failure instanceof \Modules\Core\Concurrency\BatchOutcome) {
+            if ($this->errorPolicy === ErrorPolicy::FailFast && ! $first_failure instanceof BatchOutcome) {
                 $first_failure = $result;
                 $this->drainPendingTasks($fork);
             }
@@ -271,7 +273,7 @@ final class ParallelTaskRunner
 
         $this->safeReport(fn () => $this->reporter->finish($summary));
 
-        throw_if($first_failure instanceof \Modules\Core\Concurrency\BatchOutcome, BatchExecutionFailedException::class, $first_failure);
+        throw_if($first_failure instanceof BatchOutcome, BatchExecutionFailedException::class, $first_failure);
 
         if ($this->errorPolicy === ErrorPolicy::FailFast && $summary->hasFailures()) {
             throw new BatchExecutionFailedException($summary->failures[0]);
@@ -292,7 +294,7 @@ final class ParallelTaskRunner
 
         foreach ($tasks as $task) {
             if (! $task instanceof BatchTask) {
-                throw new \InvalidArgumentException(
+                throw new InvalidArgumentException(
                     'ParallelTaskRunner::run() expects iterable<BatchTask>, got ' . get_debug_type($task),
                 );
             }
@@ -332,7 +334,7 @@ final class ParallelTaskRunner
     private function executeTask(BatchTask $task): BatchOutcome
     {
         $start = microtime(true);
-        $connection = DB::connection();
+        $connection = DB::connection((string) config('database.default'));
         $connection->enableQueryLog();
 
         try {

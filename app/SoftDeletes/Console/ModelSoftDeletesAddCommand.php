@@ -7,11 +7,9 @@ namespace Modules\Core\SoftDeletes\Console;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
@@ -158,13 +156,15 @@ final class ModelSoftDeletesAddCommand extends Command
 
     private function upsertSoftDeletesSetting(string $table, bool $enabled): bool
     {
-        if (! Schema::hasTable(CoreTables::Settings->value)) {
+        $setting = new Setting;
+
+        if (! $setting->getConnection()->getSchemaBuilder()->hasTable($setting->getTable())) {
             $this->warn('Settings table not found; runtime flag was not updated.');
 
             return false;
         }
 
-        Setting::query()->updateOrCreate(
+        $setting->newQuery()->updateOrCreate(
             ['name' => "soft_deletes_{$table}"],
             [
                 'value' => $enabled,

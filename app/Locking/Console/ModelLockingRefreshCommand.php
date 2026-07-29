@@ -7,7 +7,6 @@ namespace Modules\Core\Locking\Console;
 use function Laravel\Prompts\confirm;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Overrides\Command;
@@ -95,7 +94,8 @@ final class ModelLockingRefreshCommand extends Command
         $optimistic_locking_column = method_exists($instance, 'lockVersionColumn') ? $instance->lockVersionColumn() : null;
         $has_optimistic_locking = class_uses_trait($instance, HasOptimisticLocking::class);
 
-        $has_optimistic_locking_column = $optimistic_locking_column !== null && Schema::hasColumn($table, $optimistic_locking_column);
+        $has_optimistic_locking_column = $optimistic_locking_column !== null
+            && $instance->getConnection()->getSchemaBuilder()->hasColumn($table, $optimistic_locking_column);
 
         if ($optimistic_locking_column && $has_optimistic_locking_column && ! $has_optimistic_locking) {
             $this->doRemoveOptimisticLockingOnModel($model, $optimistic_locking_column);
@@ -142,8 +142,9 @@ final class ModelLockingRefreshCommand extends Command
         $lock_by_column = method_exists($instance, 'getLockedByColumn') ? $instance->getLockedByColumn() : null;
         $has_locking = class_uses_trait($instance, $locked_class);
 
-        $has_locked_at_column = $lock_at_column !== null && Schema::hasColumn($table, $lock_at_column);
-        $has_locked_by_column = $lock_by_column !== null && Schema::hasColumn($table, $lock_by_column);
+        $schema = $instance->getConnection()->getSchemaBuilder();
+        $has_locked_at_column = $lock_at_column !== null && $schema->hasColumn($table, $lock_at_column);
+        $has_locked_by_column = $lock_by_column !== null && $schema->hasColumn($table, $lock_by_column);
 
         if ($lock_at_column && ($has_locked_at_column || $has_locked_by_column) && ! $has_locking) {
             $this->doRemoveLockableOnModel($model, $lock_at_column);

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ModelMakeCommand as BaseModelMakeCommand;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Console\Concerns\HasBenchmark;
@@ -27,6 +27,9 @@ use Override;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionType;
+use ReflectionUnionType;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -43,7 +46,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
 
     private bool $isNewClass = false;
 
-    /** @var list<class-string<Model>> */
+    /**
+     * @var list<class-string<Model>>
+     */
     private array $availableClasses = [];
 
     /**
@@ -119,7 +124,9 @@ final class ModelMakeCommand extends BaseModelMakeCommand
             $class_code = $this->sortImports($this->buildClass($name));
             $class_code = $this->addDefaultSections($name, $class_code);
 
-            if (Schema::hasTable($table_name)) {
+            $schema = DB::connection((string) config('database.default'))->getSchemaBuilder();
+
+            if ($schema->hasTable($table_name)) {
                 $this->info('An unmapped table with the same name was found in the schema');
 
                 if (confirm(sprintf("Would you like to automatically map '%s' table?", $table_name))) {
@@ -828,10 +835,6 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         $this->updateClassWithNewRelation($relatedClass, $related_code, $related_path, $inverted_relation_name, $reversed_relation, $className, true);
     }
 
-    /**
-     * @param  string  $className
-     * @param  string  $relatedClass
-     */
     private function updateClassWithNewRelation(string $className, string $classCode, string $classPath, string $relationName, string $relationType, string $relatedClass, bool $isInversed = false): string
     {
         $added_relation_import = $this->injectImportClass($classCode, \Illuminate\Database\Eloquent\Relations\Relation::class);
@@ -994,21 +997,21 @@ final class ModelMakeCommand extends BaseModelMakeCommand
         return is_string($result) ? $result : $classCode;
     }
 
-    private function normalizeReflectionType(?\ReflectionType $type): string
+    private function normalizeReflectionType(?ReflectionType $type): string
     {
-        if ($type instanceof \ReflectionNamedType) {
+        if ($type instanceof ReflectionNamedType) {
             return $type->getName();
         }
 
-        if ($type instanceof \ReflectionUnionType) {
+        if ($type instanceof ReflectionUnionType) {
             foreach ($type->getTypes() as $union_type) {
-                if ($union_type instanceof \ReflectionNamedType && ! $union_type->isBuiltin()) {
+                if ($union_type instanceof ReflectionNamedType && ! $union_type->isBuiltin()) {
                     return $union_type->getName();
                 }
             }
 
             foreach ($type->getTypes() as $union_type) {
-                if ($union_type instanceof \ReflectionNamedType && $union_type->isBuiltin() && $union_type->getName() !== 'null') {
+                if ($union_type instanceof ReflectionNamedType && $union_type->isBuiltin() && $union_type->getName() !== 'null') {
                     return $union_type->getName();
                 }
             }

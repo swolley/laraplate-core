@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Config\Repository;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\DatabaseConfigOverlay;
@@ -94,14 +96,34 @@ it('overlays settings for modules not hardcoded in core', function (): void {
 
 it('swallows database errors while applying overlay from database', function (): void {
     $config = new Repository([]);
-
-    Schema::shouldReceive('hasTable')
-        ->once()
-        ->andThrow(new RuntimeException('connection unavailable'));
-
+    $resolver = Model::getConnectionResolver();
     $overlay = new DatabaseConfigOverlay($config);
 
-    $overlay->applyFromDatabase(Mockery::mock(PerModelSettingResolver::class));
+    Model::setConnectionResolver(new class($resolver) implements ConnectionResolverInterface
+    {
+        public function __construct(private readonly ConnectionResolverInterface $resolver) {}
+
+        public function connection($name = null): ConnectionInterface
+        {
+            throw new RuntimeException('connection unavailable');
+        }
+
+        public function getDefaultConnection(): string
+        {
+            return $this->resolver->getDefaultConnection();
+        }
+
+        public function setDefaultConnection($name): void
+        {
+            $this->resolver->setDefaultConnection($name);
+        }
+    });
+
+    try {
+        $overlay->applyFromDatabase(Mockery::mock(PerModelSettingResolver::class));
+    } finally {
+        Model::setConnectionResolver($resolver);
+    }
 
     expect($config->all())->toBe([]);
 });

@@ -9,8 +9,6 @@ use function Laravel\Prompts\confirm;
 use function models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -56,9 +54,10 @@ final class ModelSoftDeletesRefreshCommand extends Command
         }
 
         $table = $instance->getTable();
+        $schema = $instance->getConnection()->getSchemaBuilder();
         $has_trait = class_uses_trait($model_class, SoftDeletes::class);
-        $has_deleted_at = Schema::hasTable($table) && Schema::hasColumn($table, 'deleted_at');
-        $has_is_deleted = Schema::hasTable($table) && Schema::hasColumn($table, 'is_deleted');
+        $has_deleted_at = $schema->hasTable($table) && $schema->hasColumn($table, 'deleted_at');
+        $has_is_deleted = $schema->hasTable($table) && $schema->hasColumn($table, 'is_deleted');
         $has_columns = $has_deleted_at && $has_is_deleted;
 
         if ($has_trait && ! $has_columns) {
@@ -94,18 +93,19 @@ final class ModelSoftDeletesRefreshCommand extends Command
 
     private function reconcileSetting(string $table, bool $has_trait): void
     {
-        $settings_table = CoreTables::Settings->value;
+        $setting_model = new Setting;
+        $settings_table = $setting_model->getTable();
 
-        if (! Schema::hasTable($settings_table)) {
+        if (! $setting_model->getConnection()->getSchemaBuilder()->hasTable($settings_table)) {
             return;
         }
 
         $name = "soft_deletes_{$table}";
-        $setting = Setting::query()->where('name', $name)->first();
+        $setting = $setting_model->newQuery()->where('name', $name)->first();
 
         if ($setting === null) {
             if ($has_trait && confirm("Create missing runtime setting {$name} = true?", false)) {
-                Setting::query()->create([
+                $setting_model->newQuery()->create([
                     'name' => $name,
                     'value' => true,
                     'encrypted' => false,

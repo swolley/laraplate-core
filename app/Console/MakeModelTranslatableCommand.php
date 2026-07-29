@@ -10,7 +10,6 @@ use function Laravel\Prompts\select;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Override;
@@ -80,8 +79,9 @@ class MakeModelTranslatableCommand extends Command
 
         $model_instance = new $model_full_name();
         $table_name = $model_instance->getTable();
+        $schema = $model_instance->getConnection()->getSchemaBuilder();
 
-        if (! Schema::hasTable($table_name)) {
+        if (! $schema->hasTable($table_name)) {
             $this->error("Table '{$table_name}' does not exist. Run migrations first.");
 
             return Command::FAILURE;
@@ -89,7 +89,7 @@ class MakeModelTranslatableCommand extends Command
 
         $this->info("Inspecting table '{$table_name}'...");
 
-        $raw_columns = Schema::getColumns($table_name);
+        $raw_columns = $schema->getColumns($table_name);
         $translatable = array_values(array_filter(
             $raw_columns,
             $this->isTranslatableColumn(...),
@@ -134,7 +134,7 @@ class MakeModelTranslatableCommand extends Command
         $model_fk = $model_singular . '_id';
         $translation_table = $table_name . '_translations';
 
-        if (Schema::hasTable($translation_table)) {
+        if ($schema->hasTable($translation_table)) {
             $this->error("Translation table '{$translation_table}' already exists.");
 
             return Command::FAILURE;

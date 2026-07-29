@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Support\Facades\Schema;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Setting;
 use Throwable;
 
@@ -30,7 +28,9 @@ final readonly class DatabaseConfigOverlay
     public function applyFromDatabase(PerModelSettingResolver $settings): void
     {
         try {
-            if (! Schema::hasTable(CoreTables::Settings->value)) {
+            $setting = new Setting;
+
+            if (! $setting->getConnection()->getSchemaBuilder()->hasTable($setting->getTable())) {
                 return;
             }
 
