@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 use Filament\Tables\Contracts\HasTable as HasTableContract;
 use Filament\Tables\Grouping\Group;
@@ -33,6 +34,42 @@ it('executes HasForm configureForm workflow', function (): void {
     HasFormHarness::run($schema);
 
     expect(HasFormHarness::$loaded_permissions)->toBeTrue();
+});
+
+it('defaults Toggle fields to stacked label above switch', function (): void {
+    $schema = Schema::make()->components([
+        Toggle::make('is_active'),
+    ]);
+
+    /** @var Toggle $toggle */
+    $toggle = $schema->getComponents()[0];
+
+    expect($toggle->isInline())->toBeFalse();
+});
+
+it('keeps Toggle non-inline when the form uses inline labels', function (): void {
+    $schema = Schema::make()
+        ->inlineLabel()
+        ->components([
+            Toggle::make('is_active'),
+        ]);
+
+    /** @var Toggle $toggle */
+    $toggle = $schema->getComponents()[0];
+
+    expect($toggle->hasInlineLabel())->toBeTrue()
+        ->and($toggle->isInline())->toBeFalse();
+});
+
+it('allows Toggle inline override when the form is stacked', function (): void {
+    $schema = Schema::make()->components([
+        Toggle::make('is_active')->inline(true),
+    ]);
+
+    /** @var Toggle $toggle */
+    $toggle = $schema->getComponents()[0];
+
+    expect($toggle->isInline())->toBeTrue();
 });
 
 it('returns create action when user can create records', function (): void {

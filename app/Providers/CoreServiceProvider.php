@@ -32,6 +32,7 @@ use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
+use Filament\Forms\Components\Toggle;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
@@ -126,6 +127,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->configureModels();
         $this->configureDates();
         $this->configureUrls();
+        $this->configureFilamentDefaults();
         $this->registerValidationOverrides();
         $this->registerCacheWarmOnBoot();
     }
@@ -424,6 +426,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function configureCommands(): void
     {
         DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    private function configureFilamentDefaults(): void
+    {
+        Toggle::configureUsing(
+            static fn (Toggle $toggle): Toggle => $toggle->inline(false),
+        );
     }
 
     private function configureFortifyFeatures(): void
