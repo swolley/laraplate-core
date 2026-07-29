@@ -4,16 +4,9 @@ declare(strict_types=1);
 
 use Modules\Core\Import\Contracts\BulkImporterInterface;
 use Modules\Core\Import\Support\FilesystemImportPluginDiscovery;
-use Modules\Core\Tests\Fixtures\ImportPlugin\AbstractFixtureImporter;
-use Modules\Core\Tests\Fixtures\ImportPlugin\ConcreteFixtureImporter;
-use Modules\Core\Tests\Fixtures\ImportPlugin\UnrelatedFixtureClass;
 
 it('discovers only concrete implementations of the configured contract', function (): void {
-    $root = dirname(__DIR__, 2).'/Fixtures/ImportPlugin';
-
-    require_once $root.'/src/ConcreteFixtureImporter.php';
-    require_once $root.'/src/AbstractFixtureImporter.php';
-    require_once $root.'/src/UnrelatedFixtureClass.php';
+    $root = dirname(__DIR__, 2).'/Stubs/ImportPluginFixtures';
 
     $discovery = new FilesystemImportPluginDiscovery(
         label: 'fixture-importers',
@@ -24,10 +17,12 @@ it('discovers only concrete implementations of the configured contract', functio
     expect($discovery->label())->toBe('fixture-importers')
         ->and($discovery->root())->toBe($root)
         ->and($discovery->autoloadPath())->toBeNull()
-        ->and($discovery->discoverImplementations())->toBe([ConcreteFixtureImporter::class])
+        ->and($discovery->discoverImplementations())->toBe([
+            Modules\Core\Tests\Stubs\ImportPluginFixtures\src\ConcreteFixtureImporter::class,
+        ])
         ->and($discovery->discoverImplementations())->not->toContain(
-            AbstractFixtureImporter::class,
-            UnrelatedFixtureClass::class,
+            Modules\Core\Tests\Stubs\ImportPluginFixtures\src\AbstractFixtureImporter::class,
+            Modules\Core\Tests\Stubs\ImportPluginFixtures\src\UnrelatedFixtureClass::class,
         );
 });
 

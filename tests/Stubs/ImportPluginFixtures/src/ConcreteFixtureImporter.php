@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Tests\Fixtures\ImportPlugin;
+namespace Modules\Core\Tests\Stubs\ImportPluginFixtures\src;
 
 use Modules\Core\Import\Contracts\BulkImporterInterface;
 
@@ -13,3 +13,4 @@ final class ConcreteFixtureImporter implements BulkImporterInterface
         return 1;
     }
 }
+

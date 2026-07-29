@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,6 +12,10 @@ use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
+use Modules\Core\Tests\Stubs\Versioning\ObserveVersionSetStateJob;
+use Modules\Core\Tests\Stubs\Versioning\VersionSetManagerAffinityArticle;
+use Modules\Core\Tests\Stubs\Versioning\VersionSetManagerArticle;
+use Modules\Core\Tests\Stubs\Versioning\VersionSetManagerUuidArticle;
 use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
@@ -26,57 +28,6 @@ use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 use Overtrue\LaravelVersionable\VersionStrategy;
-
-final class VersionSetManagerArticle extends Model
-{
-    public const string TABLE = 'core_test_version_set_articles';
-
-    protected $table = self::TABLE;
-
-    protected $guarded = [];
-
-    /**
-     * @return HasMany<VersionSetManagerArticle>
-     */
-    public function children(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_id');
-    }
-}
-
-final class VersionSetManagerUuidArticle extends Model
-{
-    public const string TABLE = 'core_test_version_set_uuid_articles';
-
-    public $incrementing = false;
-
-    protected $keyType = 'string';
-
-    protected $table = self::TABLE;
-
-    protected $guarded = [];
-}
-
-final class VersionSetManagerAffinityArticle extends Model
-{
-    public const string TABLE = 'core_test_affinity_version_set_articles';
-
-    protected $connection = 'version_set_affinity';
-
-    protected $table = self::TABLE;
-
-    protected $guarded = [];
-}
-
-final class ObserveVersionSetStateJob implements ShouldQueue
-{
-    public static ?bool $sawActiveSet = null;
-
-    public function handle(VersionSetManagerInterface $manager): void
-    {
-        self::$sawActiveSet = $manager->current() !== null;
-    }
-}
 
 beforeEach(function (): void {
     Schema::create(VersionSetManagerArticle::TABLE, function (Blueprint $table): void {

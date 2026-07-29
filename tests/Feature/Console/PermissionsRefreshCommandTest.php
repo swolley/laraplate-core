@@ -10,20 +10,10 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
+use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredPermissionsModel;
 use Symfony\Component\Console\Application as SymfonyConsoleApplication;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-
-class ConstructorConfiguredPermissionsModel extends Illuminate\Database\Eloquent\Model
-{
-    public function __construct(array $attributes = [])
-    {
-        parent::__construct($attributes);
-
-        $this->setConnection('permissions_constructor_connection');
-        $this->setTable('permissions_constructor_table');
-    }
-}
 
 afterEach(function (): void {
     HelpersCache::clearModels();

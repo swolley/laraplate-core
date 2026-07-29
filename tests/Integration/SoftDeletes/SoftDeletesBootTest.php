@@ -7,14 +7,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\ModuleDatabaseActivator;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Tests\Stubs\SoftDeletes\ModuleDatabaseActivatorAffinityModel;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
-
-class ModuleDatabaseActivatorAffinityModel extends Model
-{
-    protected $connection = 'module_activator_affinity';
-
-    protected $table = 'custom_module_settings';
-}
 
 it('boots soft deletes trait without a database connection resolver', function (): void {
     Model::clearBootedModels();

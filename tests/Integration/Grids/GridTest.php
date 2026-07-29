@@ -2,20 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Modules\Core\Grids\Components\Grid;
-use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\GridUtilsModelStub;
-
-class GridConnectionAffinityModel extends Model
-{
-    use HasGridUtils;
-
-    protected $connection = 'grid_layout_affinity';
-}
+use Modules\Core\Tests\Stubs\Grids\GridConnectionAffinityModel;
 
 it('detects models that use HasGridUtils', function (): void {
     expect(Grid::useGridUtils(User::factory()->make()))->toBeFalse()
