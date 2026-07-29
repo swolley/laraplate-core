@@ -3,10 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Helpers\LocaleContext;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
 
@@ -91,12 +90,12 @@ it('does not issue a DB query when translations collection is already loaded (Pr
     $fresh->unsetRelation('translation');
 
     // Count queries before and after — no new query should be issued
-    DB::enableQueryLog();
-    $count_before = count(DB::getQueryLog());
+    $fresh->getConnection()->enableQueryLog();
+    $count_before = count($fresh->getConnection()->getQueryLog());
 
     $title = $fresh->title;
 
-    $count_after = count(DB::getQueryLog());
+    $count_after = count($fresh->getConnection()->getQueryLog());
 
     expect($title)->toBe('Default Title')
         ->and($count_after)->toBe($count_before);
@@ -131,12 +130,12 @@ it('never queries DB for fallback when translations collection is loaded (proper
 
     $fresh->unsetRelation('translation');
 
-    DB::enableQueryLog();
-    $count_before = count(DB::getQueryLog());
+    $fresh->getConnection()->enableQueryLog();
+    $count_before = count($fresh->getConnection()->getQueryLog());
 
     $result = $fresh->title;
 
-    $count_after = count(DB::getQueryLog());
+    $count_after = count($fresh->getConnection()->getQueryLog());
 
     expect($result)->toBe($title_value)
         ->and($count_after)->toBe($count_before);
@@ -160,12 +159,12 @@ it('returns null without querying DB when translations collection is loaded but 
 
     $fresh->unsetRelation('translation');
 
-    DB::enableQueryLog();
-    $count_before = count(DB::getQueryLog());
+    $fresh->getConnection()->enableQueryLog();
+    $count_before = count($fresh->getConnection()->getQueryLog());
 
     $result = $fresh->title;
 
-    $count_after = count(DB::getQueryLog());
+    $count_after = count($fresh->getConnection()->getQueryLog());
 
     // No translation exists, but no query should be issued either
     expect($result)->toBeNull()

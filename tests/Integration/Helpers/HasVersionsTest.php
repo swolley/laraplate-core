@@ -139,7 +139,7 @@ it('does not query DB or persistent cache on second call for same model class', 
     $model->setConnection(config('database.default'));
 
     $query_count = 0;
-    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
+    $model->getConnection()->listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
         if (str_contains(mb_strtolower($event->sql), 'settings') || str_contains(mb_strtolower($event->sql), 'setting')) {
             $query_count++;
         }
@@ -176,7 +176,7 @@ it('resets L1 cache so next call re-resolves from persistent cache', function ()
     HasVersions::resetVersionStrategyCache();
 
     $query_count = 0;
-    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
+    $model->getConnection()->listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
         if (str_contains(mb_strtolower($event->sql), 'setting')) {
             $query_count++;
         }
@@ -328,16 +328,16 @@ it('does not query DB or access persistent cache on second call for any model cl
     $model->setConnection(config('database.default'));
 
     // Warm the L1 cache with the first call (cold path: may hit L2 persistent cache or L3 DB)
-    DB::enableQueryLog();
+    $model->getConnection()->enableQueryLog();
     $model->getVersionStrategy();
-    $count_after_first = count(DB::getQueryLog());
+    $count_after_first = count($model->getConnection()->getQueryLog());
 
     // Spy on Cache AFTER the first call so we only capture accesses during the second call
     Illuminate\Support\Facades\Cache::spy();
 
     // Second call — must be served entirely from the L1 static map
     $model->getVersionStrategy();
-    $count_after_second = count(DB::getQueryLog());
+    $count_after_second = count($model->getConnection()->getQueryLog());
 
     // No new DB queries were issued after the first call
     expect($count_after_second)->toBe($count_after_first);

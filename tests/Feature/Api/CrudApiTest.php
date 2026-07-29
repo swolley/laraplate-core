@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rules\Password;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
@@ -33,11 +32,12 @@ test('inspector returns users table with SQLite and tryResolveModel returns User
         ->and($inspected->columns->isNotEmpty())->toBeTrue('Inspector should return columns for users table');
 
     $resolved = DynamicEntity::tryResolveModel('users', null);
-    /** @var class-string<\Illuminate\Database\Eloquent\Model> $expected_user_model */
+
+    /** @var class-string<Illuminate\Database\Eloquent\Model> $expected_user_model */
     $expected_user_model = config('auth.providers.users.model');
     expect($resolved)->toBe($expected_user_model);
 
-    expect(DynamicEntity::tryResolveModel('users', null, 'Core'))->toBe(\Modules\Core\Models\User::class);
+    expect(DynamicEntity::tryResolveModel('users', null, 'Core'))->toBe(User::class);
 });
 
 // Search API disabled: route and controller method commented out.
@@ -140,10 +140,10 @@ test('api insert creates new record', function (): void {
             ],
         ]);
 
-    $this->assertDatabaseHas(CoreTables::Users->value, [
+    $this->assertDatabaseHas($this->user->getTable(), [
         'name' => 'New User',
         'email' => 'new@example.com',
-    ]);
+    ], $this->user->getConnectionName());
 });
 
 test('api insert validates required fields', function (): void {
@@ -168,9 +168,9 @@ test('api insert rejects weak password and does not create record', function ():
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['password']);
 
-    $this->assertDatabaseMissing(CoreTables::Users->value, [
+    $this->assertDatabaseMissing($this->user->getTable(), [
         'email' => 'weak@example.com',
-    ]);
+    ], $this->user->getConnectionName());
 });
 
 test('api update modifies existing record', function (): void {
@@ -193,11 +193,11 @@ test('api update modifies existing record', function (): void {
         'email' => 'updated@example.com',
     ]);
 
-    $this->assertDatabaseHas(CoreTables::Users->value, [
+    $this->assertDatabaseHas($this->user->getTable(), [
         'id' => $this->user->id,
         'name' => 'Updated User',
         'email' => 'updated@example.com',
-    ]);
+    ], $this->user->getConnectionName());
 });
 
 test('api update returns 404 for non-existent record', function (): void {
@@ -221,9 +221,9 @@ test('api delete removes record', function (): void {
 
     $response->assertStatus(200);
 
-    $this->assertDatabaseMissing(CoreTables::Users->value, [
+    $this->assertDatabaseMissing($this->user->getTable(), [
         'id' => $this->user->id,
-    ]);
+    ], $this->user->getConnectionName());
 });
 
 test('api delete returns 404 for non-existent record', function (): void {

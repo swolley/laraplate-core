@@ -93,7 +93,7 @@ it('throws BatchExecutionFailedException on FailFast', function (): void {
     $tasks = [
         new BatchTask(id: 'ok', units: 5, run: fn (): int => 1),
         new BatchTask(id: 'boom', units: 5, run: function (): never {
-            throw new \RuntimeException('intentional');
+            throw new RuntimeException('intentional');
         }),
     ];
 
@@ -104,7 +104,7 @@ it('throws BatchExecutionFailedException on FailFast', function (): void {
             ->concurrent(1)
             ->errorPolicy(ErrorPolicy::FailFast)
             ->run($tasks);
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         $caught = $e;
     }
 
@@ -117,7 +117,7 @@ it('continues on failures and collects them when policy is ContinueOnError', fun
     $tasks = [
         new BatchTask(id: 'ok', units: 5, run: fn (): int => 1),
         new BatchTask(id: 'fail', units: 5, run: function (): never {
-            throw new \RuntimeException('intentional');
+            throw new RuntimeException('intentional');
         }),
         new BatchTask(id: 'ok2', units: 5, run: fn (): int => 1),
     ];
@@ -142,7 +142,9 @@ it('rejects items that are not BatchTask instances', function (): void {
 it('invokes the reporter for start, progress and finish', function (): void {
     $reporter = new class implements BatchReporter
     {
-        /** @var list<array{event: string, payload: mixed}> */
+        /**
+         * @var list<array{event: string, payload: mixed}>
+         */
         public array $events = [];
 
         public function start(int $totalTasks, int $totalUnits): void
@@ -184,13 +186,14 @@ it('invokes the reporter for start, progress and finish', function (): void {
 it('sums queryCount from each forked child into BatchSummary::totalQueryCount', function (): void {
     $tasks = [
         new BatchTask(id: 'sql_light', units: 1, run: function (): bool {
-            DB::select('select 1');
+            DB::connection((string) config('database.default'))->select('select 1');
 
             return true;
         }),
         new BatchTask(id: 'sql_heavy', units: 1, run: function (): bool {
-            DB::select('select 1');
-            DB::select('select 1');
+            $connection = DB::connection((string) config('database.default'));
+            $connection->select('select 1');
+            $connection->select('select 1');
 
             return true;
         }),

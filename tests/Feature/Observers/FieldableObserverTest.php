@@ -98,10 +98,10 @@ it('orders fieldables by order column ascending', function (): void {
         'is_required' => false,
     ]);
 
-    Illuminate\Support\Facades\DB::table($fieldable_a->getTable())
+    $fieldable_a->getConnection()->table($fieldable_a->getTable())
         ->where('id', $fieldable_a->id)
         ->update(['order_column' => 10]);
-    Illuminate\Support\Facades\DB::table($fieldable_b->getTable())
+    $fieldable_b->getConnection()->table($fieldable_b->getTable())
         ->where('id', $fieldable_b->id)
         ->update(['order_column' => 5]);
 

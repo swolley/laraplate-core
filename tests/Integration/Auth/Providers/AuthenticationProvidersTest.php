@@ -3,20 +3,20 @@
 declare(strict_types=1);
 
 use App\Models\User as AppUser;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Laravel\Socialite\Facades\Socialite;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Auth\Providers\SocialiteProvider;
-use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\License;
+use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
 beforeEach(function (): void {
-    if (! Schema::hasColumn('users', 'social_id')) {
-        Schema::table('users', function (Illuminate\Database\Schema\Blueprint $table): void {
+    $user_schema = (new AppUser)->getConnection()->getSchemaBuilder();
+
+    if (! $user_schema->hasColumn((new AppUser)->getTable(), 'social_id')) {
+        $user_schema->table((new AppUser)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
             $table->string('social_id')->nullable();
             $table->string('social_service')->nullable();
             $table->string('social_token')->nullable();
@@ -53,7 +53,7 @@ it('authenticates credentials and covers invalid and license branches', function
         'license_id' => null,
         'email_verified_at' => now(),
     ])->save();
-    DB::table(CoreTables::ModelHasRoles->value)->insert([
+    $user->getConnection()->table((new ModelHasRole)->getTable())->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $user->id,
@@ -98,7 +98,7 @@ it('returns email-not-verified and license-available success branches for fortif
         'license_id' => null,
         'email_verified_at' => null,
     ])->save();
-    DB::table(CoreTables::ModelHasRoles->value)->insert([
+    $unverified->getConnection()->table((new ModelHasRole)->getTable())->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $unverified->id,
@@ -121,7 +121,7 @@ it('returns email-not-verified and license-available success branches for fortif
         'license_id' => null,
         'email_verified_at' => now(),
     ])->save();
-    DB::table(CoreTables::ModelHasRoles->value)->insert([
+    $verified->getConnection()->table((new ModelHasRole)->getTable())->insert([
         'role_id' => $role->id,
         'model_type' => AppUser::class,
         'model_id' => $verified->id,
@@ -265,7 +265,7 @@ it('authenticates social user successfully when data is valid', function (): voi
     $driver_mock->shouldReceive('user')->once()->andReturn($social_user_success);
     Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
 
-    expect(Schema::hasColumn('users', 'social_id'))->toBeTrue();
+    expect((new AppUser)->getConnection()->getSchemaBuilder()->hasColumn((new AppUser)->getTable(), 'social_id'))->toBeTrue();
     config(['auth.enable_user_licenses' => false]);
     $success = $provider->authenticate(request()->duplicate(['provider' => 'github']));
     expect($success['error'])->toBeNull()

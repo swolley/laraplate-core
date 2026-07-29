@@ -64,8 +64,9 @@ it('creates root, admin and anonymous users when they do not exist', function ()
 
     $tester->assertExitCode(BaseCommand::SUCCESS);
 
-    $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'root']);
-    $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'anonymous']);
+    $user_model = new $userClass();
+    $this->assertDatabaseHas($user_model->getTable(), ['name' => 'root'], $user_model->getConnectionName());
+    $this->assertDatabaseHas($user_model->getTable(), ['name' => 'anonymous'], $user_model->getConnectionName());
 });
 
 it('creates root and anonymous users when missing using non-interactive test double', function (): void {
@@ -88,8 +89,9 @@ it('creates root and anonymous users when missing using non-interactive test dou
 
     /** @var class-string $userClass */
     $userClass = user_class();
-    $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'root']);
-    $this->assertDatabaseHas((new $userClass())->getTable(), ['name' => 'anonymous']);
+    $user_model = new $userClass();
+    $this->assertDatabaseHas($user_model->getTable(), ['name' => 'root'], $user_model->getConnectionName());
+    $this->assertDatabaseHas($user_model->getTable(), ['name' => 'anonymous'], $user_model->getConnectionName());
 });
 
 it('creates root, admin and anonymous when missing including optional admin user', function (): void {
@@ -112,10 +114,12 @@ it('creates root, admin and anonymous when missing including optional admin user
 
     /** @var class-string $userClass */
     $userClass = user_class();
-    $table = (new $userClass())->getTable();
-    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com']);
-    $this->assertDatabaseHas($table, ['name' => 'admin', 'email' => 'admin@example.com']);
-    $this->assertDatabaseHas($table, ['name' => 'anonymous']);
+    $user_model = new $userClass();
+    $table = $user_model->getTable();
+    $connection = $user_model->getConnectionName();
+    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com'], $connection);
+    $this->assertDatabaseHas($table, ['name' => 'admin', 'email' => 'admin@example.com'], $connection);
+    $this->assertDatabaseHas($table, ['name' => 'anonymous'], $connection);
 });
 
 it('creates users via artisan when database is empty using console fallback prompts and skips admin', function (): void {
@@ -139,10 +143,12 @@ it('creates users via artisan when database is empty using console fallback prom
         ->expectsQuestion('Please specify a admin user email or leave blank to skip', '')
         ->assertExitCode(BaseCommand::SUCCESS);
 
-    $table = (new $userClass())->getTable();
-    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com']);
-    $this->assertDatabaseMissing($table, ['name' => 'admin']);
-    $this->assertDatabaseHas($table, ['name' => 'anonymous']);
+    $user_model = new $userClass();
+    $table = $user_model->getTable();
+    $connection = $user_model->getConnectionName();
+    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com'], $connection);
+    $this->assertDatabaseMissing($table, ['name' => 'admin'], $connection);
+    $this->assertDatabaseHas($table, ['name' => 'anonymous'], $connection);
 });
 
 it('creates users via artisan when database is empty including admin via console fallback prompts', function (): void {
@@ -168,8 +174,10 @@ it('creates users via artisan when database is empty including admin via console
         ->expectsQuestion('Please confirm the password', 'adminpass123')
         ->assertExitCode(BaseCommand::SUCCESS);
 
-    $table = (new $userClass())->getTable();
-    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com']);
-    $this->assertDatabaseHas($table, ['name' => 'admin', 'email' => 'admin@example.com']);
-    $this->assertDatabaseHas($table, ['name' => 'anonymous']);
+    $user_model = new $userClass();
+    $table = $user_model->getTable();
+    $connection = $user_model->getConnectionName();
+    $this->assertDatabaseHas($table, ['name' => 'root', 'email' => 'root@example.com'], $connection);
+    $this->assertDatabaseHas($table, ['name' => 'admin', 'email' => 'admin@example.com'], $connection);
+    $this->assertDatabaseHas($table, ['name' => 'anonymous'], $connection);
 });

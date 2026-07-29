@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Console\Command as IlluminateCommand;
 use Illuminate\Console\OutputStyle;
-use Illuminate\Support\Facades\DB;
 use Laravel\Prompts\ConfirmPrompt;
 use Laravel\Prompts\MultiSelectPrompt;
 use Laravel\Prompts\PasswordPrompt;
@@ -44,13 +43,13 @@ it('covers CreateUserCommand success and failure branches', function (): void {
         'auth.providers.users.model' => User::class,
     ]);
 
-    DB::table(CoreTables::Roles->value)->insert([
+    (new Role)->getConnection()->table(CoreTables::Roles->value)->insert([
         'name' => 'console',
         'guard_name' => 'web',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    DB::table(CoreTables::Permissions->value)->insert([
+    (new Permission)->getConnection()->table(CoreTables::Permissions->value)->insert([
         'name' => 'console_permission',
         'guard_name' => 'web',
         'created_at' => now(),
@@ -98,7 +97,7 @@ it('covers CreateUserCommand success and failure branches', function (): void {
 it('covers CreateUserCommand in-string options and random password branch', function (): void {
     config(['auth.providers.users.model' => CreateUserPromptFlowStub::class]);
 
-    DB::table(CoreTables::Roles->value)->insert([
+    (new Role)->getConnection()->table(CoreTables::Roles->value)->insert([
         'name' => 'console_second',
         'guard_name' => 'web',
         'created_at' => now(),

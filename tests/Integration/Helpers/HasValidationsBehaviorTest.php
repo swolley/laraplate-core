@@ -384,7 +384,9 @@ it('checks user permissions when a permission row exists', function (): void {
     $operation = 'select';
     $permission_name = "{$table_name}.{$operation}";
 
-    DB::table(Modules\Core\Enums\CoreTables::Permissions->value)->insert([
+    $permission_model_class = config('permission.models.permission');
+    $permission_model = new $permission_model_class();
+    $permission_model->getConnection()->table($permission_model->getTable())->insert([
         'name' => $permission_name,
         'guard_name' => 'web',
         'created_at' => now(),

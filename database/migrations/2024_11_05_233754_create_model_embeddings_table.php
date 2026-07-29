@@ -7,6 +7,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
+use Modules\Core\Models\ModelEmbedding;
 
 return new class extends Migration
 {
@@ -17,7 +18,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $connection = app('db')->connection();
+        $connection = (new ModelEmbedding)->getConnection();
         $supports_vector = $this->supportsPostgreSQLVector($connection);
         $vector_dimensions = $this->vectorDimensions();
 
@@ -53,7 +54,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        app('db')->connection()->getSchemaBuilder()->dropIfExists(CoreTables::ModelEmbeddings->value);
+        (new ModelEmbedding)->getConnection()->getSchemaBuilder()->dropIfExists(CoreTables::ModelEmbeddings->value);
     }
 
     private function supportsPostgreSQLVector(Connection $connection): bool

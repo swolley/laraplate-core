@@ -685,13 +685,14 @@ it('resolveAcls issues at most one DB query to load ACLs for a user with multipl
     // Warm up Spatie permission cache and role relations before counting queries
     $user->load('roles.permissions', 'roles.ancestors');
 
-    DB::enableQueryLog();
+    $permission_connection = $permission->getConnection();
+    $permission_connection->enableQueryLog();
     Cache::flush(); // ensure cold cache so resolveAcls is actually called
 
     $service->getEffectiveAcls($user, $permission);
 
-    $queries = DB::getQueryLog();
-    DB::disableQueryLog();
+    $queries = $permission_connection->getQueryLog();
+    $permission_connection->disableQueryLog();
 
     // Filter only ACL-related queries (SELECT from acls table)
     $acl_queries = array_filter($queries, static fn (array $q): bool => str_contains(mb_strtolower($q['query']), 'from') && str_contains(mb_strtolower($q['query']), 'acl'));

@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Modification;
@@ -214,7 +213,7 @@ it('canAccessPanel returns true when user has wildcard permission on panel guard
     config(['permission.roles.superadmin' => 'superadmin']);
     $user = User::factory()->create();
     $permissions_table = config('permission.table_names.permissions');
-    DB::table($permissions_table)->insert([
+    (new Permission)->getConnection()->table($permissions_table)->insert([
         'name' => '*',
         'guard_name' => 'web',
         'created_at' => now(),

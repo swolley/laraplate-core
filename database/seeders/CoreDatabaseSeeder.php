@@ -7,16 +7,15 @@ namespace Modules\Core\Database\Seeders;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
@@ -208,7 +207,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($role_class, $new_roles): void {
+        $role_instance->getConnection()->transaction(function () use ($role_class, $new_roles): void {
             foreach ($new_roles as &$role) {
                 $this->create($role_class, $role);
                 $this->command->line("    - {$role['name']} <fg=green>created</>");
@@ -287,7 +286,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($user_class, $new_users, $superadmin): void {
+        $user_instance->getConnection()->transaction(function () use ($user_class, $new_users, $superadmin): void {
             foreach ($new_users as &$user) {
                 $this->create($user_class, $user);
                 $this->command->line("    - {$user['username']} <fg=green>created</>");
@@ -302,6 +301,7 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultSettings(): void
     {
         $this->logOperation(Setting::class);
+        $setting_model = new Setting;
 
         $default_settings = [
             [
@@ -421,7 +421,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($new_settings): void {
+        $setting_model->getConnection()->transaction(function () use ($new_settings): void {
             foreach ($new_settings as &$setting) {
                 if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
                     $this->create(Setting::class, $setting);
@@ -552,6 +552,7 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultCrons(): void
     {
         $this->logOperation(CronJob::class);
+        $cron_job_model = new CronJob;
 
         $default_crons = [
             [
@@ -596,7 +597,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($new_crons): void {
+        $cron_job_model->getConnection()->transaction(function () use ($new_crons): void {
             foreach ($new_crons as &$cron) {
                 if (! CronJob::query()->withoutGlobalScopes()->where('name', $cron['name'])->exists()) {
                     $this->create(CronJob::class, $cron);
@@ -615,6 +616,7 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultApprovalSettings(): void
     {
         $this->command->info('  Seeding approval threshold settings...');
+        $setting_model = new Setting;
 
         $models_with_approvals = $this->getModelsWithApprovals();
 
@@ -655,7 +657,7 @@ final class CoreDatabaseSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($new_settings): void {
+        $setting_model->getConnection()->transaction(function () use ($new_settings): void {
             foreach ($new_settings as &$setting) {
                 if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
                     $this->create(Setting::class, $setting);

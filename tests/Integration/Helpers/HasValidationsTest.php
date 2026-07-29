@@ -207,7 +207,9 @@ it('uses and caches the permission model connection independently of the authori
     HasValidations::resetPermissionExistenceCache();
 
     $connection_name = 'permission_affinity';
-    $permission_table = Modules\Core\Enums\CoreTables::Permissions->value;
+    $permission_model_class = config('permission.models.permission');
+    $permission_model = new $permission_model_class();
+    $permission_table = $permission_model->getTable();
     $table_name = 'permission_affinity_records_' . uniqid();
     $permission_name = "{$table_name}.select";
 
@@ -220,7 +222,7 @@ it('uses and caches the permission model connection independently of the authori
     Illuminate\Support\Facades\DB::purge($connection_name);
 
     try {
-        Illuminate\Support\Facades\DB::table($permission_table)->insert([
+        $permission_model->getConnection()->table($permission_table)->insert([
             'name' => $permission_name,
             'guard_name' => 'web',
             'created_at' => now(),
@@ -260,7 +262,7 @@ it('uses and caches the permission model connection independently of the authori
         expect($method->invoke(null, $model, 'select'))->toBeFalse()
             ->and($method->invoke(null, $affinity_model, 'select'))->toBeFalse()
             ->and($permission_query_count)->toBe(1)
-            ->and($queried_connections)->toContain(Illuminate\Support\Facades\DB::getDefaultConnection())
+            ->and($queried_connections)->toContain($permission_model->getConnection()->getName())
             ->and($queried_connections)->not->toContain($connection_name);
     } finally {
         Illuminate\Support\Facades\Auth::logout();
@@ -323,13 +325,15 @@ it('does not query DB on warm cache for any permission name (property test)', fu
     $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
 
     // Cold cache: first call populates the static cache and may issue a DB query
-    Illuminate\Support\Facades\DB::enableQueryLog();
+    $permission_model_class = config('permission.models.permission');
+    $permission_connection = (new $permission_model_class())->getConnection();
+    $permission_connection->enableQueryLog();
     $method->invoke(null, $model, $operation);
-    $count_after_first = count(Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_first = count($permission_connection->getQueryLog());
 
     // Warm cache: second call with the same permission name must not add any new queries
     $method->invoke(null, $model, $operation);
-    $count_after_second = count(Illuminate\Support\Facades\DB::getQueryLog());
+    $count_after_second = count($permission_connection->getQueryLog());
 
     expect($count_after_second)->toBe($count_after_first);
 })->repeat(10);

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\CMS\Enums\CMSTables;
 use Modules\CMS\Models\Contributor;
@@ -116,7 +115,7 @@ describe('HasTranslatedDynamicContents', function (): void {
         $contributor->save();
 
         // Verify components are saved in translations table, not in contributors table
-        $translation = DB::table(CMSTables::ContributorsTranslations->value)
+        $translation = $contributor->getConnection()->table(CMSTables::ContributorsTranslations->value)
             ->where('contributor_id', $contributor->id)
             ->where('locale', $default_locale)
             ->first();
@@ -125,7 +124,7 @@ describe('HasTranslatedDynamicContents', function (): void {
         expect(json_decode((string) $translation->components, true))->toBeArray();
 
         // Verify components are NOT in contributors table
-        $contributorRecord = DB::table(CMSTables::Contributors->value)->where('id', $contributor->id)->first();
+        $contributorRecord = $contributor->getConnection()->table($contributor->getTable())->where('id', $contributor->id)->first();
         expect($contributorRecord)->not->toHaveProperty('components');
     });
 

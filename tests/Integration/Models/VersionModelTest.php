@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
@@ -78,8 +77,10 @@ it('createForModel stores connection and table refs for dynamic entities', funct
     DynamicEntityService::reset();
 
     $table_name = 'tmp_version_dyn_' . bin2hex(random_bytes(4));
+    $connection = DB::connection((string) config('database.default'));
+    $schema = $connection->getSchemaBuilder();
 
-    Schema::create($table_name, function (Blueprint $blueprint): void {
+    $schema->create($table_name, function (Blueprint $blueprint): void {
         $blueprint->id();
         $blueprint->string('name')->nullable();
         $blueprint->boolean('is_deleted')->default(false);
@@ -88,7 +89,7 @@ it('createForModel stores connection and table refs for dynamic entities', funct
 
     try {
         $entity = DynamicEntityService::getInstance()->resolve($table_name);
-        $inserted_id = DB::table($table_name)->insertGetId(['name' => 'row']);
+        $inserted_id = $connection->table($table_name)->insertGetId(['name' => 'row']);
 
         $row = $entity->newQuery()->findOrFail($inserted_id);
 
@@ -98,7 +99,7 @@ it('createForModel stores connection and table refs for dynamic entities', funct
             ->and($version->table_ref)->toBe($table_name);
     } finally {
         DynamicEntityService::getInstance()->clearCache($table_name);
-        Schema::dropIfExists($table_name);
+        $schema->dropIfExists($table_name);
         DynamicEntityService::reset();
     }
 });

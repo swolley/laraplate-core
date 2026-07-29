@@ -19,3 +19,13 @@ it('seeds clearUserAssignedLicenses is_active from the runtime license setting',
     expect($source)->toContain('(bool) config(\'core.enable_user_licenses\', false)')
         ->and($source)->not->toContain('config(\'auth.enable_user_licenses\')');
 });
+
+it('runs model-owned seeder work on the owning model connection', function (): void {
+    $source = file_get_contents((new ReflectionClass(CoreDatabaseSeeder::class))->getFileName());
+
+    expect($source)->not->toContain('DB::transaction(')
+        ->and($source)->toContain('$role_instance->getConnection()->transaction(')
+        ->and($source)->toContain('$user_instance->getConnection()->transaction(')
+        ->and($source)->toContain('$setting_model->getConnection()->transaction(')
+        ->and($source)->toContain('$cron_job_model->getConnection()->transaction(');
+});

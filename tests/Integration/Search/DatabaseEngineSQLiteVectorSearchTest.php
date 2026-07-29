@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
@@ -23,7 +22,7 @@ it('returns the top sqlite vector search matches without changing the result sha
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => $model_type,
         'model_id' => $model_id,
         'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
@@ -112,7 +111,7 @@ it('prefilters sqlite vector candidates from keyword constraints before scoring'
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (int $model_id): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (int $model_id): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => DatabaseEngineSQLiteVectorSearchUser::class,
         'model_id' => $model_id,
         'embedding' => json_encode([1.0, 0.0, 0.0], JSON_THROW_ON_ERROR),
@@ -144,7 +143,7 @@ it('paginates sqlite vector search as matching models ordered by similarity', fu
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => $model_type,
         'model_id' => $model_id,
         'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
@@ -191,7 +190,7 @@ it('applies keyword constraints when sqlite vector search is used as a hybrid da
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => $model_type,
         'model_id' => $model_id,
         'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
@@ -233,7 +232,7 @@ it('applies advanced range and or filters before sqlite vector pagination', func
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (int $model_id, array $embedding): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => DatabaseEngineSQLiteVectorSearchUser::class,
         'model_id' => $model_id,
         'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),
@@ -284,7 +283,7 @@ it('executes keyword vector and hybrid strategies through the database engine en
     $now = now();
     $table = CoreTables::ModelEmbeddings->value;
 
-    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) DB::table($table)->insertGetId([
+    $insert_embedding = static fn (string $model_type, int $model_id, array $embedding): int => (int) (new ModelEmbedding)->getConnection()->table($table)->insertGetId([
         'model_type' => $model_type,
         'model_id' => $model_id,
         'embedding' => json_encode($embedding, JSON_THROW_ON_ERROR),

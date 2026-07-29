@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\DB;
 use MatanYadaev\EloquentSpatial\Objects\Point;
 use Modules\Core\Models\Place;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -45,7 +44,7 @@ it('realigns geolocation from latitude and longitude on save when coordinates ch
     expect($place->latitude)->toBe(10.5)
         ->and($place->longitude)->toBe(20.25);
 
-    if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true)) {
+    if (in_array($place->getConnection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true)) {
         expect($place->geolocation)->toBeInstanceOf(Point::class)
             ->and($place->geolocation->latitude)->toBe(10.5)
             ->and($place->geolocation->longitude)->toBe(20.25);
