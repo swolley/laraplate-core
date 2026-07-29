@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
@@ -16,8 +14,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $connection = app('db')->connection();
+        $schema = $connection->getSchemaBuilder();
         $places_table = CoreTables::Places->value;
-        Schema::create($places_table, function (Blueprint $table) use ($places_table): void {
+        $schema->create($places_table, function (Blueprint $table) use ($connection, $places_table): void {
             $table->id();
             $table->string('address')->nullable();
             $table->string('city')->nullable();
@@ -28,11 +28,11 @@ return new class extends Migration
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
 
-            $driver = DB::connection()->getDriverName();
+            $driver = $connection->getDriverName();
 
             if ($driver === 'pgsql') {
                 // Create PostGIS extension first
-                DB::unprepared('CREATE EXTENSION IF NOT EXISTS postgis;');
+                $connection->unprepared('CREATE EXTENSION IF NOT EXISTS postgis;');
                 $table->geometry('geolocation', 'point', 4326)->nullable()->spatialIndex()->comment('The geolocation of the location');
             } elseif (in_array($driver, ['mysql', 'mariadb', 'sqlite'], true)) {
                 // Campo opzionale, nessun spatial index per evitare NOT NULL forzato
@@ -42,7 +42,7 @@ return new class extends Migration
                 $table->geometry('geolocation')->nullable()->comment('The geolocation of the location');
 
                 $upper_places_table = mb_strtoupper($places_table);
-                DB::unprepared("
+                $connection->unprepared("
                     DECLARE
                         tbl VARCHAR2(128) := '{$upper_places_table}';
                         col VARCHAR2(128) := 'GEOLOCATION';
@@ -67,21 +67,22 @@ return new class extends Migration
                     END;
                 ");
 
-                DB::unprepared("CREATE INDEX {$places_table}_geolocation_spx ON {$places_table}(geolocation) INDEXTYPE IS MDSYS.SPATIAL_INDEX");
+                $connection->unprepared("CREATE INDEX {$places_table}_geolocation_spx ON {$places_table}(geolocation) INDEXTYPE IS MDSYS.SPATIAL_INDEX");
             }
 
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
+                connection: $connection,
             );
 
             $table->index('city', "{$places_table}_city_IDX");
             $table->index('province', "{$places_table}_province_IDX");
         });
 
-        MigrateUtils::fuzzyIndex($places_table, 'address');
-        MigrateUtils::fuzzyIndex($places_table, 'city');
+        MigrateUtils::fuzzyIndex($places_table, 'address', connection: $connection);
+        MigrateUtils::fuzzyIndex($places_table, 'city', connection: $connection);
     }
 
     /**
@@ -89,6 +90,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(CoreTables::Places->value);
+        app('db')->connection()->getSchemaBuilder()->dropIfExists(CoreTables::Places->value);
     }
 };

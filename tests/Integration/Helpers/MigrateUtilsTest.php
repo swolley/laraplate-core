@@ -77,6 +77,47 @@ it('uses the explicit schema connection without changing the default connection'
         ->and(Schema::hasColumn($table_name, 'updated_at'))->toBeFalse();
 });
 
+it('runs migration raw statements on the migrator connection', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+
+    DB::purge('affinity');
+
+    $permissions_table = config('permission.table_names.permissions');
+    $default_connection = config('database.default');
+    $default_had_permissions = DB::connection($default_connection)->getSchemaBuilder()->hasTable($permissions_table);
+
+    DB::connection($default_connection)->getSchemaBuilder()->create('migration_affinity_sentinel', static function (Blueprint $table): void {
+        $table->id();
+    });
+    DB::connection($default_connection)->table('migration_affinity_sentinel')->insert(['id' => 1]);
+
+    $migration = require module_path('Core', 'database/migrations/2024_03_15_224941_create_permission_tables.php');
+
+    app('migrator')->usingConnection('affinity', static function () use ($migration, $permissions_table): void {
+        expect(app('db')->connection()->getName())->toBe('affinity');
+        $migration->up();
+        expect(app('db')->connection()->getSchemaBuilder()->hasTable($permissions_table))->toBeTrue();
+    });
+
+    DB::connection('affinity')->table($permissions_table)->insert([
+        'name' => 'affinity.widgets.select',
+        'guard_name' => 'web',
+        'description' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    expect(DB::connection('affinity')->table($permissions_table)->value('connection_name'))->toBe('affinity')
+        ->and(DB::connection('affinity')->table($permissions_table)->value('table_name'))->toBe('widgets')
+        ->and(DB::connection($default_connection)->getSchemaBuilder()->hasTable($permissions_table))->toBe($default_had_permissions)
+        ->and(DB::connection($default_connection)->table('migration_affinity_sentinel')->count())->toBe(1);
+});
+
 it('creates portable prefix indexes and safely degrades specialized indexes on sqlite', function (): void {
     Schema::create('migrate_utils_search', function (Blueprint $table): void {
         $table->id();

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
 
 return new class() extends Migration
@@ -15,6 +13,8 @@ return new class() extends Migration
      */
     public function up(): void
     {
+        $connection = app('db')->connection();
+        $schema = $connection->getSchemaBuilder();
         $teams = config('permission.teams');
         $tableNames = config('permission.table_names');
         $columnNames = config('permission.column_names');
@@ -35,7 +35,7 @@ return new class() extends Migration
             throw new RuntimeException('Error: team_foreign_key on config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
-        Schema::create($permissions_table, function (Blueprint $table) use ($permissions_table): void {
+        $schema->create($permissions_table, function (Blueprint $table) use ($connection, $permissions_table): void {
             $table->bigIncrements('id'); // permission id
             $table->string('name', 125)->nullable(false)->comment('The name of the permission');       // For MySQL 8.0 use string('name', 125);
             $table->string('guard_name', 125)->default('web')->nullable(false)->comment('The guard name of the permission'); // For MySQL 8.0 use string('guard_name', 125);
@@ -45,31 +45,30 @@ return new class() extends Migration
                 $table,
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
+                connection: $connection,
             );
 
             $table->unique(['name', 'guard_name'], "{$permissions_table}_UN");
         });
 
-        $connection = DB::connection();
-
         if ($connection->getDriverName() === 'pgsql') {
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
-            DB::statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
-            DB::statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
+            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
         } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'], true)) {
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
-            DB::statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
-            DB::statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
+            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
         } elseif ($connection->getDriverName() === 'sqlite') {
             // SQLite doesn't support regexp_replace in generated columns, so we use regular columns with triggers
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name TEXT");
-            DB::statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name TEXT");
-            DB::statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name TEXT");
+            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name TEXT");
+            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
 
             // Trigger to extract connection_name (first part before first dot, removing dots if multiple)
-            DB::statement("
+            $connection->statement("
                 CREATE TRIGGER permissions_set_connection_name 
                 AFTER INSERT ON {$permissions_table}
                 BEGIN
@@ -83,7 +82,7 @@ return new class() extends Migration
                 END
             ");
 
-            DB::statement("
+            $connection->statement("
                 CREATE TRIGGER permissions_update_connection_name 
                 AFTER UPDATE OF name ON {$permissions_table}
                 BEGIN
@@ -98,7 +97,7 @@ return new class() extends Migration
             ");
 
             // Trigger to extract table_name (middle part between first and last dot)
-            DB::statement("
+            $connection->statement("
                 CREATE TRIGGER permissions_set_table_name 
                 AFTER INSERT ON {$permissions_table}
                 BEGIN
@@ -116,7 +115,7 @@ return new class() extends Migration
                 END
             ");
 
-            DB::statement("
+            $connection->statement("
                 CREATE TRIGGER permissions_update_table_name 
                 AFTER UPDATE OF name ON {$permissions_table}
                 BEGIN
@@ -137,7 +136,7 @@ return new class() extends Migration
             throw new RuntimeException('Unsupported database driver');
         }
 
-        Schema::create($roles_table, function (Blueprint $table) use ($teams, $columnNames, $roles_table): void {
+        $schema->create($roles_table, function (Blueprint $table) use ($connection, $teams, $columnNames, $roles_table): void {
             $table->bigIncrements('id'); // role id
 
             if ($teams || config('permission.testing')) { // permission.testing is a fix for sqlite testing
@@ -153,6 +152,7 @@ return new class() extends Migration
                 hasCreateUpdate: true,
                 hasSoftDelete: true,
                 hasLocks: true,
+                connection: $connection,
             );
 
             if ($teams || config('permission.testing')) {
@@ -162,12 +162,12 @@ return new class() extends Migration
             }
         });
 
-        Schema::table($roles_table, function (Blueprint $table) use ($roles_table): void {
+        $schema->table($roles_table, function (Blueprint $table) use ($roles_table): void {
             $table->unsignedBigInteger('parent_id')->nullable()->comment('The parent id of the role');
             $table->foreign('parent_id', "{$roles_table}_parent_role_FK")->references('id')->on($roles_table)->nullOnDelete();
         });
 
-        Schema::create($model_has_permissions_table, function (Blueprint $table) use ($model_has_permissions_table, $columnNames, $pivotPermission, $teams, $permissions_table): void {
+        $schema->create($model_has_permissions_table, function (Blueprint $table) use ($connection, $model_has_permissions_table, $columnNames, $pivotPermission, $teams, $permissions_table): void {
             $table->unsignedBigInteger($pivotPermission);
 
             $table->string('model_type')->nullable(false)->comment('The model type of the permission');
@@ -197,10 +197,11 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
+                connection: $connection,
             );
         });
 
-        Schema::create($model_has_roles_table, function (Blueprint $table) use ($model_has_roles_table, $columnNames, $pivotRole, $teams, $roles_table): void {
+        $schema->create($model_has_roles_table, function (Blueprint $table) use ($connection, $model_has_roles_table, $columnNames, $pivotRole, $teams, $roles_table): void {
             $table->unsignedBigInteger($pivotRole);
 
             $table->string('model_type')->nullable(false)->comment('The model type of the role');
@@ -230,10 +231,11 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
+                connection: $connection,
             );
         });
 
-        Schema::create($role_has_permissions_table, function (Blueprint $table) use ($role_has_permissions_table, $pivotRole, $pivotPermission, $permissions_table, $roles_table): void {
+        $schema->create($role_has_permissions_table, function (Blueprint $table) use ($connection, $role_has_permissions_table, $pivotRole, $pivotPermission, $permissions_table, $roles_table): void {
             $table->unsignedBigInteger($pivotPermission)->nullable(false)->comment('The permission id of the role');
             $table->unsignedBigInteger($pivotRole)->nullable(false)->comment('The role id of the permission');
 
@@ -250,6 +252,7 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
+                connection: $connection,
             );
 
             $table->primary([$pivotPermission, $pivotRole], "{$role_has_permissions_table}_primary");
@@ -271,10 +274,11 @@ return new class() extends Migration
             throw new RuntimeException('Error: config/permission.php not found and defaults could not be merged. Please publish the package configuration before proceeding, or drop the tables manually.');
         }
 
-        Schema::drop($tableNames['role_has_permissions']);
-        Schema::drop($tableNames['model_has_roles']);
-        Schema::drop($tableNames['model_has_permissions']);
-        Schema::drop($tableNames['roles']);
-        Schema::drop($tableNames['permissions']);
+        $schema = app('db')->connection()->getSchemaBuilder();
+        $schema->drop($tableNames['role_has_permissions']);
+        $schema->drop($tableNames['model_has_roles']);
+        $schema->drop($tableNames['model_has_permissions']);
+        $schema->drop($tableNames['roles']);
+        $schema->drop($tableNames['permissions']);
     }
 };

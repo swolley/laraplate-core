@@ -8,7 +8,6 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\Concerns\HasValidity;
@@ -25,8 +24,7 @@ final class MigrateUtils
         string|array $columns,
         ?string $name = null,
         ?ConnectionInterface $connection = null,
-    ): void
-    {
+    ): void {
         $connection = self::connection($connection);
         $normalized_columns = self::normalizeColumns($columns);
         $index_name = $name ?? self::searchIndexName($table->getTable(), $normalized_columns, 'prefix', $connection);
@@ -427,8 +425,7 @@ final class MigrateUtils
         string $column,
         ?string $indexName,
         Connection $connection,
-    ): void
-    {
+    ): void {
         if ($indexName !== null) {
             self::assertIdentifier($indexName);
         }
@@ -518,8 +515,7 @@ final class MigrateUtils
         string $column,
         string $indexName,
         Connection $connection,
-    ): void
-    {
+    ): void {
         $connection->unprepared('CREATE EXTENSION IF NOT EXISTS pg_trgm');
         $connection->statement(sprintf('CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)', $indexName, $table, $column));
     }
@@ -556,8 +552,7 @@ final class MigrateUtils
         array $columns,
         string $indexName,
         Connection $connection,
-    ): void
-    {
+    ): void {
         $connection->statement(sprintf(
             'ALTER TABLE %s ADD FULLTEXT INDEX %s (%s)',
             $table,
@@ -601,7 +596,7 @@ final class MigrateUtils
 
     private static function connection(?ConnectionInterface $connection): Connection
     {
-        $connection ??= Schema::getConnection();
+        $connection ??= app('db')->connection();
 
         throw_unless(
             $connection instanceof Connection,

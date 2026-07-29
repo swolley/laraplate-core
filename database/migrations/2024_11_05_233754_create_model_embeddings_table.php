@@ -2,14 +2,11 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
-use Modules\Core\Models\ModelEmbedding;
 
 return new class extends Migration
 {
@@ -20,13 +17,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $connection = new ModelEmbedding()->getConnection();
-        $connection_name = $connection->getName();
+        $connection = app('db')->connection();
         $supports_vector = $this->supportsPostgreSQLVector($connection);
         $vector_dimensions = $this->vectorDimensions();
 
         $model_embeddings_table = CoreTables::ModelEmbeddings->value;
-        Schema::connection($connection_name)->create($model_embeddings_table, function (Blueprint $table) use ($supports_vector, $model_embeddings_table, $vector_dimensions): void {
+        $connection->getSchemaBuilder()->create($model_embeddings_table, function (Blueprint $table) use ($connection, $supports_vector, $model_embeddings_table, $vector_dimensions): void {
             $table->id();
             $table->morphs('model', "{$model_embeddings_table}_embedding_model_IDX");
 
@@ -39,11 +35,12 @@ return new class extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
+                connection: $connection,
             );
         });
 
         if ($supports_vector) {
-            DB::connection($connection_name)->statement("CREATE INDEX {$model_embeddings_table}_embedding_IDX ON {$model_embeddings_table} USING ivfflat (embedding vector_cosine_ops);");
+            $connection->statement("CREATE INDEX {$model_embeddings_table}_embedding_IDX ON {$model_embeddings_table} USING ivfflat (embedding vector_cosine_ops);");
         }
     }
 
@@ -52,10 +49,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $connection = new ModelEmbedding()->getConnection();
-
-        Schema::connection($connection->getName())->dropIfExists(CoreTables::ModelEmbeddings->value);
-        Schema::dropIfExists(CoreTables::ModelEmbeddings->value);
+        app('db')->connection()->getSchemaBuilder()->dropIfExists(CoreTables::ModelEmbeddings->value);
     }
 
     private function supportsPostgreSQLVector(Connection $connection): bool
@@ -64,15 +58,13 @@ return new class extends Migration
             return false;
         }
 
-        $database = DB::connection($connection->getName());
-
-        if (! $database->table('pg_available_extensions')->where('name', 'vector')->exists()) {
+        if (! $connection->table('pg_available_extensions')->where('name', 'vector')->exists()) {
             return false;
         }
 
-        $database->statement('CREATE EXTENSION IF NOT EXISTS vector');
+        $connection->statement('CREATE EXTENSION IF NOT EXISTS vector');
 
-        return $database->table('pg_extension')->where('extname', 'vector')->exists();
+        return $connection->table('pg_extension')->where('extname', 'vector')->exists();
     }
 
     private function vectorDimensions(): int

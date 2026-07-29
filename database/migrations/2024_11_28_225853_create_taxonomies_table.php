@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\MigrateUtils;
 
@@ -16,8 +14,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $connection = app('db')->connection();
+        $schema = $connection->getSchemaBuilder();
         $taxonomies_table = CoreTables::Taxonomies->value;
-        Schema::create($taxonomies_table, static function (Blueprint $table) use ($taxonomies_table): void {
+        $schema->create($taxonomies_table, static function (Blueprint $table) use ($connection, $taxonomies_table): void {
             $table->id();
             $table->foreignId('entity_id')->nullable(false)->constrained(CoreTables::Entities->value, 'id', "{$taxonomies_table}_entity_id_FK")->cascadeOnDelete()->comment('The entity that the taxonomy belongs to');
             $table->foreignId('presettable_id')->nullable(false)->constrained(CoreTables::Presettables->value, 'id', "{$taxonomies_table}_presettable_id_FK")->cascadeOnDelete()->comment('The entity preset that the taxonomy belongs to');
@@ -34,6 +34,7 @@ return new class extends Migration
                 hasSoftDelete: true,
                 hasLocks: true,
                 hasValidity: true,
+                connection: $connection,
             );
 
             // Unique constraints for name and slug are now in taxonomies_translations table (per locale)
@@ -42,14 +43,14 @@ return new class extends Migration
         });
 
         // Evita auto-relazione (categoria che punta sé stessa)
-        $driver_name = DB::getDriverName();
+        $driver_name = $connection->getDriverName();
 
         if ($driver_name === 'pgsql') {
-            DB::statement("ALTER TABLE {$taxonomies_table} ADD CONSTRAINT {$taxonomies_table}_parent_id_check CHECK (parent_id <> id)");
+            $connection->statement("ALTER TABLE {$taxonomies_table} ADD CONSTRAINT {$taxonomies_table}_parent_id_check CHECK (parent_id <> id)");
         } elseif (in_array($driver_name, ['mysql', 'mariadb'], true)) {
             // MySQL/MariaDB non consentono il CHECK con colonna usata da una FK (errore 3823),
             // quindi usiamo trigger per bloccare parent_id = id.
-            DB::unprepared(<<<SQL
+            $connection->unprepared(<<<SQL
                 CREATE TRIGGER taxonomies_parent_check_insert
                 BEFORE INSERT ON {$taxonomies_table}
                 FOR EACH ROW
@@ -60,7 +61,7 @@ return new class extends Migration
                 END;
             SQL);
 
-            DB::unprepared(<<<SQL
+            $connection->unprepared(<<<SQL
                 CREATE TRIGGER taxonomies_parent_check_update
                 BEFORE UPDATE ON {$taxonomies_table}
                 FOR EACH ROW
@@ -78,6 +79,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(CoreTables::Taxonomies->value);
+        app('db')->connection()->getSchemaBuilder()->dropIfExists(CoreTables::Taxonomies->value);
     }
 };
