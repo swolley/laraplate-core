@@ -40,7 +40,11 @@ return new class extends Migration
         });
 
         if ($supports_vector) {
-            $connection->statement("CREATE INDEX {$model_embeddings_table}_embedding_IDX ON {$model_embeddings_table} USING ivfflat (embedding vector_cosine_ops);");
+            $grammar = $connection->getQueryGrammar();
+            $wrapped_index = $grammar->wrap("{$model_embeddings_table}_embedding_IDX");
+            $wrapped_table = $grammar->wrapTable($model_embeddings_table);
+            $wrapped_embedding = $grammar->wrap('embedding');
+            $connection->statement("CREATE INDEX {$wrapped_index} ON {$wrapped_table} USING ivfflat ({$wrapped_embedding} vector_cosine_ops);");
         }
     }
 

@@ -110,11 +110,17 @@ return new class extends Migration
 
     private function createPostgreSQLTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $version_function = $this->identifier('set_presettable_version');
+        $version_trigger = $this->identifier('trg_presettables_version');
+        $sync_function = $this->identifier('sync_presettables_on_preset');
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE FUNCTION set_presettable_version()
+            CREATE OR REPLACE FUNCTION {$version_function}()
             RETURNS TRIGGER AS $$
             BEGIN
                 NEW.version := COALESCE(
@@ -127,13 +133,13 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presettables_version
+            CREATE TRIGGER {$version_trigger}
             BEFORE INSERT ON {$presettables_table}
-            FOR EACH ROW EXECUTE FUNCTION set_presettable_version();
+            FOR EACH ROW EXECUTE FUNCTION {$version_function}();
         ");
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE FUNCTION sync_presettables_on_preset()
+            CREATE OR REPLACE FUNCTION {$sync_function}()
             RETURNS TRIGGER AS $$
             BEGIN
                 IF TG_OP = 'INSERT' THEN
@@ -157,44 +163,54 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_insert
+            CREATE TRIGGER {$insert_trigger}
             AFTER INSERT ON {$presets_table}
-            FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
+            FOR EACH ROW EXECUTE FUNCTION {$sync_function}();
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_update
+            CREATE TRIGGER {$update_trigger}
             AFTER UPDATE ON {$presets_table}
-            FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
+            FOR EACH ROW EXECUTE FUNCTION {$sync_function}();
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_delete
+            CREATE TRIGGER {$delete_trigger}
             AFTER DELETE ON {$presets_table}
-            FOR EACH ROW EXECUTE FUNCTION sync_presettables_on_preset();
+            FOR EACH ROW EXECUTE FUNCTION {$sync_function}();
         ");
     }
 
     private function dropPostgreSQLTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $version_function = $this->identifier('set_presettable_version');
+        $version_trigger = $this->identifier('trg_presettables_version');
+        $sync_function = $this->identifier('sync_presettables_on_preset');
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
-        $this->connection()->unprepared("DROP TRIGGER IF EXISTS trg_presettables_version ON {$presettables_table}");
-        $this->connection()->unprepared('DROP FUNCTION IF EXISTS set_presettable_version()');
-        $this->connection()->unprepared("DROP TRIGGER IF EXISTS trg_presets_insert ON {$presets_table}");
-        $this->connection()->unprepared("DROP TRIGGER IF EXISTS trg_presets_update ON {$presets_table}");
-        $this->connection()->unprepared("DROP TRIGGER IF EXISTS trg_presets_delete ON {$presets_table}");
-        $this->connection()->unprepared('DROP FUNCTION IF EXISTS sync_presettables_on_preset()');
+        $this->connection()->unprepared("DROP TRIGGER IF EXISTS {$version_trigger} ON {$presettables_table}");
+        $this->connection()->unprepared("DROP FUNCTION IF EXISTS {$version_function}()");
+        $this->connection()->unprepared("DROP TRIGGER IF EXISTS {$insert_trigger} ON {$presets_table}");
+        $this->connection()->unprepared("DROP TRIGGER IF EXISTS {$update_trigger} ON {$presets_table}");
+        $this->connection()->unprepared("DROP TRIGGER IF EXISTS {$delete_trigger} ON {$presets_table}");
+        $this->connection()->unprepared("DROP FUNCTION IF EXISTS {$sync_function}()");
     }
 
     private function createMySQLTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $version_trigger = $this->identifier('trg_presettables_version');
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presettables_version BEFORE INSERT ON {$presettables_table}
+            CREATE TRIGGER {$version_trigger} BEFORE INSERT ON {$presettables_table}
             FOR EACH ROW
             SET NEW.version = COALESCE(
                 (SELECT MAX(version) FROM {$presettables_table}
@@ -203,14 +219,14 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
+            CREATE TRIGGER {$insert_trigger} AFTER INSERT ON {$presets_table}
             FOR EACH ROW
             INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, deleted_at)
             VALUES (NEW.entity_id, NEW.id, '[]', NEW.deleted_at);
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_update AFTER UPDATE ON {$presets_table}
+            CREATE TRIGGER {$update_trigger} AFTER UPDATE ON {$presets_table}
             FOR EACH ROW
             BEGIN
                 IF NEW.deleted_at <> OLD.deleted_at OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL) THEN
@@ -222,7 +238,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_delete AFTER DELETE ON {$presets_table}
+            CREATE TRIGGER {$delete_trigger} AFTER DELETE ON {$presets_table}
             FOR EACH ROW
             DELETE FROM {$presettables_table} WHERE preset_id = OLD.id;
         ");
@@ -230,19 +246,22 @@ return new class extends Migration
 
     private function dropMySQLTriggers(): void
     {
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presettables_version');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_insert');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_update');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_delete');
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presettables_version'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_insert'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_update'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_delete'));
     }
 
     private function createSQLiteTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_insert AFTER INSERT ON {$presets_table}
+            CREATE TRIGGER {$insert_trigger} AFTER INSERT ON {$presets_table}
             BEGIN
                 INSERT INTO {$presettables_table} (entity_id, preset_id, fields_snapshot, version, deleted_at)
                 VALUES (NEW.entity_id, NEW.id, '[]',
@@ -252,7 +271,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_update AFTER UPDATE ON {$presets_table}
+            CREATE TRIGGER {$update_trigger} AFTER UPDATE ON {$presets_table}
             WHEN NEW.deleted_at IS NOT OLD.deleted_at
             BEGIN
                 UPDATE {$presettables_table}
@@ -262,7 +281,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_delete AFTER DELETE ON {$presets_table}
+            CREATE TRIGGER {$delete_trigger} AFTER DELETE ON {$presets_table}
             BEGIN
                 DELETE FROM {$presettables_table} WHERE preset_id = OLD.id;
             END;
@@ -271,18 +290,22 @@ return new class extends Migration
 
     private function dropSQLiteTriggers(): void
     {
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_insert');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_update');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_delete');
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_insert'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_update'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_delete'));
     }
 
     private function createSQLServerTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $version_trigger = $this->identifier('trg_presettables_version');
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presettables_version ON {$presettables_table}
+            CREATE TRIGGER {$version_trigger} ON {$presettables_table}
             INSTEAD OF INSERT
             AS
             BEGIN
@@ -297,7 +320,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_insert ON {$presets_table}
+            CREATE TRIGGER {$insert_trigger} ON {$presets_table}
             AFTER INSERT
             AS
             BEGIN
@@ -309,7 +332,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_update ON {$presets_table}
+            CREATE TRIGGER {$update_trigger} ON {$presets_table}
             AFTER UPDATE
             AS
             BEGIN
@@ -326,7 +349,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE TRIGGER trg_presets_delete ON {$presets_table}
+            CREATE TRIGGER {$delete_trigger} ON {$presets_table}
             AFTER DELETE
             AS
             BEGIN
@@ -339,19 +362,23 @@ return new class extends Migration
 
     private function dropSQLServerTriggers(): void
     {
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presettables_version');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_insert');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_update');
-        $this->connection()->unprepared('DROP TRIGGER IF EXISTS trg_presets_delete');
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presettables_version'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_insert'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_update'));
+        $this->connection()->unprepared('DROP TRIGGER IF EXISTS ' . $this->identifier('trg_presets_delete'));
     }
 
     private function createOracleTriggers(): void
     {
-        $presettables_table = CoreTables::Presettables->value;
-        $presets_table = CoreTables::Presets->value;
+        $presettables_table = $this->table(CoreTables::Presettables->value);
+        $presets_table = $this->table(CoreTables::Presets->value);
+        $version_trigger = $this->identifier('trg_presettables_version');
+        $insert_trigger = $this->identifier('trg_presets_insert');
+        $update_trigger = $this->identifier('trg_presets_update');
+        $delete_trigger = $this->identifier('trg_presets_delete');
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE TRIGGER trg_presettables_version
+            CREATE OR REPLACE TRIGGER {$version_trigger}
             BEFORE INSERT ON {$presettables_table}
             FOR EACH ROW
             DECLARE
@@ -365,7 +392,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE TRIGGER trg_presets_insert
+            CREATE OR REPLACE TRIGGER {$insert_trigger}
             AFTER INSERT ON {$presets_table}
             FOR EACH ROW
             BEGIN
@@ -375,7 +402,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE TRIGGER trg_presets_update
+            CREATE OR REPLACE TRIGGER {$update_trigger}
             AFTER UPDATE ON {$presets_table}
             FOR EACH ROW
             BEGIN
@@ -389,7 +416,7 @@ return new class extends Migration
         ");
 
         $this->connection()->unprepared("
-            CREATE OR REPLACE TRIGGER trg_presets_delete
+            CREATE OR REPLACE TRIGGER {$delete_trigger}
             AFTER DELETE ON {$presets_table}
             FOR EACH ROW
             BEGIN
@@ -400,14 +427,24 @@ return new class extends Migration
 
     private function dropOracleTriggers(): void
     {
-        $this->connection()->unprepared('DROP TRIGGER trg_presettables_version');
-        $this->connection()->unprepared('DROP TRIGGER trg_presets_insert');
-        $this->connection()->unprepared('DROP TRIGGER trg_presets_update');
-        $this->connection()->unprepared('DROP TRIGGER trg_presets_delete');
+        $this->connection()->unprepared('DROP TRIGGER ' . $this->identifier('trg_presettables_version'));
+        $this->connection()->unprepared('DROP TRIGGER ' . $this->identifier('trg_presets_insert'));
+        $this->connection()->unprepared('DROP TRIGGER ' . $this->identifier('trg_presets_update'));
+        $this->connection()->unprepared('DROP TRIGGER ' . $this->identifier('trg_presets_delete'));
     }
 
     private function connection(): Connection
     {
         return $this->activeConnection ??= app('db')->connection();
+    }
+
+    private function table(string $table): string
+    {
+        return $this->connection()->getQueryGrammar()->wrapTable($table);
+    }
+
+    private function identifier(string $identifier): string
+    {
+        return $this->connection()->getQueryGrammar()->wrap($identifier);
     }
 };

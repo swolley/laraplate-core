@@ -51,28 +51,33 @@ return new class() extends Migration
             $table->unique(['name', 'guard_name'], "{$permissions_table}_UN");
         });
 
+        $grammar = $connection->getQueryGrammar();
+        $wrapped_permissions_table = $grammar->wrapTable($permissions_table);
+        $wrapped_reference_index = $grammar->wrap("{$permissions_table}_ref_IDX");
+        $wrapped_name_check = $grammar->wrap("{$permissions_table}_name_CHECK");
+
         if ($connection->getDriverName() === 'pgsql') {
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
-            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
-            $connection->statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
+            $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD CONSTRAINT {$wrapped_name_check} CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
         } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'], true)) {
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
-            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
-            $connection->statement("ALTER TABLE {$permissions_table} ADD CONSTRAINT {$permissions_table}_name_CHECK CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
+            $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD CONSTRAINT {$wrapped_name_check} CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
         } elseif ($connection->getDriverName() === 'sqlite') {
             // SQLite doesn't support regexp_replace in generated columns, so we use regular columns with triggers
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN connection_name TEXT");
-            $connection->statement("ALTER TABLE {$permissions_table} ADD COLUMN table_name TEXT");
-            $connection->statement("CREATE INDEX {$permissions_table}_ref_IDX ON {$permissions_table} (connection_name, table_name)");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name TEXT");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name TEXT");
+            $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
 
             // Trigger to extract connection_name (first part before first dot, removing dots if multiple)
-            $connection->statement("
-                CREATE TRIGGER permissions_set_connection_name 
-                AFTER INSERT ON {$permissions_table}
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER INSERT ON %s
                 BEGIN
-                    UPDATE {$permissions_table} 
+                    UPDATE %s
                     SET connection_name = substr(name, 1, CASE 
                         WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
                         THEN instr(name, '.') - 1 
@@ -80,13 +85,13 @@ return new class() extends Migration
                     END)
                     WHERE id = NEW.id;
                 END
-            ");
+            ", $grammar->wrap('permissions_set_connection_name'), $wrapped_permissions_table, $wrapped_permissions_table));
 
-            $connection->statement("
-                CREATE TRIGGER permissions_update_connection_name 
-                AFTER UPDATE OF name ON {$permissions_table}
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER UPDATE OF name ON %s
                 BEGIN
-                    UPDATE {$permissions_table} 
+                    UPDATE %s
                     SET connection_name = substr(name, 1, CASE 
                         WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 
                         THEN instr(name, '.') - 1 
@@ -94,14 +99,14 @@ return new class() extends Migration
                     END)
                     WHERE id = NEW.id;
                 END
-            ");
+            ", $grammar->wrap('permissions_update_connection_name'), $wrapped_permissions_table, $wrapped_permissions_table));
 
             // Trigger to extract table_name (middle part between first and last dot)
-            $connection->statement("
-                CREATE TRIGGER permissions_set_table_name 
-                AFTER INSERT ON {$permissions_table}
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER INSERT ON %s
                 BEGIN
-                    UPDATE {$permissions_table} 
+                    UPDATE %s
                     SET table_name = substr(
                         name, 
                         instr(name, '.') + 1,
@@ -113,13 +118,13 @@ return new class() extends Migration
                     )
                     WHERE id = NEW.id;
                 END
-            ");
+            ", $grammar->wrap('permissions_set_table_name'), $wrapped_permissions_table, $wrapped_permissions_table));
 
-            $connection->statement("
-                CREATE TRIGGER permissions_update_table_name 
-                AFTER UPDATE OF name ON {$permissions_table}
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER UPDATE OF name ON %s
                 BEGIN
-                    UPDATE {$permissions_table} 
+                    UPDATE %s
                     SET table_name = substr(
                         name, 
                         instr(name, '.') + 1,
@@ -131,7 +136,7 @@ return new class() extends Migration
                     )
                     WHERE id = NEW.id;
                 END
-            ");
+            ", $grammar->wrap('permissions_update_table_name'), $wrapped_permissions_table, $wrapped_permissions_table));
         } else {
             throw new RuntimeException('Unsupported database driver');
         }

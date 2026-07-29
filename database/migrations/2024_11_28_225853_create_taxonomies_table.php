@@ -44,15 +44,19 @@ return new class extends Migration
 
         // Evita auto-relazione (categoria che punta sé stessa)
         $driver_name = $connection->getDriverName();
+        $grammar = $connection->getQueryGrammar();
+        $wrapped_taxonomies_table = $grammar->wrapTable($taxonomies_table);
 
         if ($driver_name === 'pgsql') {
-            $connection->statement("ALTER TABLE {$taxonomies_table} ADD CONSTRAINT {$taxonomies_table}_parent_id_check CHECK (parent_id <> id)");
+            $wrapped_constraint = $grammar->wrap("{$taxonomies_table}_parent_id_check");
+            $connection->statement("ALTER TABLE {$wrapped_taxonomies_table} ADD CONSTRAINT {$wrapped_constraint} CHECK (parent_id <> id)");
         } elseif (in_array($driver_name, ['mysql', 'mariadb'], true)) {
             // MySQL/MariaDB non consentono il CHECK con colonna usata da una FK (errore 3823),
             // quindi usiamo trigger per bloccare parent_id = id.
+            $wrapped_insert_trigger = $grammar->wrap('taxonomies_parent_check_insert');
             $connection->unprepared(<<<SQL
-                CREATE TRIGGER taxonomies_parent_check_insert
-                BEFORE INSERT ON {$taxonomies_table}
+                CREATE TRIGGER {$wrapped_insert_trigger}
+                BEFORE INSERT ON {$wrapped_taxonomies_table}
                 FOR EACH ROW
                 BEGIN
                     IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN
@@ -61,9 +65,10 @@ return new class extends Migration
                 END;
             SQL);
 
+            $wrapped_update_trigger = $grammar->wrap('taxonomies_parent_check_update');
             $connection->unprepared(<<<SQL
-                CREATE TRIGGER taxonomies_parent_check_update
-                BEFORE UPDATE ON {$taxonomies_table}
+                CREATE TRIGGER {$wrapped_update_trigger}
+                BEFORE UPDATE ON {$wrapped_taxonomies_table}
                 FOR EACH ROW
                 BEGIN
                     IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN

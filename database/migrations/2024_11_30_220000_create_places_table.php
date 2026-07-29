@@ -42,6 +42,7 @@ return new class extends Migration
                 $table->geometry('geolocation')->nullable()->comment('The geolocation of the location');
 
                 $upper_places_table = mb_strtoupper($places_table);
+                $wrapped_metadata_table = $connection->getQueryGrammar()->wrap('user_sdo_geom_metadata');
                 $connection->unprepared("
                     DECLARE
                         tbl VARCHAR2(128) := '{$upper_places_table}';
@@ -49,12 +50,12 @@ return new class extends Migration
                         srid NUMBER := 4326;
                     BEGIN
                         BEGIN
-                            DELETE FROM user_sdo_geom_metadata WHERE table_name = tbl AND column_name = col;
+                            DELETE FROM {$wrapped_metadata_table} WHERE table_name = tbl AND column_name = col;
                         EXCEPTION
                             WHEN NO_DATA_FOUND THEN NULL;
                         END;
 
-                        INSERT INTO user_sdo_geom_metadata (table_name, column_name, diminfo, srid)
+                        INSERT INTO {$wrapped_metadata_table} (table_name, column_name, diminfo, srid)
                         VALUES (
                             tbl,
                             col,
@@ -67,7 +68,11 @@ return new class extends Migration
                     END;
                 ");
 
-                $connection->unprepared("CREATE INDEX {$places_table}_geolocation_spx ON {$places_table}(geolocation) INDEXTYPE IS MDSYS.SPATIAL_INDEX");
+                $grammar = $connection->getQueryGrammar();
+                $wrapped_index = $grammar->wrap("{$places_table}_geolocation_spx");
+                $wrapped_table = $grammar->wrapTable($places_table);
+                $wrapped_column = $grammar->wrap('geolocation');
+                $connection->unprepared("CREATE INDEX {$wrapped_index} ON {$wrapped_table}({$wrapped_column}) INDEXTYPE IS MDSYS.SPATIAL_INDEX");
             }
 
             MigrateUtils::timestamps(

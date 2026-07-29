@@ -186,8 +186,15 @@ final class MigrateUtils
 
             if (! $schema->hasIndex($table_name, [$valid_from_column, $valid_to_column]) && ! $schema->hasIndex($table_name, $index_name)) {
                 $connection->afterCommit(function () use ($connection, $table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
+                    $grammar = $connection->getQueryGrammar();
                     match ($connection->getDriverName()) {
-                        'pgsql' => $connection->statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
+                        'pgsql' => $connection->statement(sprintf(
+                            'CREATE INDEX %s ON %s (%s DESC, %s)',
+                            $grammar->wrap($index_name),
+                            $grammar->wrapTable($table_name),
+                            $grammar->wrap($valid_from_column),
+                            $grammar->wrap($valid_to_column),
+                        )),
                         default => $table->index([$valid_from_column, $valid_to_column], $index_name),
                     };
                 });
@@ -198,8 +205,16 @@ final class MigrateUtils
 
         if ($hasSoftDelete && $hasValidity && ! $schema->hasIndex($table_name, [$valid_from_column, $valid_to_column, 'is_deleted']) && ! $schema->hasIndex($table_name, $index_name)) {
             $connection->afterCommit(function () use ($connection, $table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
+                $grammar = $connection->getQueryGrammar();
                 match ($connection->getDriverName()) {
-                    'pgsql' => $connection->statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s, is_deleted)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
+                    'pgsql' => $connection->statement(sprintf(
+                        'CREATE INDEX %s ON %s (%s DESC, %s, %s)',
+                        $grammar->wrap($index_name),
+                        $grammar->wrapTable($table_name),
+                        $grammar->wrap($valid_from_column),
+                        $grammar->wrap($valid_to_column),
+                        $grammar->wrap('is_deleted'),
+                    )),
                     default => $table->index([$valid_from_column, $valid_to_column, 'is_deleted'], $index_name),
                 };
             });
@@ -390,13 +405,18 @@ final class MigrateUtils
         if ($connection->getDriverName() === 'oracle') {
             // In Oracle we use a virtual column with a check constraint
             // Create trigger for Oracle
+            $grammar = $connection->getQueryGrammar();
+            $wrapped_trigger = $grammar->wrap($table->getTable() . '_is_' . $suffix . '_trigger');
+            $wrapped_table = $grammar->wrapTable($table->getTable());
+            $wrapped_virtual_column = $grammar->wrap('is_' . $suffix);
+            $wrapped_source_column = $grammar->wrap($suffix . '_at');
             $connection->unprepared('
-                CREATE OR REPLACE TRIGGER ' . $table->getTable() . '_is_' . $suffix . '_trigger
-                BEFORE INSERT OR UPDATE ON ' . $table->getTable() . '
+                CREATE OR REPLACE TRIGGER ' . $wrapped_trigger . '
+                BEFORE INSERT OR UPDATE ON ' . $wrapped_table . '
                 FOR EACH ROW
                 BEGIN
-                    :NEW.is_' . $suffix . ' := CASE 
-                        WHEN :NEW.' . $suffix . '_at IS NOT NULL THEN 1 
+                    :NEW.' . $wrapped_virtual_column . ' := CASE
+                        WHEN :NEW.' . $wrapped_source_column . ' IS NOT NULL THEN 1
                         ELSE 0 
                     END;
                 END;
@@ -407,9 +427,10 @@ final class MigrateUtils
     private static function dropBooleanTriggers(Blueprint $table, string $suffix, Connection $connection): void
     {
         if ($connection->getDriverName() === 'oracle') {
+            $wrapped_trigger = $connection->getQueryGrammar()->wrap($table->getTable() . '_is_' . $suffix . '_trigger');
             $connection->unprepared('
                 BEGIN
-                    EXECUTE IMMEDIATE \'DROP TRIGGER ' . $table->getTable() . '_is_' . $suffix . '_trigger\';
+                    EXECUTE IMMEDIATE \'DROP TRIGGER ' . $wrapped_trigger . '\';
                 EXCEPTION
                     WHEN OTHERS THEN
                         IF SQLCODE != -4080 THEN  -- ORA-04080: trigger does not exist
@@ -441,7 +462,13 @@ final class MigrateUtils
 
         if ($driver_name === 'pgsql') {
             $connection->afterCommit(function () use ($connection, $table, $column, $index_name): void {
-                $connection->statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' USING BRIN (' . $column . ')');
+                $grammar = $connection->getQueryGrammar();
+                $connection->statement(sprintf(
+                    'CREATE INDEX %s ON %s USING BRIN (%s)',
+                    $grammar->wrap($index_name),
+                    $grammar->wrapTable($table->getTable()),
+                    $grammar->wrap($column),
+                ));
             });
 
             return;
@@ -516,8 +543,14 @@ final class MigrateUtils
         string $indexName,
         Connection $connection,
     ): void {
+        $grammar = $connection->getQueryGrammar();
         $connection->unprepared('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-        $connection->statement(sprintf('CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)', $indexName, $table, $column));
+        $connection->statement(sprintf(
+            'CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)',
+            $grammar->wrap($indexName),
+            $grammar->wrapTable($table),
+            $grammar->wrap($column),
+        ));
     }
 
     /**
@@ -530,15 +563,16 @@ final class MigrateUtils
         string $indexName,
         Connection $connection,
     ): void {
+        $grammar = $connection->getQueryGrammar();
         $document = implode(" || ' ' || ", array_map(
-            static fn (string $column): string => sprintf("coalesce(%s, '')", $column),
+            static fn (string $column): string => sprintf("coalesce(%s, '')", $grammar->wrap($column)),
             $columns,
         ));
 
         $connection->statement(sprintf(
             "CREATE INDEX %s ON %s USING GIN (to_tsvector('%s', %s))",
-            $indexName,
-            $table,
+            $grammar->wrap($indexName),
+            $grammar->wrapTable($table),
             $language,
             $document,
         ));
@@ -553,11 +587,12 @@ final class MigrateUtils
         string $indexName,
         Connection $connection,
     ): void {
+        $grammar = $connection->getQueryGrammar();
         $connection->statement(sprintf(
             'ALTER TABLE %s ADD FULLTEXT INDEX %s (%s)',
-            $table,
-            $indexName,
-            implode(', ', $columns),
+            $grammar->wrapTable($table),
+            $grammar->wrap($indexName),
+            implode(', ', array_map($grammar->wrap(...), $columns)),
         ));
     }
 
@@ -569,12 +604,13 @@ final class MigrateUtils
         Connection $connection,
     ): void {
         $parameters = $sync === 'on_commit' ? " PARAMETERS ('SYNC (ON COMMIT)')" : '';
+        $grammar = $connection->getQueryGrammar();
 
         $connection->statement(sprintf(
             'CREATE INDEX %s ON %s (%s) INDEXTYPE IS CTXSYS.CONTEXT%s',
-            $indexName,
-            $table,
-            $column,
+            $grammar->wrap($indexName),
+            $grammar->wrapTable($table),
+            $grammar->wrap($column),
             $parameters,
         ));
     }
@@ -587,9 +623,10 @@ final class MigrateUtils
         self::assertIdentifier($table);
         self::assertIdentifier($indexName);
 
+        $grammar = $connection->getQueryGrammar();
         match ($connection->getDriverName()) {
-            'mysql', 'mariadb' => $connection->statement(sprintf('ALTER TABLE %s DROP INDEX %s', $table, $indexName)),
-            'pgsql', 'oracle' => $connection->statement(sprintf('DROP INDEX %s', $indexName)),
+            'mysql', 'mariadb' => $connection->statement(sprintf('ALTER TABLE %s DROP INDEX %s', $grammar->wrapTable($table), $grammar->wrap($indexName))),
+            'pgsql', 'oracle' => $connection->statement(sprintf('DROP INDEX %s', $grammar->wrap($indexName))),
             default => null,
         };
     }

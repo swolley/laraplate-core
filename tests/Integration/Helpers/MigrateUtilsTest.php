@@ -81,7 +81,7 @@ it('runs migration raw statements on the migrator connection', function (): void
     config()->set('database.connections.affinity', [
         'driver' => 'sqlite',
         'database' => ':memory:',
-        'prefix' => '',
+        'prefix' => 'aff_',
         'foreign_key_constraints' => true,
     ]);
 
@@ -102,18 +102,36 @@ it('runs migration raw statements on the migrator connection', function (): void
         expect(app('db')->connection()->getName())->toBe('affinity');
         $migration->up();
         expect(app('db')->connection()->getSchemaBuilder()->hasTable($permissions_table))->toBeTrue();
+
+        app('db')->connection()->table($permissions_table)->insert([
+            'name' => 'affinity.widgets.select',
+            'guard_name' => 'web',
+            'description' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $trigger_count = (int) app('db')->connection()->scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?",
+            ['aff_' . $permissions_table],
+        );
+
+        expect(app('db')->connection()->table($permissions_table)->value('connection_name'))->toBe('affinity')
+            ->and(app('db')->connection()->table($permissions_table)->value('table_name'))->toBe('widgets')
+            ->and($trigger_count)->toBe(4);
+
+        $migration->down();
+
+        $trigger_count = (int) app('db')->connection()->scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?",
+            ['aff_' . $permissions_table],
+        );
+
+        expect(app('db')->connection()->getSchemaBuilder()->hasTable($permissions_table))->toBeFalse()
+            ->and($trigger_count)->toBe(0);
     });
 
-    DB::connection('affinity')->table($permissions_table)->insert([
-        'name' => 'affinity.widgets.select',
-        'guard_name' => 'web',
-        'description' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    expect(DB::connection('affinity')->table($permissions_table)->value('connection_name'))->toBe('affinity')
-        ->and(DB::connection('affinity')->table($permissions_table)->value('table_name'))->toBe('widgets')
+    expect(DB::connection('affinity')->getSchemaBuilder()->hasTable($permissions_table))->toBeFalse()
         ->and(DB::connection($default_connection)->getSchemaBuilder()->hasTable($permissions_table))->toBe($default_had_permissions)
         ->and(DB::connection($default_connection)->table('migration_affinity_sentinel')->count())->toBe(1);
 });
