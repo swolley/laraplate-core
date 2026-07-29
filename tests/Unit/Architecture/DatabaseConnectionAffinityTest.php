@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
+use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
@@ -46,14 +48,15 @@ function database_connection_affinity_facade_calls(string $source, string $relat
     foreach ($finder->findInstanceOf($statements, StaticCall::class) as $call) {
         if (
             ! $call->class instanceof Name
-            || ! $call->name instanceof Identifier
             || ! database_connection_affinity_is_guarded_call($call)
             || ! database_connection_affinity_is_facade_class($call->class, $declared_classes)
         ) {
             continue;
         }
 
-        $method = mb_strtolower($call->name->toString());
+        $method = $call->name instanceof Identifier
+            ? mb_strtolower($call->name->toString())
+            : 'dynamic';
         $fingerprint = database_connection_affinity_call_fingerprint($call);
         $fingerprint_ordinals[$fingerprint] = ($fingerprint_ordinals[$fingerprint] ?? 0) + 1;
         $location = "DB::{$method}:{$fingerprint}:{$fingerprint_ordinals[$fingerprint]}";
@@ -90,14 +93,15 @@ function database_connection_affinity_schema_calls(string $source, string $relat
     foreach ($finder->findInstanceOf($statements, StaticCall::class) as $call) {
         if (
             ! $call->class instanceof Name
-            || ! $call->name instanceof Identifier
             || ! database_connection_affinity_is_guarded_schema_call($call)
             || ! database_connection_affinity_is_schema_facade_class($call->class, $declared_classes)
         ) {
             continue;
         }
 
-        $method = mb_strtolower($call->name->toString());
+        $method = $call->name instanceof Identifier
+            ? mb_strtolower($call->name->toString())
+            : 'dynamic';
         $fingerprint = database_connection_affinity_schema_call_fingerprint($call);
         $fingerprint_ordinals[$fingerprint] = ($fingerprint_ordinals[$fingerprint] ?? 0) + 1;
         $location = "Schema::{$method}:{$fingerprint}:{$fingerprint_ordinals[$fingerprint]}";
@@ -181,67 +185,81 @@ function database_connection_affinity_fluent_expression(StaticCall $call): Expr
 function database_connection_affinity_is_guarded_call(StaticCall $call): bool
 {
     if (! $call->name instanceof Identifier) {
-        return false;
+        return true;
     }
 
     $method = mb_strtolower($call->name->toString());
 
-    if ($method === 'connection') {
-        return $call->args === [];
+    if (in_array($method, [
+        'connection',
+        'connectusing',
+        'usingconnection',
+        'purge',
+        'disconnect',
+        'reconnect',
+        'setdefaultconnection',
+    ], true)) {
+        return ! database_connection_affinity_has_explicit_argument($call);
     }
 
-    return in_array($method, [
-        'table',
-        'select',
-        'selectone',
-        'scalar',
-        'insert',
-        'update',
-        'delete',
-        'statement',
-        'unprepared',
-        'affectingstatement',
-        'transaction',
-        'begintransaction',
-        'commit',
-        'rollback',
+    return ! in_array($method, [
+        'raw',
+        'build',
+        'calculatedynamicconnectionname',
+        'getdefaultconnection',
+        'supporteddrivers',
+        'availabledrivers',
+        'extend',
+        'forgetextension',
+        'getconnections',
+        'setreconnector',
+        'setapplication',
+        'macro',
+        'mixin',
+        'hasmacro',
+        'flushmacros',
+        'prohibitdestructivecommands',
     ], true);
 }
 
 function database_connection_affinity_is_guarded_schema_call(StaticCall $call): bool
 {
     if (! $call->name instanceof Identifier) {
-        return false;
+        return true;
     }
 
     $method = mb_strtolower($call->name->toString());
 
     if ($method === 'connection') {
-        return $call->args === [];
+        return ! database_connection_affinity_has_explicit_argument($call);
     }
 
-    return in_array($method, [
-        'create',
-        'table',
-        'drop',
-        'dropifexists',
-        'rename',
-        'hastable',
-        'hascolumn',
-        'hascolumns',
-        'getcolumns',
-        'getcolumnlisting',
-        'getcolumntype',
-        'getindexes',
-        'getindexlisting',
-        'hasindex',
-        'getforeignkeys',
-        'getviews',
-        'hasview',
-        'enableforeignkeyconstraints',
-        'disableforeignkeyconstraints',
-        'withoutforeignkeyconstraints',
+    return ! in_array($method, [
+        'defaultstringlength',
+        'defaulttimeprecision',
+        'defaultmorphkeytype',
+        'morphusinguuids',
+        'morphusingulids',
+        'macro',
+        'mixin',
+        'hasmacro',
+        'flushmacros',
     ], true);
+}
+
+function database_connection_affinity_has_explicit_argument(StaticCall $call): bool
+{
+    if ($call->args === []) {
+        return false;
+    }
+
+    $argument = $call->args[0]->value;
+
+    if ($argument instanceof ConstFetch && strcasecmp($argument->name->toString(), 'null') === 0) {
+        return false;
+    }
+
+    return ! ($argument instanceof String_ && $argument->value === '');
 }
 
 /**
@@ -384,8 +402,12 @@ PHP;
 it('detects every DB-hitting facade operation and implicit default connection resolution', function (): void {
     $expressions = [
         'connection' => 'DB::connection();',
+        'query' => 'DB::query();',
         'select' => 'DB::select("select 1");',
         'selectone' => 'DB::selectOne("select 1");',
+        'selectfromwriteconnection' => 'DB::selectFromWriteConnection("select 1");',
+        'selectresultsets' => 'DB::selectResultSets("select 1");',
+        'cursor' => 'DB::cursor("select 1");',
         'scalar' => 'DB::scalar("select 1");',
         'insert' => 'DB::insert("insert into examples values (1)");',
         'update' => 'DB::update("update examples set id = 1");',
@@ -409,13 +431,16 @@ it('detects every DB-hitting facade operation and implicit default connection re
 
     expect(database_connection_affinity_facade_calls('<?php DB::connection("explicit");'))
         ->toBe([])
+        ->and(database_connection_affinity_facade_calls('<?php DB::connection(null);'))
+        ->toHaveCount(1)
+        ->and(database_connection_affinity_facade_calls('<?php DB::connection("");'))
+        ->toHaveCount(1)
         ->and(database_connection_affinity_facade_calls('<?php DB::raw("count(*)");'))
         ->toBe([]);
 });
 
 it('detects implicit database Schema facade operations', function (): void {
     $expressions = [
-        'connection' => 'Schema::connection();',
         'create' => 'Schema::create("examples", fn ($table) => null);',
         'table' => 'Schema::table("examples", fn ($table) => null);',
         'drop' => 'Schema::drop("examples");',
@@ -430,6 +455,10 @@ it('detects implicit database Schema facade operations', function (): void {
         'hasindex' => 'Schema::hasIndex("examples", ["id"]);',
         'getforeignkeys' => 'Schema::getForeignKeys("examples");',
         'getviews' => 'Schema::getViews();',
+        'gettables' => 'Schema::getTables();',
+        'gettypes' => 'Schema::getTypes();',
+        'dropcolumns' => 'Schema::dropColumns("examples", ["legacy"]);',
+        'dropalltables' => 'Schema::dropAllTables();',
     ];
 
     foreach ($expressions as $method => $expression) {
@@ -451,7 +480,20 @@ PHP;
 
     expect(database_connection_affinity_schema_calls($aliases))->toHaveCount(2)
         ->and(database_connection_affinity_schema_calls('<?php Schema::connection("explicit")->hasTable("examples");'))
+        ->toBe([])
+        ->and(database_connection_affinity_schema_calls('<?php Schema::connection(null);'))
+        ->toHaveCount(1)
+        ->and(database_connection_affinity_schema_calls('<?php Schema::connection("");'))
+        ->toHaveCount(1)
+        ->and(database_connection_affinity_schema_calls('<?php Schema::connection($connection);'))
         ->toBe([]);
+});
+
+it('conservatively detects dynamic DB and Schema facade methods', function (): void {
+    expect(database_connection_affinity_facade_calls('<?php DB::$method();'))
+        ->toHaveCount(1)
+        ->and(database_connection_affinity_schema_calls('<?php Schema::$method();'))
+        ->toHaveCount(1);
 });
 
 it('keeps the runtime DB facade connection-affinity baseline empty', function (): void {

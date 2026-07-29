@@ -61,6 +61,33 @@ it('instantiates the soft-delete model through its constructor', function (): vo
         ->and($model->getTable())->toBe('soft_delete_constructor_table');
 });
 
+it('refresh inspects schema through the constructor-configured model connection', function (): void {
+    config()->set('database.connections.soft_delete_constructor_connection', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+    ]);
+    DB::purge('soft_delete_constructor_connection');
+    $connection = DB::connection('soft_delete_constructor_connection');
+    $connection->getSchemaBuilder()->create('soft_delete_constructor_table', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+    });
+    $connection->enableQueryLog();
+
+    $command = app(ModelSoftDeletesRefreshCommand::class);
+    $method = new ReflectionMethod($command, 'checkModel');
+    $method->setAccessible(true);
+
+    try {
+        $method->invoke($command, ConstructorConfiguredSoftDeleteModel::class);
+
+        expect($connection->getQueryLog())->not->toBeEmpty();
+    } finally {
+        DB::disconnect('soft_delete_constructor_connection');
+        DB::purge('soft_delete_constructor_connection');
+    }
+});
+
 it('writes soft-delete settings through the Setting model connection', function (): void {
     $previous_default = config('database.default');
     $resolver = Model::getConnectionResolver();

@@ -334,7 +334,7 @@ final class ParallelTaskRunner
     private function executeTask(BatchTask $task): BatchOutcome
     {
         $start = microtime(true);
-        $connection = DB::connection((string) config('database.default'));
+        $connection = DB::connection(DB::getDefaultConnection());
         $connection->enableQueryLog();
 
         try {

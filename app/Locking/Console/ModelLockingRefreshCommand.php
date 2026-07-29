@@ -71,7 +71,7 @@ final class ModelLockingRefreshCommand extends Command
         }
 
         /** @var Model $instance */
-        $instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
+        $instance = new ReflectionClass($model)->newInstance();
         $table = $instance->getTable();
 
         $this->optimisticLockingCheck($instance, $model, $table);

@@ -47,7 +47,7 @@ final class ModelSoftDeletesRefreshCommand extends Command
             return;
         }
 
-        $instance = new ReflectionClass($model_class)->newInstanceWithoutConstructor();
+        $instance = new ReflectionClass($model_class)->newInstance();
 
         if (! $instance instanceof Model) {
             return;

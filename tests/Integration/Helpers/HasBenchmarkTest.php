@@ -89,6 +89,42 @@ it('keeps benchmark row counts and query logging on the supplied connection', fu
     }
 });
 
+it('uses the database manager runtime default when no connection is supplied', function (): void {
+    config()->set('database.connections.benchmark_runtime_default', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+    ]);
+    DB::purge('benchmark_runtime_default');
+    $runtime_connection = DB::connection('benchmark_runtime_default');
+    $database_manager = DB::getFacadeRoot();
+    $runtime_manager = Mockery::mock();
+    $runtime_manager->shouldReceive('getDefaultConnection')->andReturn('benchmark_runtime_default');
+    $runtime_manager->shouldReceive('connection')
+        ->with('benchmark_runtime_default')
+        ->andReturn($runtime_connection);
+    DB::swap($runtime_manager);
+
+    $cmd = new BenchmarkHarness;
+    $cmd->setLaravel($this->app);
+    prepare_benchmark_command($cmd);
+    $start = new ReflectionMethod($cmd, 'startBenchmark');
+    $start->setAccessible(true);
+    $connection = new ReflectionProperty($cmd, 'benchmarkConnection');
+    $connection->setAccessible(true);
+
+    try {
+        $start->invoke($cmd);
+
+        expect($connection->getValue($cmd)?->getName())->toBe('benchmark_runtime_default');
+    } finally {
+        $cmd->testCancelBenchmark();
+        DB::swap($database_manager);
+        DB::disconnect('benchmark_runtime_default');
+        DB::purge('benchmark_runtime_default');
+    }
+});
+
 it('stepBenchmark returns early when not started', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);

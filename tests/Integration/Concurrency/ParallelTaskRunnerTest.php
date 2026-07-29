@@ -207,3 +207,38 @@ it('sums queryCount from each forked child into BatchSummary::totalQueryCount', 
     expect($summary->totalQueryCount)->toBeGreaterThanOrEqual(3);
     expect($summary->outcomes[0]->queryCount + $summary->outcomes[1]->queryCount)->toBe($summary->totalQueryCount);
 });
+
+it('tracks queries on the database manager runtime default connection', function (): void {
+    config()->set('database.connections.parallel_runtime_default', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+    ]);
+    DB::purge('parallel_runtime_default');
+    $runtime_connection = DB::connection('parallel_runtime_default');
+    $database_manager = DB::getFacadeRoot();
+    $runtime_manager = Mockery::mock();
+    $runtime_manager->shouldReceive('getDefaultConnection')->andReturn('parallel_runtime_default');
+    $runtime_manager->shouldReceive('connection')
+        ->with('parallel_runtime_default')
+        ->andReturn($runtime_connection);
+    DB::swap($runtime_manager);
+
+    $runner = ParallelTaskRunner::make();
+    $execute = new ReflectionMethod($runner, 'executeTask');
+    $execute->setAccessible(true);
+
+    try {
+        $outcome = $execute->invoke($runner, new BatchTask(
+            id: 'runtime-default',
+            units: 1,
+            run: fn (): array => $runtime_connection->select('select 1'),
+        ));
+
+        expect($outcome->queryCount)->toBe(1);
+    } finally {
+        DB::swap($database_manager);
+        DB::disconnect('parallel_runtime_default');
+        DB::purge('parallel_runtime_default');
+    }
+});

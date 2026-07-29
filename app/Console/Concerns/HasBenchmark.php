@@ -59,7 +59,7 @@ trait HasBenchmark
         $this->benchmarkStartTime = microtime(true);
         $this->benchmarkTable = $table;
         $this->benchmarkStartMemory = memory_get_usage();
-        $this->benchmarkConnection = $connection ?? DB::connection((string) config('database.default'));
+        $this->benchmarkConnection = $connection ?? DB::connection(DB::getDefaultConnection());
 
         if (! in_array($table, [null, '', '0'], true)) {
             $this->startRowCount = $this->benchmarkConnection->table($table)->count();
