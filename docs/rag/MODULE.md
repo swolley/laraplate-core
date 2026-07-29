@@ -543,6 +543,11 @@ When building new module features, reuse these primitives instead of re-implemen
 
 - Swagger generation command (module-specific command wiring in Core console)
 
+### Filament scaffolding
+
+- `filament:make-resources {module?}` — scaffolds Filament resources for Eloquent models in `App` (default) or a **custom** module. Official Laraplate modules (`laraplate_owned` in `module.json`, or composer `swolley/laraplate-*` fallback) are rejected. Pivot / MorphPivot models are skipped. Existing resource files: interactive overwrite prompt; under `--no-interaction`, skip and continue the batch. Generated table / form / list-page classes inject Core (or module-local) `HasTable` / `HasForm` / `HasRecords` via permanent ClassGenerator container rebinds. App resources are discovered by `AdminPanelProvider` under `app/Filament/{Resources,Pages}`.
+- `HasForm::configureForm($schema)` — call as `return self::configureForm($schema->components([...]));`. For models using `HasDynamicContents`, prepends Entity → Preset selects (`dehydrated(false)`) and a required hidden `presettable_id` resolved from `Preset::activePresettable()`. Domain forms must not submit `entity_id` as the save key; `entity_id` is synced when `presettable_id` is set.
+
 ## How to use Core capabilities correctly
 
 ### For product/admin teams

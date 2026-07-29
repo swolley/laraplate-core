@@ -71,6 +71,7 @@ use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\VersionSetManager;
 use Modules\Core\Versioning\VersionWriter;
+use Nwidart\Modules\Module as NwidartModule;
 use Override;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -128,6 +129,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->configureDates();
         $this->configureUrls();
         $this->configureFilamentDefaults();
+        $this->registerModuleMacros();
         $this->registerValidationOverrides();
         $this->registerCacheWarmOnBoot();
     }
@@ -432,6 +434,40 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         Toggle::configureUsing(
             static fn (Toggle $toggle): Toggle => $toggle->inline(false),
+        );
+
+        $this->bindLaraplateFilamentGenerators();
+    }
+
+    private function bindLaraplateFilamentGenerators(): void
+    {
+        $this->app->bind(
+            \Filament\Commands\FileGenerators\Resources\ResourceClassGenerator::class,
+            \Modules\Core\Filament\Generators\LaraplateResourceClassGenerator::class,
+        );
+        $this->app->bind(
+            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceTableClassGenerator::class,
+            \Modules\Core\Filament\Generators\LaraplateResourceTableClassGenerator::class,
+        );
+        $this->app->bind(
+            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGenerator::class,
+            \Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator::class,
+        );
+        $this->app->bind(
+            \Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator::class,
+            \Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator::class,
+        );
+    }
+
+    private function registerModuleMacros(): void
+    {
+        if (NwidartModule::hasMacro('isLaraplateOwned')) {
+            return;
+        }
+
+        NwidartModule::macro(
+            'isLaraplateOwned',
+            fn (): bool => is_laraplate_owned_module($this->getName()),
         );
     }
 

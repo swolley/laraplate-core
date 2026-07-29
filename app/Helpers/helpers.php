@@ -81,12 +81,14 @@ if (! function_exists('modules')) {
         }
         $remapped_modules = [];
 
-        foreach ($modules as $module => $class) {
-            if ($filter && ! $filter($module)) {
+        foreach ($modules as $class) {
+            $module_name = $class->getName();
+
+            if ($filter !== null && ! $filter($module_name)) {
                 continue;
             }
 
-            $remapped_modules[$class->getName()] = $class;
+            $remapped_modules[$module_name] = $class;
         }
 
         if (! in_array($onlyModule, [null, '', '0'], true)) {
@@ -126,6 +128,64 @@ if (! function_exists('modules')) {
         }
 
         return $remapped_modules;
+    }
+}
+
+if (! function_exists('is_laraplate_owned_module')) {
+    /**
+     * Whether a module is an official Laraplate-owned distribution package.
+     *
+     * Resolution: App is never owned; module.json `laraplate_owned` when present;
+     * otherwise composer.json `name` matching `swolley/laraplate-*`.
+     */
+    function is_laraplate_owned_module(string $name): bool
+    {
+        if ($name === 'App' || strcasecmp($name, 'App') === 0) {
+            return false;
+        }
+
+        $module_name = str($name)->studly()->toString();
+
+        try {
+            $path = module_path($module_name);
+        } catch (Throwable) {
+            return false;
+        }
+
+        if ($path === '' || ! is_dir($path)) {
+            return false;
+        }
+
+        return laraplate_module_is_owned_at_path($path);
+    }
+}
+
+if (! function_exists('laraplate_module_is_owned_at_path')) {
+    /**
+     * Ownership resolution from a module root directory (module.json + composer.json).
+     */
+    function laraplate_module_is_owned_at_path(string $path): bool
+    {
+        $module_json_path = $path.DIRECTORY_SEPARATOR.'module.json';
+
+        if (is_file($module_json_path)) {
+            $decoded = json_decode((string) file_get_contents($module_json_path), true);
+
+            if (is_array($decoded) && array_key_exists('laraplate_owned', $decoded)) {
+                return (bool) $decoded['laraplate_owned'];
+            }
+        }
+
+        $composer_path = $path.DIRECTORY_SEPARATOR.'composer.json';
+
+        if (! is_file($composer_path)) {
+            return false;
+        }
+
+        $composer = json_decode((string) file_get_contents($composer_path), true);
+        $package = is_array($composer) ? ($composer['name'] ?? null) : null;
+
+        return is_string($package) && str_starts_with($package, 'swolley/laraplate-');
     }
 }
 
