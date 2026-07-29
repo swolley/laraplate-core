@@ -28,22 +28,25 @@ final class PublishOutboxEventJob implements ShouldBeUnique, ShouldQueue
      */
     public array $backoff = [30, 60, 120, 300];
 
+    public ?string $connectionName = null;
+
     public function __construct(
         public readonly int $outboxEventId,
-        public readonly string $connectionName,
+        ?string $connectionName = null,
     ) {
+        $this->connectionName = $connectionName;
         $this->onQueue('outbox');
     }
 
     public function uniqueId(): string
     {
-        return $this->connectionName . ':' . $this->outboxEventId;
+        return $this->resolveConnectionName() . ':' . $this->outboxEventId;
     }
 
     public function handle(OutboxPublisher $publisher): void
     {
         $event = (new OutboxEvent)
-            ->setConnection($this->connectionName)
+            ->setConnection($this->resolveConnectionName())
             ->newQuery()
             ->find($this->outboxEventId);
 
@@ -67,5 +70,16 @@ final class PublishOutboxEventJob implements ShouldBeUnique, ShouldQueue
 
             throw $exception;
         }
+    }
+
+    private function resolveConnectionName(): string
+    {
+        $connection_name = mb_trim((string) $this->connectionName);
+
+        if ($connection_name !== '') {
+            return $connection_name;
+        }
+
+        return (string) (new OutboxEvent)->getConnection()->getName();
     }
 }

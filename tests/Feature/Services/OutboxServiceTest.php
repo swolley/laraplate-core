@@ -64,6 +64,43 @@ it('publishes an outbox event once and records the attempt', function (): void {
         ->and($event->fresh()->publish_attempts)->toBe(1);
 });
 
+it('publishes a legacy serialized job without a connection property on the default connection', function (): void {
+    Queue::fake();
+    $aggregate = Setting::query()->forceCreate([
+        'name' => 'outbox.legacy',
+        'value' => 'enabled',
+        'description' => '',
+    ]);
+    $event = app(OutboxRecorder::class)->record($aggregate, 'core.test.legacy');
+    $class = PublishOutboxEventJob::class;
+    $serialized = sprintf(
+        'O:%d:"%s":1:{s:13:"outboxEventId";i:%d;}',
+        mb_strlen($class),
+        $class,
+        $event->id,
+    );
+    $job = unserialize($serialized, ['allowed_classes' => [$class]]);
+    $publisher = new class implements OutboxPublisher
+    {
+        public int $calls = 0;
+
+        public function publish(OutboxEvent $event): void
+        {
+            expect($event->getConnection()->getName())->toBe(config('database.default'));
+            $this->calls++;
+        }
+    };
+
+    expect($job)->toBeInstanceOf(PublishOutboxEventJob::class)
+        ->and($job->uniqueId())->toBe(config('database.default') . ':' . $event->id);
+
+    $job->handle($publisher);
+
+    expect($publisher->calls)->toBe(1)
+        ->and($event->fresh()->published_at)->not->toBeNull()
+        ->and($event->fresh()->publish_attempts)->toBe(1);
+});
+
 it('rolls back the event and does not queue publication', function (): void {
     Queue::fake();
     $aggregate = Setting::query()->forceCreate([
