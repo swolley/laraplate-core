@@ -8,11 +8,16 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Modules\Core\Filament\Utils\HasForm;
 
 final class LicenseForm
 {
+    use HasForm;
+
     public static function configure(Schema $schema): Schema
     {
+        self::configureForm($schema);
+
         return $schema
             ->components([
                 // Toggle::make('is_active')
