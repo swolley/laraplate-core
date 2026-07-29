@@ -6,6 +6,7 @@ namespace Modules\Core\Locking\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Locking\Exceptions\MissingLockVersionException;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 
 /**
@@ -33,10 +34,15 @@ trait HasOptimisticLocking
 
     /**
      * Current lock version value.
+     *
+     * Null when the model was hydrated without the version column, e.g. through
+     * a partial select, or when it has not been persisted yet.
      */
-    public function currentLockVersion(): int
+    public function currentLockVersion(): ?int
     {
-        return $this->getAttribute(static::lockVersionColumn());
+        $version = $this->getAttribute(static::lockVersionColumn());
+
+        return $version === null ? null : (int) $version;
     }
 
     /**
@@ -54,15 +60,12 @@ trait HasOptimisticLocking
     /**
      * Hooks model events to add lock version if not set.
      */
-    protected static function bootOptimisticLocking(): void
+    protected static function bootHasOptimisticLocking(): void
     {
-        static::creating(function (Model $model): Model {
-            // @phpstan-ignore method.notFound
-            if ($model->currentLockVersion() === null) {
+        static::creating(function (Model $model): void {
+            if ($model->getAttribute(static::lockVersionColumn()) === null) {
                 $model->{static::lockVersionColumn()} = 1;
             }
-
-            return $model;
         });
     }
 
@@ -93,6 +96,13 @@ trait HasOptimisticLocking
 
         if (count($dirty) > 0) {
             $versionColumn = static::lockVersionColumn();
+            $beforeUpdateVersion = $this->currentLockVersion();
+
+            // Refuse the update rather than writing without the guard: a silent
+            // overwrite is exactly what optimistic locking exists to prevent.
+            if ($beforeUpdateVersion === null) {
+                throw MissingLockVersionException::forModel($this, $versionColumn);
+            }
 
             $this->setKeysForSaveQuery($query);
 
@@ -100,10 +110,8 @@ trait HasOptimisticLocking
             // added to the update query, as every update on the model increments the version
             // by exactly "1" we will increment the value by one for update, then.
             if ($this->lockingEnabled()) {
-                $query->where($versionColumn, '=', $this->currentLockVersion());
+                $query->where($versionColumn, '=', $beforeUpdateVersion);
             }
-
-            $beforeUpdateVersion = $this->currentLockVersion();
 
             $this->setAttribute($versionColumn, $newVersion = $beforeUpdateVersion + 1);
             $dirty[$versionColumn] = $newVersion;

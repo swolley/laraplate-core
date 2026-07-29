@@ -221,6 +221,7 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultUsers(): void
     {
         $user_class = user_class();
+        $user_instance = new ReflectionClass($user_class)->newInstanceWithoutConstructor();
 
         $this->logOperation($user_class);
 

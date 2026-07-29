@@ -16,9 +16,6 @@ parameters:
         - database
         - routes
 
-    stubFiles:
-        - ../../_ide_helper_traits.php
-
     excludePaths:
         - vendor/**
         - tests/Support/**
