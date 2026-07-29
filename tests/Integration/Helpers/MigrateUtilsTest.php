@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Helpers\MigrateUtils;
 
@@ -41,6 +42,39 @@ it('dropTimestamps removes created_at and updated_at', function (): void {
 
     expect(Schema::hasColumn('migrate_utils_drop', 'created_at'))->toBeFalse()
         ->and(Schema::hasColumn('migrate_utils_drop', 'updated_at'))->toBeFalse();
+});
+
+it('uses the explicit schema connection without changing the default connection', function (): void {
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+
+    DB::purge('affinity');
+
+    $table_name = 'migrate_utils_affinity';
+    $affinity_schema = Schema::connection('affinity');
+    $affinity_connection = $affinity_schema->getConnection();
+
+    Schema::create($table_name, static function (Blueprint $table): void {
+        $table->id();
+    });
+
+    $affinity_schema->create($table_name, static function (Blueprint $table) use ($affinity_connection): void {
+        $table->id();
+        MigrateUtils::timestamps($table, true, false, false, false, true, null, $affinity_connection);
+    });
+
+    $affinity_schema->table($table_name, static function (Blueprint $table) use ($affinity_connection): void {
+        MigrateUtils::dropTimestamps($table, true, false, false, false, $affinity_connection);
+    });
+
+    expect($affinity_schema->hasColumn($table_name, 'created_at'))->toBeFalse()
+        ->and($affinity_schema->hasColumn($table_name, 'updated_at'))->toBeFalse()
+        ->and(Schema::hasColumn($table_name, 'created_at'))->toBeFalse()
+        ->and(Schema::hasColumn($table_name, 'updated_at'))->toBeFalse();
 });
 
 it('creates portable prefix indexes and safely degrades specialized indexes on sqlite', function (): void {

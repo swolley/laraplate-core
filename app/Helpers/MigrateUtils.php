@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Illuminate\Database\Connection;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Locking\Locked;
@@ -19,26 +20,38 @@ final class MigrateUtils
      *
      * @param  string|list<string>  $columns
      */
-    public static function prefixIndex(Blueprint $table, string|array $columns, ?string $name = null): void
+    public static function prefixIndex(
+        Blueprint $table,
+        string|array $columns,
+        ?string $name = null,
+        ?ConnectionInterface $connection = null,
+    ): void
     {
+        $connection = self::connection($connection);
         $normalized_columns = self::normalizeColumns($columns);
-        $index_name = $name ?? self::searchIndexName($table->getTable(), $normalized_columns, 'prefix');
+        $index_name = $name ?? self::searchIndexName($table->getTable(), $normalized_columns, 'prefix', $connection);
         self::assertIdentifier($index_name);
 
         $table->index($normalized_columns, $index_name);
     }
 
-    public static function fuzzyIndex(string $table, string $column, ?string $name = null, string $oracleSync = 'on_commit'): void
-    {
+    public static function fuzzyIndex(
+        string $table,
+        string $column,
+        ?string $name = null,
+        string $oracleSync = 'on_commit',
+        ?ConnectionInterface $connection = null,
+    ): void {
+        $connection = self::connection($connection);
         self::assertIdentifier($table);
         self::assertIdentifier($column);
         self::assertOracleSync($oracleSync);
-        $index_name = $name ?? self::searchIndexName($table, [$column], 'fuzzy');
+        $index_name = $name ?? self::searchIndexName($table, [$column], 'fuzzy', $connection);
         self::assertIdentifier($index_name);
 
-        match (DB::connection()->getDriverName()) {
-            'pgsql' => self::createPostgresFuzzyIndex($table, $column, $index_name),
-            'oracle' => self::createOracleContextIndex($table, $column, $index_name, $oracleSync),
+        match ($connection->getDriverName()) {
+            'pgsql' => self::createPostgresFuzzyIndex($table, $column, $index_name, $connection),
+            'oracle' => self::createOracleContextIndex($table, $column, $index_name, $oracleSync, $connection),
             default => null,
         };
     }
@@ -52,36 +65,56 @@ final class MigrateUtils
         string $language = 'simple',
         ?string $name = null,
         string $oracleSync = 'manual',
+        ?ConnectionInterface $connection = null,
     ): void {
+        $connection = self::connection($connection);
         self::assertIdentifier($table);
         self::assertIdentifier($language);
         self::assertOracleSync($oracleSync);
         $normalized_columns = self::normalizeColumns($columns);
-        $index_name = $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext');
+        $index_name = $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext', $connection);
         self::assertIdentifier($index_name);
 
-        match (DB::connection()->getDriverName()) {
-            'pgsql' => self::createPostgresFullTextIndex($table, $normalized_columns, $language, $index_name),
-            'mysql', 'mariadb' => self::createMysqlFullTextIndex($table, $normalized_columns, $index_name),
+        match ($connection->getDriverName()) {
+            'pgsql' => self::createPostgresFullTextIndex($table, $normalized_columns, $language, $index_name, $connection),
+            'mysql', 'mariadb' => self::createMysqlFullTextIndex($table, $normalized_columns, $index_name, $connection),
             'oracle' => count($normalized_columns) === 1
-                ? self::createOracleContextIndex($table, $normalized_columns[0], $index_name, $oracleSync)
+                ? self::createOracleContextIndex($table, $normalized_columns[0], $index_name, $oracleSync, $connection)
                 : throw new InvalidArgumentException('Oracle CONTEXT indexes require one normalized search-text column.'),
             default => null,
         };
     }
 
-    public static function dropFuzzyIndex(string $table, string $column, ?string $name = null): void
-    {
-        self::dropSpecializedSearchIndex($table, $name ?? self::searchIndexName($table, [$column], 'fuzzy'));
+    public static function dropFuzzyIndex(
+        string $table,
+        string $column,
+        ?string $name = null,
+        ?ConnectionInterface $connection = null,
+    ): void {
+        $connection = self::connection($connection);
+        self::dropSpecializedSearchIndex(
+            $table,
+            $name ?? self::searchIndexName($table, [$column], 'fuzzy', $connection),
+            $connection,
+        );
     }
 
     /**
      * @param  string|list<string>  $columns
      */
-    public static function dropFullTextIndex(string $table, string|array $columns, ?string $name = null): void
-    {
+    public static function dropFullTextIndex(
+        string $table,
+        string|array $columns,
+        ?string $name = null,
+        ?ConnectionInterface $connection = null,
+    ): void {
+        $connection = self::connection($connection);
         $normalized_columns = self::normalizeColumns($columns);
-        self::dropSpecializedSearchIndex($table, $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext'));
+        self::dropSpecializedSearchIndex(
+            $table,
+            $name ?? self::searchIndexName($table, $normalized_columns, 'fulltext', $connection),
+            $connection,
+        );
     }
 
     /**
@@ -105,34 +138,37 @@ final class MigrateUtils
         bool $hasValidity = false,
         bool $isValidityRequired = true,
         ?string $createdAtIndexName = null,
+        ?ConnectionInterface $connection = null,
     ): void {
+        $connection = self::connection($connection);
+        $schema = $connection->getSchemaBuilder();
         $table_name = $table->getTable();
 
         if ($hasCreateUpdate) {
-            if (! Schema::hasColumn($table_name, Model::CREATED_AT)) {
+            if (! $schema->hasColumn($table_name, Model::CREATED_AT)) {
                 $table->timestamp(Model::CREATED_AT)->nullable(false)->useCurrent();
             }
 
-            if (! Schema::hasColumn($table_name, Model::UPDATED_AT)) {
+            if (! $schema->hasColumn($table_name, Model::UPDATED_AT)) {
                 $table->timestamp(Model::UPDATED_AT)->nullable(false)->useCurrent()->useCurrentOnUpdate();
             }
 
-            self::createDateIndex($table, Model::CREATED_AT, $createdAtIndexName);
+            self::createDateIndex($table, Model::CREATED_AT, $createdAtIndexName, $connection);
         }
 
         if ($hasSoftDelete) {
-            self::softDeletes($table);
+            self::softDeletes($table, $connection);
         }
 
         if ($hasLocks) {
-            self::locked($table);
+            self::locked($table, $connection);
         }
 
         if ($hasValidity) {
             $valid_from_column = HasValidity::validFromKey();
             $valid_to_column = HasValidity::validToKey();
 
-            if (! Schema::hasColumn($table_name, $valid_from_column)) {
+            if (! $schema->hasColumn($table_name, $valid_from_column)) {
                 if ($isValidityRequired) {
                     $table->datetime($valid_from_column)->nullable(false)->useCurrent();
                 } else {
@@ -140,20 +176,20 @@ final class MigrateUtils
                 }
             }
 
-            if (! Schema::hasColumn($table_name, $valid_to_column)) {
+            if (! $schema->hasColumn($table_name, $valid_to_column)) {
                 $table->datetime($valid_to_column)->nullable(true);
             }
 
-            self::createDateIndex($table, $valid_from_column);
+            self::createDateIndex($table, $valid_from_column, null, $connection);
 
-            self::createDateIndex($table, $valid_to_column);
+            self::createDateIndex($table, $valid_to_column, null, $connection);
 
             $index_name = $table_name . '_validity_idx';
 
-            if (! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) && ! Schema::hasIndex($table_name, $index_name)) {
-                DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
-                    match (DB::connection()->getDriverName()) {
-                        'pgsql' => DB::statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
+            if (! $schema->hasIndex($table_name, [$valid_from_column, $valid_to_column]) && ! $schema->hasIndex($table_name, $index_name)) {
+                $connection->afterCommit(function () use ($connection, $table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
+                    match ($connection->getDriverName()) {
+                        'pgsql' => $connection->statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
                         default => $table->index([$valid_from_column, $valid_to_column], $index_name),
                     };
                 });
@@ -162,10 +198,10 @@ final class MigrateUtils
 
         $index_name = $table_name . '_validity_deleted_idx';
 
-        if ($hasSoftDelete && $hasValidity && ! Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column, 'is_deleted']) && ! Schema::hasIndex($table_name, $index_name)) {
-            DB::afterCommit(function () use ($table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
-                match (DB::connection()->getDriverName()) {
-                    'pgsql' => DB::statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s, is_deleted)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
+        if ($hasSoftDelete && $hasValidity && ! $schema->hasIndex($table_name, [$valid_from_column, $valid_to_column, 'is_deleted']) && ! $schema->hasIndex($table_name, $index_name)) {
+            $connection->afterCommit(function () use ($connection, $table, $table_name, $valid_from_column, $valid_to_column, $index_name): void {
+                match ($connection->getDriverName()) {
+                    'pgsql' => $connection->statement(sprintf('CREATE INDEX %s ON %s (%s DESC, %s, is_deleted)', $index_name, $table_name, $valid_from_column, $valid_to_column)),
                     default => $table->index([$valid_from_column, $valid_to_column, 'is_deleted'], $index_name),
                 };
             });
@@ -187,31 +223,34 @@ final class MigrateUtils
         bool $hasSoftDelete = false,
         bool $hasLocks = false,
         bool $hasValidity = false,
+        ?ConnectionInterface $connection = null,
     ): void {
+        $connection = self::connection($connection);
+        $schema = $connection->getSchemaBuilder();
         $table_name = $table->getTable();
 
         if ($hasCreateUpdate) {
             $index_name = $table_name . '_created_at_idx';
 
-            if (Schema::hasIndex($table_name, [Model::CREATED_AT]) || Schema::hasIndex($table_name, $index_name)) {
+            if ($schema->hasIndex($table_name, [Model::CREATED_AT]) || $schema->hasIndex($table_name, $index_name)) {
                 $table->dropIndex($index_name);
             }
 
-            if (Schema::hasColumn($table_name, Model::CREATED_AT)) {
+            if ($schema->hasColumn($table_name, Model::CREATED_AT)) {
                 $table->dropColumn(Model::CREATED_AT);
             }
 
-            if (Schema::hasColumn($table_name, Model::UPDATED_AT)) {
+            if ($schema->hasColumn($table_name, Model::UPDATED_AT)) {
                 $table->dropColumn(Model::UPDATED_AT);
             }
         }
 
         if ($hasSoftDelete) {
-            self::dropSoftDeletes($table);
+            self::dropSoftDeletes($table, $connection);
         }
 
         if ($hasLocks) {
-            self::dropLocked($table);
+            self::dropLocked($table, $connection);
         }
 
         if ($hasValidity) {
@@ -219,28 +258,30 @@ final class MigrateUtils
             $valid_to_column = HasValidity::validToKey();
             $index_name = $table_name . '.validity_range';
 
-            if (Schema::hasIndex($table_name, [$valid_from_column, $valid_to_column]) || Schema::hasIndex($table_name, $index_name)) {
+            if ($schema->hasIndex($table_name, [$valid_from_column, $valid_to_column]) || $schema->hasIndex($table_name, $index_name)) {
                 $table->dropIndex($index_name);
             }
 
-            if (Schema::hasColumn($table_name, $valid_from_column)) {
+            if ($schema->hasColumn($table_name, $valid_from_column)) {
                 $table->dropColumn($valid_from_column);
             }
 
-            if (Schema::hasColumn($table_name, $valid_to_column)) {
+            if ($schema->hasColumn($table_name, $valid_to_column)) {
                 $table->dropColumn($valid_to_column);
             }
         }
     }
 
-    private static function softDeletes(Blueprint $table): void
+    private static function softDeletes(Blueprint $table, Connection $connection): void
     {
-        if (! Schema::hasColumn($table->getTable(), 'deleted_at')) {
+        $schema = $connection->getSchemaBuilder();
+
+        if (! $schema->hasColumn($table->getTable(), 'deleted_at')) {
             $table->softDeletes();
         }
 
-        if (! Schema::hasColumn($table->getTable(), 'is_deleted')) {
-            switch (DB::connection()->getDriverName()) {
+        if (! $schema->hasColumn($table->getTable(), 'is_deleted')) {
+            switch ($connection->getDriverName()) {
                 case 'pgsql':
                     $table->boolean('is_deleted')->storedAs('deleted_at IS NOT NULL')->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
 
@@ -248,8 +289,8 @@ final class MigrateUtils
                 case 'oracle':
                     // Oracle richiede ancora i trigger
                     $table->boolean('is_deleted')->default(false)->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
-                    DB::afterCommit(function () use ($table): void {
-                        self::createBooleanTriggers($table, 'deleted');
+                    $connection->afterCommit(function () use ($connection, $table): void {
+                        self::createBooleanTriggers($table, 'deleted', $connection);
                     });
 
                     break;
@@ -262,39 +303,42 @@ final class MigrateUtils
         }
     }
 
-    private static function dropSoftDeletes(Blueprint $table): void
+    private static function dropSoftDeletes(Blueprint $table, Connection $connection): void
     {
         // Rimuoviamo i trigger solo per Oracle
-        if (DB::connection()->getDriverName() === 'oracle') {
-            self::dropBooleanTriggers($table, 'deleted');
+        if ($connection->getDriverName() === 'oracle') {
+            self::dropBooleanTriggers($table, 'deleted', $connection);
         }
 
-        if (Schema::hasColumn($table->getTable(), 'deleted_at')) {
+        $schema = $connection->getSchemaBuilder();
+
+        if ($schema->hasColumn($table->getTable(), 'deleted_at')) {
             $table->dropSoftDeletes();
         }
 
-        if (Schema::hasColumn($table->getTable(), 'is_deleted')) {
+        if ($schema->hasColumn($table->getTable(), 'is_deleted')) {
             $table->dropColumn('is_deleted');
         }
     }
 
-    private static function locked(Blueprint $table): void
+    private static function locked(Blueprint $table, Connection $connection): void
     {
+        $schema = $connection->getSchemaBuilder();
         $locked = new Locked();
         $locked_at_column = $locked->lockedAtColumn();
 
-        if ($locked_at_column !== '' && $locked_at_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_at_column)) {
+        if ($locked_at_column !== '' && $locked_at_column !== '0' && ! $schema->hasColumn($table->getTable(), $locked_at_column)) {
             $table->timestamp($locked_at_column)->nullable()->comment('The date and time when the entity was locked');
         }
 
         $locked_by_column = $locked->lockedByColumn();
 
-        if ($locked_by_column !== '' && $locked_by_column !== '0' && ! Schema::hasColumn($table->getTable(), $locked_by_column)) {
+        if ($locked_by_column !== '' && $locked_by_column !== '0' && ! $schema->hasColumn($table->getTable(), $locked_by_column)) {
             $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
         }
 
-        if (! Schema::hasColumn($table->getTable(), 'is_locked')) {
-            switch (DB::connection()->getDriverName()) {
+        if (! $schema->hasColumn($table->getTable(), 'is_locked')) {
+            switch ($connection->getDriverName()) {
                 case 'pgsql':
                     $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
 
@@ -302,8 +346,8 @@ final class MigrateUtils
                 case 'oracle':
                     // Oracle richiede ancora i trigger
                     $table->boolean('is_locked')->default(false)->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
-                    DB::afterCommit(function () use ($table): void {
-                        self::createBooleanTriggers($table, 'locked');
+                    $connection->afterCommit(function () use ($connection, $table): void {
+                        self::createBooleanTriggers($table, 'locked', $connection);
                     });
 
                     break;
@@ -316,37 +360,39 @@ final class MigrateUtils
         }
     }
 
-    private static function dropLocked(Blueprint $table): void
+    private static function dropLocked(Blueprint $table, Connection $connection): void
     {
+        $schema = $connection->getSchemaBuilder();
+
         // Rimuoviamo i trigger solo per Oracle
-        if (DB::connection()->getDriverName() === 'oracle') {
-            self::dropBooleanTriggers($table, 'locked');
+        if ($connection->getDriverName() === 'oracle') {
+            self::dropBooleanTriggers($table, 'locked', $connection);
         }
 
         $locked = new Locked();
         $locked_at_column = $locked->lockedAtColumn();
 
-        if ($locked_at_column !== '' && $locked_at_column !== '0' && Schema::hasColumn($table->getTable(), $locked_at_column)) {
+        if ($locked_at_column !== '' && $locked_at_column !== '0' && $schema->hasColumn($table->getTable(), $locked_at_column)) {
             $table->dropColumn($locked_at_column);
         }
 
         $locked_by_column = $locked->lockedByColumn();
 
-        if ($locked_by_column !== '' && $locked_by_column !== '0' && Schema::hasColumn($table->getTable(), $locked_by_column)) {
+        if ($locked_by_column !== '' && $locked_by_column !== '0' && $schema->hasColumn($table->getTable(), $locked_by_column)) {
             $table->dropColumn($locked_by_column);
         }
 
-        if (Schema::hasColumn($table->getTable(), 'is_locked')) {
+        if ($schema->hasColumn($table->getTable(), 'is_locked')) {
             $table->dropColumn('is_locked');
         }
     }
 
-    private static function createBooleanTriggers(Blueprint $table, string $suffix): void
+    private static function createBooleanTriggers(Blueprint $table, string $suffix, Connection $connection): void
     {
-        if (DB::connection()->getDriverName() === 'oracle') {
+        if ($connection->getDriverName() === 'oracle') {
             // In Oracle we use a virtual column with a check constraint
             // Create trigger for Oracle
-            DB::unprepared('
+            $connection->unprepared('
                 CREATE OR REPLACE TRIGGER ' . $table->getTable() . '_is_' . $suffix . '_trigger
                 BEFORE INSERT OR UPDATE ON ' . $table->getTable() . '
                 FOR EACH ROW
@@ -360,10 +406,10 @@ final class MigrateUtils
         }
     }
 
-    private static function dropBooleanTriggers(Blueprint $table, string $suffix): void
+    private static function dropBooleanTriggers(Blueprint $table, string $suffix, Connection $connection): void
     {
-        if (DB::connection()->getDriverName() === 'oracle') {
-            DB::unprepared('
+        if ($connection->getDriverName() === 'oracle') {
+            $connection->unprepared('
                 BEGIN
                     EXECUTE IMMEDIATE \'DROP TRIGGER ' . $table->getTable() . '_is_' . $suffix . '_trigger\';
                 EXCEPTION
@@ -376,22 +422,29 @@ final class MigrateUtils
         }
     }
 
-    private static function createDateIndex(Blueprint $table, string $column, ?string $indexName = null): void
+    private static function createDateIndex(
+        Blueprint $table,
+        string $column,
+        ?string $indexName,
+        Connection $connection,
+    ): void
     {
         if ($indexName !== null) {
             self::assertIdentifier($indexName);
         }
 
         $index_name = $indexName ?? $table->getTable() . '_' . $column . '_idx';
-        $driver_name = DB::connection()->getDriverName();
+        $driver_name = $connection->getDriverName();
 
-        if (Schema::hasIndex($table->getTable(), $column) || Schema::hasIndex($table->getTable(), $index_name)) {
+        $schema = $connection->getSchemaBuilder();
+
+        if ($schema->hasIndex($table->getTable(), $column) || $schema->hasIndex($table->getTable(), $index_name)) {
             return;
         }
 
         if ($driver_name === 'pgsql') {
-            DB::afterCommit(function () use ($table, $column, $index_name): void {
-                DB::statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' USING BRIN (' . $column . ')');
+            $connection->afterCommit(function () use ($connection, $table, $column, $index_name): void {
+                $connection->statement('CREATE INDEX ' . $index_name . ' ON ' . $table->getTable() . ' USING BRIN (' . $column . ')');
             });
 
             return;
@@ -441,11 +494,11 @@ final class MigrateUtils
     /**
      * @param  list<string>  $columns
      */
-    private static function searchIndexName(string $table, array $columns, string $suffix): string
+    private static function searchIndexName(string $table, array $columns, string $suffix, Connection $connection): string
     {
         self::assertIdentifier($table);
         $base = mb_strtolower(implode('_', [$table, ...$columns, $suffix, 'idx']));
-        $limit = match (DB::connection()->getDriverName()) {
+        $limit = match ($connection->getDriverName()) {
             'oracle' => 30,
             'pgsql' => 63,
             default => 64,
@@ -460,23 +513,33 @@ final class MigrateUtils
         return mb_substr($base, 0, $limit - 9) . '_' . $hash;
     }
 
-    private static function createPostgresFuzzyIndex(string $table, string $column, string $indexName): void
+    private static function createPostgresFuzzyIndex(
+        string $table,
+        string $column,
+        string $indexName,
+        Connection $connection,
+    ): void
     {
-        DB::unprepared('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-        DB::statement(sprintf('CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)', $indexName, $table, $column));
+        $connection->unprepared('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+        $connection->statement(sprintf('CREATE INDEX %s ON %s USING GIN (%s gin_trgm_ops)', $indexName, $table, $column));
     }
 
     /**
      * @param  list<string>  $columns
      */
-    private static function createPostgresFullTextIndex(string $table, array $columns, string $language, string $indexName): void
-    {
+    private static function createPostgresFullTextIndex(
+        string $table,
+        array $columns,
+        string $language,
+        string $indexName,
+        Connection $connection,
+    ): void {
         $document = implode(" || ' ' || ", array_map(
             static fn (string $column): string => sprintf("coalesce(%s, '')", $column),
             $columns,
         ));
 
-        DB::statement(sprintf(
+        $connection->statement(sprintf(
             "CREATE INDEX %s ON %s USING GIN (to_tsvector('%s', %s))",
             $indexName,
             $table,
@@ -488,9 +551,14 @@ final class MigrateUtils
     /**
      * @param  list<string>  $columns
      */
-    private static function createMysqlFullTextIndex(string $table, array $columns, string $indexName): void
+    private static function createMysqlFullTextIndex(
+        string $table,
+        array $columns,
+        string $indexName,
+        Connection $connection,
+    ): void
     {
-        DB::statement(sprintf(
+        $connection->statement(sprintf(
             'ALTER TABLE %s ADD FULLTEXT INDEX %s (%s)',
             $table,
             $indexName,
@@ -498,11 +566,16 @@ final class MigrateUtils
         ));
     }
 
-    private static function createOracleContextIndex(string $table, string $column, string $indexName, string $sync): void
-    {
+    private static function createOracleContextIndex(
+        string $table,
+        string $column,
+        string $indexName,
+        string $sync,
+        Connection $connection,
+    ): void {
         $parameters = $sync === 'on_commit' ? " PARAMETERS ('SYNC (ON COMMIT)')" : '';
 
-        DB::statement(sprintf(
+        $connection->statement(sprintf(
             'CREATE INDEX %s ON %s (%s) INDEXTYPE IS CTXSYS.CONTEXT%s',
             $indexName,
             $table,
@@ -511,15 +584,31 @@ final class MigrateUtils
         ));
     }
 
-    private static function dropSpecializedSearchIndex(string $table, string $indexName): void
-    {
+    private static function dropSpecializedSearchIndex(
+        string $table,
+        string $indexName,
+        Connection $connection,
+    ): void {
         self::assertIdentifier($table);
         self::assertIdentifier($indexName);
 
-        match (DB::connection()->getDriverName()) {
-            'mysql', 'mariadb' => DB::statement(sprintf('ALTER TABLE %s DROP INDEX %s', $table, $indexName)),
-            'pgsql', 'oracle' => DB::statement(sprintf('DROP INDEX %s', $indexName)),
+        match ($connection->getDriverName()) {
+            'mysql', 'mariadb' => $connection->statement(sprintf('ALTER TABLE %s DROP INDEX %s', $table, $indexName)),
+            'pgsql', 'oracle' => $connection->statement(sprintf('DROP INDEX %s', $indexName)),
             default => null,
         };
+    }
+
+    private static function connection(?ConnectionInterface $connection): Connection
+    {
+        $connection ??= Schema::getConnection();
+
+        throw_unless(
+            $connection instanceof Connection,
+            InvalidArgumentException::class,
+            'Migration helpers require a Laravel database connection.',
+        );
+
+        return $connection;
     }
 }
