@@ -52,7 +52,6 @@
     "babenkoivan/elastic-scout-driver-plus": "^5.1",
     "spatie/eloquent-sortable": "^4.4",
     "spatie/laravel-medialibrary": "^11.12",
-    "pxlrbt/filament-environment-indicator": "^3.2",
     "livewire/livewire": "^4.0",
     "filament/spatie-laravel-media-library-plugin": "^5.1",
     "spatie/fork": "^1.2",

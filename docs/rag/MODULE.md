@@ -550,6 +550,7 @@ When building new module features, reuse these primitives instead of re-implemen
 - Manage users/roles/ACL/settings in Filament resources.
 - Use approval queues and preview when moderation is enabled.
 - Keep module activation and runtime settings under change-control.
+- Super-admins see a Filament topbar environment badge; click it for App + installed module Composer versions (disabled modules appear muted). A Debug Mode badge appears when production runs with debug enabled.
 
 ### For API/front-end teams
 

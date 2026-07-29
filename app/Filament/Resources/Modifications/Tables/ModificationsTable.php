@@ -58,12 +58,12 @@ final class ModificationsTable
                             'auto_rejected' => 'danger',
                             default => 'gray',
                         })
-                        ->visible(fn (Modification $record): bool => $record->modifiable_type === Comment::class)
+                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class)
                         ->html(),
                     TextColumn::make('disapprovers_required')
                         ->label('Disapprovals required')
                         ->numeric()
-                        ->visible(fn (Modification $record): bool => $record->modifiable_type === Comment::class),
+                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class),
                 ]);
             },
         )
