@@ -5,13 +5,13 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Http;
 use Modules\Core\Services\FlagCDNService;
 
-
-beforeEach(function (): void {
-    $this->service = new FlagCDNService;
-});
+function flagCdnService(): FlagCDNService
+{
+    return new FlagCDNService;
+}
 
 it('getFlagsDirectory returns public flags path', function (): void {
-    expect($this->service->getFlagsDirectory())->toBe(public_path('flags'));
+    expect(flagCdnService()->getFlagsDirectory())->toBe(public_path('flags'));
 });
 
 it('getUrl returns local url when flag file already exists', function (): void {
@@ -24,7 +24,7 @@ it('getUrl returns local url when flag file already exists', function (): void {
     file_put_contents($flag_file, 'x');
 
     try {
-        $url = $this->service->getUrl('it', 40, 30, 'png');
+        $url = flagCdnService()->getUrl('it', 40, 30, 'png');
         expect($url)->toBe('/flags/it_40x30.png');
     } finally {
         @unlink($flag_file);
@@ -36,7 +36,7 @@ it('getUrl downloads and returns local url when file missing and download succee
         'https://flagcdn.com/40x30/it.png' => Http::response('binary', 200),
     ]);
 
-    $url = $this->service->getUrl('it', 40, 30, 'png');
+    $url = flagCdnService()->getUrl('it', 40, 30, 'png');
 
     expect($url)->toBe('/flags/it_40x30.png');
     $flag_file = public_path('flags/it_40x30.png');
@@ -49,7 +49,7 @@ it('getUrl returns flagcdn url when download fails', function (): void {
         'https://flagcdn.com/40x30/it.png' => Http::response(null, 404),
     ]);
 
-    $url = $this->service->getUrl('it', 40, 30, 'png');
+    $url = flagCdnService()->getUrl('it', 40, 30, 'png');
 
     expect($url)->toBe('https://flagcdn.com/40x30/it.png');
 });
@@ -60,11 +60,11 @@ it('download returns false when file already exists', function (): void {
     if (! is_dir($flags_dir)) {
         mkdir($flags_dir, 0755, true);
     }
-    $flag_file = "{$flags_dir}/en_40x30.png";
+    $flag_file = "{$flags_dir}/gb_40x30.png";
     file_put_contents($flag_file, 'x');
 
     try {
-        $result = $this->service->download('en', 40, 30, 'png');
+        $result = flagCdnService()->download('en', 40, 30, 'png');
         expect($result)->toBeFalse();
     } finally {
         @unlink($flag_file);
@@ -73,25 +73,51 @@ it('download returns false when file already exists', function (): void {
 
 it('download returns true when download succeeds', function (): void {
     Http::fake([
-        'https://flagcdn.com/40x30/en.png' => Http::response('binary', 200),
+        'https://flagcdn.com/40x30/gb.png' => Http::response('binary', 200),
     ]);
 
-    $result = $this->service->download('en', 40, 30, 'png');
+    $result = flagCdnService()->download('en', 40, 30, 'png');
 
     expect($result)->toBeTrue();
-    $flag_file = public_path('flags/en_40x30.png');
+    $flag_file = public_path('flags/gb_40x30.png');
     expect(file_exists($flag_file))->toBeTrue();
     @unlink($flag_file);
 });
 
 it('download returns false when download fails', function (): void {
     Http::fake([
-        'https://flagcdn.com/40x30/en.png' => Http::response(null, 500),
+        'https://flagcdn.com/40x30/gb.png' => Http::response(null, 500),
     ]);
 
-    $result = $this->service->download('en', 40, 30, 'png');
+    $result = flagCdnService()->download('en', 40, 30, 'png');
 
     expect($result)->toBeFalse();
+});
+
+it('getUrl maps en to gb', function (): void {
+    Http::fake([
+        'https://flagcdn.com/40x30/gb.png' => Http::response('binary', 200),
+    ]);
+
+    $url = flagCdnService()->getUrl('en', 40, 30, 'png');
+
+    expect($url)->toBe('/flags/gb_40x30.png');
+    $flag_file = public_path('flags/gb_40x30.png');
+    expect(file_exists($flag_file))->toBeTrue();
+    @unlink($flag_file);
+});
+
+it('getUrl maps en-* to gb', function (): void {
+    Http::fake([
+        'https://flagcdn.com/40x30/gb.png' => Http::response('binary', 200),
+    ]);
+
+    $url = flagCdnService()->getUrl('en-US', 40, 30, 'png');
+
+    expect($url)->toBe('/flags/gb_40x30.png');
+    $flag_file = public_path('flags/gb_40x30.png');
+    expect(file_exists($flag_file))->toBeTrue();
+    @unlink($flag_file);
 });
 
 it('getUrl creates flags directory when it does not exist', function (): void {
@@ -107,7 +133,7 @@ it('getUrl creates flags directory when it does not exist', function (): void {
     ]);
 
     try {
-        $url = $this->service->getUrl('fr', 40, 30, 'png');
+        $url = flagCdnService()->getUrl('fr', 40, 30, 'png');
         expect($url)->toBe('/flags/fr_40x30.png')
             ->and(is_dir($flags_dir))->toBeTrue();
     } finally {
@@ -120,7 +146,7 @@ it('getUrl returns flagcdn url when Http throws exception', function (): void {
         'https://flagcdn.com/40x30/xx.png' => fn () => throw new Exception('timeout'),
     ]);
 
-    $url = $this->service->getUrl('xx', 40, 30, 'png');
+    $url = flagCdnService()->getUrl('xx', 40, 30, 'png');
 
     expect($url)->toBe('https://flagcdn.com/40x30/xx.png');
 });
@@ -138,7 +164,7 @@ it('download creates flags directory when it does not exist', function (): void 
     ]);
 
     try {
-        $result = $this->service->download('de', 40, 30, 'png');
+        $result = flagCdnService()->download('de', 40, 30, 'png');
         expect($result)->toBeTrue()
             ->and(is_dir($flags_dir))->toBeTrue();
     } finally {
@@ -151,7 +177,7 @@ it('download returns false when Http throws exception', function (): void {
         'https://flagcdn.com/40x30/yy.png' => fn () => throw new Exception('connection error'),
     ]);
 
-    $result = $this->service->download('yy', 40, 30, 'png');
+    $result = flagCdnService()->download('yy', 40, 30, 'png');
 
     expect($result)->toBeFalse();
 });

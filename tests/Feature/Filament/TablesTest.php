@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
+use Modules\CMS\Models\Comment;
+use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
+use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
@@ -22,11 +26,11 @@ beforeEach(function (): void {
         'email' => 'admin@example.com',
         'password' => 'Aa1!FilamentAdminPass',
     ]));
-    $this->admin = $admin;
 
     $admin_role = Role::factory()->create(['name' => 'admin']);
-    $this->admin->roles()->attach($admin_role);
-    $this->actingAs($this->admin);
+    $admin->roles()->attach($admin_role);
+
+    \Illuminate\Support\Facades\Auth::login($admin);
 });
 
 it('builds cached distinct options for permissions table filters', function (): void {
@@ -68,6 +72,27 @@ it('applies settings default sort callback', function (): void {
         ->and($order_columns)->toContain('name');
 });
 
+it('evaluates modifications table comment-only columns without a record', function (): void {
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Modification::query());
+
+    ModificationsTable::configure($table);
+
+    $columns = $table->getColumns();
+
+    expect($columns['meta']->isVisible())->toBeTrue()
+        ->and($columns['disapprovers_required']->isVisible())->toBeTrue();
+
+    $comment_modification = new Modification(['modifiable_type' => Comment::class]);
+    $other_modification = new Modification(['modifiable_type' => User::class]);
+
+    expect($columns['meta']->record($comment_modification)->isVisible())->toBeTrue()
+        ->and($columns['meta']->record($other_modification)->isVisible())->toBeFalse()
+        ->and($columns['disapprovers_required']->record($comment_modification)->isVisible())->toBeTrue()
+        ->and($columns['disapprovers_required']->record($other_modification)->isVisible())->toBeFalse();
+});
+
 it('executes users table reset password action closure', function (): void {
     $livewire = $this->createStub(HasTable::class);
     $table = Table::make($livewire);
@@ -78,19 +103,57 @@ it('executes users table reset password action closure', function (): void {
     $action = $actions['reset_password'];
     $callback = $action->getActionFunction();
 
-    $record = new class extends App\Models\User
-    {
-        public ?string $sent_reset_to = null;
-
-        public function sendPasswordResetNotification($token): void
-        {
-            $this->sent_reset_to = (string) $token;
-        }
-    };
+    $sent_reset_to = null;
+    $record = \Mockery::mock(App\Models\User::class)->makePartial();
     $record->email = 'reset@example.com';
+    $record->shouldReceive('sendPasswordResetNotification')
+        ->once()
+        ->with('reset@example.com')
+        ->andReturnUsing(function ($token) use (&$sent_reset_to): void {
+            $sent_reset_to = (string) $token;
+        });
 
     expect($callback)->not->toBeNull();
     $callback($record);
 
-    expect($record->sent_reset_to)->toBe('reset@example.com');
+    expect($sent_reset_to)->toBe('reset@example.com');
+});
+
+it('configures stacked image overlap to 1 for translations locale', function (): void {
+    $translatable_model = new class extends \Illuminate\Database\Eloquent\Model
+    {
+        use \Modules\Core\Models\Concerns\HasTranslations;
+
+        protected $table = 'test_translatable_models';
+
+        public function getTable(): string
+        {
+            return 'test_translatable_models';
+        }
+    };
+
+    $model_class = get_class($translatable_model);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => $model_class::query());
+
+    $resource = new class
+    {
+        use \Modules\Core\Filament\Utils\HasTable;
+
+        public function configure(Table $table): Table
+        {
+            return self::configureTable($table);
+        }
+    };
+
+    $resource->configure($table);
+
+    $columns = $table->getColumns();
+    $column = $columns['translations.locale'] ?? null;
+
+    expect($column)->not->toBeNull()
+        ->and($column)->toBeInstanceOf(ImageColumn::class)
+        ->and($column->getOverlap())->toBe(1);
 });
