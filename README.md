@@ -373,7 +373,8 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 -   **UI / Admin:**
 
     -   [filament/filament](https://github.com/filamentphp/filament): Admin panel toolkit (v4).
-    -   [pxlrbt/filament-environment-indicator](https://github.com/pxlrbt/filament-environment-indicator): Environment badge in Filament.
+    -   Built-in Filament environment indicator (Core plugin): env badge + module versions dropdown for super-admins.
+    -   `filament:make-resources` — scaffold Filament resources for `App` or custom (non-owned) modules; injects `HasTable` / `HasForm` / `HasRecords` via rebound ClassGenerators. See `docs/rag/MODULE.md` (Filament scaffolding).
 
 -   **Media:**
 

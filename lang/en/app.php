@@ -64,6 +64,7 @@ $translations = [
     ],
     'language' => 'English',
     'locale' => 'en-US',
+    'flag' => 'gb',
     'login' => [
         'cannotAccess' => 'Cannot enter with specified credentials',
         'enter' => 'Enter',

@@ -2,7 +2,7 @@
   "name": "swolley/laraplate-core",
   "vendor": "swolley",
   "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
-  "version": "v1.64.1",
+  "version": "v1.65.0",
   "keywords": [
     "laravel",
     "laraplate",
@@ -52,7 +52,6 @@
     "babenkoivan/elastic-scout-driver-plus": "^5.1",
     "spatie/eloquent-sortable": "^4.4",
     "spatie/laravel-medialibrary": "^11.12",
-    "pxlrbt/filament-environment-indicator": "^3.2",
     "livewire/livewire": "^4.0",
     "filament/spatie-laravel-media-library-plugin": "^5.1",
     "spatie/fork": "^1.2",

@@ -196,6 +196,7 @@ trait HasTable
                         ->values()
                         ->all())
                     ->stacked()
+                    ->overlap(1)
                     ->limit(3)
                     ->limitedRemainingText()
                     ->extraImgAttributes(['loading' => 'lazy'])
@@ -341,6 +342,19 @@ trait HasTable
         });
 
         $table->pushColumns($default_columns->all());
+
+        // Add default column alignment: iterate columns and if boolean align to center
+        $default_columns->each(static function (Column $column): void {
+            // Check if the column is an IconColumn or has boolean formatting
+            if (
+                ($column instanceof ImageColumn || $column instanceof IconColumn)
+                || (method_exists($column, 'isBoolean') && $column->isBoolean())
+            ) {
+                $column->alignCenter();
+            } else if (method_exists($column, 'isNumeric') && $column->isNumeric()) {
+                $column->alignRight();
+            }
+        });
     }
 
     private static function configureActions(

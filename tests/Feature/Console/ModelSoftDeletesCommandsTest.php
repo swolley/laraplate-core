@@ -11,18 +11,8 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesAddCommand;
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesRefreshCommand;
 use Modules\Core\SoftDeletes\Console\ModelSoftDeletesRemoveCommand;
+use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredSoftDeleteModel;
 use Symfony\Component\Console\Application as SymfonyConsoleApplication;
-
-class ConstructorConfiguredSoftDeleteModel extends Model
-{
-    public function __construct(array $attributes = [])
-    {
-        parent::__construct($attributes);
-
-        $this->setConnection('soft_delete_constructor_connection');
-        $this->setTable('soft_delete_constructor_table');
-    }
-}
 
 it('defines expected command signatures', function (): void {
     $add = new ReflectionClass(ModelSoftDeletesAddCommand::class);

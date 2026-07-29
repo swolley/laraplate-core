@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.59.0] - 2026-07-12
+## [unreleased]
+
+### 🚀 Features
+
+- *(core)* Add environment indicator plugin for Filament with module version display
+- *(filament)* Default Toggle fields to stacked label layout
+- *(filament)* Implement HasForm Entity→Preset cascade
+- *(filament)* Add make-resources command with generator rebinds
+
+### 🐛 Bug Fixes
+
+- *(testing/core)* Move inline test classes to stubs for PSR-4 autoload
+- *(core)* Map locale flags via lang + reduce stacked flag overlap
+
+### 🚜 Refactor
+
+- *(filament)* Wire HasForm into resource form schemas
+
+## [1.58.8] - 2026-07-10
 
 ### 🐛 Bug Fixes
 

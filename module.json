@@ -1,6 +1,7 @@
 {
     "name": "Core",
-    "alias": "core", 
+    "laraplate_owned": true,
+    "alias": "core",
     "description": "Core Module for Base Functionality",
     "keywords": [
         "core",
