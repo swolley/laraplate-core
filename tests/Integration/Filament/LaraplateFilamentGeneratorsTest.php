@@ -72,6 +72,28 @@ it('emits HasTable and configureTable in generated table source', function (): v
         ->and($source)->toContain('configureTable');
 });
 
+it('passes generated domain columns into HasTable callback and omits timestamp grezzi', function (): void {
+    $generator = app(ResourceTableClassGenerator::class, [
+        'fqn' => 'App\\Filament\\Resources\\Settings\\Tables\\SettingsTable',
+        'modelFqn' => Setting::class,
+        'parentResourceFqn' => null,
+        'hasViewOperation' => false,
+        'isGenerated' => true,
+        'isSoftDeletable' => false,
+        'isSimple' => false,
+    ]);
+
+    $source = $generator->generate();
+
+    expect($source)->toContain('columns: static function')
+        ->and($source)->toContain('->unshift(')
+        ->and($source)->not->toContain("make('created_at')")
+        ->and($source)->not->toContain("make('updated_at')")
+        ->and($source)->not->toContain("make('deleted_at')")
+        ->and($source)->not->toContain("make('valid_from')")
+        ->and($source)->not->toContain("make('valid_to')");
+});
+
 it('emits HasForm and configureForm in generated form source', function (): void {
     $generator = app(ResourceFormSchemaClassGenerator::class, [
         'fqn' => 'App\\Filament\\Resources\\Settings\\Schemas\\SettingForm',
@@ -85,6 +107,21 @@ it('emits HasForm and configureForm in generated form source', function (): void
     expect($source)->toContain(HasForm::class)
         ->and($source)->toContain('configureForm')
         ->and($source)->toContain('return self::configureForm(');
+});
+
+it('excludes HasForm-owned columns from generated HasDynamicContents forms', function (): void {
+    $generator = app(ResourceFormSchemaClassGenerator::class, [
+        'fqn' => 'Modules\\CMS\\Filament\\Resources\\Contents\\Schemas\\ContentForm',
+        'modelFqn' => \Modules\CMS\Models\Content::class,
+        'parentResourceFqn' => null,
+        'isGenerated' => true,
+    ]);
+
+    $source = $generator->generate();
+
+    expect($source)->toContain(HasForm::class)
+        ->and($source)->not->toContain("make('entity_id')")
+        ->and($source)->not->toContain("make('presettable_id')");
 });
 
 it('emits HasRecords on generated list pages', function (): void {

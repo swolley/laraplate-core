@@ -12,6 +12,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Models\Preset;
 
@@ -41,7 +42,17 @@ trait HasForm
             return $schema;
         }
 
-        $existing = $schema->getComponents(withActions: true, withHidden: true);
+        $owned = FilamentTraitResolver::formColumnsOwnedByHasForm($model_class);
+        $existing = array_values(array_filter(
+            $schema->getComponents(withActions: true, withHidden: true),
+            static function (mixed $component) use ($owned): bool {
+                if (! is_object($component) || ! method_exists($component, 'getName')) {
+                    return true;
+                }
+
+                return ! in_array($component->getName(), $owned, true);
+            },
+        ));
 
         return $schema->components([
             ...self::dynamicEntityPresetComponents($model_class, $entity_type),

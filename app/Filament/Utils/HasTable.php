@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Core\Events\TranslatedModelSaved;
+use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Inspector\ModelMetadataRegistry;
 use Modules\Core\Services\FlagCDNService;
@@ -323,11 +324,16 @@ trait HasTable
             $columns($default_columns);
         }
 
-        $default_columns->keyBy(static fn (Column $column): string => $column->getName());
+        $strip = FilamentTraitResolver::HAS_TABLE_STRIP_FROM_GENERATED_COLUMNS;
+        $default_columns = $default_columns
+            ->reject(static fn (Column $column): bool => in_array($column->getName(), $strip, true))
+            ->values();
+
+        $default_columns = $default_columns->keyBy(static fn (Column $column): string => $column->getName());
         $primary_key = $model_instance->getKeyName();
 
         if (! $default_columns->offsetExists($primary_key)) {
-            $default_columns->unshift(
+            $default_columns->prepend(
                 TextColumn::make('id')
                     ->searchable()
                     ->sortable()

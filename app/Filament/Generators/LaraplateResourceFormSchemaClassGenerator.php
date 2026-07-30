@@ -34,9 +34,14 @@ final class LaraplateResourceFormSchemaClassGenerator extends ResourceFormSchema
     #[Override]
     protected function addConfigureMethodToClass(ClassType $class): void
     {
+        $except_columns = array_values(array_unique(array_filter([
+            ...Arr::wrap($this->getForeignKeyColumnToNotGenerate()),
+            ...FilamentTraitResolver::formColumnsOwnedByHasForm($this->getModelFqn()),
+        ])));
+
         $filament_body = $this->generateFormMethodBody(
             $this->getModelFqn(),
-            exceptColumns: Arr::wrap($this->getForeignKeyColumnToNotGenerate()),
+            exceptColumns: $except_columns,
         );
 
         $filament_body = preg_replace('/^return /', '', $filament_body, 1) ?? $filament_body;

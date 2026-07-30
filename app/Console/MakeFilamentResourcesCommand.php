@@ -125,6 +125,9 @@ final class MakeFilamentResourcesCommand extends Command
             '--panel' => 'admin',
             '--record-title-attribute' => $this->resolveRecordTitleAttribute($model_class),
             '--resource-namespace' => $this->resourceNamespace($module),
+            // Populate form fields from DB columns (Filament inspect). Table stubs
+            // still defer to HasTable at runtime via our rebound ClassGenerator.
+            '--generate' => true,
         ];
 
         if ($this->modelUsesSoftDeletes($model_class)) {

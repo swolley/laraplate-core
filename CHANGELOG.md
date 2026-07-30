@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Enhance MigrateUtils to support explicit database connections
+- *(core)* Implement optimistic locking with error handling
+- *(filament)* Merge Filament --generate into HasTable/HasForm
+
+## [1.65.0] - 2026-07-29
+
+### 🚀 Features
+
 - *(core)* Add environment indicator plugin for Filament with module version display
 - *(filament)* Default Toggle fields to stacked label layout
 - *(filament)* Implement HasForm Entity→Preset cascade
