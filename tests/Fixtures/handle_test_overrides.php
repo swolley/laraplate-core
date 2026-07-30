@@ -42,8 +42,25 @@ function database_path(string $path = ''): string
     return HandleTestContext::$db_base . '/' . ltrim($path, '/');
 }
 
-function config(?string $key = null, mixed $default = null): mixed
+/**
+ * Reads resolve against {@see HandleTestContext::$config}, deliberately returning
+ * the default for unstubbed keys: commands under test rely on that to stay
+ * sandboxed instead of resolving real module paths and writing into the repo.
+ *
+ * The array setter form carries no key to stub and cannot be answered from the
+ * context, so it delegates to the real helper. Without this branch it raised a
+ * TypeError in any command reached after this file was loaded — the file is
+ * required at file scope and shadows `config()` for this whole namespace for the
+ * rest of the process, so the crash surfaced purely by test ordering.
+ *
+ * @param  array<string, mixed>|string|null  $key
+ */
+function config(array|string|null $key = null, mixed $default = null): mixed
 {
+    if (is_array($key)) {
+        return \config($key, $default);
+    }
+
     return HandleTestContext::$config[$key] ?? $default;
 }
 
