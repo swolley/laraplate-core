@@ -82,6 +82,25 @@ trait HasVersions
         // Lifecycle persistence is owned by bootHasVersions().
     }
 
+    /**
+     * The optimistic locking column is concurrency plumbing, not model state.
+     * Leaving it in a SNAPSHOT image would make a restore write back a stale
+     * token, and every later update on that record would fail as if another
+     * user had touched it.
+     *
+     * @return list<string>
+     */
+    public function getDontVersionable(): array
+    {
+        $columns = $this->dontVersionable;
+
+        if (method_exists($this, 'lockVersionColumn')) {
+            $columns[] = static::lockVersionColumn();
+        }
+
+        return array_values(array_unique($columns));
+    }
+
     public function shouldBeVersioning(): bool
     {
         $version_strategy = $this->getVersionStrategy();

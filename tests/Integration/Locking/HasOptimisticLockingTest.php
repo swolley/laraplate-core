@@ -6,7 +6,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Locking\Exceptions\MissingLockVersionException;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
+use Modules\Core\Models\Permission;
 use Modules\Core\Tests\Stubs\Locking\OptimisticLockModel;
+use Modules\Core\Tests\Stubs\Locking\VersionedLockModel;
 
 beforeEach(function (): void {
     Schema::dropIfExists('optimistic_lock_models');
@@ -75,6 +77,20 @@ it('advances the lock version even when the changed column carries no business m
     $model->update(['note' => 'internal bookkeeping']);
 
     expect($model->fresh()->lock_version)->toBe(2);
+});
+
+it('keeps the lock version out of the versionable image', function (): void {
+    // A SNAPSHOT holding the guard column would make a restore write back a
+    // stale token, and every later update would then fail as a false conflict.
+    $versioned = new VersionedLockModel;
+
+    expect($versioned->getDontVersionable())
+        ->toContain(VersionedLockModel::lockVersionColumn());
+});
+
+it('leaves the versionable image untouched for models without optimistic locking', function (): void {
+    expect(new Permission()->getDontVersionable())
+        ->not->toContain('lock_version');
 });
 
 it('refuses to update a row whose lock version is null', function (): void {
