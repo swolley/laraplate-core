@@ -37,9 +37,11 @@ it('refresh command reconciles trait-schema-setting consistency', function (): v
     $reflection = new ReflectionClass(ModelSoftDeletesRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
+    // The trailing underscore now lives in PerModelSettingResolver::nameFor(),
+    // which is the single place allowed to join prefix and table.
     expect($source)->toContain('model:soft-deletes-add')
         ->and($source)->toContain('model:soft-deletes-remove')
-        ->and($source)->toContain('soft_deletes_');
+        ->and($source)->toContain('soft_deletes');
 });
 
 it('refresh command merges application quiet option without duplicate definition', function (): void {

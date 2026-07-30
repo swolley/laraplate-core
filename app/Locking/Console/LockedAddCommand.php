@@ -12,6 +12,7 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
@@ -133,7 +134,7 @@ class LockedAddCommand extends Command
 
     protected function updateSettingsTable(string $table, bool $enabled): void
     {
-        $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
+        $key_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::LOCK_NAME_PREFIX, $table);
 
         Setting::query()->updateOrCreate(
             ['name' => $key_name],

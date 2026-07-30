@@ -64,7 +64,7 @@ trait HasApprovals
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            'ai_moderation_' . $this->getTable(),
+            PerModelSettingResolver::nameFor('ai_moderation', $this->getTable()),
             default: false,
         );
     }

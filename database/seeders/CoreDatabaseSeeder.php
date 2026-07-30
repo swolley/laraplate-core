@@ -19,6 +19,7 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
@@ -441,7 +442,7 @@ final class CoreDatabaseSeeder extends Seeder
 
     private function getSettingKeyName(string $prefix, string $suffix): string
     {
-        return "{$prefix}_{$suffix}";
+        return PerModelSettingResolver::nameFor($prefix, $suffix);
     }
 
     private function seedVersionedModel(array &$defaultSettings, Model $model, string $table, string $keyName): void

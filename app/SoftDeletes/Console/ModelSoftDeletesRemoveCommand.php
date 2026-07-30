@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
@@ -88,7 +89,7 @@ final class ModelSoftDeletesRemoveCommand extends Command
 
     private function updateSettingsTable(string $table): void
     {
-        $key_name = CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX . ".{$table}";
+        $key_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table);
 
         Setting::query()->where('name', $key_name)->forceDelete();
     }
@@ -194,7 +195,7 @@ final class ModelSoftDeletesRemoveCommand extends Command
         }
 
         $settings->newQuery()->updateOrCreate(
-            ['name' => "soft_deletes_{$table}"],
+            ['name' => PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table)],
             [
                 'value' => $enabled,
                 'encrypted' => false,

@@ -11,6 +11,7 @@ use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
@@ -62,7 +63,7 @@ final class ForcedModelConfiguration
                     'model' => $model_class,
                     'property' => $property,
                     'expected' => $property_reflection->getDefaultValue(),
-                    'settingName' => "{$definition['prefix']}_{$table}",
+                    'settingName' => PerModelSettingResolver::nameFor($definition['prefix'], $table),
                     'groupName' => $definition['group'],
                 ];
             }

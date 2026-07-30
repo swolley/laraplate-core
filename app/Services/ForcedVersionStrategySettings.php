@@ -38,7 +38,7 @@ final class ForcedVersionStrategySettings
             }
             /** @var Model $model */
             $model = $reflection->newInstanceWithoutConstructor();
-            $names[] = 'version_strategy_'.$model->getTable();
+            $names[] = PerModelSettingResolver::nameFor('version_strategy', $model->getTable());
         }
 
         sort($names);

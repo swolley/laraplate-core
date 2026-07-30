@@ -11,6 +11,7 @@ use function models;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use ReflectionClass;
@@ -100,7 +101,7 @@ final class ModelSoftDeletesRefreshCommand extends Command
             return;
         }
 
-        $name = "soft_deletes_{$table}";
+        $name = PerModelSettingResolver::nameFor('soft_deletes', $table);
         $setting = $setting_model->newQuery()->where('name', $name)->first();
 
         if ($setting === null) {

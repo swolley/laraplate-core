@@ -28,6 +28,18 @@ final class PerModelSettingResolver
     private ?array $name_index = null;
 
     /**
+     * Build the canonical name of a per-model setting.
+     *
+     * Every writer and reader must go through this method: the prefix constants
+     * are declared both with and without a trailing underscore, and building the
+     * name by hand produced three incompatible spellings for the same setting.
+     */
+    public static function nameFor(string $prefix, string $table): string
+    {
+        return rtrim($prefix, '_.') . '_' . $table;
+    }
+
+    /**
      * @return Collection<string, Setting>
      */
     public function collection(): Collection

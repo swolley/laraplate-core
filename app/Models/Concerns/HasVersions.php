@@ -232,7 +232,7 @@ trait HasVersions
             return self::$version_strategy_cache[$model_class];
         }
 
-        $settings_name = "version_strategy_{$this->getTable()}";
+        $settings_name = PerModelSettingResolver::nameFor('version_strategy', $this->getTable());
 
         $raw = app(PerModelSettingResolver::class)->value($settings_name, false);
 

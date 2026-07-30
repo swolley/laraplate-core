@@ -6,6 +6,7 @@ namespace Modules\Core\Locking\Console;
 
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 
 final class LockedRemoveCommand extends LockedAddCommand
@@ -22,7 +23,7 @@ final class LockedRemoveCommand extends LockedAddCommand
     #[Override]
     protected function updateSettingsTable(string $table, bool $enabled): void
     {
-        $key_name = CoreDatabaseSeeder::LOCK_NAME_PREFIX . ".{$table}";
+        $key_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::LOCK_NAME_PREFIX, $table);
 
         Setting::query()->where('name', $key_name)->forceDelete();
     }

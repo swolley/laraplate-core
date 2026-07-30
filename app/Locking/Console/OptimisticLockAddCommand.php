@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 
 class OptimisticLockAddCommand extends LockedAddCommand
@@ -36,7 +37,7 @@ class OptimisticLockAddCommand extends LockedAddCommand
     #[Override]
     protected function updateSettingsTable(string $table, bool $enabled): void
     {
-        $key_name = CoreDatabaseSeeder::OPTIMISTIC_LOCK_NAME_PREFIX . ".{$table}";
+        $key_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::OPTIMISTIC_LOCK_NAME_PREFIX, $table);
 
         Setting::query()->insertOrIgnore([
             'name' => $key_name,

@@ -12,6 +12,7 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Services\PerModelSettingResolver;
 use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
@@ -72,7 +73,7 @@ final class ModelSoftDeletesAddCommand extends Command
 
     private function updateSettingsTable(string $table): void
     {
-        $key_name = CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX . ".{$table}";
+        $key_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table);
 
         Setting::query()->insertOrIgnore([
             'name' => $key_name,
@@ -165,7 +166,7 @@ final class ModelSoftDeletesAddCommand extends Command
         }
 
         $setting->newQuery()->updateOrCreate(
-            ['name' => "soft_deletes_{$table}"],
+            ['name' => PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table)],
             [
                 'value' => $enabled,
                 'encrypted' => false,

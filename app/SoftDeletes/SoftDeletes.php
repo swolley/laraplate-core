@@ -74,7 +74,7 @@ trait SoftDeletes
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            'soft_deletes_' . $this->getTable(),
+            PerModelSettingResolver::nameFor('soft_deletes', $this->getTable()),
             default: true,
         );
     }

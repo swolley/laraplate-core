@@ -327,7 +327,7 @@ trait HasTranslations
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            'translation_fallback_' . $this->getTable(),
+            PerModelSettingResolver::nameFor('translation_fallback', $this->getTable()),
             default: true,
         );
     }
@@ -344,7 +344,7 @@ trait HasTranslations
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            'auto_translate_' . $this->getTable(),
+            PerModelSettingResolver::nameFor('auto_translate', $this->getTable()),
             default: false,
         );
     }
