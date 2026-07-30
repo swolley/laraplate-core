@@ -108,17 +108,25 @@ HTTP Request
 | `/api/v1/insert/{entity}` | POST | Create new record |
 | `/api/v1/update/{entity}` | PATCH | Update existing record(s) |
 | `/api/v1/delete/{entity}` | DELETE | Hard delete record(s) |
-| `/api/v1/activate/{entity}` | POST | Restore soft-deleted record |
-| `/api/v1/inactivate/{entity}` | POST | Soft delete record |
 
-### Special Operations
+### Internal-only Operations
+
+These are registered in `routes/web.php`, not in the shared `routes/crud.php`. They are
+therefore reachable on the session-based `/app` surface only and are never exposed on
+`/api/v1`, regardless of `core.expose_crud_api`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/approve/{entity}` | POST | Approve pending modification |
-| `/api/v1/disapprove/{entity}` | POST | Reject pending modification |
-| `/api/v1/lock/{entity}` | POST | Lock record for editing |
-| `/api/v1/unlock/{entity}` | POST | Unlock record |
+| `/app/crud/activate/{module}/{entity}` | PATCH | Restore soft-deleted record |
+| `/app/crud/inactivate/{module}/{entity}` | PATCH | Soft delete record |
+| `/app/crud/approve/{module}/{entity}` | PATCH | Approve pending modification |
+| `/app/crud/disapprove/{module}/{entity}` | PATCH | Reject pending modification |
+| `/app/crud/lock/{module}/{entity}` | PATCH | Lock record for editing |
+| `/app/crud/unlock/{module}/{entity}` | PATCH | Unlock record |
+
+Operation pairs share a single permission: `approve` governs `disapprove`, and `lock`
+governs `unlock`. Requesting an operation whose target state already holds — locking a
+locked record, unlocking an unlocked one — returns `304 Not Modified`.
 
 ## Request Parameters
 
@@ -456,7 +464,8 @@ class Article extends Model
 }
 ```
 
-Lock/unlock via `/api/v1/lock/{entity}` and `/api/v1/unlock/{entity}`.
+Lock/unlock via `PATCH /app/crud/lock/{module}/{entity}` and `PATCH /app/crud/unlock/{module}/{entity}`.
+Both are governed by the `{connection}.{table}.lock` permission.
 
 ### RequiresApproval (Approval Workflow)
 

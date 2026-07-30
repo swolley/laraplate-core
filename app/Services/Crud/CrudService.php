@@ -796,6 +796,12 @@ class CrudService
         );
     }
 
+    /**
+     * Both operations are governed by the single `lock` permission, mirroring
+     * {@see doApproveOperation()} where `approve` also governs `disapprove`.
+     *
+     * @param  "lock"|"unlock"  $operation
+     */
     private function doLockOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
@@ -807,27 +813,33 @@ class CrudService
 
         $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
         $found_count = 0;
-        $locked_records = new Collection();
-        $model->getConnection()->transaction(function () use ($found_records, $locked_records, $operation, $requestData, &$found_count): void {
+        $target_locked_state = $operation === 'lock';
+        $affected_records = new Collection();
+        $model->getConnection()->transaction(function () use ($found_records, $affected_records, $operation, $requestData, $target_locked_state, &$found_count): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
+                $already_in_target_state = $this->recordIsLocked($found_record) === $target_locked_state;
 
                 if ($requestData->request->has('id')) {
-                    $can_be_done = ($operation === 'lock' && $this->recordIsLocked($found_record)) || ! $this->recordIsLocked($found_record);
-
-                    throw_if($can_be_done, AlreadyLockedException::class, $operation === 'lock' ? 'Record already locked' : "Record isn't locked");
+                    throw_if(
+                        $already_in_target_state,
+                        AlreadyLockedException::class,
+                        $target_locked_state ? 'Record already locked' : "Record isn't locked",
+                    );
                 }
 
-                if (! $this->recordIsLocked($found_record) && method_exists($found_record, 'lock')) {
-                    $found_record->lock();
-                    $locked_records->add($found_record->fresh());
+                if ($already_in_target_state || ! method_exists($found_record, $operation)) {
+                    continue;
                 }
+
+                $found_record->{$operation}();
+                $affected_records->add($found_record->fresh());
             }
         });
         throw_if($found_count === 0, ModelNotFoundException::class, 'No model Found');
 
         return new CrudResult(
-            data: $locked_records,
+            data: $affected_records,
         );
     }
 
