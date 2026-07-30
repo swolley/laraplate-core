@@ -14,6 +14,7 @@ use Modules\Core\Models\Setting;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 use Nwidart\Modules\Module;
 use Override;
+use ReflectionClass;
 use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
@@ -185,7 +186,12 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     private static function settingsTableAndConnection(): array
     {
         $model = self::$MODEL_NAME;
-        $prototype = new $model();
+
+        // Runs while providers are still being registered, before Eloquent has an
+        // event dispatcher. Booting the model here would make it register its
+        // observers against a missing dispatcher, and HasEvents drops them
+        // silently, so the model would stay observer-less for the whole request.
+        $prototype = new ReflectionClass($model)->newInstanceWithoutConstructor();
 
         /** @var DatabaseManager $database_manager */
         $database_manager = app()->make('db');

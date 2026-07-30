@@ -122,6 +122,26 @@ it('writes soft-delete settings through the Setting model connection', function 
         $table->timestamps();
     });
 
+    // Saving a Setting runs the permission check in HasValidations and the
+    // approval capture in RequiresApproval, so the probe connection needs those
+    // tables too. They stay empty: the point of the test is connection affinity.
+    Schema::connection('soft_delete_affinity')->create('vend_permissions', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('guard_name')->default('web');
+        $table->timestamps();
+    });
+    Schema::connection('soft_delete_affinity')->create('vend_modifications', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('modifiable_type')->nullable();
+        $table->string('modifiable_id')->nullable();
+        $table->json('modifications')->nullable();
+        $table->string('md5')->nullable();
+        $table->boolean('active')->default(true);
+        $table->boolean('is_update')->default(false);
+        $table->timestamps();
+    });
+
     Model::setConnectionResolver(new class($resolver) implements ConnectionResolverInterface
     {
         public function __construct(private readonly ConnectionResolverInterface $resolver) {}
