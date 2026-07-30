@@ -6,6 +6,7 @@ namespace Modules\Core\Filament\Utils;
 
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Utilities\Get;
@@ -13,6 +14,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Filament\FilamentTraitResolver;
+use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Models\Preset;
 
@@ -21,6 +23,10 @@ trait HasForm
     /**
      * Wire shared form behaviour. Call as:
      * `return self::configureForm($schema->components([...]));`
+     *
+     * When the schema model uses HasOptimisticLocking, appends the hidden lock
+     * version so the value read when the form opened survives the round trip
+     * and can guard the update against a concurrent writer.
      *
      * When the schema model uses HasDynamicContents, prepends Entity → Preset
      * UI (dehydrated) and a required hidden presettable_id resolved from the
@@ -31,7 +37,21 @@ trait HasForm
     {
         $model_class = $schema->getModel();
 
-        if ($model_class === null || ! class_uses_trait($model_class, HasDynamicContents::class)) {
+        if ($model_class === null) {
+            return $schema;
+        }
+
+        if (class_uses_trait($model_class, HasOptimisticLocking::class)) {
+            /** @var class-string<Model&HasOptimisticLocking> $model_class */
+            $schema->components([
+                // Re-declaring components replaces the list, so carry the
+                // resource's own fields over instead of dropping them.
+                ...$schema->getComponents(withActions: true, withHidden: true),
+                Hidden::make($model_class::lockVersionColumn()),
+            ]);
+        }
+
+        if (! class_uses_trait($model_class, HasDynamicContents::class)) {
             return $schema;
         }
 
