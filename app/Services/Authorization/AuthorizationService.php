@@ -18,6 +18,7 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AclResolverService;
+use Modules\Core\Support\PermissionName;
 
 /**
  * Authorization Service - handles permission checks and ACL filter injection.
@@ -187,9 +188,7 @@ final class AuthorizationService
         ?string $operation = null,
         ?string $connection = null,
     ): string {
-        $connection ??= 'default';
-
-        return sprintf('%s.%s.%s', $connection, $entity, $operation);
+        return PermissionName::build($connection ?? 'default', $entity, (string) $operation);
     }
 
     /**
