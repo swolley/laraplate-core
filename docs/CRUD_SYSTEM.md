@@ -128,6 +128,86 @@ Operation pairs share a single permission: `approve` governs `disapprove`, and `
 governs `unlock`. Requesting an operation whose target state already holds — locking a
 locked record, unlocking an unlocked one — returns `304 Not Modified`.
 
+### Domain Actions
+
+The verbs above are generic: they act on structures Core attaches to any record. Modules
+also need verbs that act on the record itself — posting an invoice, closing a fiscal
+period, reversing a journal entry. One route serves all of them:
+
+```
+POST /app/crud/{action}/{module}/{entity}      id and action payload in the body
+```
+
+`POST` rather than `PATCH` because a domain action invokes an operation rather than
+patching a representation, and several are not idempotent.
+
+The route is declared **last** in Core's `crud` group. Laravel matches in registration
+order with no notion of specificity, so every literal verb above must be tried first; the
+grid and graph groups carry an extra path segment and never reach it. Use
+`php artisan route:check <url> --method=POST` to see which route actually answers a URL —
+`route:list` sorts by URI and hides the ordering that decides the match.
+
+#### The registry decides what exists
+
+A module registers its actions at boot; the route table knows nothing about them:
+
+```php
+$registry->register(Invoice::class, 'post', function (Model $record, array $payload, User $user): Model {
+    $record->update(['posted_at' => now()]);
+
+    return $record->fresh();
+});
+```
+
+Handlers stay thin. Business rules, locking and state guards belong to the services and
+policies the module already has — a handler that added a rule of its own would create a
+second truth. An action nobody registered answers `404`, not `403`: replying `403` would
+claim it exists.
+
+#### Authorization goes through the policy
+
+Generic CRUD authorizes on a permission name alone. Domain actions authorize through the
+`Gate`, because their guard is intrinsic: posting an already-posted invoice is not a
+permission problem. The module policy combines the state predicate with the permission,
+and `force_post` in snake_case resolves to the `forcePost` policy method.
+
+A model must therefore have a registered policy for its domain actions to be reachable.
+Without one the Gate has nothing to consult and denies.
+
+#### Overriding a generic verb
+
+Where a module needs a generic verb to mean something else for one entity, the model
+declares it:
+
+```php
+final class ReturnOrder extends Model implements OverridesGenericCrudActions
+{
+    public static function overriddenCrudActions(): array
+    {
+        return ['approve'];
+    }
+}
+```
+
+Core's `approve` votes on a pending `Modification`; `ReturnOrder`'s advances the document
+from Draft to Approved. Only one meaning can win per entity, so `DomainActionRegistry`
+refuses to register a generic verb unless the model declares the override, and refuses it
+outright if the model also uses the trait giving that verb its generic meaning
+(`HasApprovals` for `approve`/`disapprove`, `HasLocks` for `lock`/`unlock`, `SoftDeletes`
+for `activate`/`inactivate`). The check runs at registration, which happens at boot, so a
+contradiction stops the application on start rather than surfacing when one record is
+first touched.
+
+#### Responses
+
+A handler returning a `Symfony\Component\HttpFoundation\Response` is passed through
+untouched — that is how file exports stream and how multipart uploads are consumed.
+Anything else is wrapped in a `CrudResult`, so a domain action looks like every other CRUD
+response. Authorization and the state guard run before the first byte, so a refusal is
+still a JSON error rather than a corrupt download.
+
+`ValidationException` maps to `422` and `DomainException` to `409`.
+
 ## Request Parameters
 
 ### List Request
