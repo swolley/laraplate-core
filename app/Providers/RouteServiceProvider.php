@@ -57,16 +57,31 @@ final class RouteServiceProvider extends ServiceProvider
     #[Override]
     protected function mapWebRoutes(): void
     {
-        parent::mapWebRoutes();
-
-        $name_prefix = $this->getPrefix();
+        // Registered eagerly on purpose: dev.php declares `swagger/{filename}`, the same
+        // URI+method the wotz/laravel-swagger-ui package declares. On a URI collision the
+        // RouteCollection keeps the LAST route added, and the package's one must win — it
+        // carries the `EnsureUserIsAuthorized` middleware, and CoreServiceProvider binds
+        // OpenApiJsonController to DocsController so the merged spec is served from it.
         Route::middleware('web')
             ->namespace($this->namespace)
-            ->name($name_prefix . '.')
+            ->name($this->getPrefix() . '.')
             ->group([
                 module_path($this->name, '/routes/dev.php'),
             ]);
 
+        // Core boots first (module.json priority 0) so other modules can build on its bindings,
+        // but Laravel matches routes in registration order with no notion of specificity. The
+        // remaining Core routes therefore register in `booted`, after every module provider:
+        // otherwise the generic CRUD catch-all (`app/crud/{verb}/{module}/{entity}`) would
+        // shadow module-specific routes of the same shape, e.g. `app/crud/select/ai/conversations`.
+        $this->app->booted(function (): void {
+            $this->registerDeferredWebRoutes();
+        });
+    }
+
+    private function registerDeferredWebRoutes(): void
+    {
+        $name_prefix = $this->getPrefix();
         $route_prefix = 'app';
 
         Route::middleware('auth')
@@ -83,6 +98,10 @@ final class RouteServiceProvider extends ServiceProvider
 
         // fake reset password for fortify notifications generation. Url can be modified, but name must be 'password.reset' !!
         Route::get($route_prefix . '/auth/reset-password', static fn () => abort(Response::HTTP_MOVED_PERMANENTLY))->name('password.reset');
+
+        // Loads routes/web.php, which holds the generic CRUD catch-all. Kept last so the more
+        // specific Core routes above win the match.
+        parent::mapWebRoutes();
     }
 
     /**
@@ -93,8 +112,17 @@ final class RouteServiceProvider extends ServiceProvider
     #[Override]
     protected function mapApiRoutes(): void
     {
+        // Deferred for the same reason as mapWebRoutes().
+        $this->app->booted(function (): void {
+            $this->registerApiRoutes();
+        });
+    }
+
+    private function registerApiRoutes(): void
+    {
         $name_prefix = $this->getPrefix();
         $route_prefix = 'api';
+
         Route::prefix($route_prefix . '/v1')
             ->middleware([$route_prefix, 'crud_api'])
             ->name(sprintf('%s.%s.', $name_prefix, $route_prefix))
