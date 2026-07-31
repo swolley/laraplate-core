@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use BadMethodCallException;
+use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
@@ -13,11 +14,13 @@ use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\DetailRequest;
+use Modules\Core\Http\Requests\DomainActionRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
@@ -27,6 +30,7 @@ use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Services\Crud\DomainActionDispatcher;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -254,6 +258,42 @@ class CrudController extends Controller
     }
 
     /**
+     * Invoke a module-registered domain action on one record.
+     *
+     * The dispatcher arrives by method injection rather than through the
+     * constructor: subclasses call parent::__construct($crudService), so an
+     * extra constructor parameter would break them.
+     *
+     * A handler returning a Response is returned untouched — that is how file
+     * exports stream. Anything else is wrapped in a CrudResult, so a domain
+     * action looks like every other CRUD response.
+     */
+    final public function domainAction(DomainActionRequest $request, DomainActionDispatcher $dispatcher): Response
+    {
+        $requestData = $request->parsed();
+        $model = $requestData->model;
+
+        try {
+            $record = $model->newQuery()->findOrFail($request->input('id'));
+
+            /** @var \Modules\Core\Models\User $user */
+            $user = $request->user();
+
+            $result = $dispatcher->dispatch($record, $request->action(), $user, $request->payload());
+
+            if ($result instanceof Response) {
+                return $result;
+            }
+
+            Cache::clearByEntity($model);
+
+            return $this->buildResponse(new CrudResult(data: $result), $request);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $model, shouldCache: false);
+        }
+    }
+
+    /**
      * Build HTTP Response from CrudResult.
      */
     private function buildResponse(CrudResult $result, Request $request): Response
@@ -352,6 +392,25 @@ class CrudController extends Controller
                     data: null,
                     error: $ex->getMessage(),
                     statusCode: Response::HTTP_BAD_REQUEST,
+                ),
+                $request,
+            );
+        } catch (ValidationException $ex) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_UNPROCESSABLE_ENTITY,
+                ),
+                $request,
+            );
+        } catch (DomainException $ex) {
+            // Must precede LogicException, which it extends, or it never matches.
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_CONFLICT,
                 ),
                 $request,
             );

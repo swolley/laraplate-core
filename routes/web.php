@@ -31,8 +31,11 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
         Route::delete('/cache-clear/{module}/{entity}', 'clearModelCache')->name('cache-clear');
     });
 
-    Route::controller(GridsController::class)->prefix('grid')->group(function (): void {
-        Route::get('/configs/{module}/{entity?}', 'getGridsConfigs')->name('grids.getGridsConfigs');
+    // Grid routes mirror the CRUD verbs above on a different URI prefix, so they need their own
+    // name prefix: duplicate route names break `route:cache` serialization, and `route()` keeps
+    // resolving to the first route registered under the name, leaving the later one unreachable.
+    Route::controller(GridsController::class)->prefix('grid')->name('grids.')->group(function (): void {
+        Route::get('/configs/{module}/{entity?}', 'getGridsConfigs')->name('getGridsConfigs');
         // Route::match(['get', 'post', 'patch', 'delete'], '/{entity}', 'grid')->name('grids.grid');
         Route::match(['get', 'post'], '/select/{module}/{entity}', 'grid')->name('select');
         Route::match(['get', 'post'], '/data/{module}/{entity}', 'grid')->name('data');
@@ -43,4 +46,11 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
         Route::match(['patch', 'put'], '/update/{module}/{entity}', 'grid')->name('replace');
         Route::match(['delete', 'post'], '/delete/{module}/{entity}', 'grid')->name('delete');
     });
+
+    // Last in the group on purpose. This is the catch-all for module-registered
+    // domain verbs, and Laravel matches in registration order with no notion of
+    // specificity, so every literal verb above must be tried first. The grid and
+    // graph groups carry an extra path segment and never reach it.
+    Route::post('/{action}/{module}/{entity}', [CrudController::class, 'domainAction'])
+        ->name('domain-action');
 });

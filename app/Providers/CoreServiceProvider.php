@@ -59,6 +59,7 @@ use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\ModerationAdapterRegistry;
@@ -156,6 +157,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->singleton(DynamicContentsService::class, DynamicContentsService::getInstance(...));
 
         $this->app->register(GeocodingServiceProvider::class);
+
+        // Singleton so every module registering at boot writes into the same
+        // instance the dispatcher later reads.
+        $this->app->singleton(DomainActionRegistry::class);
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);
