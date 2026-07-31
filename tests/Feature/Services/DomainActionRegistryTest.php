@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\DomainActionRegistry;
+use Modules\Core\Tests\Stubs\DomainActions\ApprovableActionModel;
+use Modules\Core\Tests\Stubs\DomainActions\OverridingActionModel;
 use Modules\Core\Tests\Stubs\DomainActions\PlainActionModel;
 
 it('resolves a registered handler for a model and action', function (): void {
@@ -38,3 +40,23 @@ it('rejects registering the same action twice for one model', function (): void 
 
     $registry->register(PlainActionModel::class, 'archive', fn (): null => null);
 })->throws(LogicException::class, 'already registered');
+
+it('allows registering a generic verb when the model declares the override', function (): void {
+    $registry = new DomainActionRegistry();
+
+    $registry->register(OverridingActionModel::class, 'approve', fn (): null => null);
+
+    expect($registry->has(OverridingActionModel::class, 'approve'))->toBeTrue();
+});
+
+it('rejects a generic verb the model did not declare as overridden', function (): void {
+    $registry = new DomainActionRegistry();
+
+    $registry->register(PlainActionModel::class, 'approve', fn (): null => null);
+})->throws(LogicException::class, 'must declare it in overriddenCrudActions()');
+
+it('rejects overriding approve on a model that also uses HasApprovals', function (): void {
+    $registry = new DomainActionRegistry();
+
+    $registry->register(ApprovableActionModel::class, 'approve', fn (): null => null);
+})->throws(LogicException::class, 'already means');
