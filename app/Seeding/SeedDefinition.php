@@ -85,6 +85,7 @@ final class SeedDefinition
      * do not fire Eloquent events, and this is a rule about the data anyway.
      *
      * @param  list<array<string,mixed>>  $rows
+     * @throws InvalidArgumentException If a row is missing or has a null/empty identity value.
      */
     public function rows(array $rows): self
     {
@@ -98,10 +99,18 @@ final class SeedDefinition
                 );
             }
 
-            $normalized[] = array_map(
+            $normalized_row = array_map(
                 static fn (mixed $value): mixed => $value === '' ? null : $value,
                 $row,
             );
+
+            if (($normalized_row[$column] ?? null) === null) {
+                throw new InvalidArgumentException(
+                    "Row {$index} is missing a value for the identity column '{$column}'.",
+                );
+            }
+
+            $normalized[] = $normalized_row;
         }
 
         $this->rows = $normalized;
@@ -112,6 +121,8 @@ final class SeedDefinition
     /**
      * Composite identities would require one OR clause per row, defeating the
      * fixed query count the reconciler exists to provide.
+     *
+     * @throws LogicException If the identity is not exactly one column.
      */
     public function identityColumn(): string
     {

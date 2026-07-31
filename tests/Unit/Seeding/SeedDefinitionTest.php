@@ -33,6 +33,18 @@ it('rejects a row missing an identity value', function (): void {
         ->rows([['type' => 'string']]);
 })->throws(InvalidArgumentException::class, 'name');
 
+it('rejects a row with an empty string identity value', function (): void {
+    SeedDefinition::for(Setting::class)
+        ->identity(['name'])
+        ->rows([['name' => '', 'value' => 'x']]);
+})->throws(InvalidArgumentException::class, 'name');
+
+it('rejects a row with a null identity value', function (): void {
+    SeedDefinition::for(Setting::class)
+        ->identity(['name'])
+        ->rows([['name' => null, 'value' => 'x']]);
+})->throws(InvalidArgumentException::class, 'name');
+
 it('normalizes empty strings to null, replacing the SettingObserver saving hook', function (): void {
     $definition = SeedDefinition::for(Setting::class)
         ->identity(['name'])
