@@ -6,6 +6,38 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Centralize permission name construction
+- *(core)* Add domain action registry and contracts
+- *(core)* Reject domain actions colliding with generic CRUD verbs
+- *(core)* Add domain action dispatcher
+- *(core)* Expose domain actions on the /app surface
+- *(core)* Add RouteCheckCommand for resolving routes by URL
+- *(core)* Settings module ownership and seeded baseline columns
+
+### 🐛 Bug Fixes
+
+- *(core)* Repair lock and unlock CRUD operations
+- *(core)* Stop test config override from crashing console commands
+- *(core)* Align per-model setting names between writers and readers
+- *(core)* Stop dropping model observers registered during provider boot
+- *(core)* Keep the optimistic locking column out of the versionable image
+
+### 🚜 Refactor
+
+- *(core)* Build permission names through PermissionName
+
+### 📚 Documentation
+
+- *(core)* Document the domain action surface
+
+### 🧪 Testing
+
+- *(core)* Cover CoreDatabaseSeeder behaviour instead of its source text
+
+## [1.66.0] - 2026-07-30
+
+### 🚀 Features
+
 - *(core)* Enhance MigrateUtils to support explicit database connections
 - *(core)* Implement optimistic locking with error handling
 - *(filament)* Merge Filament --generate into HasTable/HasForm
@@ -28,7 +60,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.58.8] - 2026-07-10
+## [1.59.0] - 2026-07-12
 
 ### 🐛 Bug Fixes
 

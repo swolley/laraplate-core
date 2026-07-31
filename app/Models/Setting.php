@@ -47,6 +47,8 @@ final class Setting extends Model
         'type',
         'group_name',
         'description',
+        'module',
+        'seeded_value',
     ];
 
     #[Override]
@@ -110,6 +112,7 @@ final class Setting extends Model
             'value' => 'json',
             'encrypted' => 'boolean',
             'choices' => 'array',
+            'seeded_value' => 'json',
             'type' => SettingTypeEnum::class,
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
