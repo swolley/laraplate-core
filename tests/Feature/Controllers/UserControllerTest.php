@@ -19,7 +19,7 @@ test('user info returns anonymous data when not authenticated', function (): voi
     $response->assertStatus(200)
         ->assertJsonStructure([
             'data' => [
-                'id', 'name', 'username', 'email', 'groups', 'canImpersonate', 'permissions',
+                'id', 'name', 'username', 'email', 'lang', 'groups', 'canImpersonate', 'permissions',
             ],
         ]);
 });
@@ -127,7 +127,7 @@ test('user info returns anonymous data when no user', function (): void {
     $response->assertStatus(200)
         ->assertJsonStructure([
             'data' => [
-                'id', 'name', 'username', 'email', 'groups', 'canImpersonate', 'permissions',
+                'id', 'name', 'username', 'email', 'lang', 'groups', 'canImpersonate', 'permissions',
             ],
         ]);
 });

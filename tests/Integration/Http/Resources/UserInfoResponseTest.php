@@ -16,7 +16,8 @@ it('transforms null resource to anonymous array', function (): void {
     expect($array['id'])->toBe('anonymous')
         ->and($array['name'])->toBe('anonymous')
         ->and($array['permissions'])->toBe([])
-        ->and($array['groups'])->toBe([]);
+        ->and($array['groups'])->toBe([])
+        ->and($array['lang'])->toBeNull();
 });
 
 it('transforms user resource to array with permissions and groups', function (): void {
@@ -39,6 +40,15 @@ it('includes canImpersonate in array', function (): void {
     $array = $resource->toArray(new Request);
 
     expect($array)->toHaveKey('canImpersonate');
+});
+
+it('exposes the user language preference', function (): void {
+    $user = User::factory()->create(['lang' => 'it']);
+    $resource = new UserInfoResponse($user);
+    $array = $resource->toArray(new Request);
+
+    expect($array)->toHaveKey('lang')
+        ->and($array['lang'])->toBe('it');
 });
 
 it('transforms superadmin user with all permissions grouped by guard', function (): void {

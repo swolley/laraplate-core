@@ -30,7 +30,20 @@ it('builds a basic ok response from array data', function (): void {
 
     $payload = json_decode($response->getContent(), true);
 
-    expect($payload['meta']['status'])->toBe(SymfonyResponse::HTTP_OK);
+    expect($payload['meta']['status'])->toBe(SymfonyResponse::HTTP_OK)
+        ->and($payload['meta']['locale'])->toBe(app()->getLocale());
+});
+
+it('exposes the current effective locale in the meta', function (): void {
+    app()->setLocale('it');
+
+    $request = Request::create('/test', 'GET');
+    $builder = new ResponseBuilder($request, Carbon::now());
+    $builder->setData(['foo' => 'bar']);
+
+    $payload = json_decode($builder->getResponse()->getContent(), true);
+
+    expect($payload['meta']['locale'])->toBe('it');
 });
 
 it('sets status based on exception error and includes error message', function (): void {

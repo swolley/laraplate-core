@@ -36,6 +36,9 @@ final class UserInfoResponse extends JsonResource
                 'name' => $this->resource->name,
                 'username' => $this->resource->username,
                 'email' => $this->resource->email,
+                // The user's explicit language preference (null when unset — the
+                // caller falls back to the browser / app default itself).
+                'lang' => $this->resource->lang,
                 'groups' => $roles,
                 'canImpersonate' => $this->resource->canImpersonate(),
                 'permissions' => $permissions,
@@ -47,6 +50,7 @@ final class UserInfoResponse extends JsonResource
             'name' => 'anonymous',
             'username' => 'anonymous',
             'email' => 'anonymous',
+            'lang' => null,
             'groups' => [],
             'canImpersonate' => false,
             'permissions' => [],

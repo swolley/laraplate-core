@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Expose current locale in response meta + user lang in user info
+
+### 🐛 Bug Fixes
+
+- *(core)* Validate identity value is not null or empty string
+- *(core)* Make ModelCapabilityScanner's model skip observable
+
+### 🧪 Testing
+
+- *(core)* Tie each capability flag to its own trait constant
+
+## [1.67.0] - 2026-07-31
+
+### 🚀 Features
+
 - *(core)* Centralize permission name construction
 - *(core)* Add domain action registry and contracts
 - *(core)* Reject domain actions colliding with generic CRUD verbs

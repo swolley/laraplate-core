@@ -436,6 +436,7 @@ class ResponseBuilder
         $payload = [
             'meta' => [
                 'status' => $this->status,
+                'locale' => app()->getLocale(),
                 'preview' => $this->preview,
                 'startedAt' => $this->startedAt,
                 'endedAt' => $endedAt,
