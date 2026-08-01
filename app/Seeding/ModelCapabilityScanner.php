@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Seeding;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasApprovals;
@@ -34,7 +35,12 @@ final class ModelCapabilityScanner
                 /** @var Model $instance */
                 $instance = new ReflectionClass($model_class)->newInstanceWithoutConstructor();
                 $table = $instance->getTable();
-            } catch (Throwable) {
+            } catch (Throwable $throwable) {
+                Log::warning('Model capability scan skipped a model', [
+                    'model' => $model_class,
+                    'exception' => $throwable,
+                ]);
+
                 continue;
             }
 

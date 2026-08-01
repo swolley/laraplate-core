@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Log;
 use Modules\CMS\Models\Content;
 use Modules\CMS\Models\Tag;
+use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Seeding\ModelCapabilityScanner;
+use Modules\Core\Tests\Stubs\Seeding\UnresolvableCapabilityModel;
 
 it('reports HasApprovals without a second filesystem walk', function (): void {
     $scanned = app(ModelCapabilityScanner::class)->scan();
@@ -96,4 +99,41 @@ it('does not confuse hasOptimisticLocking with hasApprovals', function (): void 
 
     expect($byClass[Setting::class]->hasApprovals)->toBeTrue()
         ->and($byClass[Setting::class]->hasOptimisticLocking)->toBeFalse();
+});
+
+it('logs a warning and keeps scanning when a model fails to resolve, instead of skipping silently', function (): void {
+    Log::spy();
+
+    $original_active_models = HelpersCache::getModels('active');
+
+    // Inject a deliberately unresolvable model alongside a known-good one:
+    // proves the skip is observable AND that one broken model does not stop
+    // the rest of the scan.
+    HelpersCache::setModels('active', [
+        UnresolvableCapabilityModel::class,
+        Setting::class,
+    ]);
+
+    try {
+        $scanned = app(ModelCapabilityScanner::class)->scan();
+    } finally {
+        if ($original_active_models === null) {
+            HelpersCache::clearModels();
+        } else {
+            HelpersCache::setModels('active', $original_active_models);
+        }
+    }
+
+    $classes = array_column($scanned, 'modelClass');
+
+    expect($classes)->not->toContain(UnresolvableCapabilityModel::class)
+        ->and($classes)->toContain(Setting::class);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(function (string $message, array $context): bool {
+            return $message === 'Model capability scan skipped a model'
+                && ($context['model'] ?? null) === UnresolvableCapabilityModel::class
+                && ($context['exception'] ?? null) instanceof Throwable;
+        });
 });
