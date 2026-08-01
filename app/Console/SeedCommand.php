@@ -32,6 +32,7 @@ final class SeedCommand extends BaseSeedCommand
     {
         return array_merge(parent::getOptions(), [
             ['dev', null, InputOption::VALUE_NONE, 'Seed the database with development data'],
+            ['resume', null, InputOption::VALUE_NONE, 'Skip nodes that succeeded in the last failed run'],
         ]);
     }
 }

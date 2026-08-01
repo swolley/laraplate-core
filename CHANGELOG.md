@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Seed orchestrator with per-node atomicity and in-run resume
+
+### 🐛 Bug Fixes
+
+- *(core)* Make the no-force-delete test actually reachable by reconciliation
+
+### ⚡ Performance
+
+- *(core)* Reconcile Core settings in one pass, drop duplicate model scan
+
+## [1.68.0] - 2026-08-01
+
+### 🚀 Features
+
 - *(core)* Expose current locale in response meta + user lang in user info
 
 ### 🐛 Bug Fixes
