@@ -7,26 +7,23 @@ namespace Modules\Core\Database\Seeders;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Locking\Traits\HasOptimisticLocking;
-use Modules\Core\Models\Concerns\HasApprovals;
-use Modules\Core\Models\Concerns\HasTranslations;
-use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\Seeding\ModelCapabilities;
+use Modules\Core\Seeding\ModelCapabilityScanner;
+use Modules\Core\Seeding\SeedDefinition;
+use Modules\Core\Seeding\SeedReconciler;
 use Modules\Core\Services\PerModelSettingResolver;
-use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Services\SettingsCacheCoordinator;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
 use Spatie\Permission\PermissionRegistrar;
-use Throwable;
 
 final class CoreDatabaseSeeder extends Seeder
 {
@@ -102,31 +99,26 @@ final class CoreDatabaseSeeder extends Seeder
     {
         Model::unguarded(function (): void {
             $this->defaultSettings();
-            $this->defaultApprovalSettings();
             $this->defaultPermissions();
             $this->defaultRoles();
             $this->defaultUsers();
             $this->defaultCrons();
         });
 
-        Artisan::call('cache:clear');
+        app(SettingsCacheCoordinator::class)->flushAll();
     }
 
     private static function setting(string $name, mixed $value, SettingTypeEnum $type, string $group, string $description, ?array $choices = null): array
     {
-        $definition = [
+        return [
             'name' => $name,
             'value' => $value,
+            'encrypted' => false,
+            'choices' => $choices,
             'type' => $type,
             'group_name' => $group,
             'description' => $description,
         ];
-
-        if ($choices !== null) {
-            $definition['choices'] = $choices;
-        }
-
-        return $definition;
     }
 
     private function defaultPermissions(): void
@@ -303,12 +295,13 @@ final class CoreDatabaseSeeder extends Seeder
     private function defaultSettings(): void
     {
         $this->logOperation(Setting::class);
-        $setting_model = new Setting;
 
         $default_settings = [
             [
                 'name' => 'default_language',
                 'value' => config('app.locale'),
+                'encrypted' => false,
+                'choices' => null,
                 'type' => SettingTypeEnum::String,
                 'group_name' => 'base',
                 'description' => 'Lingua default',
@@ -316,6 +309,8 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => 'pagination',
                 'value' => 20,
+                'encrypted' => false,
+                'choices' => null,
                 'type' => SettingTypeEnum::Integer,
                 'group_name' => 'base',
                 'description' => 'Paginazione default chiamate',
@@ -323,6 +318,8 @@ final class CoreDatabaseSeeder extends Seeder
             [
                 'name' => 'max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
+                'encrypted' => false,
+                'choices' => null,
                 'type' => SettingTypeEnum::Integer,
                 'group_name' => 'base',
                 'description' => 'Numero massimo sessioni simultanee',
@@ -331,113 +328,77 @@ final class CoreDatabaseSeeder extends Seeder
 
         array_push($default_settings, ...self::runtimeSettingDefinitions());
 
-        $to_remove_settings = [];
+        $all_model_classes = models();
+        $capabilities = app(ModelCapabilityScanner::class)->scan();
 
-        $all_models = models();
+        $scanned_classes = array_column($capabilities, 'modelClass');
 
-        foreach ($all_models as $model) {
-            $reflected = new ReflectionClass($model);
-            $instance = $reflected->newInstanceWithoutConstructor();
-            $table = $instance->getTable();
-
-            // versioned models
-
-            $versioned_setting_key_name = $this->getSettingKeyName(self::VERSIONING_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, HasVersions::class)) {
-                $this->seedVersionedModel($default_settings, $instance, $table, $versioned_setting_key_name);
-            } else {
-                $to_remove_settings[] = $versioned_setting_key_name;
-            }
-
-            // soft deletes models
-
-            $soft_deletes_setting_key_name = $this->getSettingKeyName(self::SOFT_DELETES_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, SoftDeletes::class)) {
-                $this->seedSoftDeletedModel($default_settings, $instance, $table, $soft_deletes_setting_key_name);
-            } else {
-                $to_remove_settings[] = $soft_deletes_setting_key_name;
-            }
-
-            // locked models
-
-            $locked_model_key_name = $this->getSettingKeyName(self::LOCK_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, HasLocks::class)) {
-                $this->seedLockedModel($default_settings, $instance, $table, $locked_model_key_name);
-            } else {
-                $to_remove_settings[] = $locked_model_key_name;
-            }
-
-            // optimistic locked models
-
-            $optimistic_locked_model_key_name = $this->getSettingKeyName(self::OPTIMISTIC_LOCK_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, HasOptimisticLocking::class)) {
-                $this->seedOptimisticLockedModel($default_settings, $instance, $table, $optimistic_locked_model_key_name);
-            } else {
-                $to_remove_settings[] = $optimistic_locked_model_key_name;
-            }
-
-            $translation_fallback_key_name = $this->getSettingKeyName(self::TRANSLATION_FALLBACK_NAME_PREFIX, $table);
-
-            $auto_translate_key_name = $this->getSettingKeyName(self::AUTO_TRANSLATE_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, HasTranslations::class)) {
-                $this->seedTranslationFallbackModel($default_settings, $instance, $table, $translation_fallback_key_name);
-                $this->seedAutoTranslateModel($default_settings, $instance, $table, $auto_translate_key_name);
-            } else {
-                $to_remove_settings[] = $translation_fallback_key_name;
-                $to_remove_settings[] = $auto_translate_key_name;
-            }
-
-            $ai_moderation_key_name = $this->getSettingKeyName(self::AI_MODERATION_NAME_PREFIX, $table);
-
-            if (class_uses_trait($model, HasApprovals::class)) {
-                $this->seedAiModerationModel($default_settings, $instance, $table, $ai_moderation_key_name);
-            } else {
-                $to_remove_settings[] = $ai_moderation_key_name;
-            }
+        foreach (array_diff($all_model_classes, $scanned_classes) as $skipped_class) {
+            $this->command->warn("    - skipped {$skipped_class}: capabilities could not be resolved (see log)");
         }
 
-        if ($to_remove_settings !== []) {
-            $this->deleteRefuses($to_remove_settings);
+        $default_approval_threshold = (int) config('core.notifications.approvals.default_threshold_hours', 8);
+
+        foreach ($capabilities as $capability) {
+            $this->pushCapabilitySettings($default_settings, $capability, $default_approval_threshold);
         }
 
-        $existing_settings = Setting::query()->withoutGlobalScopes()
-            ->whereIn('name', array_column($default_settings, 'name'))
-            ->select(['name'])
-            ->pluck('name')
-            ->flip()
-            ->all();
-
-        $new_settings = array_filter(
-            $default_settings,
-            fn ($setting) => ! isset($existing_settings[$setting['name']]),
+        $outcome = app(SeedReconciler::class)->reconcile(
+            SeedDefinition::for(Setting::class)
+                ->identity(['name'])
+                ->structural(['type', 'group_name', 'description', 'choices'])
+                ->initial(['value'])
+                ->ownedBy('Core')
+                ->rows($default_settings),
         );
 
-        if ($new_settings === []) {
-            $this->command->line('    - nothing to update');
-
-            return;
-        }
-
-        $setting_model->getConnection()->transaction(function () use ($new_settings): void {
-            foreach ($new_settings as &$setting) {
-                if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
-                    $this->create(Setting::class, $setting);
-                    $this->command->line("    - {$setting['name']} <fg=green>created</>");
-                } else {
-                    $this->command->line("    - {$setting['name']} already exists");
-                }
-            }
-        });
+        $this->command->line('    - created ' . count($outcome->created) . ', '
+            . 'realigned ' . count($outcome->realigned) . ', '
+            . "unchanged {$outcome->unchanged}");
     }
 
-    private function deleteRefuses(array $list): void
+    /**
+     * Append the per-model rows a single {@see ModelCapabilities} entry contributes.
+     */
+    private function pushCapabilitySettings(array &$defaultSettings, ModelCapabilities $capability, int $defaultApprovalThreshold): void
     {
-        Setting::query()->whereIn('name', $list)->forceDelete();
+        $table = $capability->table;
+        $instance = new ReflectionClass($capability->modelClass)->newInstanceWithoutConstructor();
+
+        if ($capability->hasVersions) {
+            $this->seedVersionedModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::VERSIONING_NAME_PREFIX, $table));
+        }
+
+        if ($capability->hasSoftDeletes) {
+            $this->seedSoftDeletedModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::SOFT_DELETES_NAME_PREFIX, $table));
+        }
+
+        if ($capability->hasLocks) {
+            $this->seedLockedModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::LOCK_NAME_PREFIX, $table));
+        }
+
+        if ($capability->hasOptimisticLocking) {
+            $this->seedOptimisticLockedModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::OPTIMISTIC_LOCK_NAME_PREFIX, $table));
+        }
+
+        if ($capability->hasTranslations) {
+            $this->seedTranslationFallbackModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::TRANSLATION_FALLBACK_NAME_PREFIX, $table));
+            $this->seedAutoTranslateModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::AUTO_TRANSLATE_NAME_PREFIX, $table));
+        }
+
+        if ($capability->hasApprovals) {
+            $this->seedAiModerationModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::AI_MODERATION_NAME_PREFIX, $table));
+
+            $defaultSettings[] = [
+                'name' => "approval_threshold__{$table}",
+                'value' => $defaultApprovalThreshold,
+                'encrypted' => false,
+                'choices' => null,
+                'type' => SettingTypeEnum::Integer,
+                'group_name' => 'approvals',
+                'description' => "Hours before notification for pending {$table} approvals",
+            ];
+        }
     }
 
     private function getSettingKeyName(string $prefix, string $suffix): string
@@ -454,10 +415,11 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => VersionStrategy::DIFF,
+            'encrypted' => false,
+            'choices' => [false, ...VersionStrategy::cases()],
             'type' => SettingTypeEnum::Json,
             'group_name' => 'versioning',
             'description' => "Version strategy for {$table}",
-            'choices' => [false, ...VersionStrategy::cases()],
         ];
     }
 
@@ -470,6 +432,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'soft_deletes',
             'description' => "Soft deletes status for {$table}",
@@ -485,6 +449,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Lock status for {$table}",
@@ -500,6 +466,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'locking',
             'description' => "Optimistic lock status for {$table}",
@@ -515,6 +483,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => true,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'translations',
             'description' => "Translation fallback for {$table}",
@@ -530,6 +500,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => false,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'translations',
             'description' => "Auto-translate for {$table}",
@@ -545,6 +517,8 @@ final class CoreDatabaseSeeder extends Seeder
         $defaultSettings[] = [
             'name' => $keyName,
             'value' => false,
+            'encrypted' => false,
+            'choices' => null,
             'type' => SettingTypeEnum::Boolean,
             'group_name' => 'moderation',
             'description' => "AI moderation for {$table}",
@@ -609,163 +583,5 @@ final class CoreDatabaseSeeder extends Seeder
                 }
             }
         });
-    }
-
-    /**
-     * Create approval threshold settings for all models using HasApprovals trait.
-     * Auto-discovers models by scanning all module Model directories.
-     */
-    private function defaultApprovalSettings(): void
-    {
-        $this->command->info('  Seeding approval threshold settings...');
-        $setting_model = new Setting;
-
-        $models_with_approvals = $this->getModelsWithApprovals();
-
-        if ($models_with_approvals === []) {
-            $this->command->line('    - no models with HasApprovals found');
-
-            return;
-        }
-
-        $default_threshold = config('core.notifications.approvals.default_threshold_hours', 8);
-        $approval_settings = [];
-
-        foreach ($models_with_approvals as $table => $model_class) {
-            $approval_settings[] = [
-                'name' => "approval_threshold__{$table}",
-                'value' => $default_threshold,
-                'type' => SettingTypeEnum::Integer,
-                'group_name' => 'approvals',
-                'description' => "Hours before notification for pending {$table} approvals",
-            ];
-        }
-
-        $existing_settings = Setting::query()->withoutGlobalScopes()
-            ->whereIn('name', array_column($approval_settings, 'name'))
-            ->select(['name'])
-            ->pluck('name')
-            ->flip()
-            ->all();
-
-        $new_settings = array_filter(
-            $approval_settings,
-            fn ($setting) => ! isset($existing_settings[$setting['name']]),
-        );
-
-        if ($new_settings === []) {
-            $this->command->line('    - nothing to update');
-
-            return;
-        }
-
-        $setting_model->getConnection()->transaction(function () use ($new_settings): void {
-            foreach ($new_settings as &$setting) {
-                if (! Setting::query()->withoutGlobalScopes()->where('name', $setting['name'])->exists()) {
-                    $this->create(Setting::class, $setting);
-                    $this->command->line("    - {$setting['name']} <fg=green>created</>");
-                } else {
-                    $this->command->line("    - {$setting['name']} already exists");
-                }
-            }
-        });
-    }
-
-    /**
-     * Auto-discover all models that use the HasApprovals trait.
-     *
-     * @return array<string, class-string<Model>>
-     */
-    private function getModelsWithApprovals(): array
-    {
-        $result = [];
-        $modules_path = base_path('Modules');
-
-        if (! File::isDirectory($modules_path)) {
-            return $result;
-        }
-
-        $modules = File::directories($modules_path);
-
-        foreach ($modules as $module_path) {
-            $models_path = $module_path . '/app/Models';
-
-            if (! File::isDirectory($models_path)) {
-                continue;
-            }
-
-            $files = File::files($models_path);
-
-            foreach ($files as $file) {
-                if ($file->getExtension() !== 'php') {
-                    continue;
-                }
-
-                $class_name = $this->getClassNameFromFile($file->getPathname(), $module_path);
-
-                if ($class_name === null || ! class_exists($class_name)) {
-                    continue;
-                }
-
-                if ($this->usesHasApprovalsTrait($class_name)) {
-                    try {
-                        /** @var Model $instance */
-                        $instance = new $class_name();
-                        $result[$instance->getTable()] = $class_name;
-                    } catch (Throwable) {
-                        // Skip models that can't be instantiated
-                    }
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Extract class name from file path.
-     */
-    private function getClassNameFromFile(string $file_path, string $module_path): ?string
-    {
-        $module_name = basename($module_path);
-        $relative_path = str_replace($module_path . '/app/', '', $file_path);
-        $relative_path = str_replace('.php', '', $relative_path);
-        $relative_path = str_replace('/', '\\', $relative_path);
-
-        return "Modules\\{$module_name}\\{$relative_path}";
-    }
-
-    /**
-     * Check if a class uses the HasApprovals trait.
-     */
-    private function usesHasApprovalsTrait(string $class_name): bool
-    {
-        try {
-            $reflection = new ReflectionClass($class_name);
-
-            // Check direct traits
-            $traits = $reflection->getTraitNames();
-
-            if (in_array(HasApprovals::class, $traits, true)) {
-                return true;
-            }
-
-            // Check parent classes
-            $parent = $reflection->getParentClass();
-
-            while ($parent !== false) {
-                $parent_traits = $parent->getTraitNames();
-
-                if (in_array(HasApprovals::class, $parent_traits, true)) {
-                    return true;
-                }
-
-                $parent = $parent->getParentClass();
-            }
-
-            return false;
-        } catch (Throwable) {
-            return false;
-        }
     }
 }
