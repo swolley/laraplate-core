@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
+return [
     'day' => [
         0 => 'Sonntag',
         1 => 'Montag',
@@ -168,9 +166,3 @@ $translations = [
         ],
     ],
 ];
-
-if ($default_locale !== 'de') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/app.php"));
-}
-
-return $translations;
