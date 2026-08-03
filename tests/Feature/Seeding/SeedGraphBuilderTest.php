@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Modules\AI\Database\Seeders\AIDatabaseSeeder;
 use Modules\CMS\Database\Seeders\CMSDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Database\Seeders\PermissionRefreshSeeder;
 use Modules\Core\Seeding\SeedGraphBuilder;
 use Modules\Core\Seeding\SeedNode;
 use Modules\ERP\Database\Seeders\ERPDatabaseSeeder;
@@ -71,8 +72,18 @@ it('wires every module that requires Core to depend on CoreDatabaseSeeder', func
     }
 });
 
-it('leaves Core, which requires nothing, with an empty dependsOn', function (): void {
-    expect(seedNodeFor(CoreDatabaseSeeder::class)->dependsOn)->toBe([]);
+it('makes permission:refresh a declared graph node that CoreDatabaseSeeder depends on', function (): void {
+    // CoreDatabaseSeeder::defaultRoles() assigns permissions that only exist once
+    // permission:refresh has run, so this is the one intra-module edge Core declares.
+    expect(seedNodeFor(CoreDatabaseSeeder::class)->dependsOn)->toBe([PermissionRefreshSeeder::class]);
+});
+
+it('propagates the permission:refresh node to every module that requires Core, so ERP can rely on it', function (): void {
+    // ERPDatabaseSeeder::ensureDomainPermissions() is the obvious consumer, but it gets this
+    // edge for free via module.json "requires": ["Core"] — no explicit dependsOn() needed there.
+    foreach ([AIDatabaseSeeder::class, CMSDatabaseSeeder::class, ERPDatabaseSeeder::class] as $seederClass) {
+        expect(seedNodeFor($seederClass)->dependsOn)->toContain(PermissionRefreshSeeder::class);
+    }
 });
 
 it('excludes Dev seeders from the production graph', function (): void {

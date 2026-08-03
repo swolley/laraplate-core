@@ -166,6 +166,6 @@ trait HasSeedersUtils
     {
         $already_exists = $model::query()->exists();
         $table = new ReflectionClass($model)->newInstanceWithoutConstructor()->getTable();
-        $this->command->line('  ' . ($already_exists ? 'Updating' : 'Creating') . ' default <fg=cyan;options=bold>' . $table . '</>');
+        $this->command?->line('  ' . ($already_exists ? 'Updating' : 'Creating') . ' default <fg=cyan;options=bold>' . $table . '</>');
     }
 }

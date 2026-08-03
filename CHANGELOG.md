@@ -6,13 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Settings cleanup keyed on module state and drift
+- *(core)* Add the frontend UI translation keys to app.php (all locales)
+- *(core)* Permission refresh as a graph node
+
+### 🐛 Bug Fixes
+
+- *(core)* Surface the rollback caveat to operators and cover the real db:seed wiring
+- *(core)* Restore corrupted translations from pre-2c7dec5 (pagination + sl validation)
+- *(core)* Own derived settings by their module and harden cleanup
+- *(core)* Complete translations + drop the runtime Italian merge
+
+## [1.68.1] - 2026-08-01
+
+### 🚀 Features
+
 - *(core)* Seed orchestrator with per-node atomicity and in-run resume
 
 ### 🐛 Bug Fixes
 
-- *(core)* Resolve approval permissions and votes on the modifiable owner's connection
-- *(core)* Deduplicate historical approval votes and enforce one vote per actor
-- *(core)* Count only existing licenses in cross-database dashboard occupancy stats
 - *(core)* Make the no-force-delete test actually reachable by reconciliation
 
 ### ⚡ Performance

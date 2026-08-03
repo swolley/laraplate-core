@@ -6,13 +6,13 @@ namespace Modules\Core\Database\Seeders;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\Seeding\Contracts\DeclaresSeedDependencies;
 use Modules\Core\Seeding\ModelCapabilities;
 use Modules\Core\Seeding\ModelCapabilityScanner;
 use Modules\Core\Seeding\SeedDefinition;
@@ -20,12 +20,12 @@ use Modules\Core\Seeding\SeedReconciler;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Overtrue\LaravelVersionable\VersionStrategy;
+use Override;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
-use Spatie\Permission\PermissionRegistrar;
 
-final class CoreDatabaseSeeder extends Seeder
+final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencies
 {
     public const VERSIONING_NAME_PREFIX = 'version_strategy_';
 
@@ -45,6 +45,20 @@ final class CoreDatabaseSeeder extends Seeder
      * @var Collection<string, BaseRole>
      */
     private Collection $groups;
+
+    /**
+     * `defaultRoles()` assigns permissions that only exist once `permission:refresh` has run, so
+     * this node must follow {@see PermissionRefreshSeeder}. That seeder is a separate graph node
+     * (not a private method here) so other modules — {@see \Modules\ERP\Database\Seeders\ERPDatabaseSeeder::ensureDomainPermissions()}
+     * — can also declare a dependency on it instead of relying on undeclared run order.
+     *
+     * @return list<class-string>
+     */
+    #[Override]
+    public static function dependsOn(): array
+    {
+        return [PermissionRefreshSeeder::class];
+    }
 
     /**
      * @return array<string,string>
@@ -99,7 +113,6 @@ final class CoreDatabaseSeeder extends Seeder
     {
         Model::unguarded(function (): void {
             $this->defaultSettings();
-            $this->defaultPermissions();
             $this->defaultRoles();
             $this->defaultUsers();
             $this->defaultCrons();
@@ -119,15 +132,6 @@ final class CoreDatabaseSeeder extends Seeder
             'group_name' => $group,
             'description' => $description,
         ];
-    }
-
-    private function defaultPermissions(): void
-    {
-        // il comando ha già le transaction
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $this->logOperation((string) config('permission.models.permission'));
-        Artisan::call('permission:refresh');
-        $this->command->line('    - permissions updated');
     }
 
     private function defaultRoles(): void
@@ -195,7 +199,7 @@ final class CoreDatabaseSeeder extends Seeder
         $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
 
         if ($new_roles === []) {
-            $this->command->line('    - nothing to update');
+            $this->command?->line('    - nothing to update');
 
             return;
         }
@@ -203,7 +207,7 @@ final class CoreDatabaseSeeder extends Seeder
         $role_instance->getConnection()->transaction(function () use ($role_class, $new_roles): void {
             foreach ($new_roles as &$role) {
                 $this->create($role_class, $role);
-                $this->command->line("    - {$role['name']} <fg=green>created</>");
+                $this->command?->line("    - {$role['name']} <fg=green>created</>");
             }
         });
 
@@ -275,7 +279,7 @@ final class CoreDatabaseSeeder extends Seeder
         $new_users = array_filter($users_data, fn ($user) => ! isset($existing_users[$user['username']]));
 
         if ($new_users === []) {
-            $this->command->line('    - nothing to update');
+            $this->command?->line('    - nothing to update');
 
             return;
         }
@@ -283,10 +287,10 @@ final class CoreDatabaseSeeder extends Seeder
         $user_instance->getConnection()->transaction(function () use ($user_class, $new_users, $superadmin): void {
             foreach ($new_users as &$user) {
                 $this->create($user_class, $user);
-                $this->command->line("    - {$user['username']} <fg=green>created</>");
+                $this->command?->line("    - {$user['username']} <fg=green>created</>");
 
                 if ($user['username'] === $superadmin) {
-                    $this->command->line("      with password: {$user['password']}");
+                    $this->command?->line("      with password: {$user['password']}");
                 }
             }
         });
@@ -334,7 +338,7 @@ final class CoreDatabaseSeeder extends Seeder
         $scanned_classes = array_column($capabilities, 'modelClass');
 
         foreach (array_diff($all_model_classes, $scanned_classes) as $skipped_class) {
-            $this->command->warn("    - skipped {$skipped_class}: capabilities could not be resolved (see log)");
+            $this->command?->warn("    - skipped {$skipped_class}: capabilities could not be resolved (see log)");
         }
 
         $default_approval_threshold = (int) config('core.notifications.approvals.default_threshold_hours', 8);
@@ -375,7 +379,7 @@ final class CoreDatabaseSeeder extends Seeder
             $unchanged += $outcome->unchanged;
         }
 
-        $this->command->line("    - created {$created}, realigned {$realigned}, unchanged {$unchanged}");
+        $this->command?->line("    - created {$created}, realigned {$realigned}, unchanged {$unchanged}");
     }
 
     /**
@@ -610,7 +614,7 @@ final class CoreDatabaseSeeder extends Seeder
         );
 
         if ($new_crons === []) {
-            $this->command->line('    - nothing to update');
+            $this->command?->line('    - nothing to update');
 
             return;
         }
@@ -619,9 +623,9 @@ final class CoreDatabaseSeeder extends Seeder
             foreach ($new_crons as &$cron) {
                 if (! CronJob::query()->withoutGlobalScopes()->where('name', $cron['name'])->exists()) {
                     $this->create(CronJob::class, $cron);
-                    $this->command->line("    - {$cron['name']} <fg=green>created</>");
+                    $this->command?->line("    - {$cron['name']} <fg=green>created</>");
                 } else {
-                    $this->command->line("    - {$cron['name']} already exists");
+                    $this->command?->line("    - {$cron['name']} already exists");
                 }
             }
         });
