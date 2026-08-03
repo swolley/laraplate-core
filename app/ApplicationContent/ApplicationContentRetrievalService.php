@@ -65,7 +65,8 @@ final readonly class ApplicationContentRetrievalService
         if (! $request_user instanceof User
             || ! $guard_user instanceof User
             || $request_user !== $guard_user
-            || $request_user->getAuthIdentifier() === null) {
+            || $request_user->getAuthIdentifier() === null
+            || $request_user->isGuest()) {
             throw new ApplicationContentUnavailableException;
         }
     }

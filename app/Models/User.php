@@ -42,6 +42,7 @@ use Modules\Core\Observers\UserObserver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\Permission\Traits\HasRoles;
+use UnexpectedValueException;
 
 /**
  * @property int|null $id
@@ -184,7 +185,20 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     public function isGuest(): bool
     {
-        return $this->getAttribute('email') === null;
+        $guest = config('permission.users.guest');
+
+        if ($this->getAttribute('email') === null) {
+            return true;
+        }
+
+        if (! is_string($guest) || $guest === '') {
+            throw new UnexpectedValueException('Configured guest account is invalid.');
+        }
+
+        return in_array($guest, [
+            $this->getAttribute('name'),
+            $this->getAttribute('username'),
+        ], true);
     }
 
     public function isSuperAdmin(): bool

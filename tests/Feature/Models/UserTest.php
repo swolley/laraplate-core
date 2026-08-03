@@ -199,6 +199,47 @@ it('isGuest returns true when user has no email', function (): void {
     expect($user->isGuest())->toBeTrue();
 });
 
+it('recognizes the configured guest account even when it has an email', function (): void {
+    config()->set('permission.users.guest', 'visitor');
+    $user = User::factory()->create([
+        'name' => 'visitor',
+        'username' => 'visitor',
+        'email' => 'visitor@example.test',
+    ]);
+
+    expect($user->isGuest())->toBeTrue();
+});
+
+it('recognizes the configured guest account by username', function (): void {
+    config()->set('permission.users.guest', 'visitor');
+    $user = User::factory()->create([
+        'name' => 'Public visitor',
+        'username' => 'visitor',
+        'email' => 'visitor@example.test',
+    ]);
+
+    expect($user->isGuest())->toBeTrue();
+});
+
+it('does not classify a normal account as guest', function (): void {
+    config()->set('permission.users.guest', 'visitor');
+    $user = User::factory()->create([
+        'name' => 'member',
+        'username' => 'member',
+        'email' => 'member@example.test',
+    ]);
+
+    expect($user->isGuest())->toBeFalse();
+});
+
+it('fails guest classification when the configured account is invalid', function (): void {
+    config()->set('permission.users.guest', '');
+    $user = User::factory()->create(['email' => 'member@example.test']);
+
+    expect(fn (): bool => $user->isGuest())
+        ->toThrow(UnexpectedValueException::class);
+});
+
 it('canAccessPanel returns true for superadmin without calling panel guard', function (): void {
     config(['permission.roles.superadmin' => 'superadmin']);
     $role = Role::factory()->create(['name' => 'superadmin']);

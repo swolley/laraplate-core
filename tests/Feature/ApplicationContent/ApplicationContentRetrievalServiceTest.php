@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Http\Request;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalService;
 use Modules\Core\ApplicationContent\Data\ApplicationContentHit;
@@ -132,6 +132,34 @@ it('fails closed before provider execution for missing or mismatched identity', 
     ))->toThrow(ApplicationContentUnavailableException::class)
         ->and($this->provider->calls)->toBe(0);
 })->with(['missing', 'mismatched']);
+
+it('rejects the configured guest before provider execution', function (): void {
+    config()->set('permission.users.guest', 'visitor');
+    $guest = User::factory()->create([
+        'name' => 'visitor',
+        'username' => 'visitor',
+        'email' => 'visitor@example.test',
+    ]);
+    $guest->givePermissionTo($this->permission);
+    Auth::login($guest);
+    $this->request->setUserResolver(static fn (): User => $guest);
+
+    expect(fn () => $this->service->retrieve(
+        $this->request,
+        new ApplicationContentQuery('core.users', 'visible record', 'en', 5),
+    ))->toThrow(ApplicationContentUnavailableException::class)
+        ->and($this->provider->calls)->toBe(0);
+});
+
+it('fails closed before provider execution when guest classification fails', function (): void {
+    config()->set('permission.users.guest', '');
+
+    expect(fn () => $this->service->retrieve(
+        $this->request,
+        new ApplicationContentQuery('core.users', 'visible record', 'en', 5),
+    ))->toThrow(ApplicationContentUnavailableException::class)
+        ->and($this->provider->calls)->toBe(0);
+});
 
 it('fails closed before provider execution for unknown source or permission denial', function (string $case): void {
     $query = new ApplicationContentQuery('core.users', 'visible record', 'en', 5);
