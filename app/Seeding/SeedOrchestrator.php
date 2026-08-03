@@ -56,6 +56,7 @@ final class SeedOrchestrator
         private readonly SeedLedger $ledger,
         private readonly SettingsCacheCoordinator $cache,
         private readonly DatabaseManager $connections,
+        private readonly SettingsCleaner $cleaner,
     ) {}
 
     /**
@@ -127,6 +128,15 @@ final class SeedOrchestrator
 
                 return 1;
             }
+        }
+
+        $report = $this->cleaner->clean();
+
+        if ($report->hardDeleted !== [] || $report->softDeleted !== []) {
+            Log::info('Seed cleanup removed orphaned settings', [
+                'hard_deleted' => $report->hardDeleted,
+                'soft_deleted' => $report->softDeleted,
+            ]);
         }
 
         $this->cache->flushAll();
