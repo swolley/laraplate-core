@@ -1001,6 +1001,139 @@ it('approve and disapprove run modification workflows', function (): void {
     expect($disapprove_result->data)->toBeInstanceOf(Model::class);
 });
 
+it('approves the modification on the target model connection', function (): void {
+    config()->set('database.connections.crud-approval-secondary', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+
+    $schema = Schema::connection('crud-approval-secondary');
+    $schema->create('crud_cov_approval_affinity', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('title')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+    $schema->create((new Modification)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modifiable_id')->nullable();
+        $table->string('modifiable_type')->nullable();
+        $table->unsignedBigInteger('modifier_id')->nullable();
+        $table->string('modifier_type')->nullable();
+        $table->boolean('active')->default(true);
+        $table->boolean('is_update')->default(true);
+        $table->unsignedInteger('approvers_required')->default(1);
+        $table->unsignedInteger('disapprovers_required')->default(1);
+        $table->string('md5');
+        $table->json('modifications');
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Approval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('approver_id');
+        $table->string('approver_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Disapproval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('disapprover_id');
+        $table->string('disapprover_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+
+    $model = (new class extends Model
+    {
+        use RequiresApproval;
+        use SoftDeletes;
+
+        protected $table = 'crud_cov_approval_affinity';
+
+        protected $guarded = [];
+
+        protected function requiresApprovalWhen($modifications): bool
+        {
+            return false;
+        }
+    })->setConnection('crud-approval-secondary');
+    $row = $model->newQuery()->create(['id' => 7101, 'title' => 'secondary target']);
+    $superadmin = crud_cov_login_superadmin();
+    $attributes = [
+        'id' => 7201,
+        'modifiable_id' => $row->getKey(),
+        'modifiable_type' => $model::class,
+        'modifier_id' => $superadmin->getKey(),
+        'modifier_type' => User::class,
+        'active' => true,
+        'is_update' => true,
+        'approvers_required' => 2,
+        'disapprovers_required' => 2,
+        'md5' => md5('affinity'),
+        'modifications' => json_encode(['title' => ['original' => 'secondary target', 'modified' => 'approved']]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+    $schema->getConnection()->table((new Modification)->getTable())->insert($attributes);
+    (new Modification)->getConnection()->table((new Modification)->getTable())->insert($attributes);
+
+    $request = Request::create('/approve', 'POST');
+    $request->setUserResolver(fn () => $superadmin);
+    $data = crud_cov_make_modify_data($row, $request, [
+        'id' => $row->getKey(),
+        'modification' => 7201,
+    ], $row->getKey());
+
+    (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->approve($data);
+
+    expect($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7201)->count())->toBe(1)
+        ->and(Modules\Core\Models\Approval::query()->where('modification_id', 7201)->count())->toBe(0)
+        ->and($schema->getConnection()->transactionLevel())->toBe(0);
+
+    $failing_model = (new class extends Model
+    {
+        use RequiresApproval;
+        use SoftDeletes;
+
+        protected $table = 'crud_cov_approval_affinity';
+
+        protected $guarded = [];
+
+        public function applyModificationChanges(Approval\Models\Modification $modification, bool $approved): void
+        {
+            throw new RuntimeException('forced approval failure');
+        }
+
+        protected function requiresApprovalWhen($modifications): bool
+        {
+            return false;
+        }
+    })->setConnection('crud-approval-secondary');
+    $failing_row = $failing_model->newQuery()->create(['id' => 7102, 'title' => 'rollback target']);
+    $rollback_attributes = $attributes;
+    $rollback_attributes['id'] = 7202;
+    $rollback_attributes['modifiable_id'] = $failing_row->getKey();
+    $rollback_attributes['modifiable_type'] = $failing_model::class;
+    $rollback_attributes['approvers_required'] = 1;
+    $schema->getConnection()->table((new Modification)->getTable())->insert($rollback_attributes);
+    $rollback_data = crud_cov_make_modify_data($failing_row, $request, [
+        'id' => $failing_row->getKey(),
+        'modification' => 7202,
+    ], $failing_row->getKey());
+
+    expect(fn () => (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->approve($rollback_data))
+        ->toThrow(RuntimeException::class, 'forced approval failure')
+        ->and($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7202)->count())->toBe(0)
+        ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7202)->value('active'))->toBe(1)
+        ->and($schema->getConnection()->transactionLevel())->toBe(0);
+});
+
 it('disapprove iterates active modifications when no modification id is passed', function (): void {
     if (! Schema::hasTable('crud_cov_approval')) {
         Schema::create('crud_cov_approval', function (Illuminate\Database\Schema\Blueprint $table): void {

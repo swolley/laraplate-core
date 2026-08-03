@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
@@ -38,19 +40,63 @@ it('builds core stats widget data', function (): void {
     $property = new ReflectionProperty(CoreStatsWidget::class, 'isLazy');
     $property->setAccessible(true);
 
-    if (config('database.default') === 'sqlite') {
-        expect($property->getDeclaringClass()->getName())->toBe(CoreStatsWidget::class)
-            ->and($property->getValue())->toBeTrue()
-            ->and(fn () => $method->invoke($widget))->toThrow(QueryException::class);
-
-        return;
-    }
-
     $stats = $method->invoke($widget);
 
     expect($stats)->toHaveCount(3)
         ->and($property->getDeclaringClass()->getName())->toBe(CoreStatsWidget::class)
-        ->and($property->getValue())->toBeTrue();
+        ->and($property->getValue())->toBeTrue()
+        ->and($stats[0]->getValue())->toBe(1)
+        ->and($stats[1]->getValue())->toBe('1 / 1')
+        ->and($stats[2]->getValue())->toBe('1 / 1');
+});
+
+it('builds core stats without joining models on different connections', function (): void {
+    config()->set('database.connections.core-license-stats', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+    config()->set('database.connections.core-user-stats', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+    config()->set('core.model_connections.' . License::class, 'core-license-stats');
+    config()->set('core.model_connections.' . App\Models\User::class, 'core-user-stats');
+
+    Schema::connection('core-license-stats')->create((new License)->getTable(), function (Blueprint $table): void {
+        $table->id();
+        $table->timestamp('valid_to')->nullable();
+        $table->boolean('is_deleted')->default(false);
+    });
+    Schema::connection('core-user-stats')->create((new User)->getTable(), function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('license_id')->nullable();
+        $table->boolean('is_deleted')->default(false);
+    });
+
+    $license_connection = Schema::connection('core-license-stats')->getConnection();
+    $user_connection = Schema::connection('core-user-stats')->getConnection();
+    $license_connection->table((new License)->getTable())->insert([
+        ['id' => 501, 'valid_to' => null],
+        ['id' => 502, 'valid_to' => now()->subDay()],
+    ]);
+    $user_connection->table((new User)->getTable())->insert([
+        ['id' => 601, 'license_id' => 501],
+        ['id' => 602, 'license_id' => null],
+    ]);
+    Cache::forget('filament.dashboard.core_stats');
+
+    $widget = new CoreStatsWidget();
+    $method = new ReflectionMethod(CoreStatsWidget::class, 'getStats');
+    $method->setAccessible(true);
+    $stats = $method->invoke($widget);
+
+    expect($stats[0]->getValue())->toBe(2)
+        ->and($stats[1]->getValue())->toBe('1 / 2')
+        ->and($stats[2]->getValue())->toBe('1 / 1');
 });
 
 it('returns horizon canView based on service provider availability', function (): void {

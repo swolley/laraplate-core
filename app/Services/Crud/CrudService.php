@@ -33,6 +33,8 @@ use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Approval;
+use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
@@ -751,49 +753,100 @@ class CrudService
 
         $user = Auth::user();
         throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+        $connection = $found_record->getConnection();
+        $modification_prototype = (new Modification())->setConnection($connection->getName());
 
-        if (isset($requestData->changes['modification'])) {
-            $modification = Modification::query()
-                ->where('modifiable_type', $model::class)
-                ->where('modifiable_id', $requestData->primaryKey)
-                ->whereKey($requestData->changes['modification'])
-                ->sole();
+        $connection->transaction(function () use ($requestData, $model, $found_record, $user, $operation, $modification_prototype): void {
+            if (isset($requestData->changes['modification'])) {
+                $modification = $modification_prototype->newQuery()
+                    ->where('modifiable_type', $model::class)
+                    ->where('modifiable_id', $requestData->primaryKey)
+                    ->whereKey($requestData->changes['modification'])
+                    ->sole();
 
-            $reason = $requestData->changes['reason'] ?? null;
-            $vote_reason = is_string($reason) ? $reason : null;
-
-            if ($operation === 'approve') {
-                $user->approve($modification, $vote_reason);
+                $reason = $requestData->changes['reason'] ?? null;
+                $vote_reason = is_string($reason) ? $reason : null;
+                $this->castApprovalVote($user, $modification, $operation, $vote_reason);
             } else {
-                $user->disapprove($modification, $vote_reason);
-            }
-        } else {
-            $modifications = Modification::query()
-                ->where('modifiable_type', $found_record::class)
-                ->where('modifiable_id', $found_record->getKey())
-                ->activeOnly()
-                ->oldest()
-                ->cursor();
+                $modifications = $modification_prototype->newQuery()
+                    ->where('modifiable_type', $found_record::class)
+                    ->where('modifiable_id', $found_record->getKey())
+                    ->activeOnly()
+                    ->oldest()
+                    ->cursor();
 
-            throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
+                throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
 
-            $reason = $requestData->changes['reason'] ?? null;
-            $vote_reason = is_string($reason) ? $reason : null;
+                $reason = $requestData->changes['reason'] ?? null;
+                $vote_reason = is_string($reason) ? $reason : null;
 
-            foreach ($modifications as $modification) {
-                if ($operation === 'approve') {
-                    $user->approve($modification, $vote_reason);
-                } else {
-                    $user->disapprove($modification, $vote_reason);
+                foreach ($modifications as $modification) {
+                    $this->castApprovalVote($user, $modification, $operation, $vote_reason);
                 }
             }
-        }
+        });
 
         $found_record->refresh();
 
         return new CrudResult(
             data: $found_record,
         );
+    }
+
+    /**
+     * Cast a vote using the modification owner's connection.
+     *
+     * @param  "approve"|"disapprove"  $operation
+     */
+    private function castApprovalVote(User $user, Modification $modification, string $operation, ?string $reason): void
+    {
+        $connection = $modification->getConnectionName();
+        $is_approval = $operation === 'approve';
+        $vote = $is_approval
+            ? (new Approval())->setConnection($connection)
+            : (new Disapproval())->setConnection($connection);
+        $opposite_vote = $is_approval
+            ? (new Disapproval())->setConnection($connection)
+            : (new Approval())->setConnection($connection);
+        $actor_id_column = $is_approval ? 'approver_id' : 'disapprover_id';
+        $actor_type_column = $is_approval ? 'approver_type' : 'disapprover_type';
+        $opposite_id_column = $is_approval ? 'disapprover_id' : 'approver_id';
+        $opposite_type_column = $is_approval ? 'disapprover_type' : 'approver_type';
+
+        $opposite_vote->newQuery()->where([
+            $opposite_id_column => $user->getKey(),
+            $opposite_type_column => $user::class,
+            'modification_id' => $modification->getKey(),
+        ])->delete();
+
+        $vote->newQuery()->firstOrCreate([
+            $actor_id_column => $user->getKey(),
+            $actor_type_column => $user::class,
+            'modification_id' => $modification->getKey(),
+            'reason' => $reason,
+        ]);
+
+        $modification->refresh();
+        $remaining = $is_approval
+            ? $modification->approversRemaining
+            : $modification->disapproversRemaining;
+
+        if ($remaining !== 0) {
+            return;
+        }
+
+        if ($modification->modifiable_id === null) {
+            throw_unless(is_string($modification->modifiable_type), LogicException::class, 'Modifiable type is required.');
+            $modifiable_type = $modification->modifiable_type;
+
+            /** @var Model $modifiable */
+            $modifiable = (new $modifiable_type())->setConnection($connection);
+        } else {
+            /** @var Model $modifiable */
+            $modifiable = $modification->modifiable;
+        }
+
+        $modifiable->applyModificationChanges($modification, $is_approval);
     }
 
     /**
@@ -818,7 +871,7 @@ class CrudService
         $model->getConnection()->transaction(function () use ($found_records, $affected_records, $operation, $requestData, $target_locked_state, &$found_count): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
-                $already_in_target_state = $this->recordIsLocked($found_record) === $target_locked_state;
+                $already_in_target_state = $target_locked_state === $this->recordIsLocked($found_record);
 
                 if ($requestData->request->has('id')) {
                     throw_if(

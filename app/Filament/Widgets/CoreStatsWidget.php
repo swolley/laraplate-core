@@ -7,9 +7,9 @@ namespace Modules\Core\Filament\Widgets;
 use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Enums\CoreTables;
+use LogicException;
 use Modules\Core\Models\License;
 use Override;
 
@@ -23,23 +23,29 @@ final class CoreStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $licenses_table = CoreTables::Licenses->value;
-        $users_table = CoreTables::Users->value;
+        $license = $this->configuredModel(new License());
+        $user = $this->configuredModel(new User());
+        $license_connection = $license->getConnection()->getName();
+        $user_connection = $user->getConnection()->getName();
+        $cache_key = sprintf(
+            'filament.dashboard.core_stats.%s.%s',
+            $license_connection,
+            $user_connection,
+        );
 
-        $data = Cache::remember('filament.dashboard.core_stats', 60, static function () use ($licenses_table, $users_table): array {
-            $licenses = (new License)->getConnection()->table($licenses_table)->select([
-                DB::raw('count(*) as total'),
-                DB::raw("coalesce(sum(case when {$licenses_table}.valid_to >= now() or {$licenses_table}.valid_to is null then 1 else 0 end), 0) as active"),
-                DB::raw("coalesce(sum(case when {$users_table}.id is not null then 1 else 0 end), 0) as occupied"),
-            ])
-                ->leftJoin($users_table, "{$licenses_table}.id", '=', "{$users_table}.license_id")
-                ->first();
-
+        $data = Cache::remember($cache_key, 60, static function () use ($license, $user): array {
             return [
-                'users' => User::query()->count(),
-                'total' => $licenses->total,
-                'active' => $licenses->active,
-                'occupied' => $licenses->occupied,
+                'users' => $user->newQuery()->count(),
+                'total' => $license->newQuery()->count(),
+                'active' => $license->newQuery()
+                    ->where(static fn ($query) => $query
+                        ->whereNull('valid_to')
+                        ->orWhere('valid_to', '>=', now()))
+                    ->count(),
+                'occupied' => $user->newQuery()
+                    ->whereNotNull('license_id')
+                    ->distinct()
+                    ->count('license_id'),
             ];
         });
 
@@ -57,5 +63,33 @@ final class CoreStatsWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-user-plus')
                 ->color('primary'),
         ];
+    }
+
+    /**
+     * Resolve dashboard model prototypes from trusted application configuration.
+     *
+     * @template TModel of Model
+     *
+     * @param  TModel  $model
+     * @return TModel
+     */
+    private function configuredModel(Model $model): Model
+    {
+        $connection = config('core.model_connections.' . $model::class);
+
+        if ($connection === null) {
+            return $model;
+        }
+
+        $connections = config('database.connections', []);
+
+        if (! is_string($connection)
+            || $connection === ''
+            || ! is_array($connections)
+            || ! array_key_exists($connection, $connections)) {
+            throw new LogicException('Core model connection is not configured.');
+        }
+
+        return $model->setConnection($connection);
     }
 }
