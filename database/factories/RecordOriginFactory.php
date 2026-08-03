@@ -25,7 +25,9 @@ final class RecordOriginFactory extends Factory
             'source_key' => fake()->slug(2),
             'source_label' => fake()->company(),
             'external_id' => (string) fake()->randomNumber(6),
+            'fingerprint' => fake()->sha256(),
             'url' => fake()->url(),
+            'source_updated_at' => fake()->dateTime(),
         ];
     }
 }
