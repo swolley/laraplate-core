@@ -37,6 +37,15 @@ use Throwable;
  */
 final class SeedOrchestrator
 {
+    /**
+     * Appended to every failure message (console and log) so the atomicity limit
+     * documented on this class also reaches whoever is reading a broken release,
+     * not only whoever reads the source.
+     */
+    private const string ROLLBACK_CAVEAT = 'Rollback only covers writes on the default database '
+        . 'connection. If this node writes to another connection, verify its state manually '
+        . 'before resuming.';
+
     /** @var list<SeedNode>|null */
     private ?array $nodes = null;
 
@@ -153,12 +162,13 @@ final class SeedOrchestrator
      */
     private function reportFailure(string $runId, string $seederClass, Throwable $throwable): void
     {
-        $message = "Seed node failed: {$seederClass}\n{$throwable->getMessage()}";
+        $message = "Seed node failed: {$seederClass}\n{$throwable->getMessage()}\n" . self::ROLLBACK_CAVEAT;
 
         Log::error('Seed node failed', [
             'run_id' => $runId,
             'node' => $seederClass,
             'exception' => $throwable,
+            'rollback_caveat' => self::ROLLBACK_CAVEAT,
         ]);
 
         if ($this->command instanceof Command) {

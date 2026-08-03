@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Console\Command;
+use Illuminate\Console\OutputStyle;
+use Illuminate\Support\Facades\Log;
 use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\SeedLedger;
 use Modules\Core\Seeding\SeedNode;
@@ -10,6 +12,8 @@ use Modules\Core\Seeding\SeedOrchestrator;
 use Modules\Core\Tests\Stubs\Seeding\CommandAwareStubSeeder;
 use Modules\Core\Tests\Stubs\Seeding\FailingStubSeeder;
 use Modules\Core\Tests\Stubs\Seeding\PassingStubSeeder;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 it('stops at the first failure and returns a non-zero exit code', function (): void {
     $orchestrator = app(SeedOrchestrator::class)->withNodes([
@@ -56,7 +60,7 @@ it('returns 0 and flushes the settings cache once when every node succeeds', fun
     expect($orchestrator->run())->toBe(0);
 });
 
-it('does not run nodes that depend on a failed node', function (): void {
+it('does not run any node after a failure, regardless of declared dependencies', function (): void {
     CommandAwareStubSeeder::$capturedCommand = null;
 
     $orchestrator = app(SeedOrchestrator::class)->withNodes([
@@ -81,4 +85,24 @@ it('propagates the invoking command to each resolved node', function (): void {
 
     expect($exit_code)->toBe(0)
         ->and(CommandAwareStubSeeder::$capturedCommand)->toBe($command);
+});
+
+it('includes the rollback-scope caveat in both the operator-facing message and the log context', function (): void {
+    Log::spy();
+
+    $output = new BufferedOutput();
+    $command = new Command();
+    $command->setOutput(new OutputStyle(new ArrayInput([]), $output));
+
+    app(SeedOrchestrator::class)
+        ->withNodes([new SeedNode(FailingStubSeeder::class, 'Core')])
+        ->withCommand($command)
+        ->run();
+
+    expect($output->fetch())->toContain('Rollback only covers writes on the default database connection');
+
+    Log::shouldHaveReceived('error')->once()->withArgs(
+        fn (string $message, array $context): bool => isset($context['rollback_caveat'])
+            && str_contains($context['rollback_caveat'], 'Rollback only covers writes on the default database connection'),
+    );
 });
