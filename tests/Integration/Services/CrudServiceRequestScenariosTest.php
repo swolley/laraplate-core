@@ -25,6 +25,7 @@ use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Models\Modification;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
@@ -1132,6 +1133,228 @@ it('approves the modification on the target model connection', function (): void
         ->and($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7202)->count())->toBe(0)
         ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7202)->value('active'))->toBe(1)
         ->and($schema->getConnection()->transactionLevel())->toBe(0);
+});
+
+it('does not cast an unauthorized approval vote on the target model connection', function (): void {
+    config()->set('database.connections.crud_approval_denied_secondary', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+
+    $schema = Schema::connection('crud_approval_denied_secondary');
+    $schema->create('crud_cov_approval_affinity_denied', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('title')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+    $schema->create((new Modification)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modifiable_id')->nullable();
+        $table->string('modifiable_type')->nullable();
+        $table->unsignedBigInteger('modifier_id')->nullable();
+        $table->string('modifier_type')->nullable();
+        $table->boolean('active')->default(true);
+        $table->boolean('is_update')->default(true);
+        $table->unsignedInteger('approvers_required')->default(1);
+        $table->unsignedInteger('disapprovers_required')->default(1);
+        $table->string('md5');
+        $table->json('modifications');
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Approval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('approver_id');
+        $table->string('approver_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Disapproval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('disapprover_id');
+        $table->string('disapprover_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+
+    $model = new class extends Model
+    {
+        use RequiresApproval;
+        use SoftDeletes;
+
+        protected $connection = 'crud_approval_denied_secondary';
+
+        protected $table = 'crud_cov_approval_affinity_denied';
+
+        protected $guarded = [];
+
+        protected function requiresApprovalWhen($modifications): bool
+        {
+            return false;
+        }
+    };
+    $row = $model->newQuery()->create(['id' => 7301, 'title' => 'approval sentinel']);
+    $user = User::factory()->create();
+    $endpoint_permission = Permission::query()->create([
+        'name' => 'crud_approval_denied_secondary.crud_cov_approval_affinity_denied.approve',
+        'guard_name' => 'web',
+    ]);
+    Permission::query()->create([
+        'name' => 'default.crud_cov_approval_affinity_denied.approve',
+        'guard_name' => 'web',
+    ]);
+    $user->givePermissionTo($endpoint_permission);
+    auth()->login($user);
+
+    $attributes = [
+        'id' => 7401,
+        'modifiable_id' => $row->getKey(),
+        'modifiable_type' => $model::class,
+        'modifier_id' => $user->getKey(),
+        'modifier_type' => User::class,
+        'active' => true,
+        'is_update' => true,
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('unauthorized approval'),
+        'modifications' => json_encode(['title' => ['original' => 'approval sentinel', 'modified' => 'must not apply']]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+    $schema->getConnection()->table((new Modification)->getTable())->insert($attributes);
+    (new Modification)->getConnection()->table((new Modification)->getTable())->insert($attributes);
+
+    $request = Request::create('/approve', 'POST');
+    $request->setUserResolver(fn () => $user);
+    $data = crud_cov_make_modify_data($row, $request, [
+        'id' => $row->getKey(),
+        'modification' => 7401,
+    ], $row->getKey());
+
+    (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->approve($data);
+
+    expect($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7401)->count())->toBe(0)
+        ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7401)->value('active'))->toBe(1)
+        ->and($row->fresh()?->title)->toBe('approval sentinel')
+        ->and(Modules\Core\Models\Approval::query()->where('modification_id', 7401)->count())->toBe(0)
+        ->and(Modification::query()->whereKey(7401)->value('active'))->toBe(1);
+});
+
+it('does not cast an unauthorized disapproval vote on the target model connection', function (): void {
+    config()->set('database.connections.crud_disapproval_denied_secondary', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+
+    $schema = Schema::connection('crud_disapproval_denied_secondary');
+    $schema->create('crud_cov_disapproval_affinity_denied', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('title')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+    $schema->create((new Modification)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modifiable_id')->nullable();
+        $table->string('modifiable_type')->nullable();
+        $table->unsignedBigInteger('modifier_id')->nullable();
+        $table->string('modifier_type')->nullable();
+        $table->boolean('active')->default(true);
+        $table->boolean('is_update')->default(true);
+        $table->unsignedInteger('approvers_required')->default(1);
+        $table->unsignedInteger('disapprovers_required')->default(1);
+        $table->string('md5');
+        $table->json('modifications');
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Approval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('approver_id');
+        $table->string('approver_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+    $schema->create((new Modules\Core\Models\Disapproval)->getTable(), function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('modification_id');
+        $table->unsignedBigInteger('disapprover_id');
+        $table->string('disapprover_type');
+        $table->text('reason')->nullable();
+        $table->json('meta')->nullable();
+        $table->timestamps();
+    });
+
+    $model = new class extends Model
+    {
+        use RequiresApproval;
+        use SoftDeletes;
+
+        protected $connection = 'crud_disapproval_denied_secondary';
+
+        protected $table = 'crud_cov_disapproval_affinity_denied';
+
+        protected $guarded = [];
+
+        protected function requiresApprovalWhen($modifications): bool
+        {
+            return false;
+        }
+    };
+    $row = $model->newQuery()->create(['id' => 7302, 'title' => 'disapproval sentinel']);
+    $user = User::factory()->create();
+    $endpoint_permission = Permission::query()->create([
+        'name' => 'crud_disapproval_denied_secondary.crud_cov_disapproval_affinity_denied.approve',
+        'guard_name' => 'web',
+    ]);
+    Permission::query()->create([
+        'name' => 'default.crud_cov_disapproval_affinity_denied.disapprove',
+        'guard_name' => 'web',
+    ]);
+    $user->givePermissionTo($endpoint_permission);
+    auth()->login($user);
+
+    $attributes = [
+        'id' => 7402,
+        'modifiable_id' => $row->getKey(),
+        'modifiable_type' => $model::class,
+        'modifier_id' => $user->getKey(),
+        'modifier_type' => User::class,
+        'active' => true,
+        'is_update' => true,
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('unauthorized disapproval'),
+        'modifications' => json_encode(['title' => ['original' => 'disapproval sentinel', 'modified' => 'must not apply']]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+    $schema->getConnection()->table((new Modification)->getTable())->insert($attributes);
+    (new Modification)->getConnection()->table((new Modification)->getTable())->insert($attributes);
+
+    $request = Request::create('/disapprove', 'POST');
+    $request->setUserResolver(fn () => $user);
+    $data = crud_cov_make_modify_data($row, $request, [
+        'id' => $row->getKey(),
+        'modification' => 7402,
+    ], $row->getKey());
+
+    (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->disapprove($data);
+
+    expect($schema->getConnection()->table((new Modules\Core\Models\Disapproval)->getTable())->where('modification_id', 7402)->count())->toBe(0)
+        ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7402)->value('active'))->toBe(1)
+        ->and($row->fresh()?->title)->toBe('disapproval sentinel')
+        ->and(Modules\Core\Models\Disapproval::query()->where('modification_id', 7402)->count())->toBe(0)
+        ->and(Modification::query()->whereKey(7402)->value('active'))->toBe(1);
 });
 
 it('disapprove iterates active modifications when no modification id is passed', function (): void {

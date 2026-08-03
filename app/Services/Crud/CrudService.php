@@ -766,7 +766,7 @@ class CrudService
 
                 $reason = $requestData->changes['reason'] ?? null;
                 $vote_reason = is_string($reason) ? $reason : null;
-                $this->castApprovalVote($user, $modification, $operation, $vote_reason);
+                $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
             } else {
                 $modifications = $modification_prototype->newQuery()
                     ->where('modifiable_type', $found_record::class)
@@ -781,7 +781,7 @@ class CrudService
                 $vote_reason = is_string($reason) ? $reason : null;
 
                 foreach ($modifications as $modification) {
-                    $this->castApprovalVote($user, $modification, $operation, $vote_reason);
+                    $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
                 }
             }
         });
@@ -798,10 +798,16 @@ class CrudService
      *
      * @param  "approve"|"disapprove"  $operation
      */
-    private function castApprovalVote(User $user, Modification $modification, string $operation, ?string $reason): void
+    private function castApprovalVote(User $user, Modification $modification, Model $modifiable, string $operation, ?string $reason): void
     {
         $connection = $modification->getConnectionName();
         $is_approval = $operation === 'approve';
+        $modification->setRelation('modifiable', $modifiable);
+
+        if (! $user->isAuthorizedToCastApprovalVote($modification, $is_approval)) {
+            return;
+        }
+
         $vote = $is_approval
             ? (new Approval())->setConnection($connection)
             : (new Disapproval())->setConnection($connection);

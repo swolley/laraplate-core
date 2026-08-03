@@ -33,10 +33,10 @@ use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\HasVersions;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -48,6 +48,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $name
  * @property string $email
  * @property BelongsToMany $roles
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
@@ -55,6 +56,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends BaseUser implements FilamentUser, MustVerifyEmail
 {
     use ApprovesChanges;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory;
     use HasLocks;
@@ -137,6 +139,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function guardName(): array
     {
         $guards = config('auth.guards', []);
+
         if (! is_array($guards)) {
             $guards = [];
         }
@@ -358,6 +361,16 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     public function disapprovals(): MorphMany
     {
         return $this->morphMany(Disapproval::class, 'disapprover');
+    }
+
+    /**
+     * Run the package authorization hook before a connection-scoped vote is cast.
+     */
+    public function isAuthorizedToCastApprovalVote(Modification $modification, bool $approval): bool
+    {
+        return $approval
+            ? $this->authorizedToApprove($modification)
+            : $this->authorizedToDisapprove($modification);
     }
 
     protected static function newFactory(): UserFactory
