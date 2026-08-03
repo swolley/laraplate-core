@@ -29,6 +29,7 @@ use Override;
  * @property \Illuminate\Support\Carbon|null $finished_at
  * @property string|null $error
  * @mixin \Eloquent
+ * @mixin IdeHelperSeedRun
  */
 final class SeedRun extends Model
 {
