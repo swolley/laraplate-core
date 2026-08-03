@@ -73,7 +73,7 @@ final class RecordOriginRegistry
         }
 
         if ($identity->sourceUpdatedAt !== null) {
-            $values['source_updated_at'] = $identity->sourceUpdatedAt;
+            $values['source_updated_at'] = $identity->sourceUpdatedAt->utc();
         }
 
         $this->connectionFor($referable)

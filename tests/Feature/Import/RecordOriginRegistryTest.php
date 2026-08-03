@@ -78,7 +78,7 @@ it('classifies missing unchanged and changed source records', function (): void 
 it('registers import evidence and resolves the local referable id', function (): void {
     $user = User::factory()->perpetual()->create();
     $registry = app(RecordOriginRegistry::class);
-    $source_updated_at = CarbonImmutable::parse('2024-09-21T16:40:53+00:00');
+    $source_updated_at = CarbonImmutable::parse('2024-09-21T16:40:53+01:00');
     $fingerprint = hash('sha256', 'normalized payload');
     $identity = new ExternalRecordIdentity(
         'legacy_symfony:nebula',
