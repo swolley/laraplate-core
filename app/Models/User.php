@@ -454,7 +454,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             $table = (new $mod->modifiable_type())->getTable();
         }
 
-        $connection = $this->getConnectionName() ?? 'default';
+        $connection = $mod->modifiable?->getConnection()->getName()
+            ?? $mod->getConnection()->getName();
 
         return "{$connection}.{$table}.{$action}";
     }

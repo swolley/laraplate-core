@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
@@ -85,9 +86,9 @@ it('builds core stats without joining models on different connections', function
     ]);
     $user_connection->table((new User)->getTable())->insert([
         ['id' => 601, 'license_id' => 501],
-        ['id' => 602, 'license_id' => null],
+        ['id' => 602, 'license_id' => 999],
     ]);
-    Cache::forget('filament.dashboard.core_stats');
+    Cache::flush();
 
     $widget = new CoreStatsWidget();
     $method = new ReflectionMethod(CoreStatsWidget::class, 'getStats');
@@ -97,6 +98,108 @@ it('builds core stats without joining models on different connections', function
     expect($stats[0]->getValue())->toBe(2)
         ->and($stats[1]->getValue())->toBe('1 / 2')
         ->and($stats[2]->getValue())->toBe('1 / 1');
+});
+
+it('isolates cached core stats when a connection name points to another database', function (): void {
+    $first_database = tempnam(sys_get_temp_dir(), 'core-stats-first-');
+    $second_database = tempnam(sys_get_temp_dir(), 'core-stats-second-');
+
+    expect($first_database)->toBeString()
+        ->and($second_database)->toBeString();
+
+    $connection_name = 'core-cache-identity';
+    $connection_config = [
+        'driver' => 'sqlite',
+        'database' => $first_database,
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ];
+    config()->set("database.connections.{$connection_name}", $connection_config);
+    config()->set('core.model_connections.' . License::class, $connection_name);
+    config()->set('core.model_connections.' . App\Models\User::class, $connection_name);
+    Cache::flush();
+
+    $read_stats = static function (): array {
+        $widget = new CoreStatsWidget();
+        $method = new ReflectionMethod(CoreStatsWidget::class, 'getStats');
+        $method->setAccessible(true);
+
+        return $method->invoke($widget);
+    };
+    $create_tables = static function () use ($connection_name): void {
+        Schema::connection($connection_name)->create((new License)->getTable(), function (Blueprint $table): void {
+            $table->id();
+            $table->timestamp('valid_to')->nullable();
+            $table->boolean('is_deleted')->default(false);
+        });
+        Schema::connection($connection_name)->create((new User)->getTable(), function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('license_id')->nullable();
+            $table->boolean('is_deleted')->default(false);
+        });
+    };
+
+    try {
+        $create_tables();
+        DB::connection($connection_name)->table((new License)->getTable())->insert([
+            'id' => 801,
+            'valid_to' => null,
+        ]);
+        DB::connection($connection_name)->table((new User)->getTable())->insert([
+            'id' => 901,
+            'license_id' => 801,
+        ]);
+
+        expect($read_stats()[0]->getValue())->toBe(1);
+
+        DB::purge($connection_name);
+        $connection_config['database'] = $second_database;
+        config()->set("database.connections.{$connection_name}", $connection_config);
+        $create_tables();
+        DB::connection($connection_name)->table((new License)->getTable())->insert([
+            ['id' => 802, 'valid_to' => null],
+            ['id' => 803, 'valid_to' => null],
+        ]);
+        DB::connection($connection_name)->table((new User)->getTable())->insert([
+            ['id' => 902, 'license_id' => 802],
+            ['id' => 903, 'license_id' => 803],
+        ]);
+
+        expect($read_stats()[0]->getValue())->toBe(2);
+    } finally {
+        DB::purge($connection_name);
+        @unlink($first_database);
+        @unlink($second_database);
+    }
+});
+
+it('includes Oracle routing attributes in the core stats database identity', function (): void {
+    $connection_name = 'core-cache-oracle-identity';
+    $connection_config = [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'tns' => 'PRIMARY_TNS',
+        'service_name' => 'PRIMARY_SERVICE',
+        'prefix_schema' => 'PRIMARY_SCHEMA',
+        'edition' => 'PRIMARY_EDITION',
+        'username' => 'primary_user',
+    ];
+    config()->set("database.connections.{$connection_name}", $connection_config);
+
+    $widget = new CoreStatsWidget();
+    $method = new ReflectionMethod(CoreStatsWidget::class, 'modelDatabaseIdentity');
+    $method->setAccessible(true);
+    $first_identity = $method->invoke($widget, (new License())->setConnection($connection_name));
+
+    DB::purge($connection_name);
+    $connection_config['prefix_schema'] = 'SECONDARY_SCHEMA';
+    $connection_config['edition'] = 'SECONDARY_EDITION';
+    $connection_config['username'] = 'secondary_user';
+    config()->set("database.connections.{$connection_name}", $connection_config);
+    $second_identity = $method->invoke($widget, (new License())->setConnection($connection_name));
+
+    expect($second_identity)->not->toBe($first_identity);
 });
 
 it('returns horizon canView based on service provider availability', function (): void {

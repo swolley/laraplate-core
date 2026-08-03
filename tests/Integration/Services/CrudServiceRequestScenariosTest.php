@@ -1135,7 +1135,7 @@ it('approves the modification on the target model connection', function (): void
         ->and($schema->getConnection()->transactionLevel())->toBe(0);
 });
 
-it('does not cast an unauthorized approval vote on the target model connection', function (): void {
+it('keeps one owner-scoped vote per actor while its reason and direction change', function (): void {
     config()->set('database.connections.crud_approval_denied_secondary', [
         'driver' => 'sqlite',
         'database' => ':memory:',
@@ -1205,10 +1205,6 @@ it('does not cast an unauthorized approval vote on the target model connection',
         'name' => 'crud_approval_denied_secondary.crud_cov_approval_affinity_denied.approve',
         'guard_name' => 'web',
     ]);
-    Permission::query()->create([
-        'name' => 'default.crud_cov_approval_affinity_denied.approve',
-        'guard_name' => 'web',
-    ]);
     $user->givePermissionTo($endpoint_permission);
     auth()->login($user);
 
@@ -1220,8 +1216,8 @@ it('does not cast an unauthorized approval vote on the target model connection',
         'modifier_type' => User::class,
         'active' => true,
         'is_update' => true,
-        'approvers_required' => 1,
-        'disapprovers_required' => 1,
+        'approvers_required' => 2,
+        'disapprovers_required' => 2,
         'md5' => md5('unauthorized approval'),
         'modifications' => json_encode(['title' => ['original' => 'approval sentinel', 'modified' => 'must not apply']]),
         'created_at' => now(),
@@ -1235,15 +1231,45 @@ it('does not cast an unauthorized approval vote on the target model connection',
     $data = crud_cov_make_modify_data($row, $request, [
         'id' => $row->getKey(),
         'modification' => 7401,
+        'reason' => 'initial reason',
     ], $row->getKey());
 
-    (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->approve($data);
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+    $service->approve($data);
 
-    expect($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7401)->count())->toBe(0)
+    crud_cov_set($data, 'changes', [
+        'id' => $row->getKey(),
+        'modification' => 7401,
+        'reason' => 'updated reason',
+    ]);
+    $service->approve($data);
+
+    expect($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7401)->count())->toBe(1)
+        ->and($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7401)->value('reason'))->toBe('updated reason')
         ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7401)->value('active'))->toBe(1)
         ->and($row->fresh()?->title)->toBe('approval sentinel')
         ->and(Modules\Core\Models\Approval::query()->where('modification_id', 7401)->count())->toBe(0)
         ->and(Modification::query()->whereKey(7401)->value('active'))->toBe(1);
+
+    $disapprove_permission = Permission::query()->create([
+        'name' => 'crud_approval_denied_secondary.crud_cov_approval_affinity_denied.disapprove',
+        'guard_name' => 'web',
+    ]);
+    $user->givePermissionTo($disapprove_permission);
+    $disapprove_request = Request::create('/disapprove', 'POST');
+    $disapprove_request->setUserResolver(fn () => $user);
+    $disapprove_data = crud_cov_make_modify_data($row, $disapprove_request, [
+        'id' => $row->getKey(),
+        'modification' => 7401,
+        'reason' => 'changed direction',
+    ], $row->getKey());
+
+    $service->disapprove($disapprove_data);
+
+    expect($schema->getConnection()->table((new Modules\Core\Models\Approval)->getTable())->where('modification_id', 7401)->count())->toBe(0)
+        ->and($schema->getConnection()->table((new Modules\Core\Models\Disapproval)->getTable())->where('modification_id', 7401)->count())->toBe(1)
+        ->and($schema->getConnection()->table((new Modules\Core\Models\Disapproval)->getTable())->where('modification_id', 7401)->value('reason'))->toBe('changed direction')
+        ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7401)->value('active'))->toBe(1);
 });
 
 it('does not cast an unauthorized disapproval vote on the target model connection', function (): void {

@@ -6,6 +6,14 @@ return [
     'name' => 'Core',
 
     /**
+     * Trusted connection overrides for Core models that may be stored outside
+     * the application's default database.
+     *
+     * @var array<class-string<Illuminate\Database\Eloquent\Model>, string>
+     */
+    'model_connections' => [],
+
+    /**
      * optimistic locking table column.
      */
     'locking' => [

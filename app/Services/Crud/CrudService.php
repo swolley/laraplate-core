@@ -762,6 +762,7 @@ class CrudService
                     ->where('modifiable_type', $model::class)
                     ->where('modifiable_id', $requestData->primaryKey)
                     ->whereKey($requestData->changes['modification'])
+                    ->lockForUpdate()
                     ->sole();
 
                 $reason = $requestData->changes['reason'] ?? null;
@@ -773,6 +774,7 @@ class CrudService
                     ->where('modifiable_id', $found_record->getKey())
                     ->activeOnly()
                     ->oldest()
+                    ->lockForUpdate()
                     ->cursor();
 
                 throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
@@ -825,10 +827,11 @@ class CrudService
             'modification_id' => $modification->getKey(),
         ])->delete();
 
-        $vote->newQuery()->firstOrCreate([
+        $vote->newQuery()->updateOrCreate([
             $actor_id_column => $user->getKey(),
             $actor_type_column => $user::class,
             'modification_id' => $modification->getKey(),
+        ], [
             'reason' => $reason,
         ]);
 

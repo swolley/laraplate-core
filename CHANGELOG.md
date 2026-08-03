@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(core)* Resolve approval permissions and votes on the modifiable owner's connection
+- *(core)* Deduplicate historical approval votes and enforce one vote per actor
+- *(core)* Count only existing licenses in cross-database dashboard occupancy stats
 - *(core)* Make the no-force-delete test actually reachable by reconciliation
 
 ### ⚡ Performance

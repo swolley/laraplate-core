@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
 use Modules\Core\Models\License;
@@ -25,15 +26,17 @@ final class CoreStatsWidget extends BaseWidget
     {
         $license = $this->configuredModel(new License());
         $user = $this->configuredModel(new User());
-        $license_connection = $license->getConnection()->getName();
-        $user_connection = $user->getConnection()->getName();
-        $cache_key = sprintf(
-            'filament.dashboard.core_stats.%s.%s',
-            $license_connection,
-            $user_connection,
-        );
+        $cache_key = 'filament.dashboard.core_stats.' . hash('sha256', serialize([
+            $this->modelDatabaseIdentity($license),
+            $this->modelDatabaseIdentity($user),
+        ]));
 
         $data = Cache::remember($cache_key, 60, static function () use ($license, $user): array {
+            $occupied_license_ids = $user->newQuery()
+                ->whereNotNull('license_id')
+                ->distinct()
+                ->pluck('license_id');
+
             return [
                 'users' => $user->newQuery()->count(),
                 'total' => $license->newQuery()->count(),
@@ -42,10 +45,9 @@ final class CoreStatsWidget extends BaseWidget
                         ->whereNull('valid_to')
                         ->orWhere('valid_to', '>=', now()))
                     ->count(),
-                'occupied' => $user->newQuery()
-                    ->whereNotNull('license_id')
-                    ->distinct()
-                    ->count('license_id'),
+                'occupied' => $license->newQuery()
+                    ->whereKey($occupied_license_ids)
+                    ->count(),
             ];
         });
 
@@ -91,5 +93,35 @@ final class CoreStatsWidget extends BaseWidget
         }
 
         return $model->setConnection($connection);
+    }
+
+    /**
+     * @return array{model: class-string<Model>, table: string, connection: string, config: array<string, mixed>}
+     */
+    private function modelDatabaseIdentity(Model $model): array
+    {
+        $connection = $model->getConnection();
+
+        return [
+            'model' => $model::class,
+            'table' => $model->getTable(),
+            'connection' => $connection->getName(),
+            'config' => Arr::only($connection->getConfig(), [
+                'driver',
+                'url',
+                'host',
+                'port',
+                'database',
+                'tns',
+                'service_name',
+                'prefix_schema',
+                'edition',
+                'username',
+                'unix_socket',
+                'prefix',
+                'search_path',
+                'schema',
+            ]),
+        ];
     }
 }
