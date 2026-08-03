@@ -365,6 +365,8 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 continue;
             }
 
+            $rows = array_values(array_column($rows, null, 'name'));
+
             $outcome = app(SeedReconciler::class)->reconcile(
                 SeedDefinition::for(Setting::class)
                     ->identity(['name'])

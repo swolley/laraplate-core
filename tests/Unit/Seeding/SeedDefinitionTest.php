@@ -45,6 +45,15 @@ it('rejects a row with a null identity value', function (): void {
         ->rows([['name' => null, 'value' => 'x']]);
 })->throws(InvalidArgumentException::class, 'name');
 
+it('rejects rows with duplicate identity values', function (): void {
+    SeedDefinition::for(Setting::class)
+        ->identity(['name'])
+        ->rows([
+            ['name' => 'duplicate', 'value' => 'first'],
+            ['name' => 'duplicate', 'value' => 'second'],
+        ]);
+})->throws(InvalidArgumentException::class, "duplicate identity value 'duplicate'");
+
 it('normalizes empty strings to null, replacing the SettingObserver saving hook', function (): void {
     $definition = SeedDefinition::for(Setting::class)
         ->identity(['name'])

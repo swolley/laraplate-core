@@ -85,12 +85,13 @@ final class SeedDefinition
      * do not fire Eloquent events, and this is a rule about the data anyway.
      *
      * @param  list<array<string,mixed>>  $rows
-     * @throws InvalidArgumentException If a row is missing or has a null/empty identity value.
+     * @throws InvalidArgumentException If a row has a missing, null, empty, or duplicate identity value.
      */
     public function rows(array $rows): self
     {
         $column = $this->identityColumn();
         $normalized = [];
+        $identity_indices = [];
 
         foreach ($rows as $index => $row) {
             if (! array_key_exists($column, $row)) {
@@ -109,6 +110,18 @@ final class SeedDefinition
                     "Row {$index} is missing a value for the identity column '{$column}'.",
                 );
             }
+
+            $identity_value = (string) $normalized_row[$column];
+
+            if (array_key_exists($identity_value, $identity_indices)) {
+                $first_index = $identity_indices[$identity_value];
+
+                throw new InvalidArgumentException(
+                    "Rows {$first_index} and {$index} share duplicate identity value '{$identity_value}' for column '{$column}'.",
+                );
+            }
+
+            $identity_indices[$identity_value] = $index;
 
             $normalized[] = $normalized_row;
         }
