@@ -53,11 +53,24 @@ final class SeedLedger
             ->all();
     }
 
+    /**
+     * Resolve the run to resume, if any.
+     *
+     * Must resolve against the newest run overall, not the newest *failed*
+     * run: a failure that was never resumed would otherwise stay the answer
+     * forever, even after later runs succeeded — a deploy script that
+     * habitually passes --resume would then skip every node that already
+     * succeeded in one of those later runs while exiting 0, silently not
+     * applying the alignment it was invoked to apply.
+     */
     public function lastFailedRunId(): ?string
     {
-        return SeedRun::query()
-            ->where('status', 'failed')
-            ->latest('id')
-            ->value('run_id');
+        $latest = SeedRun::query()->latest('id')->first(['run_id', 'status']);
+
+        if ($latest === null || $latest->getAttribute('status') !== 'failed') {
+            return null;
+        }
+
+        return $latest->getAttribute('run_id');
     }
 }

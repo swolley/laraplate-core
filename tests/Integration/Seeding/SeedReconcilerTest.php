@@ -70,6 +70,27 @@ it('realigns structural fields but never the operator value', function (): void 
         ->and($setting->seeded_value)->toBe(10);
 });
 
+it('does not move the baseline when a realignment also changes the declared default', function (): void {
+    // The other realign test declares the same value on both runs, so it
+    // cannot catch a regression that widens the upsert $update list to
+    // include seeded_value: 10 written back over 10 is not observable. Here
+    // the declared default moves from 10 to 20 between runs, so if
+    // seeded_value were ever realigned it would show up as 20.
+    app(SeedReconciler::class)->reconcile(
+        settingsDefinition([settingRow('recon_default_shift', 10)]),
+    );
+
+    $outcome = app(SeedReconciler::class)->reconcile(
+        settingsDefinition([settingRow('recon_default_shift', 20, 'Updated description')]),
+    );
+
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'recon_default_shift')->sole();
+
+    expect($outcome->realigned)->toBe(['recon_default_shift'])
+        ->and($setting->seeded_value)->toBe(10)
+        ->and($setting->value)->toBe(10);
+});
+
 it('reports rows as unchanged when nothing structural differs', function (): void {
     $definition = fn (): SeedDefinition => settingsDefinition([settingRow('recon_stable', 5)]);
 
@@ -99,6 +120,31 @@ it('restores a soft-deleted row instead of inserting a duplicate', function (): 
         ->and($count)->toBe(1)
         ->and(Setting::query()->withoutGlobalScopes()->where('name', 'recon_restore')->exists())
         ->toBeTrue();
+});
+
+it('corrects a stale module stamp on a row that already has a baseline', function (): void {
+    // The backfill trigger used to be gated solely on seeded_value IS NULL,
+    // so a row's module stamp froze forever after its first reconcile. A
+    // model reclassified from one owning module to another (e.g. Core to
+    // MES) must still have its ownership corrected on a later run.
+    app(SeedReconciler::class)->reconcile(
+        settingsDefinition([settingRow('recon_restamp', 10)]),
+    );
+
+    app(SeedReconciler::class)->reconcile(
+        SeedDefinition::for(Setting::class)
+            ->identity(['name'])
+            ->structural(['type', 'group_name', 'description'])
+            ->initial(['value'])
+            ->ownedBy('MES')
+            ->rows([settingRow('recon_restamp', 10)]),
+    );
+
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'recon_restamp')->sole();
+
+    expect($setting->module)->toBe('MES')
+        ->and($setting->seeded_value)->toBe(10)
+        ->and($setting->value)->toBe(10);
 });
 
 it('backfills the baseline for rows created before the reconciler existed without moving the operator value', function (): void {

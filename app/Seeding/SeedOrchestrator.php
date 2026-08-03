@@ -102,6 +102,10 @@ final class SeedOrchestrator
             ? []
             : array_flip($this->ledger->completedNodes($resumeRunId));
 
+        if ($resumeRunId !== null) {
+            $this->announceResume($run_id, count($already_done));
+        }
+
         foreach ($nodes as $node) {
             if (isset($already_done[$node->seederClass])) {
                 continue;
@@ -189,6 +193,27 @@ final class SeedOrchestrator
 
         if (App::runningInConsole()) {
             fwrite(STDERR, $message . PHP_EOL);
+        }
+    }
+
+    /**
+     * Make a resume visible to the operator instead of silent: --resume
+     * changes which nodes actually run, so the run id being resumed and how
+     * many nodes are being skipped as already-completed must reach the
+     * console output, not only the ledger.
+     */
+    private function announceResume(string $runId, int $skippedCount): void
+    {
+        $message = "Resuming run {$runId}: skipping {$skippedCount} already-completed node(s).";
+
+        if ($this->command instanceof Command) {
+            $this->command->line($message);
+
+            return;
+        }
+
+        if (App::runningInConsole()) {
+            fwrite(STDOUT, $message . PHP_EOL);
         }
     }
 }

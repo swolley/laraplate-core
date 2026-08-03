@@ -51,7 +51,15 @@ final class SettingsCleaner
                 continue;
             }
 
-            $setting->delete();
+            // Bypass the model path: Setting::delete() routes through
+            // Modules\Core\SoftDeletes\SoftDeletes::performDeleteOnModel(),
+            // which downgrades to forceDelete() when the operator-editable
+            // soft_deletes_core_settings row is false. That row lives in the
+            // very table being cleaned, so the one branch meant to preserve
+            // operator customizations would destroy them depending on data in
+            // this table. Writing deleted_at directly through the
+            // soft-deleting builder macro is unconditional.
+            Setting::query()->withoutGlobalScopes()->whereKey($setting->getKey())->delete();
             $soft_deleted[] = (string) $setting->getAttribute('name');
         }
 

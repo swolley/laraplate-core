@@ -7,6 +7,8 @@ use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\ModuleState;
 use Modules\Core\Seeding\ModuleStateResolver;
 use Modules\Core\Seeding\SettingsCleaner;
+use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Tests\Stubs\Seeding\FixedModuleStateResolver;
 
 /**
@@ -66,8 +68,10 @@ it('force deletes settings of a module absent from disk', function (): void {
         ->toBeNull();
 });
 
-it('never touches a setting the seeder did not write', function (): void {
-    $setting = seededSetting('clean_hand_made', 42, null, null);
+it('never touches a setting missing its seeded baseline', function (): void {
+    // module is set but seeded_value is null: only the whereNotNull('seeded_value')
+    // clause excludes this row. Pins that clause independently of whereNotNull('module').
+    $setting = seededSetting('clean_no_baseline', 42, null, 'GHOST');
     resolverReturning(ModuleState::Absent);
 
     app(SettingsCleaner::class)->clean();
@@ -76,6 +80,50 @@ it('never touches a setting the seeder did not write', function (): void {
 
     expect($fresh)->not->toBeNull()
         ->and($fresh->trashed())->toBeFalse();
+});
+
+it('never touches a setting missing its module stamp', function (): void {
+    // seeded_value is set but module is null: only the whereNotNull('module')
+    // clause excludes this row. Pins that clause independently of whereNotNull('seeded_value').
+    $setting = seededSetting('clean_no_module', 42, 5, null);
+    resolverReturning(ModuleState::Absent);
+
+    app(SettingsCleaner::class)->clean();
+
+    $fresh = Setting::query()->withoutGlobalScopes()->withTrashed()->find($setting->getKey());
+
+    expect($fresh)->not->toBeNull()
+        ->and($fresh->trashed())->toBeFalse();
+});
+
+it('soft deletes unconditionally even when soft_deletes_core_settings is disabled', function (): void {
+    // Setting::delete() routes through Modules\Core\SoftDeletes\SoftDeletes::
+    // performDeleteOnModel(), which downgrades to a forceDelete() whenever
+    // soft_deletes_core_settings is false — a row in the very table being
+    // cleaned. Prove the cleaner's soft-delete branch does not depend on it.
+    $flag_name = PerModelSettingResolver::nameFor('soft_deletes', (new Setting)->getTable());
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => $flag_name,
+        'value' => false,
+        'encrypted' => false,
+        'type' => SettingTypeEnum::Boolean,
+        'group_name' => 'soft_deletes',
+        'description' => 'Probe',
+    ]);
+
+    app(SettingsCacheCoordinator::class)->flushAll();
+
+    $setting = seededSetting('clean_soft_bypass', 99, 5, 'MES');
+    resolverReturning(ModuleState::Disabled);
+
+    app(SettingsCleaner::class)->clean();
+
+    $fresh = Setting::query()->withoutGlobalScopes()->withTrashed()->find($setting->getKey());
+
+    expect($fresh)->not->toBeNull()
+        ->and($fresh->trashed())->toBeTrue()
+        ->and($fresh->value)->toBe(99);
 });
 
 it('leaves settings of enabled modules alone', function (): void {

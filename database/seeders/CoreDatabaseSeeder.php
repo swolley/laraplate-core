@@ -296,7 +296,7 @@ final class CoreDatabaseSeeder extends Seeder
     {
         $this->logOperation(Setting::class);
 
-        $default_settings = [
+        $core_settings = [
             [
                 'name' => 'default_language',
                 'value' => config('app.locale'),
@@ -326,7 +326,7 @@ final class CoreDatabaseSeeder extends Seeder
             ],
         ];
 
-        array_push($default_settings, ...self::runtimeSettingDefinitions());
+        array_push($core_settings, ...self::runtimeSettingDefinitions());
 
         $all_model_classes = models();
         $capabilities = app(ModelCapabilityScanner::class)->scan();
@@ -339,22 +339,64 @@ final class CoreDatabaseSeeder extends Seeder
 
         $default_approval_threshold = (int) config('core.notifications.approvals.default_threshold_hours', 8);
 
+        // Group derived settings by the module that actually owns the model
+        // they describe, not by the module running this seeder: a MES model's
+        // version_strategy_* row must be reconciled with module = 'MES' so
+        // SettingsCleaner can ever classify it Disabled/Absent and remove it.
+        /** @var array<string, list<array<string,mixed>>> $settings_by_module */
+        $settings_by_module = ['Core' => $core_settings];
+
         foreach ($capabilities as $capability) {
-            $this->pushCapabilitySettings($default_settings, $capability, $default_approval_threshold);
+            $module = $this->moduleForModel($capability->modelClass);
+            $settings_by_module[$module] ??= [];
+            $this->pushCapabilitySettings($settings_by_module[$module], $capability, $default_approval_threshold);
         }
 
-        $outcome = app(SeedReconciler::class)->reconcile(
-            SeedDefinition::for(Setting::class)
-                ->identity(['name'])
-                ->structural(['type', 'group_name', 'description', 'choices'])
-                ->initial(['value'])
-                ->ownedBy('Core')
-                ->rows($default_settings),
-        );
+        $created = 0;
+        $realigned = 0;
+        $unchanged = 0;
 
-        $this->command->line('    - created ' . count($outcome->created) . ', '
-            . 'realigned ' . count($outcome->realigned) . ', '
-            . "unchanged {$outcome->unchanged}");
+        foreach ($settings_by_module as $module => $rows) {
+            if ($rows === []) {
+                continue;
+            }
+
+            $outcome = app(SeedReconciler::class)->reconcile(
+                SeedDefinition::for(Setting::class)
+                    ->identity(['name'])
+                    ->structural(['type', 'group_name', 'description', 'choices'])
+                    ->initial(['value'])
+                    ->ownedBy($module)
+                    ->rows($rows),
+            );
+
+            $created += count($outcome->created);
+            $realigned += count($outcome->realigned);
+            $unchanged += $outcome->unchanged;
+        }
+
+        $this->command->line("    - created {$created}, realigned {$realigned}, unchanged {$unchanged}");
+    }
+
+    /**
+     * Resolve the module that owns a model class, so its derived settings are
+     * stamped with that module rather than with the module running this seeder.
+     *
+     * `Modules\{Name}\Models\...` owns `{Name}`; everything else (notably
+     * `App\Models\...`) is treated as Core-owned.
+     */
+    private function moduleForModel(string $modelClass): string
+    {
+        $namespace = config('modules.namespace');
+        $prefix = (is_string($namespace) ? $namespace : 'Modules') . '\\';
+
+        if (! str_starts_with($modelClass, $prefix)) {
+            return 'Core';
+        }
+
+        $module_name = strtok(substr($modelClass, strlen($prefix)), '\\');
+
+        return $module_name === false || $module_name === '' ? 'Core' : $module_name;
     }
 
     /**

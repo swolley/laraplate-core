@@ -9,6 +9,7 @@ use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\SeedLedger;
 use Modules\Core\Seeding\SeedNode;
 use Modules\Core\Seeding\SeedOrchestrator;
+use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Tests\Stubs\Seeding\CommandAwareStubSeeder;
 use Modules\Core\Tests\Stubs\Seeding\FailingStubSeeder;
 use Modules\Core\Tests\Stubs\Seeding\PassingStubSeeder;
@@ -53,11 +54,62 @@ it('rolls back the failing node without touching earlier ones', function (): voi
 });
 
 it('returns 0 and flushes the settings cache once when every node succeeds', function (): void {
+    $flush_count = 0;
+    app(SettingsCacheCoordinator::class)->registerInvalidator(function () use (&$flush_count): void {
+        $flush_count++;
+    });
+
     $orchestrator = app(SeedOrchestrator::class)->withNodes([
         new SeedNode(PassingStubSeeder::class, 'Core'),
     ]);
 
-    expect($orchestrator->run())->toBe(0);
+    expect($orchestrator->run())->toBe(0)
+        ->and($flush_count)->toBe(1);
+});
+
+it('makes db:seed fail loudly, not exit 0, when a node fails', function (): void {
+    // Bind a pre-configured orchestrator so DatabaseSeeder's real
+    // app(SeedOrchestrator::class) resolution (used by the actual db:seed
+    // command) picks up a failing node, exercising the command-level
+    // failure path rather than SeedOrchestrator::run() called directly.
+    $orchestrator = app(SeedOrchestrator::class)->withNodes([
+        new SeedNode(FailingStubSeeder::class, 'Core'),
+    ]);
+
+    app()->instance(SeedOrchestrator::class, $orchestrator);
+
+    // $this->artisan() drives the command through Kernel::call(), which —
+    // unlike the real `artisan` CLI entry point (Kernel::handle()) — does not
+    // catch the command's exception into an exit code; it propagates the
+    // exception straight to the caller. That exception (DatabaseSeeder
+    // throws RuntimeException on a non-zero orchestrator exit code) is
+    // exactly what the real CLI entry point catches and turns into a
+    // non-zero process exit, so asserting it is thrown here is the
+    // equivalent proof that `db:seed` does not exit 0 on a failing node.
+    expect(fn () => $this->artisan('db:seed', ['--force' => true])->run())
+        ->toThrow(RuntimeException::class, 'Seeding failed; see the run ledger for the failing node.');
+});
+
+it('announces the resumed run id and skipped node count when resuming', function (): void {
+    $nodes = [
+        new SeedNode(PassingStubSeeder::class, 'Core'),
+        new SeedNode(FailingStubSeeder::class, 'Core', [PassingStubSeeder::class]),
+    ];
+
+    app(SeedOrchestrator::class)->withNodes($nodes)->run();
+
+    $run_id = app(SeedLedger::class)->lastFailedRunId();
+    expect($run_id)->not->toBeNull();
+
+    $output = new BufferedOutput();
+    $command = new Command();
+    $command->setOutput(new OutputStyle(new ArrayInput([]), $output));
+
+    app(SeedOrchestrator::class)->withNodes($nodes)->withCommand($command)->run($run_id);
+
+    expect($output->fetch())
+        ->toContain((string) $run_id)
+        ->toContain('skipping 1 already-completed node');
 });
 
 it('does not run any node after a failure, regardless of declared dependencies', function (): void {

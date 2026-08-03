@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
+use Modules\Core\Seeding\ModelCapabilityScanner;
 use Modules\Core\Services\PerModelSettingResolver;
 
 it('seeds per-model capability settings with the resolver naming', function (): void {
@@ -14,18 +15,47 @@ it('seeds per-model capability settings with the resolver naming', function (): 
     expect(Setting::query()->withoutGlobalScopes()->where('name', $name)->exists())->toBeTrue();
 });
 
+it('stamps a derived setting with the module that owns the model, not Core', function (): void {
+    // HasVersions/SoftDeletes are baked into every model via the shared
+    // Modules\Core\Overrides\Model base class (see the neighboring test's
+    // comment), so any model outside Modules\Core is guaranteed to produce a
+    // version_strategy_{table} row. Discover one dynamically instead of
+    // hardcoding a module name, so this does not rot if module contents change.
+    $foreign = collect(app(ModelCapabilityScanner::class)->scan())
+        ->first(fn ($capability): bool => str_starts_with($capability->modelClass, 'Modules\\')
+            && ! str_starts_with($capability->modelClass, 'Modules\\Core\\'));
+
+    expect($foreign)->not->toBeNull('Expected at least one non-Core module model to be scannable.');
+
+    $owning_module = explode('\\', $foreign->modelClass)[1];
+    $name = PerModelSettingResolver::nameFor('version_strategy', $foreign->table);
+
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', $name)->sole();
+
+    expect($setting->module)->toBe($owning_module);
+});
+
 it('is idempotent and leaves operator values untouched on a second run', function (): void {
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
+    // Drift the description too, not just the operator value: an unchanged
+    // structural row lands in `unchanged` and never reaches the upsert
+    // payload at all, so the second run would prove nothing about the
+    // $update list. Drifting a structural column forces a real realignment,
+    // so this assertion is only satisfied if the operator value genuinely
+    // survives that realignment rather than coinciding with it.
     Setting::query()->withoutGlobalScopes()
         ->where('name', 'pagination')
-        ->update(['value' => json_encode(999)]);
+        ->update(['value' => json_encode(999), 'description' => 'drifted description']);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
     $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
 
-    expect($setting->value)->toBe(999);
+    expect($setting->value)->toBe(999)
+        ->and($setting->description)->toBe('Paginazione default chiamate');
 });
 
 it('no longer force-deletes settings during a run', function (): void {

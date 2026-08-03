@@ -70,3 +70,17 @@ it('picks the newest failed run rather than an arbitrary one', function (): void
 
     expect($ledger->lastFailedRunId())->toBe('run-B');
 });
+
+it('stops offering a failed run to resume once a newer run has succeeded', function (): void {
+    // A failure that was never resumed must not stay the answer forever: a
+    // deploy script that habitually passes --resume would otherwise skip
+    // every node that already succeeded in a later run while exiting 0.
+    $ledger = app(SeedLedger::class);
+    $ledger->start('run-old', 'X');
+    $ledger->fail('run-old', 'X', 'boom');
+
+    $ledger->start('run-new', 'X');
+    $ledger->succeed('run-new', 'X', 'hash');
+
+    expect($ledger->lastFailedRunId())->toBeNull();
+});

@@ -51,12 +51,24 @@ final class SeedReconciler
                 $restored[] = $key;
             }
 
-            if ($definition->initial !== [] && $current->getAttribute('seeded_value') === null) {
+            if ($definition->initial !== [] && (
+                $current->getAttribute('seeded_value') === null
+                || $current->getAttribute('module') !== $definition->module
+            )) {
                 // Reuse the full row, not a bare {column, module, seeded_value}
                 // tuple: upsert() still performs a real INSERT under the hood,
                 // and a partial row would trip NOT NULL constraints on columns
                 // outside the conflict target. Only seeded_value/module are
                 // actually written — see the $update list below.
+                //
+                // The module check (not just seeded_value IS NULL) matters
+                // because module is an ownership stamp, not operator data: a
+                // row that already has a baseline must still have its module
+                // corrected if the code now attributes it to a different
+                // module (e.g. a per-model setting reclassified from Core to
+                // the module that actually owns the model). Without this, the
+                // stamp freezes at whatever the first reconcile wrote and
+                // never repairs itself on existing installations.
                 $needs_baseline[] = $this->fullPayload($definition, $row, $model);
             }
 
