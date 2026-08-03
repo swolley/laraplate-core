@@ -23,7 +23,9 @@ use Override;
  * @property string $source_key
  * @property string|null $source_label
  * @property string|null $external_id
+ * @property string|null $fingerprint
  * @property string|null $url
+ * @property \Carbon\CarbonImmutable|null $source_updated_at
  * @mixin \Eloquent
  * @mixin IdeHelperRecordOrigin
  */
@@ -41,7 +43,9 @@ final class RecordOrigin extends Model
         'source_key',
         'source_label',
         'external_id',
+        'fingerprint',
         'url',
+        'source_updated_at',
     ];
 
     /**
@@ -77,5 +81,16 @@ final class RecordOrigin extends Model
     protected static function newFactory(): RecordOriginFactory
     {
         return RecordOriginFactory::new();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Override]
+    protected function casts(): array
+    {
+        return [
+            'source_updated_at' => 'immutable_datetime',
+        ];
     }
 }

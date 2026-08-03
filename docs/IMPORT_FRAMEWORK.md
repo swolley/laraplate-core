@@ -56,3 +56,9 @@ It does not roll back other connections, files, object storage, queued work, HTT
 ## Imports versus synchronization
 
 This framework executes bounded, operator-triggered imports. Continuous external-system synchronization is a separate layer that may reuse importer pipelines but also requires explicit cursors, remote identity, idempotency, conflict policy, direction, retries, observability, and scheduling. Those concerns must not be added implicitly to `AbstractImportCommand`.
+
+## External record identities
+
+`RecordOriginRegistry` is the source-neutral persistence boundary for imported record identities. An identity is the tuple `(referable_type, source_key, external_id)`; adapters should qualify `source_key` by source instance or group when the upstream identifier is not globally unique.
+
+Adapters compute a lowercase SHA-256 fingerprint from normalized source fields and may supply the source modification timestamp as evidence. The registry reports `Missing`, `Unchanged`, or `Changed`, stores provenance on the referable model's database connection, and never decides whether the destination record may be changed. Destination modules own that policy. Source timestamps never replace destination `created_at` or `updated_at` values.
