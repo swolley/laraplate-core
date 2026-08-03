@@ -341,6 +341,170 @@ public function getAttribute($key): mixed
 ```
 
 
+## Seeding and reconciliation
+
+Production seeders run on **every release**, against a database that already has real operator
+data in it. `Modules\Core\Seeding` (`Modules/Core/app/Seeding/`) is the mechanism that makes that
+safe: it orders seeders by declared dependency instead of a flat priority number, reconciles rows
+without clobbering values an operator changed after seeding, and removes settings whose owning
+module is gone — never anything else.
+
+### Dependency graph replaces `module.json` priority
+
+A seeder opts into explicit ordering by implementing `DeclaresSeedDependencies`:
+
+```php
+<?php
+namespace Modules\ERP\Database\Seeders;
+
+use Modules\Core\Seeding\Contracts\DeclaresSeedDependencies;
+
+final class ErpDatabaseSeeder extends Seeder implements DeclaresSeedDependencies
+{
+    public static function dependsOn(): array
+    {
+        return [\Modules\Core\Database\Seeders\CoreDatabaseSeeder::class];
+    }
+}
+```
+
+`dependsOn()` is only for edges *within the same module* or edges that are not already implied by
+`module.json`. `SeedGraphBuilder` adds an implicit edge from every seeder of a module to every
+seeder of each module it `requires` in `module.json`, so cross-module order does not need to be
+restated. `SeedGraph::sort()` then performs a topological sort with a deterministic
+`[module, seederClass]` tie-break, so the same set of seeders always produces the same order
+regardless of discovery order.
+
+This replaced an implicit `module.json` `priority` ordering that could silently violate a
+module's own declared `requires`: `MES` declares `"requires": ["ERP"]` but carries a lower
+`priority` (`2`) than `ERP` (`99`), so under priority-based ordering `MES` seeded before the `ERP`
+data it depends on. The graph raises instead of degrading silently: `SeedGraphCycleException` on a
+dependency cycle, `MissingSeedDependencyException` when a declared dependency belongs to a module
+that is disabled or absent (a seeder cannot depend on a class the graph never discovered).
+
+Seeder discovery is automatic: any `database/seeders/*.php` class of an enabled module is a node,
+except classes whose basename starts with `Dev` (`DevDatabaseSeeder` and friends are never part of
+the production graph). A seeder does not need to implement `DeclaresSeedDependencies` at all if
+`module.json requires` already expresses everything it needs — `CoreDatabaseSeeder` is the
+example: it declares no dependencies of its own.
+
+### Declaring what to reconcile — `SeedDefinition`
+
+`SeedDefinition` is a value object that tells `SeedReconciler` how to treat a set of rows for one
+model:
+
+```php
+$outcome = app(SeedReconciler::class)->reconcile(
+    SeedDefinition::for(Setting::class)
+        ->identity(['name'])
+        ->structural(['type', 'group_name', 'description', 'choices'])
+        ->initial(['value'])
+        ->ownedBy('Core')
+        ->rows($defaultSettings),
+);
+```
+
+- **`identity`** must be exactly one column. A composite identity would need one `OR` clause per
+  row, which defeats the fixed query budget the reconciler exists to provide;
+  `identityColumn()` throws `LogicException` unless exactly one column is declared.
+- **`structural`** fields follow the code: every release realigns them to whatever the seeder
+  declares, overwriting any value an operator set directly.
+- **`initial`** fields are written once, at creation, and never touched again by a later run —
+  this is how a seeded default (e.g. a `Setting`'s `value`) stays an operator's to change.
+- **`rows()`** normalizes every empty string (`''`) to `null` and throws `InvalidArgumentException`
+  if a row is missing the identity column or its identity value is null/empty/absent. Do this
+  normalization here, not in a model saving hook: reconciliation writes via `upsert()`, which never
+  fires Eloquent events.
+
+### `SeedReconciler` and drift
+
+`SeedReconciler::reconcile()` runs a fixed number of queries regardless of row count: one read
+(existing rows keyed by identity), one `upsert()` for created/realigned rows, one `restore()` for
+soft-deleted rows found among the declared set, and one baseline-backfill `upsert()` for rows that
+predate the `seeded_value` column — each write only runs when its row set is non-empty. Because it
+writes through `upsert()`, **no Eloquent event fires** (no observers, no `saving`/`saved`) — this is
+deliberate, not an oversight, and is why `SeedDefinition::rows()` does its own normalization instead
+of relying on a model hook. The `$update` list passed to the realignment `upsert()` is exactly
+`$definition->structural` — nothing else. `value` and `seeded_value` must never be added to it: doing
+so would silently overwrite an operator's customization on every release.
+
+For `Setting`, drift is **computed**, never asserted: `core_settings.module` records the owning
+module (`null` when the row was not written by a seeder) and `core_settings.seeded_value` records
+the last value a seeder wrote there. A setting has drifted when `value !== seeded_value`, compared
+via `ValueComparator::equal()` (which normalizes JSON key order, numeric-string vs. numeric, and
+`BackedEnum` vs. its backing value so none of those read as drift). `seeded_value IS NULL` means the
+seeder never wrote that row — for example, a row created before this column existed.
+
+### Cleanup by module state
+
+`SettingsCleaner::clean()` runs once, after every node in the graph has succeeded, and only ever
+touches rows a seeder actually wrote:
+
+| `module` | `seeded_value` | Module state | Drifted (`value !== seeded_value`) | Outcome |
+| --- | --- | --- | --- | --- |
+| `null` | any | — | — | never a candidate, always preserved |
+| any | `null` | — | — | never a candidate, always preserved |
+| set | set | Enabled | any | preserved |
+| set | set | Disabled | No | hard deleted (`forceDelete()`) |
+| set | set | Disabled | Yes | soft deleted (`delete()`) — operator's customization kept, recoverable |
+| set | set | Absent (module directory gone) | any | hard deleted (`forceDelete()`) |
+
+The `whereNotNull('module')->whereNotNull('seeded_value')` pair on the candidate query is the
+safety mechanism, not an optimization: a row without both is never a seeder-owned row and must
+never be a deletion candidate. Keep that filter in the query, not in the loop body, so a later
+refactor of the loop cannot bypass it.
+
+Module state itself is resolved by `ModuleStateResolver`, which uses `Module::find($name)?->isEnabled()`
+rather than an array lookup — see [Gotchas](#gotchas-for-seeder-and-test-authors) below.
+
+### Resuming a failed run
+
+`SeedOrchestrator::run()` executes every node in graph order inside its own transaction, stops at
+the **first** failure (a release must not apply half a configuration), and records progress per
+node in the `core_seed_runs` ledger (`SeedLedger`, table `CoreTables::SeedRuns`). `db:seed --resume`
+(declared by `Modules\Core\Console\SeedCommand`) re-runs the last failed `run_id` and skips any node
+already marked `succeeded` under it, so a fix-and-retry does not repeat completed work.
+
+`--skip-unchanged` is deliberately **not implemented**. The ledger already records a `content_hash`
+per succeeded node, but today that hash is a placeholder — `hash('xxh128', $node->seederClass)`,
+the class name only, not a digest of what the node would actually write. A `--skip-unchanged` flag
+built on that hash would skip nodes whose content changed but whose class name did not, which is
+the opposite of what the flag would promise. Do not wire a skip decision to `content_hash` until it
+hashes the node's actual definitions.
+
+### Per-node atomicity — what "rolled back" does and does not mean
+
+Each node runs inside a transaction on the **default** database connection only, opened via the
+injected `DatabaseManager`. This is a documented compromise: `SeedNode` carries no connection
+information, and a seeder is free to write to any model on any connection, so the orchestrator has
+no general way to know which connection(s) a given node touches. If a node fails:
+
+- Writes it made on the **default connection** are rolled back.
+- Writes it made on **any other connection** are **not** rolled back by this mechanism, and must be
+  verified manually before resuming. A seeder that writes to a non-default connection is
+  responsible for wrapping those writes in its own transaction on that connection — the project's
+  connection-affinity tests already forbid `DB::transaction(` inside a seeder file, so this is the
+  existing convention, not a new obligation.
+
+The failure message printed to the console and written to the log repeats this caveat verbatim, so
+whoever is reading a broken release sees it without reading the source.
+
+### Gotchas for seeder and test authors
+
+- **`Setting::query()->forceCreate()` silently no-ops.** `Setting::requiresApprovalWhen()` shadows
+  `HasApprovals`'s version and returns `true` for any fillable-field change, so the approval
+  package's saving listener cancels every direct create/update on `Setting` — including
+  `forceCreate()`. When a seeder test needs a real, already-persisted `Setting` row (for example to
+  simulate one written before the reconciler existed), use
+  `Setting::factory()->persistedWithoutApprovalCapture()->create([...])` instead.
+- **`nwidart/laravel-modules` keys its module arrays by lowercase name; `core_settings.module`
+  does not.** `Nwidart\Modules\FileRepository::scan()` keys `all()`/`allEnabled()` by
+  `strtolower($name)`, but `core_settings.module` stores the module's declared case (`Core`, `MES`,
+  ...). `array_key_exists('Core', Module::allEnabled())` is therefore always `false`, misclassifying
+  every real module as absent. Resolve module state with `Module::find($name)?->isEnabled()`
+  instead — `find()` lowercases internally. `ModuleStateResolver` already does this; reach for it
+  rather than re-deriving module state from the array helpers.
+
 ## Features
 
 ### Requirements
