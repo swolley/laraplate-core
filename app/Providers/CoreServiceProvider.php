@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -248,7 +247,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 if (Cache::tags($cache_tags)->has($cache_key)) {
                     $crons = $this->normalizeCronJobs(Cache::tags($cache_tags)->get($cache_key));
                 } else {
-                    $crons = $this->loadCronJobsFromDatabase($cache_key);
+                    $crons = $this->loadCronJobsFromDatabase();
 
                     if ($crons !== []) {
                         Cache::tags($cache_tags)->put($cache_key, $crons);
@@ -257,7 +256,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             } elseif (Cache::has($cache_key)) {
                 $crons = $this->normalizeCronJobs(Cache::get($cache_key));
             } else {
-                $crons = $this->loadCronJobsFromDatabase($cache_key);
+                $crons = $this->loadCronJobsFromDatabase();
 
                 if ($crons !== []) {
                     Cache::put($cache_key, $crons);
@@ -273,13 +272,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
     /**
      * @return array<int, array{command: string, schedule: string}>
      */
-    private function loadCronJobsFromDatabase(string $cache_key): array
+    private function loadCronJobsFromDatabase(): array
     {
         try {
             // Live connection check — do not use SchemaInspector here. Its process-level
             // memoization survives across Pest tests while :memory: SQLite is wiped, which
             // falsely reports the table as present and floods logs with QueryExceptions.
-            if (! Schema::hasTable($cache_key)) {
+            // Query the model's own connection (not the Schema facade default) to preserve
+            // connection affinity.
+            $cron_model = new CronJob;
+
+            if (! $cron_model->getConnection()->getSchemaBuilder()->hasTable($cron_model->getTable())) {
                 return [];
             }
 
