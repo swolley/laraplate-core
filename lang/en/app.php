@@ -37,6 +37,7 @@ return [
     'Tuesday' => 'Tuesday',
     'Wednesday' => 'Wednesday',
   ],
+  'flag' => 'gb',
   'form' => [
     'backward' => 'Backward',
     'characters' => 'characters',
@@ -95,7 +96,6 @@ return [
     ],
     'words' => 'words',
   ],
-  'flag' => 'gb',
   'language' => 'English',
   'locale' => 'en-US',
   'login' => [

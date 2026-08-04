@@ -37,6 +37,7 @@ return [
     'Tuesday' => 'Torek',
     'Wednesday' => 'Sreda',
   ],
+  'flag' => 'si',
   'form' => [
     'backward' => 'Nazaj',
     'characters' => 'znakov',
@@ -95,7 +96,6 @@ return [
     ],
     'words' => 'besed',
   ],
-  'flag' => 'si',
   'language' => 'Slovenščina',
   'locale' => 'sl_SI',
   'login' => [

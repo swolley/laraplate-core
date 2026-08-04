@@ -37,6 +37,7 @@ return [
     'Tuesday' => 'Martes',
     'Wednesday' => 'Miércoles',
   ],
+  'flag' => 'es',
   'form' => [
     'backward' => 'Atrás',
     'characters' => 'caracteres',
@@ -95,7 +96,6 @@ return [
     ],
     'words' => 'palabras',
   ],
-  'flag' => 'es',
   'language' => 'Español',
   'locale' => 'es_ES',
   'login' => [

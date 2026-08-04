@@ -37,6 +37,7 @@ return [
     'Tuesday' => 'Martedì',
     'Wednesday' => 'Mercoledì',
   ],
+  'flag' => 'it',
   'form' => [
     'backward' => 'Indietro',
     'characters' => 'caratteri',
@@ -95,7 +96,6 @@ return [
     ],
     'words' => 'parole',
   ],
-  'flag' => 'it',
   'language' => 'Italiano',
   'locale' => 'it-IT',
   'login' => [
