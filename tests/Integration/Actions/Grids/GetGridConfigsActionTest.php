@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
+
+beforeEach(function (): void {
+    Cache::flush();
+    AuthorizationService::resetPermissionCache();
+});
 
 
 it('returns configs for models', function (): void {
@@ -97,7 +103,60 @@ it('uses metadata registry path and indexes results by table name', function ():
 
     $result = $action($request, null);
 
-    expect($result)->toBe(['fake_grid_table' => ['table' => true]]);
+    // A superadmin is allowed every entity operation (impersonate excluded — it is
+    // a global user capability, not an entity operation).
+    expect($result)->toBe(['fake_grid_table' => [
+        'table' => true,
+        'operations' => ['select', 'insert', 'update', 'delete', 'restore', 'forceDelete', 'approve', 'publish', 'lock'],
+    ]]);
+});
+
+it('exposes only the operations the user is permitted for the entity', function (): void {
+    Modules\Core\Inspector\ModelMetadataRegistry::reset();
+    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
+    $auth = $this->app->make(AuthorizationService::class);
+
+    $model_class = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use HasGridUtils;
+
+        protected $table = 'limited_grid_table';
+
+        public function getGrid(): object
+        {
+            return new class
+            {
+                public function getConfigs(): array
+                {
+                    return ['table' => true];
+                }
+            };
+        }
+    };
+    $class_name = $model_class::class;
+
+    $user = User::factory()->create();
+
+    // Grid visibility and its exposed operations are both derived from the
+    // per-operation permissions; names are built via the production convention
+    // so the test stays aligned with buildPermissionName().
+    $permission_names = [
+        $auth->buildPermissionName('limited_grid_table', 'select'),
+        $auth->buildPermissionName('limited_grid_table', 'update'),
+    ];
+
+    foreach ($permission_names as $permission_name) {
+        Modules\Core\Models\Permission::findOrCreate($permission_name, 'web');
+        $user->givePermissionTo($permission_name);
+    }
+
+    $request = request();
+    $request->setUserResolver(fn (): User => $user);
+
+    $action = new GetGridConfigsAction($auth, modelsProvider: fn () => [$class_name]);
+    $result = $action($request, null);
+
+    expect($result['limited_grid_table']['operations'])->toBe(['select', 'update']);
 });
 
 it('returns null in private getModelGridConfigs when permission check fails', function (): void {

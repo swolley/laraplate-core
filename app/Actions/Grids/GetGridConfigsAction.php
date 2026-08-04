@@ -84,16 +84,33 @@ final readonly class GetGridConfigsAction
     private function getModelGridConfigs(string $entity, Model $instance, string $table, Request $request): ?array
     {
         if (
-            (in_array($entity, [null, '', '0'], true) || $instance::class === $entity::class)
-            && Grid::useGridUtils($instance)
-            && $this->auth->checkPermission($request, $table, connection: $instance->getConnectionName())
+            (! in_array($entity, [null, '', '0'], true) && $instance::class !== $entity::class)
+            || ! Grid::useGridUtils($instance)
         ) {
-            /** @var Grid $grid */
-            $grid = $instance->getGrid();
-
-            return $grid->getConfigs();
+            return null;
         }
 
-        return null;
+        // Grid visibility is derived from the operations the user may actually
+        // perform on the entity. An operation-less entity gate cannot work here:
+        // its permission name ("{connection}.{table}.") has an empty operation
+        // segment and is rejected by the permission name convention, so it would
+        // only ever pass for superadmins.
+        $operations = $this->auth->allowedOperations(
+            $request,
+            $table,
+            $instance->getConnectionName(),
+        );
+
+        if ($operations === []) {
+            return null;
+        }
+
+        /** @var Grid $grid */
+        $grid = $instance->getGrid();
+
+        $configs = $grid->getConfigs();
+        $configs['operations'] = $operations;
+
+        return $configs;
     }
 }

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Auth\Access\AuthorizationException;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
@@ -82,6 +83,32 @@ final class AuthorizationService
         }
 
         return $user->hasPermissionTo($permission_name, $guard_name);
+    }
+
+    /**
+     * The operations the current user may perform on the given entity/table.
+     *
+     * Drives capability-based UI: the SPA reads these instead of reconstructing
+     * the `{connection}.{table}.{operation}` permission names. `impersonate` is a
+     * global user capability, not an entity operation, so it is excluded.
+     *
+     * @return list<string> Allowed ActionEnum values, e.g. ['select', 'update', 'approve'].
+     */
+    public function allowedOperations(Request $request, string $entity, ?string $connection = null): array
+    {
+        $operations = [];
+
+        foreach (ActionEnum::cases() as $action) {
+            if ($action === ActionEnum::Impersonate) {
+                continue;
+            }
+
+            if ($this->checkPermission($request, $entity, $action->value, $connection)) {
+                $operations[] = $action->value;
+            }
+        }
+
+        return $operations;
     }
 
     /**
@@ -197,11 +224,15 @@ final class AuthorizationService
      * Use this for requests that don't have a filters property (e.g., DetailRequestData).
      * For ListRequestData, prefer injectAclFilters() to modify the request.
      *
-     * @param  Builder  $query  The Eloquent query builder
+     * Generic over the model: a caller holding a Builder<Ticket> or any other
+     * concrete builder must be able to pass it. Declaring Builder<Model> made
+     * every such call an argument.type error, since PHPStan treats the builder
+     * as invariant in its model.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query  The Eloquent query builder
      * @param  string  $permission_name  The permission name for ACL lookup
-     */
-    /**
-     * @param  Builder<Model>  $query
      */
     public function applyAclFiltersToQuery(Builder $query, string $permission_name): void
     {
@@ -231,9 +262,10 @@ final class AuthorizationService
 
     /**
      * Apply filters recursively to a query.
-     */
-    /**
-     * @param  Builder<Model>  $query
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      */
     private function applyFiltersRecursively(Builder $query, FiltersGroup $filters): void
     {
@@ -252,7 +284,9 @@ final class AuthorizationService
     }
 
     /**
-     * @param  Builder<Model>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      */
     private function applySingleFilter(Builder $query, Filter $filter, string $method): void
     {
