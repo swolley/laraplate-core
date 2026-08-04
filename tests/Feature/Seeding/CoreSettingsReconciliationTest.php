@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Log;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\ModelCapabilityScanner;
@@ -35,6 +36,60 @@ it('stamps a derived setting with the module that owns the model, not Core', fun
     $setting = Setting::query()->withoutGlobalScopes()->where('name', $name)->sole();
 
     expect($setting->module)->toBe($owning_module);
+});
+
+it('collapses a table-derived setting shared by several model classes into one row owned by the table\'s declaring class', function (): void {
+    // Entity/Taxonomy/Preset/Presettable/User are Core base classes whose
+    // `$table` every module extends unchanged, so several concrete leaf
+    // classes across CMS/ERP (and App\Models\User) legitimately resolve to
+    // the same table — and therefore the same derived setting name. Discover
+    // one such table dynamically rather than hardcoding a class, so this
+    // does not rot if the set of shared-table models changes.
+    $by_table = [];
+
+    foreach (app(ModelCapabilityScanner::class)->scan() as $capability) {
+        $by_table[$capability->table][] = $capability->modelClass;
+    }
+
+    $shared_table = null;
+
+    foreach ($by_table as $table => $classes) {
+        if (count($classes) > 1) {
+            $shared_table = $table;
+
+            break;
+        }
+    }
+
+    expect($shared_table)->not->toBeNull(
+        'Expected at least one table shared by multiple model classes (e.g. Entity/Taxonomy/Preset/Presettable/User).',
+    );
+
+    // Every currently known shared table is one of these Core base tables, so
+    // soft_deletes (true for all of them, unlike version_strategy which the
+    // pivot Presettable classes do not have) is guaranteed to be seeded
+    // regardless of which shared table was discovered first.
+    $name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, (string) $shared_table);
+
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    $settings = Setting::query()->withoutGlobalScopes()->where('name', $name)->get();
+
+    expect($settings)->toHaveCount(1)
+        ->and($settings->first()->module)->toBe('Core');
+});
+
+it('logs a warning naming the setting and the competing model classes when a table-derived setting collides', function (): void {
+    Log::spy();
+
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    Log::shouldHaveReceived('warning')->atLeast()->once()->withArgs(
+        fn (string $message, array $context): bool => str_contains($message, 'share a table-derived setting name')
+            && isset($context['setting'], $context['module'], $context['model_classes'])
+            && is_array($context['model_classes'])
+            && count($context['model_classes']) > 1,
+    );
 });
 
 it('is idempotent and leaves operator values untouched on a second run', function (): void {

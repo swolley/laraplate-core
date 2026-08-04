@@ -66,6 +66,17 @@ it('wires MES to depend on every ERP seeder via module.json requires', function 
         ->toContain(ItalianTaxCodesSeeder::class);
 });
 
+it('wires ItalianTaxCodesSeeder to depend on ERPDatabaseSeeder, not on alphabetical tie-break', function (): void {
+    // This previously worked only because 'E' sorts before 'I' in the graph's
+    // deterministic tie-break — ItalianTaxCodesSeeder::run() looks up the
+    // default company created by ERPDatabaseSeeder::ensureDefaultCompany(),
+    // and warns-and-returns (no throw) when it is missing, so a dropped edge
+    // would silently no-seed instead of failing this graph, hence the direct
+    // assertion mirroring the PermissionRefreshSeeder edge below.
+    expect(seedNodeFor(ItalianTaxCodesSeeder::class)->dependsOn)
+        ->toContain(ERPDatabaseSeeder::class);
+});
+
 it('wires every module that requires Core to depend on CoreDatabaseSeeder', function (): void {
     foreach ([AIDatabaseSeeder::class, CMSDatabaseSeeder::class, ERPDatabaseSeeder::class] as $seederClass) {
         expect(seedNodeFor($seederClass)->dependsOn)->toContain(CoreDatabaseSeeder::class);

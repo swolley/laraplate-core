@@ -6,6 +6,7 @@ namespace Modules\Core\Database\Seeders;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
@@ -347,13 +348,33 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         // they describe, not by the module running this seeder: a MES model's
         // version_strategy_* row must be reconciled with module = 'MES' so
         // SettingsCleaner can ever classify it Disabled/Absent and remove it.
+        //
+        // "Owns the model" is resolved from wherever `$table` is actually
+        // declared, not from the scanned leaf class: Entity/Taxonomy/Preset/
+        // Presettable/User are Core base classes with a table every module
+        // extends (final on all but User, which nothing overrides in
+        // practice), so several concrete subclasses across CMS/ERP legitimately
+        // share one physical table. Attributing the setting to the leaf class's
+        // own module would let two modules fight over the same setting's
+        // ownership stamp across separate reconcile() calls, and
+        // SettingsCleaner deletes rows whose module is disabled/absent - so the
+        // "wrong" module winning is a real data-loss risk, not just cosmetic.
         /** @var array<string, list<array<string,mixed>>> $settings_by_module */
         $settings_by_module = ['Core' => $core_settings];
 
+        /** @var array<string, list<class-string<Model>>> $setting_provenance */
+        $setting_provenance = [];
+
         foreach ($capabilities as $capability) {
-            $module = $this->moduleForModel($capability->modelClass);
+            $module = $this->moduleForModel($this->tableOwningClass($capability->modelClass));
             $settings_by_module[$module] ??= [];
+
+            $before = count($settings_by_module[$module]);
             $this->pushCapabilitySettings($settings_by_module[$module], $capability, $default_approval_threshold);
+
+            for ($i = $before, $count = count($settings_by_module[$module]); $i < $count; $i++) {
+                $setting_provenance[$settings_by_module[$module][$i]['name']][] = $capability->modelClass;
+            }
         }
 
         $created = 0;
@@ -365,7 +386,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 continue;
             }
 
-            $rows = array_values(array_column($rows, null, 'name'));
+            $rows = $this->deduplicateSharedTableRows($rows, $setting_provenance, $module);
 
             $outcome = app(SeedReconciler::class)->reconcile(
                 SeedDefinition::for(Setting::class)
@@ -403,6 +424,75 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $module_name = strtok(substr($modelClass, strlen($prefix)), '\\');
 
         return $module_name === false || $module_name === '' ? 'Core' : $module_name;
+    }
+
+    /**
+     * Resolve the class that actually declares the model's `$table` property,
+     * so a shared-table hierarchy is attributed to the module owning the base
+     * class rather than to whichever leaf subclass was scanned.
+     *
+     * Falls back to the model itself when `$table` is declared on the model
+     * (the common case) or never declared at all (Eloquent infers the table
+     * name by convention) - both resolve identically to before this method
+     * existed.
+     *
+     * @param  class-string<Model>  $modelClass
+     * @return class-string<Model>
+     */
+    private function tableOwningClass(string $modelClass): string
+    {
+        $declaring_class = new ReflectionClass($modelClass)->getProperty('table')->getDeclaringClass()->getName();
+
+        /** @var class-string<Model> $owner */
+        $owner = $declaring_class === Model::class ? $modelClass : $declaring_class;
+
+        return $owner;
+    }
+
+    /**
+     * Collapse rows that share an identity value after {@see tableOwningClass()}
+     * grouped several model classes under the same module, logging the
+     * collision instead of silently keeping whichever row happened to be
+     * scanned last.
+     *
+     * Which row survives never changes what gets persisted: every field in a
+     * derived-setting row comes only from the table name and global config
+     * (default approval threshold), never from the model class itself, so
+     * colliding rows for the same name are always byte-identical. Only the log
+     * entry - naming the setting and the competing classes - carries
+     * information the dedup would otherwise discard.
+     *
+     * @param  list<array<string,mixed>>  $rows
+     * @param  array<string, list<class-string<Model>>>  $provenance
+     * @return list<array<string,mixed>>
+     */
+    private function deduplicateSharedTableRows(array $rows, array $provenance, string $module): array
+    {
+        $seen = [];
+        $deduplicated = [];
+
+        foreach ($rows as $row) {
+            $name = (string) $row['name'];
+
+            if (isset($seen[$name])) {
+                continue;
+            }
+
+            $seen[$name] = true;
+            $deduplicated[] = $row;
+
+            $classes = $provenance[$name] ?? [];
+
+            if (count($classes) > 1) {
+                Log::warning('Seeding: multiple model classes share a table-derived setting name', [
+                    'setting' => $name,
+                    'module' => $module,
+                    'model_classes' => $classes,
+                ]);
+            }
+        }
+
+        return $deduplicated;
     }
 
     /**
