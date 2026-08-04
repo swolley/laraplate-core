@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Import\Contracts;
 
+use Symfony\Component\Console\Output\OutputInterface;
+
 interface BulkImporterInterface
 {
     /**
@@ -11,5 +13,5 @@ interface BulkImporterInterface
      *
      * @return int Number of imported root records.
      */
-    public function import(): int;
+    public function import(?OutputInterface $output = null): int;
 }

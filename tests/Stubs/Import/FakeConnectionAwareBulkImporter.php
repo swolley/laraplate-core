@@ -8,6 +8,7 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\ConnectionResolverInterface;
 use Modules\Core\Import\Contracts\BulkImporterInterface;
 use Modules\Core\Import\Contracts\ConnectionAwareBulkImporterInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 final readonly class FakeConnectionAwareBulkImporter implements BulkImporterInterface, ConnectionAwareBulkImporterInterface
 {
@@ -17,7 +18,7 @@ final readonly class FakeConnectionAwareBulkImporter implements BulkImporterInte
         private string $table,
     ) {}
 
-    public function import(): int
+    public function import(?OutputInterface $output = null): int
     {
         $this->importConnection()->table($this->table)->insert(['name' => 'connection-aware']);
 

@@ -74,7 +74,7 @@ abstract class AbstractImportCommand extends Command
             : null;
         $imported = $this->runner->run(
             $dry_run,
-            static fn (): int => $importer->import(),
+            fn (): int => $importer->import($this->output),
             $connection,
         );
 

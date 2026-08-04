@@ -6,6 +6,7 @@ namespace Modules\Core\Tests\Stubs\Import;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Import\Contracts\BulkImporterInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 final class FakeBulkImporter implements BulkImporterInterface
 {
@@ -20,7 +21,7 @@ final class FakeBulkImporter implements BulkImporterInterface
         public readonly ?int $limit = null,
     ) {}
 
-    public function import(): int
+    public function import(?OutputInterface $output = null): int
     {
         self::$arguments = [
             'records' => $this->records,

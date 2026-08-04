@@ -7,7 +7,7 @@ Core provides reusable infrastructure for module-owned bulk import commands. It 
 | Component | Responsibility |
 |---|---|
 | `AbstractImportCommand` | Common command execution, options, bootstrap loading, interactive plugin selection, output, and exit codes |
-| `BulkImporterInterface` | Neutral executable contract returning the imported root-record count |
+| `BulkImporterInterface` | Neutral executable contract returning the imported root-record count; optional `OutputInterface` for console progress |
 | `ConnectionAwareBulkImporterInterface` | Optional contract selecting the destination database connection for dry-run isolation |
 | `BulkImporterResolverInterface` | Module-supplied validation and container resolution boundary |
 | `ImportPluginDiscoveryInterface` | Module-supplied external plugin discovery boundary |

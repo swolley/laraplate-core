@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(import)* Optional console `OutputInterface` on `BulkImporterInterface::import()` for progress lines
+
 ### 🐛 Bug Fixes
 
 - *(i18n)* Add FlagCDN country codes to locale lang files
