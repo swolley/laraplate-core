@@ -609,7 +609,7 @@ The Core Module includes built-in features such as:
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.
 -   Multi entities and connections crud endpoints with standardized requests parameters
--   Multi entities and connections exposed interactive grid endpoints
+-   Multi entities and connections exposed interactive grid endpoints (each grid config carries an `operations` array of the ActionEnum operations the current user may perform on that entity; an entity with no permitted operation is omitted, replacing the old operation-less gate that only passed for superadmins)
 -   Strongly validated requests for Core routes
 -   Default common Response Formatter
 -   App settings and configurable Cron-Jobs on db tables
