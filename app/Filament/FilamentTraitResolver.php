@@ -32,8 +32,25 @@ final class FilamentTraitResolver
         'created_at',
         'updated_at',
         'deleted_at',
+        'is_deleted',
         'valid_from',
         'valid_to',
+    ];
+
+    /**
+     * Platform columns that must never surface as ordinary form fields.
+     *
+     * Filament's `--generate` skips the timestamp columns it knows by Laravel
+     * convention, but `is_deleted` is added by MigrateUtils alongside
+     * `deleted_at` and the lock version column is added for optimistic locking —
+     * neither is a convention Filament can infer, so both would be emitted as
+     * editable fields. HasForm already injects the lock version as a hidden
+     * component, so generating it again would duplicate it.
+     *
+     * @var list<string>
+     */
+    public const PLATFORM_COLUMNS_NEVER_IN_FORMS = [
+        'is_deleted',
     ];
 
     /**
@@ -81,6 +98,30 @@ final class FilamentTraitResolver
         }
 
         return self::HAS_DYNAMIC_CONTENTS_OWNED_FORM_COLUMNS;
+    }
+
+    /**
+     * Platform columns that must never be generated as ordinary form fields.
+     *
+     * Separate from the HasForm-owned list because these are not owned by
+     * HasForm at all: `is_deleted` belongs to the soft-delete machinery and the
+     * lock version to optimistic locking. HasForm already injects the latter as
+     * a hidden component, so generating it again would duplicate it.
+     *
+     * @param  class-string  $modelFqn
+     * @return list<string>
+     */
+    public static function platformColumnsNeverInForms(string $modelFqn): array
+    {
+        $excluded = self::PLATFORM_COLUMNS_NEVER_IN_FORMS;
+
+        if (class_exists($modelFqn) && method_exists($modelFqn, 'lockVersionColumn')) {
+            /** @var string $lock_version */
+            $lock_version = $modelFqn::lockVersionColumn();
+            $excluded[] = $lock_version;
+        }
+
+        return array_values(array_unique($excluded));
     }
 
     /**
