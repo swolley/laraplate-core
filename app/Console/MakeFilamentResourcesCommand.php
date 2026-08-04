@@ -190,7 +190,8 @@ final class MakeFilamentResourcesCommand extends Command
         $relative = "Filament/Resources/{$folder}/{$basename}Resource.php";
 
         if ($module === 'App') {
-            return app_path($relative);
+            // Leading `\` avoids Modules\Core\Console\app_path() test overrides.
+            return \app_path($relative);
         }
 
         return module_path($module, 'app/'.$relative);

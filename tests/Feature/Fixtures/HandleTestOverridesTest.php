@@ -15,6 +15,8 @@ require_once dirname(__DIR__, 2) . '/Fixtures/handle_test_overrides.php';
  */
 afterEach(function (): void {
     HandleTestContext::$config = [];
+    HandleTestContext::$app_base = '';
+    HandleTestContext::$db_base = '';
 });
 
 it('returns the stubbed value when the key is configured', function (): void {
@@ -42,4 +44,23 @@ it('still honours an explicit default for an unknown key', function (): void {
     HandleTestContext::$config = [];
 
     expect(namespaced_config('core.definitely.missing', 'fallback'))->toBe('fallback');
+});
+
+it('keeps app_path and database_path inert when sandbox bases are empty', function (): void {
+    HandleTestContext::$app_base = '';
+    HandleTestContext::$db_base = '';
+
+    expect(\Modules\Core\Console\app_path('Filament/Resources/Users/UserResource.php'))
+        ->toBe(\app_path('Filament/Resources/Users/UserResource.php'))
+        ->and(\Modules\Core\Console\database_path('migrations'))
+        ->toBe(\database_path('migrations'));
+});
+
+it('sandboxes app_path when a base is configured', function (): void {
+    HandleTestContext::$app_base = '/tmp/handle-test-app';
+
+    expect(\Modules\Core\Console\app_path('Filament/Resources/Users/UserResource.php'))
+        ->toBe('/tmp/handle-test-app/Filament/Resources/Users/UserResource.php');
+
+    HandleTestContext::$app_base = '';
 });

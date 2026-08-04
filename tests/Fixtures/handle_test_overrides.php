@@ -34,11 +34,22 @@ function class_uses_trait(string|object $class, string $uses, bool $recursive = 
 
 function app_path(string $path = ''): string
 {
+    // Stay inert unless a test configures a sandbox base — otherwise every
+    // Modules\Core\Console command would resolve broken paths like `/Filament/...`
+    // for the rest of the process after this fixture is loaded at file scope.
+    if (HandleTestContext::$app_base === '') {
+        return \app_path($path);
+    }
+
     return HandleTestContext::$app_base . '/' . ltrim($path, '/');
 }
 
 function database_path(string $path = ''): string
 {
+    if (HandleTestContext::$db_base === '') {
+        return \database_path($path);
+    }
+
     return HandleTestContext::$db_base . '/' . ltrim($path, '/');
 }
 
