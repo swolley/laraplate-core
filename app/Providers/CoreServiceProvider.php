@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -275,7 +276,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function loadCronJobsFromDatabase(string $cache_key): array
     {
         try {
-            if (! SchemaInspector::getInstance()->hasTable($cache_key)) {
+            // Live connection check — do not use SchemaInspector here. Its process-level
+            // memoization survives across Pest tests while :memory: SQLite is wiped, which
+            // falsely reports the table as present and floods logs with QueryExceptions.
+            if (! Schema::hasTable($cache_key)) {
                 return [];
             }
 

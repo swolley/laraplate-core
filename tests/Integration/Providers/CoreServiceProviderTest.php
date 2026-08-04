@@ -186,9 +186,27 @@ it('loadCronJobsFromDatabase returns active cron rows when table exists', functi
         ->and((string) $result[0]['schedule'])->toBe('* * * * *');
 });
 
+it('loadCronJobsFromDatabase ignores stale SchemaInspector when cron table was dropped', function (): void {
+    $cron_table = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+
+    // Warm process-level memoization so hasTable stays true after DROP (Pest suite leak).
+    expect(SchemaInspector::getInstance()->hasTable($cron_table))->toBeTrue();
+
+    Schema::drop($cron_table);
+
+    expect(SchemaInspector::getInstance()->hasTable($cron_table))->toBeTrue();
+
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', [$cron_table]);
+
+    expect($result)->toBeArray()->toBeEmpty();
+});
+
 it('loadCronJobsFromDatabase returns empty array on exceptions', function (): void {
     $cron_table = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
-    Schema::drop($cron_table);
+    // Table may already be gone from the previous regression test in this file.
+    if (Schema::hasTable($cron_table)) {
+        Schema::drop($cron_table);
+    }
 
     $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', ['users']);
 

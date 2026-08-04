@@ -6,7 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- *(import)* Optional console `OutputInterface` on `BulkImporterInterface::import()` for progress lines
+- *(import)* Pass optional console output to bulk importers
+
+### 🐛 Bug Fixes
+
+- *(core)* Keep Console app_path overrides inert until sandboxed
+- *(i18n)* Restore flag mappings in locale files for consistency
+- *(schedule)* Use live Schema::hasTable for cron job loading
+
+## [1.69.1] - 2026-08-04
 
 ### 🐛 Bug Fixes
 
