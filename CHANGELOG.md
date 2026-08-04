@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(i18n)* Add FlagCDN country codes to locale lang files
+
+## [1.69.0] - 2026-08-03
+
 ### 🚀 Features
 
 - *(core)* Settings cleanup keyed on module state and drift
@@ -104,7 +110,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.59.0] - 2026-07-12
+## [1.58.8] - 2026-07-10
 
 ### 🐛 Bug Fixes
 

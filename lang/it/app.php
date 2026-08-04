@@ -95,6 +95,7 @@ return [
     ],
     'words' => 'parole',
   ],
+  'flag' => 'it',
   'language' => 'Italiano',
   'locale' => 'it-IT',
   'login' => [

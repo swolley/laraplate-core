@@ -95,6 +95,7 @@ return [
     ],
     'words' => 'words',
   ],
+  'flag' => 'gb',
   'language' => 'English',
   'locale' => 'en-US',
   'login' => [

@@ -120,6 +120,19 @@ it('getUrl maps en-* to gb', function (): void {
     @unlink($flag_file);
 });
 
+it('getUrl maps sl to si', function (): void {
+    Http::fake([
+        'https://flagcdn.com/40x30/si.png' => Http::response('binary', 200),
+    ]);
+
+    $url = flagCdnService()->getUrl('sl', 40, 30, 'png');
+
+    expect($url)->toBe('/flags/si_40x30.png');
+    $flag_file = public_path('flags/si_40x30.png');
+    expect(file_exists($flag_file))->toBeTrue();
+    @unlink($flag_file);
+});
+
 it('getUrl creates flags directory when it does not exist', function (): void {
     $flags_dir = public_path('flags');
 

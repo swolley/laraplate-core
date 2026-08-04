@@ -95,6 +95,7 @@ return [
     ],
     'words' => 'besed',
   ],
+  'flag' => 'si',
   'language' => 'Slovenščina',
   'locale' => 'sl_SI',
   'login' => [
