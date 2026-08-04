@@ -8,6 +8,7 @@ use function property_exists;
 
 use DateTimeInterface;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
@@ -265,6 +266,22 @@ trait HasVersions
         return $strategy;
     }
 
+    /**
+     * History rows that represent a soft delete (a "trashing"): an update that set the
+     * deleted-at column. The soft restore that later clears it is deliberately excluded.
+     *
+     * @return Builder<Version>
+     */
+    public function trashingVersions(): Builder
+    {
+        $deleted_at_column = $this->getVersionDeletedAtColumn() ?? 'deleted_at';
+
+        return $this->versions()
+            ->getQuery()
+            ->where('change_type', VersionChangeType::Updated)
+            ->whereNotNull("contents->{$deleted_at_column}");
+    }
+
     protected static function bootHasVersions(): void
     {
         static::created(function (Model $model): void {
@@ -399,9 +416,26 @@ trait HasVersions
             return;
         }
 
+        if ($this->isHardDelete()) {
+            $this->pending_version_delete = [
+                'mode' => 'hard',
+                'original' => $this->filterVersionableImage($this->getRawOriginal()),
+            ];
+
+            return;
+        }
+
+        $deleted_at_column = $this->getVersionDeletedAtColumn();
+
+        if ($deleted_at_column === null) {
+            return;
+        }
+
         $this->pending_version_delete = [
+            'mode' => 'soft',
             'strategy' => $strategy,
-            'original' => $this->filterVersionableImage($this->getRawOriginal()),
+            'deleted_at_column' => $deleted_at_column,
+            'original' => [$deleted_at_column => $this->getRawOriginal($deleted_at_column)],
         ];
     }
 
@@ -414,15 +448,55 @@ trait HasVersions
             return;
         }
 
+        if ($pending['mode'] === 'hard') {
+            resolve(VersionWriterInterface::class)->write(new VersionChange(
+                model: $this,
+                type: VersionChangeType::Deleted,
+                originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
+                contents: [],
+                strategy: VersionStrategy::SNAPSHOT,
+                userId: $this->getVersionUserId(),
+                encryptedAttributes: $this->encryptedVersionable,
+            ));
+
+            return;
+        }
+
+        $deleted_at_column = $pending['deleted_at_column'];
+
         resolve(VersionWriterInterface::class)->write(new VersionChange(
             model: $this,
-            type: VersionChangeType::Deleted,
+            type: VersionChangeType::Updated,
             originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
-            contents: [],
+            contents: VersionChange::encryptSelected(
+                [$deleted_at_column => $this->getRawOriginal($deleted_at_column)],
+                $this->encryptedVersionable,
+            ),
             strategy: $pending['strategy'],
             userId: $this->getVersionUserId(),
             encryptedAttributes: $this->encryptedVersionable,
         ));
+    }
+
+    /**
+     * A hard delete removes the live row, so its tombstone must be a self-contained
+     * SNAPSHOT: it cannot rely on a diff chain that the deletion itself breaks.
+     * A soft delete is only an update of the deleted-at column and the row survives.
+     */
+    private function isHardDelete(): bool
+    {
+        if (! method_exists($this, 'isForceDeleting')) {
+            return true;
+        }
+
+        return $this->isForceDeleting();
+    }
+
+    private function getVersionDeletedAtColumn(): ?string
+    {
+        return method_exists($this, 'getDeletedAtColumn')
+            ? $this->getDeletedAtColumn()
+            : null;
     }
 
     /**
