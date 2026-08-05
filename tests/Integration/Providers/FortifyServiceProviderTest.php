@@ -32,15 +32,16 @@ it('registers LogoutResponse instance', function (): void {
     expect($response)->toBeInstanceOf(LogoutResponse::class);
 });
 
-it('LogoutResponse redirects to userInfo when wantsJson', function (): void {
+it('LogoutResponse returns no content when expectsJson', function (): void {
     $this->provider->register();
 
-    $request = Request::create('/', 'GET');
+    $request = Request::create('/', 'POST');
     $request->headers->set('Accept', 'application/json');
+    $request->headers->set('X-Requested-With', 'XMLHttpRequest');
 
     $response = app(LogoutResponse::class)->toResponse($request);
 
-    expect($response->getTargetUrl())->toContain('profile-information');
+    expect($response->getStatusCode())->toBe(204);
 });
 
 it('registers LoginResponse instance', function (): void {
@@ -49,15 +50,16 @@ it('registers LoginResponse instance', function (): void {
     expect(app()->bound(LoginResponse::class))->toBeTrue();
 });
 
-it('LoginResponse redirects to userInfo when wantsJson', function (): void {
+it('LoginResponse returns no content when expectsJson', function (): void {
     $this->provider->register();
 
-    $request = Request::create('/', 'GET');
+    $request = Request::create('/', 'POST');
     $request->headers->set('Accept', 'application/json');
+    $request->headers->set('X-Requested-With', 'XMLHttpRequest');
 
     $response = app(LoginResponse::class)->toResponse($request);
 
-    expect($response->getTargetUrl())->toContain('profile-information');
+    expect($response->getStatusCode())->toBe(204);
 });
 
 it('LogoutResponse redirects to configured logout path when not json', function (): void {
@@ -84,14 +86,15 @@ it('registers RegisterResponse instance', function (): void {
     expect(app()->bound(RegisterResponse::class))->toBeTrue();
 });
 
-it('RegisterResponse redirects to userInfo when wantsJson', function (): void {
+it('RegisterResponse returns no content when expectsJson', function (): void {
     $this->provider->register();
-    $request = Request::create('/', 'GET');
+    $request = Request::create('/', 'POST');
     $request->headers->set('Accept', 'application/json');
+    $request->headers->set('X-Requested-With', 'XMLHttpRequest');
 
     $response = app(RegisterResponse::class)->toResponse($request);
 
-    expect($response->getTargetUrl())->toContain('profile-information');
+    expect($response->getStatusCode())->toBe(204);
 });
 
 it('RegisterResponse redirects to configured register path when not json', function (): void {

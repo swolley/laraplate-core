@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\UserController;
 
 Route::controller(UserController::class)->name('auth.')->group(function (): void {
-    Route::get('/user/profile-information', 'userInfo')->withoutMiddleware('auth')->name('userInfo');
+    // Keep the `auth` group session stack (StartSession, cookies, …) but allow
+    // guests: SPA login calls this right after Fortify to read the new session.
+    // `withoutMiddleware('auth')` would drop the whole group (no session → always anonymous).
+    Route::get('/user/profile-information', 'userInfo')
+        ->withoutMiddleware([Authenticate::class])
+        ->name('userInfo');
     Route::post('/impersonate', 'impersonate')->can('impersonate')->name('impersonate');
     Route::post('/leave-impersonate', 'leaveImpersonate')->can('impersonate')->name('leaveImpersonate');
     // Route::patch('/configs', 'updateConfigs')->can('edit')->name('updateConfigs');

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Cache;
 
 use Illuminate\Cache\CacheManager as BaseCacheManager;
-use Illuminate\Contracts\Cache\Repository as RepositoryContract;
 use Illuminate\Contracts\Cache\Store;
 use Illuminate\Foundation\Application;
+
 
 final class CacheManager extends BaseCacheManager
 {
@@ -48,25 +48,9 @@ final class CacheManager extends BaseCacheManager
     }
 
     /**
-     * Get a cache store instance by name. Returns the Core Repository for the default driver so that getCacheTags() and tag support are available.
-     * 
-     * @param  string|null  $name
-     */
-    public function store($name = null): RepositoryContract // @pest-ignore-type
-    {
-        $name ??= $this->getDefaultDriver();
-
-        if ($name === $this->getDefaultDriver() && $this->app->bound('cache.store')) {
-            $this->stores[$name] ??= $this->app->make(\Illuminate\Cache\Repository::class);
-
-            return $this->stores[$name];
-        }
-
-        return parent::store($name);
-    }
-
-    /**
-     * Create a custom CacheManager that returns our Repository.
+     * Create a Core Repository for every store so macros like tryByRequest /
+     * clearByEntity are available on Cache:: regardless of driver (array,
+     * redis, failover, …).
      */
     public function repository(Store $store, array $config = []): Repository
     {

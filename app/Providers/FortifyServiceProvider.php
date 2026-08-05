@@ -37,14 +37,11 @@ final class FortifyServiceProvider extends ServiceProvider
              */
             public function toResponse($request): mixed // @pest-ignore-type
             {
-                if ($request->wantsJson()) {
-                    return to_route('core.auth.userInfo');
+                // SPA / XHR clients must not receive HTML redirects (axios would
+                // follow absolute APP_URL Location headers onto :8000 /admin).
+                if ($request->expectsJson()) {
+                    return response()->noContent();
                 }
-
-                // // If we are in a Filament context, redirect to Filament login
-                // if (str_contains($request->path(), 'admin')) {
-                //     return redirect()->route('filament.auth.login');
-                // }
 
                 return redirect()->intended(Fortify::redirects('logout', '/admin'));
             }
@@ -57,14 +54,9 @@ final class FortifyServiceProvider extends ServiceProvider
              */
             public function toResponse($request): mixed // @pest-ignore-type
             {
-                if ($request->wantsJson()) {
-                    return to_route('core.auth.userInfo');
+                if ($request->expectsJson()) {
+                    return response()->noContent();
                 }
-
-                // // If we are in a Filament context, redirect to Filament dashboard
-                // if (str_contains($request->path(), 'admin')) {
-                //     return redirect()->route('filament.pages.dashboard');
-                // }
 
                 return redirect()->intended(Fortify::redirects('login'));
             }
@@ -74,14 +66,9 @@ final class FortifyServiceProvider extends ServiceProvider
         {
             public function toResponse($request): mixed // @pest-ignore-type
             {
-                if ($request->wantsJson()) {
-                    return to_route('core.auth.userInfo');
+                if ($request->expectsJson()) {
+                    return response()->noContent();
                 }
-
-                // // If we are in a Filament context, redirect to Filament dashboard
-                // if (str_contains($request->path(), 'admin')) {
-                //     return redirect()->route('filament.pages.dashboard');
-                // }
 
                 return redirect()->intended(Fortify::redirects('register'));
             }

@@ -24,6 +24,18 @@ test('user info returns anonymous data when not authenticated', function (): voi
         ]);
 });
 
+test('user info keeps session stack but allows guests', function (): void {
+    $route = app('router')->getRoutes()->getByName('core.auth.userInfo');
+
+    expect($route)->not->toBeNull()
+        ->and($route->gatherMiddleware())->toContain('auth')
+        ->and($route->excludedMiddleware())->toContain(\Illuminate\Auth\Middleware\Authenticate::class);
+
+    $this->getJson(route('core.auth.userInfo'))
+        ->assertOk()
+        ->assertJsonPath('data.id', 'anonymous');
+});
+
 test('user info returns user data when authenticated', function (): void {
     $this->actingAs($this->user);
 

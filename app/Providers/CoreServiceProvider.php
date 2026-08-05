@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Modules\Core\Cache\CacheManager as CoreCacheManager;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
@@ -149,6 +150,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         throw_unless(is_subclass_of(user_class(), CoreUser::class), ConfigurationException::class, 'User class is not ' . CoreUser::class);
 
         parent::register();
+
+        $this->registerCacheManager();
 
         $this->app->bind(OpenApiJsonController::class, DocsController::class);
 
@@ -579,6 +582,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
         if ($this->app->isProduction() && config('core.force_https')) {
             URL::forceScheme('https');
         }
+    }
+
+    /**
+     * Replace Laravel's cache manager so Cache:: resolves Core Repository
+     * (tryByRequest, clearByEntity, …) for every configured store including failover.
+     */
+    private function registerCacheManager(): void
+    {
+        $this->app->singleton('cache', static fn ($app): CoreCacheManager => new CoreCacheManager($app));
+        $this->app->singleton('cache.store', static fn ($app) => $app['cache']->driver());
+        Cache::clearResolvedInstance();
     }
 
     /**

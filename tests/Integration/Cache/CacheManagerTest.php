@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Cache\ArrayStore;
-use Illuminate\Cache\Repository as IlluminateCacheRepository;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Cache\Repository;
 
@@ -15,8 +14,9 @@ it('returns bound cache store for default driver', function (): void {
     $first = $manager->store();
     $second = $manager->store();
 
-    expect($first)->toBeInstanceOf(IlluminateCacheRepository::class)
-        ->and($second)->toBe($first);
+    expect($first)->toBeInstanceOf(Repository::class)
+        ->and($second)->toBe($first)
+        ->and(method_exists($first, 'tryByRequest'))->toBeTrue();
 });
 
 it('falls back to parent store for non-default driver', function (): void {
@@ -25,7 +25,8 @@ it('falls back to parent store for non-default driver', function (): void {
 
     $store = $manager->store('array');
 
-    expect($store)->toBeInstanceOf(Illuminate\Contracts\Cache\Repository::class);
+    expect($store)->toBeInstanceOf(Repository::class)
+        ->and(method_exists($store, 'tryByRequest'))->toBeTrue();
 });
 
 it('creates core repository instances from store', function (): void {
