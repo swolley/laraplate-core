@@ -3,17 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\CMS\Casts\EntityType;
 use Modules\CMS\Enums\CMSTables;
+use Modules\CMS\Models\Content;
+use Modules\CMS\Models\Entity;
+use Modules\CMS\Models\Pivot\Presettable;
+use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
-use Modules\Core\Models\Pivot\Presettable;
-use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\PresetVersioningService;
-use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
 
 beforeEach(function (): void {
-    if (! Schema::hasColumns(CMSTables::Contents->value, ['components', 'shared_components'])) {
+    // Base tables store shared_components; translated `components` live on *_translations.
+    if (! Schema::hasColumn(CMSTables::Contents->value, 'shared_components')) {
         $this->markTestSkipped('Preset versioning integration requires full Core runtime.');
     }
 });
@@ -25,9 +28,12 @@ beforeEach(function (): void {
  */
 function createPresetWithFields(int $field_count = 2): array
 {
+    DynamicContentsService::reset();
+
     $entity = Entity::query()->create([
         'name' => 'test_entity_' . uniqid(),
-        'type' => EntityTypeStub::Value1,
+        'slug' => 'test-entity-' . uniqid(),
+        'type' => EntityType::Contents,
     ]);
 
     $preset = Preset::query()->create([
@@ -239,7 +245,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityTypeStub::Value1);
+            ->fetchAvailablePresettables(EntityType::Contents);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -256,7 +262,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityTypeStub::Value1);
+            ->fetchAvailablePresettables(EntityType::Contents);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -268,7 +274,8 @@ describe('Presettable model', function (): void {
     it('is created automatically when a preset is created', function (): void {
         $entity = Entity::query()->create([
             'name' => 'auto_entity_' . uniqid(),
-            'type' => EntityTypeStub::Value1,
+            'slug' => 'auto-entity-' . uniqid(),
+            'type' => EntityType::Contents,
         ]);
 
         $preset = Preset::query()->create([
@@ -303,7 +310,8 @@ describe('Presettable model', function (): void {
     it('returns empty collection for empty snapshot', function (): void {
         $entity = Entity::query()->create([
             'name' => 'empty_entity_' . uniqid(),
-            'type' => EntityTypeStub::Value1,
+            'slug' => 'empty-entity-' . uniqid(),
+            'type' => EntityType::Contents,
         ]);
 
         $preset = Preset::query()->create([

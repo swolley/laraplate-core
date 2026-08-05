@@ -3,82 +3,114 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Modules\CMS\Casts\EntityType;
 use Modules\CMS\Enums\CMSTables;
 use Modules\CMS\Models\Contributor;
+use Modules\CMS\Models\Entity;
+use Modules\CMS\Models\Pivot\Presettable;
+use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
-use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
-use Modules\Core\Models\Pivot\Presettable;
-use Modules\Core\Models\Preset;
-use Modules\Core\Tests\Stubs\Casts\EntityTypeStub;
+use Modules\Core\Services\DynamicContentsService;
 
 beforeEach(function (): void {
-    if (! Schema::hasColumns(CMSTables::Contributors->value, ['components', 'shared_components'])) {
+    // Base tables store shared_components; translated `components` live on *_translations.
+    if (! Schema::hasColumn(CMSTables::Contributors->value, 'shared_components')) {
         $this->markTestSkipped('Dynamic contents integration requires full Core runtime.');
     }
 
-    setupCmsEntities();
+    setupCMSEntities([EntityType::Contributors]);
 });
 
 /**
- * Create a test entity with specific field types and a properly linked preset.
+ * Create a CMS entity with specific field types and a versioned presettable snapshot.
+ *
+ * @return array{
+ *     entity: Entity,
+ *     preset: Preset,
+ *     presettable: Presettable,
+ *     textField: Field,
+ *     arrayField: Field,
+ *     objectField: Field,
+ *     editorField: Field
+ * }
  */
 function createTestEntityWithFields(): array
 {
+    DynamicContentsService::reset();
+
     $entity = Entity::query()->create([
         'name' => 'test_entity_' . uniqid(),
-        'type' => EntityTypeStub::Value1,
+        'slug' => 'test-entity-' . uniqid(),
+        'type' => EntityType::Contributors,
     ]);
 
     $preset = Preset::query()->create([
         'entity_id' => $entity->id,
-        'name' => 'default',
-    ]);
-
-    Presettable::query()->create([
-        'entity_id' => $entity->id,
-        'preset_id' => $preset->id,
+        'name' => 'default_' . uniqid(),
     ]);
 
     $textField = Field::query()->create([
-        'name' => 'text_field_' . uniqid(),
+        'name' => 'text_field',
         'type' => FieldType::Text,
         'options' => new stdClass(),
     ]);
+    $textField->is_translatable = true;
+    $textField->save();
 
     $arrayField = Field::query()->create([
-        'name' => 'array_field_' . uniqid(),
+        'name' => 'array_field',
         'type' => FieldType::Array,
         'options' => new stdClass(),
     ]);
+    $arrayField->is_translatable = true;
+    $arrayField->save();
 
     $objectField = Field::query()->create([
-        'name' => 'object_field_' . uniqid(),
+        'name' => 'object_field',
         'type' => FieldType::Object,
         'options' => new stdClass(),
     ]);
+    $objectField->is_translatable = true;
+    $objectField->save();
 
     $editorField = Field::query()->create([
-        'name' => 'editor_field_' . uniqid(),
+        'name' => 'editor_field',
         'type' => FieldType::Editor,
         'options' => new stdClass(),
     ]);
+    $editorField->is_translatable = true;
+    $editorField->save();
 
-    $preset->fields()->attach([
-        $textField->id => ['default' => null, 'is_required' => false],
-        $arrayField->id => ['default' => null, 'is_required' => false],
-        $objectField->id => ['default' => null, 'is_required' => false],
-        $editorField->id => ['default' => null, 'is_required' => false],
+    $preset->fields()->sync([
+        $textField->id => ['default' => null, 'is_required' => false, 'order_column' => 0],
+        $arrayField->id => ['default' => null, 'is_required' => false, 'order_column' => 1],
+        $objectField->id => ['default' => null, 'is_required' => false, 'order_column' => 2],
+        $editorField->id => ['default' => null, 'is_required' => false, 'order_column' => 3],
     ]);
+
+    $presettable = $preset->createFieldsVersion();
 
     return [
         'entity' => $entity,
         'preset' => $preset,
+        'presettable' => $presettable,
         'textField' => $textField,
         'arrayField' => $arrayField,
         'objectField' => $objectField,
         'editorField' => $editorField,
     ];
+}
+
+/**
+ * Contributor bound to the custom entity/presettable under test.
+ */
+function contributorOnEntity(Entity $entity, Presettable $presettable): Contributor
+{
+    return Contributor::factory()->create([
+        'entity_id' => $entity->id,
+        'presettable_id' => $presettable->id,
+    ]);
 }
 
 describe('HasTranslatedDynamicContents', function (): void {
@@ -94,12 +126,9 @@ describe('HasTranslatedDynamicContents', function (): void {
     });
 
     it('saves components in translations table when using HasTranslatedDynamicContents', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
         $default_locale = config('app.locale');
-
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
 
         $components = [
             'text_field' => 'Test Text',
@@ -109,7 +138,6 @@ describe('HasTranslatedDynamicContents', function (): void {
         ];
 
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => $components,
         ]);
         $contributor->save();
@@ -129,15 +157,11 @@ describe('HasTranslatedDynamicContents', function (): void {
     });
 
     it('can access dynamic content fields transparently with HasTranslatedDynamicContents', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
         $default_locale = config('app.locale');
 
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
-
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [
                 'text_field' => 'Test Text',
                 'array_field' => ['item1', 'item2'],
@@ -153,57 +177,48 @@ describe('HasTranslatedDynamicContents', function (): void {
 
 describe('mergeComponentsValues', function (): void {
     it('ensures ARRAY fields have array default value instead of null', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [], // Empty components
         ]);
         $contributor->save();
 
         // array_field should have [] as default, not null
-        $components = $contributor->getComponentsAttribute();
+        $components = $contributor->components;
         expect($components['array_field'])->toBeArray();
         expect($components['array_field'])->toBe([]);
     });
 
     it('ensures OBJECT fields have object default value instead of null', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [], // Empty components
         ]);
         $contributor->save();
 
         // object_field should have stdClass() as default, not null
-        $components = $contributor->getComponentsAttribute();
+        $components = $contributor->components;
         expect($components['object_field'])->toBeInstanceOf(stdClass::class);
     });
 
     it('ensures EDITOR fields have array default value instead of null', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [], // Empty components
         ]);
         $contributor->save();
 
         // editor_field should have ['blocks' => []] as default, not null
-        $components = $contributor->getComponentsAttribute();
+        $components = $contributor->components;
         expect($components['editor_field'])->toBeArray();
         expect($components['editor_field'])->toHaveKey('blocks');
         expect($components['editor_field']['blocks'])->toBe([]);
@@ -212,79 +227,68 @@ describe('mergeComponentsValues', function (): void {
 
 describe('Validation', function (): void {
     it('validates ARRAY fields correctly', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
 
         // Should pass validation with array value
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [
                 'array_field' => ['item1', 'item2'],
             ],
         ]);
 
-        expect(fn () => $contributor->validateWithRules('create'))->not->toThrow(Exception::class);
+        // Model already exists: use update rules (create unique would fail on own name).
+        expect(fn () => $contributor->validateWithRules('update'))->not->toThrow(Exception::class);
     });
 
     it('validates OBJECT fields correctly by converting to JSON string', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
 
         // Should pass validation with object value (converted to JSON string)
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [
                 'object_field' => new stdClass(),
             ],
         ]);
 
-        expect(fn () => $contributor->validateWithRules('create'))->not->toThrow(Exception::class);
+        expect(fn () => $contributor->validateWithRules('update'))->not->toThrow(Exception::class);
     });
 
     it('validates EDITOR fields correctly by converting to JSON string', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
 
         // Should pass validation with editor value (converted to JSON string)
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [
                 'editor_field' => ['blocks' => []],
             ],
         ]);
 
-        expect(fn () => $contributor->validateWithRules('create'))->not->toThrow(Exception::class);
+        expect(fn () => $contributor->validateWithRules('update'))->not->toThrow(Exception::class);
     });
 
     it('fails validation when ARRAY field is not an array', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
         $default_locale = config('app.locale');
 
         // Set array_field as string instead of array
         $contributor->setTranslation($default_locale, [
-            'name' => 'Test Contributor',
             'components' => [
                 'array_field' => 'not an array',
             ],
         ]);
 
-        expect(fn () => $contributor->validateWithRules('create'))->toThrow(Illuminate\Validation\ValidationException::class);
+        expect(fn () => $contributor->validateWithRules('update'))->toThrow(Illuminate\Validation\ValidationException::class);
     });
 });
 
@@ -305,24 +309,21 @@ describe('initializeHasTranslatedDynamicContents', function (): void {
         expect($fillable)->not->toContain('components');
 
         // Also verify it's not in attributes
-        $reflection = new ReflectionClass($contributor);
-        $attributesProperty = $reflection->getProperty('attributes');
-        $attributes = $attributesProperty->getValue($contributor);
-
-        expect($attributes)->not->toHaveKey('components');
+        expect($contributor->getAttributes())->not->toHaveKey('components');
     });
 
     it('removes components from attributes after HasDynamicContents adds it', function (): void {
         // Create instance using factory to ensure database is ready
         $contributor = Contributor::factory()->make();
 
-        // Simulate what happens during initialization
-        $contributor->initializeHasDynamicContents();
-        expect($contributor->attributes)->toHaveKey('components');
+        // Contributor overrides initializeHasDynamicContents to clean translatable fields;
+        // call the aliased base initializer to re-add components, then assert cleanup.
+        $base_initialize = new ReflectionMethod($contributor, '_internalDynamicContentsInitialize');
+        $base_initialize->invoke($contributor);
+        expect($contributor->getAttributes())->toHaveKey('components');
 
-        // Now initializeHasTranslatedDynamicContents should remove it
         $contributor->initializeHasTranslatedDynamicContents();
-        expect($contributor->attributes)->not->toHaveKey('components');
+        expect($contributor->getAttributes())->not->toHaveKey('components');
     });
 });
 
@@ -335,33 +336,30 @@ describe('Integration with HasTranslations', function (): void {
     });
 
     it('can set components for different locales', function (): void {
-        ['entity' => $entity] = createTestEntityWithFields();
-        $contributor = Contributor::factory()->create();
-        $contributor->entity_id = $entity->id;
-        $contributor->save();
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
 
-        $default_locale = config('app.locale');
-
-        $contributor->setTranslation($default_locale, [
-            'name' => 'Italian Contributor',
+        // Use two distinct locales so default app.locale=en does not collide.
+        $contributor->setTranslation('it', [
             'components' => [
                 'text_field' => 'Testo Italiano',
             ],
         ]);
 
         $contributor->setTranslation('en', [
-            'name' => 'English Contributor',
             'components' => [
                 'text_field' => 'English Text',
             ],
         ]);
         $contributor->save();
 
-        // Access with default locale
+        Modules\Core\Helpers\LocaleContext::set('it');
+        $contributor->unsetRelation('translation');
         expect($contributor->text_field)->toBe('Testo Italiano');
 
-        // Access with English locale
         $enTranslation = $contributor->getTranslation('en');
         expect($enTranslation->components['text_field'])->toBe('English Text');
+
+        Modules\Core\Helpers\LocaleContext::set(config('app.locale'));
     });
 });
