@@ -26,6 +26,7 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
         Route::patch('/unlock/{module}/{entity}', 'unlock')->name('unlock');
         Route::patch('/approve/{module}/{entity}', 'approve')->name('approve');
         Route::patch('/disapprove/{module}/{entity}', 'disapprove')->name('disapprove');
+        Route::get('/pending-approvals/{module}/{entity}', 'pendingApprovals')->name('pending-approvals');
         Route::patch('/activate/{module}/{entity}', 'activate')->name('activate');
         Route::patch('/inactivate/{module}/{entity}', 'inactivate')->name('inactivate');
         Route::delete('/cache-clear/{module}/{entity}', 'clearModelCache')->name('cache-clear');

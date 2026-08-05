@@ -24,6 +24,7 @@ use Modules\Core\Http\Requests\DomainActionRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
+use Modules\Core\Http\Requests\PendingApprovalsRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TreeRequest;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
@@ -215,6 +216,21 @@ class CrudController extends Controller
         } catch (Throwable $ex) {
             return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
         }
+    }
+
+    /**
+     * List active modifications awaiting approval for the given entity.
+     */
+    final public function pendingApprovals(PendingApprovalsRequest $request): Response
+    {
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn (): CrudResult => $this->crudService->pendingApprovals($requestData),
+            $request,
+            $requestData->model,
+            shouldCache: false,
+        );
     }
 
     final public function lock(ModifyRequest $request): Response

@@ -136,7 +136,7 @@ trait HasApprovals
         $preview = $this->attributesToArray();
 
         /** @var Modification $modification */
-        foreach ($this->modifications()->oldest()->select(['modifications'])->cursor() as $modification) {
+        foreach ($this->modifications()->activeOnly()->oldest()->select(['modifications'])->cursor() as $modification) {
             /** @phpstan-ignore property.notFound */
             foreach ($modification->modifications as $key => $mod) {
                 $preview[$key] = $mod['modified'];

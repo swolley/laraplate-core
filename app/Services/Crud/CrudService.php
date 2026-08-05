@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Fluent;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Cache\Repository as CacheRepository;
@@ -737,6 +738,64 @@ class CrudService
             table: $model->getTable(),
             cachedAt: Date::now(),
             search: $result->meta,
+        );
+    }
+
+    /**
+     * Active modifications for an entity type (publisher approval inbox).
+     *
+     * @return CrudResult{data: list<array<string, mixed>>}
+     */
+    public function pendingApprovals(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'approve',
+            $model->getConnectionName(),
+        );
+
+        $connection = $model->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifications = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->activeOnly()
+            ->with(['modifiable', 'modifier'])
+            ->oldest()
+            ->get();
+
+        $rows = $modifications->map(static function (Modification $modification): Fluent {
+            $modifiable = $modification->modifiable;
+            $label = null;
+
+            if ($modifiable instanceof Model) {
+                $attributes = $modifiable->getAttributes();
+                $label = $attributes['title'] ?? $attributes['name'] ?? null;
+            }
+
+            return new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'title' => $label,
+                'created_at' => $modification->getAttribute('created_at'),
+                'approvers_required' => $modification->approvers_required,
+                'approvers_remaining' => $modification->approversRemaining,
+                'modifier_id' => $modification->modifier_id,
+                'modifier_type' => $modification->modifier_type,
+            ]);
+        })->values();
+
+        return new CrudResult(
+            data: $rows,
+            meta: new CrudMeta(
+                totalRecords: $rows->count(),
+                currentRecords: $rows->count(),
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
         );
     }
 
