@@ -799,6 +799,82 @@ class CrudService
         );
     }
 
+    /**
+     * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
+     */
+    public function latestDisapproval(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+
+        $record_id = $requestData->request->input('id');
+        $found_record = $model->newQuery()->whereKey($record_id)->firstOrFail();
+
+        $connection = $found_record->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifier_types = array_values(array_unique([
+            $user::class,
+            User::class,
+            \App\Models\User::class,
+        ]));
+
+        /** @var Modification|null $modification */
+        $modification = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->where('modifiable_id', $found_record->getKey())
+            ->where('modifier_id', $user->getKey())
+            ->whereIn('modifier_type', $modifier_types)
+            ->inactiveOnly()
+            ->whereHas('disapprovals')
+            ->with(['disapprovals' => static fn ($query) => $query->latest('id')])
+            ->latest('id')
+            ->first();
+
+        if ($modification === null) {
+            return new CrudResult(
+                data: null,
+                meta: new CrudMeta(
+                    totalRecords: 0,
+                    currentRecords: 0,
+                    class: $model::class,
+                    table: $model->getTable(),
+                    cachedAt: Date::now(),
+                ),
+            );
+        }
+
+        /** @var Disapproval|null $disapproval */
+        $disapproval = $modification->disapprovals->first();
+
+        return new CrudResult(
+            data: new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'reason' => $disapproval?->reason,
+                'modifications' => $modification->modifications,
+                'disapproved_at' => $disapproval?->getAttribute('created_at'),
+                'disapprover_id' => $disapproval?->disapprover_id,
+                'disapprover_type' => $disapproval?->disapprover_type,
+            ]),
+            meta: new CrudMeta(
+                totalRecords: 1,
+                currentRecords: 1,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
     private function doApproveOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;

@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(grids)* Expose per-entity allowed operations in grid config
+- *(versioning)* Implement soft and hard delete handling in versioning
+- *(core)* Apply approve permission as write-time quorum credit
+- *(core)* List pending approvals for entity inbox
+- *(core)* Expose latest soft-kept disapproval for editor banner
+
+### 🐛 Bug Fixes
+
+- *(core)* Attribute shared-table settings to the table's owning module
+- *(core)* Keep platform columns out of generated Filament resources
+- *(schedule)* Use connection-affine schema check for cron loading
+
+## [1.69.2] - 2026-08-04
+
+### 🚀 Features
+
 - *(import)* Pass optional console output to bulk importers
 
 ### 🐛 Bug Fixes

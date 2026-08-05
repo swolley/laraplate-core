@@ -23,6 +23,7 @@ use Modules\Core\Http\Requests\DetailRequest;
 use Modules\Core\Http\Requests\DomainActionRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
 use Modules\Core\Http\Requests\ListRequest;
+use Modules\Core\Http\Requests\LatestDisapprovalRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
 use Modules\Core\Http\Requests\PendingApprovalsRequest;
 use Modules\Core\Http\Requests\SearchRequest;
@@ -227,6 +228,21 @@ class CrudController extends Controller
 
         return $this->handleServiceCall(
             fn (): CrudResult => $this->crudService->pendingApprovals($requestData),
+            $request,
+            $requestData->model,
+            shouldCache: false,
+        );
+    }
+
+    /**
+     * Latest soft-kept disapproval for the current user as modifier of a record.
+     */
+    final public function latestDisapproval(LatestDisapprovalRequest $request): Response
+    {
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn (): CrudResult => $this->crudService->latestDisapproval($requestData),
             $request,
             $requestData->model,
             shouldCache: false,
