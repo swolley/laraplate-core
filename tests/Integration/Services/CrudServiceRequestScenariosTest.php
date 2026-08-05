@@ -967,6 +967,7 @@ it('approve and disapprove run modification workflows', function (): void {
         }
     };
 
+    $author = User::factory()->create();
     $superadmin = crud_cov_login_superadmin();
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
 
@@ -975,7 +976,7 @@ it('approve and disapprove run modification workflows', function (): void {
     $mod = Modification::query()->create([
         'modifiable_id' => $row->getKey(),
         'modifiable_type' => $approval_model::class,
-        'modifier_id' => $superadmin->getKey(),
+        'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
         'is_update' => true,
@@ -1065,12 +1066,13 @@ it('approves the modification on the target model connection', function (): void
         }
     })->setConnection('crud-approval-secondary');
     $row = $model->newQuery()->create(['id' => 7101, 'title' => 'secondary target']);
+    $author = User::factory()->create();
     $superadmin = crud_cov_login_superadmin();
     $attributes = [
         'id' => 7201,
         'modifiable_id' => $row->getKey(),
         'modifiable_type' => $model::class,
-        'modifier_id' => $superadmin->getKey(),
+        'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
         'is_update' => true,
@@ -1200,6 +1202,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
         }
     };
     $row = $model->newQuery()->create(['id' => 7301, 'title' => 'approval sentinel']);
+    $author = User::factory()->create();
     $user = User::factory()->create();
     $endpoint_permission = Permission::query()->create([
         'name' => 'crud_approval_denied_secondary.crud_cov_approval_affinity_denied.approve',
@@ -1212,7 +1215,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
         'id' => 7401,
         'modifiable_id' => $row->getKey(),
         'modifiable_type' => $model::class,
-        'modifier_id' => $user->getKey(),
+        'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
         'is_update' => true,
@@ -1412,6 +1415,7 @@ it('disapprove iterates active modifications when no modification id is passed',
         }
     };
 
+    $author = User::factory()->create();
     $superadmin = crud_cov_login_superadmin();
     $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
 
@@ -1420,7 +1424,7 @@ it('disapprove iterates active modifications when no modification id is passed',
     Modification::query()->create([
         'modifiable_id' => $row->getKey(),
         'modifiable_type' => $approval_model::class,
-        'modifier_id' => $superadmin->getKey(),
+        'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
         'is_update' => true,
