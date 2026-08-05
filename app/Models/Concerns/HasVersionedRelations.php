@@ -45,7 +45,9 @@ trait HasVersionedRelations
     public function attachVersioned(string $relation, int|string $subjectId, array $pivot = []): void
     {
         $this->recordRelationMembership($relation, $subjectId, VersionChangeType::Created, $pivot, function () use ($relation, $subjectId, $pivot): void {
-            $this->{$relation}()->attach($subjectId, $pivot);
+            // Idempotent: a re-attach updates the pivot in place instead of inserting a duplicate row,
+            // keeping the live relation in step with the reconstructed membership.
+            $this->{$relation}()->syncWithoutDetaching([$subjectId => $pivot]);
         });
     }
 

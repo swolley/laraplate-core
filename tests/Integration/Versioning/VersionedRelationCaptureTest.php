@@ -67,6 +67,20 @@ it('records a detach as a Deleted membership version row', function (): void {
         ->and($membership->subject_key)->toBe(['id' => $subject->getKey()]);
 });
 
+it('re-attaching an existing subject updates the pivot in place without duplicating', function (): void {
+    $root = VersionedRelationRoot::query()->create(['title' => 'First']);
+    $subject = VersionedRelationSubject::query()->create(['name' => 'News']);
+
+    $root->attachVersioned('categories', $subject->getKey(), ['position' => 1]);
+    $root->attachVersioned('categories', $subject->getKey(), ['position' => 5]);
+
+    expect($root->categories()->count())->toBe(1)
+        ->and((int) $root->categories()->first()->pivot->position)->toBe(5)
+        ->and($root->versionedRelationMembership('categories'))->toBe([
+            ['id' => $subject->getKey(), 'pivot' => ['position' => 5]],
+        ]);
+});
+
 it('rejects an undeclared relation', function (): void {
     $root = VersionedRelationRoot::query()->create(['title' => 'First']);
 
