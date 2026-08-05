@@ -14,4 +14,9 @@ final class HasApprovalsStubModel extends Model
     protected $table = 'has_approvals_stub';
 
     protected $fillable = ['name'];
+
+    public function setApproversRequired(int $count): void
+    {
+        $this->approversRequired = $count;
+    }
 }

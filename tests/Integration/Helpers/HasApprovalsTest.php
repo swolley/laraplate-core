@@ -12,6 +12,7 @@ use Modules\Core\Models\Modification;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
 
@@ -69,14 +70,14 @@ it('returns null from getPreviewAttribute when preview session is disabled', fun
 it('requires approval when not in console and user cannot bypass approval', function (): void {
     App::shouldReceive('runningInConsole')->andReturn(false);
 
+    $model = new HasApprovalsStubModel;
+    $permission = PermissionName::forModel($model, 'approve');
+
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(false);
-    $user->shouldReceive('isSuperAdmin')->andReturn(false);
-    $user->shouldReceive('can')->with('approve.has_approvals_stub')->andReturn(false);
+    $user->shouldReceive('can')->with($permission)->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
 
-    $model = new HasApprovalsStubModel;
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);
 
@@ -94,37 +95,40 @@ it('does not require approval when modifications are empty', function (): void {
     expect($method->invoke($model, []))->toBeFalse();
 });
 
-it('does not require approval when user is admin', function (): void {
+it('does not require approval when user has approve credit and N is 1', function (): void {
     App::shouldReceive('runningInConsole')->andReturn(false);
 
+    $model = new HasApprovalsStubModel;
+    $model->setApproversRequired(1);
+    $permission = PermissionName::forModel($model, 'approve');
+
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(true);
-    $user->shouldReceive('isSuperAdmin')->andReturn(false);
+    $user->shouldReceive('can')->with($permission)->andReturn(true);
 
     Auth::shouldReceive('user')->andReturn($user);
 
-    $model = new HasApprovalsStubModel;
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);
 
     expect($method->invoke($model, ['name' => 'change']))->toBeFalse();
 });
 
-it('does not require approval when user is superadmin and can approve the model', function (): void {
+it('requires approval when user has approve credit but N is greater than 1', function (): void {
     App::shouldReceive('runningInConsole')->andReturn(false);
 
+    $model = new HasApprovalsStubModel;
+    $model->setApproversRequired(2);
+    $permission = PermissionName::forModel($model, 'approve');
+
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(false);
-    $user->shouldReceive('isSuperAdmin')->andReturn(true);
-    $user->shouldReceive('can')->with('approve.has_approvals_stub')->andReturn(true);
+    $user->shouldReceive('can')->with($permission)->andReturn(true);
 
     Auth::shouldReceive('user')->andReturn($user);
 
-    $model = new HasApprovalsStubModel;
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);
 
-    expect($method->invoke($model, ['name' => 'change']))->toBeFalse();
+    expect($method->invoke($model, ['name' => 'change']))->toBeTrue();
 });
 
 it('uses declared model property for ai moderation', function (): void {

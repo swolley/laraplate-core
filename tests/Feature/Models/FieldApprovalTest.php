@@ -8,6 +8,7 @@ use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
 
 it('opts into the approvals workflow', function (): void {
     expect(class_uses_recursive(Field::class))->toContain(HasApprovals::class);
@@ -22,31 +23,32 @@ it('persists field changes directly when running in console', function (): void 
         ->and(Field::query()->whereKey($field->getKey())->value('is_translatable'))->toBeTrue();
 });
 
-it('requires approval for field changes by a non-admin outside the console', function (): void {
+it('requires approval for field changes by a user without approve credit', function (): void {
     App::shouldReceive('runningInConsole')->andReturn(false);
 
+    $field = new Field(['name' => 'field_non_admin', 'type' => FieldType::Text]);
+    $permission = PermissionName::forModel($field, 'approve');
+
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(false);
-    $user->shouldReceive('isSuperAdmin')->andReturn(false);
-    $user->shouldReceive('can')->with('approve.' . (new Field)->getTable())->andReturn(false);
+    $user->shouldReceive('can')->with($permission)->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
 
-    $field = new Field(['name' => 'field_non_admin', 'type' => FieldType::Text]);
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
     $method->setAccessible(true);
 
     expect($method->invoke($field, ['is_translatable' => true]))->toBeTrue();
 });
 
-it('does not require approval for field changes by an admin', function (): void {
+it('does not require approval for field changes when user has approve credit and N is 1', function (): void {
     App::shouldReceive('runningInConsole')->andReturn(false);
 
+    $field = new Field(['name' => 'field_admin', 'type' => FieldType::Text]);
+    $permission = PermissionName::forModel($field, 'approve');
+
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdmin')->andReturn(true);
-    $user->shouldReceive('isSuperAdmin')->andReturn(false);
+    $user->shouldReceive('can')->with($permission)->andReturn(true);
     Auth::shouldReceive('user')->andReturn($user);
 
-    $field = new Field(['name' => 'field_admin', 'type' => FieldType::Text]);
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
     $method->setAccessible(true);
 

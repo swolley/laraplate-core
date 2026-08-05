@@ -40,6 +40,7 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\PermissionName;
 use Override;
 use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
@@ -432,17 +433,35 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
 
     protected function authorizedToApprove(Modification $mod): bool
     {
+        if ($this->isModificationAuthor($mod)) {
+            return false;
+        }
+
         return $this->can($this->approvalPermissionFor($mod, 'approve'));
     }
 
     protected function authorizedToDisapprove(Modification $mod): bool
     {
+        if ($this->isModificationAuthor($mod)) {
+            return false;
+        }
+
         return $this->can($this->approvalPermissionFor($mod, 'disapprove'));
     }
 
     protected function getDefaultGuardName(): string
     {
         return 'web';
+    }
+
+    private function isModificationAuthor(Modification $mod): bool
+    {
+        if ($mod->modifier_id === null || $mod->modifier_type === null) {
+            return false;
+        }
+
+        return (string) $mod->modifier_id === (string) $this->getKey()
+            && $mod->modifier_type === static::class;
     }
 
     private function approvalPermissionFor(Modification $mod, string $action): string
@@ -453,9 +472,10 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             $table = (new $mod->modifiable_type())->getTable();
         }
 
-        $connection = $mod->modifiable?->getConnection()->getName()
-            ?? $mod->getConnection()->getName();
+        $connection = $mod->modifiable?->getConnectionName()
+            ?? $mod->getConnectionName()
+            ?? 'default';
 
-        return "{$connection}.{$table}.{$action}";
+        return PermissionName::build((string) $connection, (string) $table, $action);
     }
 }
