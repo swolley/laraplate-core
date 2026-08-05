@@ -1543,3 +1543,83 @@ it('lock throws when model does not support locks', function (): void {
 
     expect(fn () => $service->lock($modify))->toThrow(BadMethodCallException::class);
 });
+
+it('insert does not issue a redundant select on the created model table', function (): void {
+    if (! Schema::hasTable('crud_perf_insert')) {
+        Schema::create('crud_perf_insert', function (Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    $item_model = new class extends Model
+    {
+        protected $table = 'crud_perf_insert';
+
+        protected $fillable = ['name'];
+    };
+
+    $superadmin = crud_cov_login_superadmin();
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = Request::create('/modify', 'POST', ['name' => 'first']);
+    $request->setUserResolver(fn () => $superadmin);
+    $insert_data = crud_cov_make_modify_data($item_model, $request, ['name' => 'first']);
+
+    $selects_on_table = [];
+    DB::connection()->listen(static function (QueryExecuted $query) use (&$selects_on_table): void {
+        if (str_starts_with($query->sql, 'select') && str_contains($query->sql, 'crud_perf_insert')) {
+            $selects_on_table[] = $query->sql;
+        }
+    });
+
+    $result = $service->insert($insert_data);
+
+    expect($result->statusCode)->toBe(201)
+        ->and($selects_on_table)->toBe([]);
+});
+
+it('activate does not issue a redundant select after restoring the record', function (): void {
+    if (! Schema::hasTable('crud_perf_activate')) {
+        Schema::create('crud_perf_activate', function (Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+    }
+
+    $soft_model = new class extends Model
+    {
+        use SoftDeletes;
+
+        protected $table = 'crud_perf_activate';
+
+        protected $guarded = [];
+    };
+
+    $record = $soft_model->newQuery()->create(['name' => 'x']);
+    $record->delete();
+
+    $superadmin = crud_cov_login_superadmin();
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = Request::create('/modify', 'POST', ['id' => $record->getKey()]);
+    $request->request->set('id', $record->getKey());
+    $request->setUserResolver(fn () => $superadmin);
+    $modify = crud_cov_make_modify_data($soft_model, $request, []);
+
+    $select_count = 0;
+    DB::connection()->listen(static function (QueryExecuted $query) use (&$select_count): void {
+        if (str_starts_with($query->sql, 'select') && str_contains($query->sql, 'crud_perf_activate')) {
+            $select_count++;
+        }
+    });
+
+    $result = $service->activate($modify);
+
+    // Only the lookup select is expected; the discarded fresh() must not add a second one.
+    expect($result->data)->toBeInstanceOf(Model::class)
+        ->and($select_count)->toBe(1);
+});

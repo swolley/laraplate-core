@@ -375,10 +375,8 @@ if (! function_exists('models')) {
     function models(bool $onlyActive = true, ?string $onlyModule = null, ?callable $filter = null): array
     {
         $cache_key = $onlyActive ? 'active' : 'all';
-        $cached = HelpersCache::getModels($cache_key);
-
-        if ($cached === null) {
-            $cached = [];
+        $cached = HelpersCache::rememberModels($cache_key, static function () use ($onlyActive): array {
+            $discovered = [];
             $all_modules = modules(true, true, $onlyActive);
 
             foreach ($all_modules as $m) {
@@ -431,12 +429,12 @@ if (! function_exists('models')) {
                         continue;
                     }
 
-                    $cached[] = $class_subnamespace;
+                    $discovered[] = $class_subnamespace;
                 }
             }
 
-            HelpersCache::setModels($cache_key, $cached);
-        }
+            return $discovered;
+        });
 
         $result = $cached;
 

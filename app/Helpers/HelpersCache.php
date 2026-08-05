@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Helpers;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
- * Static in-memory cache for expensive helper functions (models, connections).
- * Cleared automatically after migrations via CommandListenerProvider.
+ * Two-tier cache for expensive helper functions (models, connections).
+ *
+ * Model discovery is served from a per-request static layer backed by a
+ * cross-request persistent cache, so the filesystem scan runs at most once per
+ * deploy instead of once per request. Both layers are cleared automatically
+ * after migrations via CommandListenerProvider.
  */
 final class HelpersCache
 {
@@ -22,7 +28,49 @@ final class HelpersCache
      */
     private static array $connections = [];
 
+    /**
+     * Cache-key prefix for the cross-request persistent model discovery layer.
+     */
+    private const MODELS_CACHE_PREFIX = 'core.helpers.models.';
+
     private function __construct() {}
+
+    /**
+     * Fully-qualified persistent cache key for a model discovery bucket.
+     *
+     * Exposed so deploy tooling and tests can target the exact key that backs
+     * cross-request model discovery.
+     */
+    public static function modelsCacheKey(string $key): string
+    {
+        return self::MODELS_CACHE_PREFIX . $key;
+    }
+
+    /**
+     * Resolve a model discovery bucket through both cache tiers.
+     *
+     * Returns the per-request in-memory copy when warm; otherwise runs the
+     * discovery closure through the persistent cache and warms the in-memory
+     * layer. The in-memory layer is consulted first so explicit {@see setModels()}
+     * injections keep overriding discovery.
+     *
+     * @param  Closure(): list<class-string<Model>>  $discover
+     * @return list<class-string<Model>>
+     */
+    public static function rememberModels(string $key, Closure $discover): array
+    {
+        if (isset(self::$models[$key])) {
+            return self::$models[$key];
+        }
+
+        $models = self::persistentCacheAvailable()
+            ? Cache::rememberForever(self::modelsCacheKey($key), $discover)
+            : $discover();
+
+        self::$models[$key] = $models;
+
+        return $models;
+    }
 
     /**
      * @return list<class-string<Model>>|null
@@ -58,6 +106,7 @@ final class HelpersCache
 
     public static function clearModels(): void
     {
+        self::forgetPersistentModels();
         self::$models = [];
     }
 
@@ -68,7 +117,28 @@ final class HelpersCache
 
     public static function clearAll(): void
     {
+        self::forgetPersistentModels();
         self::$models = [];
         self::$connections = [];
+    }
+
+    /**
+     * Forget every persistent model discovery bucket so the next resolution
+     * rescans the filesystem. Keeps the persistent layer in lockstep with the
+     * in-memory layer wherever discovery is invalidated.
+     */
+    private static function forgetPersistentModels(): void
+    {
+        if (! self::persistentCacheAvailable()) {
+            return;
+        }
+
+        Cache::forget(self::modelsCacheKey('active'));
+        Cache::forget(self::modelsCacheKey('all'));
+    }
+
+    private static function persistentCacheAvailable(): bool
+    {
+        return function_exists('app') && app()->bound('cache') && app()->bound('files');
     }
 }

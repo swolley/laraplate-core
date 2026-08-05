@@ -239,3 +239,61 @@ it('list applies request filters sort and relation eager-load consistently', fun
     expect($result->data->last()->roles->pluck('name')->all())->toEqual(['sales']);
     expect($result->data->pluck('id')->all())->not->toContain($u_gamma->id);
 });
+
+it('list skips the redundant count query when the full result set is materialized', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    User::factory()->count(3)->create();
+    $expected_total = User::query()->count();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    $count_queries = 0;
+    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
+        if (str_contains($query->sql, 'count(*)') && str_contains($query->sql, '"users"')) {
+            $count_queries++;
+        }
+    });
+
+    $result = $service->list($request_data);
+
+    expect($result->data->count())->toBe($expected_total)
+        ->and($result->meta->totalRecords)->toBe($expected_total)
+        ->and($result->meta->currentRecords)->toBe($expected_total)
+        ->and($count_queries)->toBe(0);
+});
+
+it('list still issues the count query when a limit caps the result set', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    User::factory()->count(9)->create();
+    $expected_total = User::query()->count();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    (new ReflectionProperty($request_data, 'limit'))->setValue($request_data, 4);
+    (new ReflectionProperty($request_data, 'take'))->setValue($request_data, 4);
+
+    $count_queries = 0;
+    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
+        if (str_contains($query->sql, 'count(*)') && str_contains($query->sql, '"users"')) {
+            $count_queries++;
+        }
+    });
+
+    $result = $service->list($request_data);
+
+    expect($result->data->count())->toBe(4)
+        ->and($result->meta->totalRecords)->toBe($expected_total)
+        ->and($count_queries)->toBe(1);
+});

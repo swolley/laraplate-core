@@ -72,6 +72,17 @@ class CrudService
     /** @phpstan-use HasCrudOperations<\Illuminate\Database\Eloquent\Model> */
     use HasCrudOperations;
 
+    /**
+     * Memoized "method requires parameters" checks, keyed by `class::method`.
+     *
+     * The reflection result depends only on the class + method signature, so it
+     * is cached to avoid rebuilding a ReflectionMethod for every row when a
+     * computed Method column is resolved over a collection.
+     *
+     * @var array<string, bool>
+     */
+    private static array $method_requires_parameters_cache = [];
+
     public function __construct(
         private readonly AuthorizationService $auth,
         private readonly QueryBuilder $query_builder,
@@ -98,13 +109,25 @@ class CrudService
         $query = $model->newQuery();
         $this->query_builder->prepareQuery($query, $requestData);
 
-        $total_records = $query->count();
+        // When the full result set is materialized (no page, no from/to range, no
+        // limit cap and not a count-only request), the total equals the number of
+        // fetched rows, so the separate COUNT(*) round-trip is redundant.
+        $is_full_get = $requestData->page === null
+            && $requestData->from === null
+            && ! isset($requestData->limit)
+            && ! $requestData->count;
+
+        $total_records = $is_full_get ? 0 : $query->count();
 
         $data = match (true) {
             $requestData->page !== null => $this->listByPagination($query, $requestData, $total_records),
             $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
             default => $this->listByOthers($query, $requestData, $total_records),
         };
+
+        if ($is_full_get && $data instanceof Collection) {
+            $total_records = $data->count();
+        }
 
         $this->applyComputedMethods($data, $requestData);
 
@@ -336,8 +359,6 @@ class CrudService
 
         throw_unless($created, LogicException::class, 'Record not created');
 
-        $created->fresh();
-
         $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
 
         return new CrudResult(
@@ -420,8 +441,6 @@ class CrudService
         throw_if($operation === 'activate' && (! method_exists($found_record, 'restore') || ! $found_record->restore()), LogicException::class, 'Record not activated');
 
         throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
-
-        $found_record->fresh();
 
         return new CrudResult(
             data: $found_record,
@@ -1174,10 +1193,15 @@ class CrudService
     {
         throw_unless(method_exists($model, $method), UnexpectedValueException::class, sprintf('Method %s not found on %s', $method, $model::class));
 
-        $reflected_method = new ReflectionMethod($model, $method);
-        throw_if($reflected_method->getNumberOfRequiredParameters() > 0, UnexpectedValueException::class, sprintf('Method %s requires parameters on %s', $method, $model::class));
+        throw_if($this->methodRequiresParameters($model, $method), UnexpectedValueException::class, sprintf('Method %s requires parameters on %s', $method, $model::class));
 
         return $model->{$method}();
+    }
+
+    private function methodRequiresParameters(Model $model, string $method): bool
+    {
+        return self::$method_requires_parameters_cache[$model::class . '::' . $method]
+            ??= (new ReflectionMethod($model, $method))->getNumberOfRequiredParameters() > 0;
     }
 
     /**

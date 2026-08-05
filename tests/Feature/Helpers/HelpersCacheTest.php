@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\User;
 
@@ -101,6 +102,29 @@ it('HelpersCache::clearModels only clears model cache', function (): void {
 
     expect(HelpersCache::getModels('active'))->toBeNull();
     expect(HelpersCache::getConnections('active'))->not->toBeNull();
+});
+
+it('models() serves discovery from the persistent cache when memory is cold', function (): void {
+    HelpersCache::clearModels();
+
+    // Seed the persistent layer with a sentinel the filesystem scan would never produce.
+    Cache::forever(HelpersCache::modelsCacheKey('active'), ['App\\Models\\SentinelNeverScanned']);
+
+    expect(models(true))->toBe(['App\\Models\\SentinelNeverScanned']);
+});
+
+it('clearModels forgets the persistent discovery cache so the next call rescans', function (): void {
+    $real = models(true);
+
+    expect($real)->not->toBeEmpty()
+        ->and($real)->not->toBe(['App\\Models\\SentinelNeverScanned']);
+
+    // Poison the persistent layer and drop the in-memory copy.
+    Cache::forever(HelpersCache::modelsCacheKey('active'), ['App\\Models\\SentinelNeverScanned']);
+    HelpersCache::clearModels();
+
+    // clearModels() must have forgotten the persistent entry, forcing a real rescan.
+    expect(models(true))->toBe($real);
 });
 
 it('HelpersCache has private constructor', function (): void {

@@ -240,3 +240,34 @@ it('throws when resolveMethodValue targets missing or invalid methods', function
     expect(fn () => $method->invoke($service, $model, 'requiresArgument'))
         ->toThrow(UnexpectedValueException::class);
 });
+
+it('resolveMethodValue keeps parameter checks per class for same-named methods', function (): void {
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $zero_param = new class extends Model
+    {
+        public function label(): string
+        {
+            return 'zero';
+        }
+    };
+
+    $requires_param = new class extends Model
+    {
+        public function label(string $value): string
+        {
+            return $value;
+        }
+    };
+
+    $ref = new ReflectionClass(CrudService::class);
+    $method = $ref->getMethod('resolveMethodValue');
+    $method->setAccessible(true);
+
+    // Resolve the zero-parameter variant first so any memoization is seeded with
+    // the "no required parameters" signature before the same method name is
+    // resolved on a different class that does require a parameter.
+    expect($method->invoke($service, $zero_param, 'label'))->toBe('zero');
+    expect(fn () => $method->invoke($service, $requires_param, 'label'))
+        ->toThrow(UnexpectedValueException::class);
+});
