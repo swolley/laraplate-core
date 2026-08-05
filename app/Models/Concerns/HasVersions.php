@@ -14,9 +14,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
+use Modules\Core\Versioning\Data\VersionSetOptions;
+use Modules\Core\Versioning\Data\VersionSetRoot;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -280,6 +284,26 @@ trait HasVersions
             ->getQuery()
             ->where('change_type', VersionChangeType::Updated)
             ->whereNotNull("contents->{$deleted_at_column}");
+    }
+
+    /**
+     * Reverting is an append-only, first-class operation: it opens a `Revert` version set
+     * that points at the restored set, so a rollback is never mistaken for an ordinary edit.
+     * The reverting save still writes a normal `Updated` record inside that set.
+     */
+    public function revertToVersion(int|string $id): bool
+    {
+        $version = $this->versions()->findOrFail($id);
+
+        return (bool) app(VersionSetManagerInterface::class)->run(
+            VersionSetRoot::forModel($this),
+            static fn (): bool => (bool) $version->revert(),
+            new VersionSetOptions(
+                kind: VersionSetKind::Revert,
+                actor: $this->getVersionUserId(),
+                revertedFrom: $version->version_set_id,
+            ),
+        );
     }
 
     protected static function bootHasVersions(): void
