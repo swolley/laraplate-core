@@ -57,6 +57,42 @@ trait HasVersionedRelations
     }
 
     /**
+     * Current membership of a versioned relation, reconstructed by replaying its membership
+     * version rows in revision order: a `Created` event adds/updates the subject, a `Deleted`
+     * event removes it.
+     *
+     * @return list<array{id: int|string, pivot: array<string, mixed>}>
+     */
+    public function versionedRelationMembership(string $relation): array
+    {
+        $events = $this->versions()
+            ->where('relation_path', $relation)
+            ->orderBy('version_set_id')
+            ->orderBy('sequence')
+            ->get();
+
+        $membership = [];
+
+        foreach ($events as $event) {
+            $id = $event->subject_key['id'] ?? null;
+
+            if ($id === null) {
+                continue;
+            }
+
+            if ($event->change_type === VersionChangeType::Deleted) {
+                unset($membership[$id]);
+
+                continue;
+            }
+
+            $membership[$id] = ['id' => $id, 'pivot' => $event->contents ?? []];
+        }
+
+        return array_values($membership);
+    }
+
+    /**
      * One supported membership mutation = one version set = one revision. The mutation and its
      * history row commit together; the membership row identifies the subject only by `subjectKey`,
      * so it is stored as a self-contained SNAPSHOT.
