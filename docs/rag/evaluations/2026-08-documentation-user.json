@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "corpus_revision": "core-2026-08",
+  "module": "core",
+  "index_profile": "user",
+  "data_classification": "synthetic",
+  "cases": [
+    {
+      "id": "search-required-terms",
+      "query": "how do I force a search term to be required?",
+      "locale": "en", "top_k": 5,
+      "expected_source_labels": ["Core · Adaptive search matching · Required terms and exact phrases"],
+      "expected_citation_labels": ["Core · Adaptive search matching · Required terms and exact phrases"],
+      "expect_authorized_empty": false, "expect_supported_answer": true, "expect_refusal": false,
+      "slices": ["search", "single_hop"], "tenant_scope": "global", "tenant_id": null, "effective_permissions": []
+    },
+    {
+      "id": "search-preferences",
+      "query": "what matching preferences can I set for search?",
+      "locale": "en", "top_k": 5,
+      "expected_source_labels": ["Core · Adaptive search matching · Matching preferences"],
+      "expected_citation_labels": ["Core · Adaptive search matching · Matching preferences"],
+      "expect_authorized_empty": false, "expect_supported_answer": true, "expect_refusal": false,
+      "slices": ["search", "single_hop"], "tenant_scope": "global", "tenant_id": null, "effective_permissions": []
+    },
+    {
+      "id": "permission-vs-acl",
+      "query": "what is the difference between a permission and an ACL?",
+      "locale": "en", "top_k": 5,
+      "expected_source_labels": ["Core · Glossary · Permission vs ACL"],
+      "expected_citation_labels": ["Core · Glossary · Permission vs ACL"],
+      "expect_authorized_empty": false, "expect_supported_answer": true, "expect_refusal": false,
+      "slices": ["permissions", "single_hop"], "tenant_scope": "global", "tenant_id": null, "effective_permissions": []
+    },
+    {
+      "id": "event-orchestration",
+      "query": "how does the cross-module event bus order listeners?",
+      "locale": "en", "top_k": 5,
+      "expected_source_labels": ["Core · Event orchestration"],
+      "expected_citation_labels": ["Core · Event orchestration"],
+      "expect_authorized_empty": false, "expect_supported_answer": true, "expect_refusal": false,
+      "slices": ["events", "single_hop"], "tenant_scope": "global", "tenant_id": null, "effective_permissions": []
+    },
+    {
+      "id": "off-topic-refusal",
+      "query": "what is the capital of France?",
+      "locale": "en", "top_k": 5,
+      "expected_source_labels": [], "expected_citation_labels": [],
+      "expect_authorized_empty": false, "expect_supported_answer": false, "expect_refusal": true,
+      "slices": ["off_topic"], "tenant_scope": "global", "tenant_id": null, "effective_permissions": []
+    }
+  ]
+}
