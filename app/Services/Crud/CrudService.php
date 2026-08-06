@@ -157,6 +157,36 @@ class CrudService
     }
 
     /**
+     * Per-facet value counts for the given fields.
+     *
+     * Walking-skeleton scope: enumerable direct columns only, without base-filter
+     * self-exclusion yet, so `total` and `count` are equal.
+     *
+     * @param  list<string>  $facetFields
+     * @return array<string, list<array{value: mixed, total: int, count: int}>>
+     */
+    public function facetCounts(ListRequestData $base, array $facetFields): array
+    {
+        $model = $base->model;
+        $result = [];
+
+        foreach ($facetFields as $field) {
+            $occurrences_by_value = $model->newQuery()->toBase()->pluck($field)->countBy();
+
+            $result[$field] = $occurrences_by_value
+                ->map(static fn (int $occurrences, mixed $value): array => [
+                    'value' => $value,
+                    'total' => $occurrences,
+                    'count' => $occurrences,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $result;
+    }
+
+    /**
      * Page-scoped freshness fingerprint: filtered total + current page id/updated_at rows,
      * plus optional presence of client snapshot ids (on_page / off_page / gone).
      *
@@ -657,14 +687,28 @@ class CrudService
     public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
     {
         $model = $requestData->model;
-        $this->assertCrudWriteAllowed($model, $operation === 'activate' ? 'restore' : 'delete');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'restore', $model->getConnectionName());
+        $is_activate = $operation === 'activate';
+
+        // activate restores a soft-deleted record (restore permission); inactivate
+        // soft-deletes a live one (delete permission). The permission must match the
+        // operation on both gates — previously the entity gate distinguished them but
+        // the user gate always required 'restore', so soft-deleting demanded the
+        // restore permission.
+        $required_permission = $is_activate ? 'restore' : 'delete';
+        $this->assertCrudWriteAllowed($model, $required_permission);
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), $required_permission, $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
         $found_record = $this->newQueryWithTrashed($model)
             ->where($this->keyValueToWhereCondition($model, $key_value))
             ->firstOrFail();
 
-        throw_if($operation === 'activate' && (! method_exists($found_record, 'restore') || ! $found_record->restore()), LogicException::class, 'Record not activated');
+        if ($is_activate) {
+            throw_if(! method_exists($found_record, 'restore') || ! $found_record->restore(), LogicException::class, 'Record not activated');
+
+            return new CrudResult(
+                data: $found_record,
+            );
+        }
 
         throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
 

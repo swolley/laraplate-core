@@ -131,6 +131,28 @@ function crud_cov_login_superadmin(): User
     return $user;
 }
 
+/**
+ * A non-superadmin user granted exactly the given permission names (web guard).
+ *
+ * @param  list<string>  $permission_names
+ */
+function crud_cov_user_with_permissions(array $permission_names): User
+{
+    $user = User::factory()->create([
+        'username' => 'crud_perm_' . uniqid(),
+        'email' => 'crud_perm_' . uniqid() . '@example.com',
+    ]);
+
+    foreach ($permission_names as $name) {
+        Permission::findOrCreate($name, 'web');
+        $user->givePermissionTo($name);
+    }
+
+    auth()->login($user);
+
+    return $user;
+}
+
 function crud_cov_advanced_search_returning(int|string $id): AdvancedSearchService
 {
     $ensemble = Mockery::mock(EnsembleSearchService::class);
@@ -549,6 +571,82 @@ it('activate and inactivate use doActivateOperation path', function (): void {
 
     $inactivate_result = $service->inactivate($modify);
     expect($inactivate_result->data)->toBeInstanceOf(Model::class);
+});
+
+function crud_perm_soft_model(): Model
+{
+    if (! Schema::hasTable('crud_perm_soft')) {
+        Schema::create('crud_perm_soft', function (Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+    }
+
+    return new class extends Model
+    {
+        use SoftDeletes;
+
+        protected $table = 'crud_perm_soft';
+
+        protected $guarded = [];
+    };
+}
+
+it('inactivate soft-deletes when the user holds the delete permission', function (): void {
+    $soft_model = crud_perm_soft_model();
+    $record = $soft_model->newQuery()->create(['name' => 'live']);
+
+    $user = crud_cov_user_with_permissions(['default.crud_perm_soft.delete']);
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = Request::create('/modify', 'POST', ['id' => $record->getKey()]);
+    $request->request->set('id', $record->getKey());
+    $request->setUserResolver(fn () => $user);
+    $modify = crud_cov_make_modify_data($soft_model, $request, []);
+
+    $service->inactivate($modify);
+
+    expect($soft_model->newQuery()->withTrashed()->find($record->getKey())->trashed())->toBeTrue();
+});
+
+it('inactivate is denied when the user lacks the delete permission', function (): void {
+    $soft_model = crud_perm_soft_model();
+    $record = $soft_model->newQuery()->create(['name' => 'live']);
+
+    // Only restore — before the fix this passed, because inactivate wrongly
+    // required the restore permission instead of delete.
+    $user = crud_cov_user_with_permissions(['default.crud_perm_soft.restore']);
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = Request::create('/modify', 'POST', ['id' => $record->getKey()]);
+    $request->request->set('id', $record->getKey());
+    $request->setUserResolver(fn () => $user);
+    $modify = crud_cov_make_modify_data($soft_model, $request, []);
+
+    expect(fn (): mixed => $service->inactivate($modify))
+        ->toThrow(Illuminate\Auth\Access\AuthorizationException::class);
+});
+
+it('activate restores a trashed record and leaves it active', function (): void {
+    $soft_model = crud_perm_soft_model();
+    $record = $soft_model->newQuery()->create(['name' => 'gone']);
+    $record->delete();
+
+    $user = crud_cov_user_with_permissions(['default.crud_perm_soft.restore']);
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class));
+
+    $request = Request::create('/modify', 'POST', ['id' => $record->getKey()]);
+    $request->request->set('id', $record->getKey());
+    $request->setUserResolver(fn () => $user);
+    $modify = crud_cov_make_modify_data($soft_model, $request, []);
+
+    $service->activate($modify);
+
+    // Regression: activate must not re-soft-delete after restoring, so a plain
+    // (not withTrashed) lookup finds a live record.
+    expect($soft_model->newQuery()->find($record->getKey()))->not->toBeNull();
 });
 
 it('insert, update and delete cover core mutation flows', function (): void {
