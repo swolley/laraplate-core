@@ -469,6 +469,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
             \Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator::class,
         );
         $this->app->bind(
+            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceInfolistSchemaClassGenerator::class,
+            \Modules\Core\Filament\Generators\LaraplateResourceInfolistSchemaClassGenerator::class,
+        );
+        $this->app->bind(
             \Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator::class,
             \Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator::class,
         );
