@@ -173,3 +173,29 @@ it('flushes one group without clearing another loaded group', function (): void 
     expect(Cache::has(PerModelSettingResolver::groupCacheKey('translations')))->toBeFalse()
         ->and(Cache::has(PerModelSettingResolver::groupCacheKey('erp')))->toBeTrue();
 });
+
+it('reloads a group from the database when the cache payload is not a collection', function (): void {
+    $group = 'corrupt_group_' . uniqid();
+    $name = 'corrupt_setting_' . uniqid();
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => $name,
+        'value' => 'from-db',
+        'type' => SettingTypeEnum::String,
+        'group_name' => $group,
+        'description' => 'test',
+    ]);
+
+    $resolver = app(PerModelSettingResolver::class);
+    $resolver->flush();
+
+    Cache::forever(PerModelSettingResolver::groupCacheKey($group), [
+        $name => ['name' => $name, 'value' => 'stale-array'],
+    ]);
+
+    $loaded = $resolver->group($group);
+
+    expect($loaded)->toBeInstanceOf(Illuminate\Support\Collection::class)
+        ->and($loaded->get($name))->toBeInstanceOf(Setting::class)
+        ->and($resolver->string($name, 'missing'))->toBe('from-db');
+});

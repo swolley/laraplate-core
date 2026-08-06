@@ -221,7 +221,7 @@ final class DynamicEntity extends Model
             $filtered = [];
 
             foreach ($found as $class) {
-                if (class_module($class) === $module) {
+                if (strcasecmp((string) class_module($class), $module) === 0) {
                     $filtered[] = $class;
                 }
             }
@@ -246,7 +246,7 @@ final class DynamicEntity extends Model
                     continue;
                 }
 
-                if ($expected_basename === class_basename($model) && in_array($model, $found, true) && ($module === null || $module === class_module($model))) {
+                if ($expected_basename === class_basename($model) && in_array($model, $found, true) && ($module === null || strcasecmp((string) class_module($model), $module) === 0)) {
                     return $model;
                 }
             }

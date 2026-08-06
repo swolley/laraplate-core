@@ -15,17 +15,18 @@ beforeEach(function (): void {
 });
 
 
-it('returns configs for models', function (): void {
+it('filters models by module when listing configs', function (): void {
     $auth = $this->app->make(AuthorizationService::class);
     $action = new GetGridConfigsAction(
         $auth,
-        modelsProvider: fn () => ['ModelOne'],
-        gridResolver: fn () => ['config' => true],
+        modelsProvider: fn () => ['Modules\\CMS\\Models\\Content', 'Modules\\Core\\Models\\User'],
+        gridResolver: fn (string $model) => ['model' => $model],
     );
 
-    $result = $action(request(), null);
+    $result = $action(request(), null, 'cms');
 
-    expect($result)->toBe(['ModelOne' => ['config' => true]]);
+    expect($result)->toHaveKey('Modules\\CMS\\Models\\Content')
+        ->and($result)->not->toHaveKey('Modules\\Core\\Models\\User');
 });
 
 it('filters single entity', function (): void {

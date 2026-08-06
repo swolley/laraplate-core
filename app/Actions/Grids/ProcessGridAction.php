@@ -18,26 +18,28 @@ final readonly class ProcessGridAction
         private ?Closure $gridFactory = null,
     ) {}
 
-    public function __invoke(object $request, string $entity): JsonResponse
+    public function __invoke(object $request, string $entity, ?string $module = null): JsonResponse
     {
         $filters = method_exists($request, 'parsed') ? $request->parsed() : [];
         $connection = is_array($filters) ? ($filters['connection'] ?? null) : ($filters->connection ?? ($filters['connection'] ?? null));
         $actionValue = $this->extractActionValue($filters);
 
-        $model = $this->resolveEntity($entity, $connection, $request);
+        $model = $this->resolveEntity($entity, $connection, $request, $module);
         $this->auth->ensurePermission($request, $model->getTable(), $actionValue, $model->getConnectionName());
         $grid = $this->gridFactory instanceof Closure ? ($this->gridFactory)($model) : new Grid($model);
 
         return $grid->process($request);
     }
 
-    private function resolveEntity(string $entity, ?string $connection, object $request): mixed
+    private function resolveEntity(string $entity, ?string $connection, object $request, ?string $module = null): mixed
     {
         if ($this->entityResolver instanceof Closure) {
-            return ($this->entityResolver)($entity, $connection, $request);
+            return ($this->entityResolver)($entity, $connection, $request, $module);
         }
 
-        return DynamicEntity::resolve($entity, $connection, request: $request);
+        $http_request = $request instanceof \Illuminate\Http\Request ? $request : null;
+
+        return DynamicEntity::resolve($entity, $connection, request: $http_request, module: $module);
     }
 
     private function extractActionValue(mixed $filters): string

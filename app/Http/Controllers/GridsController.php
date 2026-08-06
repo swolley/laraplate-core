@@ -20,14 +20,14 @@ final class GridsController extends Controller
         private readonly ProcessGridAction $processGridAction,
     ) {}
 
-    public function getGridsConfigs(Request $request, ?string $entity = null): \Illuminate\Http\JsonResponse
+    public function getGridsConfigs(Request $request, string $module, ?string $entity = null): \Illuminate\Http\JsonResponse
     {
         $response_builder = new ResponseBuilder($request);
 
         try {
-            $targetEntity = in_array($entity, [null, '', '0'], true) ? null : $this->getModel($entity);
+            $targetEntity = in_array($entity, [null, '', '0'], true) ? null : $this->getModel($module, $entity);
 
-            $response_builder->setData(($this->getGridConfigsAction)($request, $targetEntity));
+            $response_builder->setData(($this->getGridConfigsAction)($request, $targetEntity, $module));
         } catch (UnexpectedValueException $ex) {
             $response_builder
                 ->setData($ex)
@@ -41,10 +41,10 @@ final class GridsController extends Controller
         }
     }
 
-    public function grid(\Modules\Core\Grids\Requests\GridRequest $request, string $entity): \Illuminate\Http\JsonResponse
+    public function grid(\Modules\Core\Grids\Requests\GridRequest $request, string $module, string $entity): \Illuminate\Http\JsonResponse
     {
         try {
-            return ($this->processGridAction)($request, $entity);
+            return ($this->processGridAction)($request, $entity, $module);
         } catch (UnexpectedValueException|AuthorizationException $ex) {
             return new ResponseBuilder($request)
                 ->setData($ex)
@@ -52,11 +52,11 @@ final class GridsController extends Controller
         }
     }
 
-    private function getModel(string $entity): string
+    private function getModel(string $module, string $entity): string
     {
-        $entity_instance = DynamicEntity::tryResolveModel($entity);
+        $entity_instance = DynamicEntity::tryResolveModel($entity, module: $module);
 
-        throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, sprintf("Unable to find entity '%s'", $entity));
+        throw_if(in_array($entity_instance, [null, '', '0'], true), UnexpectedValueException::class, sprintf("Unable to find entity '%s' in module '%s'", $entity, $module));
 
         return $entity_instance;
     }
