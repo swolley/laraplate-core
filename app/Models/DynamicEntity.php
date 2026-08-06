@@ -209,13 +209,25 @@ final class DynamicEntity extends Model
      */
     private static function findModel(array $models, string $modelName, ?string $module = null): ?string
     {
-        $found = [];
+        $studly = Str::studly($modelName);
+
+        // Index candidates by their namespaced basename so resolution is a single
+        // hash lookup instead of an endsWith()/studly() scan over every model on
+        // each request. Classes without a namespace separator never matched the
+        // original `\{Studly}` suffix check, so they are skipped here too.
+        $by_basename = [];
 
         foreach ($models as $class) {
-            if (Str::endsWith($class, '\\' . Str::studly($modelName))) {
-                $found[] = $class;
+            $position = mb_strrpos($class, '\\');
+
+            if ($position === false) {
+                continue;
             }
+
+            $by_basename[mb_substr($class, $position + 1)][] = $class;
         }
+
+        $found = $by_basename[$studly] ?? [];
 
         if ($module !== null && $module !== '') {
             $filtered = [];

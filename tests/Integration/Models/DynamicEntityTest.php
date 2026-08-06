@@ -55,6 +55,16 @@ it('findModel returns the only matching class', function (): void {
     expect($resolved)->toBe('App\\Models\\OnlyThing');
 });
 
+it('findModel matches the exact studly basename, not a suffix substring', function (): void {
+    $method = new ReflectionMethod(DynamicEntity::class, 'findModel');
+    $method->setAccessible(true);
+
+    // "SuperUser" ends with "User" but its basename is not "User", so entity
+    // "user" must not resolve to it.
+    expect($method->invoke(null, ['App\\Models\\SuperUser'], 'user'))->toBeNull()
+        ->and($method->invoke(null, ['App\\Models\\Sub\\User'], 'user'))->toBe('App\\Models\\Sub\\User');
+});
+
 it('columnTypeToValidationRule maps core types and falls back to string', function (): void {
     $entity = new DynamicEntity();
     $method = new ReflectionMethod(DynamicEntity::class, 'columnTypeToValidationRule');
