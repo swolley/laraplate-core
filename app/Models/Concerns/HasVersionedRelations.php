@@ -59,6 +59,37 @@ trait HasVersionedRelations
     }
 
     /**
+     * Replace the whole membership of a versioned relation with a target set, as a single revision:
+     * every detach and upsert joins one version set. The target accepts either a list of subject ids
+     * or a `[subjectId => pivotAttributes]` map.
+     *
+     * @param  array<int|string, array<string, mixed>>|list<int|string>  $target
+     */
+    public function syncVersioned(string $relation, array $target): void
+    {
+        $this->assertVersionedRelation($relation);
+
+        $normalized = $this->normalizeSyncTarget($target);
+        $current_ids = array_map(
+            static fn (array $entry): int|string => $entry['id'],
+            $this->versionedRelationMembership($relation),
+        );
+        $to_detach = array_diff($current_ids, array_keys($normalized));
+
+        $this->runInMembershipScope(function () use ($relation, $normalized, $to_detach): void {
+            foreach ($to_detach as $subject_id) {
+                $this->{$relation}()->detach($subject_id);
+                $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Deleted, []);
+            }
+
+            foreach ($normalized as $subject_id => $pivot) {
+                $this->{$relation}()->syncWithoutDetaching([$subject_id => $pivot]);
+                $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Created, $pivot);
+            }
+        });
+    }
+
+    /**
      * Current membership of a versioned relation, reconstructed by replaying its membership
      * version rows in revision order: a `Created` event adds/updates the subject, a `Deleted`
      * event removes it.
@@ -103,29 +134,76 @@ trait HasVersionedRelations
      */
     private function recordRelationMembership(string $relation, int|string $subjectId, VersionChangeType $type, array $pivot, Closure $mutation): void
     {
+        $this->assertVersionedRelation($relation);
+
+        $this->runInMembershipScope(function () use ($mutation, $relation, $subjectId, $type, $pivot): void {
+            $mutation();
+            $this->writeMembershipRow($relation, $subjectId, $type, $pivot);
+        });
+    }
+
+    private function assertVersionedRelation(string $relation): void
+    {
         if ($this->versionedRelationDescriptor($relation) === null) {
             throw new InvalidArgumentException("Relation '{$relation}' is not a declared versioned relation.");
         }
+    }
 
-        $actor = method_exists($this, 'getVersionUserId') ? $this->getVersionUserId() : null;
-
+    private function runInMembershipScope(Closure $operation): void
+    {
         app(VersionSetManagerInterface::class)->run(
             VersionSetRoot::forModel($this),
-            function () use ($mutation, $type, $relation, $subjectId, $pivot, $actor): void {
-                $mutation();
-
-                resolve(VersionWriterInterface::class)->write(new VersionChange(
-                    model: $this,
-                    type: $type,
-                    originalContents: [],
-                    contents: $type === VersionChangeType::Created ? $pivot : [],
-                    strategy: VersionStrategy::SNAPSHOT,
-                    userId: $actor,
-                    relationPath: $relation,
-                    subjectKey: ['id' => $subjectId],
-                ));
-            },
-            new VersionSetOptions(actor: $actor),
+            $operation,
+            new VersionSetOptions(actor: $this->versionActor()),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $pivot
+     */
+    private function writeMembershipRow(string $relation, int|string $subjectId, VersionChangeType $type, array $pivot): void
+    {
+        resolve(VersionWriterInterface::class)->write(new VersionChange(
+            model: $this,
+            type: $type,
+            originalContents: [],
+            contents: $type === VersionChangeType::Created ? $pivot : [],
+            strategy: VersionStrategy::SNAPSHOT,
+            userId: $this->versionActor(),
+            relationPath: $relation,
+            subjectKey: ['id' => $subjectId],
+        ));
+    }
+
+    private function versionActor(): ?int
+    {
+        if (! method_exists($this, 'getVersionUserId')) {
+            return null;
+        }
+
+        $actor = $this->getVersionUserId();
+
+        return is_numeric($actor) ? (int) $actor : null;
+    }
+
+    /**
+     * @param  array<int|string, array<string, mixed>>|list<int|string>  $target
+     * @return array<int|string, array<string, mixed>>
+     */
+    private function normalizeSyncTarget(array $target): array
+    {
+        $normalized = [];
+
+        foreach ($target as $key => $value) {
+            if (is_int($key) && ! is_array($value)) {
+                $normalized[$value] = [];
+
+                continue;
+            }
+
+            $normalized[$key] = is_array($value) ? $value : [];
+        }
+
+        return $normalized;
     }
 }
