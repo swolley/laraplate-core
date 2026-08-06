@@ -128,6 +128,11 @@ Operation pairs share a single permission: `approve` governs `disapprove`, and `
 governs `unlock`. Requesting an operation whose target state already holds — locking a
 locked record, unlocking an unlocked one — returns `304 Not Modified`.
 
+`activate`/`inactivate` are the exception: they do **not** share a permission. `activate`
+restores a soft-deleted record and requires the `restore` permission; `inactivate`
+soft-deletes a live record and requires the `delete` permission (hard delete via
+`/api/v1/delete` and `/app/crud/delete` requires `forceDelete`).
+
 ### Domain Actions
 
 The verbs above are generic: they act on structures Core attaches to any record. Modules
