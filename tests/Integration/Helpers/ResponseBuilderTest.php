@@ -95,6 +95,33 @@ it('can handle collection and resource data and exposes resourceResponse', funct
     expect($builder->getResourceResponse())->toBeInstanceOf(JsonResource::class);
 });
 
+it('serializes models with toArray(?array) without passing the HTTP request', function (): void {
+    config(['app.debug' => false]);
+
+    $item = new class
+    {
+        /**
+         * @param  array<string, mixed>|null  $parsed
+         * @return array<string, mixed>
+         */
+        public function toArray(?array $parsed = null): array
+        {
+            return $parsed ?? ['id' => 1, 'name' => 'place'];
+        }
+    };
+
+    $request = Request::create('/app/crud/select/cms/locations', 'GET');
+    $builder = new ResponseBuilder($request, Carbon::now());
+    $builder->setData(collect([$item]));
+
+    $response = $builder->getResponse();
+    $payload = json_decode($response->getContent(), true);
+
+    expect($response->getStatusCode())->toBe(SymfonyResponse::HTTP_OK)
+        ->and($payload['data'])->toBeArray()
+        ->and($payload['data'][0]['name'])->toBe('place');
+});
+
 it('serializes and unserializes response data', function (): void {
     config(['app.debug' => false]);
 
