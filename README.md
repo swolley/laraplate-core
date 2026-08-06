@@ -472,6 +472,45 @@ built on that hash would skip nodes whose content changed but whose class name d
 the opposite of what the flag would promise. Do not wire a skip decision to `content_hash` until it
 hashes the node's actual definitions.
 
+### Dev data and volume scaling
+
+`db:seed --dev` (declared by `Modules\Core\Console\SeedCommand`) runs the `Dev*` seeders instead of
+the production graph: it dispatches `DevDatabaseSeeder`, which discovers every enabled module's
+`database/seeders/Dev*.php` class and fills the database with fake bulk data. These seeders extend
+`Modules\Core\Helpers\BatchSeeder` and pass a hardcoded target count (their "max" size) to
+`createInBatches()` / `createInParallelBatches()`.
+
+Four mutually-exclusive flags scale that fake volume without editing the seeders:
+
+| Flag | Multiplier | Example (`TARGET_COUNT_CONTENTS = 500_000`) |
+| --- | --- | --- |
+| `--micro` | ×0.01 | 5 000 |
+| `--min` | ×0.1 | 50 000 |
+| `--mid` | ×0.5 | 250 000 |
+| `--max` | ×1.0 | 500 000 |
+
+- The default, when no flag is given, is `--micro` (1% — a fast, workable dev dataset).
+- Precedence is fixed as `micro → min → mid → max`: the first one present wins (so `--min --mid`
+  resolves to `--min`), regardless of the order typed on the command line.
+- `SeedCommand` resolves the factor **once**, from the real invocation flags, and publishes it on the
+  container under `BatchSeeder::SCALE_CONTAINER_KEY` before dispatching (clearing it in a `finally`).
+  `BatchSeeder` reads the factor from there and multiplies each target count. It is **not** read off
+  `$this->command`: `db:seed` is a shared container instance whose input is rebound by the nested
+  `module:seed → db:seed` calls the dev seeders make, so a seeder reading `option('min')` later would
+  see that mutated input, not the operator's flags. A positive target is floored to at least one
+  record, so a scaled-down run never leaves a table empty for a dependent seeder; a zero target
+  stays zero.
+- Only fake bulk volume scales. Reference/settings data seeded via `module:seed` inside the dev
+  seeders is **not** scaled — partial reference data would break dependencies.
+- The flags are no-ops outside `--dev`: the production graph seeds fixed reference data only, and the
+  container key is never published.
+
+The same flags work per module: `module:seed <Module> --dev [--min|--mid|--max]`
+(`Modules\Core\Console\ModuleSeedCommand`, an override of nwidart's `module:seed`) runs that module's
+`Dev{Module}DatabaseSeeder` alone, publishing the scale the same way. Both commands share
+`Modules\Core\Console\Concerns\ResolvesDevSeedScale` so the flag set, precedence, and container
+publishing live in one place.
+
 ### Per-node atomicity — what "rolled back" does and does not mean
 
 Each node runs inside a transaction on the **default** database connection only, opened via the

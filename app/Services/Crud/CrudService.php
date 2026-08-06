@@ -24,6 +24,8 @@ use LogicException;
 use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\HistoryRequestData;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
@@ -159,8 +161,9 @@ class CrudService
     /**
      * Per-facet value counts for the given fields.
      *
-     * Walking-skeleton scope: enumerable direct columns only, without base-filter
-     * self-exclusion yet, so `total` and `count` are equal.
+     * `total` is the value distribution ignoring the request filters; `count` applies
+     * them (reusing the list query preparation). Walking-skeleton scope: enumerable
+     * direct columns, no per-facet self-exclusion of the current selection yet.
      *
      * @param  list<string>  $facetFields
      * @return array<string, list<array{value: mixed, total: int, count: int}>>
@@ -171,19 +174,63 @@ class CrudService
         $result = [];
 
         foreach ($facetFields as $field) {
-            $occurrences_by_value = $model->newQuery()->toBase()->pluck($field)->countBy();
+            $totals = $model->newQuery()->toBase()->pluck($field)->countBy();
 
-            $result[$field] = $occurrences_by_value
+            $count_query = $model->newQuery();
+
+            if ($base->filters instanceof FiltersGroup) {
+                $this->query_builder->applyFilters($count_query, $this->excludeFacetField($base->filters, $field));
+            }
+
+            $counts = $count_query->toBase()->pluck($field)->countBy();
+
+            $result[$field] = $totals
                 ->map(static fn (int $occurrences, mixed $value): array => [
                     'value' => $value,
                     'total' => $occurrences,
-                    'count' => $occurrences,
+                    'count' => (int) ($counts[$value] ?? 0),
                 ])
                 ->values()
                 ->all();
         }
 
         return $result;
+    }
+
+    /**
+     * Rebuild a FiltersGroup without the nodes targeting the given facet field, so a
+     * facet's own selection does not suppress the counts of its other values.
+     */
+    private function excludeFacetField(FiltersGroup $filters, string $field): FiltersGroup
+    {
+        $kept = [];
+
+        foreach ($filters->filters as $node) {
+            if ($node instanceof FiltersGroup) {
+                $kept[] = $this->excludeFacetField($node, $field);
+
+                continue;
+            }
+
+            if ($node instanceof Filter && $this->facetFieldMatches($node->property, $field)) {
+                continue;
+            }
+
+            $kept[] = $node;
+        }
+
+        return new FiltersGroup($kept, $filters->operator);
+    }
+
+    private function facetFieldMatches(string $property, string $field): bool
+    {
+        $last_segment = static function (string $path): string {
+            $position = mb_strrpos($path, '.');
+
+            return $position === false ? $path : mb_substr($path, $position + 1);
+        };
+
+        return $last_segment($property) === $last_segment($field);
     }
 
     /**

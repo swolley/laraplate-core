@@ -6,11 +6,14 @@ namespace Modules\Core\Console;
 
 use Database\Seeders\DevDatabaseSeeder;
 use Illuminate\Database\Console\Seeds\SeedCommand as BaseSeedCommand;
+use Modules\Core\Console\Concerns\ResolvesDevSeedScale;
 use Override;
 use Symfony\Component\Console\Input\InputOption;
 
 final class SeedCommand extends BaseSeedCommand
 {
+    use ResolvesDevSeedScale;
+
     #[\Override]
     protected $description = 'Seed the database with records. <fg=green>(⚡ Modules\Core)</fg=green>';
 
@@ -18,7 +21,15 @@ final class SeedCommand extends BaseSeedCommand
     public function handle(): int
     {
         if ($this->option('dev')) {
-            return (int) $this->call('db:seed', ['--class' => DevDatabaseSeeder::class]);
+            // Resolve the scale once, here, from the real invocation flags and
+            // publish it through the container: the db:seed command is a shared
+            // container instance whose input is rebound by the nested
+            // module:seed -> db:seed calls the dev seeders make, so a seeder
+            // reading $this->command->option('min') later would read that
+            // mutated input, not the flags the operator actually passed.
+            return $this->withPublishedDevSeedScale(
+                fn (): int => (int) $this->call('db:seed', ['--class' => DevDatabaseSeeder::class]),
+            );
         }
 
         return parent::handle();
@@ -33,6 +44,6 @@ final class SeedCommand extends BaseSeedCommand
         return array_merge(parent::getOptions(), [
             ['dev', null, InputOption::VALUE_NONE, 'Seed the database with development data'],
             ['resume', null, InputOption::VALUE_NONE, 'Skip nodes that succeeded in the last failed run'],
-        ]);
+        ], $this->devSeedScaleOptions());
     }
 }

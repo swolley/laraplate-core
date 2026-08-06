@@ -220,13 +220,24 @@ final class PerModelSettingResolver
             return $this->name_index;
         }
 
-        $this->name_index = Cache::rememberForever(
-            self::nameIndexCacheKey(),
-            static fn (): array => Setting::query()
-                ->pluck('group_name', 'name')
-                ->toArray(),
-        );
+        $cached = Cache::get(self::nameIndexCacheKey());
 
-        return $this->name_index;
+        if (is_array($cached)) {
+            return $this->name_index = $cached;
+        }
+
+        // Invalid / legacy payloads (e.g. a Collection from Redis-after-fork
+        // corruption or older writers) must not leak past the ?array property type.
+        if ($cached !== null) {
+            Cache::forget(self::nameIndexCacheKey());
+        }
+
+        $name_index = Setting::query()
+            ->pluck('group_name', 'name')
+            ->toArray();
+
+        Cache::forever(self::nameIndexCacheKey(), $name_index);
+
+        return $this->name_index = $name_index;
     }
 }

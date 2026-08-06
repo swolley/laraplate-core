@@ -199,3 +199,26 @@ it('reloads a group from the database when the cache payload is not a collection
         ->and($loaded->get($name))->toBeInstanceOf(Setting::class)
         ->and($resolver->string($name, 'missing'))->toBe('from-db');
 });
+
+it('rebuilds the name index from the database when the cached payload is not an array', function (): void {
+    $name = 'name_index_corrupt_' . uniqid();
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => $name,
+        'value' => 'from-db',
+        'type' => SettingTypeEnum::String,
+        'group_name' => 'base',
+        'description' => 'test',
+    ]);
+
+    $resolver = app(PerModelSettingResolver::class);
+    $resolver->flush();
+
+    Cache::forever(
+        PerModelSettingResolver::nameIndexCacheKey(),
+        new Illuminate\Support\Collection([$name => 'base']),
+    );
+
+    expect($resolver->string($name, 'missing'))->toBe('from-db')
+        ->and(Cache::get(PerModelSettingResolver::nameIndexCacheKey()))->toBeArray();
+});

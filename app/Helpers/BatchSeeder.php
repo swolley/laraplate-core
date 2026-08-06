@@ -34,6 +34,13 @@ abstract class BatchSeeder extends Seeder
 
     private const int RETRY_DELAY = 1; // seconds
 
+    /**
+     * Container key under which {@see \Modules\Core\Console\SeedCommand} publishes
+     * the resolved dev-seed volume multiplier. Read here rather than off the
+     * console command, whose input the nested module:seed -> db:seed calls mutate.
+     */
+    public const string SCALE_CONTAINER_KEY = 'core.dev-seed-scale';
+
     private ?string $childDatabaseConnectionName = null;
 
     /**
@@ -107,6 +114,7 @@ abstract class BatchSeeder extends Seeder
         int $totalCount,
         ?int $batchSize = null,
     ): int {
+        $totalCount = $this->scaleTargetCount($totalCount);
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $entity_name = new ReflectionClass($modelClass)->newInstanceWithoutConstructor()->getTable();
@@ -169,6 +177,7 @@ abstract class BatchSeeder extends Seeder
         ?int $batchSize = null,
         int $maxParallelCount = 10,
     ): int {
+        $totalCount = $this->scaleTargetCount($totalCount);
         $current_count = $this->countCurrentRecords($modelClass);
         $count_to_create = $this->countToCreate($totalCount, $current_count);
         $model = new $modelClass();
@@ -297,6 +306,32 @@ abstract class BatchSeeder extends Seeder
         $currentCount = $this->command->option('force') ? 0 : $currentCount;
 
         return $totalCount - $currentCount;
+    }
+
+    /**
+     * Apply the resolved dev-seed scale to a seeder's target count. A positive
+     * target is floored to one record so a scaled-down run never empties a table
+     * other seeders depend on; a zero target stays zero.
+     */
+    private function scaleTargetCount(int $totalCount): int
+    {
+        if ($totalCount < 1) {
+            return $totalCount;
+        }
+
+        return max(1, (int) round($totalCount * $this->resolveSeedScale()));
+    }
+
+    /**
+     * Resolve the dev-seed volume multiplier published by
+     * {@see \Modules\Core\Console\SeedCommand}. Absent (any non dev run) the
+     * target count is used in full.
+     */
+    private function resolveSeedScale(): float
+    {
+        return app()->bound(self::SCALE_CONTAINER_KEY)
+            ? (float) app(self::SCALE_CONTAINER_KEY)
+            : 1.0;
     }
 
     private function isSearchable(string $modelClass): bool

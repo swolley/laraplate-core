@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Add syncVersioned for one-revision membership replacement
+- *(perf)* Stress-test toolkit — perf:profile, perf:crud, perf:boot + auth profiling
+- *(seeding)* Implement dev seeding with volume scaling options
+
+### 🐛 Bug Fixes
+
+- *(core)* Keep platform columns out of generated infolists too
+- *(crud)* Gate inactivate on delete, activate on restore
+
+## [1.70.0] - 2026-08-06
+
+### 🚀 Features
+
 - *(cache)* Implement custom CacheManager to support Core Repository
 - *(versioning)* Mark rollbacks with a Revert version set
 - *(docs)* Add user evaluation cases for search and permissions
@@ -164,7 +177,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.58.8] - 2026-07-10
+## [1.59.0] - 2026-07-12
 
 ### 🐛 Bug Fixes
 
