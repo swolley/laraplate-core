@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Performance\EndpointBenchmarkReport;
@@ -34,4 +36,19 @@ it('exposes the last response status so failures are visible', function (): void
     $report = $profiler->profile('GET', '/perf-probe-ok', iterations: 2, warmup: 0);
 
     expect($report->lastStatus)->toBe(200);
+});
+
+it('authenticates the profiled request as the given user', function (): void {
+    Route::get('/perf-auth-probe', fn (Request $request) => $request->user() !== null
+        ? response('yes', 200)
+        : response('no', 403));
+
+    $user = User::factory()->create();
+    $profiler = app(EndpointProfiler::class);
+
+    $anonymous = $profiler->profile('GET', '/perf-auth-probe', iterations: 2, warmup: 0);
+    $authenticated = $profiler->profile('GET', '/perf-auth-probe', iterations: 2, warmup: 0, user: $user);
+
+    expect($anonymous->lastStatus)->toBe(403)
+        ->and($authenticated->lastStatus)->toBe(200);
 });

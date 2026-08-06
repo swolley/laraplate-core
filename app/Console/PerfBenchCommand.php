@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Performance\EndpointBenchmarkReport;
 use Modules\Core\Performance\EndpointProfiler;
@@ -23,15 +25,29 @@ final class PerfBenchCommand extends Command
         {endpoint* : One or more METHOD:URI targets, e.g. GET:/api/v1/health}
         {--iterations=30 : Number of measured iterations per endpoint}
         {--warmup=3 : Number of unmeasured warmup iterations per endpoint}
+        {--user= : Authenticate profiled requests as this user id}
         {--json : Output raw JSON instead of a formatted table}';
 
     #[Override]
     protected $description = 'Benchmark HTTP endpoints through the real kernel (latency, queries, memory) <fg=green>(⚡ Modules\Core)</fg=green>';
 
-    public function handle(EndpointProfiler $profiler): int
+    public function handle(EndpointProfiler $profiler, AuthFactory $auth): int
     {
         $iterations = max(1, (int) $this->option('iterations'));
         $warmup = max(0, (int) $this->option('warmup'));
+
+        $user = null;
+        $user_id = $this->option('user');
+
+        if ($user_id !== null && $user_id !== '') {
+            $user = $this->resolveUser($auth, (string) $user_id);
+
+            if (! $user instanceof Authenticatable) {
+                $this->error(sprintf('No authenticatable user found with id %s.', $user_id));
+
+                return self::FAILURE;
+            }
+        }
 
         /** @var list<string> $endpoints */
         $endpoints = array_values((array) $this->argument('endpoint'));
@@ -48,7 +64,7 @@ final class PerfBenchCommand extends Command
             }
 
             [$method, $uri] = $parsed;
-            $reports[] = $profiler->profile($method, $uri, $iterations, $warmup);
+            $reports[] = $profiler->profile($method, $uri, $iterations, $warmup, $user);
         }
 
         if ((bool) $this->option('json')) {
@@ -60,6 +76,17 @@ final class PerfBenchCommand extends Command
         $this->renderTable($reports);
 
         return self::SUCCESS;
+    }
+
+    private function resolveUser(AuthFactory $auth, string $userId): ?Authenticatable
+    {
+        $guard = $auth->guard();
+
+        if (! method_exists($guard, 'getProvider')) {
+            return null;
+        }
+
+        return $guard->getProvider()->retrieveById($userId);
     }
 
     /**

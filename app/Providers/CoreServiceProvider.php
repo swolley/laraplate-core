@@ -35,6 +35,7 @@ use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
 use Filament\Forms\Components\Toggle;
 use Modules\Core\Console\WarmCacheCommand;
+use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
@@ -53,6 +54,7 @@ use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User as CoreUser;
 use Modules\Core\Overrides\ContextualValidator;
+use Modules\Core\Performance\SubprocessBootSampler;
 use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
@@ -172,6 +174,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ApplicationContentRetrievalProviderRegistry::class,
         );
         $this->app->bind(OutboxPublisher::class, StubOutboxPublisher::class);
+        $this->app->bind(BootSampler::class, SubprocessBootSampler::class);
         $this->app->scoped(ActiveVersionSet::class);
         $this->app->scoped(VersionSetManagerInterface::class, VersionSetManager::class);
         $this->app->scoped(VersionWriterInterface::class, VersionWriter::class);
