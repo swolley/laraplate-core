@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(cache)* Implement custom CacheManager to support Core Repository
+- *(versioning)* Mark rollbacks with a Revert version set
+- *(docs)* Add user evaluation cases for search and permissions
+- *(perf)* Add zero-dependency benchmarking harness (perf:bench)
+- *(crud)* Add list freshness fingerprint endpoint
+- *(crud)* Classify freshness check_ids as on_page, off_page, or gone
+
+### 🐛 Bug Fixes
+
+- *(tests)* Unskip dynamic contents and preset versioning suites
+- *(core)* Make versioned relation attach idempotent
+- *(http)* Wrap list collections as JsonResource in ResponseBuilder
+- *(grids)* Resolve grid action from route name instead of URL tail
+
+### 🚜 Refactor
+
+- *(tests)* Replace superadmin modifier with author in modification tests
+
+### ⚡ Performance
+
+- *(crud)* Drop redundant queries and cache model discovery
+
+## [1.69.3] - 2026-08-05
+
+### 🚀 Features
+
 - *(grids)* Expose per-entity allowed operations in grid config
 - *(versioning)* Implement soft and hard delete handling in versioning
 - *(core)* Apply approve permission as write-time quorum credit

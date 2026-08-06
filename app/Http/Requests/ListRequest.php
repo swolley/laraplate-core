@@ -38,6 +38,9 @@ class ListRequest extends SelectRequest
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'filters' => [new QueryBuilder()],
             'group_by.*' => ['string'],
+            /** Snapshot ids for freshness presence (on_page / off_page / gone). */
+            'check_ids' => ['sometimes', 'array', 'max:100'],
+            'check_ids.*' => ['nullable'],
         ];
         $rules['relations.*'][] = 'exclude_if:count,true';
 
@@ -74,6 +77,12 @@ class ListRequest extends SelectRequest
 
         if ($group_by) {
             $to_merge['group_by'] = is_string($group_by) && is_json($group_by) ? json_decode($group_by, true) : $group_by;
+        }
+
+        $check_ids = $this->input('check_ids');
+
+        if (is_string($check_ids) && is_json($check_ids)) {
+            $to_merge['check_ids'] = json_decode($check_ids, true);
         }
 
         /** @phpstan-ignore method.notFound */

@@ -32,15 +32,23 @@ final readonly class GetGridConfigsAction
      * @throws ExpectationFailedException
      * @throws UnknownClassOrInterfaceException
      */
-    public function __invoke(Request $request, ?string $entity = null): array
+    public function __invoke(Request $request, ?string $entity = null, ?string $module = null): array
     {
         $models = $this->modelsProvider instanceof Closure ? ($this->modelsProvider)() : models();
         $registry = ModelMetadataRegistry::getInstance();
         $grids = [];
 
         foreach ($models as $model) {
+            if (
+                $module !== null
+                && $module !== ''
+                && strcasecmp((string) class_module($model), $module) !== 0
+            ) {
+                continue;
+            }
+
             if ($this->gridResolver instanceof Closure) {
-                $grid = ($this->gridResolver)($model, $entity, $request);
+                $grid = ($this->gridResolver)($model, $entity, $request, $module);
 
                 if ($grid !== null) {
                     $grids[$model] = $grid;

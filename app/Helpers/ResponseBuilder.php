@@ -84,7 +84,13 @@ class ResponseBuilder
                 $this->setClass($data);
             }
         } elseif ($data instanceof Collection || (is_array($data) && Arr::isList($data))) {
-            $this->resourceResponse = new ResourceCollection($data);
+            // Wrap items as JsonResource so ResourceCollection resolves via
+            // map->resolve($request), not map->toArray($request). Models that
+            // override toArray(?array $parsed) (HasPlace, HasTranslations, …)
+            // reject the HTTP Request as $parsed under PHP typed signatures.
+            $this->resourceResponse = JsonResource::collection(
+                $data instanceof Collection ? $data : collect($data),
+            );
 
             if (count($data) > 0) {
                 $first = $data instanceof Collection ? $data->first() : $data[0];

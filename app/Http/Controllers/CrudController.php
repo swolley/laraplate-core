@@ -54,6 +54,23 @@ class CrudController extends Controller
     }
 
     /**
+     * Lightweight list fingerprint (id + updated_at) for freshness ping.
+     *
+     * Same auth, ACL, filters, sort and pagination as {@see list()}; never cached.
+     */
+    final public function freshness(ListRequest $request): Response
+    {
+        $requestData = $request->parsed();
+
+        return $this->handleServiceCall(
+            fn (): CrudResult => $this->crudService->freshness($requestData),
+            $request,
+            $requestData->model,
+            shouldCache: false,
+        );
+    }
+
+    /**
      * Show the specified resource.
      *
      * @throws BindingResolutionException

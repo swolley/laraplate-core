@@ -58,13 +58,30 @@ final class PerModelSettingResolver
      */
     public function group(string $group_name): Collection
     {
-        return $this->loaded_groups[$group_name] ??= Cache::rememberForever(
-            self::groupCacheKey($group_name),
-            static fn (): Collection => Setting::query()
-                ->where('group_name', $group_name)
-                ->get()
-                ->keyBy('name'),
-        );
+        if (isset($this->loaded_groups[$group_name])) {
+            return $this->loaded_groups[$group_name];
+        }
+
+        $cached = Cache::get(self::groupCacheKey($group_name));
+
+        if ($cached instanceof Collection) {
+            return $this->loaded_groups[$group_name] = $cached;
+        }
+
+        // Invalid / legacy payloads (e.g. plain arrays from Redis-after-fork
+        // corruption or older writers) must not leak past the Collection return type.
+        if ($cached !== null) {
+            Cache::forget(self::groupCacheKey($group_name));
+        }
+
+        $group = Setting::query()
+            ->where('group_name', $group_name)
+            ->get()
+            ->keyBy('name');
+
+        Cache::forever(self::groupCacheKey($group_name), $group);
+
+        return $this->loaded_groups[$group_name] = $group;
     }
 
     /**

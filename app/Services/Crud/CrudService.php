@@ -156,6 +156,232 @@ class CrudService
         );
     }
 
+    /**
+     * Page-scoped freshness fingerprint: filtered total + current page id/updated_at rows,
+     * plus optional presence of client snapshot ids (on_page / off_page / gone).
+     *
+     * Reuses list auth, ACL injection, filters, sort and pagination. Selects only
+     * primary key + updated_at (when the model has timestamps).
+     *
+     * Rows are read via the base query builder (no Eloquent hydration) so model
+     * global `with()` scopes, `retrieved` hooks, and missing-attribute guards
+     * cannot blow up when FK columns were intentionally omitted from the select.
+     *
+     * @return CrudResult data shape: `{ total, items, presence }`
+     */
+    public function freshness(ListRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $this->auth->injectAclFilters($requestData, $permission_name);
+
+        $query = $model->newQuery();
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        // Drop eager loads / wide selects from the list pipeline; fingerprint only.
+        $query->withoutEagerLoads();
+        $table = $model->getTable();
+        $key_name = $model->getKeyName();
+        $updated_at_column = $model->usesTimestamps() ? $model->getUpdatedAtColumn() : null;
+
+        $select_columns = is_array($key_name)
+            ? array_map(static fn (string $key): string => $table . '.' . $key, $key_name)
+            : [$table . '.' . $key_name];
+
+        if (is_string($updated_at_column) && $updated_at_column !== '') {
+            $select_columns[] = $table . '.' . $updated_at_column;
+        }
+
+        $query->select($select_columns);
+
+        $total_records = (clone $query)->count();
+
+        // Page window on a clone so the filtered base query stays usable for presence.
+        $page_query = clone $query;
+        match (true) {
+            $requestData->page !== null => $page_query
+                ->skip($requestData->from - 1)
+                ->take($requestData->to - $requestData->from + 1),
+            $requestData->from !== null => tap($page_query, static function (Builder $q) use ($requestData): void {
+                $q->skip($requestData->from - 1);
+                if ($requestData->to !== null) {
+                    $q->take($requestData->to - $requestData->from + 1);
+                }
+            }),
+            isset($requestData->limit) => $page_query->take($requestData->take),
+            default => $page_query,
+        };
+
+        $rows = $requestData->count
+            ? collect()
+            : $page_query->toBase()->get();
+
+        $key_columns = is_array($key_name) ? $key_name : [$key_name];
+
+        $items = $rows->map(
+            fn (object $row): array => $this->mapFreshnessRow($row, $key_columns, $updated_at_column),
+        )->values()->all();
+
+        $presence = $this->buildFreshnessPresence(
+            $query,
+            $items,
+            $key_name,
+            $key_columns,
+            $table,
+            $updated_at_column,
+            $this->normalizeFreshnessCheckIds($requestData),
+        );
+
+        return new CrudResult(
+            data: [
+                'total' => $total_records,
+                'items' => $items,
+                'presence' => $presence,
+            ],
+            meta: new CrudMeta(
+                totalRecords: $total_records,
+                currentRecords: count($items),
+                currentPage: $requestData->page,
+                totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+                pagination: $requestData->pagination,
+                from: $requestData->from,
+                to: $requestData->to,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $key_columns
+     * @return array{id: mixed, updated_at: string|null}
+     */
+    private function mapFreshnessRow(object $row, array $key_columns, ?string $updated_at_column): array
+    {
+        $id = count($key_columns) === 1
+            ? $row->{$key_columns[0]}
+            : array_map(static fn (string $key): mixed => $row->{$key}, $key_columns);
+
+        return [
+            'id' => $id,
+            'updated_at' => $this->formatFreshnessUpdatedAt(
+                is_string($updated_at_column) && $updated_at_column !== ''
+                    ? ($row->{$updated_at_column} ?? null)
+                    : null,
+            ),
+        ];
+    }
+
+    private function formatFreshnessUpdatedAt(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTimeInterface::ATOM);
+        }
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * @return list<int|string>
+     */
+    private function normalizeFreshnessCheckIds(ListRequestData $requestData): array
+    {
+        $raw = $requestData->request->input('check_ids', []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($raw as $value) {
+            if ($value === null || $value === '' || is_array($value)) {
+                continue;
+            }
+            if (is_int($value) || is_string($value)) {
+                $ids[] = $value;
+            } elseif (is_numeric($value)) {
+                $ids[] = (string) $value;
+            }
+            if (count($ids) >= 100) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($ids, SORT_REGULAR));
+    }
+
+    /**
+     * Classify snapshot ids against the filtered set (no page window) and current page items.
+     *
+     * @param  list<array{id: mixed, updated_at: string|null}>  $items
+     * @param  string|array<int, string>  $key_name
+     * @param  array<int, string>  $key_columns
+     * @param  list<int|string>  $check_ids
+     * @return list<array{id: int|string, status: 'on_page'|'off_page'|'gone', updated_at: string|null}>
+     */
+    private function buildFreshnessPresence(
+        Builder $filtered_query,
+        array $items,
+        string|array $key_name,
+        array $key_columns,
+        string $table,
+        ?string $updated_at_column,
+        array $check_ids,
+    ): array {
+        if ($check_ids === [] || is_array($key_name)) {
+            return [];
+        }
+
+        $page_ids = [];
+        foreach ($items as $item) {
+            $page_ids[(string) $item['id']] = true;
+        }
+
+        $found_rows = (clone $filtered_query)
+            ->whereIn($table . '.' . $key_name, $check_ids)
+            ->toBase()
+            ->get();
+
+        $found_by_id = [];
+        foreach ($found_rows as $row) {
+            $mapped = $this->mapFreshnessRow($row, $key_columns, $updated_at_column);
+            $found_by_id[(string) $mapped['id']] = $mapped;
+        }
+
+        $presence = [];
+        foreach ($check_ids as $id) {
+            $key = (string) $id;
+            if (! isset($found_by_id[$key])) {
+                $presence[] = [
+                    'id' => $id,
+                    'status' => 'gone',
+                    'updated_at' => null,
+                ];
+
+                continue;
+            }
+
+            $presence[] = [
+                'id' => $found_by_id[$key]['id'],
+                'status' => isset($page_ids[$key]) ? 'on_page' : 'off_page',
+                'updated_at' => $found_by_id[$key]['updated_at'],
+            ];
+        }
+
+        return $presence;
+    }
+
     public function detail(DetailRequestData $requestData): CrudResult
     {
         $model = $requestData->model;

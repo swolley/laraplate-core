@@ -99,7 +99,8 @@ final class ProgressBarReporter implements BatchReporter
 
         if (! $summary->hasFailures()) {
             $this->progress->label(sprintf(
-                'Successfully processed %d units across %d tasks in %.2fs',
+                '%s — Successfully processed %d units across %d tasks in %.2fs',
+                $this->label,
                 $summary->totalUnitsProcessed,
                 $summary->totalTasks,
                 $summary->totalDuration,

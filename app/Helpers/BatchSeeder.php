@@ -62,11 +62,12 @@ abstract class BatchSeeder extends Seeder
     /**
      * Hook executed once inside each forked child process before the batch task runs.
      *
-     * The default implementation only reconnects to the database (PDO links
-     * inherited from the parent are not safe to reuse after a fork). Override
-     * in your seeder if you need additional resets, e.g. cache, queue, or
-     * search engine clients. Avoid destructive operations like Cache::flush()
-     * which would truncate shared stores (Redis FLUSHDB).
+     * The default implementation reconnects the database (PDO links inherited
+     * from the parent are not safe to reuse after a fork) and purges Cache/Redis
+     * managers so workers open fresh connections. Override in your seeder if you
+     * need additional resets (e.g. queue or search engine clients). Avoid
+     * destructive operations like Cache::flush() which would truncate shared
+     * stores (Redis FLUSHDB).
      *
      * Forked workers inherit a copy of this seeder instance (including HasBenchmark
      * state). Child processes share STDOUT with the parent; without cancelling the
@@ -83,6 +84,14 @@ abstract class BatchSeeder extends Seeder
 
         if ($this->childDatabaseConnectionName !== null) {
             DB::reconnect($this->childDatabaseConnectionName);
+        }
+
+        // Redis sockets inherited from the parent are not fork-safe; purge so
+        // the next Cache/Redis access opens a fresh connection in this child.
+        Cache::purge();
+
+        if (app()->bound('redis')) {
+            app('redis')->purge();
         }
     }
 

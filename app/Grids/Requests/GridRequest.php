@@ -121,9 +121,7 @@ final class GridRequest extends FormRequest implements IParsableRequest
     {
         parent::prepareForValidation();
 
-        /** @phpstan-ignore method.notFound */
-        $exploded_url = explode('/', $this->url());
-        $this->action = GridAction::from($exploded_url[count($exploded_url) - 2]);
+        $this->action = $this->resolveActionFromRequest();
 
         switch ($this->action) {
             case GridAction::Data:
@@ -175,6 +173,40 @@ final class GridRequest extends FormRequest implements IParsableRequest
 
                 break;
         }
+    }
+
+    /**
+     * Resolve the grid verb from `/app/crud/grid/{action}/{module}/{entity}`.
+     * Prefer the route name (`*.grids.{action}`); fall back to the path segment
+     * immediately after `grid` so `{module}` is never mistaken for the action.
+     */
+    private function resolveActionFromRequest(): GridAction
+    {
+        $route = $this->route();
+        $route_name = $route?->getName();
+
+        if (is_string($route_name) && str_contains($route_name, 'grids.')) {
+            $action_name = Str::afterLast($route_name, 'grids.');
+
+            // `replace` is the route name for update; GridAction uses `update`.
+            if ($action_name === 'replace') {
+                return GridAction::Update;
+            }
+
+            if ($action_name !== 'getGridsConfigs') {
+                return GridAction::from($action_name);
+            }
+        }
+
+        $path = parse_url($this->url(), PHP_URL_PATH);
+        $segments = is_string($path) ? explode('/', trim($path, '/')) : [];
+        $grid_index = array_search('grid', $segments, true);
+
+        if ($grid_index !== false && isset($segments[$grid_index + 1])) {
+            return GridAction::from($segments[$grid_index + 1]);
+        }
+
+        throw new \ValueError('Unable to resolve grid action from request URL.');
     }
 
     private function remapListRules(string $prefix): array
