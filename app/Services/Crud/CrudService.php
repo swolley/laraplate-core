@@ -156,6 +156,97 @@ class CrudService
         );
     }
 
+    /**
+     * Page-scoped freshness fingerprint: filtered total + current page id/updated_at rows.
+     *
+     * Reuses list auth, ACL injection, filters, sort and pagination. Selects only
+     * primary key + updated_at (when the model has timestamps).
+     *
+     * @return CrudResult data shape: `{ total: int, items: list<{ id, updated_at }> }`
+     */
+    public function freshness(ListRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $this->auth->injectAclFilters($requestData, $permission_name);
+
+        $query = $model->newQuery();
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        // Drop eager loads / wide selects from the list pipeline; fingerprint only.
+        $query->setEagerLoads([]);
+        $table = $model->getTable();
+        $key_name = $model->getKeyName();
+        $updated_at_column = $model->usesTimestamps() ? $model->getUpdatedAtColumn() : null;
+
+        $select_columns = is_array($key_name)
+            ? array_map(static fn (string $key): string => $table . '.' . $key, $key_name)
+            : [$table . '.' . $key_name];
+
+        if (is_string($updated_at_column) && $updated_at_column !== '') {
+            $select_columns[] = $table . '.' . $updated_at_column;
+        }
+
+        $query->select($select_columns);
+
+        $total_records = $query->count();
+
+        $rows = match (true) {
+            $requestData->page !== null => $this->listByPagination($query, $requestData, $total_records),
+            $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
+            default => $this->listByOthers($query, $requestData, $total_records),
+        };
+
+        if (! $rows instanceof Collection) {
+            $rows = new Collection;
+        }
+
+        $items = $rows->map(static function (Model $row) use ($updated_at_column): array {
+            $updated_at = null;
+
+            if (is_string($updated_at_column) && $updated_at_column !== '') {
+                $value = $row->getAttribute($updated_at_column);
+
+                if ($value instanceof \DateTimeInterface) {
+                    $updated_at = $value->format(\DateTimeInterface::ATOM);
+                } elseif ($value !== null) {
+                    $updated_at = (string) $value;
+                }
+            }
+
+            return [
+                'id' => $row->getKey(),
+                'updated_at' => $updated_at,
+            ];
+        })->values()->all();
+
+        return new CrudResult(
+            data: [
+                'total' => $total_records,
+                'items' => $items,
+            ],
+            meta: new CrudMeta(
+                totalRecords: $total_records,
+                currentRecords: count($items),
+                currentPage: $requestData->page,
+                totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+                pagination: $requestData->pagination,
+                from: $requestData->from,
+                to: $requestData->to,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
     public function detail(DetailRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
