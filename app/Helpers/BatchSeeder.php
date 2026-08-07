@@ -192,23 +192,48 @@ abstract class BatchSeeder extends Seeder
 
         $effective_batch_size = $batchSize ?? self::BATCHSIZE;
         $total_batches = (int) ceil($count_to_create / $effective_batch_size);
-        $this->childDatabaseConnectionName = $db_connection_name;
 
         $tasks = $this->buildSeederTasks($modelClass, $count_to_create, $effective_batch_size, $total_batches);
 
+        return $this->runParallelTasks(
+            $tasks,
+            'Creating ' . $entity_name . ' (parallel)',
+            $db_connection_name,
+            $effective_batch_size,
+            $maxParallelCount,
+        );
+    }
+
+    /**
+     * Run pre-built BatchTasks through the fork-based worker pool, wiring the
+     * shared reporter, fail-fast policy and per-fork bootstrap. Records the
+     * child DB connection so {@see self::bootstrapChildProcess()} reconnects the
+     * correct one after each fork.
+     *
+     * @param  list<BatchTask>  $tasks
+     */
+    final protected function runParallelTasks(
+        array $tasks,
+        string $label,
+        string $connectionName,
+        int $batchSize,
+        int $maxParallelCount = 10,
+    ): int {
         if ($tasks === []) {
             return 0;
         }
 
+        $this->childDatabaseConnectionName = $connectionName;
+
         $reporter = new ProgressBarReporter(
-            label: 'Creating ' . $entity_name . ' (parallel)',
-            extraHint: "Up to {$maxParallelCount} workers, {$effective_batch_size} records/batch, {$total_batches} batches",
+            label: $label,
+            extraHint: 'Up to ' . $maxParallelCount . ' workers, ' . count($tasks) . ' batches',
         );
 
         try {
             $summary = ParallelTaskRunner::make()
                 ->concurrent($maxParallelCount)
-                ->withResourceSizing($db_connection_name, $effective_batch_size)
+                ->withResourceSizing($connectionName, $batchSize)
                 ->errorPolicy(ErrorPolicy::FailFast)
                 ->reportTo($reporter)
                 ->beforeChild(fn () => $this->bootstrapChildProcess())
