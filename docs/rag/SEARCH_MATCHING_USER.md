@@ -1,3 +1,8 @@
+---
+module: core
+audience: user
+cross_cutting_user: true
+---
 # Adaptive search matching — user and API guide
 
 ## What adaptive matching does
