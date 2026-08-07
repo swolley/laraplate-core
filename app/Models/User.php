@@ -117,8 +117,6 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         'two_factor_secret',
         'two_factor_recovery_codes',
         'last_login_at',
-        'updated_at',
-        'created_at',
         'email_verified_at',
     ];
 

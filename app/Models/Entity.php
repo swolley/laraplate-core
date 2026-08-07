@@ -51,8 +51,6 @@ abstract class Entity extends Model
 
     #[Override]
     final protected $hidden = [
-        'created_at',
-        'updated_at',
         'type',
     ];
 

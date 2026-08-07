@@ -36,12 +36,6 @@ final class TaxonomyTranslation extends Model implements ITranslated
         'components',
     ];
 
-    #[Override]
-    protected $hidden = [
-        'created_at',
-        'updated_at',
-    ];
-
     // /**
     //  * The category that belongs to the translation.
     //  *

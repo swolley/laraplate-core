@@ -77,8 +77,6 @@ abstract class Taxonomy extends Model implements Sortable
         'parent_id',
         'presettable_id',
         'entity_id',
-        'created_at',
-        'updated_at',
         'ancestorsAndSelf',
         'ancestors',
         'descendants',

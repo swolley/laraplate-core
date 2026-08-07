@@ -31,12 +31,6 @@ final class Template extends Model
         'content',
     ];
 
-    #[Override]
-    protected $hidden = [
-        'created_at',
-        'updated_at',
-    ];
-
     public function getRules(): array
     {
         $rules = parent::getRules();

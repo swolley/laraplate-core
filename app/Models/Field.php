@@ -49,12 +49,6 @@ final class Field extends Model
         'options',
     ];
 
-    #[Override]
-    protected $hidden = [
-        'created_at',
-        'updated_at',
-    ];
-
     public function getAttribute(mixed $key): mixed
     {
         if (property_exists($this, 'pivot') && $this->pivot !== null && isset($this->pivot->{$key})) {

@@ -45,7 +45,10 @@ it('returns page-scoped id and updated_at fingerprints with filtered total', fun
 
     foreach ($data['items'] as $item) {
         expect($item)->toHaveKeys(['id', 'updated_at'])
-            ->and($item['updated_at'])->not->toBeNull();
+            ->and($item['updated_at'])->not->toBeNull()
+            // Must be ISO-8601 (not raw MySQL "Y-m-d H:i:s") so clients can
+            // compare against Eloquent JSON timestamps without false modified marks.
+            ->and($item['updated_at'])->toMatch('/^\d{4}-\d{2}-\d{2}T/');
     }
 });
 

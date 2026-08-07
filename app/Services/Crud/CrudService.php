@@ -359,15 +359,17 @@ class CrudService
 
     private function formatFreshnessUpdatedAt(mixed $value): ?string
     {
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format(\DateTimeInterface::ATOM);
-        }
-
         if ($value === null || $value === '') {
             return null;
         }
 
-        return (string) $value;
+        try {
+            // toBase() returns MySQL "Y-m-d H:i:s" (app TZ). Normalize to ISO-8601 UTC
+            // so clients can compare with Eloquent JSON timestamps without false positives.
+            return Date::parse($value)->utc()->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
