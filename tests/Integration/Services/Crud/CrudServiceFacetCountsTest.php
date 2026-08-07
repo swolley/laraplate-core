@@ -9,6 +9,9 @@ use Modules\Core\Casts\Column;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\WhereClause;
+use Modules\Core\Models\ACL;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Services\Crud\CrudService;
 
@@ -163,4 +166,44 @@ it('excludes the facet field own filter so its other values stay counted', funct
         ->and($by_value['B']['count'])->toBe(1)
         ->and($by_value['A']['total'])->toBe(2)
         ->and($by_value['B']['total'])->toBe(1);
+});
+
+it('restricts facet counts to the ACL-visible rows', function (): void {
+    $permission = Permission::findOrCreate('default.users.select', 'web');
+
+    $role = Role::factory()->create(['name' => 'facet_acl_role_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($permission);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => new FiltersGroup([new Filter('name', 'A', FilterOperator::Equals)], WhereClause::And),
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $viewer = User::factory()->create(['name' => 'zzz-viewer']);
+    $viewer->assignRole($role);
+    auth()->login($viewer);
+
+    User::factory()->create(['name' => 'A']);
+    User::factory()->create(['name' => 'A']);
+    User::factory()->create(['name' => 'B']);
+
+    $service = app(CrudService::class);
+    $request = facet_make_request();
+    $request->setUserResolver(fn (): User => $viewer);
+    $base = facet_make_list_data(new User, $request, [new Column('name')]);
+
+    $facets = $service->facetCounts($base);
+    $by_value = collect($facets['name'])->keyBy('value');
+
+    // ACL limits visibility to name = A: rows named B (and the viewer) are hidden,
+    // so 'B' never appears in the distribution and A only counts visible rows.
+    expect($by_value->has('B'))->toBeFalse()
+        ->and($by_value['A']['total'])->toBe(2)
+        ->and($by_value['A']['count'])->toBe(2);
 });

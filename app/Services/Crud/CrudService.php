@@ -172,7 +172,7 @@ class CrudService
     {
         $model = $base->model;
 
-        $this->auth->ensurePermission(
+        $permission_name = $this->auth->ensurePermission(
             $base->request,
             $model->getTable(),
             'select',
@@ -186,9 +186,14 @@ class CrudService
             // own table, regardless of any entity-qualified prefix on the request.
             $field = $this->facetKey($column->name);
 
-            $totals = $model->newQuery()->toBase()->pluck($field)->countBy();
+            // Both universes stay within the ACL-visible rows: `total` ignores the
+            // request filters but not the row-level ACL, `count` applies both.
+            $total_query = $model->newQuery();
+            $this->auth->applyAclFiltersToQuery($total_query, $permission_name);
+            $totals = $total_query->toBase()->pluck($field)->countBy();
 
             $count_query = $model->newQuery();
+            $this->auth->applyAclFiltersToQuery($count_query, $permission_name);
 
             if ($base->filters instanceof FiltersGroup) {
                 $this->query_builder->applyFilters($count_query, $this->excludeFacetField($base->filters, $field));
