@@ -39,20 +39,10 @@ trait HasLocks
      */
     public function initializeHasLocks(): void
     {
+        // is_locked stays guarded (never mass-assigned) but the lock columns are
+        // intentionally visible so CRUD payloads can surface lock state to the UI.
         if (! in_array($this->getIsLockedColumn(), $this->guarded, true)) {
             $this->guarded[] = $this->getIsLockedColumn();
-        }
-
-        if (! in_array($this->getIsLockedColumn(), $this->hidden, true)) {
-            $this->hidden[] = $this->getIsLockedColumn();
-        }
-
-        if (! in_array($this->getLockedAtColumn(), $this->hidden, true)) {
-            $this->hidden[] = $this->getLockedAtColumn();
-        }
-
-        if (! in_array($this->getLockedByColumn(), $this->hidden, true)) {
-            $this->hidden[] = $this->getLockedByColumn();
         }
     }
 

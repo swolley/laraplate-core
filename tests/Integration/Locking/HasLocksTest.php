@@ -21,13 +21,26 @@ beforeEach(function (): void {
     });
 });
 
-it('initializes guarded and hidden lock columns', function (): void {
+it('guards is_locked but keeps lock columns visible in the payload', function (): void {
     $model = new LockableTestModel;
 
     expect($model->getGuarded())->toContain('is_locked')
-        ->and($model->getHidden())->toContain('is_locked')
-        ->and($model->getHidden())->toContain('locked_at')
-        ->and($model->getHidden())->toContain('locked_user_id');
+        ->and($model->getHidden())->not->toContain('is_locked')
+        ->and($model->getHidden())->not->toContain('locked_at')
+        ->and($model->getHidden())->not->toContain('locked_user_id');
+});
+
+it('surfaces lock state in the serialized model so the UI can read it', function (): void {
+    $user = User::factory()->create();
+    $model = LockableTestModel::query()->create(['name' => 'doc']);
+    $model->lockBy($user);
+
+    $array = LockableTestModel::query()->findOrFail($model->id)->toArray();
+
+    expect($array)->toHaveKey('locked_at')
+        ->and($array['locked_at'])->not->toBeNull()
+        ->and($array)->toHaveKey('locked_user_id')
+        ->and($array['locked_user_id'])->toBe($user->id);
 });
 
 it('applies saving hooks for lock_version and removes virtual is_locked attribute', function (): void {
