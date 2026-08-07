@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Modules\Core\Casts\Column;
-use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -99,9 +98,9 @@ it('counts each facet value with total equal to count when there is no base filt
     $service = app(CrudService::class);
     $request = facet_make_request();
     $request->setUserResolver(fn (): User => $superadmin);
-    $base = facet_make_list_data(new User, $request, [new Column('users.name', ColumnType::Column)]);
+    $base = facet_make_list_data(new User, $request, [new Column('name')]);
 
-    $facets = $service->facetCounts($base, ['name']);
+    $facets = $service->facetCounts($base);
 
     $by_value = collect($facets['name'])->keyBy('value');
 
@@ -121,12 +120,12 @@ it('keeps total unfiltered while count reflects a base filter on another field',
     $service = app(CrudService::class);
     $request = facet_make_request();
     $request->setUserResolver(fn (): User => $superadmin);
-    $base = facet_make_list_data(new User, $request, [new Column('users.name', ColumnType::Column)]);
+    $base = facet_make_list_data(new User, $request, [new Column('name')]);
 
     $filters = new ReflectionProperty($base, 'filters');
     $filters->setValue($base, new FiltersGroup([new Filter('email', '%keep%', FilterOperator::Like)]));
 
-    $facets = $service->facetCounts($base, ['name']);
+    $facets = $service->facetCounts($base);
 
     $by_value = collect($facets['name'])->keyBy('value');
 
@@ -147,7 +146,7 @@ it('excludes the facet field own filter so its other values stay counted', funct
     $service = app(CrudService::class);
     $request = facet_make_request();
     $request->setUserResolver(fn (): User => $superadmin);
-    $base = facet_make_list_data(new User, $request, [new Column('users.name', ColumnType::Column)]);
+    $base = facet_make_list_data(new User, $request, [new Column('name')]);
 
     // The facet field (name) is itself selected, alongside another filter.
     $filters = new ReflectionProperty($base, 'filters');
@@ -156,7 +155,7 @@ it('excludes the facet field own filter so its other values stay counted', funct
         new Filter('email', '%keep%', FilterOperator::Like),
     ]));
 
-    $facets = $service->facetCounts($base, ['name']);
+    $facets = $service->facetCounts($base);
     $by_value = collect($facets['name'])->keyBy('value');
 
     // 'name = A' is dropped for the name facet; 'email like keep' stays applied.

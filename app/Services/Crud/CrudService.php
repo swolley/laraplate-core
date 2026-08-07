@@ -159,21 +159,33 @@ class CrudService
     }
 
     /**
-     * Per-facet value counts for the given fields.
+     * Per-facet value counts. Every requested column is treated as a facet dimension.
      *
-     * `total` is the value distribution ignoring the request filters; `count` applies
-     * them (reusing the list query preparation). Walking-skeleton scope: enumerable
-     * direct columns, no per-facet self-exclusion of the current selection yet.
+     * For each facet value, `total` is the value distribution ignoring the request
+     * filters, while `count` applies them minus the facet's own selection (so a facet
+     * stays live as its values are toggled), reusing the list filter machinery. Results
+     * are keyed by the facet's bare column name.
      *
-     * @param  list<string>  $facetFields
      * @return array<string, list<array{value: mixed, total: int, count: int}>>
      */
-    public function facetCounts(ListRequestData $base, array $facetFields): array
+    public function facetCounts(ListRequestData $base): array
     {
         $model = $base->model;
+
+        $this->auth->ensurePermission(
+            $base->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
         $result = [];
 
-        foreach ($facetFields as $field) {
+        foreach ($base->columns as $column) {
+            // Direct-column scope: the bare column name resolves against the model's
+            // own table, regardless of any entity-qualified prefix on the request.
+            $field = $this->facetKey($column->name);
+
             $totals = $model->newQuery()->toBase()->pluck($field)->countBy();
 
             $count_query = $model->newQuery();
@@ -224,13 +236,17 @@ class CrudService
 
     private function facetFieldMatches(string $property, string $field): bool
     {
-        $last_segment = static function (string $path): string {
-            $position = mb_strrpos($path, '.');
+        return $this->facetKey($property) === $this->facetKey($field);
+    }
 
-            return $position === false ? $path : mb_substr($path, $position + 1);
-        };
+    /**
+     * The bare column name (last dot segment) used as the facet's response key.
+     */
+    private function facetKey(string $field): string
+    {
+        $position = mb_strrpos($field, '.');
 
-        return $last_segment($property) === $last_segment($field);
+        return $position === false ? $field : mb_substr($field, $position + 1);
     }
 
     /**

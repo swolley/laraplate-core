@@ -21,6 +21,7 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\DetailRequest;
 use Modules\Core\Http\Requests\DomainActionRequest;
+use Modules\Core\Http\Requests\FacetsRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\LatestDisapprovalRequest;
@@ -51,6 +52,25 @@ class CrudController extends Controller
             $request,
             $requestData->model,
         );
+    }
+
+    /**
+     * Standalone facet counts for the entity, independent of the data list so the
+     * client can reload facets without re-fetching table rows. Every requested column
+     * is a facet dimension.
+     */
+    final public function facets(FacetsRequest $request): Response
+    {
+        try {
+            $facets = $this->crudService->facetCounts($request->parsed());
+
+            return new ResponseBuilder($request)->setData($facets)->json();
+        } catch (AuthorizationException $exception) {
+            return new ResponseBuilder($request)
+                ->setData($exception)
+                ->setStatus(Response::HTTP_UNAUTHORIZED)
+                ->json();
+        }
     }
 
     /**
