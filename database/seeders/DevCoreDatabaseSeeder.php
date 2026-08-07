@@ -20,10 +20,13 @@ final class DevCoreDatabaseSeeder extends BatchSeeder
     {
         Artisan::call('module:seed', ['module' => 'Core', '--force' => $this->command->option('force')], outputBuffer: $this->command->getOutput());
 
-        Model::unguarded(function (): void {
-            $this->seedUsers();
-            $this->seedLicenses();
-        });
+        $this->withoutModelVersioning(
+            [User::class, License::class],
+            fn () => Model::unguarded(function (): void {
+                $this->seedUsers();
+                $this->seedLicenses();
+            }),
+        );
 
         Artisan::call('cache:clear');
     }

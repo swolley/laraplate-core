@@ -262,6 +262,36 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
+     * Run $callback with versioning disabled for each given model class, then
+     * restore each class's prior state. Dev bulk data needs no version history,
+     * and creating snapshots adds many writes per record; this mirrors the Scout
+     * ModelObserver::disableSyncingFor() pattern the dev seeders already use.
+     * Disabling in the parent before a parallel run is inherited by every fork.
+     *
+     * @param  list<class-string>  $modelClasses
+     */
+    final protected function withoutModelVersioning(array $modelClasses, callable $callback): mixed
+    {
+        $previous = [];
+
+        foreach ($modelClasses as $model_class) {
+            /** @phpstan-ignore staticMethod.notFound */
+            $previous[$model_class] = $model_class::getVersioning();
+            /** @phpstan-ignore staticMethod.notFound */
+            $model_class::disableVersioning();
+        }
+
+        try {
+            return $callback();
+        } finally {
+            foreach ($previous as $model_class => $was_enabled) {
+                /** @phpstan-ignore staticMethod.notFound */
+                $was_enabled ? $model_class::enableVersioning() : $model_class::disableVersioning();
+            }
+        }
+    }
+
+    /**
      * Build the BatchTask list for parallel seeding.
      *
      * @param  class-string<Model>  $modelClass

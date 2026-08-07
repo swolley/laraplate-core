@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Concerns\HasSlug;
 use Modules\Core\Models\Field;
+use Modules\Core\Services\DynamicContentsService;
 use RuntimeException;
 use stdClass;
 
@@ -83,9 +84,9 @@ trait HasDynamicContentFactory
     {
         throw_unless($model->entity_id, RuntimeException::class, 'No entity specified for model: ' . $model::class);
 
-        $model->load('presettable');
+        $fields = $this->resolvePresetFields($model);
 
-        $components_array = $model->presettable->preset->fields->mapWithKeys(function (Field $field) use ($forcedValues): array {
+        $components_array = $fields->mapWithKeys(function (Field $field) use ($forcedValues): array {
             $value = $field->pivot->default;
 
             if ($field->pivot->is_required || fake()->boolean()) {
@@ -124,7 +125,7 @@ trait HasDynamicContentFactory
         $shared = json_decode((string) ($model->attributes['shared_components'] ?? '{}'), true) ?? [];
         $translatable = [];
 
-        foreach ($model->presettable->preset->fields as $field) {
+        foreach ($fields as $field) {
             $value = $components_array[$field->name] ?? $field->pivot->default;
             if ($field->is_translatable ?? false) {
                 $translatable[$field->name] = $value;
@@ -148,5 +149,38 @@ trait HasDynamicContentFactory
         ) {
             $model->slug = $model->generateSlug();
         }
+    }
+
+    /**
+     * Resolve a model's preset fields (with pivot) from the cached
+     * {@see DynamicContentsService} data instead of loading
+     * presettable -> preset -> fields from the database for every record. The
+     * fields are static per presettable, so this collapses ~15 queries per
+     * record into a single warm-up load per entity type.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Field>
+     */
+    private function resolvePresetFields(Model $model): Collection
+    {
+        $type = $model::getEntityType();
+        $service = DynamicContentsService::getInstance();
+
+        $presettable = $service->fetchAvailablePresettables($type)->firstWhere('id', $model->presettable_id);
+
+        throw_unless(
+            $presettable,
+            RuntimeException::class,
+            sprintf('No cached presettable [%s] for model [%s].', $model->presettable_id, $model::class),
+        );
+
+        $preset = $service->fetchAvailablePresets($type)->firstWhere('id', $presettable->preset_id);
+
+        throw_unless(
+            $preset,
+            RuntimeException::class,
+            sprintf('No cached preset [%s] for model [%s].', $presettable->preset_id, $model::class),
+        );
+
+        return $preset->fields;
     }
 }
