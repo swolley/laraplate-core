@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🐛 Bug Fixes
+
+- *(crud)* Normalize freshness timestamps and expose created/updated_at
+
 ## [1.71.0] - 2026-08-06
 
 ### 🚀 Features
@@ -177,7 +183,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.59.0] - 2026-07-12
+## [1.58.8] - 2026-07-10
 
 ### 🐛 Bug Fixes
 
