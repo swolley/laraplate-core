@@ -296,6 +296,7 @@ final class MigrateUtils
         if (! $schema->hasColumn($table->getTable(), 'is_deleted')) {
             switch ($connection->getDriverName()) {
                 case 'pgsql':
+                case 'sqlite':
                     $table->boolean('is_deleted')->storedAs('deleted_at IS NOT NULL')->index($table->getTable() . '_is_deleted_idx')->comment('Whether the entity is deleted');
 
                     break;
@@ -353,6 +354,7 @@ final class MigrateUtils
         if (! $schema->hasColumn($table->getTable(), 'is_locked')) {
             switch ($connection->getDriverName()) {
                 case 'pgsql':
+                case 'sqlite':
                     $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
 
                     break;
