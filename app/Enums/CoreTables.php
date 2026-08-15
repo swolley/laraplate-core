@@ -35,6 +35,7 @@ enum CoreTables: string
     case Modifications = 'vend_modifications';
     case Approvals = 'vend_approvals';
     case Disapprovals = 'vend_disapprovals';
+    case Media = 'vend_media';
 
     // do not modify because they are used in the Laravel core environment
     case Users = 'users';
