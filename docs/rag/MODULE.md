@@ -499,6 +499,7 @@ Core exposes reusable primitives for module authors:
 - Searchable trait + `SchemaDefinition` + `ISearchEngine`/`IReranker`/`ISearchPlanner`/`IQueryIntentParser`.
 - Graph providers and traversal services (`GraphService`, `GraphTraversal`, `GraphProviderInterface`, `GraphProviderRulesInterface`).
 - Geocoding contracts and providers (`IGeocodingService`, `NominatimService`, `GoogleMapsService`).
+- Tabular exporters (`TabularCsvExporter`, `TabularPdfExporter`) — serialize an explicit `{key, label, format?}` column spec plus a row iterable to CSV or a minimal self-contained PDF, sharing one column contract. `TabularPdfExporter`'s PDF plumbing is `protected` so a module exporter with a custom row layout can extend it instead of duplicating the byte-offset bookkeeping (ERP's `ReportPdfExporter` does this).
 - Settings infrastructure and module activation.
 
 When building new module features, reuse these primitives instead of re-implementing lifecycle logic.
