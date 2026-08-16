@@ -8,11 +8,16 @@ use Modules\Core\Tests\Fixtures\GelfFingerprintLogFixture;
 use Monolog\Level;
 use Monolog\LogRecord;
 
-it('groups the same exception with different volatile message values from one throw site', function (): void {
+/**
+ * These assertions describe the corrected algorithm (design §7): the line number
+ * is not part of the hash, and only value-position numbers normalize away — a
+ * bare, meaning-carrying number (a 404 vs a 500) stays distinct.
+ */
+it('groups the same exception when only value-position detail changes', function (): void {
     $resolver = new GelfErrorFingerprintResolver;
 
     try {
-        GelfFingerprintExceptionFixture::indexingFailure('User 42 not found in index posts-991');
+        GelfFingerprintExceptionFixture::indexingFailure('record id=42');
     } catch (RuntimeException $first_exception) {
         $first = $resolver->resolve(new LogRecord(
             datetime: new DateTimeImmutable(),
@@ -25,7 +30,7 @@ it('groups the same exception with different volatile message values from one th
     }
 
     try {
-        GelfFingerprintExceptionFixture::indexingFailure('User 7 not found in index posts-12');
+        GelfFingerprintExceptionFixture::indexingFailure('record id=991');
     } catch (RuntimeException $second_exception) {
         $second = $resolver->resolve(new LogRecord(
             datetime: new DateTimeImmutable(),
@@ -94,10 +99,10 @@ it('uses the root cause for wrapped exceptions', function (): void {
     expect($wrapped)->toBe($root);
 });
 
-it('groups recurring log messages with changing numbers from one log site', function (): void {
+it('groups recurring log messages when the changing number is in value position', function (): void {
     $fingerprints = GelfFingerprintLogFixture::fingerprintsForMessages(
-        'Document 100 could not be indexed',
-        'Document 55 could not be indexed',
+        'Document id=100 could not be indexed',
+        'Document id=55 could not be indexed',
     );
 
     expect($fingerprints['first'])->toBe($fingerprints['second']);
@@ -117,7 +122,7 @@ it('keeps the same fingerprint for the same code location across execution conte
                 'class' => RuntimeException::class,
                 'file' => $job_file,
                 'line' => 89,
-                'message' => 'Model 12 failed',
+                'message' => 'Model id=12 failed',
             ],
         ],
         extra: [],
@@ -133,7 +138,7 @@ it('keeps the same fingerprint for the same code location across execution conte
                 'class' => RuntimeException::class,
                 'file' => $job_file,
                 'line' => 89,
-                'message' => 'Model 99 failed',
+                'message' => 'Model id=99 failed',
             ],
         ],
         extra: [],
@@ -142,7 +147,11 @@ it('keeps the same fingerprint for the same code location across execution conte
     expect($from_queue)->toBe($from_http);
 });
 
-it('separates errors thrown from different lines in the same file', function (): void {
+/**
+ * The headline correction: a refactor that shifts lines within the same file
+ * must not fork the group. Under the old algorithm this asserted the opposite.
+ */
+it('does not fork by line number within the same file', function (): void {
     $resolver = new GelfErrorFingerprintResolver;
     $job_file = base_path('Modules/AI/app/Jobs/GenerateEmbeddingsJob.php');
 
@@ -178,5 +187,25 @@ it('separates errors thrown from different lines in the same file', function ():
         extra: [],
     ));
 
-    expect($line_89)->not->toBe($line_120);
+    expect($line_89)->toBe($line_120);
+});
+
+/**
+ * The deliberate cost of value-position-only numeric normalization: a bare,
+ * meaning-carrying number keeps two errors distinct rather than merging them.
+ */
+it('keeps a 404 and a 500 in separate groups', function (): void {
+    $resolver = new GelfErrorFingerprintResolver;
+    $file = base_path('Modules/AI/app/Http/Client.php');
+
+    $make = static fn (string $message): string => (new GelfErrorFingerprintResolver)->resolve(new LogRecord(
+        datetime: new DateTimeImmutable(),
+        channel: 'gelf',
+        level: Level::Error,
+        message: 'Failed',
+        context: ['exception' => ['class' => RuntimeException::class, 'file' => $file, 'line' => 5, 'message' => $message]],
+        extra: [],
+    ));
+
+    expect($make('Upstream returned status 404'))->not->toBe($make('Upstream returned status 500'));
 });

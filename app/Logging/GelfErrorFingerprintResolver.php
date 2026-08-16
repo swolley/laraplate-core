@@ -4,9 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Core\Logging;
 
+use Modules\Core\Logging\Fingerprint\Fingerprinter;
+use Modules\Core\Logging\Fingerprint\FingerprintNormalizer;
 use Monolog\LogRecord;
 use Throwable;
 
+/**
+ * The in-process frame resolver: from a real {@see Throwable} (or a flattened
+ * exception array / a plain log record) it recovers the fingerprint parts and
+ * hashes them through the shared {@see Fingerprinter}. The message normalization
+ * lives in the Core fingerprint chain, so an error fingerprinted here and the
+ * same error received by SAO from a payload yield one key.
+ *
+ * The line number is intentionally absent from the hash (a refactor that shifts
+ * lines must not fork the group); it is retained as metadata by the GELF
+ * processor, not by the fingerprint.
+ */
 final class GelfErrorFingerprintResolver
 {
     /**
@@ -31,50 +44,56 @@ final class GelfErrorFingerprintResolver
         'call_user_func_array',
     ];
 
+    private readonly Fingerprinter $fingerprinter;
+
+    public function __construct(?Fingerprinter $fingerprinter = null)
+    {
+        $this->fingerprinter = $fingerprinter ?? new Fingerprinter(FingerprintNormalizer::default());
+    }
+
     public function resolve(LogRecord $record): string
     {
         if (array_key_exists('exception', $record->context)) {
             $signature = $this->resolveExceptionSignature($record->context['exception']);
 
             if ($signature !== null) {
-                return $this->hash([
+                return $this->fingerprinter->hash(
                     'exception',
                     $signature['module'],
                     $signature['class'],
                     $signature['file'],
-                    (string) $signature['line'],
+                    $signature['function'],
                     $signature['message'],
-                ]);
+                );
             }
         }
 
         $caller = $this->resolveCallerFrame();
 
-        return $this->hash([
+        return $this->fingerprinter->hash(
             'log',
             $caller['module'],
             $caller['class'],
             $caller['file'],
-            (string) $caller['line'],
-            $this->normalizeMessage($record->message),
-        ]);
+            $caller['function'],
+            $record->message,
+        );
     }
 
     /**
-     * @return array{module: string, class: string, file: string, line: int, message: string}|null
+     * @return array{module: string, class: string, file: string, function: string, message: string}|null
      */
     private function resolveExceptionSignature(mixed $exception): ?array
     {
         if ($exception instanceof Throwable) {
             $exception = $this->rootCause($exception);
-            $file = $this->normalizePath($exception->getFile());
 
             return [
                 'module' => file_module($exception->getFile()),
                 'class' => $exception::class,
-                'file' => $file,
-                'line' => $exception->getLine(),
-                'message' => $this->normalizeMessage($exception->getMessage()),
+                'file' => $this->normalizePath($exception->getFile()),
+                'function' => $this->exceptionFunction($exception),
+                'message' => $exception->getMessage(),
             ];
         }
 
@@ -84,22 +103,26 @@ final class GelfErrorFingerprintResolver
 
         $class = $exception['class'] ?? null;
         $file = $exception['file'] ?? null;
-        $line = $exception['line'] ?? null;
         $message = $exception['message'] ?? null;
 
-        if (! is_string($class) || ! is_string($file) || ! is_numeric($line) || ! is_string($message)) {
+        if (! is_string($class) || ! is_string($file) || ! is_string($message)) {
             return null;
         }
-
-        $normalized_file = $this->normalizePath($file);
 
         return [
             'module' => file_module($file),
             'class' => $class,
-            'file' => $normalized_file,
-            'line' => (int) $line,
-            'message' => $this->normalizeMessage($message),
+            'file' => $this->normalizePath($file),
+            'function' => is_string($exception['function'] ?? null) ? $exception['function'] : '',
+            'message' => $message,
         ];
+    }
+
+    private function exceptionFunction(Throwable $exception): string
+    {
+        $frame = $exception->getTrace()[0] ?? [];
+
+        return isset($frame['function']) && is_string($frame['function']) ? $frame['function'] : '';
     }
 
     private function rootCause(Throwable $exception): Throwable
@@ -112,7 +135,7 @@ final class GelfErrorFingerprintResolver
     }
 
     /**
-     * @return array{module: string, class: string, file: string, line: int}
+     * @return array{module: string, class: string, file: string, function: string}
      */
     private function resolveCallerFrame(): array
     {
@@ -135,16 +158,16 @@ final class GelfErrorFingerprintResolver
             $file = $raw_file !== ''
                 ? $this->normalizePath($raw_file)
                 : '';
-            $line = isset($frame['line']) && is_int($frame['line'])
-                ? $frame['line']
-                : 0;
+            $function = isset($frame['function']) && is_string($frame['function'])
+                ? $frame['function']
+                : '';
 
             if ($class !== '' || $file !== '') {
                 return [
                     'module' => $raw_file !== '' ? file_module($raw_file) : 'App',
                     'class' => $class,
                     'file' => $file,
-                    'line' => $line,
+                    'function' => $function,
                 ];
             }
         }
@@ -153,7 +176,7 @@ final class GelfErrorFingerprintResolver
             'module' => 'App',
             'class' => '',
             'file' => '',
-            'line' => 0,
+            'function' => '',
         ];
     }
 
@@ -188,42 +211,5 @@ final class GelfErrorFingerprintResolver
         }
 
         return str_replace('\\', '/', $path);
-    }
-
-    private function normalizeMessage(string $message): string
-    {
-        $normalized = preg_replace(
-            '/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i',
-            '{uuid}',
-            $message,
-        ) ?? $message;
-
-        $normalized = preg_replace(
-            '/\b(?:\d{1,3}\.){3}\d{1,3}\b/',
-            '{ip}',
-            $normalized,
-        ) ?? $normalized;
-
-        $normalized = preg_replace(
-            '/\b[0-9a-f]{32,}\b/i',
-            '{hex}',
-            $normalized,
-        ) ?? $normalized;
-
-        $normalized = preg_replace(
-            '/\b\d+\b/',
-            '{n}',
-            $normalized,
-        ) ?? $normalized;
-
-        return mb_trim($normalized);
-    }
-
-    /**
-     * @param  list<string>  $parts
-     */
-    private function hash(array $parts): string
-    {
-        return mb_substr(hash('sha256', implode("\0", $parts)), 0, 16);
     }
 }
