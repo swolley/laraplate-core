@@ -589,6 +589,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [hedii/laravel-gelf-logger](https://github.com/hedii/laravel-gelf-logger): Graylog via GELF.
     -   [laravel/horizon](https://github.com/laravel/horizon): Queue dashboard and management.
+    -   **Error fingerprinting** (`app/Logging/Fingerprint`): a dependency-free, ordered normalization rule chain (`StripStackTraces`, `CollapseVolatilePayloads`, `CollapseSqlState`, `SubstituteUuidIpHex`, value-position-only `SubstituteNumbersInValuePosition`) plus a `Fingerprinter` that hashes `kind+module+class+file+function+normalized message` — the line is deliberately excluded so a refactor does not fork a group, and a 404 and a 500 stay distinct. `GelfErrorFingerprintResolver` (in-process) and SAO's payload path share this chain, so one error yields one key however it is captured.
 
 -   **User Management:**
 
