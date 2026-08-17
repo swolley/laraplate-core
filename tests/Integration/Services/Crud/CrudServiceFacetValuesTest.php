@@ -185,6 +185,46 @@ it('resolves a single-hop BelongsTo label whose foreign key is the group key', f
         ->and($row['attributes'])->toBe(['license.uuid' => $license->uuid]);
 });
 
+it('sorts an open facet by a relation label via a correlated subquery', function (): void {
+    $admin = facet_values_superadmin();
+
+    // uuid order (0001 < 0002) is the opposite of count order (3 > 2), so a label
+    // sort must reorder against count_desc to prove it takes effect.
+    $first = License::factory()->create(['uuid' => '00000000-0000-0000-0000-000000000001']);
+    $second = License::factory()->create(['uuid' => '00000000-0000-0000-0000-000000000002']);
+    User::factory()->count(2)->create(['license_id' => $first->id]);
+    User::factory()->count(3)->create(['license_id' => $second->id]);
+
+    $page = facet_values_service($admin, null, new FacetQuery(
+        groupBy: 'license_id',
+        fields: ['license.uuid'],
+        sort: FacetSort::LabelAsc,
+        labelField: 'license.uuid',
+    ));
+
+    // The superadmin has no license (null key) and sorts to an end per DB null
+    // ordering; assert the relative order of the two labelled keys.
+    expect(collect($page->values)->pluck('key')->filter()->values()->all())->toBe([$first->id, $second->id]);
+});
+
+it('searches an open facet by a relation label', function (): void {
+    $admin = facet_values_superadmin();
+
+    $matching = License::factory()->create(['uuid' => '00000000-0000-0000-0000-0000000000aa']);
+    $other = License::factory()->create(['uuid' => '00000000-0000-0000-0000-0000000000bb']);
+    User::factory()->create(['license_id' => $matching->id]);
+    User::factory()->create(['license_id' => $other->id]);
+
+    $page = facet_values_service($admin, null, new FacetQuery(
+        groupBy: 'license_id',
+        labelField: 'license.uuid',
+        search: '0000aa',
+    ));
+
+    expect($page->distinctValues)->toBe(1)
+        ->and(collect($page->values)->pluck('key')->all())->toBe([$matching->id]);
+});
+
 it('skips relation labels that are not a BelongsTo keyed by the group key', function (): void {
     $admin = facet_values_superadmin();
     User::factory()->count(2)->create(['name' => 'Ada']);

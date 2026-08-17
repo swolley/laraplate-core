@@ -20,7 +20,10 @@ final readonly class FacetQuery
     /**
      * @param  list<string>  $fields  Display fields resolved per key in a bounded second query:
      *                                base-table columns, or a single-hop `relation.column` whose
-     *                                relation is a BelongsTo keyed by `groupBy` (label search/sort deferred).
+     *                                relation is a BelongsTo keyed by `groupBy`.
+     * @param  ?string  $labelField  A single-hop `relation.column` (BelongsTo keyed by `groupBy`) to
+     *                               search and sort by instead of the raw key; enables the LabelAsc/
+     *                               LabelDesc sorts and makes `search` match the label.
      */
     public function __construct(
         public string $groupBy,
@@ -29,6 +32,7 @@ final readonly class FacetQuery
         public int $perPage = self::DEFAULT_PER_PAGE,
         public ?string $search = null,
         public FacetSort $sort = FacetSort::CountDesc,
+        public ?string $labelField = null,
     ) {}
 
     /**
@@ -47,6 +51,7 @@ final readonly class FacetQuery
         }
 
         $search = $input['search'] ?? null;
+        $label_field = $input['labelField'] ?? null;
 
         return new self(
             groupBy: (string) ($input['groupBy'] ?? ''),
@@ -55,6 +60,7 @@ final readonly class FacetQuery
             perPage: max(1, min(self::MAX_PER_PAGE, (int) ($input['perPage'] ?? self::DEFAULT_PER_PAGE))),
             search: is_string($search) && $search !== '' ? $search : null,
             sort: FacetSort::tryFrom((string) ($input['sort'] ?? '')) ?? FacetSort::CountDesc,
+            labelField: is_string($label_field) && $label_field !== '' ? $label_field : null,
         );
     }
 }

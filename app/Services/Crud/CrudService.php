@@ -254,8 +254,24 @@ class CrudService
 
         $filtered_base = $filtered->toBase();
 
+        // A relation label (single-hop BelongsTo keyed by the group key) lets the
+        // facet search and sort by the label instead of the raw key — resolved
+        // without a join, so no column collides with the ACL/soft-delete scopes.
+        $label_relation = $facet->labelField === null
+            ? null
+            : $this->resolveLabelRelation($model, $key, $facet->labelField);
+
         if ($facet->search !== null) {
-            $filtered_base->where($key, 'like', '%' . $facet->search . '%');
+            if ($label_relation === null) {
+                $filtered_base->where($key, 'like', '%' . $facet->search . '%');
+            } else {
+                $matching_keys = $label_relation['related']->newQuery()
+                    ->where($label_relation['column'], 'like', '%' . $facet->search . '%')
+                    ->pluck($label_relation['ownerKey'])
+                    ->all();
+
+                $filtered_base->whereIn($key, $matching_keys);
+            }
         }
 
         $distinct_values = (int) (clone $filtered_base)->distinct()->count($key);
@@ -265,7 +281,7 @@ class CrudService
             ->selectRaw('count(*) as aggregate')
             ->groupBy($key);
 
-        $this->orderFacetPage($page_query, $key, $facet->sort);
+        $this->orderFacetPage($page_query, $model->getTable(), $key, $facet->sort, $label_relation);
 
         $rows = $page_query->forPage($facet->page, $facet->perPage)->get();
 
@@ -880,7 +896,10 @@ class CrudService
         );
     }
 
-    private function orderFacetPage(\Illuminate\Database\Query\Builder $query, string $key, FacetSort $sort): void
+    /**
+     * @param  array{related: Model, relatedTable: string, ownerKey: string, column: string}|null  $label_relation
+     */
+    private function orderFacetPage(\Illuminate\Database\Query\Builder $query, string $base_table, string $key, FacetSort $sort, ?array $label_relation): void
     {
         match ($sort) {
             // A stable key tiebreak keeps paging deterministic when counts tie.
@@ -888,7 +907,76 @@ class CrudService
             FacetSort::CountAsc => $query->orderByRaw('count(*) asc')->orderBy($key),
             FacetSort::KeyAsc => $query->orderBy($key),
             FacetSort::KeyDesc => $query->orderByDesc($key),
+            FacetSort::LabelAsc => $this->orderFacetByLabel($query, $base_table, $key, $label_relation, 'asc'),
+            FacetSort::LabelDesc => $this->orderFacetByLabel($query, $base_table, $key, $label_relation, 'desc'),
         };
+    }
+
+    /**
+     * Order a grouped facet page by a relation label without joining: a
+     * correlated subquery yields each group's label (the label is functionally
+     * dependent on the group key, so one row). With no resolvable label relation
+     * it falls back to the key, so a label sort never silently does nothing.
+     *
+     * @param  array{related: Model, relatedTable: string, ownerKey: string, column: string}|null  $label_relation
+     */
+    private function orderFacetByLabel(\Illuminate\Database\Query\Builder $query, string $base_table, string $key, ?array $label_relation, string $direction): void
+    {
+        if ($label_relation === null) {
+            $query->orderBy($key, $direction);
+
+            return;
+        }
+
+        $subquery = $label_relation['related']->newQuery()
+            ->select($label_relation['column'])
+            ->whereColumn($label_relation['relatedTable'] . '.' . $label_relation['ownerKey'], $base_table . '.' . $key)
+            ->limit(1)
+            ->toBase();
+
+        $query->orderBy($subquery, $direction);
+    }
+
+    /**
+     * Resolve a `relation.column` label target to its single-hop BelongsTo — only
+     * when the relation's foreign key is the facet's group key, so the label can
+     * be reached from the group key alone.
+     *
+     * @return array{related: Model, relatedTable: string, ownerKey: string, column: string}|null
+     */
+    private function resolveLabelRelation(Model $model, string $key, string $label_field): ?array
+    {
+        $dot = mb_strpos($label_field, '.');
+
+        if ($dot === false || mb_strpos($label_field, '.', $dot + 1) !== false) {
+            return null;
+        }
+
+        $relation = mb_substr($label_field, 0, $dot);
+        $column = mb_substr($label_field, $dot + 1);
+
+        if (! method_exists($model, $relation)) {
+            return null;
+        }
+
+        try {
+            $relation_object = $model->newInstance()->{$relation}();
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! $relation_object instanceof BelongsTo || $key !== $this->facetKey($relation_object->getForeignKeyName())) {
+            return null;
+        }
+
+        $related = $relation_object->getRelated();
+
+        return [
+            'related' => $related,
+            'relatedTable' => $related->getTable(),
+            'ownerKey' => $relation_object->getOwnerKeyName(),
+            'column' => $column,
+        ];
     }
 
     /**
