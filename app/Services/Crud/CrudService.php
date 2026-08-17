@@ -33,6 +33,7 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
+use Modules\Core\Contracts\ProvidesFacetLabelSources;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
@@ -50,6 +51,7 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
+use Modules\Core\Services\Crud\DTOs\FacetLabelSource;
 use Modules\Core\Services\Crud\DTOs\FacetPage;
 use Modules\Core\Services\Crud\DTOs\FacetQuery;
 use Modules\Core\Services\Crud\DTOs\FacetSort;
@@ -953,29 +955,71 @@ class CrudService
         }
 
         $relation = mb_substr($label_field, 0, $dot);
-        $column = mb_substr($label_field, $dot + 1);
+        $target = $this->labelRelationTarget($model, $key, $relation);
 
-        if (! method_exists($model, $relation)) {
+        return $target === null ? null : [...$target, 'column' => mb_substr($label_field, $dot + 1)];
+    }
+
+    /**
+     * Resolve the label target a facet's group key can reach in a single hop:
+     * either a declared {@see BelongsTo} whose foreign key is the group key, or a
+     * {@see FacetLabelSource} the model registers for a foreign key exposed without
+     * a relation (e.g. through an accessor). Both are keyed by the group key alone,
+     * so no join enters the aggregated query.
+     *
+     * @return array{related: Model, relatedTable: string, ownerKey: string}|null
+     */
+    private function labelRelationTarget(Model $model, string $key, string $relation): ?array
+    {
+        if (method_exists($model, $relation)) {
+            try {
+                $relation_object = $model->newInstance()->{$relation}();
+            } catch (Throwable) {
+                $relation_object = null;
+            }
+
+            if ($relation_object instanceof BelongsTo && $key === $this->facetKey($relation_object->getForeignKeyName())) {
+                $related = $relation_object->getRelated();
+
+                return [
+                    'related' => $related,
+                    'relatedTable' => $related->getTable(),
+                    'ownerKey' => $relation_object->getOwnerKeyName(),
+                ];
+            }
+        }
+
+        return $this->declaredLabelTarget($model, $key, $relation);
+    }
+
+    /**
+     * Build a label target from a model-declared {@see FacetLabelSource} when its
+     * foreign key is the facet's group key.
+     *
+     * @return array{related: Model, relatedTable: string, ownerKey: string}|null
+     */
+    private function declaredLabelTarget(Model $model, string $key, string $relation): ?array
+    {
+        if (! $model instanceof ProvidesFacetLabelSources) {
             return null;
         }
 
-        try {
-            $relation_object = $model->newInstance()->{$relation}();
-        } catch (Throwable) {
+        $source = $model->facetLabelSources()[$relation] ?? null;
+
+        if (! $source instanceof FacetLabelSource || $key !== $this->facetKey($source->foreignKey)) {
             return null;
         }
 
-        if (! $relation_object instanceof BelongsTo || $key !== $this->facetKey($relation_object->getForeignKeyName())) {
+        $related = new $source->relatedClass;
+
+        if (! $related instanceof Model) {
             return null;
         }
-
-        $related = $relation_object->getRelated();
 
         return [
             'related' => $related,
             'relatedTable' => $related->getTable(),
-            'ownerKey' => $relation_object->getOwnerKeyName(),
-            'column' => $column,
+            'ownerKey' => $source->ownerKey,
         ];
     }
 
@@ -1094,26 +1138,18 @@ class CrudService
      */
     private function resolveRelationLabels(Model $model, string $key, array $page_keys, string $relation, array $specs, array &$resolved): void
     {
-        if (! method_exists($model, $relation)) {
+        // Only a single-hop label target whose key is the facet key can be resolved
+        // from the page's keys without a join (a BelongsTo or a declared source).
+        $target = $this->labelRelationTarget($model, $key, $relation);
+
+        if ($target === null) {
             return;
         }
 
-        try {
-            $relation_object = $model->newInstance()->{$relation}();
-        } catch (Throwable) {
-            return;
-        }
-
-        // Only a single-hop BelongsTo whose foreign key is the facet key can be
-        // resolved from the page's keys without a join.
-        if (! $relation_object instanceof BelongsTo || $key !== $this->facetKey($relation_object->getForeignKeyName())) {
-            return;
-        }
-
-        $owner_key = $relation_object->getOwnerKeyName();
+        $owner_key = $target['ownerKey'];
         $columns = array_column($specs, 'column');
 
-        $related = $relation_object->getRelated()->newQuery()
+        $related = $target['related']->newQuery()
             ->whereIn($owner_key, $page_keys)
             ->get(array_values(array_unique([$owner_key, ...$columns])))
             ->keyBy($owner_key);
