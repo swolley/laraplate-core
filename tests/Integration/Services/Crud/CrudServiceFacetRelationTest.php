@@ -116,6 +116,31 @@ it('keeps a relation total unfiltered while count reflects a base filter', funct
         ->and($byLabel['editor']['count'])->toBe(1);
 });
 
+it('excludes a relation facet own selection so cross-filtering stays live', function (): void {
+    $admin = facet_rel_superadmin();
+    $editor = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);
+    $viewer = Role::factory()->create(['name' => 'viewer', 'guard_name' => 'web']);
+    User::factory()->count(2)->create()->each(fn (User $u) => $u->assignRole($editor));
+    User::factory()->create()->assignRole($viewer);
+
+    // Selecting editor filters the list, but the roles facet must still show viewer
+    // (its own selection is excluded from its own counts).
+    $filters = new FiltersGroup([new Filter('roles.id', [$editor->id], FilterOperator::In)]);
+
+    $page = facet_rel_service($admin, $filters, new FacetQuery(
+        groupBy: 'roles',
+        relation: 'roles',
+        fields: ['name'],
+        sort: FacetSort::CountDesc,
+    ));
+
+    $byLabel = facet_rel_by_label($page);
+
+    expect($byLabel['editor']['count'])->toBe(2)
+        ->and($byLabel->has('viewer'))->toBeTrue()
+        ->and($byLabel['viewer']['count'])->toBe(1);
+});
+
 it('searches and sorts a relation facet by the related label', function (): void {
     $admin = facet_rel_superadmin();
     $editor = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);

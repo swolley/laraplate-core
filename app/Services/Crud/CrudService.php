@@ -1523,6 +1523,17 @@ class CrudService
 
     private function facetFieldMatches(string $property, string $field): bool
     {
+        if ($property === $field) {
+            return true;
+        }
+
+        // Relation facet: the field is the relation name and its selection targets a
+        // column on it (field `categories`, property `categories.id`), so the whole
+        // relation membership filter is the facet's own selection.
+        if (str_contains($property, '.') && strstr($property, '.', true) === $field) {
+            return true;
+        }
+
         return $this->facetKey($property) === $this->facetKey($field);
     }
 
