@@ -772,7 +772,12 @@ whether the label is materialised in a DB column:
    accessor (no `BelongsTo`), a model declares the mapping via
    `ProvidesFacetLabelSources::facetLabelSources()`, returning a `FacetLabelSource`
    (related class + foreign key). Content maps `entity` → `entity_id` this way so
-   the content type labels from the entity name.
+   the content type labels from the entity name. A declared source wins over a
+   same-named `BelongsTo`, and may point the label at the related model's
+   locale-scoped translation (`translationRelation` + `translationColumn`) — so a
+   base-column FK facet can label, search and sort by a **translated** name, keyed
+   by the group key. Category maps `parent` → `parent_id` labelled from the parent's
+   translated `name`.
 3. **Translated label** — for a relation facet, a `relation.column` label field
    whose relation is the related model's `HasMany` translation relation
    (`translations.name`) is joined locale-scoped, enabling display, search and

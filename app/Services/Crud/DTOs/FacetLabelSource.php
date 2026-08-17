@@ -23,10 +23,16 @@ final readonly class FacetLabelSource
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $relatedClass  The model owning the label column.
      * @param  string  $foreignKey  The facet group key (foreign key column on the grouped model) this label is keyed by.
      * @param  string  $ownerKey  The related model column matched to the foreign key.
+     * @param  ?string  $translationRelation  A HasMany translation relation on the related model (e.g. `translations`)
+     *                                        whose locale-scoped row carries the label; null for a direct column.
+     * @param  ?string  $translationColumn  The label column on the translation row (e.g. `name`), required when
+     *                                       `$translationRelation` is set.
      */
     public function __construct(
         public string $relatedClass,
         public string $foreignKey,
         public string $ownerKey = 'id',
+        public ?string $translationRelation = null,
+        public ?string $translationColumn = null,
     ) {}
 }

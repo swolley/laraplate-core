@@ -276,6 +276,16 @@ class CrudService
         if ($facet->search !== null) {
             if ($label_relation === null) {
                 $filtered_base->where($key, 'like', '%' . $facet->search . '%');
+            } elseif (isset($label_relation['translation'])) {
+                // Translated label: the translation's foreign key is the group key.
+                $translation = $label_relation['translation'];
+                $matching_keys = $translation['model']->newQuery()
+                    ->where($translation['column'], 'like', '%' . $facet->search . '%')
+                    ->where('locale', $translation['locale'])
+                    ->pluck($translation['foreign'])
+                    ->all();
+
+                $filtered_base->whereIn($key, $matching_keys);
             } else {
                 $matching_keys = $label_relation['related']->newQuery()
                     ->where($label_relation['column'], 'like', '%' . $facet->search . '%')
@@ -1262,6 +1272,21 @@ class CrudService
             return;
         }
 
+        if (isset($label_relation['translation'])) {
+            // Translated label: the translation row is keyed by the group key.
+            $translation = $label_relation['translation'];
+            $subquery = $translation['model']->newQuery()
+                ->select($translation['column'])
+                ->where('locale', $translation['locale'])
+                ->whereColumn($translation['model']->getTable() . '.' . $translation['foreign'], $base_table . '.' . $key)
+                ->limit(1)
+                ->toBase();
+
+            $query->orderBy($subquery, $direction);
+
+            return;
+        }
+
         $subquery = $label_relation['related']->newQuery()
             ->select($label_relation['column'])
             ->whereColumn($label_relation['relatedTable'] . '.' . $label_relation['ownerKey'], $base_table . '.' . $key)
@@ -1303,6 +1328,14 @@ class CrudService
      */
     private function labelRelationTarget(Model $model, string $key, string $relation): ?array
     {
+        // A model-declared source wins: it is an explicit choice and can express a
+        // translated label that a BelongsTo alone cannot.
+        $declared = $this->declaredLabelTarget($model, $key, $relation);
+
+        if ($declared !== null) {
+            return $declared;
+        }
+
         if (method_exists($model, $relation)) {
             try {
                 $relation_object = $model->newInstance()->{$relation}();
@@ -1321,7 +1354,7 @@ class CrudService
             }
         }
 
-        return $this->declaredLabelTarget($model, $key, $relation);
+        return null;
     }
 
     /**
@@ -1348,10 +1381,53 @@ class CrudService
             return null;
         }
 
-        return [
+        $target = [
             'related' => $related,
             'relatedTable' => $related->getTable(),
             'ownerKey' => $source->ownerKey,
+        ];
+
+        $translation = $this->facetLabelSourceTranslation($related, $source);
+
+        if ($translation !== null) {
+            $target['translation'] = $translation;
+        }
+
+        return $target;
+    }
+
+    /**
+     * Resolve a declared source's locale-scoped translation target (the related
+     * model's HasMany translation relation), keyed by the facet group key since the
+     * translation's foreign key equals the related id equals the group key value.
+     *
+     * @return array{model: Model, foreign: string, column: string, locale: string}|null
+     */
+    private function facetLabelSourceTranslation(Model $related, FacetLabelSource $source): ?array
+    {
+        if ($source->translationRelation === null || $source->translationColumn === null) {
+            return null;
+        }
+
+        if (! method_exists($related, $source->translationRelation)) {
+            return null;
+        }
+
+        try {
+            $relation_object = $related->{$source->translationRelation}();
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! $relation_object instanceof HasMany) {
+            return null;
+        }
+
+        return [
+            'model' => $relation_object->getRelated(),
+            'foreign' => $relation_object->getForeignKeyName(),
+            'column' => $source->translationColumn,
+            'locale' => LocaleContext::get(),
         ];
     }
 
@@ -1478,6 +1554,12 @@ class CrudService
             return;
         }
 
+        if (isset($target['translation'])) {
+            $this->resolveTranslatedFacetLabels($target['translation'], $page_keys, $specs, $resolved);
+
+            return;
+        }
+
         $owner_key = $target['ownerKey'];
         $columns = array_column($specs, 'column');
 
@@ -1492,6 +1574,34 @@ class CrudService
             foreach ($specs as $spec) {
                 $resolved[$page_key] ??= [];
                 $resolved[$page_key][$spec['field']] = $row?->{$spec['column']};
+            }
+        }
+    }
+
+    /**
+     * Resolve a base-column FK facet's translated labels for the page keys: the
+     * translation row is keyed by the group key, so one bounded locale-scoped read
+     * fills every requested field with the translated column.
+     *
+     * @param  array{model: Model, foreign: string, column: string, locale: string}  $translation
+     * @param  list<mixed>  $page_keys
+     * @param  list<array{field: string, column: string}>  $specs
+     * @param  array<mixed, array<string, mixed>>  $resolved
+     */
+    private function resolveTranslatedFacetLabels(array $translation, array $page_keys, array $specs, array &$resolved): void
+    {
+        $rows = $translation['model']->newQuery()
+            ->whereIn($translation['foreign'], $page_keys)
+            ->where('locale', $translation['locale'])
+            ->get([$translation['foreign'], $translation['column']])
+            ->keyBy($translation['foreign']);
+
+        foreach ($page_keys as $page_key) {
+            $row = $rows->get($page_key);
+
+            foreach ($specs as $spec) {
+                $resolved[$page_key] ??= [];
+                $resolved[$page_key][$spec['field']] = $row?->{$translation['column']};
             }
         }
     }
