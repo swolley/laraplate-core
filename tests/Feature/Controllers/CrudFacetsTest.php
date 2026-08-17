@@ -43,6 +43,29 @@ it('returns facet counts over the entity via a standalone endpoint', function ()
         ->and($by_value['B']['count'])->toBe(1);
 });
 
+it('returns a paginated open-facet page when a singular facet payload is sent', function (): void {
+    seedFacetSettings();
+
+    $viewer = User::factory()->create();
+    $viewer->assignRole(Role::findOrCreate('superadmin', 'web'));
+
+    $response = $this->actingAs($viewer)->getJson(
+        route('core.crud.facets', facetsRouteParams())
+            . '?' . http_build_query([
+                'facet' => ['groupBy' => 'group_name', 'fields' => ['group_name'], 'sort' => 'count_desc'],
+            ]),
+    );
+
+    $response->assertOk();
+
+    expect($response->json('data.distinctValues'))->toBe(2)
+        ->and($response->json('data.values.0.key'))->toBe('A')
+        ->and($response->json('data.values.0.total'))->toBe(2)
+        ->and($response->json('data.values.0.count'))->toBe(2)
+        ->and($response->json('data.values.0.attributes.group_name'))->toBe('A')
+        ->and($response->json('data.values.1.key'))->toBe('B');
+});
+
 it('denies facets without the select permission on the entity', function (): void {
     $operator = User::factory()->create();
 

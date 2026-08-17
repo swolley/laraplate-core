@@ -49,11 +49,15 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
+use Modules\Core\Services\Crud\DTOs\FacetPage;
+use Modules\Core\Services\Crud\DTOs\FacetQuery;
+use Modules\Core\Services\Crud\DTOs\FacetSort;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 use UnexpectedValueException;
 
 /**
@@ -215,43 +219,74 @@ class CrudService
     }
 
     /**
-     * Rebuild a FiltersGroup without the nodes targeting the given facet field, so a
-     * facet's own selection does not suppress the counts of its other values.
+     * One open (high-cardinality) facet's value page: a SQL `GROUP BY` on the key
+     * column, paginated, value-searchable and ordered by count or key, with the
+     * double counter and the key≠label two-step.
+     *
+     * The heavy `total`/`count` counting stays a single grouped query on the
+     * model's own connection (never an in-memory `group_by`, so it scales), and
+     * display fields are resolved in a second bounded `whereIn` over just the
+     * page's keys — so `GROUP BY` stays on one portable column and labelling is a
+     * cheap round trip. `total` ignores the request filters (the value universe),
+     * `count` applies them minus this facet's own selection (keeping it live), and
+     * both stay within the ACL-visible rows.
      */
-    private function excludeFacetField(FiltersGroup $filters, string $field): FiltersGroup
+    public function facetValues(ListRequestData $base, FacetQuery $facet): FacetPage
     {
-        $kept = [];
+        $model = $base->model;
 
-        foreach ($filters->filters as $node) {
-            if ($node instanceof FiltersGroup) {
-                $kept[] = $this->excludeFacetField($node, $field);
+        $permission_name = $this->auth->ensurePermission(
+            $base->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
 
-                continue;
-            }
+        $key = $this->facetKey($facet->groupBy);
 
-            if ($node instanceof Filter && $this->facetFieldMatches($node->property, $field)) {
-                continue;
-            }
+        $filtered = $model->newQuery();
+        $this->auth->applyAclFiltersToQuery($filtered, $permission_name);
 
-            $kept[] = $node;
+        if ($base->filters instanceof FiltersGroup) {
+            $this->query_builder->applyFilters($filtered, $this->excludeFacetField($base->filters, $key));
         }
 
-        return new FiltersGroup($kept, $filters->operator);
-    }
+        $filtered_base = $filtered->toBase();
 
-    private function facetFieldMatches(string $property, string $field): bool
-    {
-        return $this->facetKey($property) === $this->facetKey($field);
-    }
+        if ($facet->search !== null) {
+            $filtered_base->where($key, 'like', '%' . $facet->search . '%');
+        }
 
-    /**
-     * The bare column name (last dot segment) used as the facet's response key.
-     */
-    private function facetKey(string $field): string
-    {
-        $position = mb_strrpos($field, '.');
+        $distinct_values = (int) (clone $filtered_base)->distinct()->count($key);
 
-        return $position === false ? $field : mb_substr($field, $position + 1);
+        $page_query = (clone $filtered_base)
+            ->select($key)
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy($key);
+
+        $this->orderFacetPage($page_query, $key, $facet->sort);
+
+        $rows = $page_query->forPage($facet->page, $facet->perPage)->get();
+
+        $page_keys = $rows->pluck($key)->all();
+
+        $counts = [];
+
+        foreach ($rows as $row) {
+            $counts[$row->{$key}] = (int) $row->aggregate;
+        }
+
+        $totals = $this->facetTotals($model, $permission_name, $key, $page_keys);
+        $attributes = $this->resolveFacetLabels($model, $key, $page_keys, $facet->fields);
+
+        $values = array_map(static fn (mixed $value): array => [
+            'key' => $value,
+            'total' => $totals[$value] ?? 0,
+            'count' => $counts[$value] ?? 0,
+            'attributes' => $attributes[$value] ?? [],
+        ], $page_keys);
+
+        return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
     }
 
     /**
@@ -309,6 +344,7 @@ class CrudService
                 ->take($requestData->to - $requestData->from + 1),
             $requestData->from !== null => tap($page_query, static function (Builder $q) use ($requestData): void {
                 $q->skip($requestData->from - 1);
+
                 if ($requestData->to !== null) {
                     $q->take($requestData->to - $requestData->from + 1);
                 }
@@ -356,130 +392,6 @@ class CrudService
                 cachedAt: Date::now(),
             ),
         );
-    }
-
-    /**
-     * @param  array<int, string>  $key_columns
-     * @return array{id: mixed, updated_at: string|null}
-     */
-    private function mapFreshnessRow(object $row, array $key_columns, ?string $updated_at_column): array
-    {
-        $id = count($key_columns) === 1
-            ? $row->{$key_columns[0]}
-            : array_map(static fn (string $key): mixed => $row->{$key}, $key_columns);
-
-        return [
-            'id' => $id,
-            'updated_at' => $this->formatFreshnessUpdatedAt(
-                is_string($updated_at_column) && $updated_at_column !== ''
-                    ? ($row->{$updated_at_column} ?? null)
-                    : null,
-            ),
-        ];
-    }
-
-    private function formatFreshnessUpdatedAt(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        try {
-            // toBase() returns MySQL "Y-m-d H:i:s" (app TZ). Normalize to ISO-8601 UTC
-            // so clients can compare with Eloquent JSON timestamps without false positives.
-            return Date::parse($value)->utc()->toIso8601String();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * @return list<int|string>
-     */
-    private function normalizeFreshnessCheckIds(ListRequestData $requestData): array
-    {
-        $raw = $requestData->request->input('check_ids', []);
-        if (! is_array($raw)) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($raw as $value) {
-            if ($value === null || $value === '' || is_array($value)) {
-                continue;
-            }
-            if (is_int($value) || is_string($value)) {
-                $ids[] = $value;
-            } elseif (is_numeric($value)) {
-                $ids[] = (string) $value;
-            }
-            if (count($ids) >= 100) {
-                break;
-            }
-        }
-
-        return array_values(array_unique($ids, SORT_REGULAR));
-    }
-
-    /**
-     * Classify snapshot ids against the filtered set (no page window) and current page items.
-     *
-     * @param  list<array{id: mixed, updated_at: string|null}>  $items
-     * @param  string|array<int, string>  $key_name
-     * @param  array<int, string>  $key_columns
-     * @param  list<int|string>  $check_ids
-     * @return list<array{id: int|string, status: 'on_page'|'off_page'|'gone', updated_at: string|null}>
-     */
-    private function buildFreshnessPresence(
-        Builder $filtered_query,
-        array $items,
-        string|array $key_name,
-        array $key_columns,
-        string $table,
-        ?string $updated_at_column,
-        array $check_ids,
-    ): array {
-        if ($check_ids === [] || is_array($key_name)) {
-            return [];
-        }
-
-        $page_ids = [];
-        foreach ($items as $item) {
-            $page_ids[(string) $item['id']] = true;
-        }
-
-        $found_rows = (clone $filtered_query)
-            ->whereIn($table . '.' . $key_name, $check_ids)
-            ->toBase()
-            ->get();
-
-        $found_by_id = [];
-        foreach ($found_rows as $row) {
-            $mapped = $this->mapFreshnessRow($row, $key_columns, $updated_at_column);
-            $found_by_id[(string) $mapped['id']] = $mapped;
-        }
-
-        $presence = [];
-        foreach ($check_ids as $id) {
-            $key = (string) $id;
-            if (! isset($found_by_id[$key])) {
-                $presence[] = [
-                    'id' => $id,
-                    'status' => 'gone',
-                    'updated_at' => null,
-                ];
-
-                continue;
-            }
-
-            $presence[] = [
-                'id' => $found_by_id[$key]['id'],
-                'status' => isset($page_ids[$key]) ? 'on_page' : 'off_page',
-                'updated_at' => $found_by_id[$key]['updated_at'],
-            ];
-        }
-
-        return $presence;
     }
 
     public function detail(DetailRequestData $requestData): CrudResult
@@ -833,6 +745,397 @@ class CrudService
         );
     }
 
+    /**
+     * Active modifications for an entity type (publisher approval inbox).
+     *
+     * @return CrudResult{data: list<array<string, mixed>>}
+     */
+    public function pendingApprovals(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'approve',
+            $model->getConnectionName(),
+        );
+
+        $connection = $model->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifications = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->activeOnly()
+            ->with(['modifiable', 'modifier'])
+            ->oldest()
+            ->get();
+
+        $rows = $modifications->map(static function (Modification $modification): Fluent {
+            $modifiable = $modification->modifiable;
+            $label = null;
+
+            if ($modifiable instanceof Model) {
+                $attributes = $modifiable->getAttributes();
+                $label = $attributes['title'] ?? $attributes['name'] ?? null;
+            }
+
+            return new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'title' => $label,
+                'created_at' => $modification->getAttribute('created_at'),
+                'approvers_required' => $modification->approvers_required,
+                'approvers_remaining' => $modification->approversRemaining,
+                'modifier_id' => $modification->modifier_id,
+                'modifier_type' => $modification->modifier_type,
+            ]);
+        })->values();
+
+        return new CrudResult(
+            data: $rows,
+            meta: new CrudMeta(
+                totalRecords: $rows->count(),
+                currentRecords: $rows->count(),
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    /**
+     * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
+     */
+    public function latestDisapproval(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+
+        $record_id = $requestData->request->input('id');
+        $found_record = $model->newQuery()->whereKey($record_id)->firstOrFail();
+
+        $connection = $found_record->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifier_types = array_values(array_unique([
+            $user::class,
+            User::class,
+            \App\Models\User::class,
+        ]));
+
+        /** @var Modification|null $modification */
+        $modification = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->where('modifiable_id', $found_record->getKey())
+            ->where('modifier_id', $user->getKey())
+            ->whereIn('modifier_type', $modifier_types)
+            ->inactiveOnly()
+            ->whereHas('disapprovals')
+            ->with(['disapprovals' => static fn ($query) => $query->latest('id')])
+            ->latest('id')
+            ->first();
+
+        if ($modification === null) {
+            return new CrudResult(
+                data: null,
+                meta: new CrudMeta(
+                    totalRecords: 0,
+                    currentRecords: 0,
+                    class: $model::class,
+                    table: $model->getTable(),
+                    cachedAt: Date::now(),
+                ),
+            );
+        }
+
+        /** @var Disapproval|null $disapproval */
+        $disapproval = $modification->disapprovals->first();
+
+        return new CrudResult(
+            data: new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'reason' => $disapproval?->reason,
+                'modifications' => $modification->modifications,
+                'disapproved_at' => $disapproval?->getAttribute('created_at'),
+                'disapprover_id' => $disapproval?->disapprover_id,
+                'disapprover_type' => $disapproval?->disapprover_type,
+            ]),
+            meta: new CrudMeta(
+                totalRecords: 1,
+                currentRecords: 1,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    private function orderFacetPage(\Illuminate\Database\Query\Builder $query, string $key, FacetSort $sort): void
+    {
+        match ($sort) {
+            // A stable key tiebreak keeps paging deterministic when counts tie.
+            FacetSort::CountDesc => $query->orderByRaw('count(*) desc')->orderBy($key),
+            FacetSort::CountAsc => $query->orderByRaw('count(*) asc')->orderBy($key),
+            FacetSort::KeyAsc => $query->orderBy($key),
+            FacetSort::KeyDesc => $query->orderByDesc($key),
+        };
+    }
+
+    /**
+     * `total` per key: the value distribution ignoring the request filters (ACL
+     * only), restricted to the page's keys so it stays bounded.
+     *
+     * @param  list<mixed>  $page_keys
+     * @return array<mixed, int>
+     */
+    private function facetTotals(Model $model, string $permission_name, string $key, array $page_keys): array
+    {
+        if ($page_keys === []) {
+            return [];
+        }
+
+        $query = $model->newQuery();
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+
+        $rows = $query->toBase()
+            ->select($key)
+            ->selectRaw('count(*) as aggregate')
+            ->whereIn($key, $page_keys)
+            ->groupBy($key)
+            ->get();
+
+        $totals = [];
+
+        foreach ($rows as $row) {
+            $totals[$row->{$key}] = (int) $row->aggregate;
+        }
+
+        return $totals;
+    }
+
+    /**
+     * The key≠label second step: resolve the requested display fields per key in
+     * one bounded read over the page's keys. Tier 2 resolves base-table columns
+     * only; relation-sourced labels (`relation.column`) are deferred and skipped.
+     *
+     * @param  list<mixed>  $page_keys
+     * @param  list<string>  $fields
+     * @return array<mixed, array<string, mixed>>
+     */
+    private function resolveFacetLabels(Model $model, string $key, array $page_keys, array $fields): array
+    {
+        $columns = array_values(array_filter($fields, static fn (string $field): bool => ! str_contains($field, '.')));
+
+        if ($columns === [] || $page_keys === []) {
+            return [];
+        }
+
+        $rows = $model->newQuery()
+            ->whereIn($key, $page_keys)
+            ->get(array_values(array_unique([$key, ...$columns])));
+
+        $resolved = [];
+
+        foreach ($rows as $row) {
+            $value = $row->{$key};
+
+            if (array_key_exists($value, $resolved)) {
+                continue;
+            }
+
+            $attributes = [];
+
+            foreach ($columns as $column) {
+                $attributes[$column] = $row->{$column};
+            }
+
+            $resolved[$value] = $attributes;
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Rebuild a FiltersGroup without the nodes targeting the given facet field, so a
+     * facet's own selection does not suppress the counts of its other values.
+     */
+    private function excludeFacetField(FiltersGroup $filters, string $field): FiltersGroup
+    {
+        $kept = [];
+
+        foreach ($filters->filters as $node) {
+            if ($node instanceof FiltersGroup) {
+                $kept[] = $this->excludeFacetField($node, $field);
+
+                continue;
+            }
+
+            if ($node instanceof Filter && $this->facetFieldMatches($node->property, $field)) {
+                continue;
+            }
+
+            $kept[] = $node;
+        }
+
+        return new FiltersGroup($kept, $filters->operator);
+    }
+
+    private function facetFieldMatches(string $property, string $field): bool
+    {
+        return $this->facetKey($property) === $this->facetKey($field);
+    }
+
+    /**
+     * The bare column name (last dot segment) used as the facet's response key.
+     */
+    private function facetKey(string $field): string
+    {
+        $position = mb_strrpos($field, '.');
+
+        return $position === false ? $field : mb_substr($field, $position + 1);
+    }
+
+    /**
+     * @param  array<int, string>  $key_columns
+     * @return array{id: mixed, updated_at: string|null}
+     */
+    private function mapFreshnessRow(object $row, array $key_columns, ?string $updated_at_column): array
+    {
+        $id = count($key_columns) === 1
+            ? $row->{$key_columns[0]}
+            : array_map(static fn (string $key): mixed => $row->{$key}, $key_columns);
+
+        return [
+            'id' => $id,
+            'updated_at' => $this->formatFreshnessUpdatedAt(
+                is_string($updated_at_column) && $updated_at_column !== ''
+                    ? ($row->{$updated_at_column} ?? null)
+                    : null,
+            ),
+        ];
+    }
+
+    private function formatFreshnessUpdatedAt(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            // toBase() returns MySQL "Y-m-d H:i:s" (app TZ). Normalize to ISO-8601 UTC
+            // so clients can compare with Eloquent JSON timestamps without false positives.
+            return Date::parse($value)->utc()->toIso8601String();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return list<int|string>
+     */
+    private function normalizeFreshnessCheckIds(ListRequestData $requestData): array
+    {
+        $raw = $requestData->request->input('check_ids', []);
+
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($raw as $value) {
+            if ($value === null || $value === '' || is_array($value)) {
+                continue;
+            }
+
+            if (is_int($value) || is_string($value)) {
+                $ids[] = $value;
+            } elseif (is_numeric($value)) {
+                $ids[] = (string) $value;
+            }
+
+            if (count($ids) >= 100) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($ids, SORT_REGULAR));
+    }
+
+    /**
+     * Classify snapshot ids against the filtered set (no page window) and current page items.
+     *
+     * @param  list<array{id: mixed, updated_at: string|null}>  $items
+     * @param  string|array<int, string>  $key_name
+     * @param  array<int, string>  $key_columns
+     * @param  list<int|string>  $check_ids
+     * @return list<array{id: int|string, status: 'on_page'|'off_page'|'gone', updated_at: string|null}>
+     */
+    private function buildFreshnessPresence(
+        Builder $filtered_query,
+        array $items,
+        string|array $key_name,
+        array $key_columns,
+        string $table,
+        ?string $updated_at_column,
+        array $check_ids,
+    ): array {
+        if ($check_ids === [] || is_array($key_name)) {
+            return [];
+        }
+
+        $page_ids = [];
+
+        foreach ($items as $item) {
+            $page_ids[(string) $item['id']] = true;
+        }
+
+        $found_rows = (clone $filtered_query)
+            ->whereIn($table . '.' . $key_name, $check_ids)
+            ->toBase()
+            ->get();
+
+        $found_by_id = [];
+
+        foreach ($found_rows as $row) {
+            $mapped = $this->mapFreshnessRow($row, $key_columns, $updated_at_column);
+            $found_by_id[(string) $mapped['id']] = $mapped;
+        }
+
+        $presence = [];
+
+        foreach ($check_ids as $id) {
+            $key = (string) $id;
+
+            if (! isset($found_by_id[$key])) {
+                $presence[] = [
+                    'id' => $id,
+                    'status' => 'gone',
+                    'updated_at' => null,
+                ];
+
+                continue;
+            }
+
+            $presence[] = [
+                'id' => $found_by_id[$key]['id'],
+                'status' => isset($page_ids[$key]) ? 'on_page' : 'off_page',
+                'updated_at' => $found_by_id[$key]['updated_at'],
+            ];
+        }
+
+        return $presence;
+    }
+
     private function assertCrudWriteAllowed(Model $model, string $operation): void
     {
         if ($model instanceof RestrictsCrudWrites && in_array($operation, $model->deniedCrudWrites(), true)) {
@@ -1097,140 +1400,6 @@ class CrudService
             table: $model->getTable(),
             cachedAt: Date::now(),
             search: $result->meta,
-        );
-    }
-
-    /**
-     * Active modifications for an entity type (publisher approval inbox).
-     *
-     * @return CrudResult{data: list<array<string, mixed>>}
-     */
-    public function pendingApprovals(CrudRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'approve',
-            $model->getConnectionName(),
-        );
-
-        $connection = $model->getConnectionName();
-        $modification_prototype = (new Modification())->setConnection($connection);
-
-        $modifications = $modification_prototype->newQuery()
-            ->where('modifiable_type', $model::class)
-            ->activeOnly()
-            ->with(['modifiable', 'modifier'])
-            ->oldest()
-            ->get();
-
-        $rows = $modifications->map(static function (Modification $modification): Fluent {
-            $modifiable = $modification->modifiable;
-            $label = null;
-
-            if ($modifiable instanceof Model) {
-                $attributes = $modifiable->getAttributes();
-                $label = $attributes['title'] ?? $attributes['name'] ?? null;
-            }
-
-            return new Fluent([
-                'id' => $modification->modifiable_id,
-                'modification_id' => $modification->getKey(),
-                'title' => $label,
-                'created_at' => $modification->getAttribute('created_at'),
-                'approvers_required' => $modification->approvers_required,
-                'approvers_remaining' => $modification->approversRemaining,
-                'modifier_id' => $modification->modifier_id,
-                'modifier_type' => $modification->modifier_type,
-            ]);
-        })->values();
-
-        return new CrudResult(
-            data: $rows,
-            meta: new CrudMeta(
-                totalRecords: $rows->count(),
-                currentRecords: $rows->count(),
-                class: $model::class,
-                table: $model->getTable(),
-                cachedAt: Date::now(),
-            ),
-        );
-    }
-
-    /**
-     * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
-     */
-    public function latestDisapproval(CrudRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        $user = Auth::user();
-        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
-
-        $record_id = $requestData->request->input('id');
-        $found_record = $model->newQuery()->whereKey($record_id)->firstOrFail();
-
-        $connection = $found_record->getConnectionName();
-        $modification_prototype = (new Modification())->setConnection($connection);
-
-        $modifier_types = array_values(array_unique([
-            $user::class,
-            User::class,
-            \App\Models\User::class,
-        ]));
-
-        /** @var Modification|null $modification */
-        $modification = $modification_prototype->newQuery()
-            ->where('modifiable_type', $model::class)
-            ->where('modifiable_id', $found_record->getKey())
-            ->where('modifier_id', $user->getKey())
-            ->whereIn('modifier_type', $modifier_types)
-            ->inactiveOnly()
-            ->whereHas('disapprovals')
-            ->with(['disapprovals' => static fn ($query) => $query->latest('id')])
-            ->latest('id')
-            ->first();
-
-        if ($modification === null) {
-            return new CrudResult(
-                data: null,
-                meta: new CrudMeta(
-                    totalRecords: 0,
-                    currentRecords: 0,
-                    class: $model::class,
-                    table: $model->getTable(),
-                    cachedAt: Date::now(),
-                ),
-            );
-        }
-
-        /** @var Disapproval|null $disapproval */
-        $disapproval = $modification->disapprovals->first();
-
-        return new CrudResult(
-            data: new Fluent([
-                'id' => $modification->modifiable_id,
-                'modification_id' => $modification->getKey(),
-                'reason' => $disapproval?->reason,
-                'modifications' => $modification->modifications,
-                'disapproved_at' => $disapproval?->getAttribute('created_at'),
-                'disapprover_id' => $disapproval?->disapprover_id,
-                'disapprover_type' => $disapproval?->disapprover_type,
-            ]),
-            meta: new CrudMeta(
-                totalRecords: 1,
-                currentRecords: 1,
-                class: $model::class,
-                table: $model->getTable(),
-                cachedAt: Date::now(),
-            ),
         );
     }
 

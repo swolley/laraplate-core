@@ -23,8 +23,8 @@ use Modules\Core\Http\Requests\DetailRequest;
 use Modules\Core\Http\Requests\DomainActionRequest;
 use Modules\Core\Http\Requests\FacetsRequest;
 use Modules\Core\Http\Requests\HistoryRequest;
-use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\LatestDisapprovalRequest;
+use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\ModifyRequest;
 use Modules\Core\Http\Requests\PendingApprovalsRequest;
 use Modules\Core\Http\Requests\SearchRequest;
@@ -35,6 +35,7 @@ use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DomainActionDispatcher;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
+use Modules\Core\Services\Crud\DTOs\FacetQuery;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use UnexpectedValueException;
@@ -62,9 +63,13 @@ class CrudController extends Controller
     final public function facets(FacetsRequest $request): Response
     {
         try {
-            $facets = $this->crudService->facetCounts($request->parsed());
+            $facet = $request->facet();
 
-            return new ResponseBuilder($request)->setData($facets)->json();
+            $data = $facet instanceof FacetQuery
+                ? $this->crudService->facetValues($request->parsed(), $facet)->toArray()
+                : $this->crudService->facetCounts($request->parsed());
+
+            return new ResponseBuilder($request)->setData($data)->json();
         } catch (AuthorizationException $exception) {
             return new ResponseBuilder($request)
                 ->setData($exception)
