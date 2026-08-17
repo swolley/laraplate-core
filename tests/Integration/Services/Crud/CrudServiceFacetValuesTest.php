@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DTOs\FacetPage;
@@ -162,4 +164,40 @@ it('resolves display fields per key in the key/label two-step', function (): voi
     $ada = collect($page->values)->firstWhere('key', 'Ada');
 
     expect($ada['attributes'])->toBe(['name' => 'Ada']);
+});
+
+it('resolves a single-hop BelongsTo label whose foreign key is the group key', function (): void {
+    $admin = facet_values_superadmin();
+
+    $license = License::factory()->create(['uuid' => Str::uuid()->toString()]);
+    User::factory()->count(2)->create(['license_id' => $license->id]);
+
+    // Group by the foreign key, label from the related license.
+    $page = facet_values_service($admin, null, new FacetQuery(
+        groupBy: 'license_id',
+        fields: ['license.uuid'],
+        sort: FacetSort::CountDesc,
+    ));
+
+    $row = collect($page->values)->firstWhere('key', $license->id);
+
+    expect($row['count'])->toBe(2)
+        ->and($row['attributes'])->toBe(['license.uuid' => $license->uuid]);
+});
+
+it('skips relation labels that are not a BelongsTo keyed by the group key', function (): void {
+    $admin = facet_values_superadmin();
+    User::factory()->count(2)->create(['name' => 'Ada']);
+
+    // `license` is a BelongsTo keyed by license_id, not by `name`, so it cannot be
+    // resolved from a name-grouped page: its field is dropped, not guessed.
+    $page = facet_values_service($admin, null, new FacetQuery(
+        groupBy: 'name',
+        fields: ['license.uuid'],
+        sort: FacetSort::CountDesc,
+    ));
+
+    $ada = collect($page->values)->firstWhere('key', 'Ada');
+
+    expect($ada['attributes'])->toBe([]);
 });

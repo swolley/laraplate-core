@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -924,8 +925,12 @@ class CrudService
 
     /**
      * The key≠label second step: resolve the requested display fields per key in
-     * one bounded read over the page's keys. Tier 2 resolves base-table columns
-     * only; relation-sourced labels (`relation.column`) are deferred and skipped.
+     * bounded reads over the page's keys — never a join into the aggregated query,
+     * so `GROUP BY` stays on one portable column. Base-table columns resolve
+     * directly; a single-dot `relation.column` resolves through a single-hop
+     * {@see BelongsTo} whose foreign key is the facet key (e.g. group by
+     * `license_id`, label `license.uuid`). Multi-hop paths and non-BelongsTo
+     * relations are skipped; label search/sort remain deferred.
      *
      * @param  list<mixed>  $page_keys
      * @param  list<string>  $fields
@@ -933,35 +938,106 @@ class CrudService
      */
     private function resolveFacetLabels(Model $model, string $key, array $page_keys, array $fields): array
     {
-        $columns = array_values(array_filter($fields, static fn (string $field): bool => ! str_contains($field, '.')));
-
-        if ($columns === [] || $page_keys === []) {
+        if ($fields === [] || $page_keys === []) {
             return [];
+        }
+
+        $columns = [];
+        $relation_fields = [];
+
+        foreach ($fields as $field) {
+            $dot = mb_strpos($field, '.');
+
+            if ($dot === false) {
+                $columns[] = $field;
+
+                continue;
+            }
+
+            // Single-hop only: a second dot is a multi-hop path, deferred.
+            if (mb_strpos($field, '.', $dot + 1) !== false) {
+                continue;
+            }
+
+            $relation = mb_substr($field, 0, $dot);
+            $relation_fields[$relation][] = ['field' => $field, 'column' => mb_substr($field, $dot + 1)];
+        }
+
+        $resolved = [];
+
+        $this->resolveBaseColumnLabels($model, $key, $page_keys, array_values(array_unique($columns)), $resolved);
+
+        foreach ($relation_fields as $relation => $specs) {
+            $this->resolveRelationLabels($model, $key, $page_keys, $relation, $specs, $resolved);
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * @param  list<mixed>  $page_keys
+     * @param  list<string>  $columns
+     * @param  array<mixed, array<string, mixed>>  $resolved
+     */
+    private function resolveBaseColumnLabels(Model $model, string $key, array $page_keys, array $columns, array &$resolved): void
+    {
+        if ($columns === []) {
+            return;
         }
 
         $rows = $model->newQuery()
             ->whereIn($key, $page_keys)
             ->get(array_values(array_unique([$key, ...$columns])));
 
-        $resolved = [];
-
         foreach ($rows as $row) {
             $value = $row->{$key};
 
-            if (array_key_exists($value, $resolved)) {
-                continue;
-            }
-
-            $attributes = [];
-
             foreach ($columns as $column) {
-                $attributes[$column] = $row->{$column};
+                $resolved[$value] ??= [];
+                $resolved[$value][$column] ??= $row->{$column};
             }
+        }
+    }
 
-            $resolved[$value] = $attributes;
+    /**
+     * @param  list<mixed>  $page_keys
+     * @param  list<array{field: string, column: string}>  $specs
+     * @param  array<mixed, array<string, mixed>>  $resolved
+     */
+    private function resolveRelationLabels(Model $model, string $key, array $page_keys, string $relation, array $specs, array &$resolved): void
+    {
+        if (! method_exists($model, $relation)) {
+            return;
         }
 
-        return $resolved;
+        try {
+            $relation_object = $model->newInstance()->{$relation}();
+        } catch (Throwable) {
+            return;
+        }
+
+        // Only a single-hop BelongsTo whose foreign key is the facet key can be
+        // resolved from the page's keys without a join.
+        if (! $relation_object instanceof BelongsTo || $key !== $this->facetKey($relation_object->getForeignKeyName())) {
+            return;
+        }
+
+        $owner_key = $relation_object->getOwnerKeyName();
+        $columns = array_column($specs, 'column');
+
+        $related = $relation_object->getRelated()->newQuery()
+            ->whereIn($owner_key, $page_keys)
+            ->get(array_values(array_unique([$owner_key, ...$columns])))
+            ->keyBy($owner_key);
+
+        foreach ($page_keys as $page_key) {
+            $row = $related->get($page_key);
+
+            foreach ($specs as $spec) {
+                $resolved[$page_key] ??= [];
+                $resolved[$page_key][$spec['field']] = $row?->{$spec['column']};
+            }
+        }
     }
 
     /**
