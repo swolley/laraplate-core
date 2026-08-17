@@ -739,6 +739,58 @@ public function crudComputedDependencies(): array
 }
 ```
 
+## Faceted Counts
+
+The standalone `crud/facets/{module}/{entity}` endpoint reuses the whole list
+vocabulary (`filters`, `sort`, `pagination`) and serves two shapes on one route:
+
+- **Tier 1 — enumerable counts.** Send `columns[]`; each column becomes a flat
+  facet dimension returning every distinct value with a `total`/`count` pair.
+- **Tier 2 — open facet.** Send a singular `facet` object to page, search and sort
+  one high-cardinality dimension. The double counter reports `total` (ACL only)
+  next to `count` (ACL + the request filters, minus the facet's own selection so
+  cross-filtering stays live).
+
+`facet` fields:
+
+| Field | Meaning |
+| --- | --- |
+| `groupBy` | Key column grouped and counted on (e.g. `category_id`). |
+| `fields[]` | Display fields resolved per key: base columns, or single-hop `relation.column`. |
+| `labelField` | A label to search/sort by instead of the raw key; enables `label_asc`/`label_desc`. |
+| `relation` | A BelongsToMany/MorphToMany relation to facet over its pivot instead of a base column. |
+| `page`, `perPage`, `search`, `sort` | The facet's own window, value search and ordering. |
+
+### Label resolution
+
+A facet key labels through one of three sources, decided before the query by
+whether the label is materialised in a DB column:
+
+1. **Base column** — the key column itself, or a base column on the grouped model.
+2. **Foreign-key label** — a single-hop `BelongsTo` keyed by `groupBy`
+   (`license_id` → `license.uuid`). When the key is exposed only through an
+   accessor (no `BelongsTo`), a model declares the mapping via
+   `ProvidesFacetLabelSources::facetLabelSources()`, returning a `FacetLabelSource`
+   (related class + foreign key). Content maps `entity` → `entity_id` this way so
+   the content type labels from the entity name.
+3. **Translated label** — for a relation facet, a `relation.column` label field
+   whose relation is the related model's `HasMany` translation relation
+   (`translations.name`) is joined locale-scoped, enabling display, search and
+   sort by the translated name.
+
+Labels that live only in a PHP accessor (not materialised in any DB column) cannot
+be searched or sorted; expose the underlying column through one of the sources
+above to facet by it.
+
+### Relation facets
+
+With `relation` set, keys are the related model ids and the double counter counts
+distinct parent rows per related key. Parent ACL and filters are enforced through
+a bounded id subquery (never a join into the aggregated query, so parent scopes
+never collide with related columns), the MorphToMany morph constraint is applied,
+and related soft-deletes are honoured. Content facets `categories` and `tags` this
+way.
+
 ## Related Documentation
 
 - [ACL System](./ACL_SYSTEM.md) - Row-level security
