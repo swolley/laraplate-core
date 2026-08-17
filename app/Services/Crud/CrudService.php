@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -245,6 +247,10 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        if ($facet->relation !== null) {
+            return $this->facetRelationValues($base, $facet, $permission_name);
+        }
+
         $key = $this->facetKey($facet->groupBy);
 
         $filtered = $model->newQuery();
@@ -306,6 +312,208 @@ class CrudService
         ], $page_keys);
 
         return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Facet over a BelongsToMany/MorphToMany relation's pivot: keys are related model
+     * ids and the double counter counts distinct parent rows per related key. Parent
+     * ACL and filters are enforced through a bounded id subquery, never a join into
+     * the aggregated query, so parent scopes cannot collide with related columns. A
+     * relation facet's own selection is excluded from its filtered counts, keeping
+     * cross-filtering live. Labels, search and sort resolve on the related table.
+     */
+    private function facetRelationValues(ListRequestData $base, FacetQuery $facet, string $permission_name): FacetPage
+    {
+        $model = $base->model;
+        $relation = $this->resolveManyRelation($model, (string) $facet->relation);
+
+        if ($relation === null) {
+            return new FacetPage([], 0, $facet->page, $facet->perPage);
+        }
+
+        $pivot_table = $relation->getTable();
+        $qualified_foreign = $pivot_table . '.' . $relation->getForeignPivotKeyName();
+        $qualified_related = $pivot_table . '.' . $relation->getRelatedPivotKeyName();
+        $related = $relation->getRelated();
+        $related_key_name = $relation->getRelatedKeyName();
+        $related_key = $related->getTable() . '.' . $related_key_name;
+        $label = $facet->labelField !== null && $facet->labelField !== ''
+            ? $related->getTable() . '.' . $facet->labelField
+            : null;
+
+        $filtered_ids = fn (): \Illuminate\Database\Query\Builder => $this->relationParentIds($model, $permission_name, $base->filters, $facet->relation);
+        $acl_ids = fn (): \Illuminate\Database\Query\Builder => $this->relationParentIds($model, $permission_name, null, null);
+
+        $joined = fn (): Builder => $related->newQuery()
+            ->join($pivot_table, $related_key, '=', $qualified_related)
+            ->when(
+                $relation instanceof MorphToMany,
+                fn (Builder $query): Builder => $query->where($pivot_table . '.' . $relation->getMorphType(), $relation->getMorphClass()),
+            );
+
+        $searched = fn (Builder $query): Builder => $query->when(
+            $facet->search !== null,
+            fn (Builder $q): Builder => $q->where($label ?? $qualified_related, 'like', '%' . $facet->search . '%'),
+        );
+
+        $distinct_values = (int) $searched($joined()->whereIn($qualified_foreign, $filtered_ids()))
+            ->distinct()
+            ->count($qualified_related);
+
+        $page_query = $searched($joined()->whereIn($qualified_foreign, $filtered_ids()))
+            ->groupBy($qualified_related)
+            ->selectRaw($qualified_related . ' as facet_key')
+            ->selectRaw('count(distinct ' . $qualified_foreign . ') as aggregate');
+
+        $this->orderRelationFacet($page_query, $qualified_related, $facet->sort, $label);
+
+        $rows = $page_query->forPage($facet->page, $facet->perPage)->get();
+
+        $page_keys = [];
+        $counts = [];
+
+        foreach ($rows as $row) {
+            $page_keys[] = $row->facet_key;
+            $counts[$row->facet_key] = (int) $row->aggregate;
+        }
+
+        $totals = $this->relationFacetTotals($joined, $qualified_foreign, $qualified_related, $acl_ids(), $page_keys);
+        $attributes = $this->resolveRelationFacetLabels($related, $related_key_name, $page_keys, $facet->fields);
+
+        $values = array_map(static fn (mixed $value): array => [
+            'key' => $value,
+            'total' => $totals[$value] ?? 0,
+            'count' => $counts[$value] ?? 0,
+            'attributes' => $attributes[$value] ?? [],
+        ], $page_keys);
+
+        return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Bounded parent-id subquery: ACL plus the request filters (minus the facet's
+     * own relation selection, when given), selecting only the parent key so it can
+     * feed a `whereIn` without joining into the aggregated query.
+     */
+    private function relationParentIds(Model $model, string $permission_name, ?FiltersGroup $filters, ?string $relation): \Illuminate\Database\Query\Builder
+    {
+        $query = $model->newQuery();
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+
+        if ($filters instanceof FiltersGroup) {
+            $this->query_builder->applyFilters(
+                $query,
+                $relation !== null ? $this->excludeFacetField($filters, $relation) : $filters,
+            );
+        }
+
+        return $query->toBase()->select($model->getTable() . '.' . $model->getKeyName());
+    }
+
+    /**
+     * `total` per related key: the distribution ignoring the request filters (ACL
+     * only), restricted to the page's keys so it stays bounded.
+     *
+     * @param  callable(): Builder  $joined
+     * @param  list<mixed>  $page_keys
+     * @return array<mixed, int>
+     */
+    private function relationFacetTotals(callable $joined, string $qualified_foreign, string $qualified_related, \Illuminate\Database\Query\Builder $acl_ids, array $page_keys): array
+    {
+        if ($page_keys === []) {
+            return [];
+        }
+
+        $rows = $joined()
+            ->whereIn($qualified_foreign, $acl_ids)
+            ->whereIn($qualified_related, $page_keys)
+            ->groupBy($qualified_related)
+            ->selectRaw($qualified_related . ' as facet_key')
+            ->selectRaw('count(distinct ' . $qualified_foreign . ') as aggregate')
+            ->get();
+
+        $totals = [];
+
+        foreach ($rows as $row) {
+            $totals[$row->facet_key] = (int) $row->aggregate;
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Resolve display fields for a relation facet's page keys as bounded reads over
+     * the related table. Base columns only here; a translated label column is
+     * resolved by {@see resolveTranslatedRelationLabels} in the caller.
+     *
+     * @param  list<mixed>  $page_keys
+     * @param  list<string>  $fields
+     * @return array<mixed, array<string, mixed>>
+     */
+    private function resolveRelationFacetLabels(Model $related, string $related_key, array $page_keys, array $fields): array
+    {
+        if ($fields === [] || $page_keys === []) {
+            return [];
+        }
+
+        $columns = array_values(array_unique(array_filter($fields, static fn (string $field): bool => ! str_contains($field, '.'))));
+
+        if ($columns === []) {
+            return [];
+        }
+
+        $rows = $related->newQuery()
+            ->whereIn($related_key, $page_keys)
+            ->get(array_values(array_unique([$related_key, ...$columns])));
+
+        $resolved = [];
+
+        foreach ($rows as $row) {
+            $value = $row->{$related_key};
+
+            foreach ($columns as $column) {
+                $resolved[$value] ??= [];
+                $resolved[$value][$column] ??= $row->{$column};
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Reflectively resolve a BelongsToMany/MorphToMany relation by name, or null
+     * when it is absent or of another kind.
+     */
+    private function resolveManyRelation(Model $model, string $relation): ?BelongsToMany
+    {
+        if ($relation === '' || ! method_exists($model, $relation)) {
+            return null;
+        }
+
+        try {
+            $object = $model->newInstance()->{$relation}();
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $object instanceof BelongsToMany ? $object : null;
+    }
+
+    /**
+     * Order a relation facet's page: by the grouped count, the related key, or a
+     * related label column (a real column in this joined query, so no subquery is
+     * needed). A key tiebreak keeps count paging deterministic.
+     */
+    private function orderRelationFacet(Builder $query, string $key, FacetSort $sort, ?string $label): void
+    {
+        match ($sort) {
+            FacetSort::CountDesc => $query->orderByRaw('aggregate desc')->orderBy($key),
+            FacetSort::CountAsc => $query->orderByRaw('aggregate asc')->orderBy($key),
+            FacetSort::KeyAsc => $query->orderBy($key),
+            FacetSort::KeyDesc => $query->orderByDesc($key),
+            FacetSort::LabelAsc => $label !== null ? $query->orderBy($label) : $query->orderBy($key),
+            FacetSort::LabelDesc => $label !== null ? $query->orderByDesc($label) : $query->orderByDesc($key),
+        };
     }
 
     /**
