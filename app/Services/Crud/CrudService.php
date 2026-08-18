@@ -536,8 +536,11 @@ class CrudService
             return;
         }
 
+        // Read on the query builder (applying the related scopes, never Eloquent
+        // hydration) so a heavy related model is not built from a partial select.
         $rows = $related->newQuery()
-            ->whereIn($related_key, $page_keys)
+            ->toBase()
+            ->whereIn($related->getTable() . '.' . $related_key, $page_keys)
             ->get(array_values(array_unique([$related_key, ...$columns])));
 
         foreach ($rows as $row) {
