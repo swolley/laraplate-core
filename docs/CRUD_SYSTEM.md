@@ -788,6 +788,11 @@ Labels that live only in a PHP accessor (not materialised in any DB column) cann
 be searched or sorted; expose the underlying column through one of the sources
 above to facet by it.
 
+A facet's `groupBy` (and `relation`) is validated up front: if it resolves to a
+column that does not exist — e.g. a magic accessor whose value lives on another
+table, like `country` on a `HasPlace` model — the request fails fast with a clear
+error naming the real path to use (`place.country`), never a cryptic SQL error.
+
 ### Related-column facets
 
 A dotted `groupBy` such as `place.country` groups over a column reached through a

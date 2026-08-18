@@ -251,11 +251,12 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        $to_one = $facet->relation === null ? $this->resolveToOneColumn($model, $facet->groupBy) : null;
+        $this->assertFacetResolvable($model, $facet, $to_one);
+
         if ($facet->relation !== null) {
             return $this->facetRelationValues($base, $facet, $permission_name);
         }
-
-        $to_one = $this->resolveToOneColumn($model, $facet->groupBy);
 
         if ($to_one !== null) {
             return $this->facetRelatedColumnValues($base, $facet, $permission_name, $to_one);
@@ -511,6 +512,58 @@ class CrudService
         ], $page_keys);
 
         return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Fail fast when a facet's grouping target cannot be resolved to a real DB
+     * column/relation, so a magic-accessor or typo yields a clear message instead of
+     * a cryptic SQL error deep in the aggregate query.
+     *
+     * @param  array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null  $to_one
+     */
+    private function assertFacetResolvable(Model $model, FacetQuery $facet, ?array $to_one): void
+    {
+        if ($facet->relation !== null) {
+            throw_if(
+                $this->resolveManyRelation($model, $facet->relation) === null,
+                InvalidArgumentException::class,
+                sprintf("Facet relation '%s' is not a BelongsToMany/MorphToMany relation on %s.", $facet->relation, $model::class),
+            );
+
+            return;
+        }
+
+        if (str_contains($facet->groupBy, '.')) {
+            throw_if(
+                $to_one === null,
+                InvalidArgumentException::class,
+                sprintf("Facet groupBy '%s' is not a single-hop BelongsTo column on %s.", $facet->groupBy, $model::class),
+            );
+
+            $this->assertFacetColumnExists($model, $to_one['relatedTable'], $to_one['column'], $facet->groupBy);
+
+            return;
+        }
+
+        $this->assertFacetColumnExists($model, $model->getTable(), $this->facetKey($facet->groupBy), $facet->groupBy);
+    }
+
+    /**
+     * Assert a facet grouping column is a real column on its table (never a computed
+     * accessor whose value lives on another entity).
+     */
+    private function assertFacetColumnExists(Model $model, string $table, string $column, string $group_by): void
+    {
+        throw_unless(
+            $model->getConnection()->getSchemaBuilder()->hasColumn($table, $column),
+            InvalidArgumentException::class,
+            sprintf(
+                "Facet groupBy '%s' resolves to column '%s.%s', which does not exist. If it is a computed accessor, group by its real column or relation path (e.g. 'place.country').",
+                $group_by,
+                $table,
+                $column,
+            ),
+        );
     }
 
     /**
