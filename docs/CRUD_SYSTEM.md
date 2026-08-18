@@ -759,6 +759,7 @@ vocabulary (`filters`, `sort`, `pagination`) and serves two shapes on one route:
 | `fields[]` | Display fields resolved per key: base columns, or single-hop `relation.column`. |
 | `labelField` | A label to search/sort by instead of the raw key; enables `label_asc`/`label_desc`. |
 | `relation` | A BelongsToMany/MorphToMany relation to facet over its pivot instead of a base column. |
+| `groupBy: relation.column` | A single-hop to-one (`BelongsTo`) column to group by via a join (e.g. `place.country`); the value is its own label. |
 | `page`, `perPage`, `search`, `sort` | The facet's own window, value search and ordering. |
 
 ### Label resolution
@@ -786,6 +787,15 @@ whether the label is materialised in a DB column:
 Labels that live only in a PHP accessor (not materialised in any DB column) cannot
 be searched or sorted; expose the underlying column through one of the sources
 above to facet by it.
+
+### Related-column facets
+
+A dotted `groupBy` such as `place.country` groups over a column reached through a
+single-hop `BelongsTo`: the parent rows are joined to the related table and grouped
+by the related column, counting distinct parents per value (the value is its own
+label). This facets a list by a column that lives one hop away — e.g. Locations by
+their place's country/province. Its selection folds back as a `relation.column`
+membership filter.
 
 ### Relation facets
 

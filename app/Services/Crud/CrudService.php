@@ -255,6 +255,12 @@ class CrudService
             return $this->facetRelationValues($base, $facet, $permission_name);
         }
 
+        $to_one = $this->resolveToOneColumn($model, $facet->groupBy);
+
+        if ($to_one !== null) {
+            return $this->facetRelatedColumnValues($base, $facet, $permission_name, $to_one);
+        }
+
         $key = $this->facetKey($facet->groupBy);
 
         $filtered = $model->newQuery();
@@ -429,6 +435,120 @@ class CrudService
         ], $page_keys);
 
         return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Facet over a column reached through a single-hop to-one relation (e.g. group
+     * by `place.country`): the parent rows are joined to the related table and
+     * grouped by the related column, counting distinct parents per value. The value
+     * is its own label, so no label resolution is needed. Parent ACL and filters are
+     * enforced through a bounded id subquery, and the facet's own selection
+     * (`<relation>.<column>`) is excluded to keep cross-filtering live.
+     *
+     * @param  array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}  $to_one
+     */
+    private function facetRelatedColumnValues(ListRequestData $base, FacetQuery $facet, string $permission_name, array $to_one): FacetPage
+    {
+        $model = $base->model;
+        $table = $model->getTable();
+        $qualified_pk = $table . '.' . $model->getKeyName();
+        $qualified_group = $to_one['relatedTable'] . '.' . $to_one['column'];
+
+        $filtered_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, $base->filters, $facet->groupBy);
+        $acl_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, null, null);
+
+        $joined = fn (): BaseQueryBuilder => $model->getConnection()->query()
+            ->from($table)
+            ->join($to_one['relatedTable'], $table . '.' . $to_one['foreignKey'], '=', $to_one['relatedTable'] . '.' . $to_one['ownerKey']);
+
+        $searched = fn (BaseQueryBuilder $query): BaseQueryBuilder => $query->when(
+            $facet->search !== null,
+            fn (BaseQueryBuilder $q): BaseQueryBuilder => $q->where($qualified_group, 'like', '%' . $facet->search . '%'),
+        );
+
+        $distinct_values = (int) $searched($joined()->whereIn($qualified_pk, $filtered_ids()))
+            ->distinct()
+            ->count($qualified_group);
+
+        $page_query = $searched($joined()->whereIn($qualified_pk, $filtered_ids()))
+            ->groupBy($qualified_group)
+            ->selectRaw($qualified_group . ' as facet_key')
+            ->selectRaw('count(distinct ' . $qualified_pk . ') as aggregate');
+
+        $this->orderRelationFacet($page_query, $qualified_group, $facet->sort, $qualified_group);
+
+        $rows = $page_query->forPage($facet->page, $facet->perPage)->get();
+
+        $page_keys = [];
+        $counts = [];
+
+        foreach ($rows as $row) {
+            $page_keys[] = $row->facet_key;
+            $counts[$row->facet_key] = (int) $row->aggregate;
+        }
+
+        $totals = [];
+
+        if ($page_keys !== []) {
+            $total_rows = $joined()
+                ->whereIn($qualified_pk, $acl_ids())
+                ->whereIn($qualified_group, $page_keys)
+                ->groupBy($qualified_group)
+                ->selectRaw($qualified_group . ' as facet_key')
+                ->selectRaw('count(distinct ' . $qualified_pk . ') as aggregate')
+                ->get();
+
+            foreach ($total_rows as $row) {
+                $totals[$row->facet_key] = (int) $row->aggregate;
+            }
+        }
+
+        $values = array_map(static fn (mixed $value): array => [
+            'key' => $value,
+            'total' => $totals[$value] ?? 0,
+            'count' => $counts[$value] ?? 0,
+            'attributes' => [$facet->groupBy => $value],
+        ], $page_keys);
+
+        return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Resolve a `relation.column` group key to its single-hop to-one relation join,
+     * or null when it is not a dotted path over a {@see BelongsTo}.
+     *
+     * @return array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null
+     */
+    private function resolveToOneColumn(Model $model, string $group_by): ?array
+    {
+        $dot = mb_strpos($group_by, '.');
+
+        if ($dot === false || mb_strpos($group_by, '.', $dot + 1) !== false) {
+            return null;
+        }
+
+        $relation = mb_substr($group_by, 0, $dot);
+
+        if (! method_exists($model, $relation)) {
+            return null;
+        }
+
+        try {
+            $relation_object = $model->newInstance()->{$relation}();
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! $relation_object instanceof BelongsTo) {
+            return null;
+        }
+
+        return [
+            'relatedTable' => $relation_object->getRelated()->getTable(),
+            'foreignKey' => $relation_object->getForeignKeyName(),
+            'ownerKey' => $relation_object->getOwnerKeyName(),
+            'column' => mb_substr($group_by, $dot + 1),
+        ];
     }
 
     /**
