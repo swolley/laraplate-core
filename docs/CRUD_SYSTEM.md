@@ -290,6 +290,8 @@ Columns can be of different types:
 }
 ```
 
+A "dotless" aggregate names a relation on the main model itself: `{ "name": "comments", "type": "count" }` runs `withCount('comments')` and adds a `comments_count` attribute to each row (`<relation>_count`; `sum`/`avg`/… follow Eloquent's `<relation>_<agg>_<column>` naming). It applies whether or not other relations are eager-loaded. A dotted aggregate (`author.comments:count`) instead counts a sub-relation inside the loaded `author` relation. Columns are namespaced to the model's real table, so this works for entities whose route alias differs from their table (e.g. the `locations` alias over `cms_locations`). An aggregate whose name is not a real relation fails fast with a clear error. Each relation-count subquery is constrained by the related entity's read ACL, so a `*_count` never counts rows the viewer is not permitted to see.
+
 ## Filters
 
 ### Filter Operators
@@ -738,6 +740,78 @@ public function crudComputedDependencies(): array
     ];
 }
 ```
+
+## Faceted Counts
+
+The standalone `crud/facets/{module}/{entity}` endpoint reuses the whole list
+vocabulary (`filters`, `sort`, `pagination`) and serves two shapes on one route:
+
+- **Tier 1 — enumerable counts.** Send `columns[]`; each column becomes a flat
+  facet dimension returning every distinct value with a `total`/`count` pair.
+- **Tier 2 — open facet.** Send a singular `facet` object to page, search and sort
+  one high-cardinality dimension. The double counter reports `total` (ACL only)
+  next to `count` (ACL + the request filters, minus the facet's own selection so
+  cross-filtering stays live).
+
+`facet` fields:
+
+| Field | Meaning |
+| --- | --- |
+| `groupBy` | Key column grouped and counted on (e.g. `category_id`). |
+| `fields[]` | Display fields resolved per key: base columns, or single-hop `relation.column`. |
+| `labelField` | A label to search/sort by instead of the raw key; enables `label_asc`/`label_desc`. |
+| `relation` | A BelongsToMany/MorphToMany relation to facet over its pivot instead of a base column. |
+| `groupBy: relation.column` | A single-hop to-one (`BelongsTo`) column to group by via a join (e.g. `place.country`); the value is its own label. |
+| `page`, `perPage`, `search`, `sort` | The facet's own window, value search and ordering. |
+
+### Label resolution
+
+A facet key labels through one of three sources, decided before the query by
+whether the label is materialised in a DB column:
+
+1. **Base column** — the key column itself, or a base column on the grouped model.
+2. **Foreign-key label** — a single-hop `BelongsTo` keyed by `groupBy`
+   (`license_id` → `license.uuid`). When the key is exposed only through an
+   accessor (no `BelongsTo`), a model declares the mapping via
+   `ProvidesFacetLabelSources::facetLabelSources()`, returning a `FacetLabelSource`
+   (related class + foreign key). Content maps `entity` → `entity_id` this way so
+   the content type labels from the entity name. A declared source wins over a
+   same-named `BelongsTo`, and may point the label at the related model's
+   locale-scoped translation (`translationRelation` + `translationColumn`) — so a
+   base-column FK facet can label, search and sort by a **translated** name, keyed
+   by the group key. Category maps `parent` → `parent_id` labelled from the parent's
+   translated `name`.
+3. **Translated label** — for a relation facet, a `relation.column` label field
+   whose relation is the related model's `HasMany` translation relation
+   (`translations.name`) is joined locale-scoped, enabling display, search and
+   sort by the translated name.
+
+Labels that live only in a PHP accessor (not materialised in any DB column) cannot
+be searched or sorted; expose the underlying column through one of the sources
+above to facet by it.
+
+A facet's `groupBy` (and `relation`) is validated up front: if it resolves to a
+column that does not exist — e.g. a magic accessor whose value lives on another
+table, like `country` on a `HasPlace` model — the request fails fast with a clear
+error naming the real path to use (`place.country`), never a cryptic SQL error.
+
+### Related-column facets
+
+A dotted `groupBy` such as `place.country` groups over a column reached through a
+single-hop `BelongsTo`: the parent rows are joined to the related table and grouped
+by the related column, counting distinct parents per value (the value is its own
+label). This facets a list by a column that lives one hop away — e.g. Locations by
+their place's country/province. Its selection folds back as a `relation.column`
+membership filter.
+
+### Relation facets
+
+With `relation` set, keys are the related model ids and the double counter counts
+distinct parent rows per related key. Parent ACL and filters are enforced through
+a bounded id subquery (never a join into the aggregated query, so parent scopes
+never collide with related columns), the MorphToMany morph constraint is applied,
+and related soft-deletes are honoured. Content facets `categories` and `tags` this
+way.
 
 ## Related Documentation
 

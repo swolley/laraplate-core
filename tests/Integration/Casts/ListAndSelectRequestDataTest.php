@@ -23,20 +23,22 @@ it('select request data conforms columns and relations', function (): void {
         'relations' => ['setting.translations', 'owner'],
     ], 'id');
 
-    expect($data->columns[0]->name)->toBe('setting.id')
-        ->and($data->columns[1]->name)->toBe('setting.name')
+    expect($data->columns[0]->name)->toBe('core_settings.id')
+        ->and($data->columns[1]->name)->toBe('core_settings.name')
         ->and($data->relations)->toBe(['translations', 'owner']);
 });
 
-it('select request data keeps already prefixed columns unchanged', function (): void {
+it('select request data namespaces columns to the real table, re-mapping the route alias', function (): void {
     $request = new class extends SelectRequest {};
 
     $data = new SelectRequestData($request, 'setting', [
-        'columns' => ['setting.created_at'],
+        // Already namespaced to the table → kept; alias-prefixed → re-mapped to the table.
+        'columns' => ['core_settings.created_at', 'setting.updated_at'],
         'relations' => [],
     ], 'id');
 
-    expect($data->columns[0]->name)->toBe('setting.created_at');
+    expect($data->columns[0]->name)->toBe('core_settings.created_at')
+        ->and($data->columns[1]->name)->toBe('core_settings.updated_at');
 });
 
 it('list request data extracts pagination, filters, groups and sorts from pagination payload', function (): void {

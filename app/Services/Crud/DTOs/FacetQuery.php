@@ -23,7 +23,12 @@ final readonly class FacetQuery
      *                                relation is a BelongsTo keyed by `groupBy`.
      * @param  ?string  $labelField  A single-hop `relation.column` (BelongsTo keyed by `groupBy`) to
      *                               search and sort by instead of the raw key; enables the LabelAsc/
-     *                               LabelDesc sorts and makes `search` match the label.
+     *                               LabelDesc sorts and makes `search` match the label. For a relation
+     *                               facet it is a bare column on the related table.
+     * @param  ?string  $relation  A BelongsToMany/MorphToMany relation to facet over its pivot instead
+     *                             of a base column: keys are the related model ids, `fields`/`labelField`
+     *                             resolve on the related table, and the double counter counts distinct
+     *                             parent rows per related key.
      */
     public function __construct(
         public string $groupBy,
@@ -33,6 +38,7 @@ final readonly class FacetQuery
         public ?string $search = null,
         public FacetSort $sort = FacetSort::CountDesc,
         public ?string $labelField = null,
+        public ?string $relation = null,
     ) {}
 
     /**
@@ -52,6 +58,7 @@ final readonly class FacetQuery
 
         $search = $input['search'] ?? null;
         $label_field = $input['labelField'] ?? null;
+        $relation = $input['relation'] ?? null;
 
         return new self(
             groupBy: (string) ($input['groupBy'] ?? ''),
@@ -61,6 +68,7 @@ final readonly class FacetQuery
             search: is_string($search) && $search !== '' ? $search : null,
             sort: FacetSort::tryFrom((string) ($input['sort'] ?? '')) ?? FacetSort::CountDesc,
             labelField: is_string($label_field) && $label_field !== '' ? $label_field : null,
+            relation: is_string($relation) && $relation !== '' ? $relation : null,
         );
     }
 }

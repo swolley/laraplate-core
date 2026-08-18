@@ -37,6 +37,7 @@ final class FacetsRequest extends ListRequest
             'facet.search' => ['sometimes', 'nullable', 'string'],
             'facet.sort' => ['sometimes', 'in:' . implode(',', FacetSort::values())],
             'facet.labelField' => ['sometimes', 'nullable', 'string'],
+            'facet.relation' => ['sometimes', 'nullable', 'string'],
         ];
     }
 
