@@ -14,11 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Database\Query\Builder as BaseQueryBuilder;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Query\Builder as BaseQueryBuilder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,6 +39,7 @@ use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Contracts\ProvidesFacetLabelSources;
+use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
@@ -171,26 +172,6 @@ class CrudService
             data: $data,
             meta: $meta,
         );
-    }
-
-    /**
-     * Constrain a relation-count subquery with the related entity's read ACL, so a
-     * `<relation>_count` on a list row only counts rows the viewer may see. For an
-     * unrestricted viewer the ACL resolves to no filters and the count is unchanged.
-     *
-     * @param  Builder<Model>  $subquery
-     */
-    private function relationCountAclConstraint(string $relation, Builder $subquery): void
-    {
-        $related = $subquery->getModel();
-
-        $permission = $this->auth->buildPermissionName(
-            $related->getTable(),
-            'select',
-            $related->getConnectionName(),
-        );
-
-        $this->auth->applyAclFiltersToQuery($subquery, $permission);
     }
 
     /**
@@ -355,6 +336,624 @@ class CrudService
         ], $page_keys);
 
         return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * Page-scoped freshness fingerprint: filtered total + current page id/updated_at rows,
+     * plus optional presence of client snapshot ids (on_page / off_page / gone).
+     *
+     * Reuses list auth, ACL injection, filters, sort and pagination. Selects only
+     * primary key + updated_at (when the model has timestamps).
+     *
+     * Rows are read via the base query builder (no Eloquent hydration) so model
+     * global `with()` scopes, `retrieved` hooks, and missing-attribute guards
+     * cannot blow up when FK columns were intentionally omitted from the select.
+     *
+     * @return CrudResult data shape: `{ total, items, presence }`
+     */
+    public function freshness(ListRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $this->auth->injectAclFilters($requestData, $permission_name);
+
+        $query = $model->newQuery();
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        // Drop eager loads / wide selects from the list pipeline; fingerprint only.
+        $query->withoutEagerLoads();
+        $table = $model->getTable();
+        $key_name = $model->getKeyName();
+        $updated_at_column = $model->usesTimestamps() ? $model->getUpdatedAtColumn() : null;
+
+        $select_columns = is_array($key_name)
+            ? array_map(static fn (string $key): string => $table . '.' . $key, $key_name)
+            : [$table . '.' . $key_name];
+
+        if (is_string($updated_at_column) && $updated_at_column !== '') {
+            $select_columns[] = $table . '.' . $updated_at_column;
+        }
+
+        $query->select($select_columns);
+
+        $total_records = (clone $query)->count();
+
+        // Page window on a clone so the filtered base query stays usable for presence.
+        $page_query = clone $query;
+        match (true) {
+            $requestData->page !== null => $page_query
+                ->skip($requestData->from - 1)
+                ->take($requestData->to - $requestData->from + 1),
+            $requestData->from !== null => tap($page_query, static function (Builder $q) use ($requestData): void {
+                $q->skip($requestData->from - 1);
+
+                if ($requestData->to !== null) {
+                    $q->take($requestData->to - $requestData->from + 1);
+                }
+            }),
+            isset($requestData->limit) => $page_query->take($requestData->take),
+            default => $page_query,
+        };
+
+        $rows = $requestData->count
+            ? collect()
+            : $page_query->toBase()->get();
+
+        $key_columns = is_array($key_name) ? $key_name : [$key_name];
+
+        $items = $rows->map(
+            fn (object $row): array => $this->mapFreshnessRow($row, $key_columns, $updated_at_column),
+        )->values()->all();
+
+        $presence = $this->buildFreshnessPresence(
+            $query,
+            $items,
+            $key_name,
+            $key_columns,
+            $table,
+            $updated_at_column,
+            $this->normalizeFreshnessCheckIds($requestData),
+        );
+
+        return new CrudResult(
+            data: [
+                'total' => $total_records,
+                'items' => $items,
+                'presence' => $presence,
+            ],
+            meta: new CrudMeta(
+                totalRecords: $total_records,
+                currentRecords: count($items),
+                currentPage: $requestData->page,
+                totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+                pagination: $requestData->pagination,
+                from: $requestData->from,
+                to: $requestData->to,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    public function detail(DetailRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // 2. Constrain by primary key first (from validated/input/route so record-not-found can 404)
+        $key = $this->getModelPrimaryKeyName($model);
+
+        if (is_array($key)) {
+            $key_value = array_map(
+                fn (string $k): mixed => $this->resolveKeyFromRequest($requestData->request, $k),
+                $key,
+            );
+            throw_if(
+                array_any($key_value, static fn (mixed $value): bool => $value === null || $value === ''),
+                ModelNotFoundException::class,
+                'Primary key is required for detail.',
+            );
+            $query = $model->newQuery()->where(array_combine($key, $key_value));
+        } else {
+            $key_value = $this->resolveKeyFromRequest($requestData->request, $key);
+            throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
+            $query = $model->newQuery()->where([$key => $key_value]);
+        }
+
+        // 3. Build query and apply ACL filters
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        $data = $query->sole();
+
+        $this->applyComputedMethods($data, $requestData);
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
+    }
+
+    public function search(SearchRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        $is_searchable_class = class_uses_trait($model, Searchable::class);
+
+        if (! $is_searchable_class) {
+            return new CrudResult(
+                data: null,
+                error: 'Full-search operation can be done only on Searchable entities',
+                statusCode: Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        // 2. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        return match ($requestData->mode) {
+            SearchMode::Orchestrated => $this->searchWithAdvanced($requestData, $permission_name),
+            SearchMode::Auto => ($this->advanced_search ?? app(AdvancedSearchService::class))->available($model)
+                ? $this->searchWithAdvanced($requestData, $permission_name)
+                : $this->searchWithScout($requestData, $permission_name),
+            SearchMode::Basic => $this->searchWithScout($requestData, $permission_name),
+        };
+    }
+
+    public function history(HistoryRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $requestData->mainEntity));
+
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // 2. Build query and apply ACL filters
+        $query = $model->newQuery();
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        $query->with('history', function (Relation $q) use ($requestData): void {
+            $q->latest();
+
+            if (isset($requestData->limit)) {
+                $q->take($requestData->limit);
+            }
+        });
+
+        if (! preview() && $this->useHasApproval($model)) {
+            $query->with('modifications');
+        }
+
+        $data = $query->sole();
+
+        $this->applyComputedMethods($data, $requestData);
+
+        $history_relation = $data->getRelation('history');
+        $history_array = [];
+
+        if ($history_relation !== null && $history_relation instanceof Collection) {
+            $history_array = $history_relation->toArray();
+        }
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        $record_array = $data->getAttributes();
+
+        $payload = [
+            'record' => $record_array,
+            'history' => $history_array,
+        ];
+
+        return new CrudResult(
+            data: $payload,
+            meta: $meta,
+        );
+    }
+
+    public function tree(TreeRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+
+        throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $requestData->mainEntity));
+
+        // 1. Check permission
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $tree_relation_type = [];
+
+        if ($requestData->parents && $requestData->children) {
+            $tree_relation_type = 'bloodline';
+        } elseif ($requestData->parents) {
+            $tree_relation_type = 'ancestorsAndSelf';
+        } elseif ($requestData->children) {
+            $tree_relation_type = 'descendantsAndSelf';
+        }
+
+        // 2. Build query and apply ACL filters
+        $query = $model->newQuery()->with($tree_relation_type);
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+        $this->query_builder->prepareQuery($query, $requestData);
+
+        $data = $requestData->request->has(is_array($requestData->primaryKey) ? $requestData->primaryKey[0] : $requestData->primaryKey)
+            ? $query->sole()
+            : $query->get();
+
+        $this->applyComputedMethods($data, $requestData);
+
+        $meta = new CrudMeta(
+            class: $model::class,
+            table: $model->getTable(),
+            cachedAt: Date::now(),
+        );
+
+        return new CrudResult(
+            data: $data,
+            meta: $meta,
+        );
+    }
+
+    public function insert(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'insert');
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
+        $changes = $requestData->changes;
+        $discarded_values = $this->removeNonFillableProperties($model, $changes);
+
+        $created = $model->create($changes);
+
+        throw_unless($created, LogicException::class, 'Record not created');
+
+        $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
+
+        return new CrudResult(
+            data: $created,
+            error: $error,
+            statusCode: Response::HTTP_CREATED,
+        );
+    }
+
+    public function update(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'update');
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
+
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+        $changes = $requestData->changes;
+        $discarded_values = $this->removeNonFillableProperties($model, $changes);
+        $relations = $this->resolveSyncableRelations($model, $requestData->relations);
+
+        $updated_records = new Collection();
+        $found_count = 0;
+        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, &$found_count): void {
+            foreach ($found_records as $found_record) {
+                $found_count++;
+
+                /** @psalm-suppress InvalidArgument */
+                $mutated = (bool) $found_record->update($changes);
+
+                if ($relations !== []) {
+                    $this->syncModelRelations($found_record, $relations);
+                    $mutated = true;
+                }
+
+                if ($mutated) {
+                    $updated_records->add($found_record->fresh());
+                }
+            }
+        });
+        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+
+        $error = $this->filterExpectedDiscardedForError($discarded_values, $requestData);
+
+        return new CrudResult(
+            data: $updated_records,
+            error: $error,
+        );
+    }
+
+    public function delete(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->assertCrudWriteAllowed($model, 'delete');
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+
+        $found_count = 0;
+        $deleted_count = 0;
+        $model->getConnection()->transaction(function () use ($found_records, &$found_count, &$deleted_count): void {
+            foreach ($found_records as $found_record) {
+                $found_count++;
+
+                if ($found_record->forceDelete()) {
+                    $deleted_count++;
+                }
+            }
+        });
+        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+
+        return new CrudResult(
+            data: ['deleted' => $deleted_count],
+            statusCode: Response::HTTP_OK,
+        );
+    }
+
+    public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
+    {
+        $model = $requestData->model;
+        $is_activate = $operation === 'activate';
+
+        // activate restores a soft-deleted record (restore permission); inactivate
+        // soft-deletes a live one (delete permission). The permission must match the
+        // operation on both gates — previously the entity gate distinguished them but
+        // the user gate always required 'restore', so soft-deleting demanded the
+        // restore permission.
+        $required_permission = $is_activate ? 'restore' : 'delete';
+        $this->assertCrudWriteAllowed($model, $required_permission);
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), $required_permission, $model->getConnectionName());
+        $key_value = $this->getModelKeyValue($requestData);
+        $found_record = $this->newQueryWithTrashed($model)
+            ->where($this->keyValueToWhereCondition($model, $key_value))
+            ->firstOrFail();
+
+        if ($is_activate) {
+            throw_if(! method_exists($found_record, 'restore') || ! $found_record->restore(), LogicException::class, 'Record not activated');
+
+            return new CrudResult(
+                data: $found_record,
+            );
+        }
+
+        throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
+
+        return new CrudResult(
+            data: $found_record,
+        );
+    }
+
+    public function activate(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doActivateOperation($requestData, 'activate');
+    }
+
+    public function inactivate(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doActivateOperation($requestData, 'inactivate');
+    }
+
+    public function approve(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doApproveOperation($requestData, 'approve');
+    }
+
+    public function disapprove(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doApproveOperation($requestData, 'disapprove');
+    }
+
+    public function lock(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doLockOperation($requestData, 'lock');
+    }
+
+    public function unlock(ModifyRequestData $requestData): CrudResult
+    {
+        return $this->doLockOperation($requestData, 'unlock');
+    }
+
+    public function clearModelCache(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $table = $model->getTable();
+        $cache = Cache::store();
+
+        if ($cache instanceof CacheRepository) {
+            $cache->clearByEntity($model);
+        }
+
+        return new CrudResult(
+            data: $table . ' cached cleared',
+            statusCode: Response::HTTP_OK,
+        );
+    }
+
+    /**
+     * Active modifications for an entity type (publisher approval inbox).
+     *
+     * @return CrudResult{data: list<array<string, mixed>>}
+     */
+    public function pendingApprovals(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'approve',
+            $model->getConnectionName(),
+        );
+
+        $connection = $model->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifications = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->activeOnly()
+            ->with(['modifiable', 'modifier'])
+            ->oldest()
+            ->get();
+
+        $rows = $modifications->map(static function (Modification $modification): Fluent {
+            $modifiable = $modification->modifiable;
+            $label = null;
+
+            if ($modifiable instanceof Model) {
+                $attributes = $modifiable->getAttributes();
+                $label = $attributes['title'] ?? $attributes['name'] ?? null;
+            }
+
+            return new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'title' => $label,
+                'created_at' => $modification->getAttribute('created_at'),
+                'approvers_required' => $modification->approvers_required,
+                'approvers_remaining' => $modification->approversRemaining,
+                'modifier_id' => $modification->modifier_id,
+                'modifier_type' => $modification->modifier_type,
+            ]);
+        })->values();
+
+        return new CrudResult(
+            data: $rows,
+            meta: new CrudMeta(
+                totalRecords: $rows->count(),
+                currentRecords: $rows->count(),
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    /**
+     * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
+     */
+    public function latestDisapproval(CrudRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+
+        $record_id = $requestData->request->input('id');
+        $found_record = $model->newQuery()->whereKey($record_id)->firstOrFail();
+
+        $connection = $found_record->getConnectionName();
+        $modification_prototype = (new Modification())->setConnection($connection);
+
+        $modifier_types = array_values(array_unique([
+            $user::class,
+            User::class,
+            \App\Models\User::class,
+        ]));
+
+        /** @var Modification|null $modification */
+        $modification = $modification_prototype->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->where('modifiable_id', $found_record->getKey())
+            ->where('modifier_id', $user->getKey())
+            ->whereIn('modifier_type', $modifier_types)
+            ->inactiveOnly()
+            ->whereHas('disapprovals')
+            ->with(['disapprovals' => static fn ($query) => $query->latest('id')])
+            ->latest('id')
+            ->first();
+
+        if ($modification === null) {
+            return new CrudResult(
+                data: null,
+                meta: new CrudMeta(
+                    totalRecords: 0,
+                    currentRecords: 0,
+                    class: $model::class,
+                    table: $model->getTable(),
+                    cachedAt: Date::now(),
+                ),
+            );
+        }
+
+        /** @var Disapproval|null $disapproval */
+        $disapproval = $modification->disapprovals->first();
+
+        return new CrudResult(
+            data: new Fluent([
+                'id' => $modification->modifiable_id,
+                'modification_id' => $modification->getKey(),
+                'reason' => $disapproval?->reason,
+                'modifications' => $modification->modifications,
+                'disapproved_at' => $disapproval?->getAttribute('created_at'),
+                'disapprover_id' => $disapproval?->disapprover_id,
+                'disapprover_type' => $disapproval?->disapprover_type,
+            ]),
+            meta: new CrudMeta(
+                totalRecords: 1,
+                currentRecords: 1,
+                class: $model::class,
+                table: $model->getTable(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
+    /**
+     * Constrain a relation-count subquery with the related entity's read ACL, so a
+     * `<relation>_count` on a list row only counts rows the viewer may see. For an
+     * unrestricted viewer the ACL resolves to no filters and the count is unchanged.
+     *
+     * @param  Builder<Model>  $subquery
+     */
+    private function relationCountAclConstraint(string $relation, Builder $subquery): void
+    {
+        $related = $subquery->getModel();
+
+        $permission = $this->auth->buildPermissionName(
+            $related->getTable(),
+            'select',
+            $related->getConnectionName(),
+        );
+
+        $this->auth->applyAclFiltersToQuery($subquery, $permission);
     }
 
     /**
@@ -849,599 +1448,72 @@ class CrudService
     }
 
     /**
-     * Page-scoped freshness fingerprint: filtered total + current page id/updated_at rows,
-     * plus optional presence of client snapshot ids (on_page / off_page / gone).
+     * Validate the relation-sync payload against the model's whitelist and shape,
+     * before any write, and normalize the id lists.
      *
-     * Reuses list auth, ACL injection, filters, sort and pagination. Selects only
-     * primary key + updated_at (when the model has timestamps).
+     * @param  array<string, mixed>  $relations
      *
-     * Rows are read via the base query builder (no Eloquent hydration) so model
-     * global `with()` scopes, `retrieved` hooks, and missing-attribute guards
-     * cannot blow up when FK columns were intentionally omitted from the select.
+     * @throws UnexpectedValueException when a relation is not whitelisted or is not many-to-many
      *
-     * @return CrudResult data shape: `{ total, items, presence }`
+     * @return array<string, list<int>>
      */
-    public function freshness(ListRequestData $requestData): CrudResult
+    private function resolveSyncableRelations(Model $model, array $relations): array
     {
-        $model = $requestData->model;
-
-        $permission_name = $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        $this->auth->injectAclFilters($requestData, $permission_name);
-
-        $query = $model->newQuery();
-        $this->query_builder->prepareQuery($query, $requestData);
-
-        // Drop eager loads / wide selects from the list pipeline; fingerprint only.
-        $query->withoutEagerLoads();
-        $table = $model->getTable();
-        $key_name = $model->getKeyName();
-        $updated_at_column = $model->usesTimestamps() ? $model->getUpdatedAtColumn() : null;
-
-        $select_columns = is_array($key_name)
-            ? array_map(static fn (string $key): string => $table . '.' . $key, $key_name)
-            : [$table . '.' . $key_name];
-
-        if (is_string($updated_at_column) && $updated_at_column !== '') {
-            $select_columns[] = $table . '.' . $updated_at_column;
+        if ($relations === []) {
+            return [];
         }
 
-        $query->select($select_columns);
+        $whitelist = $model instanceof ProvidesSyncableRelations ? $model->syncableRelations() : [];
 
-        $total_records = (clone $query)->count();
+        $resolved = [];
 
-        // Page window on a clone so the filtered base query stays usable for presence.
-        $page_query = clone $query;
-        match (true) {
-            $requestData->page !== null => $page_query
-                ->skip($requestData->from - 1)
-                ->take($requestData->to - $requestData->from + 1),
-            $requestData->from !== null => tap($page_query, static function (Builder $q) use ($requestData): void {
-                $q->skip($requestData->from - 1);
-
-                if ($requestData->to !== null) {
-                    $q->take($requestData->to - $requestData->from + 1);
-                }
-            }),
-            isset($requestData->limit) => $page_query->take($requestData->take),
-            default => $page_query,
-        };
-
-        $rows = $requestData->count
-            ? collect()
-            : $page_query->toBase()->get();
-
-        $key_columns = is_array($key_name) ? $key_name : [$key_name];
-
-        $items = $rows->map(
-            fn (object $row): array => $this->mapFreshnessRow($row, $key_columns, $updated_at_column),
-        )->values()->all();
-
-        $presence = $this->buildFreshnessPresence(
-            $query,
-            $items,
-            $key_name,
-            $key_columns,
-            $table,
-            $updated_at_column,
-            $this->normalizeFreshnessCheckIds($requestData),
-        );
-
-        return new CrudResult(
-            data: [
-                'total' => $total_records,
-                'items' => $items,
-                'presence' => $presence,
-            ],
-            meta: new CrudMeta(
-                totalRecords: $total_records,
-                currentRecords: count($items),
-                currentPage: $requestData->page,
-                totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
-                pagination: $requestData->pagination,
-                from: $requestData->from,
-                to: $requestData->to,
-                class: $model::class,
-                table: $model->getTable(),
-                cachedAt: Date::now(),
-            ),
-        );
-    }
-
-    public function detail(DetailRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-
-        // 1. Check permission
-        $permission_name = $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        // 2. Constrain by primary key first (from validated/input/route so record-not-found can 404)
-        $key = $this->getModelPrimaryKeyName($model);
-
-        if (is_array($key)) {
-            $key_value = array_map(
-                fn (string $k): mixed => $this->resolveKeyFromRequest($requestData->request, $k),
-                $key,
+        foreach ($relations as $name => $ids) {
+            throw_unless(
+                is_string($name) && in_array($name, $whitelist, true),
+                UnexpectedValueException::class,
+                sprintf("Relation '%s' is not syncable on %s.", (string) $name, $model->getTable()),
             );
-            throw_if(
-                array_any($key_value, static fn (mixed $value): bool => $value === null || $value === ''),
-                ModelNotFoundException::class,
-                'Primary key is required for detail.',
+            throw_unless(
+                $model->{$name}() instanceof BelongsToMany,
+                UnexpectedValueException::class,
+                sprintf("Relation '%s' on %s is not a many-to-many relation.", $name, $model->getTable()),
             );
-            $query = $model->newQuery()->where(array_combine($key, $key_value));
-        } else {
-            $key_value = $this->resolveKeyFromRequest($requestData->request, $key);
-            throw_if($key_value === null || $key_value === '', ModelNotFoundException::class, 'Primary key is required for detail.');
-            $query = $model->newQuery()->where([$key => $key_value]);
+
+            $resolved[$name] = $this->normalizeRelationIds(is_array($ids) ? $ids : []);
         }
 
-        // 3. Build query and apply ACL filters
-        $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
-
-        $data = $query->sole();
-
-        $this->applyComputedMethods($data, $requestData);
-
-        $meta = new CrudMeta(
-            class: $model::class,
-            table: $model->getTable(),
-            cachedAt: Date::now(),
-        );
-
-        return new CrudResult(
-            data: $data,
-            meta: $meta,
-        );
-    }
-
-    public function search(SearchRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-
-        $is_searchable_class = class_uses_trait($model, Searchable::class);
-
-        if (! $is_searchable_class) {
-            return new CrudResult(
-                data: null,
-                error: 'Full-search operation can be done only on Searchable entities',
-                statusCode: Response::HTTP_BAD_REQUEST,
-            );
-        }
-
-        // 2. Check permission
-        $permission_name = $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        return match ($requestData->mode) {
-            SearchMode::Orchestrated => $this->searchWithAdvanced($requestData, $permission_name),
-            SearchMode::Auto => ($this->advanced_search ?? app(AdvancedSearchService::class))->available($model)
-                ? $this->searchWithAdvanced($requestData, $permission_name)
-                : $this->searchWithScout($requestData, $permission_name),
-            SearchMode::Basic => $this->searchWithScout($requestData, $permission_name),
-        };
-    }
-
-    public function history(HistoryRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-
-        throw_unless($this->hasHistory($model), BadMethodCallException::class, sprintf("'%s' doesn't have history handling", $requestData->mainEntity));
-
-        // 1. Check permission
-        $permission_name = $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        // 2. Build query and apply ACL filters
-        $query = $model->newQuery();
-        $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
-
-        $query->with('history', function (Relation $q) use ($requestData): void {
-            $q->latest();
-
-            if (isset($requestData->limit)) {
-                $q->take($requestData->limit);
-            }
-        });
-
-        if (! preview() && $this->useHasApproval($model)) {
-            $query->with('modifications');
-        }
-
-        $data = $query->sole();
-
-        $this->applyComputedMethods($data, $requestData);
-
-        $history_relation = $data->getRelation('history');
-        $history_array = [];
-
-        if ($history_relation !== null && $history_relation instanceof Collection) {
-            $history_array = $history_relation->toArray();
-        }
-
-        $meta = new CrudMeta(
-            class: $model::class,
-            table: $model->getTable(),
-            cachedAt: Date::now(),
-        );
-
-        $record_array = $data->getAttributes();
-
-        $payload = [
-            'record' => $record_array,
-            'history' => $history_array,
-        ];
-
-        return new CrudResult(
-            data: $payload,
-            meta: $meta,
-        );
-    }
-
-    public function tree(TreeRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-
-        throw_unless($this->useRecursiveRelationships($model), UnexpectedValueException::class, sprintf("'%s' is not a hierarchical class", $requestData->mainEntity));
-
-        // 1. Check permission
-        $permission_name = $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        $tree_relation_type = [];
-
-        if ($requestData->parents && $requestData->children) {
-            $tree_relation_type = 'bloodline';
-        } elseif ($requestData->parents) {
-            $tree_relation_type = 'ancestorsAndSelf';
-        } elseif ($requestData->children) {
-            $tree_relation_type = 'descendantsAndSelf';
-        }
-
-        // 2. Build query and apply ACL filters
-        $query = $model->newQuery()->with($tree_relation_type);
-        $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
-
-        $data = $requestData->request->has(is_array($requestData->primaryKey) ? $requestData->primaryKey[0] : $requestData->primaryKey)
-            ? $query->sole()
-            : $query->get();
-
-        $this->applyComputedMethods($data, $requestData);
-
-        $meta = new CrudMeta(
-            class: $model::class,
-            table: $model->getTable(),
-            cachedAt: Date::now(),
-        );
-
-        return new CrudResult(
-            data: $data,
-            meta: $meta,
-        );
-    }
-
-    public function insert(ModifyRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $this->assertCrudWriteAllowed($model, 'insert');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'insert', $model->getConnectionName());
-        $changes = $requestData->changes;
-        $discarded_values = $this->removeNonFillableProperties($model, $changes);
-
-        $created = $model->create($changes);
-
-        throw_unless($created, LogicException::class, 'Record not created');
-
-        $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
-
-        return new CrudResult(
-            data: $created,
-            error: $error,
-            statusCode: Response::HTTP_CREATED,
-        );
-    }
-
-    public function update(ModifyRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $this->assertCrudWriteAllowed($model, 'update');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
-
-        $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
-        $changes = $requestData->changes;
-        $discarded_values = $this->removeNonFillableProperties($model, $changes);
-
-        $updated_records = new Collection();
-        $found_count = 0;
-        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, &$found_count): void {
-            foreach ($found_records as $found_record) {
-                $found_count++;
-
-                /** @psalm-suppress InvalidArgument */
-                if ($found_record->update($changes)) {
-                    $updated_records->add($found_record->fresh());
-                }
-            }
-        });
-        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
-
-        $error = $this->filterExpectedDiscardedForError($discarded_values, $requestData);
-
-        return new CrudResult(
-            data: $updated_records,
-            error: $error,
-        );
-    }
-
-    public function delete(ModifyRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $this->assertCrudWriteAllowed($model, 'delete');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
-        $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
-
-        $found_count = 0;
-        $deleted_count = 0;
-        $model->getConnection()->transaction(function () use ($found_records, &$found_count, &$deleted_count): void {
-            foreach ($found_records as $found_record) {
-                $found_count++;
-
-                if ($found_record->forceDelete()) {
-                    $deleted_count++;
-                }
-            }
-        });
-        throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
-
-        return new CrudResult(
-            data: ['deleted' => $deleted_count],
-            statusCode: Response::HTTP_OK,
-        );
-    }
-
-    public function doActivateOperation(ModifyRequestData $requestData, string $operation): CrudResult
-    {
-        $model = $requestData->model;
-        $is_activate = $operation === 'activate';
-
-        // activate restores a soft-deleted record (restore permission); inactivate
-        // soft-deletes a live one (delete permission). The permission must match the
-        // operation on both gates — previously the entity gate distinguished them but
-        // the user gate always required 'restore', so soft-deleting demanded the
-        // restore permission.
-        $required_permission = $is_activate ? 'restore' : 'delete';
-        $this->assertCrudWriteAllowed($model, $required_permission);
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), $required_permission, $model->getConnectionName());
-        $key_value = $this->getModelKeyValue($requestData);
-        $found_record = $this->newQueryWithTrashed($model)
-            ->where($this->keyValueToWhereCondition($model, $key_value))
-            ->firstOrFail();
-
-        if ($is_activate) {
-            throw_if(! method_exists($found_record, 'restore') || ! $found_record->restore(), LogicException::class, 'Record not activated');
-
-            return new CrudResult(
-                data: $found_record,
-            );
-        }
-
-        throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
-
-        return new CrudResult(
-            data: $found_record,
-        );
-    }
-
-    public function activate(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doActivateOperation($requestData, 'activate');
-    }
-
-    public function inactivate(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doActivateOperation($requestData, 'inactivate');
-    }
-
-    public function approve(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doApproveOperation($requestData, 'approve');
-    }
-
-    public function disapprove(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doApproveOperation($requestData, 'disapprove');
-    }
-
-    public function lock(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doLockOperation($requestData, 'lock');
-    }
-
-    public function unlock(ModifyRequestData $requestData): CrudResult
-    {
-        return $this->doLockOperation($requestData, 'unlock');
-    }
-
-    public function clearModelCache(CrudRequestData $requestData): CrudResult
-    {
-        $model = $requestData->model;
-        $table = $model->getTable();
-        $cache = Cache::store();
-
-        if ($cache instanceof CacheRepository) {
-            $cache->clearByEntity($model);
-        }
-
-        return new CrudResult(
-            data: $table . ' cached cleared',
-            statusCode: Response::HTTP_OK,
-        );
+        return $resolved;
     }
 
     /**
-     * Active modifications for an entity type (publisher approval inbox).
+     * Sync each already-validated relation on a record from its list of ids.
      *
-     * @return CrudResult{data: list<array<string, mixed>>}
+     * @param  array<string, list<int>>  $relations
      */
-    public function pendingApprovals(CrudRequestData $requestData): CrudResult
+    private function syncModelRelations(Model $record, array $relations): void
     {
-        $model = $requestData->model;
-        $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'approve',
-            $model->getConnectionName(),
-        );
+        foreach ($relations as $name => $ids) {
+            $relation = $record->{$name}();
 
-        $connection = $model->getConnectionName();
-        $modification_prototype = (new Modification())->setConnection($connection);
-
-        $modifications = $modification_prototype->newQuery()
-            ->where('modifiable_type', $model::class)
-            ->activeOnly()
-            ->with(['modifiable', 'modifier'])
-            ->oldest()
-            ->get();
-
-        $rows = $modifications->map(static function (Modification $modification): Fluent {
-            $modifiable = $modification->modifiable;
-            $label = null;
-
-            if ($modifiable instanceof Model) {
-                $attributes = $modifiable->getAttributes();
-                $label = $attributes['title'] ?? $attributes['name'] ?? null;
+            if ($relation instanceof BelongsToMany) {
+                $relation->sync($ids);
             }
-
-            return new Fluent([
-                'id' => $modification->modifiable_id,
-                'modification_id' => $modification->getKey(),
-                'title' => $label,
-                'created_at' => $modification->getAttribute('created_at'),
-                'approvers_required' => $modification->approvers_required,
-                'approvers_remaining' => $modification->approversRemaining,
-                'modifier_id' => $modification->modifier_id,
-                'modifier_type' => $modification->modifier_type,
-            ]);
-        })->values();
-
-        return new CrudResult(
-            data: $rows,
-            meta: new CrudMeta(
-                totalRecords: $rows->count(),
-                currentRecords: $rows->count(),
-                class: $model::class,
-                table: $model->getTable(),
-                cachedAt: Date::now(),
-            ),
-        );
+        }
     }
 
     /**
-     * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
+     * @param  array<int|string, mixed>  $ids
+     * @return list<int>
      */
-    public function latestDisapproval(CrudRequestData $requestData): CrudResult
+    private function normalizeRelationIds(array $ids): array
     {
-        $model = $requestData->model;
-        $this->auth->ensurePermission(
-            $requestData->request,
-            $model->getTable(),
-            'select',
-            $model->getConnectionName(),
-        );
-
-        $user = Auth::user();
-        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
-
-        $record_id = $requestData->request->input('id');
-        $found_record = $model->newQuery()->whereKey($record_id)->firstOrFail();
-
-        $connection = $found_record->getConnectionName();
-        $modification_prototype = (new Modification())->setConnection($connection);
-
-        $modifier_types = array_values(array_unique([
-            $user::class,
-            User::class,
-            \App\Models\User::class,
-        ]));
-
-        /** @var Modification|null $modification */
-        $modification = $modification_prototype->newQuery()
-            ->where('modifiable_type', $model::class)
-            ->where('modifiable_id', $found_record->getKey())
-            ->where('modifier_id', $user->getKey())
-            ->whereIn('modifier_type', $modifier_types)
-            ->inactiveOnly()
-            ->whereHas('disapprovals')
-            ->with(['disapprovals' => static fn ($query) => $query->latest('id')])
-            ->latest('id')
-            ->first();
-
-        if ($modification === null) {
-            return new CrudResult(
-                data: null,
-                meta: new CrudMeta(
-                    totalRecords: 0,
-                    currentRecords: 0,
-                    class: $model::class,
-                    table: $model->getTable(),
-                    cachedAt: Date::now(),
-                ),
-            );
-        }
-
-        /** @var Disapproval|null $disapproval */
-        $disapproval = $modification->disapprovals->first();
-
-        return new CrudResult(
-            data: new Fluent([
-                'id' => $modification->modifiable_id,
-                'modification_id' => $modification->getKey(),
-                'reason' => $disapproval?->reason,
-                'modifications' => $modification->modifications,
-                'disapproved_at' => $disapproval?->getAttribute('created_at'),
-                'disapprover_id' => $disapproval?->disapprover_id,
-                'disapprover_type' => $disapproval?->disapprover_type,
-            ]),
-            meta: new CrudMeta(
-                totalRecords: 1,
-                currentRecords: 1,
-                class: $model::class,
-                table: $model->getTable(),
-                cachedAt: Date::now(),
-            ),
-        );
+        return array_values(array_unique(array_map(static fn (mixed $id): int => (int) $id, $ids)));
     }
 
     /**
      * @param  array{related: Model, relatedTable: string, ownerKey: string, column: string}|null  $label_relation
      */
-    private function orderFacetPage(\Illuminate\Database\Query\Builder $query, string $base_table, string $key, FacetSort $sort, ?array $label_relation): void
+    private function orderFacetPage(BaseQueryBuilder $query, string $base_table, string $key, FacetSort $sort, ?array $label_relation): void
     {
         match ($sort) {
             // A stable key tiebreak keeps paging deterministic when counts tie.
@@ -1462,7 +1534,7 @@ class CrudService
      *
      * @param  array{related: Model, relatedTable: string, ownerKey: string, column: string}|null  $label_relation
      */
-    private function orderFacetByLabel(\Illuminate\Database\Query\Builder $query, string $base_table, string $key, ?array $label_relation, string $direction): void
+    private function orderFacetByLabel(BaseQueryBuilder $query, string $base_table, string $key, ?array $label_relation, string $direction): void
     {
         if ($label_relation === null) {
             $query->orderBy($key, $direction);
@@ -1838,7 +1910,7 @@ class CrudService
         // Relation facet: the field is the relation name and its selection targets a
         // column on it (field `categories`, property `categories.id`), so the whole
         // relation membership filter is the facet's own selection.
-        if (str_contains($property, '.') && strstr($property, '.', true) === $field) {
+        if (str_contains($property, '.') && $field === mb_strstr($property, '.', true)) {
             return true;
         }
 

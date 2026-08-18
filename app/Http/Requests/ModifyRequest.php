@@ -50,6 +50,11 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
         $to_merge = [
             'filters' => $this->filters ?? [],
+            // Many-to-many relation sync payload: { relation: [id, ...] }. Kept
+            // separate from column changes; the whitelist is enforced in CrudService.
+            'relations' => ['sometimes', 'array'],
+            'relations.*' => ['array'],
+            'relations.*.*' => ['integer'],
         ];
 
         /** @phpstan-ignore method.notFound */

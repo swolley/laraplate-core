@@ -11,12 +11,28 @@ final class ModifyRequestData extends CrudRequestData
 {
     public protected(set) array $changes = [];
 
+    /**
+     * Many-to-many relations to sync, keyed by relation name with a list of ids.
+     * Kept out of {@see $changes} so a column update never treats it as an attribute.
+     *
+     * @var array<string, list<int|string>>
+     */
+    public protected(set) array $relations = [];
+
     public function __construct(ModifyRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
         parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
 
         foreach ($validated as $property => $value) {
-            $this->changes[Str::replaceFirst($this->mainEntity . '.', '', $property)] = $value;
+            $key = Str::replaceFirst($this->mainEntity . '.', '', $property);
+
+            if ($key === 'relations') {
+                $this->relations = is_array($value) ? $value : [];
+
+                continue;
+            }
+
+            $this->changes[$key] = $value;
         }
     }
 
