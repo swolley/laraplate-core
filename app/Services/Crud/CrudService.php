@@ -120,9 +120,11 @@ class CrudService
         // 2. Inject ACL filters into request (filters become: ACL AND user_filters)
         $this->auth->injectAclFilters($requestData, $permission_name);
 
-        // 3. Build query (now includes ACL filters)
+        // 3. Build query (now includes ACL filters). Relation-count aggregates get the
+        //    related entity's ACL applied to their subquery, so a `*_count` never
+        //    counts rows the viewer is not permitted to see.
         $query = $model->newQuery();
-        $this->query_builder->prepareQuery($query, $requestData);
+        $this->query_builder->prepareQuery($query, $requestData, $this->relationCountAclConstraint(...));
 
         // When the full result set is materialized (no page, no from/to range, no
         // limit cap and not a count-only request), the total equals the number of
@@ -169,6 +171,26 @@ class CrudService
             data: $data,
             meta: $meta,
         );
+    }
+
+    /**
+     * Constrain a relation-count subquery with the related entity's read ACL, so a
+     * `<relation>_count` on a list row only counts rows the viewer may see. For an
+     * unrestricted viewer the ACL resolves to no filters and the count is unchanged.
+     *
+     * @param  Builder<Model>  $subquery
+     */
+    private function relationCountAclConstraint(string $relation, Builder $subquery): void
+    {
+        $related = $subquery->getModel();
+
+        $permission = $this->auth->buildPermissionName(
+            $related->getTable(),
+            'select',
+            $related->getConnectionName(),
+        );
+
+        $this->auth->applyAclFiltersToQuery($subquery, $permission);
     }
 
     /**

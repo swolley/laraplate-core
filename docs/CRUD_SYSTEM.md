@@ -290,6 +290,8 @@ Columns can be of different types:
 }
 ```
 
+A "dotless" aggregate names a relation on the main model itself: `{ "name": "comments", "type": "count" }` runs `withCount('comments')` and adds a `comments_count` attribute to each row (`<relation>_count`; `sum`/`avg`/… follow Eloquent's `<relation>_<agg>_<column>` naming). It applies whether or not other relations are eager-loaded. A dotted aggregate (`author.comments:count`) instead counts a sub-relation inside the loaded `author` relation. Columns are namespaced to the model's real table, so this works for entities whose route alias differs from their table (e.g. the `locations` alias over `cms_locations`). An aggregate whose name is not a real relation fails fast with a clear error. Each relation-count subquery is constrained by the related entity's read ACL, so a `*_count` never counts rows the viewer is not permitted to see.
+
 ## Filters
 
 ### Filter Operators

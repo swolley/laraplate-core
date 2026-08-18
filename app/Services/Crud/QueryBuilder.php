@@ -54,7 +54,16 @@ final class QueryBuilder
      *
      * @throws InvalidArgumentException
      */
-    public function prepareQuery(Builder $query, SelectRequestData $request_data): void
+    /**
+     * @param  Builder<Model>  $query
+     * @param  (callable(string, Builder<Model>): void)|null  $countConstraint  Optional
+     *         hook to constrain each main-model relation-count subquery — the caller
+     *         (CrudService) uses it to apply the related entity's ACL so a `*_count`
+     *         never leaks rows the viewer cannot see. QueryBuilder stays auth-agnostic.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function prepareQuery(Builder $query, SelectRequestData $request_data, ?callable $countConstraint = null): void
     {
         $main_model = $query->getModel();
         $main_entity = $main_model->getTable();
@@ -172,6 +181,10 @@ final class QueryBuilder
                 $normalized_relations = array_values(array_unique(array_merge($normalized_relations, array_keys($relations_filters))));
             }
         }
+
+        // Main-model relation aggregates (dotless keys) apply whether or not other
+        // relations are eager-loaded; the relation pass then handles the dotted ones.
+        $this->applyMainAggregates($query, $columns['aggregates'], $countConstraint);
 
         if ($normalized_relations !== []) {
             $this->applyRelations($query, $normalized_relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters, $computed_relations);
@@ -605,6 +618,72 @@ final class QueryBuilder
     }
 
     /**
+     * Apply main-model relation aggregates — the "dotless" aggregate keys such as
+     * `contents` (a direct relation of the main model) → withCount('contents') → a
+     * `contents_count` attribute on each row. Runs regardless of whether other
+     * relations are eager-loaded (dotted keys stay scoped to their loaded relation
+     * and are consumed by {@see applyAggregatesToQuery()}). Consumed keys are removed
+     * so the relation pass does not see them again.
+     *
+     * @param  Builder<Model>  $query
+     * @param  array<string,array<int,Column>>  $aggregates
+     * @param  (callable(string, Builder<Model>): void)|null  $countConstraint
+     *
+     * @throws InvalidArgumentException when a dotless key is not an Eloquent relation
+     */
+    private function applyMainAggregates(Builder $query, array &$aggregates, ?callable $countConstraint = null): void
+    {
+        $model = $query->getModel();
+
+        foreach ($aggregates as $relation => $aggregates_cols) {
+            if (Str::contains($relation, '.')) {
+                continue;
+            }
+
+            $this->assertAggregateRelation($model, $relation);
+
+            $constraint = $countConstraint === null
+                ? null
+                : static function (Builder $subquery) use ($countConstraint, $relation): void {
+                    $countConstraint($relation, $subquery);
+                };
+
+            foreach ($aggregates_cols as $col) {
+                $method = $this->resolveAggregateMethod($col->type);
+
+                if ($col->type === ColumnType::Count) {
+                    $query->{$method}($constraint === null ? [$relation] : [$relation => $constraint]);
+
+                    continue;
+                }
+
+                $query->{$method}($constraint === null ? $relation : [$relation => $constraint], $col->name);
+            }
+
+            unset($aggregates[$relation]);
+        }
+    }
+
+    /**
+     * Fail fast when an aggregate targets something that is not a real relation on
+     * the model, turning an opaque "undefined method" into a clear message.
+     */
+    private function assertAggregateRelation(Model $model, string $relation): void
+    {
+        $is_relation = method_exists($model, $relation)
+            && ($return = new ReflectionMethod($model, $relation)->getReturnType()) !== null
+            && is_a((string) $return, Relation::class, true);
+
+        if (! $is_relation) {
+            throw new InvalidArgumentException(sprintf(
+                "Aggregate '%s' is not an Eloquent relation on %s, so it cannot be counted or summed.",
+                $relation,
+                $model::class,
+            ));
+        }
+    }
+
+    /**
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relations_aggregates
      */
@@ -754,26 +833,6 @@ final class QueryBuilder
         $relations = $this->normalizeRelations($relations);
         $this->cleanRelations($relations);
         $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
-
-        foreach ($relations_aggregates as $relation => $aggregates_cols) {
-            if (Str::contains($relation, '.')) {
-                continue;
-            }
-
-            foreach ($aggregates_cols as $col) {
-                $method = $this->resolveAggregateMethod($col->type);
-
-                if ($col->type === ColumnType::Count) {
-                    $query->{$method}([$relation]);
-
-                    continue;
-                }
-
-                $query->{$method}($relation, $col->name);
-            }
-
-            unset($relations_aggregates[$relation]);
-        }
 
         $withs = [];
 

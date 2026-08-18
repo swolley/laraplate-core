@@ -158,6 +158,48 @@ it('prepareQuery applies aggregates on relations (withCount)', function (): void
     expect(mb_strtolower($sql))->toContain('roles_count');
 });
 
+it('applies a dotless relation count on the main model regardless of eager loads', function (): void {
+    $query = User::query();
+    $request_data = qb_make_list_request_data(
+        columns: [new Column('roles', ColumnType::Count)],
+        relations: [],
+    );
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    expect(mb_strtolower($query->toSql()))->toContain('roles_count');
+});
+
+it('constrains a main relation-count subquery with the count constraint hook', function (): void {
+    $query = User::query();
+    $request_data = qb_make_list_request_data(
+        columns: [new Column('roles', ColumnType::Count)],
+        relations: [],
+    );
+
+    (new QueryBuilder())->prepareQuery(
+        $query,
+        $request_data,
+        static function (string $relation, Builder $subquery): void {
+            $subquery->where('acl_sentinel_column', '=', 'restricted');
+        },
+    );
+
+    // The constraint lands inside the roles_count correlated subquery.
+    expect(mb_strtolower($query->toSql()))->toContain('acl_sentinel_column');
+});
+
+it('fails fast when a dotless aggregate targets a non-relation', function (): void {
+    $query = User::query();
+    $request_data = qb_make_list_request_data(
+        columns: [new Column('not_a_relation', ColumnType::Count)],
+        relations: [],
+    );
+
+    expect(fn (): mixed => (new QueryBuilder())->prepareQuery($query, $request_data))
+        ->toThrow(InvalidArgumentException::class, 'not an Eloquent relation');
+});
+
 it('relation deleted_at filter requires delete permission to include trashed relations', function (): void {
     $role = Role::factory()->create(['name' => 'to_be_deleted', 'guard_name' => 'web']);
     $user = User::factory()->create();

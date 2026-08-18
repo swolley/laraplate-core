@@ -31,13 +31,30 @@ class SelectRequestData extends CrudRequestData
         $this->relations = $this->conformRelations($validated['relations'] ?? []);
     }
 
+    /**
+     * Namespace a column to the main model's real table, not the request's entity
+     * alias. {@see QueryBuilder::groupColumns()} strips the table prefix, so both
+     * ends must agree — otherwise, for entities whose route alias differs from their
+     * table (prefixed module tables such as `cms_locations` behind the `locations`
+     * alias), the prefix is never stripped and an aggregate/column is mis-keyed to
+     * the alias (e.g. a `contents` count becomes `withCount(['locations'])`).
+     *
+     * A column already namespaced to the table is kept; one namespaced to the route
+     * alias is re-namespaced to the table; a bare column is namespaced to the table.
+     */
     private function conformColumnName(string $column): string
     {
-        if (! Str::startsWith($column, $this->mainEntity)) {
-            return $this->mainEntity . '.' . $column;
+        $table = $this->model->getTable();
+
+        if ($column === $table || Str::startsWith($column, $table . '.')) {
+            return $column;
         }
 
-        return $column;
+        if ($this->mainEntity !== $table && Str::startsWith($column, $this->mainEntity . '.')) {
+            return $table . '.' . Str::after($column, $this->mainEntity . '.');
+        }
+
+        return $table . '.' . $column;
     }
 
     /**
