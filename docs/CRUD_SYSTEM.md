@@ -119,14 +119,22 @@ boundary. `CrudService::update` rejects any relation not whitelisted or not a
 `BelongsToMany`/`MorphToMany` with `422`/`400`, then syncs each present relation in the
 update transaction (a present key syncs wholesale, empty clears, an omitted key is untouched).
 
-#### Authoring surface & validity
+#### Role-scoped ACLs and dynamic placeholders
 
-Models with a validity (`valid()`) global scope — e.g. `CMS\Content`, `Core\Taxonomy` —
-make that scope **authoring-surface aware**: it is skipped when `authoring_surface()` is
-true. `CrudAuthoringContextMiddleware` sets that flag on the session app CRUD group
-(`/app/crud/*`) only, so staff working in the app see drafts, scheduled and expired
-records, while the public `/api/v1` surface (and every non-request context) keeps
-returning only currently-valid records.
+An `acls.role_id` (nullable) scopes an ACL to a single role: set, it applies only to that
+role (paired with `permission_id`, i.e. the `role_has_permissions` pair); null keeps the
+legacy behavior (applies to every role holding the permission). This lets two roles that
+share a permission carry different row-level filters — e.g. the anonymous `guest` role is
+restricted while staff roles are not.
+
+ACL filter values may use dynamic placeholders resolved at query-build time: `@now` and
+`@today` become the live `Carbon::now()` / `Carbon::today()`. This is what lets a stored
+ACL express a moving publication window.
+
+Together these replace what used to be a per-model validity global scope: `CMS\Content`
+publication filtering is a `guest`-scoped ACL on `cms_contents.select` whose `valid_from <=
+@now AND (valid_to >= @now OR valid_to IS NULL)` filter limits the public reader to
+published content, while staff (no such ACL) read everything.
 
 ### Internal-only Operations
 

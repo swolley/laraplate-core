@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\CrudController;
 use Modules\Core\Http\Controllers\GridsController;
-use Modules\Core\Http\Middleware\CrudAuthoringContextMiddleware;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,7 +17,7 @@ use Modules\Core\Http\Middleware\CrudAuthoringContextMiddleware;
 |
 */
 
-Route::name('crud.')->prefix('/crud')->middleware(CrudAuthoringContextMiddleware::class)->group(function (): void {
+Route::name('crud.')->prefix('/crud')->group(function (): void {
     require __DIR__ . '/crud.php';
 
     require __DIR__ . '/graph.php';

@@ -184,13 +184,7 @@ abstract class Taxonomy extends Model implements Sortable
     protected static function booted(): void
     {
         self::addGlobalScope('global_filters', static function (Builder $query): void {
-            $query->active();
-
-            // The authoring surface (session app CRUD) must see out-of-validity
-            // taxonomies so they remain selectable; the public API keeps filtering.
-            if (! authoring_surface()) {
-                $query->valid();
-            }
+            $query->active()->valid();
         });
         self::addGlobalScope('global_ordered', static function (Builder $query): void {
             $query->ordered();

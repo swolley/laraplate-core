@@ -614,38 +614,6 @@ if (! function_exists('preview')) {
     }
 }
 
-if (! function_exists('authoring_surface')) {
-    /**
-     * Getter/Setter for the request-scoped authoring-surface flag.
-     *
-     * The authoring surface is the session app's CRUD (the `/app/crud/*` routes),
-     * where staff must see unpublished/out-of-validity records to work; the public
-     * API surface leaves it off and keeps validity filtering. Stored on the current
-     * request so it never leaks across requests or into console/queue contexts
-     * (where it defaults to off).
-     *
-     * @param  bool|null  $enable  set the flag when provided
-     */
-    function authoring_surface(?bool $enable = null): bool
-    {
-        if (! app()->bound('request')) {
-            return false;
-        }
-
-        $request = request();
-
-        if (! $request instanceof Illuminate\Http\Request) {
-            return false;
-        }
-
-        if ($enable !== null) {
-            $request->attributes->set('authoring_surface', $enable);
-        }
-
-        return (bool) $request->attributes->get('authoring_surface', false);
-    }
-}
-
 if (! function_exists('class_uses_trait')) {
     /**
      * Check if a class uses a trait.
