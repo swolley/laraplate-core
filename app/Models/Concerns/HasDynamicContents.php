@@ -318,8 +318,11 @@ trait HasDynamicContents
 
     public function setDefaultPresettable(): void
     {
-        $entity_type = static::getEntityType();
-        $first_available = static::fetchAvailablePresettables($entity_type::tryFrom($this->getTable()))->firstOrFail();
+        // getEntityType() already returns the model's entity enum; the previous
+        // `tryFrom($this->getTable())` fed the prefixed table name (e.g. cms_contents)
+        // to a backed enum whose values are unprefixed (contents), always yielding
+        // null and a TypeError.
+        $first_available = static::fetchAvailablePresettables(static::getEntityType())->firstOrFail();
         $this->setRelation('presettable', $first_available);
     }
 
