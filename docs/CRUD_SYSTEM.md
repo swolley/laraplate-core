@@ -136,6 +136,16 @@ publication filtering is a `guest`-scoped ACL on `cms_contents.select` whose `va
 @now AND (valid_to >= @now OR valid_to IS NULL)` filter limits the public reader to
 published content, while staff (no such ACL) read everything.
 
+Role inheritance never leaks an unwanted restriction: a role with its own ACL for a
+permission uses it and ignores any ancestor ACL. So a child role that would otherwise
+inherit a restrictive parent ACL can carry its own higher-priority `unrestricted = true`
+ACL — which contributes no filters — to override the inherited one and read everything.
+
+Effective ACLs are cached per user/permission (`AclResolverService`, one-hour TTL).
+`AclObserver` flushes that cache on every ACL create/update/delete/restore, so an ACL
+change (including flipping `unrestricted`) takes effect immediately instead of after the
+TTL expires.
+
 ### Internal-only Operations
 
 These are registered in `routes/web.php`, not in the shared `routes/crud.php`. They are

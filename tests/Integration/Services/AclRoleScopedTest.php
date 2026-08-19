@@ -101,3 +101,29 @@ it('prefers a higher-priority scoped ACL over an unscoped one for the same role'
     // The unrestricted, higher-priority role-scoped ACL wins → no filters.
     expect((new AclResolverService)->getCombinedFilters($user, $permission))->toBeNull();
 });
+
+it('lets a child role override an inherited parent ACL with its own unrestricted ACL', function (): void {
+    $permission = scoped_permission();
+
+    $parent = Role::factory()->create(['name' => 'scope_parent_' . uniqid(), 'guard_name' => 'web']);
+    $child = Role::factory()->create(['name' => 'scope_child_' . uniqid(), 'guard_name' => 'web', 'parent_id' => $parent->id]);
+    $parent->givePermissionTo($permission);
+    $child->givePermissionTo($permission);
+
+    // Only the parent carries a restrictive ACL.
+    make_acl($permission, scoped_filters(), ['role_id' => $parent->id]);
+
+    $child_user = User::factory()->create();
+    $child_user->assignRole($child);
+
+    $service = new AclResolverService;
+
+    // With no ACL of its own, the child inherits the parent's restrictive ACL.
+    expect($service->getCombinedFilters($child_user, $permission))->toBeInstanceOf(FiltersGroup::class);
+
+    // Giving the child its own unrestricted ACL overrides the inherited one. The ACL
+    // observer flushes the resolver cache, so the override takes effect immediately.
+    make_acl($permission, scoped_filters(), ['role_id' => $child->id, 'unrestricted' => true, 'priority' => 50]);
+
+    expect((new AclResolverService)->getCombinedFilters($child_user->fresh(), $permission))->toBeNull();
+});

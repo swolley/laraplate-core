@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Observers\AclObserver;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
@@ -39,6 +41,7 @@ use Override;
  * @mixin \Eloquent
  * @mixin IdeHelperACL
  */
+#[ObservedBy([AclObserver::class])]
 final class ACL extends Model
 {
     /**

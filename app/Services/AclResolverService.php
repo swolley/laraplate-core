@@ -182,6 +182,20 @@ final class AclResolverService
     }
 
     /**
+     * Flush every cached ACL resolution across all users and permissions.
+     *
+     * Driver-agnostic and independent of per-user key reconstruction, so it stays
+     * correct when an ACL write must invalidate entries whose exact keys are not known
+     * (e.g. role-scoped ACLs affecting many users). ACL writes are administrative and
+     * rare, so flushing the whole `acl:` namespace is an acceptable trade-off for
+     * guaranteed consistency.
+     */
+    public function flushCache(): void
+    {
+        $this->flushAclPrefixedKeys();
+    }
+
+    /**
      * Build the ACL cache key for a specific user and permission.
      */
     private function buildCacheKey(string $connection_name, int|string $user_id, int|string $perm_id): string
