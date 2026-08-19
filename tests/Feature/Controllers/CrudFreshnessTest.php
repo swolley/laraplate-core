@@ -53,11 +53,12 @@ it('returns page-scoped id and updated_at fingerprints with filtered total', fun
 });
 
 it('classifies check_ids as on_page, off_page, or gone', function (): void {
-    // listByPagination uses to = from + pagination → window size = pagination + 1.
+    // listByPagination slices exactly `pagination` rows per page (take(to - from + 1)).
     $pageSize = 2;
-    $windowSize = $pageSize + 1;
+    $windowSize = $pageSize;
 
     $settings = collect();
+
     foreach (range(1, $windowSize + 1) as $i) {
         $settings->push(
             Setting::factory()->persistedWithoutApprovalCapture()->create([

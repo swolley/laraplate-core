@@ -122,7 +122,10 @@ class ListRequestData extends SelectRequestData
             $this->page = self::intFromMixed($validated['page'] ?? null, 1);
             $this->skip = ($this->page - 1) * $this->pagination;
             $this->from = $this->skip + 1;
-            $this->to = $this->from + $this->pagination;
+            // `to` is the inclusive index of the last row on the page, so a page of
+            // `pagination` rows spans [from, from + pagination - 1]. listByPagination
+            // slices with take(to - from + 1), which must equal `pagination`.
+            $this->to = $this->from + $this->pagination - 1;
         } elseif (isset($validated['from']) || isset($validated['to'])) {
             $this->from = self::intFromMixed($validated['from'] ?? null, 1);
             $this->skip = $this->from - 1;
@@ -143,6 +146,11 @@ class ListRequestData extends SelectRequestData
             $this->skip = 0;
             $this->take = $this->getDefaultPagination();
             $this->pagination = $this->take;
+            // `page` is set, so list() routes to listByPagination, which needs a
+            // populated from/to window; without it the slice would collapse to a
+            // single row (take(null - null + 1)).
+            $this->from = 1;
+            $this->to = $this->from + $this->pagination - 1;
         }
     }
 
@@ -177,6 +185,80 @@ class ListRequestData extends SelectRequestData
         } elseif ($filter['operator'] === FilterOperator::In && is_string($filter['value'])) {
             $filter['value'] = is_json($filter['value']) ? json_decode($filter['value'], true) : explode(',', $filter['value']);
         }
+    }
+
+    private static function intFromMixed(mixed $value, int $default): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if (is_float($value)) {
+            return (int) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $strings = [];
+
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $strings[] = $item;
+            }
+        }
+
+        return $strings;
+    }
+
+    /**
+     * @return array<int, string|array{property:string,direction:SortDirection|string}>
+     */
+    private static function sortInput(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $sorts = [];
+
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $sorts[] = $item;
+
+                continue;
+            }
+
+            if (! is_array($item) || ! isset($item['property']) || ! is_string($item['property'])) {
+                continue;
+            }
+
+            $direction = $item['direction'] ?? SortDirection::Asc;
+
+            if (! is_string($direction) && ! $direction instanceof SortDirection) {
+                $direction = SortDirection::Asc;
+            }
+
+            $sorts[] = [
+                'property' => $item['property'],
+                'direction' => $direction,
+            ];
+        }
+
+        return $sorts;
     }
 
     /**
@@ -320,79 +402,5 @@ class ListRequestData extends SelectRequestData
                 }
             }
         }
-    }
-
-    private static function intFromMixed(mixed $value, int $default): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-
-        if (is_float($value)) {
-            return (int) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private static function stringList(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $strings = [];
-
-        foreach ($value as $item) {
-            if (is_string($item)) {
-                $strings[] = $item;
-            }
-        }
-
-        return $strings;
-    }
-
-    /**
-     * @return array<int, string|array{property:string,direction:SortDirection|string}>
-     */
-    private static function sortInput(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $sorts = [];
-
-        foreach ($value as $item) {
-            if (is_string($item)) {
-                $sorts[] = $item;
-
-                continue;
-            }
-
-            if (! is_array($item) || ! isset($item['property']) || ! is_string($item['property'])) {
-                continue;
-            }
-
-            $direction = $item['direction'] ?? SortDirection::Asc;
-
-            if (! is_string($direction) && ! $direction instanceof SortDirection) {
-                $direction = SortDirection::Asc;
-            }
-
-            $sorts[] = [
-                'property' => $item['property'],
-                'direction' => $direction,
-            ];
-        }
-
-        return $sorts;
     }
 }

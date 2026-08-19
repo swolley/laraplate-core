@@ -14,7 +14,6 @@ use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Http\Requests\SelectRequest;
 use Modules\Core\Models\Setting;
 
-
 it('select request data conforms columns and relations', function (): void {
     $request = new class extends SelectRequest {};
 
@@ -65,7 +64,7 @@ it('list request data extracts pagination, filters, groups and sorts from pagina
         ->and($data->page)->toBe(2)
         ->and($data->skip)->toBe(10)
         ->and($data->from)->toBe(11)
-        ->and($data->to)->toBe(21)
+        ->and($data->to)->toBe(20)
         ->and($data->count)->toBeTrue()
         ->and($data->sort[0])->toBeInstanceOf(Sort::class)
         ->and($data->sort[1]->direction)->toBe(SortDirection::Desc)
