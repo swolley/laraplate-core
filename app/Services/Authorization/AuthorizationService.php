@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Authorization;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
@@ -50,6 +51,16 @@ final class AuthorizationService
     public function __construct(
         private readonly AclResolverService $acl_resolver,
     ) {}
+
+    /**
+     * Reset the static permission model cache.
+     *
+     * Intended for use in tests to ensure a clean state between test cases.
+     */
+    public static function resetPermissionCache(): void
+    {
+        self::$permission_model_cache = [];
+    }
 
     /**
      * Check if user has permission for the requested operation.
@@ -301,31 +312,49 @@ final class AuthorizationService
             return;
         }
 
+        $value = $this->resolveFilterValue($filter->value);
+
         if ($filter->operator->value === 'in') {
             $in_method = $method === 'orWhere' ? 'orWhereIn' : 'whereIn';
-            $query->{$in_method}($filter->property, (array) $filter->value);
+            $query->{$in_method}($filter->property, (array) $value);
 
             return;
         }
 
-        if ($filter->operator->value === 'between' && is_array($filter->value)) {
+        if ($filter->operator->value === 'between' && is_array($value)) {
             $between_method = $method === 'orWhere' ? 'orWhereBetween' : 'whereBetween';
-            $query->{$between_method}($filter->property, $filter->value);
+            $query->{$between_method}($filter->property, $value);
 
             return;
         }
 
-        $query->{$method}($filter->property, $filter->operator->value, $filter->value);
+        $query->{$method}($filter->property, $filter->operator->value, $value);
     }
 
     /**
-     * Reset the static permission model cache.
+     * Resolve dynamic placeholders in an ACL filter value at query-build time.
      *
-     * Intended for use in tests to ensure a clean state between test cases.
+     * ACL filters are JSON-persisted with frozen literal values, so a stored value
+     * cannot express a moving target such as the current time. A value equal to a
+     * known placeholder token (e.g. `@now`, `@today`) is substituted with its live
+     * value here; array values (for `in` / `between`) are resolved element-wise, and
+     * any other value is returned untouched.
      */
-    public static function resetPermissionCache(): void
+    private function resolveFilterValue(mixed $value): mixed
     {
-        self::$permission_model_cache = [];
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => $this->resolveFilterValue($item), $value);
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        return match ($value) {
+            '@now' => Carbon::now(),
+            '@today' => Carbon::today(),
+            default => $value,
+        };
     }
 
     /**
