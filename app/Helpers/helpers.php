@@ -166,7 +166,7 @@ if (! function_exists('laraplate_module_is_owned_at_path')) {
      */
     function laraplate_module_is_owned_at_path(string $path): bool
     {
-        $module_json_path = $path.DIRECTORY_SEPARATOR.'module.json';
+        $module_json_path = $path . DIRECTORY_SEPARATOR . 'module.json';
 
         if (is_file($module_json_path)) {
             $decoded = json_decode((string) file_get_contents($module_json_path), true);
@@ -176,7 +176,7 @@ if (! function_exists('laraplate_module_is_owned_at_path')) {
             }
         }
 
-        $composer_path = $path.DIRECTORY_SEPARATOR.'composer.json';
+        $composer_path = $path . DIRECTORY_SEPARATOR . 'composer.json';
 
         if (! is_file($composer_path)) {
             return false;
@@ -525,7 +525,7 @@ if (! function_exists('routes')) {
         foreach ($all_routes as $route) {
             $reference = $route->action['namespace'] ?? $route->action['controller'] ?? $route->action['uses'];
 
-            if ($reference instanceof \Closure) {
+            if ($reference instanceof Closure) {
                 $reference = (new ReflectionFunction($reference))->getName();
             } elseif (is_string($reference) && is_callable($reference)) {
                 $reference = (new ReflectionFunction($reference))->getName();
@@ -611,6 +611,38 @@ if (! function_exists('preview')) {
         }
 
         return (bool) session('preview', false);
+    }
+}
+
+if (! function_exists('authoring_surface')) {
+    /**
+     * Getter/Setter for the request-scoped authoring-surface flag.
+     *
+     * The authoring surface is the session app's CRUD (the `/app/crud/*` routes),
+     * where staff must see unpublished/out-of-validity records to work; the public
+     * API surface leaves it off and keeps validity filtering. Stored on the current
+     * request so it never leaks across requests or into console/queue contexts
+     * (where it defaults to off).
+     *
+     * @param  bool|null  $enable  set the flag when provided
+     */
+    function authoring_surface(?bool $enable = null): bool
+    {
+        if (! app()->bound('request')) {
+            return false;
+        }
+
+        $request = request();
+
+        if (! $request instanceof Illuminate\Http\Request) {
+            return false;
+        }
+
+        if ($enable !== null) {
+            $request->attributes->set('authoring_surface', $enable);
+        }
+
+        return (bool) $request->attributes->get('authoring_surface', false);
     }
 }
 

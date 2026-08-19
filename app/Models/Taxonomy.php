@@ -12,14 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Helpers\LocaleContext;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasPath;
 use Modules\Core\Models\Concerns\HasTranslatedDynamicContents;
 use Modules\Core\Models\Concerns\HasValidity;
-use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\SortableTrait;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Translations\TaxonomyTranslation;
 use Modules\Core\Overrides\Model;
 use Override;
@@ -184,7 +184,13 @@ abstract class Taxonomy extends Model implements Sortable
     protected static function booted(): void
     {
         self::addGlobalScope('global_filters', static function (Builder $query): void {
-            $query->active()->valid();
+            $query->active();
+
+            // The authoring surface (session app CRUD) must see out-of-validity
+            // taxonomies so they remain selectable; the public API keeps filtering.
+            if (! authoring_surface()) {
+                $query->valid();
+            }
         });
         self::addGlobalScope('global_ordered', static function (Builder $query): void {
             $query->ordered();

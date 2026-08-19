@@ -109,6 +109,25 @@ HTTP Request
 | `/api/v1/update/{entity}` | PATCH | Update existing record(s) |
 | `/api/v1/delete/{entity}` | DELETE | Hard delete record(s) |
 
+#### Relation sync on update
+
+`update` writes only fillable columns. To reassign many-to-many relations in the same
+call, send a `relations` map: `{ "id": 5, "relations": { "tags": [1,2], "categories": [] } }`.
+A model opts in by implementing `Contracts\ProvidesSyncableRelations::syncableRelations()`,
+which whitelists the relations a client may `sync` — that whitelist is the authorization
+boundary. `CrudService::update` rejects any relation not whitelisted or not a
+`BelongsToMany`/`MorphToMany` with `422`/`400`, then syncs each present relation in the
+update transaction (a present key syncs wholesale, empty clears, an omitted key is untouched).
+
+#### Authoring surface & validity
+
+Models with a validity (`valid()`) global scope — e.g. `CMS\Content`, `Core\Taxonomy` —
+make that scope **authoring-surface aware**: it is skipped when `authoring_surface()` is
+true. `CrudAuthoringContextMiddleware` sets that flag on the session app CRUD group
+(`/app/crud/*`) only, so staff working in the app see drafts, scheduled and expired
+records, while the public `/api/v1` surface (and every non-request context) keeps
+returning only currently-valid records.
+
 ### Internal-only Operations
 
 These are registered in `routes/web.php`, not in the shared `routes/crud.php`. They are
