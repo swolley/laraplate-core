@@ -19,6 +19,7 @@ return new class extends Migration
         Schema::create($acls_table, function (Blueprint $table) use ($acls_table): void {
             $table->id();
             $table->foreignId('permission_id')->constrained(CoreTables::Permissions->value, 'id', "{$acls_table}_permission_id_FK")->onDelete('cascade')->comment('The permission id of the acl');
+            $table->foreignId('role_id')->nullable()->constrained(CoreTables::Roles->value, 'id', "{$acls_table}_role_id_FK")->onDelete('cascade')->comment('When set, the ACL applies only to this role (paired with permission_id); null applies to every role holding the permission');
             $table->string('description')->nullable()->comment('The description of the acl');
             $table->json('filters')->nullable()->comment('The filters of the acl');
             $table->json('sort')->nullable()->comment('The sort of the acl');
@@ -34,6 +35,7 @@ return new class extends Migration
 
             $table->index(['permission_id', 'deleted_at'], "{$acls_table}_permissions_IDX");
             $table->index(['permission_id', 'is_active', 'deleted_at'], "{$acls_table}_active_IDX");
+            $table->index(['permission_id', 'role_id', 'is_active', 'deleted_at'], "{$acls_table}_role_active_IDX");
 
             MigrateUtils::timestamps(
                 $table,

@@ -27,12 +27,14 @@ use Override;
  *
  * @property int $id
  * @property int $permission_id
+ * @property int|null $role_id
  * @property FiltersGroup|null $filters
  * @property array<string, mixed>|null $sort
  * @property string|null $description
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
+ *
  * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin \Eloquent
  * @mixin IdeHelperACL
@@ -48,6 +50,7 @@ final class ACL extends Model
     #[Override]
     protected $fillable = [
         'permission_id',
+        'role_id',       // Optional: scopes the ACL to a single role; null = every role holding the permission
         'filters',       // Stored as JSON - query builder filters
         'sort',          // Optional: stored as JSON
         'description',   // Optional: human readable description
@@ -66,11 +69,23 @@ final class ACL extends Model
         return $this->belongsTo(Permission::class);
     }
 
+    /**
+     * The role this ACL is scoped to, when set. A null role means the ACL applies
+     * to every role that holds its permission (the legacy, unscoped behavior).
+     *
+     * @return BelongsTo<Role>
+     */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
     public function getRules(): array
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'permission_id' => ['required', 'exists:' . CoreTables::Permissions->value . ',id'],
+            'role_id' => ['nullable', 'exists:' . CoreTables::Roles->value . ',id'],
             'filters' => [new QueryBuilder()],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],

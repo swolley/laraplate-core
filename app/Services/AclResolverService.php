@@ -352,6 +352,11 @@ final class AclResolverService
             ->active()
             ->byPriority()
             ->with(['permission.roles'])
+            ->where(static function (Builder $query) use ($all_role_ids): void {
+                // Role-scoped ACLs apply only to their own role; unscoped (null) ACLs
+                // apply to every role holding the permission.
+                $query->whereNull('role_id')->orWhereIn('role_id', $all_role_ids);
+            })
             ->whereHas('permission.roles', static function (Builder $query) use ($all_role_ids): void {
                 $query->whereIn($query->qualifyColumn('id'), $all_role_ids);
             })
@@ -362,8 +367,11 @@ final class AclResolverService
         $acl_by_role = [];
 
         foreach ($batch_acls as $acl) {
-            // permission.roles is already eager-loaded — no extra queries here
-            $acl_role_ids = $acl->permission->roles->pluck('id')->all();
+            // A role-scoped ACL maps only to its own role; an unscoped ACL maps to
+            // every role that holds the permission (eager-loaded to avoid N+1).
+            $acl_role_ids = $acl->role_id !== null
+                ? [$acl->role_id]
+                : $acl->permission->roles->pluck('id')->all();
 
             foreach ($acl_role_ids as $acl_role_id) {
                 // Only map roles that are in our set; keep the first (highest priority) ACL per role
