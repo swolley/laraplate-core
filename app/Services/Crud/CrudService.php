@@ -149,11 +149,15 @@ class CrudService
 
         $this->applyComputedMethods($data, $requestData);
 
+        // The number of records in the current page is the count of the fetched rows.
+        // It must be captured before grouping, otherwise `applyGroupBy` would collapse
+        // the collection into its group buckets and `currentRecords` would report the
+        // number of groups instead of the number of records.
+        $current_records = is_numeric($data) ? $data : $data->count();
+
         if ($requestData->group_by !== [] && $data instanceof Collection) {
             $data = $this->applyGroupBy($data, $requestData->group_by);
         }
-
-        $current_records = is_numeric($data) ? $data : $data->count();
 
         $meta = new CrudMeta(
             totalRecords: $total_records,

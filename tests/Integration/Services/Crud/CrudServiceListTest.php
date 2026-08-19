@@ -297,3 +297,32 @@ it('list still issues the count query when a limit caps the result set', functio
         ->and($result->meta->totalRecords)->toBe($expected_total)
         ->and($count_queries)->toBe(1);
 });
+
+it('reports currentRecords as the number of records even when group_by collapses them', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    // Every user shares the same name so grouping yields a single bucket.
+    User::factory()->count(3)->create(['name' => 'Shared Name']);
+    $expected_total = User::query()->where('name', 'Shared Name')->count();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+        new Column('users.name', ColumnType::Column),
+    ]);
+
+    crud_set_request_data_prop($request_data, 'filters', new FiltersGroup(
+        filters: [new Filter('users.name', 'Shared Name', FilterOperator::Equals)],
+        operator: \Modules\Core\Casts\WhereClause::And,
+    ));
+    crud_set_request_data_prop($request_data, 'group_by', ['name']);
+
+    $result = $service->list($request_data);
+
+    // The grouped payload has a single bucket, but the counters must reflect records.
+    expect($result->data)->toHaveCount(1)
+        ->and($result->meta->totalRecords)->toBe($expected_total)
+        ->and($result->meta->currentRecords)->toBe($expected_total);
+});
