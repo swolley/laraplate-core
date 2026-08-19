@@ -41,7 +41,7 @@ function app_path(string $path = ''): string
         return \app_path($path);
     }
 
-    return HandleTestContext::$app_base . '/' . ltrim($path, '/');
+    return HandleTestContext::$app_base . '/' . mb_ltrim($path, '/');
 }
 
 function database_path(string $path = ''): string
@@ -50,25 +50,24 @@ function database_path(string $path = ''): string
         return \database_path($path);
     }
 
-    return HandleTestContext::$db_base . '/' . ltrim($path, '/');
+    return HandleTestContext::$db_base . '/' . mb_ltrim($path, '/');
 }
 
 /**
- * Reads resolve against {@see HandleTestContext::$config}, deliberately returning
- * the default for unstubbed keys: commands under test rely on that to stay
- * sandboxed instead of resolving real module paths and writing into the repo.
- *
- * The array setter form carries no key to stub and cannot be answered from the
- * context, so it delegates to the real helper. Without this branch it raised a
- * TypeError in any command reached after this file was loaded — the file is
- * required at file scope and shadows `config()` for this whole namespace for the
- * rest of the process, so the crash surfaced purely by test ordering.
+ * By default this delegates to the real config() helper: the fixture is required
+ * at file scope and shadows config() for the whole Modules\Core\Console namespace
+ * for the rest of the process, so any unrelated command reached afterwards (e.g.
+ * perf:crud) must keep reading the real config. Only when a handle test flips
+ * {@see HandleTestContext::$config_from_global_helpers} off does it read from the
+ * stub map, returning the default for unstubbed keys so the command under test
+ * stays sandboxed instead of resolving real module paths and writing into the
+ * repo. The array setter form always delegates to the real helper.
  *
  * @param  array<string, mixed>|string|null  $key
  */
 function config(array|string|null $key = null, mixed $default = null): mixed
 {
-    if (is_array($key)) {
+    if (is_array($key) || HandleTestContext::$config_from_global_helpers) {
         return \config($key, $default);
     }
 
@@ -82,5 +81,5 @@ function module_path(string $module, string $path = ''): string
         // Fallback for tests when a base is not explicitly provided
         : dirname(__DIR__, 3) . '/' . $module;
 
-    return rtrim($base, '/') . '/' . ltrim($path, '/');
+    return mb_rtrim($base, '/') . '/' . mb_ltrim($path, '/');
 }

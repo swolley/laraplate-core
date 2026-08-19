@@ -1201,10 +1201,12 @@ describe('handle', function (): void {
         HandleTestContext::$db_base = '';
         HandleTestContext::$module_base = '';
         HandleTestContext::$config = [];
+        HandleTestContext::$config_from_global_helpers = false;
     });
 
     afterEach(function (): void {
         Model::setConnectionResolver($this->model_connection_resolver);
+        HandleTestContext::$config_from_global_helpers = true;
         Prompt::interactive(true);
 
         // Reset Prompt fallback state

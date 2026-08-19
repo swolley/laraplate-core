@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Tests\Fixtures\HandleTestContext;
-
 use function Modules\Core\Console\config as namespaced_config;
+
+use Modules\Core\Tests\Fixtures\HandleTestContext;
 
 require_once dirname(__DIR__, 2) . '/Fixtures/handle_test_overrides.php';
 
@@ -15,17 +15,28 @@ require_once dirname(__DIR__, 2) . '/Fixtures/handle_test_overrides.php';
  */
 afterEach(function (): void {
     HandleTestContext::$config = [];
+    HandleTestContext::$config_from_global_helpers = true;
     HandleTestContext::$app_base = '';
     HandleTestContext::$db_base = '';
 });
 
+it('delegates to the real config helper by default so it does not shadow other console code', function (): void {
+    // Default state: the override must not swallow config reads made by unrelated
+    // Modules\Core\Console code after this fixture is loaded at file scope.
+    config(['core.real.key' => 'real']);
+
+    expect(namespaced_config('core.real.key'))->toBe('real');
+});
+
 it('returns the stubbed value when the key is configured', function (): void {
+    HandleTestContext::$config_from_global_helpers = false;
     HandleTestContext::$config['core.some.flag'] = 'stubbed';
 
     expect(namespaced_config('core.some.flag'))->toBe('stubbed');
 });
 
 it('keeps unstubbed keys sandboxed instead of resolving real config', function (): void {
+    HandleTestContext::$config_from_global_helpers = false;
     HandleTestContext::$config = [];
     config(['core.untouched.key' => 'real']);
 
