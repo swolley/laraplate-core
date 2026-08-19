@@ -21,7 +21,8 @@ it('has prepareQuery method with correct signature', function (): void {
     $method = $reflection->getMethod('prepareQuery');
 
     expect($method->isPublic())->toBeTrue();
-    expect($method->getNumberOfParameters())->toBe(2);
+    expect($method->getNumberOfParameters())->toBe(3);
+    expect($method->getNumberOfRequiredParameters())->toBe(2);
 });
 
 it('has applyFilters method', function (): void {

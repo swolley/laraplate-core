@@ -187,6 +187,10 @@ it('parses existing JSON output as the previous document on a second run', funct
 });
 
 it('parses existing YAML output as the previous document on a second run', function (): void {
+    if (! extension_loaded('yaml')) {
+        $this->markTestSkipped('The yaml PHP extension is required for the yaml output format.');
+    }
+
     swaggerTestConfig();
 
     $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'swagger_yaml_old_' . uniqid('', true);
