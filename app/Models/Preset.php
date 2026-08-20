@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Pivot\Presettable;
+use Modules\Core\Observers\DynamicContentMetadataObserver;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Services\PresetVersioningService;
 use Override;
@@ -26,6 +28,7 @@ use Override;
  * @property int|string|null $entity_id
  * @property int|string|null $template_id
  */
+#[ObservedBy(DynamicContentMetadataObserver::class)]
 abstract class Preset extends Model
 {
     use HasActivation {

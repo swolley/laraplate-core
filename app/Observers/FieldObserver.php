@@ -7,6 +7,7 @@ namespace Modules\Core\Observers;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Field;
+use Modules\Core\Services\DynamicContentsService;
 
 final class FieldObserver
 {
@@ -31,6 +32,47 @@ final class FieldObserver
         if (property_exists($model, 'pivot') && $model->pivot && $model->pivot->isDirty()) {
             $model->pivot->save();
         }
+    }
+
+    /**
+     * Handle the Field "created" event.
+     */
+    public function created(Field $model): void
+    {
+        $this->flushDynamicContentsMetadata();
+    }
+
+    /**
+     * Handle the Field "updated" event.
+     */
+    public function updated(Field $model): void
+    {
+        $this->flushDynamicContentsMetadata();
+    }
+
+    /**
+     * Handle the Field "deleted" event.
+     */
+    public function deleted(Field $model): void
+    {
+        $this->flushDynamicContentsMetadata();
+    }
+
+    /**
+     * Handle the Field "restored" event.
+     */
+    public function restored(Field $model): void
+    {
+        $this->flushDynamicContentsMetadata();
+    }
+
+    /**
+     * A field's structure feeds the cached preset and presettable metadata, so any
+     * write must invalidate the persistent {@see DynamicContentsService} caches.
+     */
+    private function flushDynamicContentsMetadata(): void
+    {
+        DynamicContentsService::getInstance()->clearAllCaches();
     }
 
     /**

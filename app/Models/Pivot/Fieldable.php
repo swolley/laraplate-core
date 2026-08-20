@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Concerns\SortableTrait;
+use Modules\Core\Observers\DynamicContentMetadataObserver;
 use Modules\Core\Observers\FieldableObserver;
 use Modules\Core\Overrides\Pivot;
 use Override;
@@ -19,7 +20,7 @@ use Spatie\EloquentSortable\Sortable;
  * @mixin \Eloquent
  * @mixin IdeHelperFieldable
  */
-#[ObservedBy(FieldableObserver::class)]
+#[ObservedBy([FieldableObserver::class, DynamicContentMetadataObserver::class])]
 final class Fieldable extends Pivot implements Sortable
 {
     use HasVersions;

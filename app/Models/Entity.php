@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -11,10 +12,11 @@ use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Database\Factories\EntityFactory;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasPath;
 use Modules\Core\Models\Concerns\HasSlug;
-use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Observers\DynamicContentMetadataObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
@@ -24,6 +26,7 @@ use Override;
  * @property string $slug
  * @property IDynamicEntityTypable $type
  */
+#[ObservedBy(DynamicContentMetadataObserver::class)]
 abstract class Entity extends Model
 {
     // region Traits
@@ -80,10 +83,10 @@ abstract class Entity extends Model
             'type' => ['required', static::getEntityTypeEnumClass()::validationRule()],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'unique:'.CoreTables::Entities->value.',name'],
+            'name' => ['required', 'string', 'max:255', 'unique:' . CoreTables::Entities->value . ',name'],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:'.CoreTables::Entities->value.',name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'unique:' . CoreTables::Entities->value . ',name,' . $this->id],
         ]);
 
         return $rules;
