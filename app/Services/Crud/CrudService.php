@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Modules\Core\Authorization\RetrievedSelectGuard;
 use Illuminate\Database\Query\Builder as BaseQueryBuilder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Foundation\Http\FormRequest;
@@ -137,11 +138,17 @@ class CrudService
 
         $total_records = $is_full_get ? 0 : $query->count();
 
-        $data = match (true) {
-            $requestData->page !== null => $this->listByPagination($query, $requestData, $total_records),
-            $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
-            default => $this->listByOthers($query, $requestData, $total_records),
-        };
+        // The table-level select permission was ensured above and row-level ACL
+        // filters are already baked into the query, so the per-row retrieved check is
+        // redundant for this model; suppress it just for this class while hydrating.
+        $data = RetrievedSelectGuard::without(
+            $model::class,
+            fn (): Collection|int => match (true) {
+                $requestData->page !== null => $this->listByPagination($query, $requestData, $total_records),
+                $requestData->from !== null => $this->listByFromTo($query, $requestData, $total_records),
+                default => $this->listByOthers($query, $requestData, $total_records),
+            },
+        );
 
         if ($is_full_get && $data instanceof Collection) {
             $total_records = $data->count();
@@ -206,11 +213,16 @@ class CrudService
             // own table, regardless of any entity-qualified prefix on the request.
             $field = $this->facetKey($column->name);
 
+            // Real base-table columns count with a portable SQL `GROUP BY` (no rows
+            // hydrated into PHP); computed accessors have no column to group on, so
+            // they fall back to plucking the values and counting them in memory.
+            $is_real_column = $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), $field);
+
             // Both universes stay within the ACL-visible rows: `total` ignores the
             // request filters but not the row-level ACL, `count` applies both.
             $total_query = $model->newQuery();
             $this->auth->applyAclFiltersToQuery($total_query, $permission_name);
-            $totals = $total_query->toBase()->pluck($field)->countBy();
+            $totals = $this->columnValueCounts($total_query, $field, $is_real_column);
 
             $count_query = $model->newQuery();
             $this->auth->applyAclFiltersToQuery($count_query, $permission_name);
@@ -219,7 +231,7 @@ class CrudService
                 $this->query_builder->applyFilters($count_query, $this->excludeFacetField($base->filters, $field));
             }
 
-            $counts = $count_query->toBase()->pluck($field)->countBy();
+            $counts = $this->columnValueCounts($count_query, $field, $is_real_column);
 
             $result[$field] = $totals
                 ->map(static fn (int $occurrences, mixed $value): array => [
@@ -232,6 +244,32 @@ class CrudService
         }
 
         return $result;
+    }
+
+    /**
+     * Count occurrences of each value of a facet field within an ACL-scoped query.
+     *
+     * A real base-table column is counted with a single portable `GROUP BY`
+     * aggregate on the underlying query (nothing hydrated into PHP). A computed
+     * accessor has no column to group on, so it falls back to hydrating the models
+     * and counting the resolved attribute values in memory. Both paths return a
+     * value-keyed map of integer counts.
+     *
+     * @return \Illuminate\Support\Collection<array-key, int>
+     */
+    private function columnValueCounts(Builder $query, string $field, bool $is_real_column): \Illuminate\Support\Collection
+    {
+        if (! $is_real_column) {
+            return $query->get()->pluck($field)->countBy();
+        }
+
+        return $query
+            ->toBase()
+            ->select($field)
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy($field)
+            ->pluck('aggregate', $field)
+            ->map(static fn (mixed $count): int => (int) $count);
     }
 
     /**

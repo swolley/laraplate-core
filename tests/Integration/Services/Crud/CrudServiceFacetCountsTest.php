@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
@@ -14,6 +15,7 @@ use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Tests\Stubs\Crud\FacetAccessorStubModel;
 
 /**
  * @param  array<string,mixed>  $validated
@@ -166,6 +168,35 @@ it('excludes the facet field own filter so its other values stay counted', funct
         ->and($by_value['B']['count'])->toBe(1)
         ->and($by_value['A']['total'])->toBe(2)
         ->and($by_value['B']['total'])->toBe(1);
+});
+
+it('counts a computed accessor facet via the in-memory fallback', function (): void {
+    Schema::create('facet_accessor_stub', function ($table): void {
+        $table->id();
+        $table->integer('tier');
+    });
+
+    $superadmin = facet_login_superadmin();
+
+    FacetAccessorStubModel::query()->create(['tier' => 1]);
+    FacetAccessorStubModel::query()->create(['tier' => 1]);
+    FacetAccessorStubModel::query()->create(['tier' => 2]);
+
+    $service = app(CrudService::class);
+    $request = facet_make_request();
+    $request->setUserResolver(fn (): User => $superadmin);
+
+    // `tier_label` has no backing column, so the SQL GROUP BY path cannot apply and
+    // the counts must be resolved by hydrating rows and reading the accessor.
+    $base = facet_make_list_data(new FacetAccessorStubModel, $request, [new Column('tier_label')]);
+
+    $facets = $service->facetCounts($base);
+    $by_value = collect($facets['tier_label'])->keyBy('value');
+
+    expect($by_value['Tier 1']['total'])->toBe(2)
+        ->and($by_value['Tier 1']['count'])->toBe(2)
+        ->and($by_value['Tier 2']['total'])->toBe(1)
+        ->and($by_value['Tier 2']['count'])->toBe(1);
 });
 
 it('restricts facet counts to the ACL-visible rows', function (): void {

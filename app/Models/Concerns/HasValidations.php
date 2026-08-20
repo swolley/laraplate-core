@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
 use LogicException;
+use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
@@ -172,8 +173,16 @@ trait HasValidations
 
     protected static function bootHasValidations(): void
     {
-        // FIXME: no events before retrieved, so I do the query and then check if the user can read, bit I don't like it
+        // There is no pre-query event, so the select authorization is verified per
+        // hydrated row here — except when a caller that already authorized the select
+        // for this exact class (e.g. the CRUD engine, which ensures the table-level
+        // permission and applies row-level ACL filters before hydrating) suppresses
+        // the now-redundant per-row check for that class only.
         static::retrieved(function (Model $model): void {
+            if (RetrievedSelectGuard::isSuppressed($model::class)) {
+                return;
+            }
+
             throw_unless(static::checkUserCanDo($model, 'select'), AuthorizationException::class, 'User cannot select ' . $model->getTable());
         });
         static::creating(function (Model $model): void {

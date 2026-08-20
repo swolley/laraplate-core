@@ -14,6 +14,7 @@ use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\SortDirection;
 use Modules\Core\Models\Role;
 use App\Models\User;
+use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
@@ -107,6 +108,33 @@ function crud_set_request_data_prop(ListRequestData $request_data, string $name,
     $prop->setAccessible(true);
     $prop->setValue($request_data, $value);
 }
+
+it('suppresses the redundant per-row select check for the main model during list hydration', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    User::factory()->count(3)->create();
+
+    // Capture whether the guard is engaged for each User hydrated by the list query.
+    $captured = [];
+    User::retrieved(function (User $user) use (&$captured): void {
+        $captured[] = RetrievedSelectGuard::isSuppressed(User::class);
+    });
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    $result = $service->list($request_data);
+
+    // The list still hydrates rows, they were hydrated while the guard was active,
+    // and the suppression is fully released once the list call returns.
+    expect($result->data->count())->toBeGreaterThan(0)
+        ->and(in_array(true, $captured, true))->toBeTrue()
+        ->and(RetrievedSelectGuard::isSuppressed(User::class))->toBeFalse();
+});
 
 it('list returns paginated results when page is set', function (): void {
     $superadmin = crud_login_as_superadmin();
