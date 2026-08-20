@@ -34,6 +34,10 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
         Route::delete('/cache-clear/{module}/{entity}', 'clearModelCache')->name('cache-clear');
     });
 
+    // Generic media endpoints for any media-enabled entity. Registered before the
+    // domain-action catch-all below; the extra {id} segment avoids any collision.
+    require __DIR__ . '/media.php';
+
     // Grid routes mirror the CRUD verbs above on a different URI prefix, so they need their own
     // name prefix: duplicate route names break `route:cache` serialization, and `route()` keeps
     // resolving to the first route registered under the name, leaving the later one unreachable.

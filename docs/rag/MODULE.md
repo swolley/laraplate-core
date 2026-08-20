@@ -329,6 +329,12 @@ Traversal is explicit. Requested `relations[]` are the only traversed paths; wit
 
 Providers are optional. `GraphProviderInterface` supplies default relations, summary fields, edge labels, and exclusions. `GraphProviderRulesInterface` can narrow allowed paths, max depth, and per-relation limits. Runtime traversal remains the source of truth for `expand`, `search`, and `stats`; materialized edges are deferred until real benchmarks and an invalidation/freshness strategy justify storage. Stable developer reference: [GRAPH_SYSTEM.md](../GRAPH_SYSTEM.md).
 
+### Media API
+
+Core exposes a generic media HTTP API for any media-enabled owner entity (any model that uses `Core\Helpers\HasMedia` and implements Spatie's `HasMedia` contract). Routes are session-authenticated and mounted inside the `/crud` web group, addressed as `{module}/{entity}/{id}`: `GET /app/crud/media/{module}/{entity}/{id}` (`core.crud.media.list`) lists the record's media grouped by collection name, `POST /app/crud/media/{module}/{entity}/{id}` (`core.crud.media.upload`) adds an uploaded `file` to a `collection` (validated against the model's registered collections; unknown collection → 422; optional `name`, optional `custom_properties[]`), and `DELETE /app/crud/media/{module}/{entity}/{id}/{media}` (`core.crud.media.delete`) removes one media item by id or uuid after verifying it belongs to the record.
+
+Authorization **reuses the owner entity's CRUD permissions** — no media-specific permissions exist: LIST requires the entity's `select`, UPLOAD and DELETE require the entity's `update`, enforced through `AuthorizationService::ensurePermission()` against the owner model's table + connection (same check as the CRUD pipeline). An `AuthorizationException` maps to a 401 envelope like sibling CRUD endpoints; an entity whose model is not media-enabled returns 404. `MediaResource` serializes `id`, `uuid`, `collection_name`, `name`, `file_name`, `mime_type`, `size`, `order_column`, `custom_properties`, `url`, and a `conversions` map (generated conversion name → url) derived generically from the media's own generated conversions.
+
 ```mermaid
 flowchart LR
   Req[Graph request]
