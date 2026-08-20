@@ -34,6 +34,7 @@ use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
 use Filament\Forms\Components\Toggle;
+use Modules\Core\Console\PruneMediaDraftsCommand;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
@@ -242,6 +243,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         $this->app->booted(function (): void {
             $schedule = $this->app->make(Schedule::class);
+
+            $schedule->command(PruneMediaDraftsCommand::class)->daily()->onOneServer();
+
             $crons = [];
             $cache_key = new ReflectionClass(CronJob::class)->newInstanceWithoutConstructor()->getTable();
 

@@ -39,15 +39,6 @@ abstract class MediaRequest extends CrudRequest
         return $this->model;
     }
 
-    /**
-     * Load the concrete owner record the media belongs to, respecting the
-     * model's connection. A missing row surfaces as a 404.
-     */
-    public function mediaRecord(): Model
-    {
-        return $this->mediaModel()->newQuery()->findOrFail($this->route('id'));
-    }
-
     #[Override]
     protected function prepareForValidation(): void
     {

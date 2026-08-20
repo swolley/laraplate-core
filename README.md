@@ -583,7 +583,8 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [spatie/laravel-medialibrary](https://github.com/spatie/laravel-medialibrary): Media handling for models.
     -   Core owns the media foundation: the shared `vend_media` table (guarded migration), the app-wide `media_model` (`Modules\Core\Models\Media`, soft-delete + version aware with a computed `expires_at`), the `file_namer` (`Modules\Core\Helpers\MediaFileNamer`), and the generic soft-delete-aware lifecycle trait `Modules\Core\Helpers\HasMedia`. Any module that needs attachments uses `HasMedia`; rows live in `vend_media`. The full `config/media-library.php` is Core-owned.
-    -   Env: `MEDIA_DISK` (default `media-library`), `MAX_FILE_SIZE` (bytes, default 10MB), `MEDIA_QUEUE` (default `media-library`), `QUEUE_CONVERSIONS_BY_DEFAULT`, `QUEUE_CONVERSIONS_AFTER_DB_COMMIT`, `IMAGE_DRIVER` (default `imagick`), `FFMPEG_PATH`, `FFPROBE_PATH`, `MEDIA_DOWNLOADER_SSL`, `MEDIA_PREFIX`.
+    -   Core also exposes a generic media HTTP API (`core.crud.media.*`) with a token-keyed pending bucket (`Modules\Core\Models\MediaDraft`, table `core_media_drafts`) for CREATE forms; stale drafts are pruned daily by `core:prune-media-drafts`.
+    -   Env: `MEDIA_DISK` (default `media-library`), `MAX_FILE_SIZE` (bytes, default 10MB), `MEDIA_QUEUE` (default `media-library`), `QUEUE_CONVERSIONS_BY_DEFAULT`, `QUEUE_CONVERSIONS_AFTER_DB_COMMIT`, `IMAGE_DRIVER` (default `imagick`), `FFMPEG_PATH`, `FFPROBE_PATH`, `MEDIA_DOWNLOADER_SSL`, `MEDIA_PREFIX`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL in hours, default 24).
 
 -   **Logging and Monitoring:**
 
@@ -631,7 +632,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 ### Environment (principali variabili)
 
 -   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
--   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`.
+-   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24).
 -   Search: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (embeddings generation requires AI module).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE`, `QUEUE_CONNECTION=failover`, `FILESYSTEM_DISK`, `LOG_*`.
 

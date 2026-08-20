@@ -54,6 +54,16 @@ return [
         'tabs_counts_ttl_seconds' => env('FILAMENT_TABS_COUNTS_TTL_SECONDS', 60),
     ],
 
+    'media' => [
+        /**
+         * Time-to-live, in hours, for pending media drafts (the token-keyed bucket
+         * that backs CREATE forms). Drafts older than this are pruned, together with
+         * their staged media, by the core:prune-media-drafts command.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'draft_ttl_hours' => (int) env('CORE_MEDIA_DRAFT_TTL_HOURS', 24),
+    ],
+
     'acl' => [
         /**
          * Maximum number of users for targeted ACL cache invalidation.

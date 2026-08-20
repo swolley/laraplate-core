@@ -26,6 +26,7 @@ enum CoreTables: string
     case RecordOrigins = 'core_record_origins';
     case OutboxEvents = 'core_outbox_events';
     case SeedRuns = 'core_seed_runs';
+    case MediaDrafts = 'core_media_drafts';
 
     // generic or vendors models
     case Roles = 'vend_roles';
