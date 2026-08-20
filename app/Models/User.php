@@ -50,6 +50,7 @@ use UnexpectedValueException;
  * @property string|null $name
  * @property string $email
  * @property BelongsToMany $roles
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
@@ -79,6 +80,17 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     protected $table = CoreTables::Users->value;
 
     /**
+     * Default attribute values, so a fresh or partially-hydrated instance always
+     * exposes the onboarding flag and preferences bag (strict attribute access).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_first_login' => true,
+        'preferences' => null,
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -99,6 +111,7 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         'social_token',
         'social_refresh_token',
         'social_token_secret',
+        'preferences',
     ];
 
     /**
@@ -426,6 +439,8 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
             'password' => 'hashed',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
+            'is_first_login' => 'boolean',
+            'preferences' => 'array',
         ];
     }
 

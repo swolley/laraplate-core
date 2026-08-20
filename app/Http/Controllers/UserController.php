@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Actions\Users\ImpersonateUserAction;
 use Modules\Core\Actions\Users\LeaveImpersonationAction;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\ImpersonationRequest;
+use Modules\Core\Http\Requests\UpdatePreferencesRequest;
 use Modules\Core\Http\Resources\UserInfoResponse;
 
 final class UserController extends Controller
@@ -101,5 +102,37 @@ final class UserController extends Controller
         return Auth::user()
             ? response()->json(['message' => 'Session maintained successfully.'])
             : response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    /**
+     * Persist the caller's own UI preferences and echo back the refreshed profile.
+     */
+    public function updatePreferences(UpdatePreferencesRequest $request): \Illuminate\Http\JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        // Self-service write on the caller's own row: bypass the CRUD `update`
+        // authorization + versioning events, which gate admins editing other users.
+        $user->forceFill(['preferences' => $request->validated()['preferences']])->saveQuietly();
+
+        return new ResponseBuilder($request)
+            ->setData(($this->getUserInfoAction)($user))
+            ->json();
+    }
+
+    /**
+     * Mark the caller's onboarding flow as done and echo back the refreshed profile.
+     */
+    public function completeFirstLogin(Request $request): \Illuminate\Http\JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->forceFill(['is_first_login' => false])->saveQuietly();
+
+        return new ResponseBuilder($request)
+            ->setData(($this->getUserInfoAction)($user))
+            ->json();
     }
 }

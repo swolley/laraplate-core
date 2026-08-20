@@ -13,6 +13,9 @@ Route::controller(UserController::class)->name('auth.')->group(function (): void
     Route::get('/user/profile-information', 'userInfo')
         ->withoutMiddleware([Authenticate::class])
         ->name('userInfo');
+    // Self-service profile writes on the caller's own row (auth-gated by the group).
+    Route::patch('/user/preferences', 'updatePreferences')->name('updatePreferences');
+    Route::patch('/user/first-login-complete', 'completeFirstLogin')->name('completeFirstLogin');
     Route::post('/impersonate', 'impersonate')->can('impersonate')->name('impersonate');
     Route::post('/leave-impersonate', 'leaveImpersonate')->can('impersonate')->name('leaveImpersonate');
     // Route::patch('/configs', 'updateConfigs')->can('edit')->name('updateConfigs');

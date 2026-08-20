@@ -29,7 +29,7 @@ test('user info keeps session stack but allows guests', function (): void {
 
     expect($route)->not->toBeNull()
         ->and($route->gatherMiddleware())->toContain('auth')
-        ->and($route->excludedMiddleware())->toContain(\Illuminate\Auth\Middleware\Authenticate::class);
+        ->and($route->excludedMiddleware())->toContain(Illuminate\Auth\Middleware\Authenticate::class);
 
     $this->getJson(route('core.auth.userInfo'))
         ->assertOk()
@@ -263,4 +263,57 @@ test('user info returns correct groups structure', function (): void {
                 'groups' => [],
             ],
         ]);
+});
+
+test('user info exposes the onboarding flag and persisted preferences', function (): void {
+    $this->actingAs($this->user);
+
+    $this->getJson(route('core.auth.userInfo'))
+        ->assertOk()
+        ->assertJsonStructure(['data' => ['isFirstLogin', 'preferences']])
+        // A fresh factory account still needs onboarding.
+        ->assertJsonPath('data.isFirstLogin', true);
+});
+
+test('update preferences persists the caller preferences without an update permission', function (): void {
+    // The user holds no CRUD permissions; a self-service write must still succeed.
+    $this->actingAs($this->user);
+
+    $this->patchJson(route('core.auth.updatePreferences'), [
+        'preferences' => ['theme' => 'dark', 'density' => 'compact'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.preferences.theme', 'dark')
+        ->assertJsonPath('data.preferences.density', 'compact');
+
+    expect($this->user->refresh()->preferences)->toBe(['theme' => 'dark', 'density' => 'compact']);
+});
+
+test('update preferences rejects a non-array payload', function (): void {
+    $this->actingAs($this->user);
+
+    $this->patchJson(route('core.auth.updatePreferences'), ['preferences' => 'nope'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['preferences']);
+});
+
+test('update preferences requires authentication', function (): void {
+    $this->patchJson(route('core.auth.updatePreferences'), ['preferences' => []])
+        ->assertStatus(401);
+});
+
+test('complete first login flips the flag to false', function (): void {
+    $this->actingAs($this->user);
+    expect($this->user->is_first_login)->toBeTrue();
+
+    $this->patchJson(route('core.auth.completeFirstLogin'))
+        ->assertOk()
+        ->assertJsonPath('data.isFirstLogin', false);
+
+    expect($this->user->refresh()->is_first_login)->toBeFalse();
+});
+
+test('complete first login requires authentication', function (): void {
+    $this->patchJson(route('core.auth.completeFirstLogin'))
+        ->assertStatus(401);
 });

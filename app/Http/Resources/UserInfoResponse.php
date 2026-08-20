@@ -42,6 +42,10 @@ final class UserInfoResponse extends JsonResource
                 'groups' => $roles,
                 'canImpersonate' => $this->resource->canImpersonate(),
                 'permissions' => $permissions,
+                // Whether the onboarding flow still applies, and the server-persisted
+                // UI preferences the SPA rehydrates its chrome from.
+                'isFirstLogin' => (bool) $this->resource->is_first_login,
+                'preferences' => (object) ($this->resource->preferences ?? []),
             ];
         }
 
@@ -54,6 +58,8 @@ final class UserInfoResponse extends JsonResource
             'groups' => [],
             'canImpersonate' => false,
             'permissions' => [],
+            'isFirstLogin' => false,
+            'preferences' => (object) [],
         ];
     }
 }
