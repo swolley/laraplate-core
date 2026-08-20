@@ -30,7 +30,10 @@ class ListRequestData extends SelectRequestData
 
     /**
      * Whether the paginated list should compute the exact total (`COUNT(*)`).
-     * When false, the page path skips the count and reports `hasMore` instead.
+     * The real (parsed) default is false — the page path skips the count and
+     * reports `hasMore` instead; opt in with `totals=true` for page numbers.
+     * The property initializer is only the fallback when the DTO is built without
+     * the constructor (e.g. reflection in tests), where counted stays the default.
      */
     public protected(set) bool $totals = true;
 
@@ -61,7 +64,7 @@ class ListRequestData extends SelectRequestData
         }
 
         $this->count = isset($validated['count']) && (bool) $validated['count'];
-        $this->totals = ! array_key_exists('totals', $validated) || (bool) $validated['totals'];
+        $this->totals = array_key_exists('totals', $validated) && (bool) $validated['totals'];
         $this->sort = $this->conformSorts(self::sortInput($validated['sort'] ?? []));
         $this->relations = $this->conformRelations(self::stringList($validated['relations'] ?? []));
 

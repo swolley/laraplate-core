@@ -408,6 +408,10 @@ class CrudController extends Controller
                 $builder->setHasMore($result->meta->hasMore);
             }
 
+            if ($result->meta->mode !== null) {
+                $builder->setMode($result->meta->mode);
+            }
+
             if ($result->meta->class !== null) {
                 $builder->setClass($result->meta->class);
             }

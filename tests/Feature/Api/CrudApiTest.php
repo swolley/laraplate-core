@@ -96,35 +96,38 @@ test('api select returns data for valid entity', function (): void {
         ]);
 });
 
-test('api list look-ahead exposes hasMore and omits the total when totals=false', function (): void {
+test('api list defaults to look-ahead: hasMore, lookahead mode, no total', function (): void {
     User::factory()->count(5)->create();
 
+    // No `totals` param: the default is now look-ahead (no COUNT).
     $response = $this->getJson(route('core.api.list', coreCrudRouteParams('users') + [
         'page' => 1,
         'pagination' => 2,
-        'totals' => 0,
     ]));
 
     $response->assertStatus(200)
         ->assertJsonPath('meta.hasMore', true)
+        ->assertJsonPath('meta.mode', 'lookahead')
         ->assertJsonMissingPath('meta.totalRecords')
         ->assertJsonMissingPath('meta.totalPages');
 
     expect($response->json('data'))->toHaveCount(2);
 });
 
-test('api list keeps the exact total by default and reports no hasMore', function (): void {
+test('api list computes the exact total and counted mode when totals=true', function (): void {
     User::factory()->count(5)->create();
 
     $response = $this->getJson(route('core.api.list', coreCrudRouteParams('users') + [
         'page' => 1,
         'pagination' => 2,
+        'totals' => 1,
     ]));
 
     // 5 factory users + the acting superadmin = 6 rows, 3 pages of 2.
     $response->assertStatus(200)
         ->assertJsonPath('meta.totalRecords', 6)
         ->assertJsonPath('meta.totalPages', 3)
+        ->assertJsonPath('meta.mode', 'counted')
         ->assertJsonMissingPath('meta.hasMore');
 });
 

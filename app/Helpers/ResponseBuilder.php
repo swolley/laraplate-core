@@ -13,6 +13,7 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use UnexpectedValueException;
@@ -38,6 +39,8 @@ class ResponseBuilder
     private ?int $to = null;
 
     private ?bool $hasMore = null;
+
+    private ?PaginationMode $mode = null;
 
     private ?string $class = null;
 
@@ -296,6 +299,16 @@ class ResponseBuilder
         return $this;
     }
 
+    /**
+     * Set the pagination counting mode advertised to the client.
+     */
+    public function setMode(?PaginationMode $mode): self
+    {
+        $this->mode = $mode;
+
+        return $this;
+    }
+
     public function getClass(): ?string
     {
         return $this->class;
@@ -513,6 +526,10 @@ class ResponseBuilder
 
             if ($this->hasMore !== null) {
                 $payload['meta']['hasMore'] = $this->hasMore;
+            }
+
+            if ($this->mode instanceof PaginationMode) {
+                $payload['meta']['mode'] = $this->mode->value;
             }
         }
 

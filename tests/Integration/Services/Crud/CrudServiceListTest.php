@@ -18,6 +18,7 @@ use Modules\Core\Casts\SortDirection;
 use Modules\Core\Models\Role;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Modules\Core\Services\Crud\QueryBuilder;
 
 /**
@@ -170,6 +171,7 @@ it('look-ahead pagination reports hasMore without a COUNT and skips the total', 
     expect($count_queries)->toBeEmpty()
         ->and($result->data->count())->toBe(10)
         ->and($result->meta->hasMore)->toBeTrue()
+        ->and($result->meta->mode)->toBe(PaginationMode::Lookahead)
         ->and($result->meta->totalRecords)->toBeNull()
         ->and($result->meta->totalPages)->toBeNull();
 });
@@ -196,10 +198,11 @@ it('look-ahead pagination reports hasMore false on the last page', function (): 
 
     expect($result->data->count())->toBe(1)
         ->and($result->meta->hasMore)->toBeFalse()
+        ->and($result->meta->mode)->toBe(PaginationMode::Lookahead)
         ->and($result->meta->totalRecords)->toBeNull();
 });
 
-it('default pagination still computes the exact total and no hasMore', function (): void {
+it('totals=true computes the exact total and reports the counted mode', function (): void {
     $superadmin = crud_login_as_superadmin();
 
     User::factory()->count(30)->create();
@@ -211,15 +214,16 @@ it('default pagination still computes the exact total and no hasMore', function 
         new Column('users.id', ColumnType::Column),
     ]);
 
-    foreach (['page' => 1, 'pagination' => 10, 'skip' => 0, 'take' => 10, 'from' => 1, 'to' => 10] as $prop => $value) {
+    foreach (['page' => 1, 'pagination' => 10, 'skip' => 0, 'take' => 10, 'from' => 1, 'to' => 10, 'totals' => true] as $prop => $value) {
         crud_set_request_data_prop($request_data, $prop, $value);
     }
 
     $result = $service->list($request_data);
 
-    // totals defaults to true: exact count preserved, hasMore stays null.
+    // Exact count preserved, counted mode advertised, hasMore stays null.
     expect($result->meta->totalRecords)->toBe(31)
         ->and($result->meta->totalPages)->toBe(4)
+        ->and($result->meta->mode)->toBe(PaginationMode::Counted)
         ->and($result->meta->hasMore)->toBeNull();
 });
 

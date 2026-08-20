@@ -26,6 +26,11 @@ readonly class CrudMeta
          * Whether a further page exists, set only when the exact total was skipped (`totals=false`).
          */
         public ?bool $hasMore = null,
+        /**
+         * Explicit pagination-counting mode, set on paginated (`page`) responses so the
+         * client renders the right footer without inferring it from field presence.
+         */
+        public ?PaginationMode $mode = null,
         public ?string $class = null,
         public ?string $table = null,
         public ?CarbonInterface $cachedAt = null,

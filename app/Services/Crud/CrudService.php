@@ -63,6 +63,7 @@ use Modules\Core\Services\Crud\DTOs\FacetLabelSource;
 use Modules\Core\Services\Crud\DTOs\FacetPage;
 use Modules\Core\Services\Crud\DTOs\FacetQuery;
 use Modules\Core\Services\Crud\DTOs\FacetSort;
+use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
@@ -186,6 +187,14 @@ class CrudService
             $data = $this->applyGroupBy($data, $requestData->group_by);
         }
 
+        // A paginated (`page`) response advertises its counting mode explicitly so the
+        // client can pick its footer; non-paginated responses leave it null.
+        $mode = match (true) {
+            $look_ahead => PaginationMode::Lookahead,
+            $requestData->page !== null => PaginationMode::Counted,
+            default => null,
+        };
+
         $meta = new CrudMeta(
             totalRecords: $look_ahead ? null : $total_records,
             currentRecords: $current_records,
@@ -195,6 +204,7 @@ class CrudService
             from: $requestData->from,
             to: $requestData->to,
             hasMore: $has_more,
+            mode: $mode,
             class: $model::class,
             table: $model->getTable(),
             cachedAt: Date::now(),
