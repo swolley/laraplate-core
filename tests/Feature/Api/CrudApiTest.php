@@ -96,6 +96,38 @@ test('api select returns data for valid entity', function (): void {
         ]);
 });
 
+test('api list look-ahead exposes hasMore and omits the total when totals=false', function (): void {
+    User::factory()->count(5)->create();
+
+    $response = $this->getJson(route('core.api.list', coreCrudRouteParams('users') + [
+        'page' => 1,
+        'pagination' => 2,
+        'totals' => 0,
+    ]));
+
+    $response->assertStatus(200)
+        ->assertJsonPath('meta.hasMore', true)
+        ->assertJsonMissingPath('meta.totalRecords')
+        ->assertJsonMissingPath('meta.totalPages');
+
+    expect($response->json('data'))->toHaveCount(2);
+});
+
+test('api list keeps the exact total by default and reports no hasMore', function (): void {
+    User::factory()->count(5)->create();
+
+    $response = $this->getJson(route('core.api.list', coreCrudRouteParams('users') + [
+        'page' => 1,
+        'pagination' => 2,
+    ]));
+
+    // 5 factory users + the acting superadmin = 6 rows, 3 pages of 2.
+    $response->assertStatus(200)
+        ->assertJsonPath('meta.totalRecords', 6)
+        ->assertJsonPath('meta.totalPages', 3)
+        ->assertJsonMissingPath('meta.hasMore');
+});
+
 test('api detail returns specific record', function (): void {
     $response = $this->getJson(route('core.api.detail', [
         ...coreCrudRouteParams('users'),

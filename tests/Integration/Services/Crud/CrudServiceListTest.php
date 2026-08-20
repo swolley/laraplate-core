@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\Filter;
@@ -13,12 +16,9 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\SortDirection;
 use Modules\Core\Models\Role;
-use App\Models\User;
-use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
-
 
 /**
  * @param  array<string,mixed>  $validated
@@ -134,6 +134,93 @@ it('suppresses the redundant per-row select check for the main model during list
     expect($result->data->count())->toBeGreaterThan(0)
         ->and(in_array(true, $captured, true))->toBeTrue()
         ->and(RetrievedSelectGuard::isSuppressed(User::class))->toBeFalse();
+});
+
+it('look-ahead pagination reports hasMore without a COUNT and skips the total', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    User::factory()->count(30)->create();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    foreach (['page' => 1, 'pagination' => 10, 'skip' => 0, 'take' => 10, 'from' => 1, 'to' => 10, 'totals' => false] as $prop => $value) {
+        crud_set_request_data_prop($request_data, $prop, $value);
+    }
+
+    $connection = (new User())->getConnectionName();
+    DB::connection($connection)->flushQueryLog();
+    DB::connection($connection)->enableQueryLog();
+
+    $result = $service->list($request_data);
+
+    $queries = DB::connection($connection)->getQueryLog();
+    DB::connection($connection)->disableQueryLog();
+
+    $count_queries = collect($queries)->filter(
+        fn (array $entry): bool => preg_match('/select count\(\*\)/i', (string) $entry['query']) === 1,
+    );
+
+    // No COUNT(*) is issued, the page is trimmed back to its size, and meta reports
+    // hasMore in place of the (skipped) exact total.
+    expect($count_queries)->toBeEmpty()
+        ->and($result->data->count())->toBe(10)
+        ->and($result->meta->hasMore)->toBeTrue()
+        ->and($result->meta->totalRecords)->toBeNull()
+        ->and($result->meta->totalPages)->toBeNull();
+});
+
+it('look-ahead pagination reports hasMore false on the last page', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    // 30 factory users + the superadmin = 31 visible rows.
+    User::factory()->count(30)->create();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    // Page 4 of 10 spans rows 31..40, so only the 31st row exists: no further page.
+    foreach (['page' => 4, 'pagination' => 10, 'skip' => 30, 'take' => 10, 'from' => 31, 'to' => 40, 'totals' => false] as $prop => $value) {
+        crud_set_request_data_prop($request_data, $prop, $value);
+    }
+
+    $result = $service->list($request_data);
+
+    expect($result->data->count())->toBe(1)
+        ->and($result->meta->hasMore)->toBeFalse()
+        ->and($result->meta->totalRecords)->toBeNull();
+});
+
+it('default pagination still computes the exact total and no hasMore', function (): void {
+    $superadmin = crud_login_as_superadmin();
+
+    User::factory()->count(30)->create();
+
+    $service = new CrudService(app(AuthorizationService::class), new QueryBuilder());
+    $request = crud_make_validated_request();
+    $request->setUserResolver(fn () => $superadmin);
+    $request_data = crud_make_list_request_data(new User(), $request, [
+        new Column('users.id', ColumnType::Column),
+    ]);
+
+    foreach (['page' => 1, 'pagination' => 10, 'skip' => 0, 'take' => 10, 'from' => 1, 'to' => 10] as $prop => $value) {
+        crud_set_request_data_prop($request_data, $prop, $value);
+    }
+
+    $result = $service->list($request_data);
+
+    // totals defaults to true: exact count preserved, hasMore stays null.
+    expect($result->meta->totalRecords)->toBe(31)
+        ->and($result->meta->totalPages)->toBe(4)
+        ->and($result->meta->hasMore)->toBeNull();
 });
 
 it('list returns paginated results when page is set', function (): void {
@@ -282,7 +369,7 @@ it('list skips the redundant count query when the full result set is materialize
     ]);
 
     $count_queries = 0;
-    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
+    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
         if (str_contains($query->sql, 'count(*)') && str_contains($query->sql, '"users"')) {
             $count_queries++;
         }
@@ -313,7 +400,7 @@ it('list still issues the count query when a limit caps the result set', functio
     (new ReflectionProperty($request_data, 'take'))->setValue($request_data, 4);
 
     $count_queries = 0;
-    \Illuminate\Support\Facades\DB::listen(static function (\Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
+    DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use (&$count_queries): void {
         if (str_contains($query->sql, 'count(*)') && str_contains($query->sql, '"users"')) {
             $count_queries++;
         }
@@ -343,7 +430,7 @@ it('reports currentRecords as the number of records even when group_by collapses
 
     crud_set_request_data_prop($request_data, 'filters', new FiltersGroup(
         filters: [new Filter('users.name', 'Shared Name', FilterOperator::Equals)],
-        operator: \Modules\Core\Casts\WhereClause::And,
+        operator: Modules\Core\Casts\WhereClause::And,
     ));
     crud_set_request_data_prop($request_data, 'group_by', ['name']);
 

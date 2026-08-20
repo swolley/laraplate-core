@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Modules\Core\Authorization\RetrievedSelectGuard;
 use Illuminate\Database\Query\Builder as BaseQueryBuilder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,6 +27,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Fluent;
 use InvalidArgumentException;
 use LogicException;
+use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
@@ -136,7 +136,14 @@ class CrudService
             && ! isset($requestData->limit)
             && ! $requestData->count;
 
-        $total_records = $is_full_get ? 0 : $query->count();
+        // Paginated request that opted out of the exact total (`totals=false`): skip
+        // the COUNT(*) entirely and rely on the over-fetched look-ahead row to report
+        // whether a further page exists. Sort-agnostic, so it works for any ordering.
+        $look_ahead = $requestData->page !== null
+            && ! $requestData->totals
+            && ! $requestData->count;
+
+        $total_records = ($is_full_get || $look_ahead) ? 0 : $query->count();
 
         // The table-level select permission was ensured above and row-level ACL
         // filters are already baked into the query, so the per-row retrieved check is
@@ -154,6 +161,19 @@ class CrudService
             $total_records = $data->count();
         }
 
+        // Look-ahead: an over-fetched extra row proves a further page exists. Record
+        // it, then trim back to the requested page size before anything else sees it.
+        $has_more = null;
+
+        if ($look_ahead && $data instanceof Collection) {
+            $per_page = max(1, $requestData->pagination);
+            $has_more = $per_page < $data->count();
+
+            if ($has_more) {
+                $data = $data->take($per_page)->values();
+            }
+        }
+
         $this->applyComputedMethods($data, $requestData);
 
         // The number of records in the current page is the count of the fetched rows.
@@ -167,13 +187,14 @@ class CrudService
         }
 
         $meta = new CrudMeta(
-            totalRecords: $total_records,
+            totalRecords: $look_ahead ? null : $total_records,
             currentRecords: $current_records,
             currentPage: $requestData->page,
-            totalPages: $requestData->page !== null ? $requestData->calculateTotalPages($total_records) : null,
+            totalPages: ($requestData->page !== null && ! $look_ahead) ? $requestData->calculateTotalPages($total_records) : null,
             pagination: $requestData->pagination,
             from: $requestData->from,
             to: $requestData->to,
+            hasMore: $has_more,
             class: $model::class,
             table: $model->getTable(),
             cachedAt: Date::now(),
@@ -244,32 +265,6 @@ class CrudService
         }
 
         return $result;
-    }
-
-    /**
-     * Count occurrences of each value of a facet field within an ACL-scoped query.
-     *
-     * A real base-table column is counted with a single portable `GROUP BY`
-     * aggregate on the underlying query (nothing hydrated into PHP). A computed
-     * accessor has no column to group on, so it falls back to hydrating the models
-     * and counting the resolved attribute values in memory. Both paths return a
-     * value-keyed map of integer counts.
-     *
-     * @return \Illuminate\Support\Collection<array-key, int>
-     */
-    private function columnValueCounts(Builder $query, string $field, bool $is_real_column): \Illuminate\Support\Collection
-    {
-        if (! $is_real_column) {
-            return $query->get()->pluck($field)->countBy();
-        }
-
-        return $query
-            ->toBase()
-            ->select($field)
-            ->selectRaw('count(*) as aggregate')
-            ->groupBy($field)
-            ->pluck('aggregate', $field)
-            ->map(static fn (mixed $count): int => (int) $count);
     }
 
     /**
@@ -976,6 +971,32 @@ class CrudService
                 cachedAt: Date::now(),
             ),
         );
+    }
+
+    /**
+     * Count occurrences of each value of a facet field within an ACL-scoped query.
+     *
+     * A real base-table column is counted with a single portable `GROUP BY`
+     * aggregate on the underlying query (nothing hydrated into PHP). A computed
+     * accessor has no column to group on, so it falls back to hydrating the models
+     * and counting the resolved attribute values in memory. Both paths return a
+     * value-keyed map of integer counts.
+     *
+     * @return \Illuminate\Support\Collection<array-key, int>
+     */
+    private function columnValueCounts(Builder $query, string $field, bool $is_real_column): \Illuminate\Support\Collection
+    {
+        if (! $is_real_column) {
+            return $query->get()->pluck($field)->countBy();
+        }
+
+        return $query
+            ->toBase()
+            ->select($field)
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy($field)
+            ->pluck('aggregate', $field)
+            ->map(static fn (mixed $count): int => (int) $count);
     }
 
     /**

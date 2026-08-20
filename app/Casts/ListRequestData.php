@@ -29,6 +29,12 @@ class ListRequestData extends SelectRequestData
     public protected(set) bool $count;
 
     /**
+     * Whether the paginated list should compute the exact total (`COUNT(*)`).
+     * When false, the page path skips the count and reports `hasMore` instead.
+     */
+    public protected(set) bool $totals = true;
+
+    /**
      * @var array<int, Sort>
      */
     public protected(set) array $sort;
@@ -55,6 +61,7 @@ class ListRequestData extends SelectRequestData
         }
 
         $this->count = isset($validated['count']) && (bool) $validated['count'];
+        $this->totals = ! array_key_exists('totals', $validated) || (bool) $validated['totals'];
         $this->sort = $this->conformSorts(self::sortInput($validated['sort'] ?? []));
         $this->relations = $this->conformRelations(self::stringList($validated['relations'] ?? []));
 

@@ -404,6 +404,10 @@ class CrudController extends Controller
                 $builder->setTo($result->meta->to);
             }
 
+            if ($result->meta->hasMore !== null) {
+                $builder->setHasMore($result->meta->hasMore);
+            }
+
             if ($result->meta->class !== null) {
                 $builder->setClass($result->meta->class);
             }

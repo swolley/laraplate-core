@@ -24,7 +24,14 @@ trait HasCrudOperations
      */
     protected function listByPagination(Builder $query, ListRequestData $filters, int $totalRecords): Collection
     {
-        $query->skip($filters->from - 1)->take($filters->to - $filters->from + 1);
+        $per_page = $filters->to - $filters->from + 1;
+
+        // Look-ahead mode: with the exact total skipped (`totals=false`), over-fetch
+        // by one row so the caller can tell whether a further page exists without a
+        // separate COUNT(*). The extra row is trimmed by the caller.
+        $take = $filters->totals ? $per_page : $per_page + 1;
+
+        $query->skip($filters->from - 1)->take($take);
 
         return $query->get();
     }

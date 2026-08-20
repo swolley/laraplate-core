@@ -37,6 +37,8 @@ class ResponseBuilder
 
     private ?int $to = null;
 
+    private ?bool $hasMore = null;
+
     private ?string $class = null;
 
     private ?string $table = null;
@@ -284,6 +286,16 @@ class ResponseBuilder
         return $this;
     }
 
+    /**
+     * Set whether a further page exists (look-ahead pagination, `totals=false`).
+     */
+    public function setHasMore(?bool $hasMore): self
+    {
+        $this->hasMore = $hasMore;
+
+        return $this;
+    }
+
     public function getClass(): ?string
     {
         return $this->class;
@@ -497,6 +509,10 @@ class ResponseBuilder
                     $count = $this->resourceResponse->resource->count();
                     $payload['meta']['to'] = $count < $this->to - $this->from + 1 ? $this->from + $count - 1 : $this->to;
                 }
+            }
+
+            if ($this->hasMore !== null) {
+                $payload['meta']['hasMore'] = $this->hasMore;
             }
         }
 

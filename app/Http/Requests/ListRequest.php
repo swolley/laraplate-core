@@ -15,6 +15,7 @@ use Override;
  * @property ?int $to
  * @property ?int $limit
  * @property ?bool $count
+ * @property ?bool $totals
  * @property ?array<list{property:string,direction:string}> $sort
  * @property array<int, list{property:string,value:mixed}> $filters
  * @property ?array $group_by
@@ -34,6 +35,7 @@ class ListRequest extends SelectRequest
             'to' => ['integer', 'numeric', 'min:1', 'exclude_if:count,true'],
             'limit' => ['integer', 'numeric', 'min:1', 'exclude_if:count,true'],
             'count' => ['boolean'],
+            'totals' => ['boolean'],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'filters' => [new QueryBuilder()],

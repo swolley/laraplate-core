@@ -301,6 +301,8 @@ flowchart LR
 
 `CrudService` is the unified entry for list/detail/history/tree/search/insert/update/delete. Each read operation runs in this order: (1) `AuthorizationService::ensurePermission()` (super-admin bypass + `hasPermissionTo`), (2) `AuthorizationService::injectAclFilters()` which merges the resolved `FiltersGroup` (AND with caller filters) into request data, (3) `QueryBuilder::prepareQuery()` builds the Eloquent query (filters/sort/relations/cursor), (4) execution either by pagination, range, or others, with optional `applyComputedMethods` and `applyGroupBy`, returning a `CrudResult` with `CrudMeta`. Write operations stack lock checks (`HasLocks`/`HasOptimisticLocking`) and approval routing (`RequiresApproval`).
 
+**List counting modes.** A paginated list (`page`) computes the exact total with a separate `COUNT(*)` and returns `totalRecords`/`totalPages` in `CrudMeta`. Pass `totals=false` to skip that count on the page path: the engine over-fetches one row (`pagination + 1`), trims it, and returns `hasMore` instead (`totalRecords`/`totalPages` are `null`/omitted). This is sort-agnostic — it works for any ordering, unlike keyset cursors — and suits infinite-scroll / "load more" UIs; numbered-page UIs simply omit the flag. A full `get` (no `page`/`from`/`limit`/`count`) already derives the total from the fetched rows without a `COUNT(*)`. Facet distribution counts (`facetCounts`) group real base-table columns in SQL and fall back to an in-memory count only for computed accessors.
+
 ```mermaid
 flowchart LR
   Req[CrudService.list req data]

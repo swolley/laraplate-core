@@ -22,10 +22,16 @@ readonly class CrudMeta
         public ?int $pagination = null,
         public ?int $from = null,
         public ?int $to = null,
+        /**
+         * Whether a further page exists, set only when the exact total was skipped (`totals=false`).
+         */
+        public ?bool $hasMore = null,
         public ?string $class = null,
         public ?string $table = null,
         public ?CarbonInterface $cachedAt = null,
-        /** @var array<string, mixed> */
+        /**
+         * @var array<string, mixed>
+         */
         public array $search = [],
     ) {}
 }
