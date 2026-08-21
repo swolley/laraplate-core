@@ -232,7 +232,7 @@ final class AuthorizationService
     /**
      * Whether the user holds at least one permission on the module's entities.
      *
-     * The `permissions` table carries a generated `module` column (the table's
+     * The `permissions` table carries a generated `module_name` column (the table's
      * prefix before the first underscore, e.g. `sao_tickets` -> `sao`), so module
      * access is a single indexed lookup rather than parsing permission names in
      * PHP. Checks direct permissions then permissions granted via the user's
@@ -246,7 +246,7 @@ final class AuthorizationService
             return true;
         }
 
-        if ($user->permissions()->where('module', $scope)->exists()) {
+        if ($user->permissions()->where('module_name', $scope)->exists()) {
             return true;
         }
 
@@ -257,7 +257,7 @@ final class AuthorizationService
         }
 
         return Permission::query()
-            ->where('module', $scope)
+            ->where('module_name', $scope)
             ->whereHas('roles', static fn (Builder $query): Builder => $query->whereKey($role_ids->all()))
             ->exists();
     }
