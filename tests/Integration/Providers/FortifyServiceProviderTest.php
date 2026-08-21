@@ -8,10 +8,44 @@ use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Auth\Services\AuthenticationService;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Providers\FortifyServiceProvider;
+use Spatie\Permission\PermissionRegistrar;
+
+/** An AuthenticationService whose single provider authenticates `$user` successfully. */
+function scopeAuthService(User $user): AuthenticationService
+{
+    return new AuthenticationService([
+        new class($user) implements IAuthenticationProvider
+        {
+            public function __construct(private User $user) {}
+
+            public function canHandle(Request $request): bool
+            {
+                return true;
+            }
+
+            public function authenticate(Request $request): array
+            {
+                return ['success' => true, 'user' => $this->user, 'error' => null, 'license' => null];
+            }
+
+            public function isEnabled(): bool
+            {
+                return true;
+            }
+
+            public function getProviderName(): string
+            {
+                return 'test';
+            }
+        },
+    ]);
+}
 
 
 beforeEach(function (): void {
@@ -229,4 +263,58 @@ it('returns null when authentication service reports failure', function (): void
     $result = $callback($request);
 
     expect($result)->toBeNull();
+});
+
+it('allows a scoped login when the user holds a permission on the module', function (): void {
+    $this->provider->register();
+    $user = User::factory()->create();
+    Permission::findOrCreate('default.sao_tickets.select', 'web');
+    $user->givePermissionTo('default.sao_tickets.select');
+    app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+    app()->instance(AuthenticationService::class, scopeAuthService($user));
+    $this->provider->boot();
+
+    $session = app('session')->driver();
+    $session->start();
+    $request = Request::create('/', 'POST', ['scope' => 'sao']);
+    $request->setLaravelSession($session);
+    $callback = Fortify::$authenticateUsingCallback;
+
+    expect($callback($request))->toBe($user);
+});
+
+it('denies a scoped login when the user has no permission on the module', function (): void {
+    $this->provider->register();
+    $user = User::factory()->create();
+    // A permission on a different module must not grant access to `sao`.
+    Permission::findOrCreate('default.cms_contents.select', 'web');
+    $user->givePermissionTo('default.cms_contents.select');
+    app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+    app()->instance(AuthenticationService::class, scopeAuthService($user));
+    $this->provider->boot();
+
+    $session = app('session')->driver();
+    $session->start();
+    $request = Request::create('/', 'POST', ['scope' => 'sao']);
+    $request->setLaravelSession($session);
+    $callback = Fortify::$authenticateUsingCallback;
+
+    expect(fn () => $callback($request))->toThrow(ValidationException::class);
+});
+
+it('ignores an empty scope and performs an ordinary login', function (): void {
+    $this->provider->register();
+    $user = User::factory()->create();
+    app()->instance(AuthenticationService::class, scopeAuthService($user));
+    $this->provider->boot();
+
+    $session = app('session')->driver();
+    $session->start();
+    $request = Request::create('/', 'POST');
+    $request->setLaravelSession($session);
+    $callback = Fortify::$authenticateUsingCallback;
+
+    expect($callback($request))->toBe($user);
 });

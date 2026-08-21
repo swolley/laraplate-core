@@ -8,6 +8,7 @@ $translations = [
     'failed' => 'Credenziali non valide.',
     'password' => 'Password non corretta.',
     'throttle' => 'Troppi tentativi di accesso. Riprova tra :seconds secondi.',
+    'module_scope_denied' => 'Non hai accesso a questo modulo.',
 ];
 
 if ($default_locale !== 'it') {

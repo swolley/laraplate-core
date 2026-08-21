@@ -230,6 +230,39 @@ final class AuthorizationService
     }
 
     /**
+     * Whether the user holds at least one permission on the module's entities.
+     *
+     * The `permissions` table carries a generated `module` column (the table's
+     * prefix before the first underscore, e.g. `sao_tickets` -> `sao`), so module
+     * access is a single indexed lookup rather than parsing permission names in
+     * PHP. Checks direct permissions then permissions granted via the user's
+     * roles. Super admins always pass. Used to gate scoped SPA logins.
+     */
+    public function userHasModuleAccess(User $user, string $scope): bool
+    {
+        $scope = mb_strtolower(trim($scope));
+
+        if ($scope === '' || $user->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($user->permissions()->where('module', $scope)->exists()) {
+            return true;
+        }
+
+        $role_ids = $user->roles()->pluck('id');
+
+        if ($role_ids->isEmpty()) {
+            return false;
+        }
+
+        return Permission::query()
+            ->where('module', $scope)
+            ->whereHas('roles', static fn (Builder $query): Builder => $query->whereKey($role_ids->all()))
+            ->exists();
+    }
+
+    /**
      * Apply ACL filters directly to a query builder.
      *
      * Use this for requests that don't have a filters property (e.g., DetailRequestData).

@@ -6,9 +6,11 @@ namespace Modules\Core\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
@@ -20,6 +22,8 @@ use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Auth\Providers\SocialiteProvider;
 use Modules\Core\Auth\Services\AuthenticationService;
+use Modules\Core\Models\User;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Override;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -103,11 +107,43 @@ final class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('im-still-here', static fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
+        $this->registerAuthenticateCallback();
+    }
+
+    /**
+     * Enforce an optional module `scope` on login: when the SPA sends a `scope`
+     * (its module slug, e.g. `sao`), the credentials must belong to a user who
+     * holds at least one permission on that module's entities, otherwise the
+     * login is rejected. No scope means an ordinary login.
+     */
+    private function ensureModuleScope(Request $request, ?Authenticatable $user): void
+    {
+        $scope = $request->input('scope');
+
+        if (! is_string($scope) || trim($scope) === '') {
+            return;
+        }
+
+        $authorization = $this->app->make(AuthorizationService::class);
+
+        if ($user instanceof User && $authorization->userHasModuleAccess($user, $scope)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            Fortify::username() => [__('auth.module_scope_denied')],
+        ]);
+    }
+
+    private function registerAuthenticateCallback(): void
+    {
         Fortify::authenticateUsing(function (Request $request) {
             $service = $this->app->make(AuthenticationService::class);
             $result = $service->authenticate($request);
 
             if ($result['success']) {
+                $this->ensureModuleScope($request, $result['user']);
+
                 if (config('auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
                     if (isset($result['license']->uuid)) {

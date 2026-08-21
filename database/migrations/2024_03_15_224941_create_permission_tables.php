@@ -54,23 +54,32 @@ return new class() extends Migration
         $grammar = $connection->getQueryGrammar();
         $wrapped_permissions_table = $grammar->wrapTable($permissions_table);
         $wrapped_reference_index = $grammar->wrap("{$permissions_table}_ref_IDX");
+        $wrapped_module_index = $grammar->wrap("{$permissions_table}_module_IDX");
         $wrapped_name_check = $grammar->wrap("{$permissions_table}_name_CHECK");
 
         if ($connection->getDriverName() === 'pgsql') {
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '\\.\\w+\\.\\w+$', ''), '\\.', '')) STORED");
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', '')) STORED");
             $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
+            // Module = the table's prefix (chars before the first underscore), e.g. `sao_tickets` -> `sao`.
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN module VARCHAR(50) GENERATED ALWAYS AS (regexp_replace(regexp_replace(regexp_replace(name, '^\\w+\\.', ''), '\\.\\w+$', ''), '_.*$', '')) STORED");
+            $connection->statement("CREATE INDEX {$wrapped_module_index} ON {$wrapped_permissions_table} (module)");
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD CONSTRAINT {$wrapped_name_check} CHECK (name ~ '^\\w+\\.\\w+\\.\\w+$')");
         } elseif (in_array($connection->getDriverName(), ['mysql', 'mariadb'], true)) {
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name VARCHAR(50) AS (regexp_substr(name, '^\\\\w+')) STORED");
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name VARCHAR(50) AS (replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', '')) STORED");
             $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
+            // Module = the table's prefix (chars before the first underscore), e.g. `sao_tickets` -> `sao`.
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN module VARCHAR(50) AS (substring_index(replace(regexp_substr(name, '\\\\.\\\\w+\\\\.'), '.', ''), '_', 1)) STORED");
+            $connection->statement("CREATE INDEX {$wrapped_module_index} ON {$wrapped_permissions_table} (module)");
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD CONSTRAINT {$wrapped_name_check} CHECK (REGEXP_INSTR(name, '^\\\\w+\\\\.\\\\w+\\\\.\\\\w+$') = 1)");
         } elseif ($connection->getDriverName() === 'sqlite') {
             // SQLite doesn't support regexp_replace in generated columns, so we use regular columns with triggers
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN connection_name TEXT");
             $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN table_name TEXT");
+            $connection->statement("ALTER TABLE {$wrapped_permissions_table} ADD COLUMN module TEXT");
             $connection->statement("CREATE INDEX {$wrapped_reference_index} ON {$wrapped_permissions_table} (connection_name, table_name)");
+            $connection->statement("CREATE INDEX {$wrapped_module_index} ON {$wrapped_permissions_table} (module)");
 
             // Trigger to extract connection_name (first part before first dot, removing dots if multiple)
             $connection->statement(sprintf("
@@ -137,6 +146,28 @@ return new class() extends Migration
                     WHERE id = NEW.id;
                 END
             ", $grammar->wrap('permissions_update_table_name'), $wrapped_permissions_table, $wrapped_permissions_table));
+
+            // Module = the table's prefix (before the first underscore). Computed
+            // directly from `name` (a sibling AFTER INSERT trigger cannot see the
+            // table_name value another trigger set on the same insert).
+            $table_expr = "substr(name, instr(name, '.') + 1, CASE WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 THEN instr(substr(name, instr(name, '.') + 1), '.') - 1 ELSE 0 END)";
+            $module_expr = "CASE WHEN instr(({$table_expr}), '_') > 0 THEN substr(({$table_expr}), 1, instr(({$table_expr}), '_') - 1) ELSE ({$table_expr}) END";
+
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER INSERT ON %s
+                BEGIN
+                    UPDATE %s SET module = %s WHERE id = NEW.id;
+                END
+            ", $grammar->wrap('permissions_set_module'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
+
+            $connection->statement(sprintf("
+                CREATE TRIGGER %s
+                AFTER UPDATE OF name ON %s
+                BEGIN
+                    UPDATE %s SET module = %s WHERE id = NEW.id;
+                END
+            ", $grammar->wrap('permissions_update_module'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
         } else {
             throw new RuntimeException('Unsupported database driver');
         }
