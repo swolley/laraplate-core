@@ -7,6 +7,7 @@ namespace Modules\Core\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Models\Media;
+use Modules\Core\Models\MediaDraft;
 use Override;
 use Throwable;
 
@@ -37,7 +38,24 @@ final class MediaResource extends JsonResource
             'custom_properties' => $media->custom_properties,
             'url' => $this->resolveUrl($media),
             'conversions' => $this->resolveConversions($media),
+            'draft_token' => $this->resolveDraftToken($media),
         ];
+    }
+
+    /**
+     * The owning draft's token when this asset is still staged in the pending
+     * bucket, else null. Guarded by the stored morph type so bound-record media
+     * never trigger an owner lookup.
+     */
+    private function resolveDraftToken(Media $media): ?string
+    {
+        if ($media->model_type !== MediaDraft::class) {
+            return null;
+        }
+
+        $owner = $media->model;
+
+        return $owner instanceof MediaDraft ? $owner->token : null;
     }
 
     /**

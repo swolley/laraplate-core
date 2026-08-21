@@ -11,16 +11,25 @@ use Spatie\MediaLibrary\HasMedia as SpatieHasMedia;
 
 /**
  * Uploads a file into one of the owner model's registered media collections.
- * Gated by the owner entity's `update` permission. The target collection is
- * validated against the model's registered collections; an unknown name is
- * rejected with a 422.
+ *
+ * A single endpoint with an optional `{id}`:
+ * - with an id, the file binds to that record and the request is gated by the
+ *   owner entity's `update` permission (plus the target row's ACL);
+ * - without an id, the file is staged in the caller's pending bucket and the
+ *   request is gated by the `insert` permission — an optional `token` targets an
+ *   existing draft, otherwise the server opens a new one and returns its token.
+ *
+ * The target collection is validated against the model's registered collections;
+ * an unknown name is rejected with a 422.
  */
 final class MediaUploadRequest extends MediaRequest
 {
     #[Override]
     public function mediaOperation(): string
     {
-        return ActionEnum::Update->value;
+        return $this->route('id') !== null
+            ? ActionEnum::Update->value
+            : ActionEnum::Insert->value;
     }
 
     /**
@@ -32,6 +41,7 @@ final class MediaUploadRequest extends MediaRequest
         return array_merge(parent::rules(), [
             'file' => ['required', 'file'],
             'collection' => ['required', 'string', Rule::in($this->registeredCollections())],
+            'token' => ['sometimes', 'uuid'],
             'name' => ['sometimes', 'string'],
             'custom_properties' => ['sometimes', 'array'],
         ]);

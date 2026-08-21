@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\MediaClaimRequest;
@@ -19,7 +20,6 @@ use Modules\Core\Http\Requests\MediaDeleteRequest;
 use Modules\Core\Http\Requests\MediaListRequest;
 use Modules\Core\Http\Requests\MediaPendingDeleteRequest;
 use Modules\Core\Http\Requests\MediaPendingListRequest;
-use Modules\Core\Http\Requests\MediaPendingUploadRequest;
 use Modules\Core\Http\Requests\MediaRequest;
 use Modules\Core\Http\Requests\MediaUploadRequest;
 use Modules\Core\Http\Resources\MediaResource;
@@ -72,29 +72,35 @@ final class MediaController extends Controller
     }
 
     /**
-     * Add an uploaded file to one of the owner model's registered collections.
+     * Add an uploaded file to a collection.
+     *
+     * With an `{id}` the file binds to that owner record (row-level ACL applies).
+     * Without an id the file is staged in the caller's pending bucket, opening a
+     * draft — and minting a `token`, surfaced on the returned media — on the first
+     * upload; a supplied `token` appends to that existing draft.
      */
     public function upload(MediaUploadRequest $request): Response
     {
         return $this->handle($request, function (string $permissionName) use ($request): Response {
-            $record = $this->resolveOwnerRecord($request, $permissionName);
-
             /** @var UploadedFile $file */
             $file = $request->file('file');
-
+            $collection = $request->string('collection')->toString();
+            $name = $request->string('name')->toString();
             $custom_properties = $request->input('custom_properties');
-            $media = $this->addUploadedFile(
-                $record,
-                $file,
-                $request->string('collection')->toString(),
-                $request->string('name')->toString(),
-                is_array($custom_properties) ? $custom_properties : [],
-            );
+            $properties = is_array($custom_properties) ? $custom_properties : [];
 
-            return new ResponseBuilder($request)
-                ->setData(new MediaResource($media))
-                ->setStatus(Response::HTTP_CREATED)
-                ->json();
+            if ($request->route('id') !== null) {
+                $record = $this->resolveOwnerRecord($request, $permissionName);
+                $media = $this->addUploadedFile($record, $file, $collection, $name, $properties);
+
+                return $this->createdMedia($request, $media);
+            }
+
+            $draft = $this->resolveDraft($request);
+            $properties['target_collection'] = $collection;
+            $media = $this->addUploadedFile($draft, $file, MediaDraft::PENDING_COLLECTION, $name, $properties);
+
+            return $this->createdMedia($request, $media);
         });
     }
 
@@ -119,38 +125,6 @@ final class MediaController extends Controller
             $media->delete();
 
             return new ResponseBuilder($request)->setData(['deleted' => true, 'id' => $key])->json();
-        });
-    }
-
-    /**
-     * Stage an uploaded file in the current user's pending bucket for a token,
-     * before the owner record exists. Gated by the entity's `insert` permission.
-     */
-    public function uploadPending(MediaPendingUploadRequest $request): Response
-    {
-        return $this->handle($request, function () use ($request): Response {
-            $draft = MediaDraft::query()->firstOrCreate($this->draftAttributes($request));
-
-            /** @var UploadedFile $file */
-            $file = $request->file('file');
-
-            $collection = $request->string('collection')->toString();
-            $custom_properties = $request->input('custom_properties');
-            $properties = is_array($custom_properties) ? $custom_properties : [];
-            $properties['target_collection'] = $collection;
-
-            $media = $this->addUploadedFile(
-                $draft,
-                $file,
-                MediaDraft::PENDING_COLLECTION,
-                $request->string('name')->toString(),
-                $properties,
-            );
-
-            return new ResponseBuilder($request)
-                ->setData(new MediaResource($media))
-                ->setStatus(Response::HTTP_CREATED)
-                ->json();
         });
     }
 
@@ -297,6 +271,45 @@ final class MediaController extends Controller
         return $adder->toMediaCollection($collection);
 
         /** @var Media $media */
+    }
+
+    /**
+     * Render a freshly created media item under the shared envelope with a 201.
+     */
+    private function createdMedia(MediaRequest $request, Media $media): Response
+    {
+        return new ResponseBuilder($request)
+            ->setData(new MediaResource($media))
+            ->setStatus(Response::HTTP_CREATED)
+            ->json();
+    }
+
+    /**
+     * Resolve the pending draft for an id-less upload: reuse the caller's draft
+     * for a supplied `token`, otherwise open a new one with a server-minted token.
+     */
+    private function resolveDraft(MediaRequest $request): MediaDraft
+    {
+        $base = [
+            'user_id' => $request->user()?->getAuthIdentifier(),
+            'target_module' => (string) $request->route('module'),
+            'target_entity' => (string) $request->route('entity'),
+        ];
+
+        $token = $request->string('token')->toString();
+
+        if ($token !== '') {
+            $existing = MediaDraft::query()->where($base)->where('token', $token)->first();
+
+            if ($existing instanceof MediaDraft) {
+                return $existing;
+            }
+        }
+
+        return MediaDraft::query()->create([
+            ...$base,
+            'token' => $token !== '' ? $token : (string) Str::uuid(),
+        ]);
     }
 
     /**
