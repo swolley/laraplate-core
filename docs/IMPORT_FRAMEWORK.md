@@ -77,4 +77,16 @@ Distinct from the CLI framework above, Core also provides an **interactive**, en
 | `ImportRunner` + `ProcessImportSessionJob` | Streams the source, per-chunk commit (durable progress), each row in its own savepoint so a failing row rolls back only itself and lands in the report; fires `ImportSessionCompleted` / `ImportSessionFailed` (the seam for the future in-app notification tray). |
 | `ImportLauncher` | The shared "every required field must be mapped before running, then queue" rule, used by both the API controller and the Filament run action. |
 
-An entity importer validates the mapped row, upserts idempotently (typically via `RecordOriginRegistry`), and returns `Created`/`Updated`/`Skipped` or raises `RowImportException` for a per-row failure. Reference importers ship for `core.user` (Core) and `sao.ticket` (SAO — the tracker "file-dump" path). A module adds an importable entity by implementing `EntityImporterInterface` and registering it; the framework never touches an arbitrary table.
+An entity importer validates the mapped row, upserts idempotently (typically via `RecordOriginRegistry`), and returns `Created`/`Updated`/`Skipped` or raises `RowImportException` for a per-row failure. Registered importers today:
+
+| Key | Module | Natural key / dedupe | Notes |
+|---|---|---|---|
+| `core.user` | Core | email | Reference importer. |
+| `sao.ticket` | SAO | `TicketLink` / `RecordOrigin` external id | The tracker "file-dump" path. |
+| `cms.tag` | CMS | translated name within `type` | Name is a per-locale translation. |
+| `cms.contributor` | CMS | name (unique) | Anchored to the `contributors` entity's default preset. |
+| `cms.category` | CMS | slug | Hierarchy via an optional `parent` column (slug/name). |
+| `erp.item` | ERP | `(company, sku)` | Materials/products; company from a column or the active company context. |
+| `erp.party` | ERP | `(company, vat)` or `(company, name)` | Customers/suppliers via the `is_customer`/`is_supplier` flags. |
+
+A module adds an importable entity by implementing `EntityImporterInterface` and registering it from its provider's `boot`; the framework never touches an arbitrary table.
