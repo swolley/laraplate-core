@@ -76,6 +76,7 @@ Distinct from the CLI framework above, Core also provides an **interactive**, en
 | `ImportSession` / `ImportRowError` | The durable record (`core_import_sessions`): mapping, status, per-outcome counters; and the per-row failure report (`core_import_row_errors`). |
 | `ImportRunner` + `ProcessImportSessionJob` | Streams the source, per-chunk commit (durable progress), each row in its own savepoint so a failing row rolls back only itself and lands in the report; fires `ImportSessionCompleted` / `ImportSessionFailed` (the seam for the future in-app notification tray). |
 | `ImportLauncher` | The shared "every required field must be mapped before running, then queue" rule, used by both the API controller and the Filament run action. |
+| `ImportRelationField` + `RelationValueResolver` | Declares a mapped column that resolves to one or more **related** records by their natural key (slug/name/code), and the reusable engine that turns a possibly multi-value cell into a list of ids. The importer supplies only two domain callbacks — how to find a token, and (for `onMissing: create`) how to create it — while the framework owns splitting, trimming, de-duplication and the missing-token policy. |
 
 An entity importer validates the mapped row, upserts idempotently (typically via `RecordOriginRegistry`), and returns `Created`/`Updated`/`Skipped` or raises `RowImportException` for a per-row failure. Registered importers today:
 
@@ -86,7 +87,18 @@ An entity importer validates the mapped row, upserts idempotently (typically via
 | `cms.tag` | CMS | translated name within `type` | Name is a per-locale translation. |
 | `cms.contributor` | CMS | name (unique) | Anchored to the `contributors` entity's default preset. |
 | `cms.category` | CMS | slug | Hierarchy via an optional `parent` column (slug/name). |
+| `cms.content` | CMS | translated slug | Attaches `tags` (by name, created on the fly), `categories` and `contributors` (by slug/name, must pre-exist) from multi-value columns via `RelationValueResolver`. |
 | `erp.item` | ERP | `(company, sku)` | Materials/products; company from a column or the active company context. |
 | `erp.party` | ERP | `(company, vat)` or `(company, name)` | Customers/suppliers via the `is_customer`/`is_supplier` flags. |
 
 A module adds an importable entity by implementing `EntityImporterInterface` and registering it from its provider's `boot`; the framework never touches an arbitrary table.
+
+### Relations by natural key
+
+Foreign keys are never expressed as internal ids in a source file — a row references a related record by the same human-readable natural key an operator would type (a slug, name or code). A to-one relation resolves that key inline (e.g. `cms.category.parent`, `erp.item.company`). A to-many or cross-entity relation is declared as an `ImportRelationField` and resolved through `RelationValueResolver`, which splits a multi-value cell (`"news, politics"`), de-duplicates the tokens, and applies the field's `OnMissingRelation` policy to any token that matches nothing:
+
+- `create` — provision the related record from the token (tags, cheap folksonomy);
+- `error` — fail the row with a per-field message (categories, contributors: curated, so import them first);
+- `skip` — silently drop the unmatched token.
+
+`cms.content` is the reference implementation: it attaches tags, categories and contributors in the same row without the file ever carrying an id.
