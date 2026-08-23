@@ -10,6 +10,7 @@ use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
+use Filament\Forms\Components\Toggle;
 use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -28,12 +29,11 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
-use Modules\Core\Cache\CacheManager as CoreCacheManager;
 use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
-use Filament\Forms\Components\Toggle;
+use Modules\Core\Cache\CacheManager as CoreCacheManager;
 use Modules\Core\Console\PruneMediaDraftsCommand;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\BootSampler;
@@ -49,18 +49,20 @@ use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
+use Modules\Core\Import\Importers\UserImporter;
+use Modules\Core\Import\Support\EntityImporterRegistry;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User as CoreUser;
 use Modules\Core\Overrides\ContextualValidator;
-use Modules\Core\Performance\SubprocessBootSampler;
 use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
+use Modules\Core\Performance\SubprocessBootSampler;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Services\Crud\DomainActionRegistry;
@@ -137,6 +139,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->registerModuleMacros();
         $this->registerValidationOverrides();
         $this->registerCacheWarmOnBoot();
+        $this->registerImportEntities();
     }
 
     /**
@@ -167,6 +170,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Singleton so every module registering at boot writes into the same
         // instance the dispatcher later reads.
         $this->app->singleton(DomainActionRegistry::class);
+
+        // Singleton so every module registering its importable entities at boot
+        // writes into the same registry the import framework later resolves from.
+        $this->app->singleton(EntityImporterRegistry::class);
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);
@@ -277,6 +284,16 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
             }
         });
+    }
+
+    /**
+     * Register Core's own importable entities into the shared registry. Other
+     * modules register theirs the same way from their providers' boot.
+     */
+    private function registerImportEntities(): void
+    {
+        $this->app->make(EntityImporterRegistry::class)
+            ->register($this->app->make(UserImporter::class));
     }
 
     /**
