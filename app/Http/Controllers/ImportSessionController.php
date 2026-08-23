@@ -11,9 +11,9 @@ use Modules\Core\Http\Requests\ImportUploadRequest;
 use Modules\Core\Import\Enums\ImportSessionStatus;
 use Modules\Core\Import\Enums\ImportSourceFormat;
 use Modules\Core\Import\Support\EntityImporterRegistry;
+use Modules\Core\Import\Support\ImportLauncher;
 use Modules\Core\Import\Support\ImportPreviewService;
 use Modules\Core\Import\ValueObjects\ImportField;
-use Modules\Core\Jobs\ProcessImportSessionJob;
 use Modules\Core\Models\ImportSession;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -110,13 +110,13 @@ final class ImportSessionController extends Controller
     /**
      * Queue the import. Requires a mapping that covers every required field.
      */
-    public function run(ImportSession $import, EntityImporterRegistry $registry): JsonResponse
+    public function run(ImportSession $import, ImportLauncher $launcher): JsonResponse
     {
-        if ($import->status->isTerminal() || $import->status === ImportSessionStatus::Processing) {
+        if (! $launcher->isLaunchable($import)) {
             return response()->json(['message' => 'This import is already running or finished.'], Response::HTTP_CONFLICT);
         }
 
-        $missing = $this->missingRequired($import, $registry);
+        $missing = $launcher->missingRequiredFields($import);
 
         if ($missing !== []) {
             return response()->json([
@@ -125,9 +125,7 @@ final class ImportSessionController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $import->forceFill(['status' => ImportSessionStatus::Queued])->save();
-
-        ProcessImportSessionJob::dispatch($import->getKey());
+        $launcher->queue($import);
 
         return response()->json(['data' => $this->payload($import)]);
     }
@@ -158,29 +156,6 @@ final class ImportSessionController extends Controller
 
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
-    }
-
-    /**
-     * Required target fields with no mapped source column.
-     *
-     * @return list<string>
-     */
-    private function missingRequired(ImportSession $import, EntityImporterRegistry $registry): array
-    {
-        if (! $registry->has($import->entity_key)) {
-            return [];
-        }
-
-        $mapping = $import->mapping ?? [];
-        $missing = [];
-
-        foreach ($registry->get($import->entity_key)->fields() as $field) {
-            if ($field->required && ($mapping[$field->name] ?? '') === '') {
-                $missing[] = $field->name;
-            }
-        }
-
-        return $missing;
     }
 
     /**
