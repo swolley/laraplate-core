@@ -45,6 +45,12 @@ final readonly class ImportRelationField
      */
     public function toField(): ImportField
     {
-        return new ImportField($this->name, $this->label, $this->required, $this->aliases);
+        return new ImportField(
+            $this->name,
+            $this->label,
+            $this->required,
+            $this->aliases,
+            new ImportRelationDescriptor($this->multiple, $this->separator, $this->onMissing),
+        );
     }
 }
