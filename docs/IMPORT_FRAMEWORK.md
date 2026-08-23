@@ -62,3 +62,19 @@ This framework executes bounded, operator-triggered imports. Continuous external
 `RecordOriginRegistry` is the source-neutral persistence boundary for imported record identities. An identity is the tuple `(referable_type, source_key, external_id)`; adapters should qualify `source_key` by source instance or group when the upstream identifier is not globally unique.
 
 Adapters compute a lowercase SHA-256 fingerprint from normalized source fields and may supply the source modification timestamp as evidence. The registry reports `Missing`, `Unchanged`, or `Changed`, stores provenance on the referable model's database connection, and never decides whether the destination record may be changed. Destination modules own that policy. Source timestamps never replace destination `created_at` or `updated_at` values.
+
+## Interactive bulk import (upload → map → preview → run)
+
+Distinct from the CLI framework above, Core also provides an **interactive**, entity-agnostic bulk import: a user uploads a file, maps its columns to a target entity's fields through dropdowns with a spreadsheet-like preview, and runs the import as a queued job. It is surfaced by the SPA (`/app/crud/imports`) and a Filament monitoring resource.
+
+| Component | Responsibility |
+|---|---|
+| `EntityImporterInterface` + `EntityImporterRegistry` | The open, per-entity contract (`key`, `label`, `fields`, `import(row, ctx)`) and the singleton registry modules register into from their provider's `boot`. Only registered entities are importable. |
+| `ImportField` | One mappable target field a source column can map to (`name`, `label`, `required`, `aliases`). |
+| `SourceReaderInterface` + `SourceReaderFactory` | Streaming readers per `ImportSourceFormat`: CSV (`league/csv`), XLSX/ODS (`openspout`), JSON (in-process). SQL is deliberately deferred. |
+| `ImportPreviewService` | Detected columns, sample rows, target fields and a header auto-matched mapping suggestion. |
+| `ImportSession` / `ImportRowError` | The durable record (`core_import_sessions`): mapping, status, per-outcome counters; and the per-row failure report (`core_import_row_errors`). |
+| `ImportRunner` + `ProcessImportSessionJob` | Streams the source, per-chunk commit (durable progress), each row in its own savepoint so a failing row rolls back only itself and lands in the report; fires `ImportSessionCompleted` / `ImportSessionFailed` (the seam for the future in-app notification tray). |
+| `ImportLauncher` | The shared "every required field must be mapped before running, then queue" rule, used by both the API controller and the Filament run action. |
+
+An entity importer validates the mapped row, upserts idempotently (typically via `RecordOriginRegistry`), and returns `Created`/`Updated`/`Skipped` or raises `RowImportException` for a per-row failure. Reference importers ship for `core.user` (Core) and `sao.ticket` (SAO — the tracker "file-dump" path). A module adds an importable entity by implementing `EntityImporterInterface` and registering it; the framework never touches an arbitrary table.
