@@ -38,6 +38,10 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
     // domain-action catch-all below; the extra {id} segment avoids any collision.
     require __DIR__ . '/media.php';
 
+    // Generic bulk-import endpoints. Registered before the domain-action catch-all;
+    // the literal `imports` prefix keeps them from being read as a domain verb.
+    require __DIR__ . '/imports.php';
+
     // Grid routes mirror the CRUD verbs above on a different URI prefix, so they need their own
     // name prefix: duplicate route names break `route:cache` serialization, and `route()` keeps
     // resolving to the first route registered under the name, leaving the later one unreachable.
