@@ -389,6 +389,18 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
     }
 
     /**
+     * Override the Notifiable relation so database notifications are read and
+     * written through {@see Notification}, which mirrors the module scope into a
+     * queryable `module_name` column.
+     *
+     * @return MorphMany<Notification, $this>
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable')->latest();
+    }
+
+    /**
      * Run the package authorization hook before a connection-scoped vote is cast.
      */
     public function isAuthorizedToCastApprovalVote(Modification $modification, bool $approval): bool

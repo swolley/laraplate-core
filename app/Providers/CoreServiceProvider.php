@@ -24,6 +24,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
@@ -49,9 +50,12 @@ use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
+use Modules\Core\Import\Events\ImportSessionCompleted;
+use Modules\Core\Import\Events\ImportSessionFailed;
 use Modules\Core\Import\Importers\UserImporter;
 use Modules\Core\Import\Support\EntityImporterRegistry;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Listeners\SendImportFinishedNotification;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
@@ -140,6 +144,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->registerValidationOverrides();
         $this->registerCacheWarmOnBoot();
         $this->registerImportEntities();
+        $this->registerImportListeners();
     }
 
     /**
@@ -294,6 +299,16 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         $this->app->make(EntityImporterRegistry::class)
             ->register($this->app->make(UserImporter::class));
+    }
+
+    /**
+     * Fan the terminal import events out to the in-app notification listener, so the
+     * user who launched an import is told when it finishes or fails.
+     */
+    private function registerImportListeners(): void
+    {
+        Event::listen(ImportSessionCompleted::class, [SendImportFinishedNotification::class, 'handle']);
+        Event::listen(ImportSessionFailed::class, [SendImportFinishedNotification::class, 'handle']);
     }
 
     /**

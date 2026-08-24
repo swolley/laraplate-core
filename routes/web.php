@@ -65,3 +65,6 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
     Route::post('/{action}/{module}/{entity}', [CrudController::class, 'domainAction'])
         ->name('domain-action');
 });
+
+// In-app notification tray (user-scoped, outside the /crud group): `/app/notifications`.
+require __DIR__ . '/notifications.php';
