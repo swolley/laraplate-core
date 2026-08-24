@@ -74,8 +74,9 @@ Distinct from the CLI framework above, Core also provides an **interactive**, en
 | `SourceReaderInterface` + `SourceReaderFactory` | Streaming readers per `ImportSourceFormat`: CSV (`league/csv`), XLSX/ODS (`openspout`), JSON (in-process). SQL is deliberately deferred. |
 | `ImportPreviewService` | Detected columns, sample rows, target fields and a header auto-matched mapping suggestion. |
 | `ImportSession` / `ImportRowError` | The durable record (`core_import_sessions`): mapping, status, per-outcome counters; and the per-row failure report (`core_import_row_errors`). |
-| `ImportRunner` + `ProcessImportSessionJob` | Streams the source, per-chunk commit (durable progress), each row in its own savepoint so a failing row rolls back only itself and lands in the report; fires `ImportSessionCompleted` / `ImportSessionFailed` (the seam for the future in-app notification tray). |
+| `ImportRunner` + `ProcessImportSessionJob` | Streams the source, per-chunk commit (durable progress), each row in its own savepoint so a failing row rolls back only itself and lands in the report; fires `ImportSessionCompleted` / `ImportSessionFailed`. |
 | `ImportLauncher` | The shared "every required field must be mapped before running, then queue" rule, used by both the API controller and the Filament run action. |
+| `SendImportFinishedNotification` → `ImportFinishedNotification` | The listener on the two terminal events sends an in-app database notification to the user who launched the import (skipped when the session has no owner). |
 | `ImportRelationField` + `RelationValueResolver` | Declares a mapped column that resolves to one or more **related** records by their natural key (slug/name/code), and the reusable engine that turns a possibly multi-value cell into a list of ids. The importer supplies only two domain callbacks — how to find a token, and (for `onMissing: create`) how to create it — while the framework owns splitting, trimming, de-duplication and the missing-token policy. |
 
 An entity importer validates the mapped row, upserts idempotently (typically via `RecordOriginRegistry`), and returns `Created`/`Updated`/`Skipped` or raises `RowImportException` for a per-row failure. Registered importers today:
@@ -102,3 +103,14 @@ Foreign keys are never expressed as internal ids in a source file — a row refe
 - `skip` — silently drop the unmatched token.
 
 `cms.content` is the reference implementation: it attaches tags, categories and contributors in the same row without the file ever carrying an id.
+
+### In-app notifications
+
+When a queued import ends, `SendImportFinishedNotification` (listening on `ImportSessionCompleted` / `ImportSessionFailed`) sends an `ImportFinishedNotification` to the user who launched it — a Laravel **database** notification, the same store two surfaces read:
+
+- the **SPA** notification tray (`NotificationBell`, mounted once in the shared `AppShell`), and
+- Filament's **native** database-notifications bell (`->databaseNotifications()`).
+
+The notification payload is UI-locale-agnostic — a machine `type` (`import.finished`) plus a `meta` bag (per-outcome counts) the SPA localizes itself, with English `title`/`body` as a backoffice fallback — and carries the module `scope` (the imported entity's module) and a **semantic** `action` target (`{ target: 'import_session', id, view }`) that each surface resolves to its own route. The `notifications` table adds one derived column, `module_name` (mirrored from `data->scope` by the `Notification` model on save), so a module-scoped tray filters at the database level.
+
+`GET /app/notifications` (optionally `?scope=`), `.../unread-count`, `POST .../{id}/read` and `.../read-all` back the SPA tray, each bound to the authenticated user. Both bells refresh by **polling** (SPA: unread-count on a ~30s interval, list on open; Filament: 30s) — real-time broadcast is a later, additive upgrade.
