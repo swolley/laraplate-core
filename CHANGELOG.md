@@ -4,6 +4,82 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(locking)* Expose lock columns in serialized models
+- *(crud)* Add facet counters to CrudService and CrudController
+- *(crud)* Constrain facet counts to ACL-visible rows
+- *(core)* Add TabularPdfExporter tabular-to-PDF service
+- *(core)* Own the media library table, model and config
+- *(core)* Shared fingerprint normalization chain
+- *(core)* Optional AI text generation request event
+- *(core)* CRUD facet-counters tier 2 — open facets with key/label two-step
+- *(core)* Facet tier 2 — single-hop relation labels
+- *(core)* Facet tier 2 — label search/sort without a join
+- *(crud)* Resolve facet labels via declared FK source without a BelongsTo
+- *(crud)* Facet over a BelongsToMany/MorphToMany relation via its pivot
+- *(crud)* Resolve relation-facet labels from a locale-scoped translation table
+- *(crud)* Accept facet relation param + document faceted counts
+- *(crud)* Translated labels for base-column FK facets
+- *(crud)* Facet by a to-one relation column via join
+- *(crud)* Fail fast when a facet groupBy/relation is unresolvable
+- *(core)* Sync whitelisted m2m relations through the generic CRUD update
+- *(core)* Authoring surface — app CRUD sees drafts, API stays valid-only
+- *(core)* Dynamic placeholders in ACL filters
+- *(core)* Role-scoped ACLs (acls.role_id)
+- *(core)* Default list pagination to look-ahead + explicit mode discriminator
+- *(core)* Self-service user preferences + first-login endpoints
+- *(core)* Generic media HTTP API for any media-enabled entity
+- *(core)* Media pending-bucket + claim, and row-level ACL on media
+- *(core)* Optional module scope on login
+- *(import)* Generic interactive bulk-import framework
+- *(import)* SPA API for the interactive bulk import
+- *(import)* Filament monitoring surface + shared launcher
+- *(core/import)* Relation resolution by natural key
+- *(core/import)* Surface relation metadata to the mapping UI
+- *(core)* In-app notifications for finished imports
+
+### 🐛 Bug Fixes
+
+- *(core)* SQLite support for generated is_deleted/is_locked columns
+- *(crud)* Exclude a relation facet own selection from its own counts
+- *(crud)* Read relation-facet base labels on the query builder
+- *(crud)* Make dotless relation-count aggregates work on prefixed-table entities
+- *(crud)* Count records not groups for currentRecords when group_by is set
+- *(acl)* Invalidate the resolver cache on ACL writes
+- *(crud)* Return a full page instead of a single row for list pagination
+- *(core)* Resolve the default presettable from the entity enum, not the table name
+- *(core)* Invalidate dynamic-content metadata cache on model writes
+
+### 🚜 Refactor
+
+- *(core)* Extract reusable runParallelTasks helper from BatchSeeder
+- *(core)* Resolve fingerprints through the shared chain
+- *(core)* Drop the authoring-surface hack (superseded by role-scoped ACLs)
+- *(core)* Unify media upload into one endpoint with server-minted token
+- *(core)* Rename permissions.module column to module_name
+
+### 📚 Documentation
+
+- *(core)* Mark cross-cutting user guides for assistant module scope
+- *(core)* Document shared tabular exporters as reusable primitives
+- *(core)* Document the shared error fingerprint chain
+- *(core)* Document the scoped-login contract in RAG
+- *(import)* Document the interactive bulk-import framework
+- *(core)* Document interactive import + notifications (repo + RAG)
+
+### ⚡ Performance
+
+- *(core)* Speed up dev seeding — skip versioning, cache preset fields
+- *(core)* Short-circuit per-row select check on list, count facets in SQL
+- *(core)* Optional list total via look-ahead pagination (totals flag)
+
+### 🧪 Testing
+
+- *(core)* Stop the namespaced config() override from shadowing sibling commands
+
+## [1.72.1] - 2026-08-07
+
 ### 🐛 Bug Fixes
 
 - *(crud)* Normalize freshness timestamps and expose created/updated_at
@@ -183,7 +259,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.58.8] - 2026-07-10
+## [1.59.0] - 2026-07-12
 
 ### 🐛 Bug Fixes
 
