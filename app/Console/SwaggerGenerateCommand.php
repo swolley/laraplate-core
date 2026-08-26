@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Cache\CacheManager;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Modules\Core\Cache\Repository as CoreCacheRepository;
@@ -88,6 +88,12 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
         $file = $this->option('output') ?: swagger_doc_path($moduleName);
         $config = $this->resolveSwaggerConfig();
 
+        if ($file && app()->environment('testing') && $this->isCommittedSwaggerPath($file)) {
+            throw new LaravelSwaggerException(
+                'Refusing to overwrite committed swagger assets during tests. Pass --output to a temporary path.',
+            );
+        }
+
         if ($moduleName !== 'App') {
             $module_path = Module::getModulePath($moduleName);
             $module_json = $this->readModuleJson($module_path);
@@ -120,12 +126,6 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
             ->format();
 
         if ($file) {
-            if (app()->environment('testing') && $this->isCommittedSwaggerPath($file)) {
-                throw new LaravelSwaggerException(
-                    'Refusing to overwrite committed swagger assets during tests. Pass --output to a temporary path.',
-                );
-            }
-
             $folder = Str::beforeLast($file, DIRECTORY_SEPARATOR);
 
             if (! file_exists($folder)) {
@@ -308,7 +308,7 @@ final class SwaggerGenerateCommand extends BaseGenerateSwaggerDoc
 
             $keys = array_keys($methods);
             $imploded_methods = implode('|', array_map(
-                static fn (int|string $method): string => strtoupper((string) $method),
+                static fn (int|string $method): string => mb_strtoupper((string) $method),
                 $keys,
             ));
             $post_methods_padding = max(0, 40 - mb_strlen($imploded_methods));

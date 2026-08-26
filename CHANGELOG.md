@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(tests)* Expect six SQLite permission name triggers
+- *(core)* Refuse committed swagger paths before generation
+
+## [1.73.3] - 2026-08-26
+
+### 🐛 Bug Fixes
+
 - *(core)* Enhance BatchSeeder to reinitialize PermissionRegistrar cache
 
 ### 🚜 Refactor
