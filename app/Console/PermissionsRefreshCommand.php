@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
@@ -25,6 +26,7 @@ use Modules\Core\Services\Translation\Definitions\ITranslated;
 use Override;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
+use Throwable;
 
 final class PermissionsRefreshCommand extends Command
 {
@@ -65,6 +67,10 @@ final class PermissionsRefreshCommand extends Command
         $quiet_mode = $this->option('quiet');
         $pretend_mode = $this->option('pretend');
 
+        // Drop stale persistent discovery (e.g. Media moved CMS → Core) but keep
+        // in-memory injections used by tests via HelpersCache::setModels().
+        HelpersCache::forgetPersistentModels();
+
         $all_models = models();
         $user_class = user_class();
 
@@ -103,7 +109,7 @@ final class PermissionsRefreshCommand extends Command
                 continue;
             }
 
-            if (! class_exists($model)) {
+            if (! $this->modelClassExists($model)) {
                 continue;
             }
             $need_bypass = $this->checkIfBlacklisted($model);
@@ -253,5 +259,18 @@ final class PermissionsRefreshCommand extends Command
         $blacklist = array_merge(self::$MODELS_BLACKLIST, $config_blacklist);
 
         return array_any($blacklist, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
+    }
+
+    /**
+     * Autoload may emit a Warning (converted to ErrorException by Laravel) when a
+     * cached FQCN points at a moved/deleted file — treat that as "missing".
+     */
+    private function modelClassExists(string $model): bool
+    {
+        try {
+            return class_exists($model);
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

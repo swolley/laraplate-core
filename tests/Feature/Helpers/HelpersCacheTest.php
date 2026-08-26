@@ -127,6 +127,17 @@ it('clearModels forgets the persistent discovery cache so the next call rescans'
     expect(models(true))->toBe($real);
 });
 
+it('forgetPersistentModels drops Redis/file discovery without wiping in-memory injections', function (): void {
+    HelpersCache::setModels('active', [User::class]);
+    Cache::forever(HelpersCache::modelsCacheKey('active'), ['App\\Models\\SentinelNeverScanned']);
+
+    HelpersCache::forgetPersistentModels();
+
+    expect(Cache::has(HelpersCache::modelsCacheKey('active')))->toBeFalse()
+        ->and(HelpersCache::getModels('active'))->toBe([User::class])
+        ->and(models(true))->toBe([User::class]);
+});
+
 it('HelpersCache has private constructor', function (): void {
     $ref = new ReflectionClass(HelpersCache::class);
     $constructor = $ref->getConstructor();

@@ -204,6 +204,33 @@ it('does not duplicate permissions when they already exist for the model table',
         ->and($output)->not->toContain("Created '{$permission_name}' permission");
 });
 
+it('skips cached model classes whose files were moved or deleted', function (): void {
+    // Simulate a stale HelpersCache entry after Media moved from CMS to Core.
+    HelpersCache::setModels('active', [
+        'Modules\\CMS\\Models\\Media',
+        PermissionsRefreshPlainModel::class,
+    ]);
+
+    $exit_code = null;
+    $output = null;
+
+    expect(function () use (&$exit_code, &$output): void {
+        $command = app(PermissionsRefreshCommand::class);
+        $command->setLaravel(app());
+        $command->setApplication(new SymfonyConsoleApplication('coverage', '1.0.0'));
+        $command->mergeApplicationDefinition();
+        $buffered = new BufferedOutput();
+        $exit_code = $command->run(
+            new ArrayInput(['command' => $command->getName()], $command->getDefinition()),
+            $buffered,
+        );
+        $output = $buffered->fetch();
+    })->not->toThrow(\Throwable::class);
+
+    expect($exit_code)->toBe(0)
+        ->and($output)->not->toContain('Modules\\CMS\\Models\\Media');
+});
+
 it('uses connection and table configured by the model constructor', function (): void {
     $permission_name = 'permissions_constructor_connection.permissions_constructor_table.select';
     Permission::query()->where('name', $permission_name)->delete();

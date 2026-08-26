@@ -124,10 +124,10 @@ final class HelpersCache
 
     /**
      * Forget every persistent model discovery bucket so the next resolution
-     * rescans the filesystem. Keeps the persistent layer in lockstep with the
-     * in-memory layer wherever discovery is invalidated.
+     * rescans the filesystem. Leaves the in-memory layer untouched so test
+     * injections via {@see setModels()} keep working (e.g. permission:refresh).
      */
-    private static function forgetPersistentModels(): void
+    public static function forgetPersistentModels(): void
     {
         if (! self::persistentCacheAvailable()) {
             return;

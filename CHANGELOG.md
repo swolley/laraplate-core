@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(core)* Enhance PermissionsRefreshCommand to handle stale model classes
+
+## [1.73.0] - 2026-08-25
+
 ### 🚀 Features
 
 - *(locking)* Expose lock columns in serialized models
@@ -259,7 +265,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.59.0] - 2026-07-12
+## [1.58.8] - 2026-07-10
 
 ### 🐛 Bug Fixes
 
