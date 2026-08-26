@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🐛 Bug Fixes
+
+- *(core)* Enhance BatchSeeder to reinitialize PermissionRegistrar cache
+
+### 🚜 Refactor
+
+- *(core)* Update BatchSeeder and DynamicContentsService for improved cache handling
+
 ## [1.73.1] - 2026-08-26
 
 ### 🐛 Bug Fixes

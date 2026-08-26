@@ -25,6 +25,7 @@ use Modules\Core\Overrides\Seeder;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\DynamicContentsService;
 use ReflectionClass;
+use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 
 abstract class BatchSeeder extends Seeder
@@ -110,6 +111,14 @@ abstract class BatchSeeder extends Seeder
         $default_driver = (string) config('cache.default');
         app()->forgetInstance('cache.__memoized:' . $default_driver);
         DynamicContentsService::reset();
+
+        // PermissionRegistrar keeps its own Repository from construction; after
+        // Cache::purge() that handle still points at the parent's dead store.
+        if (app()->bound(PermissionRegistrar::class)) {
+            $registrar = app(PermissionRegistrar::class);
+            $registrar->initializeCache();
+            $registrar->clearPermissionsCollection();
+        }
     }
 
     /**

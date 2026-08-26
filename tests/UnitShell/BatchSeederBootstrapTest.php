@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Helpers\BatchSeeder;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Services\DynamicContentsService;
+use Spatie\Permission\PermissionRegistrar;
 
 uses(Tests\TestCase::class);
 
@@ -97,4 +98,28 @@ it('bootstrapChildProcess rebuilds Cache::memo and resets DynamicContentsService
     expect(Cache::memo())->not->toBe($memo_before)
         ->and(DynamicContentsService::getInstance())->not->toBe($service_before)
         ->and(app()->bound('cache.__memoized:' . $default_driver))->toBeTrue();
+});
+
+it('bootstrapChildProcess reinitializes PermissionRegistrar cache handle', function (): void {
+    $registrar = app(PermissionRegistrar::class);
+    $cache_before = (new ReflectionObject($registrar))->getProperty('cache');
+    $cache_before->setAccessible(true);
+    $repo_before = $cache_before->getValue($registrar);
+
+    $seeder = new class(app(DatabaseManager::class)) extends BatchSeeder
+    {
+        public function __destruct() {}
+
+        protected function execute(): void {}
+    };
+
+    $bootstrap = new ReflectionMethod(BatchSeeder::class, 'bootstrapChildProcess');
+    $bootstrap->setAccessible(true);
+    $connection_name = (new ReflectionClass(BatchSeeder::class))->getProperty('childDatabaseConnectionName');
+    $connection_name->setValue($seeder, app(DatabaseManager::class)->getDefaultConnection());
+    $bootstrap->invoke($seeder);
+
+    $repo_after = $cache_before->getValue(app(PermissionRegistrar::class));
+
+    expect($repo_after)->not->toBe($repo_before);
 });
