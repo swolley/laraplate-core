@@ -118,7 +118,8 @@ it('runs migration raw statements on the migrator connection', function (): void
 
         expect(app('db')->connection()->table($permissions_table)->value('connection_name'))->toBe('affinity')
             ->and(app('db')->connection()->table($permissions_table)->value('table_name'))->toBe('widgets')
-            ->and($trigger_count)->toBe(4);
+            ->and(app('db')->connection()->table($permissions_table)->value('module_name'))->toBe('widgets')
+            ->and($trigger_count)->toBe(6);
 
         $migration->down();
 
