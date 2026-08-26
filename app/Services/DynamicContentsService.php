@@ -115,7 +115,7 @@ final class DynamicContentsService
         $cache_key = $this->typedMemoKey($entity_model->getCacheKey(), $type_cache_key);
         $this->registerEntityMemoKey($cache_key);
 
-        $this->entities_cache[$type_cache_key] = Cache::memo()->rememberForever(
+        $this->entities_cache[$type_cache_key] = $this->rememberForeverCollection(
             $cache_key,
             fn (): Collection => $entity_class::query()
                 ->withoutGlobalScopes()
@@ -147,7 +147,7 @@ final class DynamicContentsService
         $cache_key = $this->typedMemoKey($preset_model->getCacheKey(), $type_cache_key);
         $this->registerPresetMemoKey($cache_key);
 
-        $this->presets_cache[$type_cache_key] = Cache::memo()->rememberForever(
+        $this->presets_cache[$type_cache_key] = $this->rememberForeverCollection(
             $cache_key,
             fn (): Collection => $preset_class::query()
                 ->withoutGlobalScopes()
@@ -187,7 +187,7 @@ final class DynamicContentsService
         $presets_table = CoreTables::Presets->value;
         $entities_table = CoreTables::Entities->value;
 
-        $this->presettables_cache[$type_cache_key] = Cache::memo()->rememberForever(
+        $this->presettables_cache[$type_cache_key] = $this->rememberForeverCollection(
             $cache_key,
             fn (): Collection => $presettable_class::query()
                 ->join($presets_table, "{$presettables_table}.preset_id", '=', "{$presets_table}.id")
@@ -253,6 +253,33 @@ final class DynamicContentsService
     private static function forgetMemoCacheKey(string $key): void
     {
         Cache::memo()->forget($key);
+    }
+
+    /**
+     * Remember a value forever via Cache::memo(), guaranteeing an Eloquent Collection.
+     *
+     * Persistent drivers (Redis serializers, failover, fork reconnect) can rehydrate
+     * Eloquent collections as plain arrays. Laravel's rememberForever treats any
+     * non-null value as a hit, so a cached array would bypass the loader and violate
+     * our return type — reload from the database when that happens.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  callable(): Collection<int, TModel>  $loader
+     * @return Collection<int, TModel>
+     */
+    private function rememberForeverCollection(string $cache_key, callable $loader): Collection
+    {
+        $cached = Cache::memo()->rememberForever($cache_key, $loader);
+
+        if ($cached instanceof Collection) {
+            return $cached;
+        }
+
+        $fresh = $loader();
+        Cache::memo()->forever($cache_key, $fresh);
+
+        return $fresh;
     }
 
     /**

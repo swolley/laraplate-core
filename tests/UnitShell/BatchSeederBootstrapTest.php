@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Helpers\BatchSeeder;
 use Modules\Core\Overrides\Seeder;
+use Modules\Core\Services\DynamicContentsService;
 
 uses(Tests\TestCase::class);
 
@@ -70,4 +72,29 @@ it('bootstrapChildProcess reconnects the resolved worker connection', function (
     } finally {
         DB::swap($original);
     }
+});
+
+it('bootstrapChildProcess rebuilds Cache::memo and resets DynamicContentsService', function (): void {
+    config()->set('cache.default', 'array');
+    $default_driver = (string) config('cache.default');
+
+    $memo_before = Cache::memo();
+    $service_before = DynamicContentsService::getInstance();
+
+    $seeder = new class(app(DatabaseManager::class)) extends BatchSeeder
+    {
+        public function __destruct() {}
+
+        protected function execute(): void {}
+    };
+
+    $bootstrap = new ReflectionMethod(BatchSeeder::class, 'bootstrapChildProcess');
+    $bootstrap->setAccessible(true);
+    $connection_name = (new ReflectionClass(BatchSeeder::class))->getProperty('childDatabaseConnectionName');
+    $connection_name->setValue($seeder, app(DatabaseManager::class)->getDefaultConnection());
+    $bootstrap->invoke($seeder);
+
+    expect(Cache::memo())->not->toBe($memo_before)
+        ->and(DynamicContentsService::getInstance())->not->toBe($service_before)
+        ->and(app()->bound('cache.__memoized:' . $default_driver))->toBeTrue();
 });

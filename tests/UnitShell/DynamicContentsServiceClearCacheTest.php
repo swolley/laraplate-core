@@ -40,3 +40,23 @@ it('clearAllCaches forgets memo store entries for entities, presets, and presett
 
     DynamicContentsService::getInstance()->clearAllCaches();
 });
+
+it('rememberForeverCollection reloads when the persistent cache returns a plain array', function (): void {
+    config()->set('cache.default', 'array');
+    Cache::flush();
+    app()->forgetInstance('cache.__memoized:array');
+    DynamicContentsService::reset();
+
+    $cache_key = 'core.dynamic_contents.test:array-rehydrate';
+    Cache::forever($cache_key, ['not' => 'a-collection']);
+
+    $service = DynamicContentsService::getInstance();
+    $method = new ReflectionMethod(DynamicContentsService::class, 'rememberForeverCollection');
+    $method->setAccessible(true);
+
+    $fresh = new Illuminate\Database\Eloquent\Collection();
+    $result = $method->invoke($service, $cache_key, static fn (): Illuminate\Database\Eloquent\Collection => $fresh);
+
+    expect($result)->toBe($fresh)
+        ->and($result)->toBeInstanceOf(Illuminate\Database\Eloquent\Collection::class);
+});

@@ -23,23 +23,24 @@ use Modules\Core\Concurrency\ParallelTaskRunner;
 use Modules\Core\Concurrency\Reporters\ProgressBarReporter;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\DynamicContentsService;
 use ReflectionClass;
 use Throwable;
 
 abstract class BatchSeeder extends Seeder
 {
-    private const int MAX_RETRIES = 3;
-
-    private const int BATCHSIZE = 100;
-
-    private const int RETRY_DELAY = 1; // seconds
-
     /**
      * Container key under which {@see \Modules\Core\Console\SeedCommand} publishes
      * the resolved dev-seed volume multiplier. Read here rather than off the
      * console command, whose input the nested module:seed -> db:seed calls mutate.
      */
     public const string SCALE_CONTAINER_KEY = 'core.dev-seed-scale';
+
+    private const int MAX_RETRIES = 3;
+
+    private const int BATCHSIZE = 100;
+
+    private const int RETRY_DELAY = 1; // seconds
 
     private ?string $childDatabaseConnectionName = null;
 
@@ -100,6 +101,15 @@ abstract class BatchSeeder extends Seeder
         if (app()->bound('redis')) {
             app('redis')->purge();
         }
+
+        // Cache::memo() is a scoped container binding that survives Cache::purge().
+        // After fork it still wraps the parent's dead Redis connection; forget it so
+        // the next memo() rebuilds against fresh stores. Reset DynamicContentsService
+        // so workers do not reuse in-memory buckets paired with that stale memo store
+        // (persistent cache can rehydrate Eloquent collections as plain arrays).
+        $default_driver = (string) config('cache.default');
+        app()->forgetInstance('cache.__memoized:' . $default_driver);
+        DynamicContentsService::reset();
     }
 
     /**
@@ -277,6 +287,7 @@ abstract class BatchSeeder extends Seeder
         foreach ($modelClasses as $model_class) {
             /** @phpstan-ignore staticMethod.notFound */
             $previous[$model_class] = $model_class::getVersioning();
+
             /** @phpstan-ignore staticMethod.notFound */
             $model_class::disableVersioning();
         }
