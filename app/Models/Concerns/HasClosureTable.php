@@ -21,11 +21,6 @@ use Modules\Core\Helpers\TreeCollection;
  */
 trait HasClosureTable
 {
-    /**
-     * In-memory cache for depth values during the request.
-     */
-    private static array $depth_cache = [];
-
     public static function rebuildClosure(): void
     {
         $model = new static;
@@ -156,15 +151,13 @@ trait HasClosureTable
     public function getDepth(): int
     {
         $cache_key = $this->depthCacheKey();
-
-        // Check in-memory cache first
-        if (isset(self::$depth_cache[$cache_key])) {
-            return self::$depth_cache[$cache_key];
-        }
-
         $closureTable = $this->getClosureTable();
 
-        $depth = Cache::remember(
+        // The in-request memo sits on the memoized store rather than in a static array:
+        // a static L1 grows by one entry per node the process ever touches, which never
+        // shrinks on a long-lived worker. The memoized store is bound per request and
+        // still exposes forget(), which invalidateDepthCache() needs.
+        return (int) Cache::memo()->remember(
             $cache_key,
             now()->addHours(24),
             fn () => $this->getConnection()->table($closureTable)
@@ -172,11 +165,6 @@ trait HasClosureTable
                 ->where($this->qualifyTreeColumn('descendant_id', $closureTable), $this->id)
                 ->value($this->qualifyTreeColumn('depth', $closureTable)) ?? 0,
         );
-
-        // Store in memory
-        self::$depth_cache[$cache_key] = $depth;
-
-        return $depth;
     }
 
     public function isRoot(): bool
@@ -406,12 +394,8 @@ trait HasClosureTable
         // This is currently handled by calling rebuildClosure() when needed, or can be
         // optimized in the future with a more efficient SQL-based approach
 
-        // Clear in-memory cache for this model
-        $cache_key = $this->depthCacheKey();
-        unset(self::$depth_cache[$cache_key]);
-
-        // Clear external cache
-        Cache::forget($cache_key);
+        // Clears both the in-request memo and the persistent entry for this node only.
+        Cache::memo()->forget($this->depthCacheKey());
     }
 
     private function depthCacheKey(): string

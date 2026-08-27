@@ -152,6 +152,51 @@ it('computes depth with cache and memory cache', function (): void {
     expect($depth_again)->toBe(0);
 });
 
+it('memoizes depth for the request without keeping process-level state', function (): void {
+    Cache::flush();
+
+    $root = ClosureTreeStubModel::query()->create(['parent_id' => null]);
+    ClosureTreeStubModel::rebuildClosure();
+
+    $node = $root->fresh();
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    expect($node->getDepth())->toBe(0)
+        ->and($node->getDepth())->toBe(0)
+        ->and(DB::getQueryLog())->toHaveCount(1);
+
+    // A static L1 would grow by one entry per node the worker ever touches.
+    expect((new ReflectionClass(ClosureTreeStubModel::class))->getStaticProperties())
+        ->not->toHaveKey('depth_cache');
+});
+
+it('drops the memoized depth of the invalidated node on the instance that holds it', function (): void {
+    Cache::flush();
+
+    $node_id = 888_888;
+    DB::table('closure_tree_nodes')->insert(['id' => $node_id, 'parent_id' => null]);
+    DB::table('closure_tree_nodes_closure')->insert([
+        'ancestor_id' => $node_id,
+        'descendant_id' => $node_id,
+        'depth' => 4,
+    ]);
+
+    $node = (new ClosureTreeStubModel)->setRawAttributes(['id' => $node_id, 'parent_id' => null], true);
+    $node->exists = true;
+
+    expect($node->getDepth())->toBe(4);
+
+    $parent = ClosureTreeStubModel::query()->create(['parent_id' => null]);
+
+    // moveTo() rewrites this node's closure rows and invalidates its depth by key. The
+    // same instance must observe the new value, so the request memo has to be
+    // forgettable per key — an all-or-nothing request memo would keep serving 4.
+    expect($node->moveTo($parent))->toBeTrue()
+        ->and($node->getDepth())->toBe(0);
+});
+
 it('isolates depth caches for identical table and ids on different connections', function (): void {
     Cache::flush();
 
