@@ -233,6 +233,11 @@ it('issues a fixed number of queries regardless of row count', function (): void
     $small = settingsDefinition(seedQueryBudgetFixture('q_small', 1));
     $large = settingsDefinition(seedQueryBudgetFixture('q_large', 50));
 
+    // The first reconcile of a request pays a one-off permission existence query, which
+    // is memoized for the rest of the request and is not part of the per-row budget this
+    // test pins. Warm it on a throwaway definition so both measurements start level.
+    app(SeedReconciler::class)->reconcile(settingsDefinition(seedQueryBudgetFixture('q_warm', 1)));
+
     DB::enableQueryLog();
     app(SeedReconciler::class)->reconcile($small);
     $small_count = count(DB::getQueryLog());
