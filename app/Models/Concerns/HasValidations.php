@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
 use LogicException;
+use Modules\Core\Authorization\PermissionExistenceMemo;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
@@ -208,13 +209,8 @@ trait HasValidations
         $permission_class = config('permission.models.permission');
 
         // Memoized for the current request only: a permission granted or revoked
-        // between requests must be observed by the next one. Both captured values are
-        // scalars, so the memo key is stable and carries the permission identity.
-        $permission_exists = once(fn (): bool => (new $permission_class)->newQuery()
-            ->where('name', $permission)
-            ->exists());
-
-        if (! $permission_exists) {
+        // between requests must be observed by the next one.
+        if (! PermissionExistenceMemo::exists($permission_class, $permission)) {
             return true;
         }
 

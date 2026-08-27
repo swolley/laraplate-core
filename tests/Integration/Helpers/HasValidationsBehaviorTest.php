@@ -411,22 +411,6 @@ it('checks user permissions when a permission row exists', function (): void {
     expect($allowed)->toBeTrue();
 });
 
-it('clears the permission existence cache', function (): void {
-    Once::flush();
-
-    $model = new class extends Model
-    {
-        protected $table = 'cache_reset_table';
-    };
-
-    $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
-    $method->invoke(null, $model, 'select');
-
-    Once::flush();
-
-    expect(true)->toBeTrue();
-});
-
 it('rejects non-string casts for validation attribute resolution', function (): void {
     $model = new class extends Model
     {

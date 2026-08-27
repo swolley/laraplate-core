@@ -254,10 +254,14 @@ it('uses and caches the permission model connection independently of the authori
         $affinity_model->setTable($table_name);
         $affinity_model->setConnection($connection_name);
 
-        $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
+        // Dispatch through each concrete model class, as bootHasValidations() does with
+        // static::checkUserCanDo(). Invoking the trait directly would pin the late static
+        // binding to HasValidations and hide a memo key that varies per model class.
+        $check = static fn (Illuminate\Database\Eloquent\Model $subject): bool => (bool) (new ReflectionMethod($subject::class, 'checkUserCanDo'))
+            ->invoke(null, $subject, 'select');
 
-        expect($method->invoke(null, $model, 'select'))->toBeFalse()
-            ->and($method->invoke(null, $affinity_model, 'select'))->toBeFalse()
+        expect($check($model))->toBeFalse()
+            ->and($check($affinity_model))->toBeFalse()
             ->and($permission_query_count)->toBe(1)
             ->and($queried_connections)->toContain($permission_model->getConnection()->getName())
             ->and($queried_connections)->not->toContain($connection_name);
