@@ -46,6 +46,7 @@ use Modules\Core\Graph\GraphProviderRegistry;
 use Modules\Core\Graph\GraphToolGateway;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
+use Modules\Core\Http\Middleware\ApplyDatabaseSettingsOverlay;
 use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
@@ -69,6 +70,7 @@ use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Performance\SubprocessBootSampler;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
@@ -114,8 +116,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        $this->app->make(DatabaseConfigOverlay::class)
-            ->applyFromDatabase($this->app->make(PerModelSettingResolver::class));
+        // HTTP requests get the overlay from ApplyDatabaseSettingsOverlay instead: a
+        // long-lived worker boots once, so an overlay applied here would freeze
+        // database-backed config for the whole process lifetime. Console commands have
+        // no middleware pipeline, so they still need it at boot.
+        if ($this->app->runningInConsole()) {
+            $this->app->make(DatabaseConfigOverlay::class)
+                ->applyFromDatabase($this->app->make(PerModelSettingResolver::class));
+        }
+
         $this->configureFortifyFeatures();
 
         $this->registerAuths();
@@ -463,9 +472,16 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(SchemaInspector::class, static fn (): SchemaInspector => SchemaInspector::getInstance());
 
-        $this->app->singleton(PerModelSettingResolver::class);
+        // Scoped, not singleton: the resolver holds an in-memory layer over a persistent
+        // cache that only the writing process invalidates, so a process-wide instance
+        // serves stale settings on every other worker until restart.
+        $this->app->scoped(PerModelSettingResolver::class);
         $this->app->singleton(SettingsCacheCoordinator::class);
         $this->app->singleton(DatabaseConfigOverlay::class);
+
+        // Scoped so that one request shares one instance: once() binds its memo to $this,
+        // and a dozen collaborators resolve this service during a single CRUD request.
+        $this->app->scoped(AuthorizationService::class);
 
         $this->app->singleton(ModerationAdapterRegistry::class);
 
@@ -670,6 +686,18 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function registerMiddlewares(): void
     {
         $router = resolve(Router::class);
+
+        // pushMiddlewareToGroup, not $router->middleware(): the latter builds a fluent
+        // RouteRegistrar and discards it, so it registers nothing (see the note below).
+        foreach (['web', 'api'] as $group) {
+            $router->pushMiddlewareToGroup($group, ApplyDatabaseSettingsOverlay::class);
+        }
+
+        // FIXME: the four calls below register nothing. Router has no middleware()
+        // method, so they resolve through __call into a discarded RouteRegistrar. Only
+        // LocalizationMiddleware actually runs anywhere, because AdminPanelProvider lists
+        // it explicitly for the Filament panel. Fixing this changes request behaviour on
+        // /app and /api/v1, so it is deliberately left alone here.
         $router->middleware(LocalizationMiddleware::class);
         $router->middleware(PreviewMiddleware::class);
         $router->middleware(ConvertStringToBoolean::class);
