@@ -61,6 +61,37 @@ it('invalidates cached presets and presettables when a preset is created', funct
         ->and($service->fetchAvailablePresettables(EntityType::Contents)->count())->toBe($presettables_before + 1);
 });
 
+/**
+ * Parallel BatchSeeder workers call {@see DynamicContentsService::reset()} after fork,
+ * which drops the in-process memo-key registry. Invalidation must still bust typed
+ * persistent keys (via metadata generation), otherwise a stale presets list can miss
+ * a presettable's preset_id ("No cached preset [N]").
+ */
+it('invalidates typed preset memo keys even after DynamicContentsService::reset', function (): void {
+    $entity = Entity::query()->create([
+        'name' => 'Article_' . uniqid(),
+        'slug' => 'article-' . uniqid(),
+        'type' => EntityType::Contents,
+    ]);
+
+    // Warm an empty (or partial) presets list, then drop the in-process registry like a fork.
+    DynamicContentsService::getInstance()->fetchAvailablePresets(EntityType::Contents);
+    DynamicContentsService::reset();
+
+    $preset = Preset::query()->create([
+        'entity_id' => $entity->id,
+        'name' => 'preset_after_reset_' . uniqid(),
+    ]);
+
+    $ids = DynamicContentsService::getInstance()
+        ->fetchAvailablePresets(EntityType::Contents)
+        ->pluck('id')
+        ->map(fn (mixed $id): int => (int) $id)
+        ->all();
+
+    expect($ids)->toContain((int) $preset->id);
+});
+
 it('invalidates cached presets when a preset is updated', function (): void {
     $entity = Entity::query()->create([
         'name' => 'Article_' . uniqid(),

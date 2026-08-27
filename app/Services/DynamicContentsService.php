@@ -23,6 +23,15 @@ use UnexpectedValueException;
 final class DynamicContentsService
 {
     /**
+     * Shared generation embedded in every typed memo key. Bumped on metadata
+     * writes so invalidation works even after {@see self::reset()} drops the
+     * in-process key registry (parallel BatchSeeder forks) or when another
+     * process never warmed the registry — without this, stale
+     * `rememberForever` preset lists miss new preset ids ("No cached preset [N]").
+     */
+    private const string METADATA_GENERATION_KEY = 'core.dynamic_contents.generation';
+
+    /**
      * Memo / persistent cache keys used for presettable lists (one per concrete Presettable class).
      *
      * @var list<string>
@@ -210,7 +219,9 @@ final class DynamicContentsService
     public function clearEntitiesCache(): void
     {
         $this->entities_cache = [];
-        $this->forgetAllEntityMemoKeys();
+        $this->forgetRegisteredMemoKeys(self::$registered_entity_memo_keys);
+        self::forgetMemoCacheKey('entities');
+        $this->bumpMetadataGeneration();
     }
 
     /**
@@ -220,7 +231,9 @@ final class DynamicContentsService
     public function clearPresetsCache(): void
     {
         $this->presets_cache = [];
-        $this->forgetAllPresetMemoKeys();
+        $this->forgetRegisteredMemoKeys(self::$registered_preset_memo_keys);
+        self::forgetMemoCacheKey('presets');
+        $this->bumpMetadataGeneration();
     }
 
     /**
@@ -230,7 +243,9 @@ final class DynamicContentsService
     public function clearPresettablesCache(): void
     {
         $this->presettables_cache = [];
-        $this->forgetAllPresettableMemoKeys();
+        $this->forgetRegisteredMemoKeys(self::$registered_presettable_memo_keys);
+        self::forgetMemoCacheKey('presettables');
+        $this->bumpMetadataGeneration();
     }
 
     /**
@@ -241,9 +256,13 @@ final class DynamicContentsService
         $this->entities_cache = [];
         $this->presets_cache = [];
         $this->presettables_cache = [];
-        $this->forgetAllEntityMemoKeys();
-        $this->forgetAllPresetMemoKeys();
-        $this->forgetAllPresettableMemoKeys();
+        $this->forgetRegisteredMemoKeys(self::$registered_entity_memo_keys);
+        $this->forgetRegisteredMemoKeys(self::$registered_preset_memo_keys);
+        $this->forgetRegisteredMemoKeys(self::$registered_presettable_memo_keys);
+        self::forgetMemoCacheKey('entities');
+        self::forgetMemoCacheKey('presets');
+        self::forgetMemoCacheKey('presettables');
+        $this->bumpMetadataGeneration();
     }
 
     /**
@@ -252,7 +271,20 @@ final class DynamicContentsService
      */
     private static function forgetMemoCacheKey(string $key): void
     {
+        Cache::forget($key);
         Cache::memo()->forget($key);
+    }
+
+    /**
+     * @param  list<string>  $in_memory_keys
+     */
+    private function forgetRegisteredMemoKeys(array &$in_memory_keys): void
+    {
+        foreach ($in_memory_keys as $key) {
+            self::forgetMemoCacheKey($key);
+        }
+
+        $in_memory_keys = [];
     }
 
     /**
@@ -312,9 +344,21 @@ final class DynamicContentsService
         return $type::class . ':' . $type->toScalar();
     }
 
+    private function metadataGeneration(): int
+    {
+        return (int) Cache::get(self::METADATA_GENERATION_KEY, 0);
+    }
+
+    private function bumpMetadataGeneration(): void
+    {
+        // Use the non-memo store only. Cache::memo()->forget() also deletes from the
+        // underlying repository, which would wipe the generation we just wrote.
+        Cache::forever(self::METADATA_GENERATION_KEY, $this->metadataGeneration() + 1);
+    }
+
     private function typedMemoKey(string $cache_key, string $type_cache_key): string
     {
-        return $cache_key . ':' . hash('sha256', $type_cache_key);
+        return $cache_key . ':' . hash('sha256', $type_cache_key) . ':g' . $this->metadataGeneration();
     }
 
     /**
@@ -326,7 +370,7 @@ final class DynamicContentsService
             ? $presettable_class . ':' . $this->typeCacheKey($type)
             : $presettable_class;
 
-        return 'core.dynamic_contents.presettables:' . hash('sha256', $key_parts);
+        return 'core.dynamic_contents.presettables:' . hash('sha256', $key_parts) . ':g' . $this->metadataGeneration();
     }
 
     private function registerEntityMemoKey(string $cache_key): void
@@ -348,35 +392,5 @@ final class DynamicContentsService
         if (! in_array($cache_key, self::$registered_presettable_memo_keys, true)) {
             self::$registered_presettable_memo_keys[] = $cache_key;
         }
-    }
-
-    private function forgetAllEntityMemoKeys(): void
-    {
-        foreach (self::$registered_entity_memo_keys as $key) {
-            self::forgetMemoCacheKey($key);
-        }
-
-        self::$registered_entity_memo_keys = [];
-        self::forgetMemoCacheKey('entities');
-    }
-
-    private function forgetAllPresetMemoKeys(): void
-    {
-        foreach (self::$registered_preset_memo_keys as $key) {
-            self::forgetMemoCacheKey($key);
-        }
-
-        self::$registered_preset_memo_keys = [];
-        self::forgetMemoCacheKey('presets');
-    }
-
-    private function forgetAllPresettableMemoKeys(): void
-    {
-        foreach (self::$registered_presettable_memo_keys as $key) {
-            self::forgetMemoCacheKey($key);
-        }
-
-        self::$registered_presettable_memo_keys = [];
-        self::forgetMemoCacheKey('presettables');
     }
 }

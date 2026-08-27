@@ -1,29 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication Language Lines
-    |--------------------------------------------------------------------------
-    |
-    | The following language lines are used during authentication for various
-    | messages that we need to display to the user. You are free to modify
-    | these language lines according to your application's requirements.
-    |
-    */
-
-    'failed' => 'These credentials do not match our records.',
-    'password' => 'The provided password is incorrect.',
-    'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
-    'module_scope_denied' => 'You do not have access to this module.',
+return [
+  'failed' => 'Credenziali non valide.',
+  'module_scope_denied' => 'Non hai accesso a questo modulo.',
+  'password' => 'Password non corretta.',
+  'throttle' => 'Troppi tentativi di accesso. Riprova tra :seconds secondi.',
 ];
-
-if ($default_locale !== 'en') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/auth.php"));
-}
-
-return $translations;

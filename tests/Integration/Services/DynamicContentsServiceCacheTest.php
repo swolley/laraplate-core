@@ -29,7 +29,7 @@ it('registers namespaced presettable memo keys for later invalidation', function
 
     $key = $reflection->invoke($service, Presettable::class);
 
-    expect($key)->toBe('core.dynamic_contents.presettables:' . hash('sha256', Presettable::class));
+    expect($key)->toBe('core.dynamic_contents.presettables:' . hash('sha256', Presettable::class) . ':g0');
 });
 
 it('keeps entity in-memory cache buckets isolated by dynamic content type', function (): void {

@@ -1,17 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
-    'failed' => 'Diese Kombination aus Zugangsdaten wurde nicht in unserer Datenbank gefunden.',
-    'password' => 'Das Passwort ist falsch.',
-    'throttle' => 'Zu viele Login-Versuche. Versuchen Sie es bitte in :seconds Sekunden nochmal.',
+return [
+  'failed' => 'Credenziali non valide.',
+  'module_scope_denied' => 'Non hai accesso a questo modulo.',
+  'password' => 'Password non corretta.',
+  'throttle' => 'Troppi tentativi di accesso. Riprova tra :seconds secondi.',
 ];
-
-if ($default_locale !== 'de') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/auth.php"));
-}
-
-return $translations;

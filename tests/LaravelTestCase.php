@@ -67,5 +67,11 @@ abstract class LaravelTestCase extends \Tests\TestCase
         // Facade caches the manager from earlier bootstrap; without this, __callStatic
         // keeps using a default CacheManager whose Repository forwards unknown methods to ArrayStore.
         Cache::clearResolvedInstance();
+
+        // Cache::memo() is a scoped binding that can outlive the store swap above and
+        // keep stale rememberForever values across tests in the same parallel worker.
+        foreach (array_unique(['array', (string) $app['config']->get('cache.default')]) as $driver) {
+            $app->forgetInstance('cache.__memoized:' . $driver);
+        }
     }
 }
