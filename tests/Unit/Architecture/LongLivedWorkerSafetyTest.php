@@ -67,3 +67,15 @@ it('never runs subprocess or fork concurrency in request-reachable code', functi
 
     expect($offenders)->toBe([]);
 });
+
+it('never installs POSIX signal handlers in request-reachable code', function (): void {
+    $offenders = [];
+
+    foreach (http_reachable_sources() as $path => $contents) {
+        if (preg_match('/\bpcntl_(signal|alarm|async_signals|fork)\s*\(/', $contents) === 1) {
+            $offenders[] = $path;
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});
