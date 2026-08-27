@@ -47,24 +47,6 @@ trait HasValidations
     protected bool $skip_validation = false;
 
     /**
-     * In-memory cache for permission existence checks.
-     * Keyed by connection and permission name, value is whether the permission row exists in DB.
-     * Populated on first access; reset between requests naturally by PHP-FPM.
-     *
-     * @var array<string, bool>
-     */
-    private static array $permission_existence_cache = [];
-
-    /**
-     * Reset the in-memory permission existence cache.
-     * Used in tests and long-running processes to clear stale state.
-     */
-    public static function resetPermissionExistenceCache(): void
-    {
-        self::$permission_existence_cache = [];
-    }
-
-    /**
      * Imposta il flag per saltare le validazioni.
      */
     public function setSkipValidation(bool $skip = true): void
@@ -221,20 +203,18 @@ trait HasValidations
     protected static function checkUserCanDo(Model $model, string $operation): bool
     {
         $permission = $model->getTable() . '.' . $operation;
+
+        /** @var class-string<Model> $permission_class */
         $permission_class = config('permission.models.permission');
 
-        /** @var Model $permission_model */
-        $permission_model = new $permission_class;
-        $permission_connection = $permission_model->getConnection()->getName();
-        $cache_key = $permission_connection . ':' . $permission;
+        // Memoized for the current request only: a permission granted or revoked
+        // between requests must be observed by the next one. Both captured values are
+        // scalars, so the memo key is stable and carries the permission identity.
+        $permission_exists = once(fn (): bool => (new $permission_class)->newQuery()
+            ->where('name', $permission)
+            ->exists());
 
-        // L1: check static in-memory cache first to avoid repeated DB queries
-        // for the same permission name within the same request lifecycle
-        if (! array_key_exists($cache_key, self::$permission_existence_cache)) {
-            self::$permission_existence_cache[$cache_key] = $permission_model->newQuery()->where('name', $permission)->exists();
-        }
-
-        if (! self::$permission_existence_cache[$cache_key]) {
+        if (! $permission_exists) {
             return true;
         }
 

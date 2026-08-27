@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Once;
 use Illuminate\Validation\Rule;
 use Modules\CMS\Casts\EntityType;
 use Modules\CMS\Models\Entity;
@@ -363,7 +364,7 @@ it('preserves explicitly qualified string and object database rule tables', func
 });
 
 it('authorizes force delete and restore lifecycle hooks', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $role = Role::factory()->create();
     Auth::login(User::factory()->create());
@@ -378,7 +379,7 @@ it('authorizes force delete and restore lifecycle hooks', function (): void {
 });
 
 it('checks user permissions when a permission row exists', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $table_name = 'check_perm_' . uniqid();
     $operation = 'select';
@@ -411,7 +412,7 @@ it('checks user permissions when a permission row exists', function (): void {
 });
 
 it('clears the permission existence cache', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $model = new class extends Model
     {
@@ -421,7 +422,7 @@ it('clears the permission existence cache', function (): void {
     $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
     $method->invoke(null, $model, 'select');
 
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     expect(true)->toBeTrue();
 });

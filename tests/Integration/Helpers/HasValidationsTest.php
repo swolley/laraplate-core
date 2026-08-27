@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Once;
 use Modules\Core\Models\Concerns\HasValidations;
 
 it('trait can be used', function (): void {
@@ -168,12 +169,8 @@ it('trait can be used in different scenarios', function (): void {
 
 // Feature: performance-optimization, Property 1: permission existence cache eliminates redundant DB queries
 
-it('exposes resetPermissionExistenceCache static method', function (): void {
-    expect(method_exists(HasValidations::class, 'resetPermissionExistenceCache'))->toBeTrue();
-});
-
 it('does not issue a second DB query for the same permission name', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $permission_name = 'test_table_cache.' . fake()->unique()->word();
     $query_count = 0;
@@ -204,7 +201,7 @@ it('does not issue a second DB query for the same permission name', function ():
 });
 
 it('uses and caches the permission model connection independently of the authorized model connection', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $connection_name = 'permission_affinity';
     $permission_model_class = config('permission.models.permission');
@@ -266,16 +263,16 @@ it('uses and caches the permission model connection independently of the authori
             ->and($queried_connections)->not->toContain($connection_name);
     } finally {
         Illuminate\Support\Facades\Auth::logout();
-        HasValidations::resetPermissionExistenceCache();
+        Once::flush();
         Illuminate\Support\Facades\DB::disconnect($connection_name);
         Illuminate\Support\Facades\DB::purge($connection_name);
     }
 });
 
-it('resets permission existence cache to empty state', function (): void {
-    HasValidations::resetPermissionExistenceCache();
+it('issues a fresh DB query after the request-scoped memo is flushed', function (): void {
+    Once::flush();
 
-    // After reset the static cache is empty — next call will query DB again
+    // After the flush the memo is empty — next call will query DB again
     $model = new class extends Illuminate\Database\Eloquent\Model
     {
         use HasValidations;
@@ -286,7 +283,7 @@ it('resets permission existence cache to empty state', function (): void {
     $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
     $method->invoke(null, $model, 'select');
 
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $query_count = 0;
     Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $event) use (&$query_count): void {
@@ -297,7 +294,7 @@ it('resets permission existence cache to empty state', function (): void {
 
     $method->invoke(null, $model, 'select');
 
-    // After reset, a fresh DB query is issued
+    // After the flush, a fresh DB query is issued
     expect($query_count)->toBeGreaterThanOrEqual(1);
 });
 
@@ -311,7 +308,7 @@ it('resets permission existence cache to empty state', function (): void {
  */
 it('does not query DB on warm cache for any permission name (property test)', function (): void {
     // Feature: performance-optimization, Property 1: permission existence cache eliminates redundant DB queries
-    HasValidations::resetPermissionExistenceCache();
+    Once::flush();
 
     $table = fake()->unique()->word();
     $operation = fake()->randomElement(['select', 'insert', 'update', 'delete']);

@@ -9,15 +9,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\CronJob;
-use Modules\Core\Models\Permission;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Override;
-use ReflectionProperty;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\NullOutput;
@@ -30,7 +27,6 @@ use Throwable;
  * 1. All Setting groups (all records)
  * 2. Cron jobs
  * 3. Version strategies (all Setting records with group_name = 'versioning')
- * 4. Permission existence map (all Permission names → true)
  */
 final class WarmCacheCommand extends Command
 {
@@ -38,7 +34,7 @@ final class WarmCacheCommand extends Command
     protected $signature = 'cache:warm';
 
     #[Override]
-    protected $description = 'Pre-warm critical runtime cache entries (settings, cron jobs, version strategies, permissions) <fg=green>(⚡ Modules\Core)</fg=green>';
+    protected $description = 'Pre-warm critical runtime cache entries (settings, cron jobs, version strategies) <fg=green>(⚡ Modules\Core)</fg=green>';
 
     public function handle(): int
     {
@@ -49,7 +45,7 @@ final class WarmCacheCommand extends Command
         $start = microtime(true);
         $total_warmed = 0;
         $failed_steps = 0;
-        $total_steps = 4;
+        $total_steps = 3;
 
         $this->info('Warming cache entries...');
 
@@ -84,17 +80,6 @@ final class WarmCacheCommand extends Command
             $failed_steps++;
             Log::error('cache:warm — failed to warm version strategies', ['exception' => $e->getMessage()]);
             $this->line('  <fg=red>✗</fg=red> Version strategies: failed (' . $e->getMessage() . ')');
-        }
-
-        // Step 4: Warm permission existence map
-        try {
-            $warmed = $this->warmPermissionExistenceMap();
-            $total_warmed += $warmed;
-            $this->line("  <fg=green>✓</fg=green> Permission existence map: {$warmed} entries warmed.");
-        } catch (Throwable $e) {
-            $failed_steps++;
-            Log::error('cache:warm — failed to warm permission existence map', ['exception' => $e->getMessage()]);
-            $this->line('  <fg=red>✗</fg=red> Permission existence map: failed (' . $e->getMessage() . ')');
         }
 
         $elapsed = round((microtime(true) - $start) * 1000, 2);
@@ -177,38 +162,5 @@ final class WarmCacheCommand extends Command
         HasVersions::resetVersionStrategyCache();
 
         return 1;
-    }
-
-    /**
-     * Warm the permission existence map into the static in-memory cache.
-     * Loads all Permission names and marks them as existing (true).
-     * Returns the number of permission entries warmed.
-     */
-    private function warmPermissionExistenceMap(): int
-    {
-        if (! SchemaInspector::getInstance()->hasTable(CoreTables::Permissions->value)) {
-            return 0;
-        }
-
-        // Reset first to ensure idempotency
-        HasValidations::resetPermissionExistenceCache();
-
-        $permission_names = Permission::query()->pluck('name');
-
-        // Populate the static cache by calling the internal mechanism via reflection
-        // We use the public reset + direct static property access pattern established
-        // by the HasValidations trait design.
-        $reflection = new ReflectionProperty(HasValidations::class, 'permission_existence_cache');
-
-        /** @var array<string, bool> $cache_map */
-        $cache_map = [];
-
-        foreach ($permission_names as $name) {
-            $cache_map[(string) $name] = true; // @phpstan-ignore cast.string
-        }
-
-        $reflection->setValue(null, $cache_map);
-
-        return $permission_names->count();
     }
 }

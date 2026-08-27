@@ -5,9 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Console\WarmCacheCommand;
-use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\Concerns\HasVersions;
-use Modules\Core\Models\Permission;
 use Modules\Core\Models\Setting;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
@@ -69,38 +67,9 @@ it('running cache:warm twice produces the same version_strategies cache state', 
 
 // Feature: performance-optimization, Property 22: Cache warming command is idempotent
 // Validates: Requirements 16.3
-it('running cache:warm twice produces the same permission existence map state', function (): void {
-    HasValidations::resetPermissionExistenceCache();
-
-    // Create some permissions
-    Permission::factory()->count(3)->create();
-
-    $reflection = new ReflectionProperty(HasValidations::class, 'permission_existence_cache');
-    $reflection->setAccessible(true);
-
-    // First run
-    $this->artisan('cache:warm')->assertExitCode(BaseCommand::SUCCESS);
-
-    /** @var array<string, bool> $state_after_first */
-    $state_after_first = $reflection->getValue(null);
-
-    // Second run (should produce identical state)
-    $this->artisan('cache:warm')->assertExitCode(BaseCommand::SUCCESS);
-
-    /** @var array<string, bool> $state_after_second */
-    $state_after_second = $reflection->getValue(null);
-
-    expect($state_after_first)->not->toBeEmpty()
-        ->and(array_keys($state_after_first))->toBe(array_keys($state_after_second))
-        ->and(array_values($state_after_first))->toBe(array_values($state_after_second));
-})->repeat(3);
-
-// Feature: performance-optimization, Property 22: Cache warming command is idempotent
-// Validates: Requirements 16.3
 it('running cache:warm N times always produces the same final cache state', function (): void {
     CacheManager::resetAppNameCache();
     HasVersions::resetVersionStrategyCache();
-    HasValidations::resetPermissionExistenceCache();
 
     $cache_key = CacheManager::key('version_strategies');
 
@@ -148,7 +117,6 @@ it('cache:warm is triggered on boot when warm_on_boot is true', function (): voi
     config(['core.cache.warm_on_boot' => true]);
 
     HasVersions::resetVersionStrategyCache();
-    HasValidations::resetPermissionExistenceCache();
 
     $cache_key = CacheManager::key('version_strategies');
     Cache::forget($cache_key);

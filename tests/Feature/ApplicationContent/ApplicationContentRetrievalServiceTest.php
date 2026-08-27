@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Once;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalService;
 use Modules\Core\ApplicationContent\Data\ApplicationContentHit;
@@ -33,7 +34,7 @@ function applicationContentServiceHit(int $key = 1): ApplicationContentHit
 
 beforeEach(function (): void {
     Cache::flush();
-    AuthorizationService::resetPermissionCache();
+    Once::flush();
     $this->permission = Permission::query()->firstOrCreate([
         'name' => 'default.users.select',
         'guard_name' => 'web',

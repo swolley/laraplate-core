@@ -12,6 +12,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Contracts\Support\HasOnceHash;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -55,7 +56,7 @@ use UnexpectedValueException;
  * @mixin IdeHelperUser
  */
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, MustVerifyEmail
+class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmail
 {
     use ApprovesChanges;
 
@@ -183,6 +184,20 @@ class User extends BaseUser implements FilamentUser, MustVerifyEmail
         $default_guard = config('auth.defaults.guard', 'web');
 
         return [is_string($default_guard) ? $default_guard : 'web'];
+    }
+
+    /**
+     * Key `once()` memoization on the user identity rather than the object handle.
+     *
+     * PHP reuses an object handle after the previous object is freed, so
+     * spl_object_hash() — Onceable's default for captured objects — can make two
+     * different users collide on one memoization key.
+     */
+    public function onceHash(): string
+    {
+        $key = $this->getKey();
+
+        return static::class . ':' . (is_scalar($key) ? (string) $key : 'unsaved');
     }
 
     public function canAccessPanel(Panel $panel): bool

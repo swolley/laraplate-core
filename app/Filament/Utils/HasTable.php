@@ -44,8 +44,6 @@ use ReflectionClass;
 
 trait HasTable
 {
-    private static array $permissionCache = [];
-
     /**
      * @param  ?callable(Collection<string,Column> $columns):void  $columns
      * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
@@ -156,13 +154,9 @@ trait HasTable
             return false;
         }
 
-        $key = $user->id . '_' . $permission;
-
-        if (! isset(self::$permissionCache[$key])) {
-            self::$permissionCache[$key] = $user->can($permission);
-        }
-
-        return self::$permissionCache[$key];
+        // Memoized for the current request only. Capturing $user is safe because
+        // User implements HasOnceHash, so the memo key is the user identity.
+        return once(fn (): bool => $user->can($permission));
     }
 
     private static function configureColumns(

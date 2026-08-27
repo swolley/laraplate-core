@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Once;
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Models\Role;
@@ -11,7 +12,7 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 
 beforeEach(function (): void {
     Cache::flush();
-    AuthorizationService::resetPermissionCache();
+    Once::flush();
 });
 
 

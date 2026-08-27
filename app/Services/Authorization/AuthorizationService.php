@@ -40,27 +40,9 @@ use Modules\Core\Support\PermissionName;
  */
 final class AuthorizationService
 {
-    /**
-     * Static in-memory cache for resolved Permission model instances, keyed by permission name.
-     * Populated on first access; avoids repeated Permission::findByName() DB queries per request.
-     *
-     * @var array<string, Permission>
-     */
-    private static array $permission_model_cache = [];
-
     public function __construct(
         private readonly AclResolverService $acl_resolver,
     ) {}
-
-    /**
-     * Reset the static permission model cache.
-     *
-     * Intended for use in tests to ensure a clean state between test cases.
-     */
-    public static function resetPermissionCache(): void
-    {
-        self::$permission_model_cache = [];
-    }
 
     /**
      * Check if user has permission for the requested operation.
@@ -391,22 +373,15 @@ final class AuthorizationService
     }
 
     /**
-     * Resolve a Permission model instance by name, using the static in-memory cache.
-     *
-     * On first access the model is fetched via Permission::findByName() and stored in the cache.
-     * Subsequent calls for the same name return the cached instance without a DB query.
+     * Resolve a Permission model instance by name, memoized for the current request.
      *
      * @param  string  $permission_name  The full permission name (e.g., 'default.orders.select')
      */
     private function resolvePermission(string $permission_name): Permission
     {
-        if (! isset(self::$permission_model_cache[$permission_name])) {
-            self::$permission_model_cache[$permission_name] = Permission::query()
-                ->where('name', $permission_name)
-                ->firstOrFail();
-        }
-
-        return self::$permission_model_cache[$permission_name];
+        return once(fn (): Permission => Permission::query()
+            ->where('name', $permission_name)
+            ->firstOrFail());
     }
 
     /**
