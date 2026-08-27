@@ -45,6 +45,8 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
     // Grid routes mirror the CRUD verbs above on a different URI prefix, so they need their own
     // name prefix: duplicate route names break `route:cache` serialization, and `route()` keeps
     // resolving to the first route registered under the name, leaving the later one unreachable.
+    // DEPRECATED: this surface is being retired; facets on the CRUD routes replace the Funnels
+    // action.
     Route::controller(GridsController::class)->prefix('grid')->name('grids.')->group(function (): void {
         Route::get('/configs/{module}/{entity?}', 'getGridsConfigs')->name('getGridsConfigs');
         // Route::match(['get', 'post', 'patch', 'delete'], '/{entity}', 'grid')->name('grids.grid');

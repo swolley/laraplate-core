@@ -18,10 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
@@ -52,6 +50,12 @@ use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
 use Throwable;
 use UnexpectedValueException;
 
+/**
+ * @deprecated The Grid subsystem is being retired. Its Funnels concept survives as
+ *             Facets: see Modules\Core\Services\Crud\DTOs\FacetQuery and the facet
+ *             handling in Modules\Core\Services\Crud\CrudService. Do not build on
+ *             this class.
+ */
 final class Grid extends Entity
 {
     use HasReadHooks;
@@ -718,14 +722,8 @@ final class Grid extends Entity
             $processes[] = fn (): ResponseBuilder => $this->processFunnels($responseBuilder);
         }
 
-        if ($processes !== []) {
-            $concurrency_driver = Concurrency::driver(App::runningInConsole() ? 'fork' : 'process');
-
-            if (! is_object($concurrency_driver) || ! method_exists($concurrency_driver, 'run')) {
-                throw new RuntimeException('Invalid concurrency driver');
-            }
-
-            $concurrency_driver->run($processes);
+        foreach ($processes as $process) {
+            $process();
         }
 
         return $responseBuilder;

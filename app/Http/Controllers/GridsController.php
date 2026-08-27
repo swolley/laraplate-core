@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Request;
 use Modules\Core\Actions\Grids\GetGridConfigsAction;
 use Modules\Core\Actions\Grids\ProcessGridAction;
 use Modules\Core\Helpers\ResponseBuilder;
@@ -13,6 +13,12 @@ use Modules\Core\Models\DynamicEntity;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
+/**
+ * @deprecated The Grid subsystem is being retired. Its Funnels concept survives as
+ *             Facets: see Modules\Core\Services\Crud\DTOs\FacetQuery and the facet
+ *             handling in Modules\Core\Services\Crud\CrudService. Do not build on
+ *             this class.
+ */
 final class GridsController extends Controller
 {
     public function __construct(
