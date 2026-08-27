@@ -192,6 +192,10 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
      * PHP reuses an object handle after the previous object is freed, so
      * spl_object_hash() — Onceable's default for captured objects — can make two
      * different users collide on one memoization key.
+     *
+     * Limitation: unsaved users have no key and therefore all share the `unsaved`
+     * hash. Every caller today memoizes against a persisted user, so this is safe;
+     * reuse in a context that memoizes unsaved users would need a different fallback.
      */
     public function onceHash(): string
     {

@@ -273,6 +273,47 @@ it('uses and caches the permission model connection independently of the authori
     }
 });
 
+it('shares one permission existence query between two model classes on the same table', function (): void {
+    $table_name = 'memo_shared_' . uniqid();
+
+    Illuminate\Support\Facades\Schema::create($table_name, function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('name')->nullable();
+    });
+
+    Illuminate\Support\Facades\DB::table($table_name)->insert(['name' => 'row']);
+
+    $first = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use HasValidations;
+    };
+    $first->setTable($table_name);
+
+    $second = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use HasValidations;
+    };
+    $second->setTable($table_name);
+
+    Once::flush();
+
+    $permission_query_count = 0;
+    Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use ($table_name, &$permission_query_count): void {
+        if (in_array($table_name . '.select', $query->bindings, true)) {
+            $permission_query_count++;
+        }
+    });
+
+    // Retrieving the rows fires the `retrieved` hook registered by bootHasValidations(),
+    // which reaches checkUserCanDo() through static:: on each concrete model class —
+    // the real production path. Invoking the trait by reflection would pin the late
+    // static binding and hide a memo key that varies per model class.
+    $first->newQuery()->get();
+    $second->newQuery()->get();
+
+    expect($permission_query_count)->toBe(1);
+});
+
 it('issues a fresh DB query after the request-scoped memo is flushed', function (): void {
     Once::flush();
 
