@@ -600,14 +600,35 @@ if (! function_exists('api_versions')) {
 
 if (! function_exists('preview')) {
     /**
-     * Getter/Setter for session preview flag.
+     * Getter/Setter for the approvals preview flag.
+     *
+     * Storage is chosen by {@see \Modules\Core\Http\Middleware\PreviewMiddleware}:
+     * - `request` (app / api): the flag lives on the current request only; a missing
+     *   `preview` query/body param is off, and the session is never read or written.
+     * - `session` (admin): the flag persists across requests until explicitly cleared.
+     *
+     * Outside an HTTP request (console, bare unit tests) the session is the store,
+     * which keeps the existing helper tests and Artisan tooling working.
      *
      * @param  bool|null  $enablePreview  enable preview flag
      */
     function preview(?bool $enablePreview = null): bool
     {
+        $request = request();
+        $storage = $request->attributes->get('_preview_storage', 'session');
+
         if ($enablePreview !== null) {
-            session()->put('preview', $enablePreview);
+            if ($storage === 'session') {
+                session()->put('preview', $enablePreview);
+            }
+
+            $request->attributes->set('preview', $enablePreview);
+
+            return $enablePreview;
+        }
+
+        if ($request->attributes->has('preview')) {
+            return (bool) $request->attributes->get('preview');
         }
 
         return (bool) session('preview', false);

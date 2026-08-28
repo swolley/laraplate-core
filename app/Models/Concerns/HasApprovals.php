@@ -129,7 +129,9 @@ trait HasApprovals
 
     protected function getPreviewAttribute(): ?array
     {
-        if (! session('preview', false)) {
+        // preview(), not session('preview'): on app/api the flag is request-scoped and
+        // the session is deliberately unread.
+        if (! preview()) {
             return null;
         }
 

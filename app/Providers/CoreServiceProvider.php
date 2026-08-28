@@ -697,18 +697,20 @@ final class CoreServiceProvider extends ModuleServiceProvider
             // pushMiddlewareToGroup, not $router->middleware(): Router has no
             // middleware() method, so that call resolves through __call into a
             // RouteRegistrar which is built, never bound to a route, and discarded —
-            // which is why these three middleware had never run outside the panel.
+            // which is why these middleware had never run outside the panel.
             $router->pushMiddlewareToGroup($group, ApplyDatabaseSettingsOverlay::class);
             $router->pushMiddlewareToGroup($group, LocalizationMiddleware::class);
+            // Request-scoped: ?preview=true arms HasApprovals for this call only.
+            // The SPA re-sends the param when it wants the overlay; the session is
+            // never touched on these surfaces.
+            $router->pushMiddlewareToGroup($group, PreviewMiddleware::class . ':request');
             $router->pushMiddlewareToGroup($group, AddContext::class . ':' . $scope);
         }
 
-        // FIXME: these two register nothing, for the reason above. PreviewMiddleware is
-        // the only entry point of the approvals preview that HasApprovals, CrudService
-        // and ResponseBuilder all read, so the feature is currently unreachable over
-        // HTTP; ConvertStringToBoolean would change validation semantics on every
-        // route. Both need their own decision and are deliberately left inert here.
-        $router->middleware(PreviewMiddleware::class);
+        // FIXME: ConvertStringToBoolean is still a no-op. Router has no middleware()
+        // method, so this call registers nothing. Activating it schema-blind would
+        // corrupt string/int fields; coercion belongs in ModifyRequest once the
+        // model (and its boolean columns) is known.
         $router->middleware(ConvertStringToBoolean::class);
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
