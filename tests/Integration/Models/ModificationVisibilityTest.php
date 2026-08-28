@@ -6,7 +6,7 @@ use Modules\CMS\Models\Comment;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 
-it('exposes active but keeps modifier and quorum columns hidden', function (): void {
+it('exposes active and modifier identity but keeps quorum columns hidden', function (): void {
     $user = User::factory()->create();
 
     $modification = Modification::query()->create([
@@ -24,10 +24,13 @@ it('exposes active but keeps modifier and quorum columns hidden', function (): v
 
     $array = $modification->fresh()->toArray();
 
-    // active must reach the payload so the UI can flag pending records.
+    // active + modifier identity must reach the payload so the UI can flag pending
+    // records and tell whether the viewer authored the pending modification.
     expect($array)->toHaveKey('active')
         ->and($array['active'])->toBeTruthy()
-        // modifier identity and quorum counts stay hidden for now.
-        ->and($array)->not->toHaveKey('modifier_id')
-        ->and($array)->not->toHaveKey('approvers_required');
+        ->and($array)->toHaveKey('modifier_id')
+        ->and((int) $array['modifier_id'])->toBe($user->id)
+        // quorum counts stay hidden.
+        ->and($array)->not->toHaveKey('approvers_required')
+        ->and($array)->not->toHaveKey('disapprovers_required');
 });
