@@ -687,21 +687,29 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         $router = resolve(Router::class);
 
-        // pushMiddlewareToGroup, not $router->middleware(): the latter builds a fluent
-        // RouteRegistrar and discards it, so it registers nothing (see the note below).
-        foreach (['web', 'api'] as $group) {
+        // The order inside each group is load-bearing. The overlay copies dotted
+        // settings onto config, app.locale included, so it has to run before the locale
+        // is resolved; AddContext records the resolved locale, so it runs last.
+        // /admin declares its own stack and is wired in AdminPanelProvider instead.
+        $surfaces = ['web' => 'app', 'api' => 'api'];
+
+        foreach ($surfaces as $group => $scope) {
+            // pushMiddlewareToGroup, not $router->middleware(): Router has no
+            // middleware() method, so that call resolves through __call into a
+            // RouteRegistrar which is built, never bound to a route, and discarded —
+            // which is why these three middleware had never run outside the panel.
             $router->pushMiddlewareToGroup($group, ApplyDatabaseSettingsOverlay::class);
+            $router->pushMiddlewareToGroup($group, LocalizationMiddleware::class);
+            $router->pushMiddlewareToGroup($group, AddContext::class . ':' . $scope);
         }
 
-        // FIXME: the four calls below register nothing. Router has no middleware()
-        // method, so they resolve through __call into a discarded RouteRegistrar. Only
-        // LocalizationMiddleware actually runs anywhere, because AdminPanelProvider lists
-        // it explicitly for the Filament panel. Fixing this changes request behaviour on
-        // /app and /api/v1, so it is deliberately left alone here.
-        $router->middleware(LocalizationMiddleware::class);
+        // FIXME: these two register nothing, for the reason above. PreviewMiddleware is
+        // the only entry point of the approvals preview that HasApprovals, CrudService
+        // and ResponseBuilder all read, so the feature is currently unreachable over
+        // HTTP; ConvertStringToBoolean would change validation semantics on every
+        // route. Both need their own decision and are deliberately left inert here.
         $router->middleware(PreviewMiddleware::class);
         $router->middleware(ConvertStringToBoolean::class);
-        $router->middleware(AddContext::class);
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
