@@ -54,7 +54,10 @@ final class MediaUploadRequest extends MediaRequest
      */
     private function registeredCollections(): array
     {
-        $model = $this->mediaModel();
+        // Not mediaModel(): that throws when no owner is resolved, and the swagger
+        // generator reads rules() from a bare instance with no route bound. During a
+        // real request prepareForValidation() has already resolved the owner.
+        $model = $this->model;
 
         if (! $model instanceof SpatieHasMedia) {
             return [];
