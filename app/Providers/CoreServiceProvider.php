@@ -47,7 +47,6 @@ use Modules\Core\Graph\GraphToolGateway;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ApplyDatabaseSettingsOverlay;
-use Modules\Core\Http\Middleware\ConvertStringToBoolean;
 use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
@@ -707,11 +706,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
             $router->pushMiddlewareToGroup($group, AddContext::class . ':' . $scope);
         }
 
-        // FIXME: ConvertStringToBoolean is still a no-op. Router has no middleware()
-        // method, so this call registers nothing. Activating it schema-blind would
-        // corrupt string/int fields; coercion belongs in ModifyRequest once the
-        // model (and its boolean columns) is known.
-        $router->middleware(ConvertStringToBoolean::class);
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);

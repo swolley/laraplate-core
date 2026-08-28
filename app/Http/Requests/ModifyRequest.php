@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\IParsableRequest;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Models\Concerns\HasValidations;
+use Modules\Core\Support\BooleanInput;
 use Override;
 
 // use Illuminate\Foundation\Http\FormRequest;
@@ -36,6 +38,10 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
     protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
+
+        // Model is resolved by CrudRequest: coerce only known boolean attributes so
+        // "true"/"yes" survive Laravel's boolean rule without touching string fields.
+        $this->coerceBooleanInputs();
 
         // Ensure primary key (e.g. id) from route/query is in request for update/delete so validated() and ModifyRequestData have it
         $pk = is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey];
@@ -151,5 +157,38 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
         }
 
         return $result;
+    }
+
+    /**
+     * Rewrite recognised boolean forms on attributes the model already declares as boolean.
+     */
+    private function coerceBooleanInputs(): void
+    {
+        if (! $this->model instanceof Model) {
+            return;
+        }
+
+        $attributes = BooleanInput::attributeNames($this->model);
+
+        if ($attributes === []) {
+            return;
+        }
+
+        $main_entity = $this->resolveMainEntity();
+        $merge = [];
+
+        foreach ($attributes as $attribute) {
+            foreach ([$attribute, $main_entity . '.' . $attribute] as $key) {
+                if (! $this->exists($key)) {
+                    continue;
+                }
+
+                $merge[$key] = BooleanInput::coerce($this->input($key));
+            }
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
     }
 }

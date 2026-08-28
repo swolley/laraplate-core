@@ -6,6 +6,7 @@ namespace Modules\Core\Http\Requests;
 
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Rules\QueryBuilder;
+use Modules\Core\Support\BooleanInput;
 use Override;
 
 /**
@@ -85,6 +86,12 @@ class ListRequest extends SelectRequest
 
         if (is_string($check_ids) && is_json($check_ids)) {
             $to_merge['check_ids'] = json_decode($check_ids, true);
+        }
+
+        foreach (['count', 'totals'] as $flag) {
+            if ($this->exists($flag)) {
+                $to_merge[$flag] = BooleanInput::coerce($this->input($flag));
+            }
         }
 
         /** @phpstan-ignore method.notFound */

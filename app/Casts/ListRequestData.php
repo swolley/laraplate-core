@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Support\BooleanInput;
 
 class ListRequestData extends SelectRequestData
 {
@@ -180,6 +181,11 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
+     * @var list<string>|null
+     */
+    private ?array $boolean_attributes = null;
+
+    /**
      * @param  array{property:string,value:mixed,operator:FilterOperator}  $filter
      */
     protected function conformFilterValue(array &$filter): void
@@ -195,6 +201,36 @@ class ListRequestData extends SelectRequestData
         } elseif ($filter['operator'] === FilterOperator::In && is_string($filter['value'])) {
             $filter['value'] = is_json($filter['value']) ? json_decode($filter['value'], true) : explode(',', $filter['value']);
         }
+
+        if (! $this->isBooleanFilterProperty($filter['property'])) {
+            return;
+        }
+
+        if (is_array($filter['value'])) {
+            $filter['value'] = array_map(
+                static fn (mixed $item): mixed => BooleanInput::coerce($item),
+                $filter['value'],
+            );
+
+            return;
+        }
+
+        $filter['value'] = BooleanInput::coerce($filter['value']);
+    }
+
+    private function isBooleanFilterProperty(string $property): bool
+    {
+        $bare = str_contains($property, '.') ? Str::afterLast($property, '.') : $property;
+
+        return in_array($bare, $this->booleanAttributes(), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function booleanAttributes(): array
+    {
+        return $this->boolean_attributes ??= BooleanInput::attributeNames($this->model);
     }
 
     private static function intFromMixed(mixed $value, int $default): int

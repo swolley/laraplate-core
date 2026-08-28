@@ -122,3 +122,19 @@ it('list request data wraps top-level list filters into a FiltersGroup', functio
     expect($data->filters)->toBeInstanceOf(FiltersGroup::class)
         ->and($data->filters->filters)->toHaveCount(2);
 });
+
+it('coerces boolean filter values without touching string filters', function (): void {
+    $request = new ListRequest();
+
+    $data = new ListRequestData($request, 'setting', [
+        'sort' => [],
+        'filters' => [
+            ['property' => 'encrypted', 'value' => 'yes'],
+            ['property' => 'name', 'value' => 'no'],
+        ],
+    ], 'id');
+
+    expect($data->filters->filters[0])->toBeInstanceOf(Filter::class)
+        ->and($data->filters->filters[0]->value)->toBeTrue()
+        ->and($data->filters->filters[1]->value)->toBe('no');
+});
