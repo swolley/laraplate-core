@@ -46,7 +46,8 @@ final class Modification extends ApprovalModification
         'modifier_id',
         'modifier_type',
         'md5',
-        'active',
+        // `active` stays visible so an eager-loaded modifications relation lets the
+        // UI tell which records have a pending (active) modification.
         'is_update',
         'approvers_required',
         'disapprovers_required',
