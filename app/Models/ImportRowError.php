@@ -21,7 +21,6 @@ use Override;
  * @property int $row_number
  * @property array<string, list<string>> $errors
  * @property array<string, string>|null $raw
- *
  * @mixin \Eloquent
  * @mixin IdeHelperImportRowError
  */
