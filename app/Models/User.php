@@ -51,7 +51,6 @@ use UnexpectedValueException;
  * @property string|null $name
  * @property string $email
  * @property BelongsToMany $roles
- *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */

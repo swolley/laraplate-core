@@ -43,10 +43,10 @@ final class Modification extends ApprovalModification
     protected $hidden = [
         'modifiable_id',
         'modifiable_type',
-        'modifier_id',
-        'modifier_type',
         'md5',
-        'active',
+        // `active` and the modifier identity (modifier_id/type) stay visible so an
+        // eager-loaded modifications relation lets the UI flag records with a
+        // pending (active) modification and tell whether the viewer authored it.
         'is_update',
         'approvers_required',
         'disapprovers_required',

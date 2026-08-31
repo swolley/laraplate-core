@@ -7,12 +7,16 @@ namespace Modules\Core\Models\Concerns;
 use Closure;
 use InvalidArgumentException;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\RelationDescriptor;
+use Modules\Core\Versioning\Data\RestoreReport;
 use Modules\Core\Versioning\Data\VersionChange;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\Exceptions\AggregateRestoreConflictException;
+use Modules\Core\Versioning\Exceptions\MissingRestoreSubjectException;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
 /**
@@ -70,23 +74,80 @@ trait HasVersionedRelations
         $this->assertVersionedRelation($relation);
 
         $normalized = $this->normalizeSyncTarget($target);
-        $current_ids = array_map(
-            static fn (array $entry): int|string => $entry['id'],
-            $this->versionedRelationMembership($relation),
-        );
-        $to_detach = array_diff($current_ids, array_keys($normalized));
 
-        $this->runInMembershipScope(function () use ($relation, $normalized, $to_detach): void {
-            foreach ($to_detach as $subject_id) {
-                $this->{$relation}()->detach($subject_id);
-                $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Deleted, []);
+        $this->runInMembershipScope(fn () => $this->applyMembershipTarget($relation, $normalized));
+    }
+
+    /**
+     * The current aggregate revision: the latest version set that touched this root. Callers pass it
+     * back as the expected revision on a restore, so a concurrent change is rejected instead of clobbered.
+     */
+    public function currentRevision(): ?int
+    {
+        $max = $this->versions()->max('version_set_id');
+
+        return $max === null ? null : (int) $max;
+    }
+
+    /**
+     * Restore the aggregate to the state represented by revision `$targetSetId`, as a single, reversible
+     * `Revert` version set. Scalars and every declared `reference` relation are reset to that revision;
+     * owned relations are out of scope for this milestone. The restore is rejected when the aggregate has
+     * moved past `$expectedSetId`. A referenced subject that no longer exists aborts the restore unless
+     * `$force` is set, in which case it is skipped and reported.
+     */
+    public function restoreToRevision(int $targetSetId, int $expectedSetId, bool $force = false): RestoreReport
+    {
+        $current = $this->currentRevision();
+
+        if ($current !== $expectedSetId) {
+            throw new AggregateRestoreConflictException($expectedSetId, $current);
+        }
+
+        $targets = [];
+        $skipped = [];
+
+        foreach ($this->versionedRelations() as $descriptor) {
+            if ($descriptor->isOwned()) {
+                continue;
             }
 
-            foreach ($normalized as $subject_id => $pivot) {
-                $this->{$relation}()->syncWithoutDetaching([$subject_id => $pivot]);
-                $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Created, $pivot);
+            $relation = $descriptor->relation;
+            $existing = [];
+            $missing = [];
+
+            foreach ($this->replayMembership($relation, $targetSetId) as $entry) {
+                if ($this->referenceSubjectExists($relation, $entry['id'])) {
+                    $existing[$entry['id']] = $entry['pivot'];
+                } else {
+                    $missing[] = $entry['id'];
+                }
+            }
+
+            if ($missing !== [] && ! $force) {
+                throw new MissingRestoreSubjectException($relation, $missing);
+            }
+
+            $targets[$relation] = $existing;
+
+            if ($missing !== []) {
+                $skipped[$relation] = $missing;
+            }
+        }
+
+        $this->runInRevertScope($targetSetId, function () use ($targetSetId, $targets): void {
+            $this->restoreScalarState($targetSetId);
+
+            foreach ($targets as $relation => $normalized) {
+                $this->applyMembershipTarget($relation, $normalized);
             }
         });
+
+        return new RestoreReport(
+            targetRevision: $targetSetId,
+            restoredRelations: array_keys($targets),
+            skippedSubjects: $skipped,
+        );
     }
 
     /**
@@ -98,31 +159,7 @@ trait HasVersionedRelations
      */
     public function versionedRelationMembership(string $relation): array
     {
-        $events = $this->versions()
-            ->where('relation_path', $relation)
-            ->orderBy('version_set_id')
-            ->orderBy('sequence')
-            ->get();
-
-        $membership = [];
-
-        foreach ($events as $event) {
-            $id = $event->subject_key['id'] ?? null;
-
-            if ($id === null) {
-                continue;
-            }
-
-            if ($event->change_type === VersionChangeType::Deleted) {
-                unset($membership[$id]);
-
-                continue;
-            }
-
-            $membership[$id] = ['id' => $id, 'pivot' => $event->contents ?? []];
-        }
-
-        return array_values($membership);
+        return $this->replayMembership($relation, null);
     }
 
     /**
@@ -205,5 +242,98 @@ trait HasVersionedRelations
         }
 
         return $normalized;
+    }
+
+    /**
+     * Reconstruct a relation's membership by replaying its version rows in revision order, optionally
+     * bounded to sets up to `$uptoSetId` (used to read the membership as of a target revision).
+     *
+     * @return list<array{id: int|string, pivot: array<string, mixed>}>
+     */
+    private function replayMembership(string $relation, ?int $uptoSetId): array
+    {
+        $query = $this->versions()
+            ->where('relation_path', $relation)
+            ->orderBy('version_set_id')
+            ->orderBy('sequence');
+
+        if ($uptoSetId !== null) {
+            $query->where('version_set_id', '<=', $uptoSetId);
+        }
+
+        $membership = [];
+
+        foreach ($query->get() as $event) {
+            $id = $event->subject_key['id'] ?? null;
+
+            if ($id === null) {
+                continue;
+            }
+
+            if ($event->change_type === VersionChangeType::Deleted) {
+                unset($membership[$id]);
+
+                continue;
+            }
+
+            $membership[$id] = ['id' => $id, 'pivot' => $event->contents ?? []];
+        }
+
+        return array_values($membership);
+    }
+
+    /**
+     * Bring the live relation into line with a target membership, writing one membership version row per
+     * change. Assumes an active version-set scope; detaches members absent from the target and upserts the rest.
+     *
+     * @param  array<int|string, array<string, mixed>>  $normalized
+     */
+    private function applyMembershipTarget(string $relation, array $normalized): void
+    {
+        $current_ids = array_map(
+            static fn (array $entry): int|string => $entry['id'],
+            $this->versionedRelationMembership($relation),
+        );
+        $to_detach = array_diff($current_ids, array_keys($normalized));
+
+        foreach ($to_detach as $subject_id) {
+            $this->{$relation}()->detach($subject_id);
+            $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Deleted, []);
+        }
+
+        foreach ($normalized as $subject_id => $pivot) {
+            $this->{$relation}()->syncWithoutDetaching([$subject_id => $pivot]);
+            $this->writeMembershipRow($relation, $subject_id, VersionChangeType::Created, $pivot);
+        }
+    }
+
+    private function runInRevertScope(int $targetSetId, Closure $operation): void
+    {
+        app(VersionSetManagerInterface::class)->run(
+            VersionSetRoot::forModel($this),
+            $operation,
+            new VersionSetOptions(
+                kind: VersionSetKind::Revert,
+                actor: $this->versionActor(),
+                revertedFrom: $targetSetId,
+            ),
+        );
+    }
+
+    private function restoreScalarState(int $targetSetId): void
+    {
+        $version = $this->versions()
+            ->whereNull('relation_path')
+            ->where('version_set_id', '<=', $targetSetId)
+            ->orderByDesc('version_set_id')
+            ->orderByDesc('sequence')
+            ->first();
+
+        $version?->revert();
+    }
+
+    private function referenceSubjectExists(string $relation, int|string $subjectId): bool
+    {
+        return $this->{$relation}()->getRelated()->newQueryWithoutScopes()->whereKey($subjectId)->exists();
     }
 }

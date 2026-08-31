@@ -23,7 +23,6 @@ use Spatie\MediaLibrary\HasMedia as SpatieHasMedia;
  * @property string $token
  * @property string $target_module
  * @property string $target_entity
- *
  * @mixin \Eloquent
  * @mixin IdeHelperMediaDraft
  */

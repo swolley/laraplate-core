@@ -36,7 +36,6 @@ use Override;
  * @property bool $unrestricted
  * @property int $priority
  * @property bool $is_active
- *
  * @mixin \Illuminate\Database\Eloquent\Model
  * @mixin \Eloquent
  * @mixin IdeHelperACL
