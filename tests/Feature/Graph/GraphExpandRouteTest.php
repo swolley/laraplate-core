@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Modules\Core\Models\User;
+use Modules\Core\Support\CrudApiExposure;
 
 uses(RefreshDatabase::class);
 
 it('registers the api graph expand route under crud', function (): void {
-    Config::set('core.expose_crud_api', true);
+    CrudApiExposure::enable();
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -18,7 +18,7 @@ it('registers the api graph expand route under crud', function (): void {
 });
 
 it('registers the api graph search route under crud', function (): void {
-    Config::set('core.expose_crud_api', true);
+    CrudApiExposure::enable();
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -27,7 +27,7 @@ it('registers the api graph search route under crud', function (): void {
 });
 
 it('registers the api graph stats route under crud', function (): void {
-    Config::set('core.expose_crud_api', true);
+    CrudApiExposure::enable();
     $user = User::factory()->create();
 
     $this->actingAs($user)

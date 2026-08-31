@@ -12,6 +12,7 @@ use Modules\Core\Models\User;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Performance\EndpointBenchmarkReport;
 use Modules\Core\Performance\EndpointProfiler;
+use Modules\Core\Support\CrudApiExposure;
 use Override;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -19,9 +20,10 @@ use Spatie\Permission\PermissionRegistrar;
  * Stress-tests the CRUD read engine across entities, reporting latency and
  * query counts for the /api/v1 list endpoint.
  *
- * The public CRUD API is enabled for the process, and — unless an existing
- * --user is given — a superadmin is created inside a transaction that is always
- * rolled back, so the run leaves no data behind.
+ * The public CRUD API is enabled via the database setting the per-request overlay
+ * reads (a process-level config()->set is discarded on every HTTP request). Unless
+ * an existing --user is given, a superadmin is created inside a transaction that is
+ * always rolled back, so the run leaves no data behind.
  *
  *   php artisan perf:crud --module=core --entity=users --entity=roles
  */
@@ -55,9 +57,6 @@ final class PerfCrudCommand extends Command
         $iterations = max(1, (int) $this->option('iterations'));
         $warmup = max(0, (int) $this->option('warmup'));
 
-        // The public CRUD API is gated behind config; enable it for this process only.
-        config(['core.expose_crud_api' => true]);
-
         $user_id = $this->option('user');
 
         if (is_string($user_id) && $user_id !== '') {
@@ -69,7 +68,10 @@ final class PerfCrudCommand extends Command
                 return self::FAILURE;
             }
 
-            $reports = $this->profileEntities($profiler, $module, $entities, $iterations, $warmup, $user);
+            // Restore the prior setting afterwards: this path does not wrap a rollback.
+            $reports = CrudApiExposure::runEnabled(
+                fn (): array => $this->profileEntities($profiler, $module, $entities, $iterations, $warmup, $user),
+            );
             $this->renderTable($module, $reports);
 
             return self::SUCCESS;
@@ -79,6 +81,8 @@ final class PerfCrudCommand extends Command
         $connection->beginTransaction();
 
         try {
+            // Transaction rolls back: flip the setting in-place, no restore needed.
+            CrudApiExposure::enable();
             $user = $this->createTransientSuperadmin();
             $reports = $this->profileEntities($profiler, $module, $entities, $iterations, $warmup, $user);
         } finally {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Illuminate\Contracts\Config\Repository;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\Setting;
 use Throwable;
 
@@ -30,7 +31,13 @@ final readonly class DatabaseConfigOverlay
         try {
             $setting = new Setting;
 
-            if (! $setting->getConnection()->getSchemaBuilder()->hasTable($setting->getTable())) {
+            // SchemaInspector, not getSchemaBuilder(): the inspector memoizes the
+            // table probe for the process, so the overlay does not pay an
+            // information_schema round-trip on every HTTP request.
+            if (! SchemaInspector::getInstance()->hasTable(
+                $setting->getTable(),
+                $setting->getConnectionName(),
+            )) {
                 return;
             }
 

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rules\Password;
 use Modules\Core\Inspector\Entities\Table;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Support\CrudApiExposure;
 
 /**
  * @return array{module: string, entity: string}
@@ -19,7 +19,9 @@ function coreCrudRouteParams(string $entity): array
 }
 
 beforeEach(function (): void {
-    Config::set('core.expose_crud_api', true);
+    // Write the database setting the per-request overlay reads. A process-level
+    // Config::set is discarded when ApplyDatabaseSettingsOverlay runs.
+    CrudApiExposure::enable();
     $this->user = User::factory()->create();
     $this->user->assignRole(Role::findOrCreate('superadmin', 'web'));
     $this->actingAs($this->user);
