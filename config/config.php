@@ -36,7 +36,6 @@ return [
     // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     // 'dynamic_entities' => env('ENABLE_DYNAMIC_ENTITIES', false),
     // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-    // 'dynamic_gridutils' => env('ENABLE_DYNAMIC_GRIDUTILS', false),
     // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     // 'expose_crud_api' => env('EXPOSE_CRUD_API', false),
     // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig

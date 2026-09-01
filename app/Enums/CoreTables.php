@@ -20,7 +20,6 @@ enum CoreTables: string
     case Presets = 'core_presets';
     case Fields = 'core_fields';
     case Acls = 'core_acls';
-    case UsersGridConfigs = 'core_users_grid_configs';
     case Settings = 'core_settings';
     case ModelEmbeddings = 'core_model_embeddings';
     case RecordOrigins = 'core_record_origins';

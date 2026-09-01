@@ -6,7 +6,6 @@ namespace Modules\Core\Casts;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Modules\Core\Grids\Requests\GridRequest;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\BooleanInput;
@@ -54,7 +53,7 @@ class ListRequestData extends SelectRequestData
      * @param  string|array<string>  $primaryKey
      * @param  array<string, mixed>  $validated
      */
-    public function __construct(ListRequest|GridRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
+    public function __construct(ListRequest $request, string $mainEntity, array $validated, string|array $primaryKey, ?string $module = null)
     {
         parent::__construct($request, $mainEntity, $validated, $primaryKey, $module);
 

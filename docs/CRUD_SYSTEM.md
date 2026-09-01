@@ -185,7 +185,7 @@ patching a representation, and several are not idempotent.
 
 The route is declared **last** in Core's `crud` group. Laravel matches in registration
 order with no notion of specificity, so every literal verb above must be tried first; the
-grid and graph groups carry an extra path segment and never reach it. Use
+graph group carries an extra path segment and never reaches it. Use
 `php artisan route:check <url> --method=POST` to see which route actually answers a URL —
 `route:list` sorts by URI and hides the ordering that decides the match.
 

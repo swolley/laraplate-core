@@ -41,13 +41,6 @@ it('enforces class-level feature flags without a matching Setting row', function
     }
 });
 
-it('discovers at least one model with forced soft deletes disabled', function (): void {
-    $has_soft_delete_override = collect(ForcedModelConfiguration::cases())
-        ->contains(fn (array $case): bool => $case['property'] === 'softDeletesEnabled' && $case['expected'] === false);
-
-    expect($has_soft_delete_override)->toBeTrue();
-});
-
 it('discovers at least one model with forced translation fallback enabled', function (): void {
     $has_translation_fallback_override = collect(ForcedModelConfiguration::cases())
         ->contains(fn (array $case): bool => $case['property'] === 'translation_fallback_enabled' && $case['expected'] === true);

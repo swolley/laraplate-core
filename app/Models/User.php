@@ -289,16 +289,6 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
     }
 
     /**
-     * returns the saved custom grid configs for the user.
-     *
-     * @return HasMany<UserGridConfig, $this>
-     */
-    public function grid_configs(): HasMany
-    {
-        return $this->hasMany(UserGridConfig::class);
-    }
-
-    /**
      * returns the license currently related to the user.
      *
      * @return BelongsTo<License, $this>

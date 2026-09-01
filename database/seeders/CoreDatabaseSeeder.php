@@ -179,7 +179,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'permissions' => fn () => $all_permissions
                     ->filter(function ($permission) {
                         $isSelectAction = str_ends_with($permission->name, '.' . ActionEnum::Select->value);
-                        $excludedTables = ['versions', 'user_grid_configs', 'modifications', 'cron_jobs'];
+                        $excludedTables = ['versions', 'modifications', 'cron_jobs'];
 
                         return $isSelectAction && ! in_array($permission->table_name, $excludedTables, true);
                     }),

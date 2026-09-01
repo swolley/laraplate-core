@@ -11,7 +11,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
-use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
@@ -30,8 +29,6 @@ use UnexpectedValueException;
  */
 final class DynamicEntity extends Model
 {
-    use HasGridUtils;
-
     // no need to override table here, it's dynamically injected by code
 
     /**

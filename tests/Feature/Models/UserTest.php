@@ -330,12 +330,6 @@ it('getImpersonator returns impersonator from manager when session is impersonat
     expect($target->getImpersonator()->is($admin))->toBeTrue();
 });
 
-it('grid_configs returns has many relationship', function (): void {
-    $user = User::factory()->create();
-
-    expect($user->grid_configs())->toBeInstanceOf(HasMany::class);
-});
-
 it('roles relationship uses model has role pivot class', function (): void {
     $user = User::factory()->create();
 

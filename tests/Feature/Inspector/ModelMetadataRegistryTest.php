@@ -89,7 +89,6 @@ it('resolves trait flags correctly for User model', function (): void {
         ->and($meta->hasSorts)->toBeBool()
         ->and($meta->hasSearchable)->toBeBool()
         ->and($meta->hasTranslations)->toBeBool()
-        ->and($meta->hasGridUtils)->toBeBool()
         ->and($meta->hasCache)->toBeBool();
 });
 

@@ -9,7 +9,6 @@ use Modules\Core\Search\Exceptions\EmbeddingsException;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\ReindexException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
-use Modules\Core\Grids\Exceptions\ConcurrencyException;
 use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Exceptions\LockedModelException;
@@ -34,9 +33,8 @@ test('ambiguous model exception extends logic exception', function (): void {
     expect(AmbiguousModelException::class)->toExtend(LogicException::class);
 });
 
-test('locking and grid concurrency exceptions extend runtime exception', function (): void {
+test('locking exceptions extend runtime exception', function (): void {
     expect(LockedModelException::class)->toExtend(RuntimeException::class)
         ->and(AlreadyLockedException::class)->toExtend(RuntimeException::class)
-        ->and(CannotUnlockException::class)->toExtend(RuntimeException::class)
-        ->and(ConcurrencyException::class)->toExtend(RuntimeException::class);
+        ->and(CannotUnlockException::class)->toExtend(RuntimeException::class);
 });

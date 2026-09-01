@@ -7,7 +7,6 @@ namespace Modules\Core\Inspector;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Modules\Core\Cache\HasCache;
-use Modules\Core\Grids\Traits\HasGridUtils;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
@@ -51,7 +50,6 @@ final readonly class ModelMetadata
         public bool $hasSorts,
         public bool $hasSearchable,
         public bool $hasTranslations,
-        public bool $hasGridUtils,
         public bool $hasCache,
     ) {}
 
@@ -82,7 +80,6 @@ final readonly class ModelMetadata
             hasSorts: isset($traits[SortableTrait::class]) || isset($traits[BaseSortableTrait::class]),
             hasSearchable: isset($traits[Searchable::class]),
             hasTranslations: isset($traits[HasTranslations::class]),
-            hasGridUtils: isset($traits[HasGridUtils::class]),
             hasCache: isset($traits[HasCache::class]),
         );
     }

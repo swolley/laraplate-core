@@ -652,7 +652,6 @@ The Core Module includes built-in features such as:
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.
 -   Multi entities and connections crud endpoints with standardized requests parameters
--   Multi entities and connections exposed interactive grid endpoints (each grid config carries an `operations` array of the ActionEnum operations the current user may perform on that entity; an entity with no permitted operation is omitted, replacing the old operation-less gate that only passed for superadmins)
 -   Strongly validated requests for Core routes
 -   Default common Response Formatter
 -   App settings and configurable Cron-Jobs on db tables
@@ -789,19 +788,6 @@ This section tracks all pending tasks and issues that need to be addressed in th
 - [ ] **Preview Record Management** - `Modules/Core/app/Http/Controllers/CrudController.php:304`
   - TODO: How to handle record preview? What to do with pending changes?
   - Need to implement proper preview functionality
-
-- [ ] **Grid Request Data Completion** - `Modules/Core/app/Grids/Casts/GridRequestData.php:138`
-  - TODO: Need to complete implementation
-  - Current implementation is incomplete
-
-- [ ] **Grid Request Entity Handling** - `Modules/Core/app/Grids/Requests/GridRequest.php:48`
-  - TODO: Need entity or start from grid entity and check requested columns
-  - Clarify entity handling strategy
-
-- [ ] **Grid Components Review** - Multiple files
-  - TODO: Review and improve Option component (`Modules/Core/app/Grids/Components/Option.php:37`)
-  - TODO: Review and improve Funnel component (`Modules/Core/app/Grids/Components/Funnel.php:43`)
-  - TODO: Test Grid component implementation (`Modules/Core/app/Grids/Components/Grid.php:134`)
 
 - [ ] **Versioning Implementation** - `Modules/Core/app/Models/Concerns/HasVersions.php:161,166`
   - TODO: May need override for multiple primary keys
