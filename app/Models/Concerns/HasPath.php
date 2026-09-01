@@ -7,6 +7,13 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 /**
+ * Optional path accessor for models that can expose a hierarchical or derived path.
+ *
+ * The accessor is intentional: `$model->path` still works when a caller needs it
+ * (e.g. after loading a tree with ancestors). It is deliberately NOT appended to
+ * `$appends`, so list/CRUD serialization does not pay `getPath()` — and its
+ * relation loads — for every row.
+ *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait HasPath
@@ -15,13 +22,6 @@ trait HasPath
      * get path for full path.
      */
     abstract protected function getPath(): ?string;
-
-    public function initializeHasPath(): void
-    {
-        if (! in_array('path', $this->appends, true)) {
-            $this->appends[] = 'path';
-        }
-    }
 
     /** @class-property string|null $slug */
     /**
