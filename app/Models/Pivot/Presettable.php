@@ -25,6 +25,16 @@ abstract class Presettable extends Pivot
 {
     use SoftDeletes;
 
+    /**
+     * Memoized result of {@see self::getFieldsFromSnapshot()}.
+     */
+    private ?Collection $hydrated_snapshot_fields = null;
+
+    /**
+     * The snapshot the memoized fields were built from, so a changed snapshot rebuilds.
+     */
+    private ?string $hydrated_snapshot_key = null;
+
     #[Override]
     final public $incrementing = true;
 
@@ -88,7 +98,14 @@ abstract class Presettable extends Pivot
      */
     final public function getFieldsFromSnapshot(): Collection
     {
-        $fields = collect($this->fields_snapshot ?? [])
+        $snapshot = $this->fields_snapshot ?? [];
+        $key = (string) json_encode($snapshot);
+
+        if ($this->hydrated_snapshot_key === $key && $this->hydrated_snapshot_fields instanceof Collection) {
+            return $this->hydrated_snapshot_fields;
+        }
+
+        $fields = collect($snapshot)
             ->map(static function (array $data): Field {
                 $field = new Field();
                 $field->forceFill([
@@ -118,7 +135,9 @@ abstract class Presettable extends Pivot
             ->sortBy(fn (Field $field): int => $field->getRelation('pivot')->order_column)
             ->values();
 
-        return new Collection($fields->all());
+        $this->hydrated_snapshot_key = $key;
+
+        return $this->hydrated_snapshot_fields = new Collection($fields->all());
     }
 
     final protected static function boot(): void

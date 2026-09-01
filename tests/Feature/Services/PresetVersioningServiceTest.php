@@ -326,3 +326,49 @@ describe('Presettable model', function (): void {
         expect($presettable->getFieldsFromSnapshot())->toHaveCount(0);
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| getFieldsFromSnapshot() hydrates Field + Fieldable models out of the frozen
+| snapshot. isFieldTranslatable() calls it once per dynamic field per model, so
+| rebuilding those models on every call dominated list serialization (a 25-row
+| /app/crud/select with relations spent seconds there). The result is memoized
+| per instance and keyed on the snapshot, so a changed snapshot still rebuilds.
+|--------------------------------------------------------------------------
+*/
+describe('Presettable::getFieldsFromSnapshot memoization', function (): void {
+    it('rebuilds the fields only once per snapshot', function (): void {
+        ['presettable' => $presettable] = createPresetWithFields();
+
+        $first = $presettable->getFieldsFromSnapshot();
+        $second = $presettable->getFieldsFromSnapshot();
+
+        expect($second)->toBe($first)
+            ->and($second->first())->toBe($first->first());
+    });
+
+    it('still returns the snapshot contents', function (): void {
+        ['presettable' => $presettable, 'fields' => $fields] = createPresetWithFields();
+
+        $hydrated = $presettable->getFieldsFromSnapshot();
+
+        expect($hydrated)->toHaveCount(2)
+            ->and($hydrated->pluck('name')->all())->toContain($fields[0]->name, $fields[1]->name)
+            ->and($hydrated->first()->pivot->is_required)->toBeTrue();
+    });
+
+    it('rebuilds when the snapshot changes', function (): void {
+        ['presettable' => $presettable] = createPresetWithFields();
+
+        $before = $presettable->getFieldsFromSnapshot();
+
+        $snapshot = $presettable->fields_snapshot;
+        array_pop($snapshot);
+        $presettable->fields_snapshot = $snapshot;
+
+        $after = $presettable->getFieldsFromSnapshot();
+
+        expect($after)->not->toBe($before)
+            ->and($after)->toHaveCount(1);
+    });
+});
