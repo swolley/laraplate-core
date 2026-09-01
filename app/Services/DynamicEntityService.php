@@ -13,14 +13,12 @@ use Modules\Core\Models\DynamicEntity;
 use UnexpectedValueException;
 
 /**
- * Singleton service that caches DynamicEntity instances during the request/command scope.
+ * Request-scoped service that caches DynamicEntity instances for the current request/command.
  * When a concrete model exists for the table (e.g. User for "users"), returns that instead.
  * Schema inspection is delegated to SchemaInspector (shared in-memory cache).
  */
 final class DynamicEntityService
 {
-    private static ?self $instance = null;
-
     /**
      * In-memory cache for resolved DynamicEntity instances (concrete models like User are not cached).
      */
@@ -31,16 +29,24 @@ final class DynamicEntityService
      */
     private ?bool $dynamic_entities_enabled = null;
 
-    private function __construct() {}
-
+    /**
+     * Get the request-scoped service instance.
+     *
+     * Scoped container binding rather than a process-level singleton: the resolved
+     * cache holds DynamicEntity models built from the current Request, which must
+     * not leak into the next request under a long-lived worker.
+     */
     public static function getInstance(): self
     {
-        return self::$instance ??= new self();
+        return app(self::class);
     }
 
+    /**
+     * Drop the current instance (tests, cache invalidation, post-fork workers).
+     */
     public static function reset(): void
     {
-        self::$instance = null;
+        app()->forgetInstance(self::class);
     }
 
     public function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null, ?string $module = null): Model

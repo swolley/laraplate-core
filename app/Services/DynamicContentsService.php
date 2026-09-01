@@ -53,11 +53,6 @@ final class DynamicContentsService
     private static array $registered_preset_memo_keys = [];
 
     /**
-     * Singleton instance.
-     */
-    private static ?self $instance = null;
-
-    /**
      * In-memory cache for entities.
      *
      * @var array<string, Collection<int, Entity>>
@@ -79,24 +74,24 @@ final class DynamicContentsService
     private array $presettables_cache = [];
 
     /**
-     * Private constructor to enforce singleton pattern.
-     */
-    private function __construct() {}
-
-    /**
-     * Get service instance (singleton pattern).
+     * Get the request-scoped service instance.
+     *
+     * The instance is a scoped container binding, not a process-level singleton:
+     * it memoizes hydrated Entity/Preset/Presettable collections, which must not
+     * survive into the next request when the app is served by a long-lived worker.
      */
     public static function getInstance(): self
     {
-        return self::$instance ??= new self();
+        return app(self::class);
     }
 
     /**
-     * Reset the singleton instance (useful for testing or cache invalidation).
+     * Drop the current instance and the registered memo keys.
+     * Used by tests, cache invalidation and post-fork seeder workers.
      */
     public static function reset(): void
     {
-        self::$instance = null;
+        app()->forgetInstance(self::class);
         self::$registered_presettable_memo_keys = [];
         self::$registered_entity_memo_keys = [];
         self::$registered_preset_memo_keys = [];

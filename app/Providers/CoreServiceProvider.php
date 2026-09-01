@@ -73,6 +73,7 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
+use Modules\Core\Services\DynamicEntityService;
 use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\SettingsCacheCoordinator;
@@ -176,7 +177,12 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->register(FortifyServiceProvider::class);
 
-        $this->app->singleton(DynamicContentsService::class, DynamicContentsService::getInstance(...));
+        // Scoped, not singleton: both services memoize hydrated models for the current
+        // request only (Entity/Preset collections, DynamicEntity instances built from the
+        // Request). A singleton would carry that data into the next request when the app
+        // is served by a long-lived worker.
+        $this->app->scoped(DynamicContentsService::class);
+        $this->app->scoped(DynamicEntityService::class);
 
         $this->app->register(GeocodingServiceProvider::class);
 
