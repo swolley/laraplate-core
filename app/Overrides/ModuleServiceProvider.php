@@ -97,6 +97,13 @@ class ModuleServiceProvider extends ServiceProvider
 
         $componentNamespace = $this->module_namespace($this->name, $this->app_path(config('modules.paths.generator.component-class.path')));
         Blade::componentNamespace($componentNamespace, $this->nameLower);
+
+        // Anonymous components: <x-mes::layouts.master> resolves to the module's own
+        // resources/views/layouts/master.blade.php. componentNamespace() above only covers
+        // class-based components, and the default anonymous lookup expects a components/
+        // subfolder, so without this the module scaffold views cannot be compiled and
+        // `php artisan view:cache` fails on them.
+        Blade::anonymousComponentPath($sourcePath, $this->nameLower);
     }
 
     /**
