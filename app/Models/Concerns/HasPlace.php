@@ -235,15 +235,8 @@ trait HasPlace
 
     protected function resolvePlace(): ?Place
     {
-        if (($this->attributes['place_id'] ?? null) === null) {
-            return null;
-        }
-
-        if ($this->relationLoaded('place')) {
-            return $this->getRelation('place');
-        }
-
-        return $this->place()->first();
+        // BelongsTo skips the query when the FK is null and caches via setRelation.
+        return $this->place;
     }
 
     /**

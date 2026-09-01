@@ -629,3 +629,44 @@ it('prepareQuery ignores relation sort without field segment', function (): void
 
     expect($query->getQuery()->orders ?? [])->toBe([]);
 });
+
+it('prepareQuery eager-loads place for HasPlace models', function (): void {
+    if (! Schema::hasTable('qb_has_place')) {
+        Schema::create('qb_has_place', function (Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('place_id')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    SchemaInspector::getInstance()->clearAll();
+
+    $model = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use Modules\Core\Models\Concerns\HasPlace;
+
+        protected $table = 'qb_has_place';
+
+        protected $guarded = [];
+    };
+
+    $query = $model->newQuery();
+    $request_data = qb_make_list_request_data([
+        new Column('qb_has_place.id', ColumnType::Column),
+    ]);
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    expect($query->getEagerLoads())->toHaveKey('place');
+});
+
+it('prepareQuery does not eager-load place for models without HasPlace', function (): void {
+    $query = User::query();
+    $request_data = qb_make_list_request_data([
+        new Column('users.username', ColumnType::Column),
+    ]);
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    expect($query->getEagerLoads())->not->toHaveKey('place');
+});

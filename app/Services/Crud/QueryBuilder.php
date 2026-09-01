@@ -21,6 +21,7 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Models\Concerns\HasPlace;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionMethod;
@@ -76,6 +77,11 @@ final class QueryBuilder
         $computed_relations = $computed_columns['relations'];
         $computed_main_dependencies = $this->resolveComputedDependencies($main_model, $computed_main);
         $force_select_all_main = $computed_main_dependencies['force_select_all'];
+
+        // HasPlace::toArray always overlays bridged geography — eager-load to avoid N+1 on list/select.
+        if (in_array(HasPlace::class, class_uses_recursive($main_model), true)) {
+            $normalized_relations = array_values(array_unique(array_merge($normalized_relations, ['place'])));
+        }
 
         if ($computed_main['append'] !== []) {
             $this->applyModelAppends($main_model, $computed_main['append']);

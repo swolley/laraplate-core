@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Hybrid approvals preview — request on app/api, session on admin
+- *(core)* Coerce boolean inputs only on known boolean attributes
+- *(approvals)* Expose active on Modification for pending signals
+- *(approvals)* Expose modifier identity on Modification for viewer-relative pending
+
+### 🐛 Bug Fixes
+
+- *(core)* Apply database settings per request and scope the resolver
+- *(core)* Let MediaUploadRequest expose rules without a bound owner
+- *(core)* Register locale and log-context middleware on app and api
+- *(core)* Enable the CRUD API through the database setting the overlay reads
+- *(core)* Stop appending path on every model serialization
+- *(core)* Cache HasPlace relation and eager-load place on lists
+
+### 🚜 Refactor
+
+- *(core)* Enhance DynamicContentsService cache management and metadata handling
+- *(core)* Key the permission existence memo independently of the model class
+- *(core)* Bound the closure-table depth cache to the request
+
+### 📚 Documentation
+
+- *(core)* Record process-level vs request-level cache rules
+
+### 🧪 Testing
+
+- *(core)* Gate the class-independent permission memo through the production path
+- *(core)* Warm the permission memo before pinning the seed query budget
+
+### ⚙️ Miscellaneous Tasks
+
+- *(core)* Enable the Spatie permission reset listener for long-lived workers
+
+## [1.73.4] - 2026-08-26
+
 ### 🐛 Bug Fixes
 
 - *(tests)* Expect six SQLite permission name triggers
