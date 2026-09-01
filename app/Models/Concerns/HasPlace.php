@@ -50,6 +50,19 @@ trait HasPlace
     }
 
     /**
+     * Bridged geography always comes from Place on serialize / search / path, so every
+     * host model eager-loads the relation. Declared here rather than on each model (or
+     * special-cased in the CRUD query builder) so any future HasPlace model inherits it;
+     * a caller that does not need it can still drop it with `->without('place')`.
+     */
+    public function initializeHasPlace(): void
+    {
+        if (! in_array('place', $this->with, true)) {
+            $this->with[] = 'place';
+        }
+    }
+
+    /**
      * @return BelongsTo<Place, $this>
      */
     public function place(): BelongsTo
