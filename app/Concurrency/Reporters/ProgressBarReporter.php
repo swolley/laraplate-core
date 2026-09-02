@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Concurrency\Reporters;
 
+use Carbon\CarbonInterval;
+use Illuminate\Support\Str;
 use function Laravel\Prompts\progress;
 
 use Illuminate\Support\Sleep;
@@ -63,7 +65,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function progress(BatchOutcome $outcome): void
     {
-        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
+        if (!$this->progress instanceof Progress) {
             return;
         }
 
@@ -82,7 +84,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function failure(BatchOutcome $outcome): void
     {
-        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
+        if (!$this->progress instanceof Progress) {
             return;
         }
 
@@ -93,17 +95,16 @@ final class ProgressBarReporter implements BatchReporter
 
     public function finish(BatchSummary $summary): void
     {
-        if (!$this->progress instanceof \Laravel\Prompts\Progress) {
+        if (!$this->progress instanceof Progress) {
             return;
         }
 
         if (! $summary->hasFailures()) {
             $this->progress->label(sprintf(
-                '%s — Successfully processed %d units across %d tasks in %.2fs',
-                $this->label,
+                '%s — Processed %d units in %s',
+                (string) Str::replace(['Creating ', ' (parallel)'], '', $this->label),
                 $summary->totalUnitsProcessed,
-                $summary->totalTasks,
-                $summary->totalDuration,
+                CarbonInterval::seconds($summary->totalDuration)->cascade()->forHumans(short: true, parts: 2),
             ));
             $this->progress->render();
 

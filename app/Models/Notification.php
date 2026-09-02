@@ -16,7 +16,7 @@ use Illuminate\Notifications\DatabaseNotification;
  * and stays portable across PostgreSQL and SQLite (no DB-specific generated column).
  *
  * @mixin \Eloquent
-     * @mixin IdeHelperNotification
+ * @mixin IdeHelperNotification
  */
 final class Notification extends DatabaseNotification
 {

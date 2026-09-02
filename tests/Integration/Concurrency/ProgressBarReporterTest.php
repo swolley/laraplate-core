@@ -26,8 +26,8 @@ it('keeps the original label at the start of the finish message', function (): v
     $progress = (new ReflectionProperty($reporter, 'progress'))->getValue($reporter);
 
     expect($progress->label)
-        ->toStartWith('Creating cms_contents (parallel)')
-        ->toContain('Successfully processed 100 units across 2 tasks in 1.25s');
+        ->toStartWith('cms_contents')
+        ->toContain('Processed 100 units in 1s');
 });
 
 it('does not rewrite the label when the summary has failures', function (): void {
