@@ -10,12 +10,13 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\MultipleRecordsFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
-use LogicException;
+use InvalidArgumentException;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
@@ -468,7 +469,7 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (UnexpectedValueException|BadMethodCallException $ex) {
+        } catch (UnexpectedValueException|BadMethodCallException|InvalidArgumentException $ex) {
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
@@ -486,8 +487,10 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (DomainException $ex) {
-            // Must precede LogicException, which it extends, or it never matches.
+        } catch (DomainException|CannotUnlockException $ex) {
+            // Both mean the request clashes with the record's current state rather than
+            // being malformed: a domain rule refuses it, or the caller may not lift a lock
+            // it does not hold. 409 carries a body, so the reason reaches the client.
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
@@ -496,12 +499,31 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (LogicException|AlreadyLockedException|CannotUnlockException $ex) {
+        } catch (AlreadyLockedException $ex) {
+            // A bare LogicException used to land here too. In this codebase it marks a
+            // broken invariant (an unconfigured connection, a lost version-set scope), so
+            // it now falls through to the Throwable arm below, which reports it and
+            // answers 500 instead of dressing a server fault up as "nothing changed".
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
                     error: $ex->getMessage(),
                     statusCode: Response::HTTP_NOT_MODIFIED,
+                ),
+                $request,
+            );
+        } catch (MultipleRecordsFoundException $ex) {
+            // `sole()` throws this when the criteria match more than one row. It is a
+            // sibling of RecordsNotFoundException rather than a subclass, so without its
+            // own arm it falls to the Throwable catch below and is reported as a server
+            // fault. It is not one: the request is well formed, it just fails to identify
+            // a single record, so it answers 400 and stays out of the error log. 404 would
+            // be wrong here, since it would tell the client nothing exists when several do.
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: sprintf('The criteria matched %d records, this endpoint returns a single one.', $ex->getCount()),
+                    statusCode: Response::HTTP_BAD_REQUEST,
                 ),
                 $request,
             );
