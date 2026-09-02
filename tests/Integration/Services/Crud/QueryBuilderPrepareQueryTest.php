@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\Filter;
@@ -18,6 +19,7 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use App\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
+use Modules\Core\Support\PermissionName;
 
 
 /**
@@ -221,7 +223,9 @@ it('relation deleted_at filter requires delete permission to include trashed rel
     $split_property->setAccessible(true);
     $splitted = $split_property->invoke(new QueryBuilder(), new User(), 'roles.deleted_at');
 
-    $permission_name = sprintf('%s.%s.delete', $splitted['connection'], $splitted['table']);
+    // splitProperty reports the *resolved* connection; PermissionName collapses it
+    // onto `default`, exactly as QueryBuilder does when it checks this permission.
+    $permission_name = PermissionName::build($splitted['connection'], $splitted['table'], ActionEnum::Delete->value);
     $permission = Permission::factory()->create(['name' => $permission_name, 'guard_name' => 'web']);
     $permission_holder_role = Role::factory()->create(['name' => 'can_view_trashed_roles', 'guard_name' => 'web']);
     $permission_holder_role->givePermissionTo($permission);

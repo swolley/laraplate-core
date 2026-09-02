@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\Filter;
@@ -23,6 +24,7 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\PermissionName;
 use ReflectionMethod;
 
 /**
@@ -480,11 +482,10 @@ final class QueryBuilder
                         $q->withoutGlobalScope('global_ordered');
 
                         if ($splitted['field'] === 'deleted_at') {
-                            $permission = sprintf(
-                                '%s.%s.delete',
-                                $splitted['connection'],
-                                $splitted['table'],
-                            );
+                            // Built from the related model, not from `$splitted['connection']`:
+                            // that key carries the *resolved* connection (e.g. `mysql`), while
+                            // permissions name the default connection `default`.
+                            $permission = PermissionName::forModel($q->getModel(), ActionEnum::Delete->value);
                             $user = Auth::user();
 
                             if ($user && $user->can($permission) && in_array(SoftDeletes::class, class_uses_recursive($q->getModel()), true)) {

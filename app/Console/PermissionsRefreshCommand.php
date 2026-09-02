@@ -23,6 +23,7 @@ use Modules\Core\Models\Modification;
 use Modules\Core\Models\Version;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
+use Modules\Core\Support\PermissionName;
 use Override;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
@@ -130,7 +131,12 @@ final class PermissionsRefreshCommand extends Command
 
             $instance = $reflection->newInstance();
 
-            $connection_name = $instance->getConnectionName() ?? $instance->getConnection()->getName();
+            // Models without an explicit connection live on whatever `database.default`
+            // resolves to, which changes per environment. Naming their permissions after
+            // the resolved driver ("mysql.…") would make the same permission unmatchable
+            // elsewhere, so the convention pins them to the literal `default` prefix,
+            // exactly as PermissionName does for every runtime check.
+            $connection_name = $instance->getConnectionName() ?? 'default';
             $table = $instance->getTable();
             $permission_class::flushEventListeners();
 
@@ -139,7 +145,7 @@ final class PermissionsRefreshCommand extends Command
             $new_model_suffix = $found_permissions !== [] ? ' for new model ' . $model : '';
 
             foreach ($common_permissions as $permission) {
-                $permission_name = $connection_name . '.' . $table . '.' . $permission->value;
+                $permission_name = PermissionName::build($connection_name, $table, $permission->value);
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
@@ -199,7 +205,7 @@ final class PermissionsRefreshCommand extends Command
 
             if ($model === $user_class) {
                 // solo per gli utenti aggiungo l'impersonificazione
-                $permission_name = sprintf('%s.%s.', $connection_name, $table) . ActionEnum::Impersonate->value;
+                $permission_name = PermissionName::build($connection_name, $table, ActionEnum::Impersonate->value);
                 $all_permissions[] = $permission_name;
 
                 if (! in_array($permission_name, $found_permissions, true)) {

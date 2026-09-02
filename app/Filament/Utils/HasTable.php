@@ -39,6 +39,7 @@ use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Inspector\ModelMetadataRegistry;
 use Modules\Core\Services\FlagCDNService;
+use Modules\Core\Support\PermissionName;
 use PHPUnit\Event\InvalidArgumentException;
 use ReflectionClass;
 
@@ -64,7 +65,7 @@ trait HasTable
         $model = $table->getModel();
         $meta = ModelMetadataRegistry::getInstance()->get($model);
         $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
-        $permissions_prefix = sprintf('%s.%s', $meta->connection ?? 'default', $meta->table);
+        $permissions_prefix = sprintf('%s.%s', PermissionName::normalizeConnection($meta->connection), $meta->table);
 
         $has_soft_deletes = $meta->hasSoftDeletes;
         $has_validity = $meta->hasValidity;

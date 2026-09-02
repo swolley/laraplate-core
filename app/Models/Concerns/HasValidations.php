@@ -16,6 +16,7 @@ use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
+use Modules\Core\Support\PermissionName;
 use ReflectionException;
 use ReflectionProperty;
 
@@ -203,7 +204,12 @@ trait HasValidations
 
     protected static function checkUserCanDo(Model $model, string $operation): bool
     {
-        $permission = $model->getTable() . '.' . $operation;
+        // Model events fire on the write path, so the name must match exactly what
+        // `permission:refresh` registers: `{connection}.{table}.{operation}`, with
+        // `default` standing in for models that follow `database.default`. Dropping
+        // the connection segment made every lookup miss, and a miss reads as
+        // "permission not registered" -> operation allowed.
+        $permission = PermissionName::forModel($model, $operation);
 
         /** @var class-string<Model> $permission_class */
         $permission_class = config('permission.models.permission');
@@ -221,7 +227,7 @@ trait HasValidations
                 return true;
             }
 
-            return (bool) $user->hasPermission($permission);
+            return $user->can($permission);
         }
 
         return true;

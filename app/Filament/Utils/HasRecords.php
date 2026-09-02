@@ -12,6 +12,8 @@ use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
+use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Support\PermissionName;
 use Override;
 use ReflectionClass;
 
@@ -39,11 +41,9 @@ trait HasRecords
     {
         $model = self::getResource()::getModel();
         $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
-        $model_table = $model_instance->getTable();
-        $model_connection = $model_instance->getConnectionName() ?? 'default';
-        $permissions_prefix = sprintf('%s.%s', $model_connection, $model_table);
-
-        $can_create = Auth::user()->can($permissions_prefix . '.create');
+        // `insert` is the registered action name; `create` was never seeded, so the
+        // check always failed for anyone but a super admin (Gate::before).
+        $can_create = Auth::user()->can(PermissionName::forModel($model_instance, ActionEnum::Insert->value));
 
         return $can_create ? [
             CreateAction::make()->icon(Heroicon::OutlinedPlus),

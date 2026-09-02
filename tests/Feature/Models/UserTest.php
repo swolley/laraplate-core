@@ -6,12 +6,14 @@ use Filament\Panel;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Lab404\Impersonate\Services\ImpersonateManager;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
 use Spatie\Permission\Guard;
 
 beforeEach(function (): void {
@@ -299,9 +301,8 @@ it('canImpersonate returns true when user has impersonate permission via role', 
     config(['permission.roles.superadmin' => 'superadmin']);
     $user = User::factory()->create();
     $guard_name = Guard::getDefaultName(User::class);
-    $perm_name = ($user->getConnectionName() ?? 'default') . $user->getTable() . '.impersonate';
+    $perm_name = PermissionName::forModel($user, ActionEnum::Impersonate->value);
     $permission = new Permission(['name' => $perm_name, 'guard_name' => $guard_name]);
-    $permission->setSkipValidation(true);
     $permission->save();
     $role = Role::factory()->create(['name' => 'impersonator', 'guard_name' => $guard_name]);
     $role->givePermissionTo($permission);

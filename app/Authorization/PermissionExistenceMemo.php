@@ -21,7 +21,7 @@ final class PermissionExistenceMemo
 {
     /**
      * @param  class-string<Model>  $permissionClass  The configured permission model.
-     * @param  string  $permission  Full permission name, e.g. `orders.select`.
+     * @param  string  $permission  Full permission name, e.g. `default.orders.select`.
      */
     public static function exists(string $permissionClass, string $permission): bool
     {

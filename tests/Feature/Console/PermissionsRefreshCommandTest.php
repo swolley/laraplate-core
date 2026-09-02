@@ -9,6 +9,7 @@ use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
+use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
 use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredPermissionsModel;
 use Symfony\Component\Console\Application as SymfonyConsoleApplication;
@@ -44,9 +45,8 @@ function runPermissionsRefreshForCoverage(array $options = []): string
 function permissionNameForModel(string $model_class, ActionEnum $action): string
 {
     $model = new $model_class();
-    $connection = $model->getConnectionName() ?? $model->getConnection()->getName();
 
-    return "{$connection}.{$model->getTable()}.{$action->value}";
+    return PermissionName::forModel($model, $action->value);
 }
 
 it('command exists and has correct signature', function (): void {

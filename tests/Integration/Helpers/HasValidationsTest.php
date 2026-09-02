@@ -208,7 +208,10 @@ it('uses and caches the permission model connection independently of the authori
     $permission_model = new $permission_model_class();
     $permission_table = $permission_model->getTable();
     $table_name = 'permission_affinity_records_' . uniqid();
-    $permission_name = "{$table_name}.select";
+    // A model pinned to another connection is a distinct permission: names carry the
+    // connection segment, with `default` standing in for `database.default`.
+    $permission_name = "default.{$table_name}.select";
+    $affinity_permission_name = "{$connection_name}.{$table_name}.select";
 
     config()->set("database.connections.{$connection_name}", [
         'driver' => 'sqlite',
@@ -219,24 +222,28 @@ it('uses and caches the permission model connection independently of the authori
     Illuminate\Support\Facades\DB::purge($connection_name);
 
     try {
-        $permission_model->getConnection()->table($permission_table)->insert([
-            'name' => $permission_name,
-            'guard_name' => 'web',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        foreach ([$permission_name, $affinity_permission_name] as $name) {
+            $permission_model->getConnection()->table($permission_table)->insert([
+                'name' => $name,
+                'guard_name' => 'web',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         $user = Mockery::mock(Modules\Core\Models\User::class)->makePartial();
         $user->shouldReceive('isSuperAdmin')->andReturn(false);
-        $user->shouldReceive('hasPermission')->with($permission_name)->andReturn(false);
+        $user->shouldReceive('can')->with($permission_name)->andReturn(false);
+        $user->shouldReceive('can')->with($affinity_permission_name)->andReturn(false);
         Illuminate\Support\Facades\Auth::login($user);
 
         $queried_connections = [];
         $permission_query_count = 0;
-        Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use ($permission_name, $permission_table, &$permission_query_count, &$queried_connections): void {
+        Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use ($permission_name, $affinity_permission_name, $permission_table, &$permission_query_count, &$queried_connections): void {
             $queried_connections[] = $query->connectionName;
 
-            if (str_contains($query->sql, $permission_table) && in_array($permission_name, $query->bindings, true)) {
+            if (str_contains($query->sql, $permission_table)
+                && (in_array($permission_name, $query->bindings, true) || in_array($affinity_permission_name, $query->bindings, true))) {
                 $permission_query_count++;
             }
         });
@@ -260,9 +267,11 @@ it('uses and caches the permission model connection independently of the authori
         $check = static fn (Illuminate\Database\Eloquent\Model $subject): bool => (bool) (new ReflectionMethod($subject::class, 'checkUserCanDo'))
             ->invoke(null, $subject, 'select');
 
+        // One existence query per distinct permission name, all of them on the
+        // permission model's own connection — never on the audited model's.
         expect($check($model))->toBeFalse()
             ->and($check($affinity_model))->toBeFalse()
-            ->and($permission_query_count)->toBe(1)
+            ->and($permission_query_count)->toBe(2)
             ->and($queried_connections)->toContain($permission_model->getConnection()->getName())
             ->and($queried_connections)->not->toContain($connection_name);
     } finally {
@@ -299,7 +308,7 @@ it('shares one permission existence query between two model classes on the same 
 
     $permission_query_count = 0;
     Illuminate\Support\Facades\DB::listen(static function (Illuminate\Database\Events\QueryExecuted $query) use ($table_name, &$permission_query_count): void {
-        if (in_array($table_name . '.select', $query->bindings, true)) {
+        if (in_array('default.' . $table_name . '.select', $query->bindings, true)) {
             $permission_query_count++;
         }
     });

@@ -383,7 +383,9 @@ it('checks user permissions when a permission row exists', function (): void {
 
     $table_name = 'check_perm_' . uniqid();
     $operation = 'select';
-    $permission_name = "{$table_name}.{$operation}";
+    // The name must carry the connection segment, or the existence memo misses and
+    // checkUserCanDo() short-circuits to "allowed" without consulting the user.
+    $permission_name = "default.{$table_name}.{$operation}";
 
     $permission_model_class = config('permission.models.permission');
     $permission_model = new $permission_model_class();
@@ -402,7 +404,7 @@ it('checks user permissions when a permission row exists', function (): void {
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
-    $user->shouldReceive('hasPermission')->with($permission_name)->andReturn(true);
+    $user->shouldReceive('can')->with($permission_name)->andReturn(true);
     Auth::login($user);
 
     $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');

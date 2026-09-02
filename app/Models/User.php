@@ -32,6 +32,7 @@ use Lab404\Impersonate\Exceptions\MissingUserProvider;
 use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -264,7 +265,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
         }
 
         try {
-            return $this->hasPermissionViaRole(Permission::findByName(($this->getConnectionName() ?? 'default') . $this->getTable() . '.impersonate'));
+            return $this->hasPermissionViaRole(Permission::findByName(PermissionName::forModel($this, ActionEnum::Impersonate->value)));
         } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
             return false;
         }

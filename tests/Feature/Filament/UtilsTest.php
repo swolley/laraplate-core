@@ -9,10 +9,12 @@ use Filament\Tables\Contracts\HasTable as HasTableContract;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\Filament\HasFormHarness;
 use Modules\Core\Tests\Stubs\Filament\HasRecordsHarness;
 
@@ -85,11 +87,7 @@ it('allows Toggle inline override when the form is stacked', function (): void {
 
 it('returns create action when user can create records', function (): void {
     $setting = new Setting;
-    $permission_name = sprintf(
-        '%s.%s.create',
-        $setting->getConnectionName() ?? 'default',
-        $setting->getTable(),
-    );
+    $permission_name = PermissionName::forModel($setting, ActionEnum::Insert->value);
 
     $permission = Permission::factory()->create([
         'name' => $permission_name,
