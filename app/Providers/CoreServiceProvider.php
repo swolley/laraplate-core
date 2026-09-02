@@ -34,6 +34,7 @@ use Laravel\Fortify\Features;
 use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
+use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Cache\CacheManager as CoreCacheManager;
 use Modules\Core\Console\PruneMediaDraftsCommand;
 use Modules\Core\Console\WarmCacheCommand;
@@ -189,6 +190,11 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Singleton so every module registering at boot writes into the same
         // instance the dispatcher later reads.
         $this->app->singleton(DomainActionRegistry::class);
+
+        // Declared, not registered: no module pushes into this at boot, and nothing
+        // in a request reads it. Binding it only names the class — `permission:refresh`
+        // is what actually builds it, so an HTTP request never pays for the discovery.
+        $this->app->singleton(PermissionManifest::class);
 
         // Singleton so every module registering its importable entities at boot
         // writes into the same registry the import framework later resolves from.

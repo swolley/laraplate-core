@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 use Modules\AI\Models\ActionRequest;
+use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Console\PermissionsRefreshCommand;
 use Modules\Core\Helpers\HelpersCache;
+use Modules\Core\Models\OutboxEvent;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
 use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredPermissionsModel;
+use Modules\ERP\Models\ReturnOrder;
 use Symfony\Component\Console\Application as SymfonyConsoleApplication;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -399,4 +402,68 @@ it('creates impersonate permission for the configured user model when missing', 
     expect(Permission::query()->where('name', $impersonate_name)->exists())->toBeTrue();
     expect($output)->toContain($impersonate_name);
     expect($output)->toContain("Created '{$impersonate_name}' permission");
+});
+
+it('creates the domain permissions a module declares', function (): void {
+    $declared = app(PermissionManifest::class)->namesFor('ERP');
+    $permission_name = $declared[0];
+
+    Permission::query()->where('name', $permission_name)->delete();
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $permission_name)->exists())->toBeTrue()
+        ->and($output)->toContain("Created '{$permission_name}' declared permission");
+});
+
+it('keeps a declared permission whose verb collides with a generic one it would otherwise drop', function (): void {
+    // `approve` is a generic verb the command drops for a model without the
+    // approval trait, and at the same time a domain step ERP declares on returns.
+    $permission_name = PermissionName::forClass(ReturnOrder::class, 'approve');
+
+    expect(app(PermissionManifest::class)->names())->toContain($permission_name);
+
+    Permission::query()->firstOrCreate(['name' => $permission_name], ['guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [ReturnOrder::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $permission_name)->exists())->toBeTrue()
+        ->and($output)->not->toContain("Deleted '{$permission_name}' permission");
+});
+
+it('leaves alone a permission whose operation it does not generate', function (): void {
+    // Names also come from data: `sao_workflow_transitions.required_permission` is
+    // free text checked with Gate::allows(). Pruning one would forbid the
+    // transition for good.
+    $orphan_name = 'default.zz_' . bin2hex(random_bytes(4)) . '.frobnicate';
+
+    Permission::query()->create(['name' => $orphan_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $orphan_name)->exists())->toBeTrue()
+        ->and($output)->not->toContain($orphan_name);
+});
+
+it('generates no permission for a model a module excludes', function (): void {
+    $table = (new OutboxEvent)->getTable();
+
+    expect(app(PermissionManifest::class)->excludedModels())->toContain(OutboxEvent::class);
+
+    Permission::query()->firstOrCreate(
+        ['name' => PermissionName::forClass(OutboxEvent::class, ActionEnum::Select->value)],
+        ['guard_name' => 'web'],
+    );
+
+    HelpersCache::setModels('active', [OutboxEvent::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('table_name', $table)->count())->toBe(0);
 });
