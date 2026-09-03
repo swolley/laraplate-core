@@ -100,6 +100,42 @@ it('bootstrapChildProcess rebuilds Cache::memo and resets DynamicContentsService
         ->and(app()->bound('cache.__memoized:' . $default_driver))->toBeTrue();
 });
 
+it('bootstrapChildProcess purges the redis cache connection, not only default', function (): void {
+    if (! app()->bound('redis')) {
+        $this->markTestSkipped('Redis is not bound in this environment.');
+    }
+
+    $redis = app('redis');
+    $cache_connection = (string) config('cache.stores.redis.connection', 'cache');
+
+    // Warm both connections so they appear in the manager's local cache.
+    $redis->connection('default');
+    $redis->connection($cache_connection);
+
+    $connections_prop = (new ReflectionObject($redis))->getProperty('connections');
+    $connections_prop->setAccessible(true);
+
+    expect($connections_prop->getValue($redis))->toHaveKeys(['default', $cache_connection]);
+
+    $seeder = new class(app(DatabaseManager::class)) extends BatchSeeder
+    {
+        public function __destruct() {}
+
+        protected function execute(): void {}
+    };
+
+    $bootstrap = new ReflectionMethod(BatchSeeder::class, 'bootstrapChildProcess');
+    $bootstrap->setAccessible(true);
+    $connection_name = (new ReflectionClass(BatchSeeder::class))->getProperty('childDatabaseConnectionName');
+    $connection_name->setValue($seeder, app(DatabaseManager::class)->getDefaultConnection());
+    $bootstrap->invoke($seeder);
+
+    $connections_after = $connections_prop->getValue($redis);
+
+    expect($connections_after)->not->toHaveKey('default')
+        ->and($connections_after)->not->toHaveKey($cache_connection);
+});
+
 it('bootstrapChildProcess reinitializes PermissionRegistrar cache handle', function (): void {
     $registrar = app(PermissionRegistrar::class);
     $cache_before = (new ReflectionObject($registrar))->getProperty('cache');

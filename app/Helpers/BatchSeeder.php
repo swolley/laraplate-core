@@ -97,11 +97,14 @@ abstract class BatchSeeder extends Seeder
 
         // Redis sockets inherited from the parent are not fork-safe; purge so
         // the next Cache/Redis access opens a fresh connection in this child.
+        // Cache::purge() without a name only drops the default store wrapper —
+        // failover's underlying redis/array repositories survive and must be
+        // purged explicitly so children do not reuse poisoned sockets/state.
         Cache::purge();
+        Cache::purge('redis');
+        Cache::purge('array');
 
-        if (app()->bound('redis')) {
-            app('redis')->purge();
-        }
+        $this->purgeForkedRedisConnections();
 
         // Cache::memo() is a scoped container binding that survives Cache::purge().
         // After fork it still wraps the parent's dead Redis connection; forget it so
@@ -118,6 +121,32 @@ abstract class BatchSeeder extends Seeder
             $registrar = app(PermissionRegistrar::class);
             $registrar->initializeCache();
             $registrar->clearPermissionsCollection();
+        }
+    }
+
+    /**
+     * Drop every configured Redis connection after fork.
+     *
+     * {@see \Illuminate\Redis\RedisManager::purge()} with no argument only
+     * clears the `default` connection. The cache store uses `cache` (see
+     * config/cache.php), so leaving it inherited after pcntl_fork lets parent
+     * and children share a TCP socket — replies can be stolen and a GET for an
+     * int generation counter can unserialize as an Eloquent Collection.
+     */
+    private function purgeForkedRedisConnections(): void
+    {
+        if (! app()->bound('redis')) {
+            return;
+        }
+
+        $redis = app('redis');
+
+        foreach (array_keys(config('database.redis', [])) as $name) {
+            if (in_array($name, ['client', 'options'], true)) {
+                continue;
+            }
+
+            $redis->purge($name);
         }
     }
 

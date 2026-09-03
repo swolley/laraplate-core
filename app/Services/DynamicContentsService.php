@@ -341,7 +341,21 @@ final class DynamicContentsService
 
     private function metadataGeneration(): int
     {
-        return (int) Cache::get(self::METADATA_GENERATION_KEY, 0);
+        $value = Cache::get(self::METADATA_GENERATION_KEY, 0);
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+
+        // Fork-poisoned Redis replies (or a failover array hit) can yield an
+        // Eloquent Collection under this key. Repair so typed memo keys stay usable.
+        Cache::forever(self::METADATA_GENERATION_KEY, 0);
+
+        return 0;
     }
 
     private function bumpMetadataGeneration(): void

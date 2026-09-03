@@ -56,6 +56,18 @@ it('clearPresetsCache bumps metadata generation so typed keys miss after reset',
     expect(Cache::get($generation_key))->toBe(4);
 });
 
+it('metadataGeneration recovers when the generation key holds a Collection', function (): void {
+    $generation_key = 'core.dynamic_contents.generation';
+    Cache::forever($generation_key, new Illuminate\Database\Eloquent\Collection([(object) ['id' => 1]]));
+
+    $service = DynamicContentsService::getInstance();
+    $method = new ReflectionMethod(DynamicContentsService::class, 'metadataGeneration');
+    $method->setAccessible(true);
+
+    expect($method->invoke($service))->toBe(0)
+        ->and(Cache::get($generation_key))->toBe(0);
+});
+
 it('rememberForeverCollection reloads when the persistent cache returns a plain array', function (): void {
     $cache_key = 'core.dynamic_contents.test:array-rehydrate';
     Cache::forever($cache_key, ['not' => 'a-collection']);
