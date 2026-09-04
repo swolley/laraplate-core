@@ -25,6 +25,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Fluent;
+use Carbon\Carbon;
+use DateTimeInterface;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Modules\Core\Locking\Exceptions\LockedModelException;
+use Modules\Core\Locking\LockIntent;
+use Modules\Core\Locking\Locked;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Authorization\RetrievedSelectGuard;
@@ -44,7 +50,6 @@ use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
@@ -706,19 +711,30 @@ class CrudService
     {
         $model = $requestData->model;
         $this->assertCrudWriteAllowed($model, 'update');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
+        $permission_name = $this->auth->ensurePermission($requestData->request, $model->getTable(), 'update', $model->getConnectionName());
 
         $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+        $found_records = $this->aclFiltered(
+            $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value)),
+            $permission_name,
+        )->lazy(100);
         $changes = $requestData->changes;
         $discarded_values = $this->removeNonFillableProperties($model, $changes);
         $relations = $this->resolveSyncableRelations($model, $requestData->relations);
 
         $updated_records = new Collection();
         $found_count = 0;
-        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, &$found_count): void {
+        $lock_version = $this->requestedLockVersion($requestData);
+
+        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, $lock_version, &$found_count): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
+
+                if ($lock_version !== null && method_exists($found_record, 'currentLockVersion')) {
+                    // Optimistic locking: the version the client read. Setting it here makes the
+                    // update fail loudly if somebody else has written the row in the meantime.
+                    $found_record->setAttribute($found_record::lockVersionColumn(), $lock_version);
+                }
 
                 /** @psalm-suppress InvalidArgument */
                 $mutated = (bool) $found_record->update($changes);
@@ -747,9 +763,12 @@ class CrudService
     {
         $model = $requestData->model;
         $this->assertCrudWriteAllowed($model, 'delete');
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
+        $permission_name = $this->auth->ensurePermission($requestData->request, $model->getTable(), 'forceDelete', $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
-        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+        $found_records = $this->aclFiltered(
+            $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value)),
+            $permission_name,
+        )->lazy(100);
 
         $found_count = 0;
         $deleted_count = 0;
@@ -782,11 +801,12 @@ class CrudService
         // restore permission.
         $required_permission = $is_activate ? 'restore' : 'delete';
         $this->assertCrudWriteAllowed($model, $required_permission);
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), $required_permission, $model->getConnectionName());
+        $permission_name = $this->auth->ensurePermission($requestData->request, $model->getTable(), $required_permission, $model->getConnectionName());
         $key_value = $this->getModelKeyValue($requestData);
-        $found_record = $this->newQueryWithTrashed($model)
-            ->where($this->keyValueToWhereCondition($model, $key_value))
-            ->firstOrFail();
+        $found_record = $this->aclFiltered(
+            $this->newQueryWithTrashed($model)->where($this->keyValueToWhereCondition($model, $key_value)),
+            $permission_name,
+        )->firstOrFail();
 
         if ($is_activate) {
             throw_if(! method_exists($found_record, 'restore') || ! $found_record->restore(), LogicException::class, 'Record not activated');
@@ -2403,12 +2423,13 @@ class CrudService
     {
         $model = $requestData->model;
         $this->assertCrudWriteAllowed($model, $operation);
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
+        $permission_name = $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
         $key_value = $this->getModelKeyValue($requestData);
-        $found_record = $this->newQueryWithTrashed($model)
-            ->where($this->keyValueToWhereCondition($model, $key_value))
-            ->firstOrFail();
+        $found_record = $this->aclFiltered(
+            $this->newQueryWithTrashed($model)->where($this->keyValueToWhereCondition($model, $key_value)),
+            $permission_name,
+        )->firstOrFail();
 
         $user = Auth::user();
         throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
@@ -2518,8 +2539,17 @@ class CrudService
     }
 
     /**
-     * Both operations are governed by the single `lock` permission, mirroring
-     * {@see doApproveOperation()} where `approve` also governs `disapprove`.
+     * One verb, three deliberately different acts.
+     *
+     * A **lease** is what the edit form takes: an owned, expiring lock that says "I am working on
+     * this". It needs no permission of its own beyond `update`, the same right the form already
+     * required, and it is what every caller gets unless it asks for something else. A **hold** is an
+     * owned lock with no deadline, and a **freeze** is an ownerless one that blocks everybody;
+     * both are deliberate administrative acts and both need `lock`.
+     *
+     * Nothing here is a heartbeat. The client re-calls this operation and reads the answer: an
+     * unchanged `affected_records` means the lock it holds is still its own and still valid, and in
+     * that case not a single column is written.
      *
      * @param  "lock"|"unlock"  $operation
      */
@@ -2529,32 +2559,33 @@ class CrudService
         $this->assertCrudWriteAllowed($model, $operation);
 
         throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
-        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'lock', $model->getConnectionName());
-        $key_value = $this->getModelKeyValue($requestData);
 
-        $found_records = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value))->lazy(100);
+        $request = $requestData->request;
+        $is_single = $request->has('id');
+        $intent = $operation === 'lock' ? $this->resolveLockIntent($requestData) : null;
+
+        $key_value = $this->getModelKeyValue($requestData);
+        $query = $model->newQuery()->where($this->keyValueToWhereCondition($model, $key_value));
+
+        if ($intent instanceof LockIntent) {
+            $this->aclFiltered($query, $intent->permission_name);
+        }
+
+        $found_records = $query->lazy(100);
         $found_count = 0;
-        $target_locked_state = $operation === 'lock';
         $affected_records = new Collection();
-        $model->getConnection()->transaction(function () use ($found_records, $affected_records, $operation, $requestData, $target_locked_state, &$found_count): void {
+
+        $model->getConnection()->transaction(function () use ($found_records, $affected_records, $intent, $operation, $requestData, $is_single, &$found_count): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
-                $already_in_target_state = $target_locked_state === $this->recordIsLocked($found_record);
 
-                if ($requestData->request->has('id')) {
-                    throw_if(
-                        $already_in_target_state,
-                        AlreadyLockedException::class,
-                        $target_locked_state ? 'Record already locked' : "Record isn't locked",
-                    );
+                $changed = $intent instanceof LockIntent
+                    ? $this->applyLock($found_record, $intent, $is_single)
+                    : $this->applyUnlock($found_record, $requestData, $is_single);
+
+                if ($changed) {
+                    $affected_records->add($found_record->fresh());
                 }
-
-                if ($already_in_target_state || ! method_exists($found_record, $operation)) {
-                    continue;
-                }
-
-                $found_record->{$operation}();
-                $affected_records->add($found_record->fresh());
             }
         });
         throw_if($found_count === 0, ModelNotFoundException::class, 'No model Found');
@@ -2562,6 +2593,273 @@ class CrudService
         return new CrudResult(
             data: $affected_records,
         );
+    }
+
+    /**
+     * Reads what the caller is asking for, and authorizes it.
+     *
+     * The permission is chosen by the shape of the lock being asked for, not by who is asking: a
+     * user who happens to hold `lock` still only takes a lease when it opens an edit form, because
+     * the form does not ask to freeze anything.
+     */
+    private function resolveLockIntent(ModifyRequestData $requestData): LockIntent
+    {
+        $model = $requestData->model;
+        $request = $requestData->request;
+        $table = $model->getTable();
+        $connection = $model->getConnectionName();
+
+        $until_is_explicit = $request->has('locked_until');
+        $until = $until_is_explicit ? $this->parseLockDeadline($request->input('locked_until')) : null;
+
+        if ($request->boolean('freeze')) {
+            $permission_name = $this->auth->ensurePermission($request, $table, 'lock', $connection);
+
+            return new LockIntent(
+                freeze: true,
+                user_id: null,
+                until: $until,
+                until_is_explicit: true,
+                permission_name: $permission_name,
+            );
+        }
+
+        $user = Auth::user();
+
+        // Without an owner the write would produce a freeze, so an anonymous caller asking for a
+        // lease would silently block the record for everyone. Refuse rather than degrade.
+        throw_unless(
+            $user instanceof Authenticatable,
+            AuthorizationException::class,
+            'An anonymous caller cannot take a lock: a lock with no owner blocks the record for everybody.',
+        );
+
+        $permission_name = $this->auth->ensurePermission($request, $table, 'update', $connection);
+
+        if (! $until_is_explicit) {
+            $until = now()->addSeconds(new Locked()->leaseTtl());
+        } elseif (! $until instanceof DateTimeInterface) {
+            // An owned lock with no deadline is a hold: it never lapses on its own, so it is an
+            // administrative act rather than part of the edit lifecycle.
+            $this->auth->ensurePermission($request, $table, 'lock', $connection);
+        }
+
+        return new LockIntent(
+            freeze: false,
+            user_id: (int) $user->getAuthIdentifier(),
+            until: $until,
+            until_is_explicit: $until_is_explicit,
+            permission_name: $permission_name,
+        );
+    }
+
+    private function parseLockDeadline(mixed $value): ?DateTimeInterface
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return $value;
+        }
+
+        throw_unless(is_string($value) || is_numeric($value), InvalidArgumentException::class, 'locked_until must be a date.');
+
+        try {
+            return Carbon::parse($value);
+        } catch (Throwable) {
+            throw new InvalidArgumentException('locked_until is not a valid date.');
+        }
+    }
+
+    /**
+     * @return bool whether anything was written
+     */
+    private function applyLock(Model $record, LockIntent $intent, bool $is_single): bool
+    {
+        $locked = new Locked();
+        $owner = $record->getAttribute($locked->lockedByColumn());
+        $owner_id = $owner === null ? null : (int) $owner;
+
+        if (! $record->isLocked()) {
+            $record->lock($intent->freeze ? null : $this->lockOwner($intent), $intent->until);
+
+            return true;
+        }
+
+        $held_by_caller = $owner_id !== null && $owner_id === $intent->user_id;
+        $frozen = $owner_id === null;
+
+        if ($intent->freeze && $frozen) {
+            return $this->moveDeadline($record, $intent, $locked);
+        }
+
+        if (! $held_by_caller) {
+            // Somebody else's lease, or a freeze. Reporting it is only useful when the caller named
+            // a single record; a bulk call skips what it may not touch and says so by omission.
+            throw_if($is_single, LockedModelException::class, $this->lockConflictMessage($record, $locked));
+
+            return false;
+        }
+
+        if ($intent->freeze) {
+            // The caller is turning its own lease into a freeze: a different lock, so it starts now.
+            $record->lock(null, $intent->until);
+
+            return true;
+        }
+
+        return $this->moveDeadline($record, $intent, $locked);
+    }
+
+    /**
+     * Applies the deadline of an intent to a lock the caller already holds.
+     *
+     * The lease deadline is fixed when the lock is taken, not rolling. This method is only reached
+     * when the caller's own lock is still valid, so an implicit refresh has nothing to do: writing
+     * the configured TTL again would rewrite the row on every poll, would move a deadline the user
+     * never asked to move, and would silently shorten a lock deliberately held for longer. Doing
+     * nothing is what makes the periodic re-lock a pure read.
+     *
+     * An explicit deadline is different: it is an assignment, and the lock is the caller's own to
+     * shorten or extend.
+     */
+    private function moveDeadline(Model $record, LockIntent $intent, Locked $locked): bool
+    {
+        if (! $intent->until_is_explicit) {
+            return false;
+        }
+
+        $current = $record->getAttribute($locked->lockedUntilColumn());
+        $current = $current === null ? null : Carbon::parse($current);
+
+        if ($current === null && $intent->until === null) {
+            return false;
+        }
+
+        if ($current !== null && $intent->until !== null && $current->equalTo($intent->until)) {
+            return false;
+        }
+
+        $record->setLockDeadline($intent->until);
+
+        return true;
+    }
+
+    /**
+     * @return bool whether anything was written
+     */
+    private function applyUnlock(Model $record, ModifyRequestData $requestData, bool $is_single): bool
+    {
+        if (! $record->isLocked()) {
+            // Already in the target state. Not an error, and not a 304 either: the envelope says so
+            // by returning no affected record.
+            return false;
+        }
+
+        $locked = new Locked();
+        $owner = $record->getAttribute($locked->lockedByColumn());
+        $user = Auth::user();
+        $held_by_caller = $owner !== null
+            && $user instanceof Authenticatable
+            && (int) $owner === (int) $user->getAuthIdentifier();
+
+        if ($held_by_caller) {
+            // Releasing your own lock is the owner's right and needs no permission of its own.
+            $record->forceUnlock();
+
+            return true;
+        }
+
+        $model = $requestData->model;
+        $permission_name = $this->auth->ensurePermission(
+            $requestData->request,
+            $model->getTable(),
+            'unlock',
+            $model->getConnectionName(),
+        );
+
+        if (! $this->recordMatchesAcl($record, $permission_name)) {
+            throw_if($is_single, LockedModelException::class, $this->lockConflictMessage($record, $locked));
+
+            return false;
+        }
+
+        $record->forceUnlock();
+
+        return true;
+    }
+
+    /**
+     * The optimistic version the client claims to be holding, if any.
+     *
+     * Only honoured when the request names a single record. A version belongs to one row that one
+     * client read; applying it to every row a bulk criteria matched would either fail at random or,
+     * worse, pass and silently overwrite rows the client never saw.
+     */
+    private function requestedLockVersion(ModifyRequestData $requestData): ?int
+    {
+        if (! $requestData->request->has('id')) {
+            return null;
+        }
+
+        $version = $requestData->changes['lock_version'] ?? $requestData->request->input('lock_version');
+
+        return is_numeric($version) ? (int) $version : null;
+    }
+
+    /**
+     * Narrows a write query to the rows the caller's ACL actually reaches.
+     *
+     * The entity-level check says the caller may perform the operation at all; without this, every
+     * write path resolved its rows by key alone, so a row-level ACL that hid a record from a list
+     * did nothing to stop the same user updating, deleting or approving it by id.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    private function aclFiltered(Builder $query, string $permission_name): Builder
+    {
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+
+        return $query;
+    }
+
+    /**
+     * Whether the record is still reachable once the ACL row filters of a permission are applied.
+     *
+     * The entity-level check says the caller may perform the operation at all; this says whether it
+     * may perform it on *this* row.
+     */
+    private function recordMatchesAcl(Model $record, string $permission_name): bool
+    {
+        $query = $record->newQueryWithoutScopes()->whereKey($record->getKey());
+        $this->auth->applyAclFiltersToQuery($query, $permission_name);
+
+        return $query->exists();
+    }
+
+    private function lockOwner(LockIntent $intent): ?Authenticatable
+    {
+        $user = Auth::user();
+
+        return $intent->freeze ? null : $user;
+    }
+
+    private function lockConflictMessage(Model $record, Locked $locked): string
+    {
+        $owner = $record->getAttribute($locked->lockedByColumn());
+        $until = $record->getAttribute($locked->lockedUntilColumn());
+
+        $who = $owner === null
+            ? 'The record is frozen'
+            : sprintf('The record is locked by user #%s', $owner);
+
+        return $until === null
+            ? $who . ' and the lock has no expiry.'
+            : sprintf('%s until %s.', $who, Carbon::parse($until)->toIso8601String());
     }
 
     private function applyComputedMethods(mixed $data, ListRequestData|\Modules\Core\Casts\SelectRequestData $request_data): void
@@ -2752,10 +3050,4 @@ class CrudService
         return $query;
     }
 
-    private function recordIsLocked(Model $model): bool
-    {
-        $locked_at_column = (new \Modules\Core\Locking\Locked())->lockedAtColumn();
-
-        return $model->getAttribute($locked_at_column) !== null;
-    }
 }

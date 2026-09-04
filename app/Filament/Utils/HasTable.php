@@ -101,6 +101,7 @@ trait HasTable
             $has_searchable,
             $has_activation,
             $has_translations,
+            $has_locks,
             $actions,
             $fixedActions,
             $permissions_prefix,
@@ -240,10 +241,18 @@ trait HasTable
 
         if ($hasLocks) {
             $default_columns->add(
+                // `is_locked` is a computed attribute, not a column, so this cannot be sorted or
+                // searched in SQL. An ownerless lock is a freeze and gets its own icon: the UI spec
+                // asks for a snowflake, which Heroicons does not carry, so the panel uses
+                // `no-symbol` and only the Vue frontend renders the snowflake proper.
                 IconColumn::make('is_locked')
                     ->boolean()
                     ->alignCenter()
-                    ->trueIcon('heroicon-o-lock-closed')
+                    ->icon(static fn (Model $record): ?string => match (true) {
+                        ! $record->isLocked() => null,
+                        $record->{$record->getLockedByColumn()} === null => 'heroicon-o-no-symbol',
+                        default => 'heroicon-o-lock-closed',
+                    })
                     ->tooltip(
                         static function (Model $record): ?string {
                             if (! $record->isLocked()) {
@@ -256,9 +265,21 @@ trait HasTable
                                 $locked_at = $locked_at->format('Y-m-d H:i:s');
                             }
 
+                            $locked_until = $record->{$record->getLockedUntilColumn()};
+
+                            if ($locked_until instanceof Carbon) {
+                                $locked_until = $locked_until->format('Y-m-d H:i:s');
+                            }
+
                             $locked_by = $record->{$record->getLockedByColumn()};
 
-                            return sprintf('Locked at %s by User #%s', $locked_at, $locked_by);
+                            $description = $locked_by === null
+                                ? sprintf('Frozen at %s', $locked_at)
+                                : sprintf('Locked at %s by User #%s', $locked_at, $locked_by);
+
+                            return $locked_until === null
+                                ? $description
+                                : $description . sprintf(', until %s', $locked_until);
                         },
                     )
                     ->falseIcon(false),
@@ -365,6 +386,7 @@ trait HasTable
         bool $hasSearchable,
         bool $hasActivation,
         bool $hasTranslations,
+        bool $hasLocks,
         ?callable $actions,
         array $fixedActions,
         string $permissionsPrefix,
@@ -434,6 +456,59 @@ trait HasTable
                         event(new TranslatedModelSaved($record));
                     }),
             );
+        }
+
+        if ($hasLocks) {
+            // Freeze and unfreeze, never lease. A lease belongs to the edit lifecycle and is taken
+            // by opening the form; what a table offers is the deliberate administrative act, and the
+            // two rights are deliberately separate permissions: being trusted to block a record and
+            // being trusted to unblock other people are not the same responsibility.
+            if (self::checkPermissionCached($user, $permissionsPrefix . '.lock')) {
+                $default_actions->push(
+                    Action::make('freeze')
+                        ->hiddenLabel()
+                        ->icon(Heroicon::OutlinedNoSymbol)
+                        ->color('warning')
+                        ->visible(static fn (Model $record): bool => ! $record->isLocked())
+                        ->requiresConfirmation()
+                        ->action(static function (Model $record): void {
+                            // No user: an ownerless lock is a freeze, which blocks everybody.
+                            $record->lock();
+                        }),
+                );
+                $default_bulk_actions->add(
+                    BulkAction::make('freeze')
+                        ->icon(Heroicon::OutlinedNoSymbol)
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->action(static function (Collection $records): void {
+                            $records->each(static fn (Model $record) => $record->isLocked() ? null : $record->lock());
+                        }),
+                );
+            }
+
+            if (self::checkPermissionCached($user, $permissionsPrefix . '.unlock')) {
+                $default_actions->push(
+                    Action::make('unfreeze')
+                        ->hiddenLabel()
+                        ->icon(Heroicon::OutlinedLockOpen)
+                        ->visible(static fn (Model $record): bool => $record->isLocked())
+                        ->requiresConfirmation()
+                        ->action(static function (Model $record): void {
+                            // The permission has already established the right to lift somebody
+                            // else's lock, so the trait's own owner check would only get in the way.
+                            $record->forceUnlock();
+                        }),
+                );
+                $default_bulk_actions->add(
+                    BulkAction::make('unfreeze')
+                        ->icon(Heroicon::OutlinedLockOpen)
+                        ->requiresConfirmation()
+                        ->action(static function (Collection $records): void {
+                            $records->each(static fn (Model $record) => $record->isLocked() ? $record->forceUnlock() : null);
+                        }),
+                );
+            }
         }
 
         if ($hasSearchable) {
@@ -598,13 +673,15 @@ trait HasTable
                         'year' => 'Year',
                     ])
                     ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
-                        // 'all' => $query->withLocked(),
-                        'none' => $query->withoutLocked(),
-                        'only' => $query->onlyLocked(),
-                        'today' => $query->onlyLocked()->whereDate($locked_at_column, '<=', today()),
-                        'week' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
-                        'month' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
-                        'year' => $query->onlyLocked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
+                        // `onlyLocked` and `withoutLocked` were never defined anywhere: every branch
+                        // of this filter threw. The scopes are `locked` and `unlocked`, and they
+                        // account for expiry, so the filter now agrees with the model.
+                        'none' => $query->unlocked(),
+                        'only' => $query->locked(),
+                        'today' => $query->locked()->whereDate($locked_at_column, '<=', today()),
+                        'week' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
+                        'month' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
+                        'year' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
                         default => $query,
                     })),
             );

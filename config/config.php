@@ -9,6 +9,9 @@ return [
      * Trusted connection overrides for Core models that may be stored outside
      * the application's default database.
      *
+     * Frozen: native modules share one schema on one connection. Add no
+     * entries. See docs/database-connection-affinity-audit.md.
+     *
      * @var array<class-string<Illuminate\Database\Eloquent\Model>, string>
      */
     'model_connections' => [],
@@ -23,12 +26,16 @@ return [
         'lock_at_column' => env('LOCKIN_LOCK_AT_COLUMN', 'locked_at'),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'lock_by_column' => env('LOCKIN_LOCK_BY_COLUMN', 'locked_user_id'),
-        // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-        // 'unlock_allowed' => env('LOCKIN_UNLOCK_ALLOWED', true),
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'lock_until_column' => env('LOCKIN_LOCK_UNTIL_COLUMN', 'locked_until'),
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'lease_ttl' => (int) env('LOCKING_LEASE_TTL', 900),
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'unlock_allowed' => env('LOCKIN_UNLOCK_ALLOWED', true),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'can_be_unlocked' => explode(',', (string) env('LOCKING_CAN_BE_UNLOCKED', '')),
-        // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-        // 'prevent_modifications_on_locked_objects' => env('LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED', false),
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'prevent_modifications_on_locked_objects' => env('LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED', true),
         // // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         // 'prevent_notifications_to_locked_objects' => env('LOCKING_PREVENT_MODIFICATIONS_TO_LOCKED', false),
     ],

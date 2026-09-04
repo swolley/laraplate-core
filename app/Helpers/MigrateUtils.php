@@ -335,6 +335,14 @@ final class MigrateUtils
         }
     }
 
+    /**
+     * Adds the three lock columns.
+     *
+     * There is deliberately no `is_locked` column: a lock is void once
+     * {@see Locked::lockedUntilColumn()} has passed, and no engine accepts a non-deterministic
+     * expression such as `NOW()` in a generated column. Lock state is therefore computed, by
+     * {@see \Modules\Core\Locking\Traits\HasLocks::isLocked()} and its matching query scope.
+     */
     private static function locked(Blueprint $table, Connection $connection): void
     {
         $schema = $connection->getSchemaBuilder();
@@ -348,30 +356,15 @@ final class MigrateUtils
         $locked_by_column = $locked->lockedByColumn();
 
         if ($locked_by_column !== '' && $locked_by_column !== '0' && ! $schema->hasColumn($table->getTable(), $locked_by_column)) {
-            $table->timestamp($locked_by_column)->nullable()->comment('The user who locked the entity');
+            // Holds a users.id, which is bigint unsigned. No foreign key here: a lockable model may
+            // live on a connection that does not carry the users table.
+            $table->unsignedBigInteger($locked_by_column)->nullable()->comment('The user who locked the entity');
         }
 
-        if (! $schema->hasColumn($table->getTable(), 'is_locked')) {
-            switch ($connection->getDriverName()) {
-                case 'pgsql':
-                case 'sqlite':
-                    $table->boolean('is_locked')->storedAs($locked_at_column . ' IS NOT NULL')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
+        $locked_until_column = $locked->lockedUntilColumn();
 
-                    break;
-                case 'oracle':
-                    // Oracle richiede ancora i trigger
-                    $table->boolean('is_locked')->default(false)->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
-                    $connection->afterCommit(function () use ($connection, $table): void {
-                        self::createBooleanTriggers($table, 'locked', $connection);
-                    });
-
-                    break;
-                default:
-                    // MySQL supporta generated columns
-                    $table->boolean('is_locked')->storedAs('IF(' . $locked_at_column . ' IS NULL, 0, 1)')->index($table->getTable() . '_is_locked_idx')->comment('Whether the entity is locked');
-
-                    break;
-            }
+        if ($locked_until_column !== '' && $locked_until_column !== '0' && ! $schema->hasColumn($table->getTable(), $locked_until_column)) {
+            $table->timestamp($locked_until_column)->nullable()->index($table->getTable() . '_locked_until_idx')->comment('The moment the lock expires; null means it never does');
         }
     }
 
@@ -385,6 +378,12 @@ final class MigrateUtils
         }
 
         $locked = new Locked();
+        $locked_until_column = $locked->lockedUntilColumn();
+
+        if ($locked_until_column !== '' && $locked_until_column !== '0' && $schema->hasColumn($table->getTable(), $locked_until_column)) {
+            $table->dropColumn($locked_until_column);
+        }
+
         $locked_at_column = $locked->lockedAtColumn();
 
         if ($locked_at_column !== '' && $locked_at_column !== '0' && $schema->hasColumn($table->getTable(), $locked_at_column)) {

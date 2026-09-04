@@ -23,7 +23,6 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
-use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -1601,7 +1600,9 @@ it('lock unlock and guard branches on lockable models', function (): void {
     $req_with_id->setUserResolver(fn () => $superadmin);
     $modify_locked = crud_cov_make_modify_data($target, $req_with_id, ['id' => $target->getKey()]);
 
-    expect(fn () => $service->lock($modify_locked))->toThrow(AlreadyLockedException::class);
+    // Re-locking a record the caller already holds is not an error and writes nothing: the empty
+    // `data` is how the envelope says "still yours, still valid".
+    expect($service->lock($modify_locked)->data)->toBeEmpty();
 
     $service->unlock($modify_unlocked);
 

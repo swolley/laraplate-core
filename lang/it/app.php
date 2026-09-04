@@ -98,6 +98,17 @@ return [
   ],
   'language' => 'Italiano',
   'locale' => 'it-IT',
+  'locking' => [
+    'held' => [
+      'by' => ':user ha preso in carico questo record.',
+      'by_until' => ':user ha preso in carico questo record fino alle :until.',
+      'cancel' => 'Torna alla lista',
+      'frozen' => 'Questo record è congelato e non è modificabile.',
+      'frozen_until' => 'Questo record è congelato fino alle :until.',
+      'heading' => 'Questo record è in lavorazione',
+      'open_read_only' => 'Apri in sola lettura',
+    ],
+  ],
   'login' => [
     'cannotAccess' => 'Impossibile accedere con le credenziali specificate',
     'enter' => 'Accedi',

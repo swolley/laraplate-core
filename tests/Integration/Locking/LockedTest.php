@@ -53,7 +53,7 @@ it('returns fallback defaults when config is not bound in container', function (
             ->and($locked->lockedByColumn())->toBe('locked_user_id')
             ->and($locked->unlockAllowed())->toBeTrue()
             ->and($locked->classesThatCanBeUnlocked())->toBe([])
-            ->and($locked->preventsModificationsOnLockedObjects())->toBeFalse()
+            ->and($locked->preventsModificationsOnLockedObjects())->toBeTrue()
             ->and($locked->allowsNotificationsToLockedObjects())->toBeFalse();
     } finally {
         Container::setInstance($original);
@@ -78,7 +78,7 @@ it('returns fallback defaults when config repository throws errors', function ()
             ->and($locked->lockedByColumn())->toBe('locked_user_id')
             ->and($locked->unlockAllowed())->toBeTrue()
             ->and($locked->classesThatCanBeUnlocked())->toBe([])
-            ->and($locked->preventsModificationsOnLockedObjects())->toBeFalse()
+            ->and($locked->preventsModificationsOnLockedObjects())->toBeTrue()
             ->and($locked->allowsNotificationsToLockedObjects())->toBeFalse();
     } finally {
         $app->instance('config', $original);

@@ -307,6 +307,29 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
         return $this->rolesTrait()->using(ModelHasRole::class);
     }
 
+    /**
+     * Whether the user holds a permission by any route at all.
+     *
+     * Three routes exist and all three must count: granted straight to the user, granted to one of
+     * their roles, or granted to an **ancestor** of one of their roles. Spatie's `hasPermissionTo`
+     * covers the first two only: it asks whether the user holds one of the roles attached to the
+     * permission, so a permission sitting on a parent role is invisible to it even though
+     * {@see Role::hasPermission()} and {@see Role::getAllPermissions()} both report it. Role
+     * inheritance stopped one step short of the user, and this closes that step.
+     */
+    public function hasPermission(string $permission, ?string $guard_name = null): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($this->hasPermissionTo($permission, $guard_name)) {
+            return true;
+        }
+
+        return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission));
+    }
+
     public function getPermissionsViaRoles(): Collection
     {
         if ($this->isSuperAdmin()) {

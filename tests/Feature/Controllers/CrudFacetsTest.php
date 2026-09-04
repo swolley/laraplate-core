@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Models\Role;
+use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Symfony\Component\HttpFoundation\Response;
@@ -75,4 +76,29 @@ it('denies facets without the select permission on the entity', function (): voi
     );
 
     $response->assertStatus(Response::HTTP_UNAUTHORIZED);
+});
+
+it('maps a facet failure onto a client error instead of letting it escape', function (): void {
+    seedFacetSettings();
+
+    $viewer = User::factory()->create();
+    $viewer->assignRole(Role::findOrCreate('superadmin', 'web'));
+
+    // Facets used to sit outside the shared error mapping, with a `try` that caught only
+    // AuthorizationException. Everything else escaped to the global handler as a 500, and the
+    // message saying what was wrong with the request never reached the caller.
+    $service = Mockery::mock(CrudService::class);
+    $service->shouldReceive('facetCounts')->once()->andThrow(new InvalidArgumentException(
+        "Facet 'not_a_relation' is not an Eloquent relation on Setting, so it cannot be counted.",
+    ));
+    app()->instance(CrudService::class, $service);
+
+    $response = $this->actingAs($viewer)->getJson(
+        route('core.crud.facets', facetsRouteParams())
+            . '?' . http_build_query(['columns' => ['group_name']]),
+    );
+
+    $response->assertStatus(Response::HTTP_BAD_REQUEST);
+
+    expect((string) $response->json('error'))->toContain('not_a_relation');
 });

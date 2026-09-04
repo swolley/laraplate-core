@@ -9,7 +9,6 @@ use Modules\Core\Search\Exceptions\EmbeddingsException;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\ReindexException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
-use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Search\Exceptions\SearchException;
@@ -35,6 +34,5 @@ test('ambiguous model exception extends logic exception', function (): void {
 
 test('locking exceptions extend runtime exception', function (): void {
     expect(LockedModelException::class)->toExtend(RuntimeException::class)
-        ->and(AlreadyLockedException::class)->toExtend(RuntimeException::class)
         ->and(CannotUnlockException::class)->toExtend(RuntimeException::class);
 });

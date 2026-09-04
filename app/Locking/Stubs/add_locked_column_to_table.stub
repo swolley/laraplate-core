@@ -13,14 +13,20 @@ return new class extends Migration
         $table_name = $ModelTable$;
         $lock_at_column = config('core.locking.lock_at_column');
         $lock_by_column = config('core.locking.lock_by_column');
+        $lock_until_column = config('core.locking.lock_until_column');
 
-        Schema::table($table_name, function (Blueprint $table) use ($table_name, $lock_at_column, $lock_by_column): void {
+        Schema::table($table_name, function (Blueprint $table) use ($table_name, $lock_at_column, $lock_by_column, $lock_until_column): void {
             if (! Schema::hasColumn($table_name, $lock_at_column)) {
                 $table->timestamp($lock_at_column)->nullable();
             }
 
             if (! Schema::hasColumn($table_name, $lock_by_column)) {
-                $table->timestamp($lock_by_column)->nullable();
+                // users.id is bigint unsigned. No foreign key: the model may live on another connection.
+                $table->unsignedBigInteger($lock_by_column)->nullable();
+            }
+
+            if (! Schema::hasColumn($table_name, $lock_until_column)) {
+                $table->timestamp($lock_until_column)->nullable()->index($table_name . '_locked_until_idx');
             }
         });
     }
@@ -30,8 +36,13 @@ return new class extends Migration
         $table_name = $ModelTable$;
         $lock_at_column = config('core.locking.lock_at_column');
         $lock_by_column = config('core.locking.lock_by_column');
+        $lock_until_column = config('core.locking.lock_until_column');
 
-        Schema::table($table_name, function (Blueprint $table) use ($table_name, $lock_at_column, $lock_by_column): void {
+        Schema::table($table_name, function (Blueprint $table) use ($table_name, $lock_at_column, $lock_by_column, $lock_until_column): void {
+            if (Schema::hasColumn($table_name, $lock_until_column)) {
+                $table->dropColumn($lock_until_column);
+            }
+
             if (Schema::hasColumn($table_name, $lock_at_column)) {
                 $table->dropColumn($lock_at_column);
             }

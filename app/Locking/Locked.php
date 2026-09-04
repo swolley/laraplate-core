@@ -10,6 +10,54 @@ use Throwable;
 
 final class Locked
 {
+    /**
+     * Whether the modification guard is currently suspended for this process.
+     *
+     * @see withoutGuard()
+     */
+    private static bool $guard_suspended = false;
+
+    /**
+     * Runs a callback with the lock guard suspended, and puts it back afterwards.
+     *
+     * The guard has no notion of an acting user outside a request, so on a queue or in the console
+     * nobody holds the lock and every leased record is closed to writing. That is the right default:
+     * a lease exists to protect somebody's work in progress, and a background job overwriting it is
+     * exactly the damage the mechanism is for. But some system work genuinely must go through, and
+     * it should say so out loud rather than be waved past by an implicit exception for "no user":
+     *
+     * <code>
+     * Locked::withoutGuard(fn () => $invoice->recalculateTotals());
+     * </code>
+     *
+     * Nested calls restore the previous state rather than switching the guard back on, so a bypass
+     * inside a bypass cannot silently re-enable it halfway through.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function withoutGuard(callable $callback): mixed
+    {
+        $previous = self::$guard_suspended;
+        self::$guard_suspended = true;
+
+        try {
+            return $callback();
+        } finally {
+            self::$guard_suspended = $previous;
+        }
+    }
+
+    /**
+     * Whether a {@see withoutGuard()} block is currently running.
+     */
+    public static function guardIsSuspended(): bool
+    {
+        return self::$guard_suspended;
+    }
+
     public function lockedAtColumn(): string
     {
         try {
@@ -33,6 +81,38 @@ final class Locked
             return config('core.locking.lock_by_column', 'locked_user_id');
         } catch (Throwable) {
             return 'locked_user_id';
+        }
+    }
+
+    /**
+     * Deadline column: after this moment the lock is void, whether or not the sweep has run.
+     */
+    public function lockedUntilColumn(): string
+    {
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return 'locked_until';
+            }
+
+            return config('core.locking.lock_until_column', 'locked_until');
+        } catch (Throwable) {
+            return 'locked_until';
+        }
+    }
+
+    /**
+     * Default lifetime, in seconds, of a lease taken by the edit-form lifecycle.
+     */
+    public function leaseTtl(): int
+    {
+        try {
+            if (! function_exists('app') || ! app()->bound('config')) {
+                return 900;
+            }
+
+            return (int) config('core.locking.lease_ttl', 900);
+        } catch (Throwable) {
+            return 900;
         }
     }
 
@@ -91,18 +171,22 @@ final class Locked
      *
      * Config: core.locking.prevent_modifications_on_locked_objects (runtime setting, DB overlay).
      * Used by {@see LockedModelSubscriber} on eloquent.saving, eloquent.deleting, eloquent.replicating.
-     * When false (default), locked records can still be modified; when true, dirty changes throw {@see LockedModelException}.
+     *
+     * **On by default.** A lock that enforces nothing is decoration: with this off, a record one
+     * user has taken charge of can still be saved over by anybody, and the only real protection in
+     * the system is the handful of database triggers on the ERP documents. The guard exempts the
+     * holder of the lock, so the person who took it is never the one it stops.
      */
     public function preventsModificationsOnLockedObjects(): bool
     {
         try {
             if (! function_exists('app') || ! app()->bound('config')) {
-                return false;
+                return true;
             }
 
-            return config('core.locking.prevent_modifications_on_locked_objects', false);
+            return config('core.locking.prevent_modifications_on_locked_objects', true);
         } catch (Throwable) {
-            return false;
+            return true;
         }
     }
 

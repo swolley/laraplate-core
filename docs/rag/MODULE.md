@@ -170,7 +170,7 @@ flowchart TB
 
 ### Record lifecycle traits stack
 
-A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes_{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `version_strategy_{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` columns plus scopes `valid()`, `expired()`, `scheduled()`, `draft()`; some models such as CMS `Content` also add a `valid` global scope in `booted()`), `HasLocks` (`is_locked`/`locked_at`/`locked_by`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
+A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes_{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `version_strategy_{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` columns plus scopes `valid()`, `expired()`, `scheduled()`, `draft()`; some models such as CMS `Content` also add a `valid` global scope in `booted()`), `HasLocks` (`locked_at`/`locked_user_id`/`locked_until`; `is_locked` is computed, not stored — see `RECORD_LOCKING_DEVELOPER.md`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
 
 ```mermaid
 stateDiagram-v2
@@ -181,7 +181,7 @@ stateDiagram-v2
   PendingApproval --> Live: Modification approved
   PendingApproval --> Reverted: Modification disapproved (deleteWhenDisapproved)
   Live --> Locked: HasLocks acquired
-  Locked --> Live: unlock by owner or admin
+  Locked --> Live: released by its holder, lifted with `unlock`, or lapsed at `locked_until`
   Live --> StaleConflict: lock_version mismatch
   StaleConflict --> Live: client retries with fresh version
   Live --> Trashed: SoftDeletes deleted_at set
@@ -543,9 +543,10 @@ When building new module features, reuse these primitives instead of re-implemen
 
 ### Locking and concurrency
 
-- `lock:refresh`
-- `lock:locked-add` / `lock:locked-remove` (often aliased as `lock:add` / `lock:remove`)
-- `lock:optimistic-add` / `lock:optimistic-remove`
+- `model:lock-refresh`
+- `model:lock-sweep {--limit=1000}`
+- `module:locked-add {model} {--namespace=}` / `model:locked-remove {model} {--namespace=}`
+- `model:optimistic-lock-add {model} {--namespace=}` / `model:optimistic-lock-remove {model} {--namespace=}`
 
 ### Soft delete lifecycle
 
@@ -596,9 +597,23 @@ When building new module features, reuse these primitives instead of re-implemen
 - Use settings groups for runtime switches when behavior must be configurable per table/module.
 - Reuse inspector-driven metadata and avoid hardcoded schema assumptions.
 
-## Locking toggle design note (planned extension)
+## Locking
 
-The platform already supports runtime toggles for soft deletes and versioning per table. A similar runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict safeguards to avoid accidental concurrency regressions.
+Full treatment in `RECORD_LOCKING_USER.md` and `RECORD_LOCKING_DEVELOPER.md`. In short: a lock carries
+two axes, an owner (`locked_user_id`) and a deadline (`locked_until`). An owned lock is a **lease**
+when it expires and a **hold** when it does not; an ownerless one is a **freeze**, meaning nobody may
+write. Expiry is evaluated on read, so a lapsed lock is free at once and `model:lock-sweep` is only
+housekeeping. Leases are taken by opening an edit form and cost no permission beyond `update`; holds
+and freezes need `lock`, and releasing somebody else's lock needs `unlock`, deliberately a separate
+permission.
+
+The guard (`LockedModelSubscriber`) is on by default and refuses writes from anybody but the holder.
+It has no acting user outside a request, so queues and console commands cannot write to a leased
+record unless they say so with `Locked::withoutGuard()`.
+
+The platform already supports runtime toggles for soft deletes and versioning per table. A similar
+runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict
+safeguards to avoid accidental concurrency regressions.
 
 ## Troubleshooting quick guide
 

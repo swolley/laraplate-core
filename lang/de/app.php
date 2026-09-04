@@ -98,6 +98,17 @@ return [
   ],
   'language' => 'Deutsch',
   'locale' => 'de_CH',
+  'locking' => [
+    'held' => [
+      'by' => ':user bearbeitet diesen Datensatz.',
+      'by_until' => ':user bearbeitet diesen Datensatz bis :until.',
+      'cancel' => 'Zurück zur Liste',
+      'frozen' => 'Dieser Datensatz ist eingefroren und kann nicht bearbeitet werden.',
+      'frozen_until' => 'Dieser Datensatz ist bis :until eingefroren.',
+      'heading' => 'Dieser Datensatz wird gerade bearbeitet',
+      'open_read_only' => 'Schreibgeschützt öffnen',
+    ],
+  ],
   'login' => [
     'cannotAccess' => 'Zugriff mit den angegebenen Anmeldeinformationen nicht möglich',
     'enter' => 'Einloggen',

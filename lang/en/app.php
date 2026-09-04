@@ -98,6 +98,17 @@ return [
   ],
   'language' => 'English',
   'locale' => 'en-US',
+  'locking' => [
+    'held' => [
+      'by' => ':user has taken charge of this record.',
+      'by_until' => ':user has taken charge of this record until :until.',
+      'cancel' => 'Back to the list',
+      'frozen' => 'This record is frozen and cannot be edited.',
+      'frozen_until' => 'This record is frozen until :until.',
+      'heading' => 'This record is being worked on',
+      'open_read_only' => 'Open read-only',
+    ],
+  ],
   'login' => [
     'cannotAccess' => 'Cannot enter with specified credentials',
     'enter' => 'Enter',

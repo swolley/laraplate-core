@@ -98,6 +98,17 @@ return [
   ],
   'language' => 'Slovenščina',
   'locale' => 'sl_SI',
+  'locking' => [
+    'held' => [
+      'by' => ':user je prevzel ta zapis.',
+      'by_until' => ':user je prevzel ta zapis do :until.',
+      'cancel' => 'Nazaj na seznam',
+      'frozen' => 'Ta zapis je zamrznjen in ga ni mogoče urejati.',
+      'frozen_until' => 'Ta zapis je zamrznjen do :until.',
+      'heading' => 'Ta zapis je v obdelavi',
+      'open_read_only' => 'Odpri samo za branje',
+    ],
+  ],
   'login' => [
     'cannotAccess' => 'Dostop z navedenimi poverilnicami ni mogoč',
     'enter' => 'Prijava',

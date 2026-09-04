@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Locking;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Notifications\Events\NotificationSending;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 
@@ -27,7 +28,7 @@ final class LockedModelSubscriber
 
     public function saving(string $event, object|array $entity): bool
     {
-        if (new Locked()->allowsModificationsOnLockedObjects()) {
+        if (Locked::guardIsSuspended() || new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
         }
 
@@ -45,14 +46,18 @@ final class LockedModelSubscriber
             return true;
         }
 
-        throw_if($model->wasLocked() && $model->isDirty(), LockedModelException::class, 'This model is locked');
+        throw_if(
+            $model->wasLocked() && $model->isDirty() && ! $this->heldByCurrentUser($model),
+            LockedModelException::class,
+            'This model is locked',
+        );
 
         return true;
     }
 
     public function deleting(string $event, object|array $entity): bool
     {
-        if (new Locked()->allowsModificationsOnLockedObjects()) {
+        if (Locked::guardIsSuspended() || new Locked()->allowsModificationsOnLockedObjects()) {
             return true;
         }
 
@@ -64,7 +69,7 @@ final class LockedModelSubscriber
             return true;
         }
 
-        if ($model->wasUnlocked()) {
+        if (! $model->wasLocked() || $this->heldByCurrentUser($model)) {
             return true;
         }
 
@@ -75,7 +80,7 @@ final class LockedModelSubscriber
     {
         $locked = new Locked();
 
-        if ($locked->allowsModificationsOnLockedObjects()) {
+        if (Locked::guardIsSuspended() || $locked->allowsModificationsOnLockedObjects()) {
             return true;
         }
 
@@ -86,7 +91,7 @@ final class LockedModelSubscriber
             return true;
         }
 
-        if ($model->isUnlocked()) {
+        if ($model->isUnlocked() || $this->heldByCurrentUser($model)) {
             return true;
         }
 
@@ -112,6 +117,29 @@ final class LockedModelSubscriber
         }
 
         throw new LockedModelException('This model is locked');
+    }
+
+    /**
+     * Whether the lock on the record belongs to the user making the request.
+     *
+     * A lease exists so that one person can work on a record undisturbed. Blocking that person is
+     * the one outcome the whole mechanism must never produce, and it is what this guard used to do:
+     * it asked whether the record was locked and never whose lock it was. An ownerless lock is a
+     * freeze and matches nobody, which is exactly right.
+     *
+     * The original value is read rather than the current one, so staging a change to the owner in
+     * the same save cannot be used to walk past the guard.
+     */
+    private function heldByCurrentUser(?Model $model): bool
+    {
+        if (! $model instanceof Model) {
+            return false;
+        }
+
+        $owner = $model->getOriginal(new Locked()->lockedByColumn());
+        $current = Auth::id();
+
+        return $owner !== null && $current !== null && (int) $owner === (int) $current;
     }
 
     private function getModelFromPassedParams(object|array $params): ?Model

@@ -140,15 +140,19 @@ final class ModelLockingRefreshCommand extends Command
         $locked_class = HasLocks::class;
         $lock_at_column = method_exists($instance, 'getLockedAtColumn') ? $instance->getLockedAtColumn() : null;
         $lock_by_column = method_exists($instance, 'getLockedByColumn') ? $instance->getLockedByColumn() : null;
+        $lock_until_column = method_exists($instance, 'getLockedUntilColumn') ? $instance->getLockedUntilColumn() : null;
         $has_locking = class_uses_trait($instance, $locked_class);
 
         $schema = $instance->getConnection()->getSchemaBuilder();
         $has_locked_at_column = $lock_at_column !== null && $schema->hasColumn($table, $lock_at_column);
         $has_locked_by_column = $lock_by_column !== null && $schema->hasColumn($table, $lock_by_column);
+        $has_locked_until_column = $lock_until_column !== null && $schema->hasColumn($table, $lock_until_column);
+        $has_any_lock_column = $has_locked_at_column || $has_locked_by_column || $has_locked_until_column;
+        $has_every_lock_column = $has_locked_at_column && $has_locked_by_column && $has_locked_until_column;
 
-        if ($lock_at_column && ($has_locked_at_column || $has_locked_by_column) && ! $has_locking) {
+        if ($lock_at_column && $has_any_lock_column && ! $has_locking) {
             $this->doRemoveLockableOnModel($model, $lock_at_column);
-        } elseif ($lock_at_column && $has_locking && (! $has_locked_at_column || ! $has_locked_by_column)) {
+        } elseif ($lock_at_column && $has_locking && ! $has_every_lock_column) {
             $this->doAddLockableOnModel($model, $lock_at_column);
         }
     }

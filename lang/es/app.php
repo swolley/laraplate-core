@@ -98,6 +98,17 @@ return [
   ],
   'language' => 'Español',
   'locale' => 'es_ES',
+  'locking' => [
+    'held' => [
+      'by' => ':user se ha hecho cargo de este registro.',
+      'by_until' => ':user se ha hecho cargo de este registro hasta las :until.',
+      'cancel' => 'Volver a la lista',
+      'frozen' => 'Este registro está congelado y no se puede editar.',
+      'frozen_until' => 'Este registro está congelado hasta las :until.',
+      'heading' => 'Este registro está en curso',
+      'open_read_only' => 'Abrir en solo lectura',
+    ],
+  ],
   'login' => [
     'cannotAccess' => 'No se puede acceder con las credenciales especificadas',
     'enter' => 'Acceder',

@@ -15,6 +15,13 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **AclResolverService**    | Resolves effective ACLs for a user/permission; combines filters with OR logic. |
 | **unrestricted**          | ACL flag: user sees all rows for that permission (no filter).          |
 | **License**               | Seat / entitlement record gating module or feature access.              |
+| **Lease**                 | Owned, expiring lock taken by opening an edit form; only its holder may write. |
+| **Hold**                  | Owned lock with no deadline; deliberate, needs the `lock` permission.    |
+| **Freeze**                | **Ownerless** lock: nobody may write. Ownerless, not permanent — a freeze can expire. |
+| **`locked_until`**        | Moment a lock lapses; null means never. Evaluated on read, so a lapsed lock is free at once. |
+| **lock guard**            | `LockedModelSubscriber`: refuses saves, deletes and replicates on a record the writer does not hold. |
+| **`Locked::withoutGuard()`** | Explicit, scoped bypass of the guard for system work that must go through. |
+| **`lock_version`**        | Optimistic version; a mismatch on write is a 409, not a server fault.   |
 
 
 ### Permission vs ACL

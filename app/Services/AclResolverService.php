@@ -339,7 +339,13 @@ final class AclResolverService
         /** @var Collection<int, Role> $roles */
         $roles = $user->roles;
 
-        if ($roles->isEmpty()) {
+        // A permission can reach a user two ways, and the entity-level gate honours both: through a
+        // role, or granted straight to the user. The ACLs have to honour both as well. While this
+        // returned early on a user with no roles, a direct grant carried no row filters at all, so
+        // handing someone a permission directly quietly gave them every row of the table.
+        $has_direct_permission = $user->hasDirectPermission($permission);
+
+        if ($roles->isEmpty() && ! $has_direct_permission) {
             return collect();
         }
 
@@ -368,12 +374,18 @@ final class AclResolverService
             ->with(['permission.roles'])
             ->where(static function (Builder $query) use ($all_role_ids): void {
                 // Role-scoped ACLs apply only to their own role; unscoped (null) ACLs
-                // apply to every role holding the permission.
+                // apply to every holder of the permission.
                 $query->whereNull('role_id')->orWhereIn('role_id', $all_role_ids);
             })
-            ->whereHas('permission.roles', static function (Builder $query) use ($all_role_ids): void {
-                $query->whereIn($query->qualifyColumn('id'), $all_role_ids);
-            })
+            // The permission has to actually reach this user. Through a role, that means one of the
+            // user's roles holds it; a direct grant needs no role at all, so the constraint is
+            // dropped rather than made unsatisfiable.
+            ->when(! $has_direct_permission, static fn (Builder $query): Builder => $query->whereHas(
+                'permission.roles',
+                static function (Builder $roles_query) use ($all_role_ids): void {
+                    $roles_query->whereIn($roles_query->qualifyColumn('id'), $all_role_ids);
+                },
+            ))
             ->get();
 
         // Build a lookup: role_id → ACL (highest priority ACL for that role, already ordered)
@@ -408,6 +420,20 @@ final class AclResolverService
 
             if ($acl instanceof ACL) {
                 $resolved_acls->push($acl);
+            }
+        }
+
+        if ($has_direct_permission) {
+            // A direct grant is not attached to any role, so only an unscoped ACL can speak for it.
+            // The batch is ordered by priority, so the first one is the one that wins. Added only
+            // when the role pass has not already reached it: the same ACL twice would say the same
+            // thing, since the filter groups are combined with OR, but it would be noise.
+            $direct_acl = $batch_acls->first(static fn (ACL $acl): bool => $acl->role_id === null);
+
+            if ($direct_acl instanceof ACL && ! $resolved_acls->contains(
+                static fn (ACL $acl): bool => $acl->getKey() === $direct_acl->getKey(),
+            )) {
+                $resolved_acls->push($direct_acl);
             }
         }
 

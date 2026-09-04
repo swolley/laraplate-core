@@ -98,6 +98,22 @@ it('keeps ACL cache entries isolated by resolved connection', function (): void 
         $table->unsignedBigInteger($model_key);
     });
 
+    // Resolution consults direct grants as well as role grants, so the connection has to carry the
+    // permission side too.
+    $permission_table = config('permission.table_names.permissions');
+    $model_permission_table = config('permission.table_names.model_has_permissions');
+
+    Schema::connection('affinity')->create($permission_table, function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('guard_name');
+    });
+    Schema::connection('affinity')->create($model_permission_table, function (Blueprint $table) use ($model_key): void {
+        $table->unsignedBigInteger('permission_id');
+        $table->string('model_type');
+        $table->unsignedBigInteger($model_key);
+    });
+
     try {
         $role = Role::factory()->create(['name' => config('permission.roles.superadmin'), 'guard_name' => 'web']);
         $default_user = User::factory()->create();

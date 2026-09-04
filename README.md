@@ -70,11 +70,13 @@ AUTH_MODEL=App\Models\User				#authentication model
 #locking
 LOCKIN_LOCK_VERSION_COLUMN=lock_version			#column name for the lock version
 LOCKIN_LOCK_AT_COLUMN=locked_at					#column name for the lock date
-LOCKIN_LOCK_BY_COLUMN=locked_user_id			#column name for the lock user id
+LOCKIN_LOCK_BY_COLUMN=locked_user_id			#column name for the lock owner (a users.id)
+LOCKIN_LOCK_UNTIL_COLUMN=locked_until			#column name for the lock deadline; null means it never lapses
+LOCKING_LEASE_TTL=900							#lifetime in seconds of the lease an edit form takes
 LOCKIN_UNLOCK_ALLOWED=true						#enables unlock of locked objects
-LOCKING_CAN_BE_UNLOCKED=						#comma separated list of user ids that can unlock locked objects
-LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED=false	#prevents modifications on locked objects
-LOCKING_PREVENT_MODIFICATIONS_TO_LOCKED=false	#prevents modifications to locked objects
+LOCKING_CAN_BE_UNLOCKED=						#comma separated list of classes exempt when the above is false
+LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED=true	#refuses saves, deletes and replicates from anybody but the lock holder
+LOCKING_PREVENT_MODIFICATIONS_TO_LOCKED=false	#prevents notifications to locked objects
 
 #entities
 ENABLE_DYNAMIC_ENTITIES=false					#enables dynamic entities

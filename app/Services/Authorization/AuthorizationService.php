@@ -75,7 +75,9 @@ final class AuthorizationService
             return true;
         }
 
-        return $user->hasPermissionTo($permission_name, $guard_name);
+        // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
+        // ancestor role, so the gate denied what the role model itself reports as granted.
+        return $user->hasPermission($permission_name, $guard_name);
     }
 
     /**
@@ -365,11 +367,44 @@ final class AuthorizationService
             return $value;
         }
 
+        if (str_starts_with($value, '@user.')) {
+            return $this->resolveUserAttribute(mb_substr($value, 6));
+        }
+
         return match ($value) {
             '@now' => Carbon::now(),
             '@today' => Carbon::today(),
             default => $value,
         };
+    }
+
+    /**
+     * Resolves `@user.<attribute>` against the acting user.
+     *
+     * Deliberately a generic attribute reader rather than a hard-coded `@user.id`: the same
+     * implementation answers `@user.department_id`, `@user.team_id` and `@user.tenant_id`, which are
+     * the cuts an ACL actually needs, and each one added by hand would be the same three lines.
+     *
+     * Only scalar, non-hidden attributes resolve. Hidden attributes are excluded so no ACL, however
+     * it is written, can pull a password hash or a remember token into a query, and relations and
+     * accessors returning objects are excluded because a filter value has to be comparable in SQL.
+     * Anything that does not resolve becomes null, which matches nothing rather than everything.
+     */
+    private function resolveUserAttribute(string $attribute): mixed
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User || $attribute === '') {
+            return null;
+        }
+
+        if (in_array($attribute, $user->getHidden(), true)) {
+            return null;
+        }
+
+        $value = $user->getAttribute($attribute);
+
+        return is_scalar($value) ? $value : null;
     }
 
     /**

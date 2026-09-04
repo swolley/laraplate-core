@@ -86,7 +86,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('core.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
             self::setting('core.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
             self::setting('core.locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
-            self::setting('core.locking.prevent_modifications_on_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
+            self::setting('core.locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
             self::setting('core.locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
             self::setting('core.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
             self::setting('core.dynamic_gridutils', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic grid utilities'),

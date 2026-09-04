@@ -18,6 +18,7 @@ beforeEach(function (): void {
         $table->unsignedBigInteger('lock_version')->nullable();
         $table->timestamp('locked_at')->nullable();
         $table->unsignedBigInteger('locked_user_id')->nullable();
+        $table->timestamp('locked_until')->nullable();
     });
 });
 
@@ -43,7 +44,10 @@ it('surfaces lock state in the serialized model so the UI can read it', function
         ->and($array['locked_user_id'])->toBe($user->id);
 });
 
-it('applies saving hooks for lock_version and removes virtual is_locked attribute', function (): void {
+it('keeps the computed is_locked attribute out of the write, and ignores the request', function (): void {
+    // The saving hook used to read `lock_version` off the global request, so every save of every
+    // lockable model picked up whatever the current HTTP request happened to carry. The version is
+    // now applied by the CRUD service, deliberately and only where it belongs, so this stays put.
     request()->merge(['lock_version' => 7]);
 
     $model = new LockableTestModel;
@@ -52,7 +56,9 @@ it('applies saving hooks for lock_version and removes virtual is_locked attribut
     $model->save();
 
     $fresh = LockableTestModel::query()->findOrFail($model->id);
-    expect($fresh->lock_version)->toBe(7);
+
+    expect($fresh->lock_version)->not->toBe(7)
+        ->and(Schema::hasColumn('lockable_test_models', 'is_locked'))->toBeFalse();
 });
 
 it('locks and unlocks model for authenticated user', function (): void {

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Events\ModificationPreProcessingCompleted;
 use Modules\Core\Events\ModificationRequiresModeration;
+use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Modification;
@@ -52,6 +53,12 @@ final class EventServiceProvider extends ServiceProvider
     #[Override]
     public function boot(): void
     {
+        // The lock guard was written but never wired up, so `prevent_modifications_on_locked_objects`
+        // enforced nothing: a record locked by one user could be saved, deleted or replicated by
+        // anybody. Subscribing it here is what makes the setting mean something. It stays off by
+        // default, so nothing changes for a deployment that has not asked for it.
+        Event::subscribe(LockedModelSubscriber::class);
+
         Event::listen('eloquent.saved: ' . Modification::class, function (Modification $modification): void {
             if (! $modification->active || ! $modification->wasRecentlyCreated) {
                 return;

@@ -45,25 +45,25 @@ it('answers 400 with the reason when the criteria name something that is not a r
     expect((string) $response->json('error'))->toContain('not_a_relation');
 });
 
-it('answers 409 with the reason when unlocking a record locked by someone else', function (): void {
-    $actor = errorMappingActor();
-    $owner = User::factory()->create();
+it('answers 403 when the deployment declares the class unlockable by nobody', function (): void {
+    errorMappingActor();
+
+    // Not a permission problem and not a conflict: no caller, however privileged, can lift a lock
+    // on a class configured this way, so the answer must not invite a retry.
+    config()->set('core.locking.unlock_allowed', false);
+    config()->set('core.locking.can_be_unlocked', []);
 
     $target = User::factory()->create();
-    $target->lockBy($owner);
-
-    expect($target->fresh()?->locked_user_id)->toBe($owner->id)
-        ->and(Auth::id())->not->toBe($owner->id);
+    $target->lock();
 
     $response = $this->patchJson(
         route('core.crud.unlock', ['module' => 'core', 'entity' => 'users']),
         ['id' => $target->id],
     );
 
-    $response->assertStatus(Response::HTTP_CONFLICT);
+    $response->assertStatus(Response::HTTP_FORBIDDEN);
 
-    expect((string) $response->json('error'))->toContain('locked by another user')
-        ->and($target->fresh()?->isLocked())->toBeTrue();
+    expect($target->fresh()?->isLocked())->toBeTrue();
 });
 
 it('answers 500 and reports a broken invariant instead of calling it "not modified"', function (): void {

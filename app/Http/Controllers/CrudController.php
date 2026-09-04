@@ -30,8 +30,9 @@ use Modules\Core\Http\Requests\ModifyRequest;
 use Modules\Core\Http\Requests\PendingApprovalsRequest;
 use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TreeRequest;
-use Modules\Core\Locking\Exceptions\AlreadyLockedException;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
+use Modules\Core\Locking\Exceptions\MissingLockVersionException;
+use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DomainActionDispatcher;
@@ -63,20 +64,23 @@ class CrudController extends Controller
      */
     final public function facets(FacetsRequest $request): Response
     {
-        try {
-            $facet = $request->facet();
+        // Routed through the shared mapping like every other operation. Its own `try` caught only
+        // AuthorizationException, so an invalid facet escaped to the global handler as a 500 and the
+        // message explaining what was wrong with it never reached the caller. The success payload is
+        // unchanged: buildResponse sets the data and nothing else when there is no meta.
+        return $this->handleServiceCall(
+            function () use ($request): CrudResult {
+                $facet = $request->facet();
 
-            $data = $facet instanceof FacetQuery
-                ? $this->crudService->facetValues($request->parsed(), $facet)->toArray()
-                : $this->crudService->facetCounts($request->parsed());
-
-            return new ResponseBuilder($request)->setData($data)->json();
-        } catch (AuthorizationException $exception) {
-            return new ResponseBuilder($request)
-                ->setData($exception)
-                ->setStatus(Response::HTTP_UNAUTHORIZED)
-                ->json();
-        }
+                return new CrudResult(
+                    data: $facet instanceof FacetQuery
+                        ? $this->crudService->facetValues($request->parsed(), $facet)->toArray()
+                        : $this->crudService->facetCounts($request->parsed()),
+                );
+            },
+            $request,
+            shouldCache: false,
+        );
     }
 
     /**
@@ -487,10 +491,9 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (DomainException|CannotUnlockException $ex) {
-            // Both mean the request clashes with the record's current state rather than
-            // being malformed: a domain rule refuses it, or the caller may not lift a lock
-            // it does not hold. 409 carries a body, so the reason reaches the client.
+        } catch (StaleModelLockingException $ex) {
+            // Ordinary concurrent editing: somebody saved the record between the moment this client
+            // read it and the moment it wrote. The textbook conflict, and until now a reported 500.
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
@@ -499,16 +502,38 @@ class CrudController extends Controller
                 ),
                 $request,
             );
-        } catch (AlreadyLockedException $ex) {
-            // A bare LogicException used to land here too. In this codebase it marks a
-            // broken invariant (an unconfigured connection, a lost version-set scope), so
-            // it now falls through to the Throwable arm below, which reports it and
-            // answers 500 instead of dressing a server fault up as "nothing changed".
+        } catch (MissingLockVersionException $ex) {
+            // The caller did not send the version, or asked for a partial select that left it out.
+            // The request is malformed rather than in conflict with anything.
             return $this->buildResponse(
                 new CrudResult(
                     data: null,
                     error: $ex->getMessage(),
-                    statusCode: Response::HTTP_NOT_MODIFIED,
+                    statusCode: Response::HTTP_BAD_REQUEST,
+                ),
+                $request,
+            );
+        } catch (CannotUnlockException $ex) {
+            // Not "occupied" but "not unlockable here": the deployment declares this class as one
+            // whose locks nobody may lift. Retrying, or waiting, or holding another permission will
+            // never change the answer, so it is 403 rather than the 423 that means "somebody else
+            // holds it" or the 409 that means "your request clashes with the current state".
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_FORBIDDEN,
+                ),
+                $request,
+            );
+        } catch (DomainException $ex) {
+            // The request clashes with the record's current state rather than being malformed: a
+            // domain rule refuses it. 409 carries a body, so the reason reaches the client.
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_CONFLICT,
                 ),
                 $request,
             );

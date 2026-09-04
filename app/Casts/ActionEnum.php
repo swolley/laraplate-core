@@ -18,7 +18,7 @@ enum ActionEnum: string
     // case Unpublish = 'unpublish';
     case Impersonate = 'impersonate';
     case Lock = 'lock';
-    // case Unlock = 'unlock';
+    case Unlock = 'unlock';
 
     /**
      * returns if is a read action.
