@@ -59,25 +59,10 @@ final class AuthorizationService
         ?string $operation = null,
         ?string $connection = null,
     ): bool {
-        /** @var SessionGuard $guard */
-        $guard = Auth::guard();
-        $guard_name = $guard->name;
-
-        $permission_name = $this->buildPermissionName($entity, $operation, $connection);
-
-        $user = $this->resolveUser($request);
-
-        if (! $user instanceof User) {
-            return false;
-        }
-
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
-        // ancestor role, so the gate denied what the role model itself reports as granted.
-        return $user->hasPermission($permission_name, $guard_name);
+        return $this->passesPermission(
+            $request,
+            $this->buildPermissionName($entity, $operation, $connection),
+        );
     }
 
     /**
@@ -124,6 +109,36 @@ final class AuthorizationService
 
         throw_unless(
             $this->checkPermission($request, $entity, $operation, $connection),
+            AuthorizationException::class,
+            'User not allowed to access this resource',
+        );
+
+        return $permission_name;
+    }
+
+    /**
+     * Ensure the user holds the permission keyed on a model's table, or throw.
+     *
+     * Derives the name from {@see PermissionName::forClass()} — the same table
+     * (and connection) source of truth the permission seeder uses — so a
+     * module-prefixed table authorizes against its real permission rather than
+     * a caller-supplied short entity that no role is ever granted.
+     *
+     * @param  class-string<Model>  $model_class
+     *
+     * @throws AuthorizationException If user doesn't have permission
+     *
+     * @return string The permission name that was checked (for ACL resolution)
+     */
+    public function ensurePermissionForClass(
+        Request $request,
+        string $model_class,
+        string $operation,
+    ): string {
+        $permission_name = PermissionName::forClass($model_class, $operation);
+
+        throw_unless(
+            $this->passesPermission($request, $permission_name),
             AuthorizationException::class,
             'User not allowed to access this resource',
         );
@@ -224,7 +239,7 @@ final class AuthorizationService
      */
     public function userHasModuleAccess(User $user, string $scope): bool
     {
-        $scope = mb_strtolower(trim($scope));
+        $scope = mb_strtolower(mb_trim($scope));
 
         if ($scope === '' || $user->isSuperAdmin()) {
             return true;
@@ -286,6 +301,30 @@ final class AuthorizationService
         if ($user instanceof User) {
             $this->acl_resolver->clearCacheForUser($user);
         }
+    }
+
+    /**
+     * Superadmin-aware check that a request's user holds a fully-qualified
+     * permission name. Shared by the entity- and model-based gates.
+     */
+    private function passesPermission(Request $request, string $permission_name): bool
+    {
+        $user = $this->resolveUser($request);
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        /** @var SessionGuard $guard */
+        $guard = Auth::guard();
+
+        // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
+        // ancestor role, so the gate denied what the role model itself reports as granted.
+        return $user->hasPermission($permission_name, $guard->name);
     }
 
     /**

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
+use Modules\Core\ApplicationContent\Contracts\ProvidesPermissionModel;
 use Modules\Core\ApplicationContent\Data\ApplicationContentAuthorization;
 use Modules\Core\ApplicationContent\Data\ApplicationContentQuery;
 use Modules\Core\ApplicationContent\Data\ApplicationContentResult;
@@ -36,11 +37,17 @@ final readonly class ApplicationContentRetrievalService
 
             $this->assertDescriptorAvailable($descriptor, $query);
 
-            $permission_name = $this->authorization->ensurePermission(
-                $request,
-                $descriptor->entity,
-                'select',
-            );
+            $permission_name = $provider instanceof ProvidesPermissionModel
+                ? $this->authorization->ensurePermissionForClass(
+                    $request,
+                    $provider->permissionModel(),
+                    'select',
+                )
+                : $this->authorization->ensurePermission(
+                    $request,
+                    $descriptor->entity,
+                    'select',
+                );
             $acl_filters = $this->authorization->getAclFilters($permission_name);
             $result = $provider->retrieve(
                 $query,
@@ -91,7 +98,7 @@ final readonly class ApplicationContentRetrievalService
     ): void {
         if ($result->source !== $descriptor->source
             || ! in_array($result->strategy, $descriptor->capabilities, true)
-            || count($result->hits) > $query->limit) {
+            || $query->limit < count($result->hits)) {
             throw new ApplicationContentUnavailableException;
         }
 
