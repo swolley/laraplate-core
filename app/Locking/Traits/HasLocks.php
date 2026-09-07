@@ -158,6 +158,45 @@ trait HasLocks
     }
 
     /**
+     * Attributes this model still accepts while it is locked.
+     *
+     * A lock answers one question, "who holds this record", and knows nothing about the meaning of
+     * any column. Some records nonetheless carry attributes that are not edits at all: counters a
+     * downstream process maintains, a status the system advances on its own. Refusing those means
+     * stopping the system from doing its work on a record somebody merely has open, which is not
+     * what a lock is for.
+     *
+     * Empty here, so a lock keeps meaning "no writes" on every model until one states otherwise.
+     * Declaring attributes is a statement about the model, not about the caller: a service with a
+     * genuine reason to overrule the lock itself uses {@see Locked::withoutGuard()}.
+     *
+     * @return list<string>
+     */
+    public function attributesWritableWhileLocked(): array
+    {
+        return [];
+    }
+
+    /**
+     * Whether the pending change consists solely of attributes a locked record still accepts.
+     *
+     * Every dirty attribute has to be exempt. One edited field makes the whole save an edit, so a
+     * write that advances a counter and rewrites a price is refused on account of the price.
+     */
+    public function writesOnlyAttributesAllowedWhileLocked(): bool
+    {
+        $allowed = $this->attributesWritableWhileLocked();
+
+        if ($allowed === []) {
+            return false;
+        }
+
+        $dirty = array_keys($this->getDirty());
+
+        return $dirty !== [] && array_diff($dirty, $allowed) === [];
+    }
+
+    /**
      * Moves the deadline of the lock already on the record, touching nothing else.
      *
      * `locked_at` records when the current lock was taken and is never refreshed, so extending a

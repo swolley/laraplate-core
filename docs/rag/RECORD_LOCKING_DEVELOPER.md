@@ -111,14 +111,43 @@ Locked::withoutGuard(fn () => $invoice->recalculateTotals());
 
 Nested calls restore the previous state rather than switching the guard back on halfway.
 
-Three call sites exist, all in ERP fulfilment: `SalesOrderEvasionService`,
-`CustomerReturnReceiptService` and `ReturnOrderService`, each writing a delivered, invoiced or
-returned quantity onto a line belonging to a confirmed and therefore frozen document. The database
-already drew that line, and more finely than the Eloquent guard can: the trigger on
-`erp_sales_order_lines` blocks only the **commercial** fields of a locked line — `sales_order_id`,
-`quotation_item_id`, `item_id`, `name`, `qty_ordered`, `unit_price` — and leaves the fulfilment
-quantities alone. A freeze on an ERP document protects its commercial terms, not its progress. The
-bypass declares in the application what the schema already said.
+There are no call sites in the codebase today. The bypass is for a caller that has a reason of its
+own to overrule a lock; a model that is simply not fully locked says so on the model instead, below.
+
+## Attributes a locked record still accepts
+
+A lock answers one question, "who holds this record". It is binary and knows nothing about what any
+column means. Some records nonetheless carry attributes that are not edits at all: a counter a
+downstream process maintains, a status the system advances by itself. Refusing those stops the
+system doing its work on a record somebody merely has open, which is not what a lock is for.
+
+`HasLocks::attributesWritableWhileLocked()` returns an empty list, so a lock keeps meaning "no
+writes" on every model until one states otherwise. A model that declares attributes accepts a write
+only when **every** dirty attribute is on the list: one edited field makes the whole save an edit,
+so a write that advances a counter and rewrites a price is refused on account of the price. Delete
+is never partial and is refused regardless.
+
+The distinction between the two mechanisms is *what* against *who*. The list is a property of the
+model and holds for every caller. `withoutGuard()` is a property of one call site and holds for
+whatever it writes.
+
+`ERP\Models\SalesOrderLine` is the only model that declares any, and derives them so the lists
+cannot drift:
+
+```php
+public function attributesWritableWhileLocked(): array
+{
+    return array_values(array_diff($this->getFillable(), self::LOCKED_COMMERCIAL_FIELDS));
+}
+```
+
+A line belonging to a confirmed and therefore frozen document still has to be delivered, invoiced
+and returned against, which is the very thing the document chain exists to record. The database had
+already drawn that line, more finely than the guard could: the trigger on `erp_sales_order_lines`
+blocks only the **commercial** fields of a locked line — `sales_order_id`, `quotation_item_id`,
+`item_id`, `name`, `qty_ordered`, `unit_price` — and leaves the fulfilment quantities alone. The
+model now says the same thing, once, and the ERP fulfilment services write through the guard with
+no bypass.
 
 The CMS importer is the counter-example. `ContentUpserter` writes `Content` from `cms:import` with no
 authenticated user, so it meets the guard too, and it must **not** bypass: `ImportRunner` already

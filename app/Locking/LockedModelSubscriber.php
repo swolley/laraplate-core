@@ -47,7 +47,10 @@ final class LockedModelSubscriber
         }
 
         throw_if(
-            $model->wasLocked() && $model->isDirty() && ! $this->heldByCurrentUser($model),
+            $model->wasLocked()
+                && $model->isDirty()
+                && ! $this->heldByCurrentUser($model)
+                && ! $model->writesOnlyAttributesAllowedWhileLocked(),
             LockedModelException::class,
             'This model is locked',
         );

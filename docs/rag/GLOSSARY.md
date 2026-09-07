@@ -21,6 +21,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **`locked_until`**        | Moment a lock lapses; null means never. Evaluated on read, so a lapsed lock is free at once. |
 | **lock guard**            | `LockedModelSubscriber`: refuses saves, deletes and replicates on a record the writer does not hold. |
 | **`Locked::withoutGuard()`** | Explicit, scoped bypass of the guard for system work that must go through. |
+| **Attributes writable while locked** | Attributes a model declares as not being edits, which a locked record still accepts from any caller. Empty by default. |
 | **`lock_version`**        | Optimistic version; a mismatch on write is a 409, not a server fault.   |
 
 

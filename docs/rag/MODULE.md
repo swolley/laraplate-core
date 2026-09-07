@@ -609,7 +609,10 @@ permission.
 
 The guard (`LockedModelSubscriber`) is on by default and refuses writes from anybody but the holder.
 It has no acting user outside a request, so queues and console commands cannot write to a leased
-record unless they say so with `Locked::withoutGuard()`.
+record unless they say so with `Locked::withoutGuard()`. A model whose lock was never meant to cover
+everything states that instead through `attributesWritableWhileLocked()`, empty by default: a write
+confined to the attributes it lists goes through for any caller, one that strays outside them does
+not.
 
 The platform already supports runtime toggles for soft deletes and versioning per table. A similar
 runtime toggle for locking (`locking_{table}`) is under evaluation to provide parity, with strict
