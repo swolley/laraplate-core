@@ -7,14 +7,14 @@ namespace Modules\Core\Search\Traits;
 use Exception;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
-use Modules\Core\Overrides\CustomSoftDeletingScope;
-use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
+use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
 use Modules\Core\Search\Schema\IndexType;
@@ -188,7 +188,8 @@ trait CommonEngineFunctions
 
             throw_if(count($models) > 1, SearchCollectionResolutionException::class, 'Multiple models found for collection name: ' . $name);
 
-            $model = head($models);
+            $resolved = head($models);
+            $model = is_string($resolved) ? new $resolved() : ($resolved instanceof Model ? $resolved : null);
             $collection = $name;
         }
 
