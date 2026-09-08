@@ -6,28 +6,29 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
-use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
 use Modules\Core\Events\ModelRequiresIndexing;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
-use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
 use Modules\Core\Search\Schema\IndexType;
 use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\Search\Schema\SchemaManager;
+use Modules\Core\SoftDeletes\SoftDeletes;
 
 /**
  * Extended searchable trait that supports multiple engines
  * Provides enhanced functionality for Elasticsearch and Typesense.
  *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-require-implements \Modules\Core\Contracts\IEmbeddableModel
  */
 trait Searchable
@@ -215,7 +216,7 @@ trait Searchable
 
             foreach ($document as $key => $value) {
                 if ($key === 'embedding') {
-                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector]));
+                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector], ['dimensions' => (int) config('search.vector_search.dimension', 384)]));
                 } else {
                     $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::Searchable]));
                 }
