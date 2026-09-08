@@ -20,8 +20,8 @@ use Modules\Core\Seeding\SeedDefinition;
 use Modules\Core\Seeding\SeedReconciler;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\SettingsCacheCoordinator;
-use Overtrue\LaravelVersionable\VersionStrategy;
 use Override;
+use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role as BaseRole;
@@ -102,7 +102,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
             self::setting('search.reranker.weight', 0.5, SettingTypeEnum::Float, 'search', 'Reranker score weight'),
             self::setting('search.vector_search.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
-            self::setting('search.vector_search.dimension', 768, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
+            self::setting('search.vector_search.dimension', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
             self::setting('search.vector_search.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
         ];
     }
@@ -421,7 +421,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             return 'Core';
         }
 
-        $module_name = strtok(substr($modelClass, strlen($prefix)), '\\');
+        $module_name = strtok(mb_substr($modelClass, mb_strlen($prefix)), '\\');
 
         return $module_name === false || $module_name === '' ? 'Core' : $module_name;
     }
@@ -444,9 +444,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $declaring_class = new ReflectionClass($modelClass)->getProperty('table')->getDeclaringClass()->getName();
 
         /** @var class-string<Model> $owner */
-        $owner = $declaring_class === Model::class ? $modelClass : $declaring_class;
-
-        return $owner;
+        return $declaring_class === Model::class ? $modelClass : $declaring_class;
     }
 
     /**

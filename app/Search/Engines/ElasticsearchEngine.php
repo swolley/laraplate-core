@@ -596,7 +596,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
         // Add a vector field if needed
         if (config('search.vector_search.enabled') && $this->supportsVectorSearch()) {
-            $dimension = config('search.vector_search.dimension', 512);
+            $dimension = config('search.vector_search.dimension', 384);
             $similarity = config('search.vector_search.similarity', 'cosine');
 
             $mapping['mappings']['properties']['embedding'] = [

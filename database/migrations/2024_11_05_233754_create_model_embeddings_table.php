@@ -11,7 +11,7 @@ use Modules\Core\Models\ModelEmbedding;
 
 return new class extends Migration
 {
-    private const int DEFAULT_VECTOR_DIMENSIONS = 1536;
+    private const int DEFAULT_VECTOR_DIMENSIONS = 384;
 
     /**
      * Run the migrations.
