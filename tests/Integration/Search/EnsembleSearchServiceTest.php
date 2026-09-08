@@ -106,6 +106,28 @@ it('uses scout pagination total for strategy totals while fetching the fusion wi
         ->and(EnsembleSearchPaginatorTestModel::$lastBuilder?->paginatedPage)->toBe(1);
 });
 
+it('reranks by default when the plan does not specify the flag', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+
+    $result = $this->service->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => [
+                'use_fulltext' => true,
+                'use_vector' => false,
+            ],
+            'ensemble' => [],
+            'ranking' => [],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    expect($result->meta['reranked'])->toBeTrue();
+});
+
 it('exposes normalized raw and diagnostic score metadata for fused hits', function (): void {
     EnsembleSearchPaginatorTestModel::$lastBuilder = null;
 

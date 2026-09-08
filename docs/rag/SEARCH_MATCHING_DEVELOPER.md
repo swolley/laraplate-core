@@ -105,6 +105,10 @@ $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = [
 
 The orchestrated pipeline passes already resolved granular options to keyword and hybrid strategies. Pure vector retrieval receives no text-match options.
 
+### Reranking
+
+The orchestrated pipeline reranks the fused top-K results and is **on by default** (`SEARCH_RERANKER_ENABLED`, default `true`; `SEARCH_RERANKER_TOP_K`, default `30`). `EnsembleSearchService` honours a per-plan `ranking.use_reranker`, falling back to `config('search.features.reranker')` when the plan omits it, so a caller can still disable it for one search. The bound `IReranker` is `HeuristicReranker` (pure-PHP lexical scoring: exact-phrase, keyword-overlap, title-area — no external service); the AI module overrides the binding with `CrossEncoderService` (an external cross-encoder) when installed. Reranked scores blend the fused score with the reranker score; `AdvancedSearchResult->meta['reranked']` reports whether reranking ran. `SEARCH_ENSEMBLE_ENABLED` (default `true`) gates ensemble fusion.
+
 ## Engine adapters
 
 ### Elasticsearch

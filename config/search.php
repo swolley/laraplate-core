@@ -19,20 +19,20 @@ return [
     | Feature flags
     |--------------------------------------------------------------------------
     */
-    // 'features' => [
-    //     'reranker' => env('SEARCH_RERANKER_ENABLED', true),
-    //     'ensemble' => env('SEARCH_ENSEMBLE_ENABLED', true),
-    // ],
+    'features' => [
+        'reranker' => env('SEARCH_RERANKER_ENABLED', true),
+        'ensemble' => env('SEARCH_ENSEMBLE_ENABLED', true),
+    ],
 
     /*
     |--------------------------------------------------------------------------
     | Reranker configuration
     |--------------------------------------------------------------------------
     */
-    // 'reranker' => [
-    //     'top_k' => (int) env('SEARCH_RERANKER_TOP_K', 30),
-    //     'weight' => (float) env('SEARCH_RERANKER_WEIGHT', 0.5),
-    // ],
+    'reranker' => [
+        'top_k' => (int) env('SEARCH_RERANKER_TOP_K', 30),
+        'weight' => (float) env('SEARCH_RERANKER_WEIGHT', 0.5),
+    ],
 
     /*
     |--------------------------------------------------------------------------

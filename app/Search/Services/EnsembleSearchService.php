@@ -84,7 +84,7 @@ class EnsembleSearchService
 
         $fused = $this->fuseStrategies($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
 
-        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('search.features.reranker', false));
+        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('search.features.reranker', true));
         $default_rerank_top_k = $this->configInt('search.reranker.top_k', 30);
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
 
@@ -138,6 +138,7 @@ class EnsembleSearchService
     {
         /** @var class-string<Model> $model_class */
         $model_class = $model::class;
+
         /** @var ScoutBuilder<Model> $builder */
         $builder = $model_class::search($query)->take($window);
 
