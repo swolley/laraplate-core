@@ -117,6 +117,22 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             $schema['name'] = $collection;
 
             parent::createIndex($collection, $schema);
+
+            // ScoutDriverPlus's createIndex only creates a bare index; ES then maps
+            // fields dynamically as documents arrive. Dynamic mapping cannot infer a
+            // `dense_vector`, so explicitly apply just the `embedding` field's mapping
+            // (the one field ES cannot map on its own) — every other field keeps its
+            // existing dynamic mapping, so this does not change keyword-search behaviour.
+            $properties = is_array($schema['mappings']['properties'] ?? null) ? $schema['mappings']['properties'] : [];
+
+            if (isset($properties['embedding']) && is_array($properties['embedding'])) {
+                ElasticsearchService::getInstance()->createIndex(
+                    $collection,
+                    [],
+                    ['properties' => ['embedding' => $this->stringifyFieldMeta($properties['embedding'])]],
+                );
+            }
+
             Log::info(sprintf("Elasticsearch collection '%s' created", $collection));
         } catch (Exception $exception) {
             Log::error(sprintf("Error creating Elasticsearch collection '%s'", $collection), [
@@ -746,6 +762,45 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
 
         return ['bool' => ['must' => $must]];
+    }
+
+    /**
+     * Cast a field's `meta` values to strings before the mapping reaches
+     * Elasticsearch: ES field `meta` accepts only string values, while the
+     * schema translator keeps app-facing flags (e.g. `filterable`) as booleans
+     * for the in-memory constraint layer. Defensive — the `embedding` vector
+     * field carries no meta today, but this keeps the applied mapping ES-valid
+     * if it ever does.
+     *
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>
+     */
+    private function stringifyFieldMeta(array $field): array
+    {
+        if (isset($field['meta']) && is_array($field['meta'])) {
+            $field['meta'] = array_map(
+                static fn (mixed $value): string => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value,
+                $field['meta'],
+            );
+        }
+
+        if (isset($field['properties']) && is_array($field['properties'])) {
+            foreach ($field['properties'] as $name => $sub) {
+                if (is_array($sub)) {
+                    $field['properties'][$name] = $this->stringifyFieldMeta($sub);
+                }
+            }
+        }
+
+        if (isset($field['fields']) && is_array($field['fields'])) {
+            foreach ($field['fields'] as $name => $sub) {
+                if (is_array($sub)) {
+                    $field['fields'][$name] = $this->stringifyFieldMeta($sub);
+                }
+            }
+        }
+
+        return $field;
     }
 
     /**
