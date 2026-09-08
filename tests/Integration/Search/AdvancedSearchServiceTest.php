@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Scout\Engines\Engine;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Search\Contracts\ISearchEngine;
@@ -13,7 +14,6 @@ use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
-use Laravel\Scout\Engines\Engine;
 
 function advanced_search_service_with_ensemble(EnsembleSearchService $ensemble): AdvancedSearchService
 {
@@ -107,6 +107,7 @@ it('executes ensemble search with parsed intent and plan through the existing en
 
     $engine = Mockery::mock(ISearchEngine::class);
     $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+    $engine->shouldReceive('supportsOrchestratedVectorSearch')->andReturnFalse();
     $model = new class($engine) extends Model
     {
         public function __construct(private readonly mixed $engine = null)
