@@ -9,7 +9,6 @@ use Modules\Core\Tests\Fixtures\StubSearchableModel;
 use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithoutTimestamp;
 use Modules\Core\Tests\Stubs\Search\IndexInSearchModelWithTimestamp;
 
-
 beforeEach(function (): void {
     config(['scout.queue.queue' => 'indexing', 'scout.queue.tries' => 3, 'scout.queue.timeout' => 120, 'scout.queue.backoff' => [30, 60, 180]]);
 });
@@ -65,6 +64,18 @@ it('updates document and timestamp when indexing succeeds', function (): void {
     expect($model->engine->updated)->toBeTrue()
         ->and($model->timestamp_updated)->toBeTrue();
     Log::shouldHaveReceived('debug')->atLeast()->times(2);
+});
+
+it('passes a collection (not a bare model) to the engine update', function (): void {
+    // Regression: Scout engines call ->isEmpty() on the argument; passing a
+    // single model threw "Content::isEmpty()" and failed every indexing job.
+    config(['scout.driver' => 'typesense']);
+    $model = new IndexInSearchModelWithTimestamp;
+    $job = new IndexInSearchJob($model);
+
+    $job->handle();
+
+    expect($model->engine->received_collection)->toBeTrue();
 });
 
 it('updates document without timestamp method when indexing succeeds', function (): void {

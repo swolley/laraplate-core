@@ -76,8 +76,11 @@ final class IndexInSearchJob extends CommonSearchJob
 
     private function updateDocument(): void
     {
+        // Scout engines' update() expects a collection of models and calls
+        // ->isEmpty() on it; passing a single model forwards isEmpty() to the
+        // model and throws BadMethodCallException.
         /** @phpstan-ignore method.notFound */
-        $this->model->searchableUsing()->update($this->model);
+        $this->model->searchableUsing()->update($this->model->newCollection([$this->model]));
     }
 
     private function updateIndexTimestampIfNeeded(): void
