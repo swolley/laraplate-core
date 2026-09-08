@@ -140,6 +140,8 @@ sequenceDiagram
 |-----------|------------|---------------------|
 | `model_indexing:{table}:{id}` | `ModelRequiresIndexing` | `embeddings`, `translation` |
 
+The `model_indexing` entry has a **10-minute TTL**. If a pre-processing step finishes after it expires (e.g. a manual `queue:retry` of an embedding job hours later), `FinalizeModelIndexingListener` no longer finds the coordination event and instead indexes the searchable model directly, so the regenerated data still reaches the search engine instead of being dropped.
+
 ### Core classes
 
 | Class | Role |
@@ -147,7 +149,7 @@ sequenceDiagram
 | `Events\ModelRequiresIndexing` | Orchestration state (`handled`, `required_pre_processing`, …) |
 | `Events\ModelPreProcessingCompleted` | Signals one step finished (`embeddings`, `translation`) |
 | `Listeners\IndexModelFallbackListener` | Index without AI when `!handled` |
-| `Listeners\FinalizeModelIndexingListener` | Dispatches `IndexInSearchJob` when all steps complete |
+| `Listeners\FinalizeModelIndexingListener` | Dispatches `IndexInSearchJob` when all steps complete; on a cache-miss (the `model_indexing` entry expired) indexes the searchable model directly so a late pre-processing retry still patches the document |
 | `Search\Jobs\IndexInSearchJob` | Writes document to Scout engine |
 
 ### AI classes

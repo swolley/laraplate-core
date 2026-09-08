@@ -42,7 +42,7 @@ Models with `Modules\Core\Search\Traits\Searchable` call `queueMakeSearchable()`
 | Core | `Events\ModelRequiresIndexing` | Orchestration state |
 | Core | `Events\ModelPreProcessingCompleted` | One step done (`embeddings`, `translation`) |
 | Core | `Listeners\IndexModelFallbackListener` | Index without AI when `!handled` |
-| Core | `Listeners\FinalizeModelIndexingListener` | Dispatches `IndexInSearchJob` when all steps complete |
+| Core | `Listeners\FinalizeModelIndexingListener` | Dispatches `IndexInSearchJob` when all steps complete; on a `model_indexing` cache-miss (10-min TTL expired) indexes the searchable model directly, so a late pre-processing retry still patches the document |
 | Core | `Search\Jobs\IndexInSearchJob` | Writes to Scout engine |
 | AI | `Listeners\HandleModelIndexingListener` | Registers embeddings, dispatches `GenerateEmbeddingsJob` |
 | AI | `Jobs\GenerateEmbeddingsJob` | Persists vectors |
