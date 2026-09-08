@@ -300,6 +300,19 @@ trait Searchable
         return null;
     }
 
+    /**
+     * Public capability query for embedding-driven indexing: the model declares
+     * embeddable attributes AND vector search is enabled. Encapsulates the
+     * protected `$embed` and the private vector-enabled check so external
+     * listeners (AI embeddings) can ask without reaching into model internals.
+     */
+    public function isEmbeddable(): bool
+    {
+        return $this->vectorSearchEnabled()
+            && isset($this->embed)
+            && $this->embed !== [];
+    }
+
     private function ensureIndexesForModels($models): void
     {
         if (! is_iterable($models)) {
