@@ -11,15 +11,56 @@ use Modules\Core\Listeners\FinalizeModelIndexingListener;
 use Modules\Core\Models\Setting;
 use Modules\Core\Search\Jobs\IndexInSearchJob;
 
-
-it('returns early when no indexing event in cache', function (): void {
+it('does not dispatch a fallback for a non-searchable model on cache miss', function (): void {
+    Queue::fake();
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
     $event = new ModelPreProcessingCompleted($setting, 'embeddings');
 
     (new FinalizeModelIndexingListener())->handle($event);
 
-    // No exception, no dispatch (event was not in cache)
-    expect(true)->toBeTrue();
+    // Setting is not searchable, so nothing to index; no exception, no dispatch.
+    Queue::assertNotPushed(IndexInSearchJob::class);
+});
+
+it('dispatches indexing on cache miss for a searchable model (late-retry recovery)', function (): void {
+    // When the coordination event has expired from cache (e.g. a manual retry of
+    // a pre-processing job hours later), the regenerated data must still reach the
+    // search engine instead of being silently dropped.
+    Queue::fake();
+
+    $model = new class extends Illuminate\Database\Eloquent\Model
+    {
+        use Laravel\Scout\Searchable;
+
+        public $timestamps = false;
+
+        protected $table = 'fallback_index_models';
+
+        public function getKey()
+        {
+            return 11;
+        }
+
+        public function searchableAs(): string
+        {
+            return 'fallback_index_models';
+        }
+
+        public function shouldBeSearchable(): bool
+        {
+            return false;
+        }
+
+        public function unsearchable()
+        {
+            return null;
+        }
+    };
+
+    // No cache entry for this model -> fallback path.
+    (new FinalizeModelIndexingListener())->handle(new ModelPreProcessingCompleted($model, 'embeddings'));
+
+    Queue::assertPushed(IndexInSearchJob::class);
 });
 
 it('updates cache when not all pre-processing completed', function (): void {
