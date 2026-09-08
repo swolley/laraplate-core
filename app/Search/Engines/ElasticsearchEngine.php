@@ -8,8 +8,6 @@ use Elastic\Adapter\Search\SearchResult;
 use Elastic\Elasticsearch\Response\Elasticsearch;
 use Elastic\ScoutDriverPlus\Engine as BaseElasticsearchEngine;
 use Exception;
-use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
-use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -17,10 +15,12 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\DTOs\TextMatchOptions;
-use Modules\Core\Search\Services\TextMatchOptionsResolver;
+use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
+use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Services\SearchQueryAnalyzer;
+use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\ElasticsearchService;
@@ -215,82 +215,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
 
         return $esFilters;
-    }
-
-    /**
-     * @param  array<string, mixed>  $filter
-     * @return array<string, mixed>
-     */
-    private function buildAdvancedSearchFilter(array $filter): array
-    {
-        if (isset($filter['filters']) && is_array($filter['filters'])) {
-            $clauses = array_values(array_map(
-                fn (array $item): array => $this->buildAdvancedSearchFilter($item),
-                array_filter($filter['filters'], is_array(...)),
-            ));
-
-            if (($filter['operator'] ?? 'and') === 'or') {
-                return [
-                    'bool' => [
-                        'should' => $clauses,
-                        'minimum_should_match' => 1,
-                    ],
-                ];
-            }
-
-            return [
-                'bool' => [
-                    'must' => $clauses,
-                ],
-            ];
-        }
-
-        $field = (string) ($filter['field'] ?? '');
-        $operator = (string) ($filter['operator'] ?? '=');
-        $value = $filter['value'] ?? null;
-        $relation = $filter['relation'] ?? null;
-
-        if (is_string($relation) && $relation !== '') {
-            $positive = match ($operator) {
-                '=' => ['term' => [$field => $value]],
-                'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
-                '!=' => is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]],
-                '>' => ['range' => [$field => ['gt' => $value]]],
-                '>=' => ['range' => [$field => ['gte' => $value]]],
-                '<' => ['range' => [$field => ['lt' => $value]]],
-                '<=' => ['range' => [$field => ['lte' => $value]]],
-                'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
-                default => ['term' => [$field => $value]],
-            };
-            $nested = [
-                'nested' => [
-                    'path' => $relation,
-                    'query' => $positive,
-                ],
-            ];
-
-            if ($operator === '!=') {
-                return [
-                    'bool' => [
-                        'must_not' => [$nested],
-                    ],
-                ];
-            }
-
-            return $nested;
-        }
-
-        return match ($operator) {
-            '=' => ['term' => [$field => $value]],
-            'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
-            '!=' => ['bool' => ['must_not' => [is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]]]]],
-            '>' => ['range' => [$field => ['gt' => $value]]],
-            '>=' => ['range' => [$field => ['gte' => $value]]],
-            '<' => ['range' => [$field => ['lt' => $value]]],
-            '<=' => ['range' => [$field => ['lte' => $value]]],
-            'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
-            default => ['term' => [$field => $value]],
-        };
     }
 
     #[Override]
@@ -672,7 +596,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
         // Add a vector field if needed
         if (config('search.vector_search.enabled') && $this->supportsVectorSearch()) {
-            $dimension = config('search.vector_search.dimension', 1536);
+            $dimension = config('search.vector_search.dimension', 512);
             $similarity = config('search.vector_search.similarity', 'cosine');
 
             $mapping['mappings']['properties']['embedding'] = [
@@ -778,11 +702,126 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     #[Override]
     public function stats(): array
     {
-        $health = $this->elasticsearchResponseToArray(
+        return $this->elasticsearchResponseToArray(
             ElasticsearchService::getInstance()->client->cluster()->health(),
         );
+    }
 
-        return $health;
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildTextMatchQuery(string $query, TextMatchOptions $options): array
+    {
+        $has_parsed_syntax = $options->requiredTerms !== [] || $options->requiredPhrases !== [];
+        $free_query = ($options->query !== '' || $has_parsed_syntax) ? $options->query : $query;
+        $must = [];
+
+        if ($free_query !== '') {
+            $must[] = $this->buildFreeTextMatchQuery($free_query, $options);
+        }
+
+        foreach ($options->requiredTerms as $term) {
+            $must[] = [
+                'multi_match' => [
+                    'query' => $term,
+                    'fields' => ['*'],
+                    'type' => 'best_fields',
+                    'operator' => 'and',
+                ],
+            ];
+        }
+
+        foreach ($options->requiredPhrases as $phrase) {
+            $must[] = [
+                'multi_match' => [
+                    'query' => $phrase,
+                    'fields' => ['*'],
+                    'type' => 'phrase',
+                ],
+            ];
+        }
+
+        if (count($must) === 1) {
+            return $must[0];
+        }
+
+        return ['bool' => ['must' => $must]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     * @return array<string, mixed>
+     */
+    private function buildAdvancedSearchFilter(array $filter): array
+    {
+        if (isset($filter['filters']) && is_array($filter['filters'])) {
+            $clauses = array_values(array_map(
+                fn (array $item): array => $this->buildAdvancedSearchFilter($item),
+                array_filter($filter['filters'], is_array(...)),
+            ));
+
+            if (($filter['operator'] ?? 'and') === 'or') {
+                return [
+                    'bool' => [
+                        'should' => $clauses,
+                        'minimum_should_match' => 1,
+                    ],
+                ];
+            }
+
+            return [
+                'bool' => [
+                    'must' => $clauses,
+                ],
+            ];
+        }
+
+        $field = (string) ($filter['field'] ?? '');
+        $operator = (string) ($filter['operator'] ?? '=');
+        $value = $filter['value'] ?? null;
+        $relation = $filter['relation'] ?? null;
+
+        if (is_string($relation) && $relation !== '') {
+            $positive = match ($operator) {
+                '=' => ['term' => [$field => $value]],
+                'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
+                '!=' => is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]],
+                '>' => ['range' => [$field => ['gt' => $value]]],
+                '>=' => ['range' => [$field => ['gte' => $value]]],
+                '<' => ['range' => [$field => ['lt' => $value]]],
+                '<=' => ['range' => [$field => ['lte' => $value]]],
+                'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
+                default => ['term' => [$field => $value]],
+            };
+            $nested = [
+                'nested' => [
+                    'path' => $relation,
+                    'query' => $positive,
+                ],
+            ];
+
+            if ($operator === '!=') {
+                return [
+                    'bool' => [
+                        'must_not' => [$nested],
+                    ],
+                ];
+            }
+
+            return $nested;
+        }
+
+        return match ($operator) {
+            '=' => ['term' => [$field => $value]],
+            'in' => ['terms' => [$field => is_array($value) ? $value : [$value]]],
+            '!=' => ['bool' => ['must_not' => [is_array($value) ? ['terms' => [$field => $value]] : ['term' => [$field => $value]]]]],
+            '>' => ['range' => [$field => ['gt' => $value]]],
+            '>=' => ['range' => [$field => ['gte' => $value]]],
+            '<' => ['range' => [$field => ['lt' => $value]]],
+            '<=' => ['range' => [$field => ['lte' => $value]]],
+            'between' => ['range' => [$field => ['gte' => is_array($value) ? array_values($value)[0] ?? null : null, 'lte' => is_array($value) ? array_values($value)[1] ?? null : null]]],
+            default => ['term' => [$field => $value]],
+        };
     }
 
     /**
@@ -913,47 +952,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     /**
      * @return array<string, mixed>
      */
-    public function buildTextMatchQuery(string $query, TextMatchOptions $options): array
-    {
-        $has_parsed_syntax = $options->requiredTerms !== [] || $options->requiredPhrases !== [];
-        $free_query = ($options->query !== '' || $has_parsed_syntax) ? $options->query : $query;
-        $must = [];
-
-        if ($free_query !== '') {
-            $must[] = $this->buildFreeTextMatchQuery($free_query, $options);
-        }
-
-        foreach ($options->requiredTerms as $term) {
-            $must[] = [
-                'multi_match' => [
-                    'query' => $term,
-                    'fields' => ['*'],
-                    'type' => 'best_fields',
-                    'operator' => 'and',
-                ],
-            ];
-        }
-
-        foreach ($options->requiredPhrases as $phrase) {
-            $must[] = [
-                'multi_match' => [
-                    'query' => $phrase,
-                    'fields' => ['*'],
-                    'type' => 'phrase',
-                ],
-            ];
-        }
-
-        if (count($must) === 1) {
-            return $must[0];
-        }
-
-        return ['bool' => ['must' => $must]];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     private function buildFreeTextMatchQuery(string $query, TextMatchOptions $options): array
     {
         $analysis = app(SearchQueryAnalyzer::class)->analyze($query, $options->minimumTermLength);
@@ -972,7 +970,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             && $options->maxEdits > 0
             && $options->fuzzyTokenLimit > 0
             && (! $analysis->protectedOnly() || $options->identifierTypos)
-            && mb_strlen($query) >= $options->minimumTermLength) {
+            && $options->minimumTermLength <= mb_strlen($query)) {
             $match['fuzziness'] = $options->maxEdits === 1
                 ? 1
                 : sprintf('AUTO:%d,%d', $options->minimumTermLength, $options->twoEditMinimumTermLength);

@@ -109,6 +109,16 @@ The orchestrated pipeline passes already resolved granular options to keyword an
 
 The orchestrated pipeline reranks the fused top-K results and is **on by default** (`SEARCH_RERANKER_ENABLED`, default `true`; `SEARCH_RERANKER_TOP_K`, default `30`). `EnsembleSearchService` honours a per-plan `ranking.use_reranker`, falling back to `config('search.features.reranker')` when the plan omits it, so a caller can still disable it for one search. The bound `IReranker` is `HeuristicReranker` (pure-PHP lexical scoring: exact-phrase, keyword-overlap, title-area — no external service); the AI module overrides the binding with `CrossEncoderService` (an external cross-encoder) when installed. Reranked scores blend the fused score with the reranker score; `AdvancedSearchResult->meta['reranked']` reports whether reranking ran. `SEARCH_ENSEMBLE_ENABLED` (default `true`) gates ensemble fusion.
 
+### Vector / hybrid retrieval (enablement)
+
+Vector/hybrid retrieval is **off by default** (`VECTOR_SEARCH_ENABLED=false`); with it off, embeddings are never generated and every plan stays keyword-only. Enabling it is not a flag flip — it requires:
+
+1. An online embeddings provider (default `sentence_transformers`, 512-dim output). `search.vector_search.dimension` MUST equal that output length; set `VECTOR_DIMENSION` in lockstep when switching provider (e.g. OpenAI `text-embedding-3-small` = 1536). The Elasticsearch `dense_vector` mapping is built from this value, so a mismatch produces an unusable index.
+2. A vector-capable engine (Elasticsearch or Typesense) reachable and healthy.
+3. Setting `VECTOR_SEARCH_ENABLED=true`, then recreating the engine indexes so the `embedding` field is mapped at the correct dimension, then reindexing every searchable model (via Scout) so `toSearchableArray()` emits the embedding and the indexing listener generates the `ModelEmbedding` rows. Until this backfill completes, models carry no vectors and hybrid ranking silently degrades to keyword.
+
+Once enabled, `FallbackSearchPlanner` plans a hybrid strategy for non-numeric queries and `EnsembleSearchService` fuses keyword and vector results (RRF + weighted + agreement) before reranking.
+
 ## Engine adapters
 
 ### Elasticsearch

@@ -100,11 +100,16 @@ return [
     | Configurazioni per la ricerca vettoriale (embedding).
     |
     */
-    // 'vector_search' => [
-    //     'enabled' => env('VECTOR_SEARCH_ENABLED', true),
-    //     'dimension' => env('VECTOR_DIMENSION', 768), // Default per OpenAI text-embedding-3-small
-    //     'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
-    // ],
+    // Vector/hybrid retrieval is off by default: it needs an online embeddings
+    // provider, a vector-capable engine, and a full embedding backfill/reindex.
+    // `dimension` MUST equal the active embeddings provider's output length
+    // (the default `sentence_transformers` provider emits 512); change it in
+    // lockstep when switching provider (e.g. OpenAI text-embedding-3-small = 1536).
+    'vector_search' => [
+        'enabled' => env('VECTOR_SEARCH_ENABLED', false),
+        'dimension' => (int) env('VECTOR_DIMENSION', 512),
+        'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
+    ],
 
     /*
     |--------------------------------------------------------------------------
