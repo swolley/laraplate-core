@@ -106,6 +106,29 @@ it('uses scout pagination total for strategy totals while fetching the fusion wi
         ->and(EnsembleSearchPaginatorTestModel::$lastBuilder?->paginatedPage)->toBe(1);
 });
 
+it('degrades to fused results when the reranker throws', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+
+    $throwing = Mockery::mock(IReranker::class);
+    $throwing->shouldReceive('score')->andThrow(new RuntimeException('reranker service down'));
+
+    $result = (new EnsembleSearchService($throwing))->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => ['use_fulltext' => true, 'use_vector' => false],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => true],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    expect($result->hits)->not->toBeEmpty()
+        ->and($result->meta['reranked'])->toBeFalse();
+});
+
 it('reranks by default when the plan does not specify the flag', function (): void {
     EnsembleSearchPaginatorTestModel::$lastBuilder = null;
 

@@ -6,11 +6,13 @@ namespace Modules\Core\Search\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
+use Throwable;
 
 /**
  * Ensemble search service that combines keyword, vector and hybrid retrieval
@@ -89,7 +91,18 @@ class EnsembleSearchService
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
 
         if ($use_reranker && $fused !== []) {
-            $fused = $this->rerankTopK($fused, $query, $rerank_top_k);
+            try {
+                $fused = $this->rerankTopK($fused, $query, $rerank_top_k);
+            } catch (Throwable $exception) {
+                // A reranker failure (e.g. the cross-encoder service is down) must
+                // not break search: keep the fused results unreranked and record
+                // that reranking did not run.
+                Log::warning('Reranker failed; returning fused results without reranking', [
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $use_reranker = false;
+            }
         }
 
         $hits = array_values(
