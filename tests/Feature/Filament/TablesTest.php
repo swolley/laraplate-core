@@ -150,7 +150,7 @@ it('configures stacked image overlap to 1 for translations locale', function ():
 
     $resource = new class
     {
-        use Modules\Core\Filament\Utils\HasTable;
+        use HasTableTrait;
 
         public function configure(Table $table): Table
         {
@@ -235,9 +235,9 @@ it('renders validity column html through filament when valid_from is set', funct
     $column = $table->getColumns()['validity']->record($record);
 
     expect($column->toEmbeddedHtml())
-        ->toContain('Valid from:')
+        ->toContain('From:')
         ->toContain($valid_from->format('Y-m-d H:i:s'))
-        ->not->toContain('Valid until:');
+        ->not->toContain('Until:');
 });
 
 it('renders validity column rows only when dates are present', function (): void {
@@ -250,12 +250,12 @@ it('renders validity column rows only when dates are present', function (): void
 
     expect(HasTableTrait::formatValidityColumnState($draft))->toBe('')
         ->and(HasTableTrait::formatValidityColumnState($open_ended))
-        ->toContain('Valid from:')
+        ->toContain('From:')
         ->toContain($valid_from->format('Y-m-d H:i:s'))
-        ->not->toContain('Valid until:')
+        ->not->toContain('Until:')
         ->and(HasTableTrait::formatValidityColumnState($bounded))
-        ->toContain('Valid from:')
-        ->toContain('Valid until:')
+        ->toContain('From:')
+        ->toContain('Until:')
         ->toContain($valid_to->format('Y-m-d H:i:s'));
 });
 

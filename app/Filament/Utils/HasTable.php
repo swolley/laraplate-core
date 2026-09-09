@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Utils;
 
 use App\Models\User;
+use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
@@ -45,6 +46,77 @@ use ReflectionClass;
 
 trait HasTable
 {
+    public static function formatValidityColumnState(Model $record): string
+    {
+        if (! method_exists($record, 'validFromKey') || ! method_exists($record, 'validToKey')) {
+            return '';
+        }
+
+        $valid_from = $record->{$record->validFromKey()};
+
+        if ($valid_from === null) {
+            return '';
+        }
+
+        $rows = sprintf(
+            '<div class="flex justify-between">
+                <span>From:</span>
+                <span>%s</span>
+            </div>',
+            self::formatTableDateTimeValue($valid_from),
+        );
+
+        $valid_to = $record->{$record->validToKey()};
+
+        if ($valid_to !== null) {
+            $rows .= sprintf(
+                '<div class="flex justify-between">
+                    <span>Until:</span>
+                    <span>%s</span>
+                </div>',
+                self::formatTableDateTimeValue($valid_to),
+            );
+        }
+
+        return '<div class="space-y-1">' . $rows . '</div>';
+    }
+
+    public static function formatTimestampsColumnState(Model $record, bool $hasSoftDeletes = false): string
+    {
+        $created_at_column = $record->getCreatedAtColumn() ?? 'created_at';
+        $updated_at_column = $record->getUpdatedAtColumn() ?? 'updated_at';
+
+        $rows = sprintf(
+            '<div class="flex justify-between">
+                <span>Created:</span>
+                <span>%s</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Updated:</span>
+                <span>%s</span>
+            </div>',
+            self::formatTableDateTimeValue($record->{$created_at_column}),
+            self::formatTableDateTimeValue($record->{$updated_at_column}),
+        );
+
+        if ($hasSoftDeletes) {
+            $deleted_at_column = $record->getDeletedAtColumn() ?? 'deleted_at';
+            $deleted_at = $record->{$deleted_at_column};
+
+            if ($deleted_at !== null) {
+                $rows .= sprintf(
+                    '<div class="flex justify-between">
+                        <span>Deleted:</span>
+                        <span>%s</span>
+                    </div>',
+                    self::formatTableDateTimeValue($deleted_at),
+                );
+            }
+        }
+
+        return '<div class="space-y-1">' . $rows . '</div>';
+    }
+
     /**
      * @param  ?callable(Collection<string,Column> $columns):void  $columns
      * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
@@ -741,80 +813,9 @@ trait HasTable
         $table->pushFilters($default_filters->all()/* , layout: FiltersLayout::Modal */);
     }
 
-    public static function formatValidityColumnState(Model $record): string
-    {
-        if (! method_exists($record, 'validFromKey') || ! method_exists($record, 'validToKey')) {
-            return '';
-        }
-
-        $valid_from = $record->{$record->validFromKey()};
-
-        if ($valid_from === null) {
-            return '';
-        }
-
-        $rows = sprintf(
-            '<div class="flex justify-between">
-                <span>Valid from:</span>
-                <span>%s</span>
-            </div>',
-            self::formatTableDateTimeValue($valid_from),
-        );
-
-        $valid_to = $record->{$record->validToKey()};
-
-        if ($valid_to !== null) {
-            $rows .= sprintf(
-                '<div class="flex justify-between">
-                    <span>Valid until:</span>
-                    <span>%s</span>
-                </div>',
-                self::formatTableDateTimeValue($valid_to),
-            );
-        }
-
-        return '<div class="space-y-1">' . $rows . '</div>';
-    }
-
-    public static function formatTimestampsColumnState(Model $record, bool $hasSoftDeletes = false): string
-    {
-        $created_at_column = $record->getCreatedAtColumn() ?? 'created_at';
-        $updated_at_column = $record->getUpdatedAtColumn() ?? 'updated_at';
-
-        $rows = sprintf(
-            '<div class="flex justify-between">
-                <span>Created:</span>
-                <span>%s</span>
-            </div>
-            <div class="flex justify-between">
-                <span>Updated:</span>
-                <span>%s</span>
-            </div>',
-            self::formatTableDateTimeValue($record->{$created_at_column}),
-            self::formatTableDateTimeValue($record->{$updated_at_column}),
-        );
-
-        if ($hasSoftDeletes) {
-            $deleted_at_column = $record->getDeletedAtColumn() ?? 'deleted_at';
-            $deleted_at = $record->{$deleted_at_column};
-
-            if ($deleted_at !== null) {
-                $rows .= sprintf(
-                    '<div class="flex justify-between">
-                        <span>Deleted:</span>
-                        <span>%s</span>
-                    </div>',
-                    self::formatTableDateTimeValue($deleted_at),
-                );
-            }
-        }
-
-        return '<div class="space-y-1">' . $rows . '</div>';
-    }
-
     private static function formatTableDateTimeValue(mixed $value): string
     {
-        if ($value instanceof \DateTimeInterface) {
+        if ($value instanceof DateTimeInterface) {
             return $value->format('Y-m-d H:i:s');
         }
 
