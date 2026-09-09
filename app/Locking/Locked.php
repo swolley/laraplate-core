@@ -156,9 +156,27 @@ final class Locked
         }
     }
 
+    /**
+     * Whether locking applies to this model at all.
+     *
+     * The trait is the first half of the answer and the `lock_{table}` setting is the
+     * second: a table whose switch is off behaves, everywhere this method is consulted,
+     * exactly like a table that never had locks. Reading it here rather than at each
+     * call site is what makes the setting mean something without every guard having to
+     * remember it.
+     *
+     * The trait probe is recursive, because a model can inherit it: the runtime
+     * `_extended` subclasses carry no traits of their own, and a flat probe reported
+     * them as unlockable, silently switching the guard off for exactly the records an
+     * installation customised.
+     */
     public function usesHasLocks(Model $model): bool
     {
-        return in_array(HasLocks::class, class_uses($model), true);
+        if (! class_uses_trait($model, HasLocks::class)) {
+            return false;
+        }
+
+        return $model->locksEnabledBySettings();
     }
 
     public function doesNotUseHasLocks(Model $model): bool

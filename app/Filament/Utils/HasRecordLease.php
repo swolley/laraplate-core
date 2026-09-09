@@ -9,7 +9,6 @@ use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Locking\Locked;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\User;
 
 /**
@@ -69,7 +68,7 @@ trait HasRecordLease
     {
         $record = $this->getRecord();
 
-        if (! $record instanceof Model || ! class_uses_trait($record, HasLocks::class)) {
+        if (! $record instanceof Model || new Locked()->doesNotUseHasLocks($record)) {
             return;
         }
 

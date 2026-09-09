@@ -50,7 +50,6 @@ use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
@@ -2558,7 +2557,10 @@ class CrudService
         $model = $requestData->model;
         $this->assertCrudWriteAllowed($model, $operation);
 
-        throw_unless(class_uses_trait($model, HasLocks::class), BadMethodCallException::class, $model::class . " doesn't support locks");
+        // Through Locked, not the trait alone: a table whose `lock_{table}` setting is
+        // off is a table without locks, and asking to take one on it is the same
+        // mistake as asking on a model that never had them.
+        throw_unless(new Locked()->usesHasLocks($model), BadMethodCallException::class, $model::class . " doesn't support locks");
 
         $request = $requestData->request;
         $is_single = $request->has('id');
