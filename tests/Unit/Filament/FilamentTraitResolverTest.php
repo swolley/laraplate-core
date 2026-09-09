@@ -47,3 +47,8 @@ it('lists HasTable strip columns including timestamp and validity grezzi', funct
     expect(FilamentTraitResolver::tableColumnsOwnedByHasTable(Setting::class))
         ->toContain('created_at', 'updated_at', 'deleted_at', 'valid_from', 'valid_to');
 });
+
+it('lists computed attributes that must never reach filament form state', function (): void {
+    expect(FilamentTraitResolver::computedAttributesNeverInForms(Content::class))
+        ->toContain('statistics', 'is_locked', 'is_deleted');
+});

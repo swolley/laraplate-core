@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Modules\CMS\Models\Comment;
@@ -16,12 +17,14 @@ use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
+use Modules\Core\Filament\Utils\HasTable as HasTableTrait;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\Stubs\ValidityStubModel;
 
 beforeEach(function (): void {
     if (! class_exists(App\Models\User::class)) {
@@ -214,4 +217,81 @@ it('orders the acl list by priority instead of the json sort column', function (
 
     expect($table->getDefaultSortColumn())->toBe('priority')
         ->and($table->getDefaultSortDirection())->toBe('desc');
+});
+
+it('renders validity column html through filament when valid_from is set', function (): void {
+    $valid_from = now()->startOfSecond();
+    $record = new ValidityStubModel(['name' => 'published', 'valid_from' => $valid_from, 'valid_to' => null]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => ValidityStubModel::query());
+    $table->pushColumns([
+        TextColumn::make('validity')
+            ->getStateUsing(static fn (ValidityStubModel $record): string => HasTableTrait::formatValidityColumnState($record))
+            ->html(),
+    ]);
+
+    $column = $table->getColumns()['validity']->record($record);
+
+    expect($column->toEmbeddedHtml())
+        ->toContain('Valid from:')
+        ->toContain($valid_from->format('Y-m-d H:i:s'))
+        ->not->toContain('Valid until:');
+});
+
+it('renders validity column rows only when dates are present', function (): void {
+    $valid_from = now()->startOfSecond();
+    $valid_to = now()->addWeek()->startOfSecond();
+
+    $draft = new ValidityStubModel(['name' => 'draft', 'valid_from' => null, 'valid_to' => null]);
+    $open_ended = new ValidityStubModel(['name' => 'open', 'valid_from' => $valid_from, 'valid_to' => null]);
+    $bounded = new ValidityStubModel(['name' => 'bounded', 'valid_from' => $valid_from, 'valid_to' => $valid_to]);
+
+    expect(HasTableTrait::formatValidityColumnState($draft))->toBe('')
+        ->and(HasTableTrait::formatValidityColumnState($open_ended))
+        ->toContain('Valid from:')
+        ->toContain($valid_from->format('Y-m-d H:i:s'))
+        ->not->toContain('Valid until:')
+        ->and(HasTableTrait::formatValidityColumnState($bounded))
+        ->toContain('Valid from:')
+        ->toContain('Valid until:')
+        ->toContain($valid_to->format('Y-m-d H:i:s'));
+});
+
+it('renders deleted timestamp row only when deleted_at is set', function (): void {
+    $created_at = now()->subDay()->startOfSecond();
+    $updated_at = now()->subHour()->startOfSecond();
+    $deleted_at = now()->startOfSecond();
+
+    $active = new User;
+    $active->forceFill([
+        'name' => 'Active User',
+        'email' => 'active-' . uniqid() . '@example.com',
+        'password' => 'Aa1!FilamentAdminPass',
+        'created_at' => $created_at,
+        'updated_at' => $updated_at,
+        'deleted_at' => null,
+    ]);
+
+    $deleted = new User;
+    $deleted->forceFill([
+        'name' => 'Deleted User',
+        'email' => 'deleted-' . uniqid() . '@example.com',
+        'password' => 'Aa1!FilamentAdminPass',
+        'created_at' => $created_at,
+        'updated_at' => $updated_at,
+        'deleted_at' => $deleted_at,
+    ]);
+
+    $active_html = HasTableTrait::formatTimestampsColumnState($active, hasSoftDeletes: true);
+    $deleted_html = HasTableTrait::formatTimestampsColumnState($deleted, hasSoftDeletes: true);
+
+    expect($active_html)
+        ->toContain('Created:')
+        ->toContain('Updated:')
+        ->not->toContain('Deleted:')
+        ->and($deleted_html)
+        ->toContain('Deleted:')
+        ->toContain($deleted_at->format('Y-m-d H:i:s'));
 });

@@ -40,6 +40,11 @@ trait HasValidity
         if (! in_array(static::$valid_to_column, $this->fillable, true)) {
             $this->fillable[] = static::$valid_to_column;
         }
+
+        $this->mergeCasts([
+            static::$valid_from_column => 'datetime',
+            static::$valid_to_column => 'datetime',
+        ]);
     }
 
     /**

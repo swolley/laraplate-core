@@ -54,6 +54,16 @@ final class FilamentTraitResolver
     ];
 
     /**
+     * Computed / appended model attributes that must never be sent to Filament form state.
+     *
+     * @var list<string>
+     */
+    public const COMPUTED_ATTRIBUTES_NEVER_IN_FORMS = [
+        'statistics',
+        'is_locked',
+    ];
+
+    /**
      * @param  'HasTable'|'HasRecords'|'HasForm'  $trait
      * @return class-string
      */
@@ -116,12 +126,28 @@ final class FilamentTraitResolver
         $excluded = self::PLATFORM_COLUMNS_NEVER_IN_FORMS;
 
         if (class_exists($modelFqn) && method_exists($modelFqn, 'lockVersionColumn')) {
-            /** @var string $lock_version */
-            $lock_version = $modelFqn::lockVersionColumn();
-            $excluded[] = $lock_version;
+            $lock_version = config('core.locking.lock_version_column');
+
+            if (is_string($lock_version) && $lock_version !== '') {
+                $excluded[] = $lock_version;
+            }
         }
 
         return array_values(array_unique($excluded));
+    }
+
+    /**
+     * Appended/computed attributes that must be stripped from Filament form hydration.
+     *
+     * @param  class-string  $modelFqn
+     * @return list<string>
+     */
+    public static function computedAttributesNeverInForms(string $modelFqn): array
+    {
+        return array_values(array_unique([
+            ...self::COMPUTED_ATTRIBUTES_NEVER_IN_FORMS,
+            ...self::platformColumnsNeverInForms($modelFqn),
+        ]));
     }
 
     /**

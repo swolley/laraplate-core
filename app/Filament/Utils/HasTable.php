@@ -208,21 +208,8 @@ trait HasTable
         if ($hasValidity) {
             $default_columns->add(
                 TextColumn::make('validity')
-                    /** @var Model&HasValidity $record */
-                    ->formatStateUsing(static fn (Model $record): string => sprintf(
-                        '<div class="space-y-1">
-                            <div class="flex justify-between">
-                                <span>Valid from:</span>
-                                <span>%s</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Valid to:</span>
-                                <span>%s</span>
-                            </div>
-                        </div>',
-                        $record->{$record->validFromKey()}?->format('Y-m-d H:i:s'),
-                        $record->{$record->validToKey()}?->format('Y-m-d H:i:s'),
-                    ))
+                    ->label('Validity')
+                    ->getStateUsing(static fn (Model $record): string => self::formatValidityColumnState($record))
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
                     ->html(),
@@ -302,35 +289,8 @@ trait HasTable
         if ($model_instance->timestamps) {
             $default_columns->add(
                 TextColumn::make('timestamps')
-                    ->formatStateUsing(function (Model $record) use ($hasSoftDeletes): string {
-                        $string
-                            = '<div class="space-y-1">
-                            <div class="flex justify-between">
-                                <span>Created:</span>
-                                <span>%s</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Updated:</span>
-                                <span>%s</span>
-                            </div>';
-                        $values = [
-                            $record->{$record->getCreatedAtColumn() ?? 'created_at'}->format('Y-m-d H:i:s'),
-                            $record->{$record->getUpdatedAtColumn() ?? 'updated_at'}->format('Y-m-d H:i:s'),
-                        ];
-
-                        if ($hasSoftDeletes) {
-                            $string
-                                .= '<div class="flex justify-between">
-                                <span>Deleted:</span>
-                                <span>%s</span>
-                            </div>';
-                            $values[] = $record->{$record->getDeletedAtColumn() ?? 'deleted_at'}?->format('Y-m-d H:i:s');
-                        }
-
-                        $string .= '</div>';
-
-                        return sprintf($string, ...$values);
-                    })
+                    ->label('Timestamps')
+                    ->getStateUsing(static fn (Model $record): string => self::formatTimestampsColumnState($record, $hasSoftDeletes))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->grow(false)
                     ->html(),
@@ -779,5 +739,89 @@ trait HasTable
         }
 
         $table->pushFilters($default_filters->all()/* , layout: FiltersLayout::Modal */);
+    }
+
+    public static function formatValidityColumnState(Model $record): string
+    {
+        if (! method_exists($record, 'validFromKey') || ! method_exists($record, 'validToKey')) {
+            return '';
+        }
+
+        $valid_from = $record->{$record->validFromKey()};
+
+        if ($valid_from === null) {
+            return '';
+        }
+
+        $rows = sprintf(
+            '<div class="flex justify-between">
+                <span>Valid from:</span>
+                <span>%s</span>
+            </div>',
+            self::formatTableDateTimeValue($valid_from),
+        );
+
+        $valid_to = $record->{$record->validToKey()};
+
+        if ($valid_to !== null) {
+            $rows .= sprintf(
+                '<div class="flex justify-between">
+                    <span>Valid until:</span>
+                    <span>%s</span>
+                </div>',
+                self::formatTableDateTimeValue($valid_to),
+            );
+        }
+
+        return '<div class="space-y-1">' . $rows . '</div>';
+    }
+
+    public static function formatTimestampsColumnState(Model $record, bool $hasSoftDeletes = false): string
+    {
+        $created_at_column = $record->getCreatedAtColumn() ?? 'created_at';
+        $updated_at_column = $record->getUpdatedAtColumn() ?? 'updated_at';
+
+        $rows = sprintf(
+            '<div class="flex justify-between">
+                <span>Created:</span>
+                <span>%s</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Updated:</span>
+                <span>%s</span>
+            </div>',
+            self::formatTableDateTimeValue($record->{$created_at_column}),
+            self::formatTableDateTimeValue($record->{$updated_at_column}),
+        );
+
+        if ($hasSoftDeletes) {
+            $deleted_at_column = $record->getDeletedAtColumn() ?? 'deleted_at';
+            $deleted_at = $record->{$deleted_at_column};
+
+            if ($deleted_at !== null) {
+                $rows .= sprintf(
+                    '<div class="flex justify-between">
+                        <span>Deleted:</span>
+                        <span>%s</span>
+                    </div>',
+                    self::formatTableDateTimeValue($deleted_at),
+                );
+            }
+        }
+
+        return '<div class="space-y-1">' . $rows . '</div>';
+    }
+
+    private static function formatTableDateTimeValue(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return Carbon::parse($value)->format('Y-m-d H:i:s');
     }
 }
