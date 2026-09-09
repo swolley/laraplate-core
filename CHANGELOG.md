@@ -6,6 +6,29 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* [**breaking**] Make record locking mean something
+- *(core)* Let a model say which attributes a lock does not cover
+
+### 🐛 Bug Fixes
+
+- *(core)* Register each module's views as an anonymous component path
+- *(core)* Stop answering 304 and 500 for client-side CRUD failures
+- *(core)* Purge redis cache connection after seeder forks
+- *(search)* Recover indexing when the coordination event expired
+
+### 🚜 Refactor
+
+- *(core)* Let HasPlace own the place eager load
+
+### ⚡ Performance
+
+- *(core)* Scope dynamic contents and entities to the request
+- *(core)* Memoize the presettable fields snapshot hydration
+
+## [1.74.0] - 2026-09-01
+
+### 🚀 Features
+
 - *(core)* Hybrid approvals preview — request on app/api, session on admin
 - *(core)* Coerce boolean inputs only on known boolean attributes
 - *(approvals)* Expose active on Modification for pending signals
@@ -434,7 +457,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- *(core)* Move HasCrudOperations to Services/Crud/Concerns
 - *(core)* Update trait namespaces and improve type declarations
+
+### ⚙️ Miscellaneous Tasks
+
+- *(core)* Release v1.54.5
 
 ## [1.54.5] - 2026-06-23
 
@@ -448,10 +476,6 @@ All notable changes to this project will be documented in this file.
 - *(core)* Move command traits from Helpers to Console/Concerns
 - *(core)* Move database traits from Helpers to Database concerns
 - *(core)* Move HasCrudOperations to Services/Crud/Concerns
-
-### ⚙️ Miscellaneous Tasks
-
-- *(core)* Release v1.54.5
 
 ## [1.54.4] - 2026-06-11
 
@@ -782,6 +806,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Update PHPUnit configuration and enhance command descriptions
 - Streamline cache management and enhance model translatability
 - Enhance command registration and improve test structure
 
@@ -803,7 +828,6 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - Enhance tab functionality in ListModifications and ListSettings
-- Update PHPUnit configuration and enhance command descriptions
 
 ### ⚙️ Miscellaneous Tasks
 
