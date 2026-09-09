@@ -2,14 +2,21 @@
 
 declare(strict_types=1);
 
-use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Modules\CMS\Models\Comment;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\WhereClause;
+use Modules\Core\Filament\Resources\ACLS\ACLResource;
+use Modules\Core\Filament\Resources\ACLS\Tables\ACLsTable;
 use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
+use Modules\Core\Models\ACL;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -30,7 +37,7 @@ beforeEach(function (): void {
     $admin_role = Role::factory()->create(['name' => 'admin']);
     $admin->roles()->attach($admin_role);
 
-    \Illuminate\Support\Facades\Auth::login($admin);
+    Illuminate\Support\Facades\Auth::login($admin);
 });
 
 it('builds cached distinct options for permissions table filters', function (): void {
@@ -104,7 +111,7 @@ it('executes users table reset password action closure', function (): void {
     $callback = $action->getActionFunction();
 
     $sent_reset_to = null;
-    $record = \Mockery::mock(App\Models\User::class)->makePartial();
+    $record = Mockery::mock(App\Models\User::class)->makePartial();
     $record->email = 'reset@example.com';
     $record->shouldReceive('sendPasswordResetNotification')
         ->once()
@@ -120,9 +127,9 @@ it('executes users table reset password action closure', function (): void {
 });
 
 it('configures stacked image overlap to 1 for translations locale', function (): void {
-    $translatable_model = new class extends \Illuminate\Database\Eloquent\Model
+    $translatable_model = new class extends Illuminate\Database\Eloquent\Model
     {
-        use \Modules\Core\Models\Concerns\HasTranslations;
+        use Modules\Core\Models\Concerns\HasTranslations;
 
         protected $table = 'test_translatable_models';
 
@@ -140,7 +147,7 @@ it('configures stacked image overlap to 1 for translations locale', function ():
 
     $resource = new class
     {
-        use \Modules\Core\Filament\Utils\HasTable;
+        use Modules\Core\Filament\Utils\HasTable;
 
         public function configure(Table $table): Table
         {
@@ -156,4 +163,55 @@ it('configures stacked image overlap to 1 for translations locale', function ():
     expect($column)->not->toBeNull()
         ->and($column)->toBeInstanceOf(ImageColumn::class)
         ->and($column->getOverlap())->toBe(1);
+});
+
+it('renders the acl filters column as a readable expression', function (): void {
+    $permission = Permission::factory()->create(['name' => 'default.acl_table_' . uniqid() . '.select']);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => new FiltersGroup([
+            new Filter('status', 'published', FilterOperator::Equals),
+            new FiltersGroup([
+                new Filter('country', ['IT', 'DE'], FilterOperator::In),
+                new Filter('archived', false, FilterOperator::Equals),
+            ], WhereClause::Or),
+        ]),
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => ACL::query());
+
+    ACLsTable::configure($table);
+
+    $column = $table->getColumns()['filters']->record($acl->fresh());
+
+    expect($column->formatState($column->getState()))
+        ->toBe('status = published and (country in ["IT","DE"] or archived = false)')
+        ->and($column->toEmbeddedHtml())->toContain('status = published');
+});
+
+it('renders the acl filters column when no filters are stored', function (): void {
+    $column = ACLsTable::describeFilters(null);
+
+    expect($column)->toBe('')
+        ->and(ACLsTable::describeFilters(new FiltersGroup))->toBe('');
+});
+
+it('orders the acl list by priority instead of the json sort column', function (): void {
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => ACL::query());
+
+    ACLResource::table($table);
+
+    expect($table->getDefaultSortColumn())->toBe('priority')
+        ->and($table->getDefaultSortDirection())->toBe('desc');
 });

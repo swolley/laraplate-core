@@ -588,7 +588,7 @@ When building new module features, reuse these primitives instead of re-implemen
 
 ### For product/admin teams
 
-- Manage users/roles/ACL/settings in Filament resources.
+- Manage users/roles/ACL/settings in Filament resources. The ACL form edits `filters` as JSON in a code editor (the nested `FiltersGroup` shape, validated by `Rules\QueryBuilder` before save) and `sort` as a repeater of property/direction rows; the list orders by `priority` descending.
 - Use approval queues and preview when moderation is enabled.
 - Keep module activation and runtime settings under change-control.
 - Super-admins see a Filament topbar environment badge; click it for App + installed module Composer versions (disabled modules appear muted). A Debug Mode badge appears when production runs with debug enabled.

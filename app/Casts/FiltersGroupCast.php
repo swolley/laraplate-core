@@ -152,31 +152,6 @@ final class FiltersGroupCast implements CastsAttributes
      */
     private function dehydrateGroup(FiltersGroup $group): array
     {
-        $filters = [];
-
-        foreach ($group->filters as $node) {
-            if ($node instanceof FiltersGroup) {
-                $filters[] = $this->dehydrateGroup($node);
-            } elseif ($node instanceof Filter) {
-                $filters[] = $this->dehydrateFilter($node);
-            }
-        }
-
-        return [
-            'filters' => $filters,
-            'operator' => $group->operator->value,
-        ];
-    }
-
-    /**
-     * @return array{property: string, value: mixed, operator: string}
-     */
-    private function dehydrateFilter(Filter $filter): array
-    {
-        return [
-            'property' => $filter->property,
-            'value' => $filter->value,
-            'operator' => $filter->operator->value,
-        ];
+        return $group->toArray();
     }
 }

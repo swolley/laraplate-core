@@ -54,7 +54,7 @@ final class ACLResource extends Resource
     {
         return ACLsTable::configure($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('permission'))
-            ->defaultSort('sort');
+            ->defaultSort('priority', 'desc');
     }
 
     public static function getRelations(): array

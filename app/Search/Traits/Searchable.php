@@ -8,6 +8,7 @@ use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
 use Modules\Core\Events\ModelRequiresIndexing;
@@ -22,6 +23,8 @@ use Modules\Core\Search\Schema\IndexType;
 use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\Search\Schema\SchemaManager;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\SearchEngineAvailability;
+use Throwable;
 
 /**
  * Extended searchable trait that supports multiple engines
@@ -66,7 +69,10 @@ trait Searchable
 
     public function queueMakeSearchable($models): void
     {
-        $this->ensureIndexesForModels($models);
+        $this->degradeWhenSearchEngineUnreachable(
+            'ensure indexes',
+            fn (): mixed => $this->ensureIndexesForModels($models),
+        );
 
         if (! is_iterable($models)) {
             $models = collect([$models]);
@@ -93,13 +99,19 @@ trait Searchable
         if ($sync) {
             // In sync mode, we still need to call base method for immediate indexing
             // if no pre-processing is required
-            $this->baseQueueMakeSearchable($models);
+            $this->degradeWhenSearchEngineUnreachable(
+                'index models',
+                fn (): mixed => $this->baseQueueMakeSearchable($models),
+            );
         }
     }
 
     public function syncMakeSearchable($models): void
     {
-        $this->ensureIndexesForModels($models);
+        $this->degradeWhenSearchEngineUnreachable(
+            'ensure indexes',
+            fn (): mixed => $this->ensureIndexesForModels($models),
+        );
 
         if (! is_iterable($models)) {
             $models = collect([$models]);
@@ -114,7 +126,10 @@ trait Searchable
             // The finalize listener will dispatch IndexInSearchJob immediately
         }
 
-        $this->baseSyncMakeSearchableSync($models);
+        $this->degradeWhenSearchEngineUnreachable(
+            'index models',
+            fn (): mixed => $this->baseSyncMakeSearchableSync($models),
+        );
     }
 
     /**
@@ -311,6 +326,33 @@ trait Searchable
         return $this->vectorSearchEnabled()
             && isset($this->embed)
             && $this->embed !== [];
+    }
+
+    /**
+     * Run a search indexing step, tolerating an unreachable engine.
+     *
+     * Indexing is a side effect of a domain write: when the engine cannot be
+     * reached the write must still succeed, with the failure logged so the
+     * documents can be reindexed later. Any other failure (schema, payload,
+     * authentication) still propagates.
+     *
+     * @param  callable(): mixed  $operation
+     */
+    private function degradeWhenSearchEngineUnreachable(string $description, callable $operation): void
+    {
+        try {
+            $operation();
+        } catch (Throwable $exception) {
+            if (! SearchEngineAvailability::isUnreachable($exception)) {
+                throw $exception;
+            }
+
+            Log::warning(sprintf('Search engine unreachable, skipped %s for [%s]', $description, static::class), [
+                'driver' => config('scout.driver'),
+                'index' => $this->searchableAs(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function ensureIndexesForModels($models): void

@@ -13,4 +13,23 @@ final readonly class FiltersGroup
         public array $filters = [],
         public WhereClause $operator = WhereClause::And,
     ) {}
+
+    /**
+     * @return array{filters: list<array<string, mixed>>, operator: string}
+     */
+    public function toArray(): array
+    {
+        $filters = [];
+
+        foreach ($this->filters as $node) {
+            if ($node instanceof self || $node instanceof Filter) {
+                $filters[] = $node->toArray();
+            }
+        }
+
+        return [
+            'filters' => $filters,
+            'operator' => $this->operator->value,
+        ];
+    }
 }

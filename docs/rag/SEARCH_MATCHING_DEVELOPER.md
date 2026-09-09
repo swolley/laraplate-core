@@ -167,6 +167,8 @@ Every `ISearchEngine` implements `textMatchCapabilities()`. Add new semantic con
 
 Response metadata is assembled from `ResolvedTextMatch::toMeta()` and engine capabilities. Never include additional raw protected token values in logs or telemetry; counts and kinds are sufficient.
 
+**Indexing degrades when the engine is unreachable.** Indexing is a side effect of a domain write, so `Search\Traits\Searchable::queueMakeSearchable()` and `syncMakeSearchable()` wrap both the index check and the document push. When the failure is a transport failure — `Support\SearchEngineAvailability::isUnreachable()` matches PSR-18 network exceptions, Guzzle and Laravel HTTP connection exceptions, Elastic `NoNodeAvailableException`, and the Typesense unavailable/timeout errors, including wrapped ones — the write completes and a `warning` is logged with driver, index and message. Every other failure (schema, payload, authentication) still propagates. Documents written while the engine was down are not queued for retry: reindex them with `scout:sync` (or `scout:reindex`) once the engine is back. Bulk imports that must skip indexing entirely still have `--no-search` on `{module}:import`.
+
 ## Testing requirements
 
 Contract tests must cover:
