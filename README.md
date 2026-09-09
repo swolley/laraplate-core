@@ -639,7 +639,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 -   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
 -   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24).
 -   Search: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (embeddings generation requires AI module).
--   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE`, `QUEUE_CONNECTION=failover`, `FILESYSTEM_DISK`, `LOG_*`.
+-   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 
 ### Additional Functionalities
 
