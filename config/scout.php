@@ -48,6 +48,13 @@ return [
         'tries' => env('SCOUT_QUEUE_TRIES', 3),
         'timeout' => env('SCOUT_QUEUE_TIMEOUT', 120),
         'backoff' => env('SCOUT_QUEUE_BACKOFF', [30, 60, 120]),
+        // Real-error budget: unhandled exceptions before the job fails. Rate-limit
+        // releases are NOT exceptions, so they never consume this budget.
+        'max_exceptions' => env('SCOUT_QUEUE_MAX_EXCEPTIONS', 3),
+        // Time window a job may keep being retried. retryUntil() takes precedence
+        // over the tries count (incl. Horizon's supervisor tries), so rate-limit
+        // releases under a mass backfill no longer kill the job.
+        'retry_until_minutes' => env('SCOUT_QUEUE_RETRY_UNTIL_MINUTES', 720),
     ] : false,
 
     /*

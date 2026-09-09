@@ -130,9 +130,11 @@ VECTOR_DIMENSIONS=1536							#vector dimensions for OpenAI default
 SCOUT_PREFIX=									#scout index prefix
 SCOUT_QUEUE=true								#enable scout queue
 SCOUT_QUEUE_NAME=indexing						#scout queue name
-SCOUT_QUEUE_TRIES=3								#scout queue retry attempts
+SCOUT_QUEUE_TRIES=3								#scout queue retry attempts (superseded by retryUntil while it is unexpired)
 SCOUT_QUEUE_TIMEOUT=120							#scout queue timeout
 SCOUT_QUEUE_BACKOFF=30,60,120					#scout queue backoff times
+SCOUT_QUEUE_MAX_EXCEPTIONS=3					#real errors before an indexing job fails (rate-limit releases do not count)
+SCOUT_QUEUE_RETRY_UNTIL_MINUTES=720				#retry window; lets rate-limited indexing jobs wait for a slot instead of dying with MaxAttemptsExceeded
 SCOUT_IDENTIFY=false							#identify user in search engine
 
 #elasticsearch

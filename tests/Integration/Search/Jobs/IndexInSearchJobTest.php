@@ -20,7 +20,15 @@ it('accepts model that uses Searchable trait', function (): void {
         ->and($job->queue)->toBe('indexing')
         ->and($job->tries)->toBe(3)
         ->and($job->timeout)->toBe(120)
-        ->and($job->backoff)->toBe([30, 60, 180]);
+        ->and($job->backoff)->toBe([30, 60, 180])
+        ->and($job->maxExceptions)->toBe(3);
+});
+
+it('uses a future time-based retryUntil so rate-limit releases do not kill the job', function (): void {
+    $job = new IndexInSearchJob(new StubSearchableModel);
+
+    expect($job->retryUntil())->toBeInstanceOf(DateTimeInterface::class)
+        ->and($job->retryUntil()->getTimestamp())->toBeGreaterThan(now()->getTimestamp());
 });
 
 it('throws when model does not use Searchable', function (): void {
@@ -90,32 +98,16 @@ it('updates document without timestamp method when indexing succeeds', function 
     Log::shouldHaveReceived('debug')->atLeast()->times(2);
 });
 
-it('releases job on indexing exception when tries remain', function (): void {
-    config(['scout.driver' => 'typesense', 'scout.queue.backoff' => [30, 60, 180], 'scout.queue.tries' => 3]);
+it('rethrows indexing exceptions so the worker applies backoff and maxExceptions', function (): void {
+    // The job no longer decides release/fail from attempts() (rate-limit releases
+    // inflate it); it logs and rethrows, letting the worker apply $backoff and
+    // fail only after $maxExceptions real errors or once retryUntil() elapses.
+    config(['scout.driver' => 'typesense']);
     $model = new IndexInSearchModelWithoutTimestamp;
     $model->engine->throw_on_update = true;
     Log::spy();
-    $job = (new IndexInSearchJob($model))->withFakeQueueInteractions();
-    $job->job->attempts = 1;
+    $job = new IndexInSearchJob($model);
 
-    $job->handle();
-
-    $job->assertReleased(30);
-    $job->assertNotFailed();
-    Log::shouldHaveReceived('error')->once();
-});
-
-it('fails job on indexing exception when no tries remain', function (): void {
-    config(['scout.driver' => 'typesense', 'scout.queue.backoff' => [30, 60, 180], 'scout.queue.tries' => 3]);
-    $model = new IndexInSearchModelWithoutTimestamp;
-    $model->engine->throw_on_update = true;
-    Log::spy();
-    $job = (new IndexInSearchJob($model))->withFakeQueueInteractions();
-    $job->job->attempts = 3;
-
-    $job->handle();
-
-    $job->assertFailed();
-    $job->assertNotReleased();
+    expect(fn (): mixed => $job->handle())->toThrow(Exception::class);
     Log::shouldHaveReceived('error')->once();
 });

@@ -103,13 +103,11 @@ final class IndexInSearchJob extends CommonSearchJob
             'trace' => $e->getTraceAsString(),
         ]);
 
-        if ($this->tries > $this->attempts()) {
-            $this->release($this->backoff[$this->attempts() - 1] ?? 60);
-
-            return;
-        }
-
-        $this->fail($e);
+        // Let the worker handle the retry: it applies $backoff, and fails the job
+        // only after $maxExceptions real errors or once retryUntil() elapses.
+        // Deciding here from attempts() is unreliable, because rate-limit releases
+        // inflate the attempt count without being real errors.
+        throw $e;
     }
 
     /**
