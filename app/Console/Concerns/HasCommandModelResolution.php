@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 trait HasCommandModelResolution
 {
-    protected function getModelClass(string $optionName, ?string $namespace = null, bool $required = true): string|false
+    protected function getModelClass(string $optionName, ?string $namespace = null, bool $required = true, ?callable $filter = null): string|false
     {
         $model = $this->getModelFromCommand($optionName);
 
@@ -19,7 +19,7 @@ trait HasCommandModelResolution
         }
 
         if (! $model && $required) {
-            $all_models = models(false);
+            $all_models = models(false, filter: $filter);
             $model = $this->askForUserInput($optionName, $all_models);
         }
 

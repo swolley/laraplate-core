@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use Exception;
+use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Console\Concerns\HasBenchmark;
@@ -25,17 +27,27 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
     #[Override]
     public function handle(EngineManager $manager): int
     {
-        $model = $this->getModelClass();
+        try {
+            $model = $this->getModelClass();
 
-        if (in_array($model, ['', '0', false], true)) {
-            return Command::INVALID;
+            if (\in_array($model, ['', '0', false], true)) {
+                return Command::INVALID;
+            }
+
+            $this->addArgument('name');
+            $this->input->setArgument('name', new $model()->indexableAs());
+
+            parent::handle($manager);
+
+            return Command::SUCCESS;
+        } catch (Exception $exception) {
+            Log::error('Error in scout:delete-index command', [
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            $this->error('An error occurred: ' . $exception->getMessage());
+
+            return Command::FAILURE;
         }
-
-        $this->addArgument('name');
-        $this->input->setArgument('name', new $model()->indexableAs());
-
-        parent::handle($manager);
-
-        return Command::SUCCESS;
     }
 }

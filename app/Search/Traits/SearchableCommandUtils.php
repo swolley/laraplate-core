@@ -14,7 +14,7 @@ trait SearchableCommandUtils
 
     private function getModelClass(): string|false
     {
-        $model = $this->getModelClassFromTrait('model');
+        $model = $this->getModelClassFromTrait('model', filter: static fn ($model) => class_uses_trait($model, Searchable::class));
 
         if (! $model) {
             return false;
