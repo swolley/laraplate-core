@@ -235,7 +235,8 @@ trait HasTable
                     ->boolean()
                     ->alignCenter()
                     ->grow(false)
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(isToggledHiddenByDefault: false)
+                    ->falseColor('gray'),
             );
         }
 
@@ -373,7 +374,7 @@ trait HasTable
                 || (method_exists($column, 'isBoolean') && $column->isBoolean())
             ) {
                 $column->alignCenter();
-            } else if (method_exists($column, 'isNumeric') && $column->isNumeric()) {
+            } elseif (method_exists($column, 'isNumeric') && $column->isNumeric()) {
                 $column->alignRight();
             }
         });
