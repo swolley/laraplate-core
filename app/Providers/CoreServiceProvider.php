@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Providers;
 
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
+use BladeUI\Icons\Factory as IconFactory;
 use Carbon\CarbonImmutable;
 use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
@@ -174,6 +175,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         parent::register();
 
         $this->registerCacheManager();
+
+        $this->registerIconSet();
 
         $this->app->bind(OpenApiJsonController::class, DocsController::class);
 
@@ -662,6 +665,31 @@ final class CoreServiceProvider extends ModuleServiceProvider
      * Replace Laravel's cache manager so Cache:: resolves Core Repository
      * (tryByRequest, clearByEntity, …) for every configured store including failover.
      */
+    /**
+     * Register the platform's own Blade icon set.
+     *
+     * Holds the icons the panel needs and Heroicons does not carry. Kept to the Heroicons
+     * grammar, a 24 by 24 box with a 1.5 stroke in `currentColor`, so the two sets can sit in the
+     * same column without one looking heavier than the other.
+     */
+    private function registerIconSet(): void
+    {
+        $this->callAfterResolving(IconFactory::class, static function (IconFactory $factory): void {
+            // Adding a set whose prefix is taken throws, and this provider is registered twice in
+            // the same container by its own test, so the set has to be claimed only once. `all()`
+            // is the only way to ask, and the package marks it internal; the alternative is to
+            // catch the collision, which would also swallow a genuinely broken path.
+            if (array_key_exists('laraplate', $factory->all())) {
+                return;
+            }
+
+            $factory->add('laraplate', [
+                'path' => __DIR__ . '/../../resources/svg',
+                'prefix' => 'laraplate',
+            ]);
+        });
+    }
+
     private function registerCacheManager(): void
     {
         $this->app->singleton('cache', static fn ($app): CoreCacheManager => new CoreCacheManager($app));

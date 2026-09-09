@@ -138,6 +138,15 @@ flowchart LR
 
 Authorization is a two-layer stack. Layer 1 is **Spatie roles + permissions** (`Core\Models\Role` and `Core\Models\Permission`, the latter with `acls()` HasMany). Layer 2 is **row-level ACLs** (`Core\Models\ACL`) tied to a permission and carrying a `FiltersGroup` (JSON query-builder filters), plus an `unrestricted` flag and a `priority`. `AclResolverService::getEffectiveAcls()` resolves ACLs per role with parent-role inheritance (closure-table ancestors), super-admin bypass, OR-composition across non-hierarchical roles, and a 1-hour cache (`acl:resolved:user:{id}:perm:{id}`). `AuthorizationService` is the single entry point used by `CrudService` to enforce permissions and inject ACL filters into request data.
 
+Beside that stack sits a per-row check: `HasValidations` verifies the table-level permission for
+every hydrated row, named `{connection}.{table}.{operation}` with `default` standing in for the
+default connection. A permission that is not registered reads as "operation allowed". The CRUD read
+engine suppresses the check for the class it is hydrating, having already ensured the table-level
+permission and injected the ACL filters. **Roles and permissions are exempt from it outright**:
+they are the material an authorization answer is made of, so reading one cannot require an answer,
+and `Core\Authorization\ResolvingAuthorization` marks the window in which an answer is being
+worked out so nested reads inside it pass.
+
 **SPA profile surface.** `GET /app/auth/user/profile-information` (`UserInfoResponse`) returns the session user's `permissions` (grouped by guard — a SPA builds its menu from these, no server-side menu), `groups`, `canImpersonate`, `lang`, plus `isFirstLogin` (onboarding flag) and `preferences` (the server-persisted UI-chrome bag). Two self-service writes let a signed-in user update **their own** row without holding CRUD `update` on `users`: `PATCH /app/auth/user/preferences` (validated array, replaces the bag) and `PATCH /app/auth/user/first-login-complete` (clears `isFirstLogin`). Both operate strictly on `Auth::user()` (no id accepted) and persist via `saveQuietly()`, deliberately bypassing the CRUD authorization/versioning events that gate admins editing other accounts; both echo the refreshed profile. Columns: `users.is_first_login` (bool, default true) and `users.preferences` (nullable json).
 
 ```mermaid

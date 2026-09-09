@@ -32,6 +32,7 @@ use Lab404\Impersonate\Exceptions\MissingUserProvider;
 use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
@@ -233,12 +234,30 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
 
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole(config('permission.roles.superadmin'));
+        return $this->resolvingAuthorization(fn (): bool => $this->hasRole(config('permission.roles.superadmin')));
     }
 
     public function isAdmin(): bool
     {
-        return $this->hasRole(config('permission.roles.admin'));
+        return $this->resolvingAuthorization(fn (): bool => $this->hasRole(config('permission.roles.admin')));
+    }
+
+    /**
+     * Read this user's own roles and permissions without the per-row select guard biting.
+     *
+     * Those rows live in tables that carry the guard themselves, so asking what somebody may do
+     * would require already knowing it. Reading your own authorization data is not a business read
+     * of the roles table, and the table-level check on that table still stands for callers that
+     * really are listing roles.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    private function resolvingAuthorization(callable $callback): mixed
+    {
+        return ResolvingAuthorization::resolve($callback);
     }
 
     /**
@@ -323,11 +342,13 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
             return true;
         }
 
-        if ($this->hasPermissionTo($permission, $guard_name)) {
-            return true;
-        }
+        return $this->resolvingAuthorization(function () use ($permission, $guard_name): bool {
+            if ($this->hasPermissionTo($permission, $guard_name)) {
+                return true;
+            }
 
-        return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission));
+            return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission));
+        });
     }
 
     public function getPermissionsViaRoles(): Collection

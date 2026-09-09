@@ -30,10 +30,10 @@ it('memoizes permission lookups within one request and forgets them afterwards',
 
     $resolve();
 
-    // Two calls, two queries: the permission lookup itself, plus the permission
-    // existence check that HasValidations fires on the retrieved Permission model.
-    // Both are memoized, so the second call adds nothing — unmemoized it would be four.
-    expect(DB::getQueryLog())->toHaveCount(2);
+    // Two calls, one query: the permission lookup itself, memoized, so the second call adds
+    // nothing. There is no second query for the retrieved Permission row, because a permission
+    // is what an authorization answer is made of and reading one cannot require an answer.
+    expect(DB::getQueryLog())->toHaveCount(1);
 
     // Octane's FlushOnce listener does exactly this between operations.
     Once::flush();
@@ -42,7 +42,7 @@ it('memoizes permission lookups within one request and forgets them afterwards',
     $resolve();
 
     // After the boundary the lookups hit the database again: no stale worker state.
-    expect(DB::getQueryLog())->toHaveCount(2);
+    expect(DB::getQueryLog())->toHaveCount(1);
 });
 
 it('keys memoized permission checks on the user identity instead of the object handle', function (): void {

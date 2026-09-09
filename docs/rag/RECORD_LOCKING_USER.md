@@ -21,8 +21,8 @@ There are two kinds, and they look different on screen.
 The icon tells you **who**, not for how long. The deadline is written next to it as text. "Frozen"
 therefore means *nobody owns it*, not *forever*: a freeze can perfectly well expire.
 
-In the superadmin panel the snowflake is drawn as a crossed-out circle, because the icon set used
-there has no snowflake.
+The snowflake is the same in the superadmin panel and in the frontend. Heroicons carries none, so
+Core draws its own and serves it from the `laraplate` icon set.
 
 ## The three acts
 

@@ -12,6 +12,7 @@ use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
 use LogicException;
 use Modules\Core\Authorization\PermissionExistenceMemo;
+use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Overrides\ContextualValidationException;
@@ -19,6 +20,8 @@ use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Support\PermissionName;
 use ReflectionException;
 use ReflectionProperty;
+use Spatie\Permission\Contracts\Permission as SpatiePermission;
+use Spatie\Permission\Contracts\Role as SpatieRole;
 
 /**
  * Trait per aggiungere validazioni ai modelli.
@@ -167,6 +170,16 @@ trait HasValidations
                 return;
             }
 
+            // Roles and permissions are what an authorization answer is made of, so reading one
+            // cannot itself require an answer: deciding whether somebody may read a role means
+            // reading their roles. Eloquent does not reload a relation that is already loading, so
+            // the circle does not merely recurse, it hands back a null relation and breaks.
+            // Callers that genuinely list these tables are still stopped by the table-level check
+            // the CRUD read engine runs before hydrating anything.
+            if ($model instanceof SpatieRole || $model instanceof SpatiePermission) {
+                return;
+            }
+
             throw_unless(static::checkUserCanDo($model, 'select'), AuthorizationException::class, 'User cannot select ' . $model->getTable());
         });
         static::creating(function (Model $model): void {
@@ -209,6 +222,14 @@ trait HasValidations
         // `default` standing in for models that follow `database.default`. Dropping
         // the connection segment made every lookup miss, and a miss reads as
         // "permission not registered" -> operation allowed.
+        // Both questions below read the acting user's roles and permissions, and those models
+        // carry this same guard. Asking whether the user may read them requires knowing what the
+        // user is allowed to do, which is what is being worked out. The machinery does not
+        // authorize itself, so a read taken inside an answer is part of that answer.
+        if (ResolvingAuthorization::inProgress()) {
+            return true;
+        }
+
         $permission = PermissionName::forModel($model, $operation);
 
         /** @var class-string<Model> $permission_class */
@@ -223,11 +244,13 @@ trait HasValidations
         $user = Auth::user();
 
         if ($user) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
+            return ResolvingAuthorization::resolve(static function () use ($user, $permission): bool {
+                if ($user->isSuperAdmin()) {
+                    return true;
+                }
 
-            return $user->can($permission);
+                return $user->can($permission);
+            });
         }
 
         return true;

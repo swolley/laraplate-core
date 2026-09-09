@@ -242,15 +242,15 @@ trait HasTable
         if ($hasLocks) {
             $default_columns->add(
                 // `is_locked` is a computed attribute, not a column, so this cannot be sorted or
-                // searched in SQL. An ownerless lock is a freeze and gets its own icon: the UI spec
-                // asks for a snowflake, which Heroicons does not carry, so the panel uses
-                // `no-symbol` and only the Vue frontend renders the snowflake proper.
+                // searched in SQL. An ownerless lock is a freeze and gets its own icon, the
+                // snowflake the UI spec asks for. Heroicons does not carry one, so Core draws it in
+                // the same grammar and serves it from its own set.
                 IconColumn::make('is_locked')
                     ->boolean()
                     ->alignCenter()
                     ->icon(static fn (Model $record): ?string => match (true) {
                         ! $record->isLocked() => null,
-                        $record->{$record->getLockedByColumn()} === null => 'heroicon-o-no-symbol',
+                        $record->{$record->getLockedByColumn()} === null => 'laraplate-snowflake',
                         default => 'heroicon-o-lock-closed',
                     })
                     ->tooltip(
