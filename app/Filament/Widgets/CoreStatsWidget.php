@@ -55,15 +55,18 @@ final class CoreStatsWidget extends BaseWidget
             Stat::make('Users', $data['users'])
                 ->description('Total registered users')
                 ->descriptionIcon('heroicon-o-users')
-                ->color('primary'),
+                ->color('primary')
+                ->descriptionColor('core'),
             Stat::make('Active Licenses', "{$data['active']} / {$data['total']}")
                 ->description('Currently valid licenses')
                 ->descriptionIcon('heroicon-o-key')
-                ->color('primary'),
+                ->color('primary')
+                ->descriptionColor('core'),
             Stat::make('Occupied Licenses', "{$data['occupied']} / {$data['active']}")
                 ->description('Active sessions')
                 ->descriptionIcon('heroicon-o-user-plus')
-                ->color('primary'),
+                ->color('primary')
+                ->descriptionColor('core'),
         ];
     }
 

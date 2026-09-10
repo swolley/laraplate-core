@@ -3,6 +3,7 @@
     "laraplate_owned": true,
     "alias": "core",
     "description": "Core Module for Base Functionality",
+    "color": "green",
     "keywords": [
         "core",
         "base",

@@ -59,7 +59,8 @@ final class HorizonStatsWidget extends BaseWidget
             $stats[] = Stat::make('Throughput', number_format($throughput))
                 ->description('Jobs per minute')
                 ->descriptionIcon('heroicon-o-arrow-trending-up')
-                ->color('primary');
+                ->color('primary')
+                ->descriptionColor('core');
         } catch (Exception) {
             // Horizon might not be fully configured
             $stats[] = Stat::make('Horizon Status', 'Not Available')
