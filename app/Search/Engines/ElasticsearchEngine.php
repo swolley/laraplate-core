@@ -160,6 +160,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     #[Override]
     public function paginate(Builder $builder, $perPage, $page): SearchResult
     {
+        // Mirror search(): a vector-carrying builder must run the kNN query.
+        // Without this, paginated vector/hybrid searches silently degraded to a
+        // plain keyword query, returning documents in id order instead of by
+        // similarity.
+        if ($this->isVectorSearch($builder)) {
+            return $this->performVectorSearch($builder);
+        }
+
         return $this->performKeywordSearch($builder, (int) $perPage, (int) $page);
     }
 
