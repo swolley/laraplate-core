@@ -491,13 +491,14 @@ Four mutually-exclusive flags scale that fake volume without editing the seeders
 
 | Flag | Multiplier | Example (`TARGET_COUNT_CONTENTS = 500_000`) |
 | --- | --- | --- |
+| `--pico` | ×0.001 | 5 00 |
 | `--micro` | ×0.01 | 5 000 |
 | `--min` | ×0.1 | 50 000 |
 | `--mid` | ×0.5 | 250 000 |
 | `--max` | ×1.0 | 500 000 |
 
-- The default, when no flag is given, is `--micro` (1% — a fast, workable dev dataset).
-- Precedence is fixed as `micro → min → mid → max`: the first one present wins (so `--min --mid`
+- The default, when no flag is given, is `--pico` (1% — a fast, workable dev dataset).
+- Precedence is fixed as `pico → micro → min → mid → max`: the first one present wins (so `--min --mid`
   resolves to `--min`), regardless of the order typed on the command line.
 - `SeedCommand` resolves the factor **once**, from the real invocation flags, and publishes it on the
   container under `BatchSeeder::SCALE_CONTAINER_KEY` before dispatching (clearing it in a `finally`).
@@ -512,7 +513,7 @@ Four mutually-exclusive flags scale that fake volume without editing the seeders
 - The flags are no-ops outside `--dev`: the production graph seeds fixed reference data only, and the
   container key is never published.
 
-The same flags work per module: `module:seed <Module> --dev [--min|--mid|--max]`
+The same flags work per module: `module:seed <Module> --dev [--pico|--micro|--min|--mid|--max]`
 (`Modules\Core\Console\ModuleSeedCommand`, an override of nwidart's `module:seed`) runs that module's
 `Dev{Module}DatabaseSeeder` alone, publishing the scale the same way. Both commands share
 `Modules\Core\Console\Concerns\ResolvesDevSeedScale` so the flag set, precedence, and container

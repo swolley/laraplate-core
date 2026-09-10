@@ -23,7 +23,7 @@ trait ResolvesDevSeedScale
      * Dev-seed volume multipliers by scale flag, in precedence order: the first
      * flag present wins. Absent flags fall through to the full (max) target.
      */
-    private const array DEV_SEED_SCALE_FACTORS = ['micro' => 0.01, 'min' => 0.1, 'mid' => 0.5, 'max' => 1.0];
+    private const array DEV_SEED_SCALE_FACTORS = ['pico' => 0.001, 'micro' => 0.01, 'min' => 0.1, 'mid' => 0.5, 'max' => 1.0];
 
     /**
      * @return list<array{0: string, 1: string|null, 2: int, 3: string}>
@@ -31,6 +31,7 @@ trait ResolvesDevSeedScale
     protected function devSeedScaleOptions(): array
     {
         return [
+            ['pico', null, InputOption::VALUE_NONE, 'Scale dev record volume to 0.1% of the target count'],
             ['micro', null, InputOption::VALUE_NONE, 'Scale dev record volume to 1% of the target count'],
             ['min', null, InputOption::VALUE_NONE, 'Scale dev record volume to 10% of the target count'],
             ['mid', null, InputOption::VALUE_NONE, 'Scale dev record volume to 50% of the target count'],
@@ -51,7 +52,7 @@ trait ResolvesDevSeedScale
             }
         }
 
-        return self::DEV_SEED_SCALE_FACTORS['micro'];
+        return self::DEV_SEED_SCALE_FACTORS['pico'];
     }
 
     /**
