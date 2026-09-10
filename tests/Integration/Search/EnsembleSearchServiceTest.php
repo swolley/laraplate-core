@@ -189,6 +189,34 @@ it('exposes normalized raw and diagnostic score metadata for fused hits', functi
         ->and($hit['score_details']['strategies']['keyword']['normalized_score'])->toBe(1.0);
 });
 
+it('exposes per-strategy ranked lists on meta for retrieval-quality evaluation', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+
+    $result = $this->service->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => [
+                'use_fulltext' => true,
+                'use_vector' => false,
+            ],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => false],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    expect($result->meta)->toHaveKey('per_strategy')
+        ->and($result->meta['per_strategy'])->toHaveKey('keyword')
+        ->and($result->meta['per_strategy']['keyword'])->not->toBeEmpty();
+
+    $first = array_values($result->meta['per_strategy']['keyword'])[0];
+
+    expect($first)->toHaveKeys(['id', 'score', 'rank']);
+});
+
 it('propagates one resolved text match decision and exposes matching metadata', function (): void {
     EnsembleSearchPaginatorTestModel::$lastBuilder = null;
     $resolved = (new TextMatchOptionsResolver(new SearchQueryAnalyzer()))->resolve('Mario Rossi');

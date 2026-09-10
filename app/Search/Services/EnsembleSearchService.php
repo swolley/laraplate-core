@@ -139,6 +139,7 @@ class EnsembleSearchService
                 'reranked' => $use_reranker,
                 'total_results' => count($hits),
                 'matching' => $textMatch?->toMeta($this->textMatchDegradations($model, $textMatch)) ?? [],
+                'per_strategy' => $per_strategy,
             ],
         );
     }
