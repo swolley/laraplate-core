@@ -45,8 +45,13 @@ final class CheckIndexCommand extends Command
             foreach ($modeles as &$model) {
                 $this->info('Checking model ' . $model);
                 $model_instance = new $model();
+                $engine = $model_instance->searchableUsing();
 
-                if (! $model_instance->checkIndex()) {
+                // Index-existence verification lives on the engine (e.g. ElasticsearchEngine::checkIndex);
+                // engines without it (e.g. the database engine) are treated as always valid.
+                $index_ok = ! is_callable([$engine, 'checkIndex']) || (bool) $engine->checkIndex($model_instance);
+
+                if (! $index_ok) {
                     $wrong_or_missing_indexes[] = $model;
                     $this->warn('Model ' . $model . ' has a wrong or missing index.');
                 }
