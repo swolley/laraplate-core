@@ -13,6 +13,9 @@ use Override;
 use Symfony\Component\Console\Input\InputOption;
 use Throwable;
 
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
+
 abstract class AbstractImportCommand extends Command
 {
     private const string SKIP_IMPORTER = '(skip)';
@@ -111,7 +114,7 @@ abstract class AbstractImportCommand extends Command
             return;
         }
 
-        if (! $this->confirm("Found {$this->discovery->label()} at {$root}. Load its Composer autoloader?", false)) {
+        if (! confirm("Found {$this->discovery->label()} at {$root}. Load its Composer autoloader?", false)) {
             return;
         }
 
@@ -133,7 +136,7 @@ abstract class AbstractImportCommand extends Command
             return;
         }
 
-        $selected = $this->choice('Select an importer (optional)', [self::SKIP_IMPORTER, ...$importers], 0);
+        $selected = select('Select an importer (optional)', [self::SKIP_IMPORTER, ...$importers], 0);
 
         if ($selected === self::SKIP_IMPORTER) {
             return;

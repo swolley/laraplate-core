@@ -50,6 +50,7 @@ abstract class Entity extends Model
         'name',
         'slug',
         'type',
+        'is_default',
     ];
 
     #[Override]
@@ -81,6 +82,7 @@ abstract class Entity extends Model
             'is_active' => 'boolean',
             'slug' => 'sometimes|nullable|string|max:255',
             'type' => ['required', static::getEntityTypeEnumClass()::validationRule()],
+            'is_default' => 'sometimes|boolean',
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => ['required', 'string', 'max:255', 'unique:' . CoreTables::Entities->value . ',name'],
@@ -126,6 +128,7 @@ abstract class Entity extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
             'type' => static::getEntityTypeEnumClass(),
+            'is_default' => 'boolean',
         ]);
     }
 }
