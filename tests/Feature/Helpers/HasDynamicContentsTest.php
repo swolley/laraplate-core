@@ -32,7 +32,8 @@ beforeEach(function (): void {
  *     textField: Field,
  *     arrayField: Field,
  *     objectField: Field,
- *     editorField: Field
+ *     editorField: Field,
+ *     numberField: Field
  * }
  */
 function createTestEntityWithFields(): array
@@ -82,11 +83,20 @@ function createTestEntityWithFields(): array
     $editorField->is_translatable = true;
     $editorField->save();
 
+    $numberField = Field::query()->create([
+        'name' => 'number_field',
+        'type' => FieldType::Number,
+        'options' => new stdClass(),
+    ]);
+    $numberField->is_translatable = true;
+    $numberField->save();
+
     $preset->fields()->sync([
         $textField->id => ['default' => null, 'is_required' => false, 'order_column' => 0],
         $arrayField->id => ['default' => null, 'is_required' => false, 'order_column' => 1],
         $objectField->id => ['default' => null, 'is_required' => false, 'order_column' => 2],
         $editorField->id => ['default' => null, 'is_required' => false, 'order_column' => 3],
+        $numberField->id => ['default' => null, 'is_required' => false, 'order_column' => 4],
     ]);
 
     $presettable = $preset->createFieldsVersion();
@@ -99,6 +109,7 @@ function createTestEntityWithFields(): array
         'arrayField' => $arrayField,
         'objectField' => $objectField,
         'editorField' => $editorField,
+        'numberField' => $numberField,
     ];
 }
 
@@ -273,6 +284,36 @@ describe('Validation', function (): void {
         ]);
 
         expect(fn () => $contributor->validateWithRules('update'))->not->toThrow(Exception::class);
+    });
+
+    it('validates NUMBER fields correctly with a numeric value', function (): void {
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
+
+        $default_locale = config('app.locale');
+
+        $contributor->setTranslation($default_locale, [
+            'components' => [
+                'number_field' => 42,
+            ],
+        ]);
+
+        expect(fn () => $contributor->validateWithRules('update'))->not->toThrow(Exception::class);
+    });
+
+    it('fails validation when NUMBER field is not numeric', function (): void {
+        ['entity' => $entity, 'presettable' => $presettable] = createTestEntityWithFields();
+        $contributor = contributorOnEntity($entity, $presettable);
+
+        $default_locale = config('app.locale');
+
+        $contributor->setTranslation($default_locale, [
+            'components' => [
+                'number_field' => 'not a number',
+            ],
+        ]);
+
+        expect(fn () => $contributor->validateWithRules('update'))->toThrow(Illuminate\Validation\ValidationException::class);
     });
 
     it('fails validation when ARRAY field is not an array', function (): void {

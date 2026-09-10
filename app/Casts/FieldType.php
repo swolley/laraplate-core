@@ -30,7 +30,7 @@ enum FieldType: string
             // self::Radio => 'string',
             // self::Select => 'string',
             self::Datetime => 'date',
-            self::Number => 'number',
+            self::Number => 'numeric',
             self::Object, self::Editor => 'json',
             self::Array => 'array',
             self::Email => 'email',
