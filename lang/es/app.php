@@ -155,6 +155,15 @@ return [
     'October' => 'Octubre',
     'September' => 'Septiembre',
   ],
+  'permissions' => [
+    'note' => [
+      'changed' => 'Efecto distinto',
+      'hard_delete' => 'El borrado lógico está desactivado para :table, así que este permiso ya no oculta el registro: lo destruye.',
+      'inert' => 'No aplicado',
+      'locking' => 'El bloqueo de registros está desactivado para :table, así que este permiso no concede nada hasta que se vuelva a activar.',
+      'soft_deletes' => 'El borrado lógico está desactivado para :table, así que no hay nada que restaurar y este permiso no concede nada hasta que se vuelva a activar.',
+    ],
+  ],
   'setting' => [
     'changePassword' => 'Cambiar contraseña',
     'layout' => 'Visualización',

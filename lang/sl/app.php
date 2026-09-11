@@ -155,6 +155,15 @@ return [
     'October' => 'Oktober',
     'September' => 'September',
   ],
+  'permissions' => [
+    'note' => [
+      'changed' => 'Drugačen učinek',
+      'hard_delete' => 'Logično brisanje je za :table izklopljeno, zato to dovoljenje zapisa ne skrije več, ampak ga uniči.',
+      'inert' => 'Ni uporabljeno',
+      'locking' => 'Zaklepanje zapisov je za :table izklopljeno, zato to dovoljenje ne omogoča ničesar, dokler ga znova ne vklopite.',
+      'soft_deletes' => 'Logično brisanje je za :table izklopljeno, zato ni česa obnoviti in to dovoljenje ne omogoča ničesar, dokler ga znova ne vklopite.',
+    ],
+  ],
   'setting' => [
     'changePassword' => 'Spremeni geslo',
     'layout' => 'Pogled',

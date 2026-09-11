@@ -111,14 +111,30 @@ trait HasLocks
      */
     public function locksEnabledBySettings(): bool
     {
-        if (property_exists($this, 'locksEnabled')) {
-            return (bool) $this->locksEnabled;
+        $in_code = $this->locksEnabledInCode();
+
+        if ($in_code !== null) {
+            return $in_code;
         }
 
         return app(PerModelSettingResolver::class)->boolean(
             PerModelSettingResolver::nameFor('lock', $this->getTable()),
             default: true,
         );
+    }
+
+    /**
+     * The model's own last word on locking, or null when it does not give one.
+     *
+     * Asked of the model rather than read from outside because the property may be
+     * private: a model pins the answer for itself, and only the model can be asked.
+     * {@see \Modules\Core\Console\PermissionsRefreshCommand} needs this half alone,
+     * without the setting, to decide whether the `lock` and `unlock` permissions
+     * belong in this model's vocabulary at all.
+     */
+    public function locksEnabledInCode(): ?bool
+    {
+        return property_exists($this, 'locksEnabled') ? (bool) $this->locksEnabled : null;
     }
 
     /**

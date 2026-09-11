@@ -2,16 +2,23 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Modules\AI\Models\ActionRequest;
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Console\PermissionsRefreshCommand;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\OutboxEvent;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Tests\Fixtures\PermissionsRefreshForcedHardDeleteModel;
+use Modules\Core\Tests\Fixtures\PermissionsRefreshForcedUnlockableModel;
+use Modules\Core\Tests\Fixtures\PermissionsRefreshLockableModel;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
 use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredPermissionsModel;
 use Modules\ERP\Models\ReturnOrder;
@@ -228,7 +235,7 @@ it('skips cached model classes whose files were moved or deleted', function (): 
             $buffered,
         );
         $output = $buffered->fetch();
-    })->not->toThrow(\Throwable::class);
+    })->not->toThrow(Throwable::class);
 
     expect($exit_code)->toBe(0)
         ->and($output)->not->toContain('Modules\\CMS\\Models\\Media');
@@ -363,6 +370,113 @@ it('removes delete approve and publish permissions when the model does not suppo
     expect(Permission::query()->where('name', $publish_name)->count())->toBe(0);
     expect($output)->toContain("Deleted '{$delete_name}' permission");
     expect($output)->toContain("Deleted '{$approve_name}' permission");
+});
+
+/**
+ * The condition behind this used to be `! usesTrait || $instance->softDeletesEnabled ?? true`,
+ * which PHP reads as `(! usesTrait || $instance->softDeletesEnabled) ?? true`: the fallback
+ * was dead and the property arm was inverted, so a model that switched soft deletes off in
+ * its own code kept the two permissions it cannot use.
+ */
+it('removes delete and restore from a model that turns soft deletes off in its own code', function (): void {
+    $delete_name = permissionNameForModel(PermissionsRefreshForcedHardDeleteModel::class, ActionEnum::Delete);
+    $restore_name = permissionNameForModel(PermissionsRefreshForcedHardDeleteModel::class, ActionEnum::Restore);
+
+    Permission::query()->whereIn('name', [$delete_name, $restore_name])->delete();
+    Permission::create(['name' => $delete_name, 'guard_name' => 'web']);
+    Permission::create(['name' => $restore_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshForcedHardDeleteModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->whereIn('name', [$delete_name, $restore_name])->count())->toBe(0);
+});
+
+/**
+ * Locking is a capability like soft deletes or approvals: the verbs belong to the
+ * models that have the trait, and to nobody else. Before this branch existed `lock`
+ * was generated for every managed table, which put 129 names on the role screen that
+ * no code could ever reach, and `unlock` was generated for none, which left the CRUD
+ * unlock check failing closed for everyone but a superadmin.
+ */
+it('removes lock and unlock from a model that cannot be locked', function (): void {
+    $lock_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Lock);
+    $unlock_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Unlock);
+
+    Permission::query()->whereIn('name', [$lock_name, $unlock_name])->delete();
+    Permission::create(['name' => $lock_name, 'guard_name' => 'web']);
+    Permission::create(['name' => $unlock_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    $output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->whereIn('name', [$lock_name, $unlock_name])->count())->toBe(0)
+        ->and($output)->toContain("Deleted '{$lock_name}' permission")
+        ->and($output)->toContain("Deleted '{$unlock_name}' permission");
+});
+
+it('creates both verbs for a model that carries the locking trait', function (): void {
+    $lock_name = permissionNameForModel(PermissionsRefreshLockableModel::class, ActionEnum::Lock);
+    $unlock_name = permissionNameForModel(PermissionsRefreshLockableModel::class, ActionEnum::Unlock);
+
+    Permission::query()->whereIn('name', [$lock_name, $unlock_name])->delete();
+
+    HelpersCache::setModels('active', [PermissionsRefreshLockableModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $lock_name)->count())->toBe(1)
+        ->and(Permission::query()->where('name', $unlock_name)->count())->toBe(1);
+});
+
+it('leaves both verbs out for a model that disables locking in its own code', function (): void {
+    $lock_name = permissionNameForModel(PermissionsRefreshForcedUnlockableModel::class, ActionEnum::Lock);
+    $unlock_name = permissionNameForModel(PermissionsRefreshForcedUnlockableModel::class, ActionEnum::Unlock);
+
+    Permission::query()->whereIn('name', [$lock_name, $unlock_name])->delete();
+
+    HelpersCache::setModels('active', [PermissionsRefreshForcedUnlockableModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->whereIn('name', [$lock_name, $unlock_name])->count())->toBe(0);
+});
+
+/**
+ * The `lock_{table}` setting is a runtime switch, not a statement about the model's
+ * vocabulary. Deleting the permission when it is off would take every grant and every
+ * ACL written on that name down with it by cascade, so the row stays and
+ * {@see Modules\Core\Locking\Locked::usesHasLocks()} reads the setting at the point
+ * of use instead.
+ */
+it('keeps the verbs when locking is only switched off in settings', function (): void {
+    $lock_name = permissionNameForModel(PermissionsRefreshLockableModel::class, ActionEnum::Lock);
+    $unlock_name = permissionNameForModel(PermissionsRefreshLockableModel::class, ActionEnum::Unlock);
+
+    DB::table(CoreTables::Settings->value)->updateOrInsert(
+        ['name' => PerModelSettingResolver::nameFor('lock', new PermissionsRefreshLockableModel()->getTable())],
+        [
+            'value' => json_encode(false),
+            'encrypted' => false,
+            'type' => SettingTypeEnum::Boolean->value,
+            'group_name' => 'locking',
+            'description' => 'Lock status for the fixture',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    );
+
+    app(PerModelSettingResolver::class)->flushGroup('locking');
+    app(PerModelSettingResolver::class)->flushNameIndex();
+
+    HelpersCache::setModels('active', [PermissionsRefreshLockableModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $lock_name)->count())->toBe(1)
+        ->and(Permission::query()->where('name', $unlock_name)->count())->toBe(1);
 });
 
 it('drops permissions that no longer match any inspected model', function (): void {

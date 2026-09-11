@@ -155,6 +155,15 @@ return [
     'October' => 'October',
     'September' => 'September',
   ],
+  'permissions' => [
+    'note' => [
+      'changed' => 'Different effect',
+      'hard_delete' => 'Soft deletes are switched off for :table, so this permission no longer hides a record: it destroys it.',
+      'inert' => 'Not applied',
+      'locking' => 'Record locking is switched off for :table, so this permission grants nothing until it is switched back on.',
+      'soft_deletes' => 'Soft deletes are switched off for :table, so there is nothing to restore and this permission grants nothing until they are switched back on.',
+    ],
+  ],
   'setting' => [
     'changePassword' => 'Change Password',
     'layout' => 'Layout',

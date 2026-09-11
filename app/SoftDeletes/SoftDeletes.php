@@ -32,11 +32,13 @@ trait SoftDeletes
         $this->baseInitializeSoftDeletes();
 
         $guarded = $this->guarded;
+
         if (is_array($guarded) && ! in_array($this->getIsDeletedColumn(), $guarded, true)) {
             $this->guarded[] = $this->getIsDeletedColumn();
         }
 
         $hidden = $this->hidden;
+
         if (is_array($hidden) && ! in_array($this->getDeletedAtColumn(), $hidden, true)) {
             $this->hidden[] = $this->getDeletedAtColumn();
         }
@@ -69,14 +71,31 @@ trait SoftDeletes
      */
     public function softDeletesEnabledBySettings(): bool
     {
-        if (property_exists($this, 'softDeletesEnabled')) {
-            return (bool) $this->softDeletesEnabled;
+        $in_code = $this->softDeletesEnabledInCode();
+
+        if ($in_code !== null) {
+            return $in_code;
         }
 
         return app(PerModelSettingResolver::class)->boolean(
             PerModelSettingResolver::nameFor('soft_deletes', $this->getTable()),
             default: true,
         );
+    }
+
+    /**
+     * The model's own last word on soft deletes, or null when it does not give one.
+     *
+     * Asked of the model rather than read from outside because the property may be
+     * private, as it is on {@see \Modules\Core\Models\License}: a model pins the
+     * answer for itself, and only the model can be asked without tripping over the
+     * visibility. {@see \Modules\Core\Console\PermissionsRefreshCommand} needs this
+     * half alone, without the setting, to decide whether `delete` and `restore` belong
+     * in this model's vocabulary.
+     */
+    public function softDeletesEnabledInCode(): ?bool
+    {
+        return property_exists($this, 'softDeletesEnabled') ? (bool) $this->softDeletesEnabled : null;
     }
 
     public function restore(): ?bool

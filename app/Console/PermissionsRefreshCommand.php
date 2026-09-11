@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HelpersCache;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
@@ -87,7 +88,7 @@ final class PermissionsRefreshCommand extends Command
             ActionEnum::Select,
             ActionEnum::Insert,
             ActionEnum::Lock,
-            // ActionEnum::Unlock,
+            ActionEnum::Unlock,
             ActionEnum::Update,
             ActionEnum::Delete,
             ActionEnum::ForceDelete,
@@ -169,7 +170,20 @@ final class PermissionsRefreshCommand extends Command
                 $all_permissions[] = $permission_name;
 
                 // permessi di cancellazione logica
-                if (($permission === ActionEnum::Delete || $permission === ActionEnum::Restore) && (! class_uses_trait($model, SoftDeletes::class) || $instance->softDeletesEnabled ?? true)) {
+                if (($permission === ActionEnum::Delete || $permission === ActionEnum::Restore) && ! $this->canBeSoftDeleted($model, $instance)) {
+                    if (! in_array($permission_name, $declared_permissions, true) && in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
+                        if (! $quiet_mode) {
+                            $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
+                        }
+
+                        $changes = true;
+                    }
+
+                    continue;
+                }
+
+                // permessi di blocco record
+                if (($permission === ActionEnum::Lock || $permission === ActionEnum::Unlock) && ! $this->canBeLocked($model, $instance)) {
                     if (! in_array($permission_name, $declared_permissions, true) && in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));
@@ -316,6 +330,69 @@ final class PermissionsRefreshCommand extends Command
         } else {
             $connection->rollBack();
         }
+    }
+
+    /**
+     * Whether soft deletes belong in this model's vocabulary at all.
+     *
+     * `delete` and `restore` are the soft-delete pair on this CRUD surface: the delete
+     * endpoint authorizes against `forceDelete` and destroys the row, while `delete`
+     * gates the inactivate operation and `restore` the activate one. A model that
+     * cannot be soft-deleted has neither operation, so it gets neither name.
+     *
+     * The condition used to read `! usesTrait || $instance->softDeletesEnabled ?? true`,
+     * which PHP parses as `(! usesTrait || $instance->softDeletesEnabled) ?? true`,
+     * because `??` binds looser than `||`. An OR never yields null, so the fallback was
+     * dead, the property arm was inverted, and reading a private property from out here
+     * would have been an error rather than a default. The model is asked instead.
+     *
+     * The `soft_deletes_{table}` setting is deliberately not consulted, for the same
+     * reason locking's is not: it is a runtime switch, and a switch must not destroy
+     * grants and ACLs by cascade.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private function canBeSoftDeleted(string $model, Model $instance): bool
+    {
+        if (! class_uses_trait($model, SoftDeletes::class)) {
+            return false;
+        }
+
+        // The trait checked above is Laravel's, which Core's own soft deletes build on.
+        // A model carrying only Laravel's has no word of its own to give.
+        if (! method_exists($instance, 'softDeletesEnabledInCode')) {
+            return true;
+        }
+
+        /** @var bool|null $in_code */
+        $in_code = $instance->softDeletesEnabledInCode();
+
+        return $in_code ?? true;
+    }
+
+    /**
+     * Whether locking belongs in this model's vocabulary at all.
+     *
+     * The trait puts the columns on the table and the optional `locksEnabled` property
+     * is the model's own last word on them. The `lock_{table}` setting is deliberately
+     * not consulted here: it is a runtime switch, and dropping the permission when it
+     * is off would take every grant and every ACL written on that name down with it,
+     * leaving the roles to be rebuilt by hand the day somebody switches locking back
+     * on. {@see \Modules\Core\Locking\Locked::usesHasLocks()} reads the setting at
+     * the point of use, which is where a runtime switch belongs.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private function canBeLocked(string $model, Model $instance): bool
+    {
+        if (! class_uses_trait($model, HasLocks::class)) {
+            return false;
+        }
+
+        /** @var bool|null $in_code */
+        $in_code = $instance->locksEnabledInCode();
+
+        return $in_code ?? true;
     }
 
     private function checkIfBlacklisted(string $model): bool

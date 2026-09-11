@@ -155,6 +155,15 @@ return [
     'October' => 'Oktober',
     'September' => 'September',
   ],
+  'permissions' => [
+    'note' => [
+      'changed' => 'Andere Wirkung',
+      'hard_delete' => 'Das logische Löschen ist für :table ausgeschaltet, daher verbirgt diese Berechtigung den Datensatz nicht mehr, sondern vernichtet ihn.',
+      'inert' => 'Nicht angewendet',
+      'locking' => 'Die Datensatzsperre ist für :table ausgeschaltet, daher gewährt diese Berechtigung nichts, bis sie wieder eingeschaltet wird.',
+      'soft_deletes' => 'Das logische Löschen ist für :table ausgeschaltet, daher gibt es nichts wiederherzustellen und diese Berechtigung gewährt nichts, bis es wieder eingeschaltet wird.',
+    ],
+  ],
   'setting' => [
     'changePassword' => 'Passwort ändern',
     'layout' => 'Ansicht',

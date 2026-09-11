@@ -48,11 +48,11 @@ trait HasRecordLease
     public function recordHeldWarningAction(): Action
     {
         return Action::make('recordHeldWarning')
-            ->modalHeading(__('core::app.locking.held.heading'))
+            ->modalHeading(__('app.locking.held.heading'))
             ->modalDescription(fn (): string => $this->recordHeldDescription())
-            ->modalSubmitActionLabel(__('core::app.locking.held.open_read_only'))
+            ->modalSubmitActionLabel(__('app.locking.held.open_read_only'))
             ->modalCancelAction(fn (Action $action): Action => $action
-                ->label(__('core::app.locking.held.cancel'))
+                ->label(__('app.locking.held.cancel'))
                 ->url(static::getResource()::getUrl('index')))
             // The choice has to be made: no dismissing it by clicking away or hitting the corner.
             ->closeModalByClickingAway(false)
@@ -100,14 +100,14 @@ trait HasRecordLease
 
         if ($owner_id === null) {
             return $until === null
-                ? __('core::app.locking.held.frozen')
-                : __('core::app.locking.held.frozen_until', ['until' => (string) $until]);
+                ? __('app.locking.held.frozen')
+                : __('app.locking.held.frozen_until', ['until' => (string) $until]);
         }
 
         $owner = User::query()->find($owner_id)?->name ?? (string) $owner_id;
 
         return $until === null
-            ? __('core::app.locking.held.by', ['user' => $owner])
-            : __('core::app.locking.held.by_until', ['user' => $owner, 'until' => (string) $until]);
+            ? __('app.locking.held.by', ['user' => $owner])
+            : __('app.locking.held.by_until', ['user' => $owner, 'until' => (string) $until]);
     }
 }

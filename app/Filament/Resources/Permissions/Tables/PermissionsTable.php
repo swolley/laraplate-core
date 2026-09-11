@@ -9,6 +9,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Authorization\PermissionEnforcement;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Permission;
 
@@ -37,6 +38,18 @@ final class PermissionsTable
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('description')
                         ->searchable(),
+                    // Only ever rendered when the answer is "this grants nothing right
+                    // now": a badge on every row would be noise, and the rows that need
+                    // it are the exception.
+                    TextColumn::make('enforcement')
+                        ->label(__('app.permissions.note.inert'))
+                        ->state(static fn (Permission $record): ?string => app(PermissionEnforcement::class)
+                            ->noteFor((string) $record->name, $record->table_name)?->label)
+                        ->tooltip(static fn (Permission $record): ?string => app(PermissionEnforcement::class)
+                            ->noteFor((string) $record->name, $record->table_name)?->reason)
+                        ->badge()
+                        ->color('warning')
+                        ->placeholder(''),
                 ]);
             },
             filters: static function (Collection $default_filters): void {
