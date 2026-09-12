@@ -127,6 +127,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Locale → analyzer map
+    |--------------------------------------------------------------------------
+    |
+    | Shared locale→analyzer resolution for search mappings. A locale not
+    | listed here falls back to the engine's `standard` analyzer.
+    |
+    */
+    'analyzers' => [
+        'it' => env('SEARCH_ANALYZER_IT', 'italian'),
+        'en' => env('SEARCH_ANALYZER_EN', 'english'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Engines configurati
     |--------------------------------------------------------------------------
     |
