@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(import)* Add a payload fingerprint for record origins
+- *(filament)* Own the module navigation group in the plugin
+- *(core)* Add module color support and update widget descriptions
+- *(seed)* Introduce 'pico' scale flag for dev seed volume adjustment
+- *(import)* Refactor import command prompts to use Laravel\Prompts functions
+- *(core)* Generate the lock verbs only where locking exists
+
+### 🐛 Bug Fixes
+
+- *(core)* Stop authorization from having to authorize itself
+- *(table)* Enhance toggleable column with falseColor option and improve conditional alignment logic
+- *(core)* Repair the ACL Filament resource and degrade indexing when the engine is down
+- *(filament)* Render composite validity cells and sanitize form state
+- *(core)* Make the per-table lock setting mean something
+- *(search)* Survive rate-limit releases with retryUntil instead of dying on tries
+- *(search)* Scout:check-index delegates to the engine's checkIndex
+
+### 🚜 Refactor
+
+- *(table)* Update validity and timestamp column formatting in HasTable trait
+
+### 📚 Documentation
+
+- *(core)* Correct the standard-stack env line
+
+## [1.75.0] - 2026-09-09
+
+### 🚀 Features
+
 - *(core)* [**breaking**] Make record locking mean something
 - *(core)* Let a model say which attributes a lock does not cover
 
@@ -342,7 +371,7 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
-## [1.58.8] - 2026-07-10
+## [1.59.0] - 2026-07-12
 
 ### 🐛 Bug Fixes
 
