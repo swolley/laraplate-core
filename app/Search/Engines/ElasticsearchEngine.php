@@ -1024,9 +1024,15 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     private function buildFreeTextMatchQuery(string $query, TextMatchOptions $options): array
     {
         $analysis = app(SearchQueryAnalyzer::class)->analyze($query, $options->minimumTermLength);
+        // Target the model's locale sub-fields (e.g. `title.it`, `title.en`) via the
+        // `title.*` field-name wildcard, boosted, instead of the single
+        // locale-current `title`; falls back to a boosted `title.*` plus a
+        // catch-all when the resolver had no explicit schema-derived field list
+        // (e.g. no ES connection available to resolve the schema).
+        $fields = $options->fields !== [] ? $options->fields : ['title.*^2', '*'];
         $match = [
             'query' => $query,
-            'fields' => ['*'],
+            'fields' => $fields,
             'type' => $options->prefix ? 'bool_prefix' : 'best_fields',
             'operator' => $options->operator,
         ];
@@ -1058,7 +1064,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                     [
                         'multi_match' => [
                             'query' => $query,
-                            'fields' => ['*'],
+                            'fields' => $fields,
                             'type' => 'phrase',
                             'boost' => $options->exactMatchBoost,
                         ],

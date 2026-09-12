@@ -25,6 +25,8 @@ final readonly class TextMatchOptions
         public array $requiredTerms = [],
         /** @var list<string> */
         public array $requiredPhrases = [],
+        /** @var list<string> */
+        public array $fields = [],
     ) {}
 
     /**
@@ -51,6 +53,7 @@ final readonly class TextMatchOptions
             query: is_string($options['query'] ?? null) ? $options['query'] : '',
             requiredTerms: self::stringList($options['required_terms'] ?? null),
             requiredPhrases: self::stringList($options['required_phrases'] ?? null),
+            fields: self::stringList($options['fields'] ?? null),
         );
     }
 
@@ -77,7 +80,8 @@ final readonly class TextMatchOptions
     }
 
     /**
-     * Include parsed syntax values for trusted internal engine propagation.
+     * Include parsed syntax values and the resolved field list for trusted
+     * internal engine propagation.
      *
      * @return array<string, bool|float|int|string|list<string>>
      */
@@ -88,6 +92,7 @@ final readonly class TextMatchOptions
             'query' => $this->query,
             'required_terms' => $this->requiredTerms,
             'required_phrases' => $this->requiredPhrases,
+            'fields' => $this->fields,
         ];
     }
 
