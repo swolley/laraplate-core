@@ -10,36 +10,31 @@ use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Tests\Stubs\Search\FlatTitleStubModel;
 use Modules\Core\Tests\Stubs\Search\FullMappingStubModel;
 
-it('targets per-locale title sub-fields for a model whose title is a locale object', function (): void {
+it('matches the generic title-wildcard-plus-catch-all fields for a model with per-locale title objects', function (): void {
     $resolver = new TextMatchOptionsResolver(new SearchQueryAnalyzer());
     $builder = new ScoutBuilder(new FullMappingStubModel(), 'festival');
     // Isolate the multi_match under test: skip the exact-match-boost bool/should wrapping.
     $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = ['exact_match_boost' => 0];
     $options = $resolver->forBuilder($builder);
 
-    expect($options->fields)->toContain('title.*^2');
-
     $engine = (new ReflectionClass(ElasticsearchEngine::class))->newInstanceWithoutConstructor();
     $query = $engine->buildTextMatchQuery('festival', $options);
 
     expect($query)->toHaveKey('multi_match')
-        ->and($query['multi_match']['fields'])->toContain('title.*^2');
+        ->and($query['multi_match']['fields'])->toContain('title.*^2')
+        ->and($query['multi_match']['fields'])->toContain('*');
 });
 
-it('keeps matching via the flat title field for a mono-language model', function (): void {
+it('matches the same generic title-wildcard-plus-catch-all fields for a mono-language model with a flat title', function (): void {
     $resolver = new TextMatchOptionsResolver(new SearchQueryAnalyzer());
     $builder = new ScoutBuilder(new FlatTitleStubModel(), 'festival');
     $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = ['exact_match_boost' => 0];
     $options = $resolver->forBuilder($builder);
 
-    expect($options->fields)->toContain('title')
-        ->and($options->fields)->toContain('*')
-        ->and($options->fields)->not->toContain('title.*^2');
-
     $engine = (new ReflectionClass(ElasticsearchEngine::class))->newInstanceWithoutConstructor();
     $query = $engine->buildTextMatchQuery('festival', $options);
 
-    expect($query['multi_match']['fields'])->toContain('title')
+    expect($query['multi_match']['fields'])->toContain('title.*^2')
         ->and($query['multi_match']['fields'])->toContain('*');
 });
 

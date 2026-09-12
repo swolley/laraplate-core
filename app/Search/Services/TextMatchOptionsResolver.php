@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Services;
 
-use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
 use Modules\Core\Search\DTOs\SearchQueryAnalysis;
 use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Enums\TextMatchPreference;
-use Throwable;
 
 final readonly class TextMatchOptionsResolver
 {
@@ -28,99 +26,7 @@ final readonly class TextMatchOptionsResolver
         $preference = is_string($input['preference'] ?? null) ? $input['preference'] : null;
         unset($input['preference']);
 
-        if (! array_key_exists('fields', $input)) {
-            $fields = $this->fieldsFromModelSchema($builder->model);
-
-            if ($fields !== []) {
-                $input['fields'] = $fields;
-            }
-        }
-
         return $this->resolve($builder->query, $preference, $input)->options;
-    }
-
-    /**
-     * Derive the free-text `fields` list from the model's search schema: a
-     * locale-object field (e.g. `title` translated per locale, or a translated
-     * component body) is targeted through its `.{locale}` sub-fields via the ES
-     * field-name wildcard `<field>.*`, with the primary `title` field boosted.
-     * Flat (non-translated) models — e.g. Ticket/Location — have no locale
-     * object to target, so their own flat `title` field name is used instead
-     * (unboosted, only the locale-object case is boosted), keeping search on
-     * those models working via `title`/`*` exactly as before. A trailing `*`
-     * always keeps every other field matchable, preserving prior (unscoped)
-     * coverage.
-     *
-     * Defensive: `getSearchMapping()` may fail (e.g. schema not resolvable
-     * outside an indexing context) — degrade to the caller's own fallback
-     * rather than breaking the search request.
-     *
-     * Memoized per model class in a function-local static (the search schema
-     * shape is static per class, but `getSearchMapping()` is a model method —
-     * it can build the schema from `toSearchableArray()`, which may touch
-     * relations, e.g. vector embeddings): this keeps a repeated free-text
-     * search on the same model from re-deriving, and re-querying for, the same
-     * field list on every request. A class property cannot hold this cache —
-     * the class is `readonly`.
-     *
-     * @return list<string>
-     */
-    private function fieldsFromModelSchema(mixed $model): array
-    {
-        static $cache = [];
-
-        if (! $model instanceof Model || ! method_exists($model, 'getSearchMapping')) {
-            return [];
-        }
-
-        $class = $model::class;
-
-        if (array_key_exists($class, $cache)) {
-            return $cache[$class];
-        }
-
-        try {
-            $mapping = $model->getSearchMapping();
-        } catch (Throwable) {
-            return $cache[$class] = [];
-        }
-
-        $properties = $mapping['mappings']['properties'] ?? null;
-
-        if (! is_array($properties) || $properties === []) {
-            return $cache[$class] = [];
-        }
-
-        $fields = [];
-
-        foreach ($properties as $name => $definition) {
-            if (! is_string($name) || $name === '' || ! is_array($definition)) {
-                continue;
-            }
-
-            $localeProperties = $definition['properties'] ?? null;
-            $isLocaleObject = ($definition['type'] ?? null) === 'object'
-                && is_array($localeProperties)
-                && $localeProperties !== [];
-
-            if ($isLocaleObject) {
-                $fields[] = $name === 'title' ? $name . '.*^2' : $name . '.*';
-
-                continue;
-            }
-
-            if ($name === 'title' && in_array($definition['type'] ?? null, ['text', 'keyword'], true)) {
-                $fields[] = $name;
-            }
-        }
-
-        if ($fields === []) {
-            return $cache[$class] = [];
-        }
-
-        $fields[] = '*';
-
-        return $cache[$class] = array_values($fields);
     }
 
     /**
