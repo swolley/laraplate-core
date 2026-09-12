@@ -245,8 +245,16 @@ trait CommonEngineFunctions
 
             if ($schema instanceof SchemaDefinition) {
                 foreach ($schema->getFields() as $field) {
-                    if ($field instanceof FieldDefinition && ($field->type === FieldType::Vector || $field->hasIndexType(IndexType::Vector))) {
+                    if (! $field instanceof FieldDefinition) {
+                        continue;
+                    }
+
+                    if ($field->type === FieldType::Vector || ($field->type !== FieldType::Array && $field->hasIndexType(IndexType::Vector))) {
                         return $field->name;
+                    }
+
+                    if ($field->type === FieldType::Array && is_array($field->options['vector'] ?? null)) {
+                        return $field->name . '.vector';
                     }
                 }
             }
@@ -273,8 +281,16 @@ trait CommonEngineFunctions
 
         if (is_array($properties)) {
             foreach ($properties as $name => $definition) {
-                if (is_string($name) && is_array($definition) && ($definition['type'] ?? null) === 'dense_vector') {
+                if (! is_string($name) || ! is_array($definition)) {
+                    continue;
+                }
+
+                if (($definition['type'] ?? null) === 'dense_vector') {
                     return $name;
+                }
+
+                if (($definition['type'] ?? null) === 'nested' && ($definition['properties']['vector']['type'] ?? null) === 'dense_vector') {
+                    return $name . '.vector';
                 }
             }
         }
