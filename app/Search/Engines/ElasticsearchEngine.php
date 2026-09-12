@@ -119,17 +119,23 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             parent::createIndex($collection, $schema);
 
             // ScoutDriverPlus's createIndex only creates a bare index; ES then maps
-            // fields dynamically as documents arrive. Dynamic mapping cannot infer a
-            // `dense_vector`, so explicitly apply just the `embedding` field's mapping
-            // (the one field ES cannot map on its own) — every other field keeps its
-            // existing dynamic mapping, so this does not change keyword-search behaviour.
+            // fields dynamically as documents arrive. Dynamic mapping cannot infer
+            // per-language analyzers or a `dense_vector` (including the nested
+            // `embeddings.vector` field), so push the full translated mapping
+            // explicitly. `italian`/`english` are built-in ES analyzers, so no
+            // custom `settings` block is required for them.
             $properties = is_array($schema['mappings']['properties'] ?? null) ? $schema['mappings']['properties'] : [];
 
-            if (isset($properties['embedding']) && is_array($properties['embedding'])) {
+            if ($properties !== []) {
+                $mapped = [];
+                foreach ($properties as $name => $definition) {
+                    $mapped[$name] = is_array($definition) ? $this->stringifyFieldMeta($definition) : $definition;
+                }
+
                 ElasticsearchService::getInstance()->createIndex(
                     $collection,
                     [],
-                    ['properties' => ['embedding' => $this->stringifyFieldMeta($properties['embedding'])]],
+                    ['properties' => $mapped],
                 );
             }
 

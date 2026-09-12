@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Services\ElasticsearchService;
+use Modules\Core\Tests\Stubs\Search\FullMappingStubModel;
 use Modules\Core\Tests\Stubs\Search\VectorMappingStubModel;
 
 /**
@@ -92,6 +93,57 @@ it('orders a paginated vector search by similarity, not by id', function (): voi
 
         expect($ids)->not->toBeEmpty()
             ->and($ids[0])->toBe('2'); // similarity order, not id order ("1" first)
+    } finally {
+        try {
+            $service->deleteIndex($index);
+        } catch (Throwable) {
+            // best-effort cleanup
+        }
+    }
+});
+
+/**
+ * ES-gated: createIndex() must push the FULL translated mapping, not only the
+ * `embedding` field. Before this fix, ES dynamically mapped everything else,
+ * so per-language analyzers (title.it/title.en) and the nested `embeddings`
+ * dense_vector sub-field were never applied and the analyzers/kNN field could
+ * not exist. Skips when Elasticsearch is not the configured engine or is
+ * unreachable, so it is a no-op in CI without ES.
+ */
+it('applies the full field mapping, including locale analyzers and a nested vector, on index creation', function (): void {
+    $engine = (new FullMappingStubModel)->searchableUsing();
+
+    if (! $engine instanceof ElasticsearchEngine) {
+        $this->markTestSkipped('Elasticsearch is not the configured scout engine.');
+    }
+
+    try {
+        $engine->health();
+    } catch (Throwable $e) {
+        $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
+    }
+
+    config()->set('search.vector_search.enabled', true);
+    config()->set('search.vector_search.dimension', 384);
+
+    $service = ElasticsearchService::getInstance();
+    $index = FullMappingStubModel::INDEX;
+
+    try {
+        $engine->createIndex(FullMappingStubModel::class, [], true);
+
+        $mapping = $service->client->indices()->getMapping(['index' => $index])->asArray();
+        $properties = $mapping[$index]['mappings']['properties'] ?? [];
+
+        $title = $properties['title'] ?? null;
+        $embeddings = $properties['embeddings'] ?? null;
+
+        expect($title)->not->toBeNull()
+            ->and($title['properties']['it']['analyzer'])->toBe('italian')
+            ->and($title['properties']['en']['analyzer'])->toBe('english')
+            ->and($embeddings)->not->toBeNull()
+            ->and($embeddings['type'])->toBe('nested')
+            ->and($embeddings['properties']['vector']['type'])->toBe('dense_vector');
     } finally {
         try {
             $service->deleteIndex($index);
