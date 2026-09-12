@@ -11,10 +11,10 @@ function modelEmbeddingsMigrationSource(): string
     return (string) file_get_contents(base_path('Modules/Core/database/migrations/2024_11_05_233754_create_model_embeddings_table.php'));
 }
 
-it('fillable contains embedding', function (): void {
+it('fillable contains embedding, locale and model_key', function (): void {
     $model = new ModelEmbedding;
 
-    expect($model->getFillable())->toBe(['embedding']);
+    expect($model->getFillable())->toBe(['embedding', 'locale', 'model_key']);
 });
 
 it('model returns MorphTo relationship', function (): void {

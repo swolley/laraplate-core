@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Database\Factories\ModelEmbeddingFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
@@ -16,6 +17,8 @@ use Override;
  * @property array<int, float>|null $embedding
  * @property int|null $model_id
  * @property string|null $model_type
+ * @property string|null $locale
+ * @property string|null $model_key
  * @mixin \Eloquent
  * @mixin IdeHelperModelEmbedding
  */
@@ -29,6 +32,8 @@ final class ModelEmbedding extends Model
     #[Override]
     protected $fillable = [
         'embedding',
+        'locale',
+        'model_key',
     ];
 
     /**
@@ -60,6 +65,36 @@ final class ModelEmbedding extends Model
         return $query
             ->where('model_type', $model->getMorphClass())
             ->where('model_id', $model->getKey());
+    }
+
+    /**
+     * Scope to filter embeddings produced by a specific embedding-model profile.
+     *
+     * @param  Builder<ModelEmbedding>  $query
+     * @return Builder<ModelEmbedding>
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function producedBy(Builder $query, string $modelKey): Builder
+    {
+        return $query->where('model_key', $modelKey);
+    }
+
+    /**
+     * Scope to filter embeddings by the translation locale they were derived from.
+     * A null locale matches non-translated models (rows with a null locale column).
+     *
+     * @param  Builder<ModelEmbedding>  $query
+     * @return Builder<ModelEmbedding>
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function forLocale(Builder $query, ?string $locale): Builder
+    {
+        return $locale === null ? $query->whereNull('locale') : $query->where('locale', $locale);
+    }
+
+    protected static function newFactory(): ModelEmbeddingFactory
+    {
+        return ModelEmbeddingFactory::new();
     }
 
     protected function casts(): array
