@@ -33,6 +33,13 @@ return new class extends Migration
                 $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
             }
 
+            // Provenance of the vector: which translation it was derived from
+            // (null for non-translated models) and which embedding-model profile
+            // produced it (enables incremental per-locale re-embed and stale detection).
+            $table->string('locale')->nullable()->comment('Translation locale this vector was derived from; null for non-translated models');
+            $table->string('model_key')->nullable()->comment('Embedding model profile key that produced this vector');
+            $table->index(['model_type', 'model_id', 'locale'], "{$model_embeddings_table}_model_locale_IDX");
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
