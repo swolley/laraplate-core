@@ -133,6 +133,21 @@ trait Searchable
     }
 
     /**
+     * Scout bulk-import hook: strips `LocaleScope` so every translated row is
+     * indexed, including mono-language (non-default-locale) content that the
+     * runtime global scope would otherwise hide from `Content::query()`.
+     * `withoutGlobalScope` is a no-op for models that never register that
+     * scope (e.g. Ticket, Location), so this is safe trait-wide.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public function makeAllSearchableUsing($query)
+    {
+        return $query->withoutGlobalScope(\Modules\Core\Overrides\LocaleScope::class);
+    }
+
+    /**
      * Extends the standard method with support for embeddings and other data.
      */
     public function toSearchableArray(): array
