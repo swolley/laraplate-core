@@ -114,6 +114,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Vector Field Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for vector fields in schema translation.
+    |
+    */
+    'vector' => [
+        'dimensions' => (int) env('VECTOR_DIMENSION', 384),
+        'similarity' => env('VECTOR_SIMILARITY', 'cosine'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Engines configurati
     |--------------------------------------------------------------------------
     |

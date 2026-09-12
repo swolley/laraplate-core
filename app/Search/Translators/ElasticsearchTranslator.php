@@ -34,6 +34,36 @@ class ElasticsearchTranslator implements ISchemaTranslator
 
     private function translateField(FieldDefinition $field): array
     {
+        // Handle Object field with locale_properties (per-language text with analyzers)
+        if ($field->type === FieldType::Object && is_array($field->options['locale_properties'] ?? null)) {
+            $properties = [];
+            foreach ($field->options['locale_properties'] as $locale => $definition) {
+                $properties[(string) $locale] = [
+                    'type' => 'text',
+                    'analyzer' => (string) ($definition['analyzer'] ?? 'standard'),
+                ];
+            }
+
+            return ['type' => 'object', 'properties' => $properties];
+        }
+
+        // Handle Array field with vector option (nested with dense_vector)
+        if ($field->type === FieldType::Array && is_array($field->options['vector'] ?? null)) {
+            $vector = $field->options['vector'];
+
+            return [
+                'type' => 'nested',
+                'properties' => [
+                    'vector' => [
+                        'type' => 'dense_vector',
+                        'dims' => (int) ($vector['dimensions'] ?? config('search.vector.dimensions', 384)),
+                        'index' => true,
+                        'similarity' => (string) ($vector['similarity'] ?? config('search.vector.similarity', 'cosine')),
+                    ],
+                ],
+            ];
+        }
+
         $esField = match ($field->type) {
             FieldType::Text => [
                 'type' => 'text',
