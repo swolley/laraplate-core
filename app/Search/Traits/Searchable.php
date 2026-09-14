@@ -360,6 +360,18 @@ trait Searchable
     }
 
     /**
+     * Public accessor for the embeddable field list ($embed), so external
+     * consumers (e.g. an observer deciding whether a translation change requires
+     * re-embedding) don't need to reach into the protected property directly.
+     *
+     * @return list<string>
+     */
+    public function getEmbedFields(): array
+    {
+        return $this->embed ?? [];
+    }
+
+    /**
      * Run a search indexing step, tolerating an unreachable engine.
      *
      * Indexing is a side effect of a domain write: when the engine cannot be
