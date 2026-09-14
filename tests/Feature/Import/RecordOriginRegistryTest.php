@@ -45,7 +45,7 @@ it('allows compatibility identities without a fingerprint', function (): void {
 
 it('rejects malformed fingerprints', function (string $fingerprint): void {
     expect(fn () => new ExternalRecordIdentity('source', '42', $fingerprint))
-        ->toThrow(\InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class);
 })->with([
     'too short' => 'abc123',
     'uppercase hexadecimal' => mb_strtoupper(hash('sha256', 'payload')),
@@ -101,6 +101,34 @@ it('registers import evidence and resolves the local referable id', function ():
         ->and($origin->source_label)->toBe('Nebula')
         ->and($origin->url)->toBe('https://legacy.test/payments/823')
         ->and($registry->referableId($user, 'legacy_symfony:nebula', 'payment:823'))->toBe((int) $user->getKey());
+});
+
+it('keeps the source instant when the application timezone changes after import', function (): void {
+    $user = User::factory()->perpetual()->create();
+    $source_updated_at = CarbonImmutable::parse('2026-09-01T10:30:00+02:00');
+
+    config(['app.timezone' => 'Europe/Rome']);
+    app(RecordOriginRegistry::class)->register(
+        $user,
+        new ExternalRecordIdentity('source-a', '42', null, $source_updated_at),
+    );
+
+    config(['app.timezone' => 'America/New_York']);
+    $origin = RecordOrigin::query()->sole();
+
+    expect($origin->source_updated_at?->equalTo($source_updated_at))->toBeTrue()
+        ->and($origin->source_updated_at?->toDateTimeString())->toBe('2026-09-01 04:30:00');
+});
+
+it('stores source timestamps set through the model in UTC', function (): void {
+    config(['app.timezone' => 'Europe/Rome']);
+
+    $origin = RecordOrigin::factory()->for(User::factory()->perpetual(), 'referable')->create([
+        'source_updated_at' => CarbonImmutable::parse('2026-09-01T10:30:00+02:00'),
+    ]);
+
+    expect($origin->getRawOriginal('source_updated_at'))->toBe('2026-09-01 08:30:00')
+        ->and($origin->fresh()?->source_updated_at?->toDateTimeString())->toBe('2026-09-01 10:30:00');
 });
 
 it('keeps external identities isolated by source key and external id', function (): void {

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -25,7 +28,8 @@ use Override;
  * @property string|null $external_id
  * @property string|null $fingerprint
  * @property string|null $url
- * @property \Carbon\CarbonImmutable|null $source_updated_at
+ * @property CarbonImmutable|null $source_updated_at
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperRecordOrigin
  */
@@ -64,6 +68,11 @@ final class RecordOrigin extends Model
         return $this->morphTo();
     }
 
+    protected static function newFactory(): RecordOriginFactory
+    {
+        return RecordOriginFactory::new();
+    }
+
     /**
      * Scope to the origin(s) of a given model instance, leveraging the composite morphs() index.
      *
@@ -78,19 +87,21 @@ final class RecordOrigin extends Model
             ->where('referable_id', $model->getKey());
     }
 
-    protected static function newFactory(): RecordOriginFactory
-    {
-        return RecordOriginFactory::new();
-    }
-
     /**
-     * @return array<string, string>
+     * Stored as UTC and exposed in the current application timezone, so the instant
+     * survives timezone changes between import and read.
      */
-    #[Override]
-    protected function casts(): array
+    protected function sourceUpdatedAt(): Attribute
     {
-        return [
-            'source_updated_at' => 'immutable_datetime',
-        ];
+        return Attribute::make(
+            get: static fn (?string $value): ?CarbonImmutable => $value === null
+                ? null
+                : CarbonImmutable::parse($value, 'UTC')->setTimezone(config('app.timezone')),
+            set: static fn (DateTimeInterface|string|null $value): ?string => match (true) {
+                $value === null => null,
+                $value instanceof DateTimeInterface => CarbonImmutable::instance($value)->utc()->format('Y-m-d H:i:s'),
+                default => CarbonImmutable::parse($value)->utc()->format('Y-m-d H:i:s'),
+            },
+        );
     }
 }
