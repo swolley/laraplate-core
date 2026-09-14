@@ -170,12 +170,14 @@ trait Searchable
             $array['is_deleted'] = $this->{self::getIsDeletedColumn()};
         }
 
-        // Add embeddings if available
+        // Add embeddings if available (agnostic array: no locale in ES, one entry per ModelEmbedding row)
         if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
-            $embeddings = $this->embeddings()->get()->pluck('embedding')->toArray();
+            $vectors = $this->embeddings()->get()
+                ->map(static fn ($e): array => ['vector' => $e->embedding])
+                ->values()->all();
 
-            if ($embeddings !== []) {
-                $array['embedding'] = $embeddings[0] ?? []; // Use first embedding
+            if ($vectors !== []) {
+                $array['embeddings'] = $vectors;
             }
         }
 
@@ -192,37 +194,47 @@ trait Searchable
             return null;
         }
 
-        $data = '';
+        return mb_trim(implode(' ', $this->prepareDataToEmbedByLocale()));
+    }
 
-        // If the model has translations, concatenate all translations for multilingual embedding
-        if (class_uses_trait($this, HasTranslations::class)) {
-            $available_locales = LocaleContext::getAvailable();
+    /**
+     * Prepare text data for embedding generation, keyed by locale.
+     * Translated models: one entry per locale that has a translation with
+     * non-empty embeddable text (or just $locale, when given). Non-translated
+     * models: a single entry keyed by the app default locale.
+     *
+     * @return array<string, string>
+     */
+    public function prepareDataToEmbedByLocale(?string $locale = null): array
+    {
+        if (! isset($this->embed) || $this->embed === []) {
+            return [];
+        }
 
-            foreach ($available_locales as $locale) {
-                $translation = $this->getTranslation($locale);
+        if (! class_uses_trait($this, HasTranslations::class)) {
+            $text = $this->collectEmbedText(fn (string $attr) => $this->{$attr});
 
-                if ($translation) {
-                    foreach ($this->embed as $attribute) {
-                        $value = $translation->{$attribute} ?? null;
+            return $text === '' ? [] : [(string) (config('app.locale') ?: 'en') => $text];
+        }
 
-                        if ($this->isValidEmbedValue($value)) {
-                            $data .= ' ' . $value;
-                        }
-                    }
-                }
+        $result = [];
+        $locales = $locale !== null ? [$locale] : LocaleContext::getAvailable();
+
+        foreach ($locales as $loc) {
+            $translation = $this->getTranslation($loc);
+
+            if (! $translation) {
+                continue;
             }
-        } else {
-            // If no translations, use direct values (current behavior)
-            foreach ($this->embed as $attribute) {
-                $value = $this->{$attribute};
 
-                if ($this->isValidEmbedValue($value)) {
-                    $data .= ' ' . $value;
-                }
+            $text = $this->collectEmbedText(fn (string $attr) => $translation->{$attr} ?? null);
+
+            if ($text !== '') {
+                $result[$loc] = $text;
             }
         }
 
-        return mb_trim($data);
+        return $result;
     }
 
     /**
@@ -418,5 +430,27 @@ trait Searchable
             && is_string($value)
             && $value !== ''
             && $value !== '0';
+    }
+
+    /**
+     * Concatenate embeddable attribute values retrieved via $get into a single
+     * trimmed string, skipping invalid values. Shared by prepareDataToEmbed
+     * and prepareDataToEmbedByLocale.
+     *
+     * @param  callable(string): mixed  $get
+     */
+    private function collectEmbedText(callable $get): string
+    {
+        $data = '';
+
+        foreach ($this->embed as $attribute) {
+            $value = $get($attribute);
+
+            if ($this->isValidEmbedValue($value)) {
+                $data .= ' ' . $value;
+            }
+        }
+
+        return mb_trim($data);
     }
 }
