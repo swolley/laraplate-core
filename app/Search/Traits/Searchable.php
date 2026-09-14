@@ -221,7 +221,11 @@ trait Searchable
         $locales = $locale !== null ? [$locale] : LocaleContext::getAvailable();
 
         foreach ($locales as $loc) {
-            $translation = $this->getTranslation($loc);
+            // with_fallback: false — a locale with no translation row of its own must be
+            // skipped, not silently resolved to the default-locale translation. Fallback
+            // is on by default (Content), so getTranslation($loc) alone would return the
+            // same default-locale row for every available locale, mislabeling embeddings.
+            $translation = $this->getTranslation($loc, with_fallback: false);
 
             if (! $translation) {
                 continue;
