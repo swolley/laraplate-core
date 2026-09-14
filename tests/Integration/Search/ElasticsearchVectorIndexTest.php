@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Services\ElasticsearchService;
 use Modules\Core\Tests\Stubs\Search\FullMappingStubModel;
+use Modules\Core\Tests\Stubs\Search\NestedVectorLocaleStubModel;
 use Modules\Core\Tests\Stubs\Search\VectorMappingStubModel;
 
 /**
@@ -144,6 +145,118 @@ it('applies the full field mapping, including locale analyzers and a nested vect
             ->and($embeddings)->not->toBeNull()
             ->and($embeddings['type'])->toBe('nested')
             ->and($embeddings['properties']['vector']['type'])->toBe('dense_vector');
+    } finally {
+        try {
+            $service->deleteIndex($index);
+        } catch (Throwable) {
+            // best-effort cleanup
+        }
+    }
+});
+
+/**
+ * ES-gated (Task 13): a kNN vector search must target the nested
+ * `embeddings.vector` dense_vector sub-field and still order results by
+ * similarity, not by id — the same guarantee as the flat-field test above,
+ * proven here specifically for the nested schema produced by Task 1-4.
+ */
+it('orders a paginated vector search by similarity over the nested embeddings field', function (): void {
+    $engine = (new NestedVectorLocaleStubModel)->searchableUsing();
+
+    if (! $engine instanceof ElasticsearchEngine) {
+        $this->markTestSkipped('Elasticsearch is not the configured scout engine.');
+    }
+
+    try {
+        $engine->health();
+    } catch (Throwable $e) {
+        $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
+    }
+
+    config()->set('search.vector_search.enabled', true);
+    config()->set('search.vector_search.dimension', 384);
+
+    $service = ElasticsearchService::getInstance();
+    $index = NestedVectorLocaleStubModel::INDEX;
+
+    $near = array_fill(0, 384, 0.0);
+    $near[0] = 1.0; // query points here → doc "2" is the closest
+    $far = array_fill(0, 384, 0.0);
+    $far[383] = 1.0; // orthogonal → doc "1" is the least similar
+
+    try {
+        $engine->createIndex(NestedVectorLocaleStubModel::class, [], true);
+
+        // Nested `embeddings` field: one entry per translation, agnostic of locale.
+        $service->client->index(['index' => $index, 'id' => '1', 'body' => ['embeddings' => [['vector' => $far]], 'locales' => ['it']], 'refresh' => true]);
+        $service->client->index(['index' => $index, 'id' => '2', 'body' => ['embeddings' => [['vector' => $near]], 'locales' => ['it']], 'refresh' => true]);
+
+        $builder = NestedVectorLocaleStubModel::search('*')->where('vector', $near)->take(5);
+        $result = $engine->paginate($builder, 5, 1);
+
+        $ids = $result->hits()->map(static fn ($hit): string => (string) $hit->document()->id())->all();
+
+        expect($ids)->not->toBeEmpty()
+            ->and($ids[0])->toBe('2'); // similarity order, not id order ("1" first)
+    } finally {
+        try {
+            $service->deleteIndex($index);
+        } catch (Throwable) {
+            // best-effort cleanup
+        }
+    }
+});
+
+/**
+ * ES-gated (Task 13): the optional `locales` where clause must become a
+ * document-level `terms` filter on the knn query, not a per-vector filter.
+ * A document available in the requested locale must be returned even when
+ * its nested embeddings vector is a weak match, and a document with a close
+ * vector match must still be excluded when it lacks the requested locale —
+ * proving the filter operates on the root `locales` field, not inside the
+ * nested `embeddings` path.
+ */
+it('filters a vector search to documents available in the requested locale', function (): void {
+    $engine = (new NestedVectorLocaleStubModel)->searchableUsing();
+
+    if (! $engine instanceof ElasticsearchEngine) {
+        $this->markTestSkipped('Elasticsearch is not the configured scout engine.');
+    }
+
+    try {
+        $engine->health();
+    } catch (Throwable $e) {
+        $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
+    }
+
+    config()->set('search.vector_search.enabled', true);
+    config()->set('search.vector_search.dimension', 384);
+
+    $service = ElasticsearchService::getInstance();
+    $index = NestedVectorLocaleStubModel::INDEX;
+
+    $near = array_fill(0, 384, 0.0);
+    $near[0] = 1.0;
+    $far = array_fill(0, 384, 0.0);
+    $far[383] = 1.0;
+
+    try {
+        $engine->createIndex(NestedVectorLocaleStubModel::class, [], true);
+
+        // doc "1": strong vector match, but only available in "en" — must be excluded by an "it" filter.
+        $service->client->index(['index' => $index, 'id' => '1', 'body' => ['embeddings' => [['vector' => $near]], 'locales' => ['en']], 'refresh' => true]);
+        // doc "2": weak vector match, but available in "it" — must survive the filter despite the weak match.
+        $service->client->index(['index' => $index, 'id' => '2', 'body' => ['embeddings' => [['vector' => $far]], 'locales' => ['it', 'en']], 'refresh' => true]);
+        // doc "3": strong vector match and available in "it" — must be returned.
+        $service->client->index(['index' => $index, 'id' => '3', 'body' => ['embeddings' => [['vector' => $near]], 'locales' => ['it']], 'refresh' => true]);
+
+        $builder = NestedVectorLocaleStubModel::search('*')->where('vector', $near)->where('locales', ['it'])->take(5);
+        $result = $engine->paginate($builder, 5, 1);
+
+        $ids = $result->hits()->map(static fn ($hit): string => (string) $hit->document()->id())->all();
+
+        expect($ids)->toEqualCanonicalizing(['2', '3'])
+            ->and($ids)->not->toContain('1');
     } finally {
         try {
             $service->deleteIndex($index);

@@ -927,6 +927,16 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         ];
 
         $filters = $this->filtersFromBuilder($builder, $model);
+        $requestedLocales = $this->extractLocaleFilter($builder);
+
+        if ($requestedLocales !== []) {
+            // Document-level filter: `locales` lives on the root document, not
+            // inside the `embeddings` nested path, so this restricts which
+            // documents are considered without touching per-vector scoring —
+            // a document with a matching vector in any language still scores,
+            // it is just excluded if none of its available locales match.
+            $filters[] = ['terms' => ['locales' => $requestedLocales]];
+        }
 
         if ($filters !== []) {
             $query['knn']['filter'] = [
@@ -1089,7 +1099,11 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     private function filtersFromBuilder(Builder $builder, Model $model): array
     {
-        $filter_wheres = array_diff_key($builder->wheres, array_flip(['vector', 'embedding', $this->resolveVectorField($model)]));
+        // `locales` (or `locale`) is excluded here and handled by extractLocaleFilter()
+        // instead: buildSearchFilters() would otherwise mishandle a multi-locale array
+        // (a 2-element array is read as a `range`, anything else as a `term` with an
+        // array value, which Elasticsearch rejects) instead of a `terms` filter.
+        $filter_wheres = array_diff_key($builder->wheres, array_flip(['vector', 'embedding', 'locales', 'locale', $this->resolveVectorField($model)]));
         $filters = $filter_wheres !== [] ? $this->buildSearchFilters($filter_wheres) : [];
         $advanced_filters = $builder->options['advanced_filters'] ?? null;
 
@@ -1098,6 +1112,32 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
 
         return $filters;
+    }
+
+    /**
+     * Extract a document-level locale filter from the builder, from either a
+     * `locales` (array or single value) or `locale` where clause.
+     *
+     * @param  Builder<covariant Model>  $builder
+     * @return list<string>
+     */
+    private function extractLocaleFilter(Builder $builder): array
+    {
+        $value = $builder->wheres['locales'] ?? $builder->wheres['locale'] ?? null;
+
+        if ($value === null) {
+            return [];
+        }
+
+        $values = is_array($value) ? $value : [$value];
+
+        return array_values(array_filter(
+            array_map(
+                static fn (mixed $item): string => is_scalar($item) ? (string) $item : '',
+                $values,
+            ),
+            static fn (string $item): bool => $item !== '',
+        ));
     }
 
     /**
