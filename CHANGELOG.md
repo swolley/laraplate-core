@@ -6,11 +6,52 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(embeddings)* Add locale and model_key provenance columns to model_embeddings
+- *(search)* Translate locale-object analyzers and nested vector fields
+- *(search)* Resolve nested embeddings.vector as the kNN field
+- *(search)* Apply the full field mapping on index creation
+- *(search)* Add shared locale->analyzer config map
+- *(search)* Index all translated content, dropping LocaleScope from the import query
+- *(search)* Match free text across per-locale title/body sub-fields
+- *(embeddings)* Stamp locale and model_key on model embeddings
+- *(search)* Per-locale embedding data + agnostic embeddings array
+- *(search)* Add public getEmbedFields() accessor to Searchable trait
+- *(events)* Add TranslationRequiresReembedding event
+- *(search)* KNN over nested embeddings with document-level locale filter
+
+### 🐛 Bug Fixes
+
+- *(search)* Type makeAllSearchableUsing() param and return
+- *(search)* Drop per-model schema-derivation from text-match field resolution
+- *(search)* PrepareDataToEmbedByLocale must not use translation fallback
+- *(import)* Keep record origin source timestamps timezone-safe
+
+### 📚 Documentation
+
+- *(core)* Say that settings cache invalidates per group
+- *(search)* Document the retrieval pipeline and in-app notifications
+
+### 🎨 Styling
+
+- Format with the application's Pint configuration
+- Apply the module's own mb_str_functions rule
+
+### ⚙️ Miscellaneous Tasks
+
+- The module carries functionality, not the toolchain
+- Core declares the runtime dependencies the application used to pin
+
+## [1.76.0] - 2026-09-12
+
+### 🚀 Features
+
 - *(import)* Add a payload fingerprint for record origins
+- *(search)* Enhance command handling with error logging and model filtering
 - *(filament)* Own the module navigation group in the plugin
 - *(core)* Add module color support and update widget descriptions
 - *(seed)* Introduce 'pico' scale flag for dev seed volume adjustment
 - *(import)* Refactor import command prompts to use Laravel\Prompts functions
+- *(search)* Expose per-strategy ranked lists on AdvancedSearchResult.meta
 - *(core)* Generate the lock verbs only where locking exists
 
 ### 🐛 Bug Fixes
@@ -21,7 +62,9 @@ All notable changes to this project will be documented in this file.
 - *(filament)* Render composite validity cells and sanitize form state
 - *(core)* Make the per-table lock setting mean something
 - *(search)* Survive rate-limit releases with retryUntil instead of dying on tries
+- *(core)* Map Number field type to numeric validation rule
 - *(search)* Scout:check-index delegates to the engine's checkIndex
+- *(search)* Apply vector search on paginate(), not just search()
 
 ### 🚜 Refactor
 
@@ -35,24 +78,50 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Let modules declare their own permissions and exclusions
 - *(core)* [**breaking**] Make record locking mean something
 - *(core)* Let a model say which attributes a lock does not cover
+- *(core)* Enable search reranker by default (R3)
 
 ### 🐛 Bug Fixes
 
 - *(core)* Register each module's views as an anonymous component path
+- *(core)* [**breaking**] Name default-connection permissions `default.`
 - *(core)* Stop answering 304 and 500 for client-side CRUD failures
 - *(core)* Purge redis cache connection after seeder forks
+- *(core)* Update laravel/boost dependency version to ^2.2
+- *(core)* Gate application-content on the model table permission, not the short entity
+- *(core)* Align vector index dimension to the embeddings provider; document vector enablement (R3)
+- *(core)* Align vector dimension to 384 (real sentence-transformers output) across config, seeder, migration, engine, docs
+- *(core)* Set embedding dense_vector dimensions from config (was translator default 1536)
+- *(core)* Resolve model instance when createIndex is called by collection name (scout:index)
+- *(core)* Apply the embedding dense_vector mapping to ES on index creation (ScoutDriverPlus creates a bare index)
+- *(core)* Degrade to fused results when the reranker fails instead of breaking search
+- *(core)* Pass a collection to the engine on indexing (IndexInSearchJob) so Scout update() works
+- *(core)* Add public isEmbeddable() so external listeners can query embeddability without touching protected/private model internals
 - *(search)* Recover indexing when the coordination event expired
 
 ### 🚜 Refactor
 
 - *(core)* Let HasPlace own the place eager load
+- *(core)* [**breaking**] Remove the deprecated grid surface
+- *(core)* Update ProgressBarReporter to improve label handling and message formatting
+
+### 📚 Documentation
+
+- *(core)* Reference the real scout:* commands in the vector enablement runbook
+- *(search)* Document late-retry indexing recovery on model_indexing cache expiry
 
 ### ⚡ Performance
 
 - *(core)* Scope dynamic contents and entities to the request
 - *(core)* Memoize the presettable fields snapshot hydration
+
+### 🧪 Testing
+
+- *(core)* Assert the seeded vector dimension is 384 (deterministic, seed-state independent)
+- *(core)* Stub orchestrated-vector capability now that vector search is enabled by default
+- *(core)* ES-gated integration test asserting createIndex applies the dense_vector embedding mapping
 
 ## [1.74.0] - 2026-09-01
 
@@ -62,6 +131,7 @@ All notable changes to this project will be documented in this file.
 - *(core)* Coerce boolean inputs only on known boolean attributes
 - *(approvals)* Expose active on Modification for pending signals
 - *(approvals)* Expose modifier identity on Modification for viewer-relative pending
+- *(versioning)* Implement restore functionality with conflict handling and report generation
 
 ### 🐛 Bug Fixes
 
@@ -75,6 +145,8 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - *(core)* Enhance DynamicContentsService cache management and metadata handling
+- *(core)* Deprecate the grid surface and run grid actions in-process
+- *(core)* Scope permission memoization to the request instead of the process
 - *(core)* Key the permission existence memo independently of the model class
 - *(core)* Bound the closure-table depth cache to the request
 
@@ -84,6 +156,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🧪 Testing
 
+- *(core)* Guard against POSIX signal handlers in request-reachable code
 - *(core)* Gate the class-independent permission memo through the production path
 - *(core)* Warm the permission memo before pinning the seed query budget
 
@@ -178,6 +251,7 @@ All notable changes to this project will be documented in this file.
 - *(core)* Document the shared error fingerprint chain
 - *(core)* Document the scoped-login contract in RAG
 - *(import)* Document the interactive bulk-import framework
+- *(import)* List the CMS and ERP importable entities
 - *(core)* Document interactive import + notifications (repo + RAG)
 
 ### ⚡ Performance
@@ -188,6 +262,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🧪 Testing
 
+- *(core)* Fix stale QueryBuilder signature and yaml-dependent swagger test
 - *(core)* Stop the namespaced config() override from shadowing sibling commands
 
 ## [1.72.1] - 2026-08-07
@@ -209,12 +284,24 @@ All notable changes to this project will be documented in this file.
 - *(core)* Keep platform columns out of generated infolists too
 - *(crud)* Gate inactivate on delete, activate on restore
 
+### 📚 Documentation
+
+- *(crud)* Clarify activate/inactivate require restore/delete respectively
+
+### ⚡ Performance
+
+- *(core)* Resolve entities via a basename index instead of a scan
+
 ## [1.70.0] - 2026-08-06
 
 ### 🚀 Features
 
 - *(cache)* Implement custom CacheManager to support Core Repository
 - *(versioning)* Mark rollbacks with a Revert version set
+- *(core)* Add versioned relation descriptor and ownership enum
+- *(core)* Declare versioned relations via HasVersionedRelations
+- *(core)* Capture reference-relation membership as version rows
+- *(core)* Reconstruct versioned relation membership from history
 - *(docs)* Add user evaluation cases for search and permissions
 - *(perf)* Add zero-dependency benchmarking harness (perf:bench)
 - *(crud)* Add list freshness fingerprint endpoint
@@ -224,12 +311,17 @@ All notable changes to this project will be documented in this file.
 
 - *(tests)* Unskip dynamic contents and preset versioning suites
 - *(core)* Make versioned relation attach idempotent
+- *(seeders)* Keep table label on progress bar finish stats
 - *(http)* Wrap list collections as JsonResource in ResponseBuilder
 - *(grids)* Resolve grid action from route name instead of URL tail
 
 ### 🚜 Refactor
 
 - *(tests)* Replace superadmin modifier with author in modification tests
+
+### 📚 Documentation
+
+- *(core)* Document versioned relation membership
 
 ### ⚡ Performance
 
@@ -251,6 +343,10 @@ All notable changes to this project will be documented in this file.
 - *(core)* Keep platform columns out of generated Filament resources
 - *(schedule)* Use connection-affine schema check for cron loading
 
+### 📚 Documentation
+
+- *(core)* Document operations array in grid config endpoints
+
 ## [1.69.2] - 2026-08-04
 
 ### 🚀 Features
@@ -267,27 +363,44 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(seeding)* Deduplicate core setting definitions
 - *(i18n)* Add FlagCDN country codes to locale lang files
+
+### ⚙️ Miscellaneous Tasks
+
+- *(models)* Update docblocks for SeedRun and User models to include IdeHelper mixins
 
 ## [1.69.0] - 2026-08-03
 
 ### 🚀 Features
 
 - *(core)* Settings cleanup keyed on module state and drift
+- *(core)* Track imported record fingerprints
 - *(core)* Add the frontend UI translation keys to app.php (all locales)
 - *(core)* Permission refresh as a graph node
 
 ### 🐛 Bug Fixes
 
 - *(core)* Surface the rollback caveat to operators and cover the real db:seed wiring
+- *(core)* Preserve connection affinity in approvals and stats
+- *(core)* Preserve approval vote authorization
 - *(core)* Restore corrupted translations from pre-2c7dec5 (pagination + sl validation)
 - *(core)* Own derived settings by their module and harden cleanup
 - *(core)* Complete translations + drop the runtime Italian merge
+- *(core)* Normalize imported source timestamps
+- *(core)* Reject guest content retrieval
+- *(core)* Harden connection-scoped approvals and stats
+
+### 📚 Documentation
+
+- *(core)* Seeding orchestration and reconciliation
+- *(core)* Document imported record identities
 
 ## [1.68.1] - 2026-08-01
 
 ### 🚀 Features
 
+- *(core)* Seed run ledger
 - *(core)* Seed orchestrator with per-node atomicity and in-run resume
 
 ### 🐛 Bug Fixes
@@ -302,6 +415,8 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* SeedDefinition declaring structural vs initial fields
+- *(core)* SeedReconciler with fixed query budget and drift-safe realignment
 - *(core)* Expose current locale in response meta + user lang in user info
 
 ### 🐛 Bug Fixes
@@ -309,8 +424,13 @@ All notable changes to this project will be documented in this file.
 - *(core)* Validate identity value is not null or empty string
 - *(core)* Make ModelCapabilityScanner's model skip observable
 
+### ⚡ Performance
+
+- *(core)* Single-pass model capability scan
+
 ### 🧪 Testing
 
+- *(core)* Pin backfill's update-list scope and exercise restore/backfill at scale
 - *(core)* Tie each capability flag to its own trait constant
 
 ## [1.67.0] - 2026-07-31
@@ -322,7 +442,9 @@ All notable changes to this project will be documented in this file.
 - *(core)* Reject domain actions colliding with generic CRUD verbs
 - *(core)* Add domain action dispatcher
 - *(core)* Expose domain actions on the /app surface
+- *(core)* Deterministic seeder dependency graph
 - *(core)* Add RouteCheckCommand for resolving routes by URL
+- *(core)* Seeder discovery with implicit module.json requires edges
 - *(core)* Settings module ownership and seeded baseline columns
 
 ### 🐛 Bug Fixes
@@ -330,6 +452,7 @@ All notable changes to this project will be documented in this file.
 - *(core)* Repair lock and unlock CRUD operations
 - *(core)* Stop test config override from crashing console commands
 - *(core)* Align per-model setting names between writers and readers
+- *(filament)* Stop HasForm from discarding the resource components
 - *(core)* Stop dropping model observers registered during provider boot
 - *(core)* Keep the optimistic locking column out of the versionable image
 
@@ -344,6 +467,7 @@ All notable changes to this project will be documented in this file.
 ### 🧪 Testing
 
 - *(core)* Cover CoreDatabaseSeeder behaviour instead of its source text
+- *(core)* Assert dependsOn edges, not just sort position, in seeder graph builder
 
 ## [1.66.0] - 2026-07-30
 
@@ -352,6 +476,19 @@ All notable changes to this project will be documented in this file.
 - *(core)* Enhance MigrateUtils to support explicit database connections
 - *(core)* Implement optimistic locking with error handling
 - *(filament)* Merge Filament --generate into HasTable/HasForm
+
+### 🐛 Bug Fixes
+
+- *(core)* Support legacy outbox job payloads
+- *(core)* Preserve active connection in migration sql
+- *(core)* Quote migration sql identifiers
+- Preserve model connection affinity in database helpers
+- *(core)* Close connection affinity guard bypasses
+
+### 🧪 Testing
+
+- *(core)* Enforce database connection affinity
+- *(core)* Reject falsy connection names
 
 ## [1.65.0] - 2026-07-29
 
@@ -364,6 +501,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(core)* Bind outbox events to aggregate connection
 - *(testing/core)* Move inline test classes to stubs for PSR-4 autoload
 - *(core)* Map locale flags via lang + reduce stacked flag overlap
 
@@ -371,11 +509,163 @@ All notable changes to this project will be documented in this file.
 
 - *(filament)* Wire HasForm into resource form schemas
 
+## [1.64.1] - 2026-07-28
+
+### 🐛 Bug Fixes
+
+- *(core)* Preserve model-owned validation connections
+
+## [1.64.0] - 2026-07-22
+
+### 🚀 Features
+
+- *(core)* Hide forced version strategy settings
+- *(core)* Add abstract module import command
+- *(core)* Add aggregate version sets
+- *(core)* Support connection-aware import dry runs
+- *(core)* Manage single connection version sets
+- *(core)* Enhance validation rules handling and connection independence
+
+### 🐛 Bug Fixes
+
+- Scope core infrastructure database operations
+- *(core)* Describe import dry-run connection
+- *(core)* Harden version set persistence
+- *(core)* Harden version set transaction state
+- *(core)* Enforce version set state invariants
+- *(core)* Finalize nested version set safety
+
+### 🚜 Refactor
+
+- *(core)* Centralize synchronous version writes
+
+### 📚 Documentation
+
+- *(core)* Document forced version settings
+- *(core)* Document module import framework
+- *(core)* Clarify importer connection affinity
+
+### 🧪 Testing
+
+- *(core)* Characterize version history writers
+- *(core)* Isolate explicit version dispatch assertion
+
+## [1.63.0] - 2026-07-21
+
+### 🚀 Features
+
+- *(graph)* Add authorized read-only tool gateway
+- *(core)* Add application content provider registry
+- *(core)* Authorize application content retrieval
+- *(core)* Add transactional outbox
+
+### 🐛 Bug Fixes
+
+- Preserve model connections in core queries
+
+### 📚 Documentation
+
+- *(core)* Document transactional outbox
+- *(core)* Document application content providers
+- Add mixin annotations for Eloquent and IdeHelper in OutboxEvent model
+
+### 🧪 Testing
+
+- *(graph)* Move fixtures to PSR-4 stubs
+- Guard model connection affinity
+- *(core)* Isolate application content registry
+
+## [1.62.0] - 2026-07-14
+
+### 🚀 Features
+
+- *(search)* Standardize database index migrations
+- *(search)* Make matching profiles query adaptive
+- *(search)* Support required terms and phrases
+- *(core)* Add HasModuleTablesUtils trait and integrate with CoreTables enum
+
+### 📚 Documentation
+
+- *(search)* Explain explicit query syntax rationale
+
+## [1.61.0] - 2026-07-14
+
+### 🚀 Features
+
+- *(search)* Add adaptive portable matching
+
+### 📚 Documentation
+
+- *(core)* Document graph system
+
+## [1.60.3] - 2026-07-14
+
+### 🧪 Testing
+
+- *(tests)* Update graph traversal test to use 'core' namespace for relations
+
+## [1.60.2] - 2026-07-14
+
+### 🚜 Refactor
+
+- *(tests)* Introduce stubs for graph traversal and enhance SQLite vector search tests
+
+## [1.60.1] - 2026-07-13
+
+### 🚜 Refactor
+
+- *(core)* Optimize license handling and caching in dynamic content service
+
+## [1.60.0] - 2026-07-13
+
+### 🚀 Features
+
+- *(core)* Support database orchestrated search
+- *(core)* Normalize database vector search
+- *(core)* Tighten database vector search parity
+- *(core)* Add advanced search score and filter contracts
+- *(core)* Enforce searchable filter metadata
+- *(core)* Support indexed relation search filters
+
+### 🐛 Bug Fixes
+
+- *(core)* Harden model embeddings migration
+- *(core)* Apply advanced filters to keyword search engines
+
 ## [1.59.0] - 2026-07-12
+
+### 🚀 Features
+
+- *(core)* Add graph provider registry
+- *(core)* Add graph expand request
+- *(core)* Add graph node serialization
+- *(core)* Add graph relation inspector
+- *(core)* Add graph traversal
+- *(core)* Add graph expand service
+- *(core)* Expose graph expand routes
+- *(core)* Support morph graph traversal
+- *(core)* Add graph search endpoint
+- *(core)* Add graph stats endpoint
+- *(core)* Add graph provider rules
+- *(core)* Add materialized graph edge store
+- *(core)* Add orchestrated scout search
 
 ### 🐛 Bug Fixes
 
 - *(core)* Encode array attributes before json validation rules
+
+### 🚜 Refactor
+
+- *(core)* Update command descriptions, improve model checks, and enhance table widget functionality
+
+### 🧪 Testing
+
+- *(core)* Harden graph traversal metadata
+- *(core)* Cover graph search expansion aggregation
+
+### ◀️ Revert
+
+- *(core)* Defer materialized graph edge store
 
 ## [1.58.7] - 2026-07-10
 
@@ -452,17 +742,37 @@ All notable changes to this project will be documented in this file.
 
 - *(core)* Handle non-array translation groups in TranslationsCheckCommand
 
+### ⚙️ Miscellaneous Tasks
+
+- *(core)* Normalize PHPDoc spacing in model docblocks
+
 ## [1.56.1] - 2026-07-01
 
 ### 🧪 Testing
 
 - *(core)* Streamline database availability check and enhance benchmark tests
 
+## [1.56.0] - 2026-06-30
+
+### 🚀 Features
+
+- *(core)* Filter internal command list
+
 ## [1.55.4] - 2026-06-30
 
 ### 🐛 Bug Fixes
 
 - *(core)* Harden CRUD module resolution and inspector caching
+
+## [1.55.3] - 2026-06-30
+
+### 🚀 Features
+
+- *(core)* Guard generic-CRUD writes on models that restrict them
+
+### 💼 Other
+
+- Add internal route list filter
 
 ## [1.55.2] - 2026-06-30
 
@@ -475,6 +785,18 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - *(core)* Enhance type declarations and method visibility across models and traits
+
+## [1.55.0] - 2026-06-28
+
+### 🚀 Features
+
+- *(core)* Add tabular csv exporter
+
+## [1.54.8] - 2026-06-27
+
+### 🚜 Refactor
+
+- *(core)* Remove redundant concern imports
 
 ## [1.54.7] - 2026-06-27
 
@@ -585,6 +907,12 @@ All notable changes to this project will be documented in this file.
 
 - *(core)* Enhance cache warming command and model structure
 
+## [1.52.0] - 2026-05-15
+
+### ⚙️ Miscellaneous Tasks
+
+- *(deps)* Update package dependencies and improve type consistency
+
 ## [1.51.0] - 2026-05-09
 
 ### 🚀 Features
@@ -634,6 +962,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(core)* Resolve UserFactory dynamic model without invalid property default
 - *(User)* Update User model properties and remove duplicate Notifiable trait
 
 ### 🚜 Refactor
@@ -715,6 +1044,10 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Introduce ReadonlyModel trait and ReadOnlyModelException
+
+### 🚜 Refactor
+
+- *(core)* Merge presettables versioning into initial migration
 
 ### 🧪 Testing
 
@@ -813,6 +1146,8 @@ All notable changes to this project will be documented in this file.
 
 ### 🧪 Testing
 
+- Tests
+- Fortify Actions coverage, HandleSocialLoginAction 100%, remove setAccessible, fix getClass deprecation
 - Add unit tests for Auth, Services (AclResolver, ApprovalNotification, Authorization, Crud, DynamicEntity, Versioning)
 - Add helper and search tests; type coverage 100%; fix TreeCollection null key
 - Improve code coverage for classes near 100%
@@ -847,12 +1182,17 @@ All notable changes to this project will be documented in this file.
 
 - Remove composer.lock and update .gitignore
 - Sync working tree - casts, controller, requests, models, tests, config
+- Ignore root build/ directory (PHPUnit coverage output)
 
 ## [1.40.0] - 2026-03-05
 
 ### 🚀 Features
 
 - Add make:model-translatable artisan command
+
+### 💼 Other
+
+- Added composer.lock
 
 ### 🚜 Refactor
 
@@ -873,6 +1213,10 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Introduce ModelMetadata and HelpersCache for improved model inspection and caching
+
+### 💼 Other
+
+- Set composer package type as laravel-module
 
 ## [1.37.0] - 2026-02-17
 
@@ -1077,6 +1421,10 @@ All notable changes to this project will be documented in this file.
 - Optimize memory management and code structure across various components
 - Enhance form and table utilities for improved functionality
 
+### ⚙️ Miscellaneous Tasks
+
+- Code lint with pint and rector
+
 ## [1.24.0] - 2025-10-14
 
 ### 🚀 Features
@@ -1123,6 +1471,10 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - Enhance code structure and improve type declarations
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog for version v1.19.2
 
 ## [1.19.2] - 2025-09-25
 
@@ -1187,6 +1539,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Update post-commit hook script path for correct execution
+
+### 💼 Other
+
+- Update README.md with complete configuration documentation
 
 ### 🚜 Refactor
 
@@ -1374,5 +1730,14 @@ All notable changes to this project will be documented in this file.
 - Improve Swagger documentation generation and configuration
 
 ## [1.0.0] - 2025-01-25
+
+### 🚀 Features
+
+- Enhance version management script with composer.json update
+
+### 💼 Other
+
+- Init project
+- Add version and git hooks scripts to composer.json
 
 <!-- generated by git-cliff -->
