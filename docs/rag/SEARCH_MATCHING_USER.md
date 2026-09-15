@@ -55,6 +55,22 @@ All percentages are applied conservatively as whole required terms. Exact and co
 
 Preferences are adaptive hints. They do not bypass identifier protection.
 
+### What `matching` does not change
+
+`matching` tunes **text** matching only. It is applied to the keyword and hybrid retrieval passes
+and never to the pure vector pass, because an embedding has no notion of typo tolerance or token
+coverage.
+
+It therefore does not change:
+
+- how many retrieval strategies run (that is the plan: keyword only, or keyword + vector + hybrid);
+- how their results are fused (weights, RRF constant, agreement bonus);
+- whether results are reranked, or how the reranked score is blended.
+
+A query that returns nothing under `strict` and returns results under `tolerant` changed only the
+lexical recall. If you need semantic recall (different words, same meaning), that comes from vector
+retrieval being active, not from a looser preference.
+
 ## Required terms and exact phrases
 
 The free-text `qs` parameter accepts familiar search operators:

@@ -1,6 +1,6 @@
 # Event orchestration (Core event bus)
 
-> **RAG / assistant corpus:** a retrieval-optimized copy lives in [`docs/rag/EVENT_ORCHESTRATION.md`](rag/EVENT_ORCHESTRATION.md). Run `php artisan ai:index-docs` after editing it. This file is the full technical reference (extra diagrams).
+> **RAG / assistant corpus:** a retrieval-optimized copy lives in [`docs/rag/EVENT_ORCHESTRATION.md`](rag/EVENT_ORCHESTRATION.md). Run `php artisan ai:index-rag-docs` after editing it. This file is the full technical reference (extra diagrams).
 
 Core owns the **contract** between domain modules (CMS, ERP, …) and optional capabilities (AI, search). Modules never import each other for these pipelines; they communicate through Core events, registries, and settings.
 

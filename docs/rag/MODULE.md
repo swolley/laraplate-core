@@ -430,6 +430,8 @@ Advanced search filters are engine-owned before pagination. Scalar filters are a
 
 Portable text matching is represented by granular `TextMatchOptions`; named profiles are presets rather than engine-level types. Elasticsearch and Typesense translate typo tolerance, prefix matching, term-length thresholds, and exact-match preference into native parameters. `ISearchEngine::textMatchCapabilities()` publishes native and degraded behavior. Database search always has a case-insensitive prefix or substring fallback. PostgreSQL can opt into `pg_trgm` `strict_word_similarity()` with `SEARCH_DATABASE_PG_TRGM_ENABLED=true`. Oracle remains on the portable fallback because `UTL_MATCH` is not suitable for generic indexed retrieval over long text; Oracle Text requires a future schema-aware adapter with explicit `CONTEXT` indexes.
 
+Retrieval orchestration itself (how many strategies run, the fusion formula, reranking, response metadata, and which configuration keys are actually consumed) is documented in [SEARCH_RETRIEVAL_PIPELINE.md](./SEARCH_RETRIEVAL_PIPELINE.md). In short: the planner runs either keyword only or keyword + vector + hybrid (never two), sequentially; fusion combines min-max normalized per-strategy scores, an RRF rank term and an agreement bonus; the reranker then reorders the fused top-K and degrades to the fused order on failure. Vector retrieval needs both `VECTOR_SEARCH_ENABLED=true` and the AI module, which owns the only `ITextEmbedder` binding.
+
 Adaptive query matching analyzes individual tokens before engine translation. Short names remain exact-first with limited typo tolerance; acronyms, codes, UUIDs, emails, numbers, and short tokens are protected. Two meaningful words use strict token coverage, while longer natural-language queries lower the required token percentage. Public `qs` syntax also supports mandatory exact phrases with quotes and mandatory position-independent terms with `+`; both remain non-fuzzy. Optional request preferences, syntax, and granular overrides are documented in [SEARCH_MATCHING_USER.md](./SEARCH_MATCHING_USER.md); internal parsing, resolution, engine mapping, PostgreSQL prerequisites, and Oracle constraints are documented in [SEARCH_MATCHING_DEVELOPER.md](./SEARCH_MATCHING_DEVELOPER.md).
 
 **Event orchestration (indexing + moderation):** Core emits `ModelRequiresIndexing` and `ModificationRequiresModeration`; the AI module registers optional pre-processing (embeddings, translation, `ai_approval`); Core finalize/fallback listeners complete indexing or leave moderation to humans. Per-model toggles: `auto_translate_{table}`, `ai_moderation_{table}` via `PerModelSettingResolver`. Full RAG-oriented flow: [EVENT_ORCHESTRATION.md](./EVENT_ORCHESTRATION.md) in this folder; extended diagrams: `Modules/Core/docs/EVENT_ORCHESTRATION.md`.
@@ -493,8 +495,6 @@ flowchart LR
 
 Runtime configuration lives in `Setting` (`Core\Models\Setting` with `HasApprovals` + `HasCache`). Three setting groups drive behaviour: `soft_deletes` (toggles `SoftDeletes` per table via `soft_deletes_{table}`), `versioning` (`version_strategy_{table}`), and `modules` (the `backendModules` JSON array consumed by `ModuleDatabaseActivator`). The activator implements the Nwidart `ActivatorInterface` and reads/writes `backendModules` straight via `DB::table('settings')` (so it works during boot when Eloquent isn't ready), with optional cache. Editing `Setting` triggers `SettingObserver` and Approval flows on any non-`description` field.
 
-The Settings UI exposes only genuinely configurable rows. Class-forced DIFF strategies are intentionally absent even if stale rows remain in the database.
-
 Settings are cached **per group**, not as one blob. `PerModelSettingResolver` stores each
 `group_name` under its own key and keeps a lightweight `name => group_name` index so the read API
 stays name-based. `SettingsCacheCoordinator` exposes `flushGroup()`, `flushGroups()` and
@@ -502,6 +502,8 @@ stays name-based. `SettingsCacheCoordinator` exposes `flushGroup()`, `flushGroup
 `flushSetting()` on save and delete. So an ordinary edit invalidates the one group it touched, and
 saving a row also syncs runtime config. Reach for `flushAll()` only when a change genuinely crosses
 every group.
+
+The Settings UI exposes only genuinely configurable rows. Class-forced DIFF strategies are intentionally absent even if stale rows remain in the database.
 
 ```mermaid
 flowchart LR

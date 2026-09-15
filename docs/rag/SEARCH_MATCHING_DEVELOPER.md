@@ -103,11 +103,11 @@ $builder->options[TextMatchOptionsResolver::BUILDER_OPTION] = [
 ];
 ```
 
-The orchestrated pipeline passes already resolved granular options to keyword and hybrid strategies. Pure vector retrieval receives no text-match options.
+The orchestrated pipeline passes already resolved granular options to keyword and hybrid strategies. Pure vector retrieval receives no text-match options. A preference therefore never changes ensemble weights, `rrf_k`, `rrf_weight`, `agreement_boost`, or reranking: those belong to the plan, not to text matching.
 
 ### Reranking
 
-The orchestrated pipeline reranks the fused top-K results and is **on by default** (`SEARCH_RERANKER_ENABLED`, default `true`; `SEARCH_RERANKER_TOP_K`, default `30`). `EnsembleSearchService` honours a per-plan `ranking.use_reranker`, falling back to `config('search.features.reranker')` when the plan omits it, so a caller can still disable it for one search. The bound `IReranker` is `HeuristicReranker` (pure-PHP lexical scoring: exact-phrase, keyword-overlap, title-area — no external service); the AI module overrides the binding with `CrossEncoderService` (an external cross-encoder) when installed. Reranked scores blend the fused score with the reranker score; `AdvancedSearchResult->meta['reranked']` reports whether reranking ran. `SEARCH_ENSEMBLE_ENABLED` (default `true`) gates ensemble fusion.
+The orchestrated pipeline reranks the fused top-K results and is **on by default** (`SEARCH_RERANKER_ENABLED`, default `true`; `SEARCH_RERANKER_TOP_K`, default `30`). `EnsembleSearchService` honours a per-plan `ranking.use_reranker`, falling back to `config('search.features.reranker')` when the plan omits it, so a caller can still disable it for one search. The bound `IReranker` is `HeuristicReranker` (pure-PHP lexical scoring: exact-phrase, keyword-overlap, title-area — no external service); the AI module overrides the binding with `CrossEncoderService` (an external cross-encoder) when installed. Reranked scores blend the fused score with the reranker score using a hardcoded 0.4/0.6 split (`search.reranker.weight` / `SEARCH_RERANKER_WEIGHT` is declared in config but read by no code). `AdvancedSearchResult->meta['reranked']` reports whether reranking ran, and is `false` when the reranker threw and the fused order was kept. `SEARCH_ENSEMBLE_ENABLED` is likewise declared but never read: fusion always runs when more than one strategy executes. The full retrieval pipeline (plan, strategy count, fusion formula, reranking, response metadata) is documented in [SEARCH_RETRIEVAL_PIPELINE.md](./SEARCH_RETRIEVAL_PIPELINE.md).
 
 ### Vector / hybrid retrieval (enablement)
 
@@ -117,7 +117,7 @@ Vector/hybrid retrieval is **off by default** (`VECTOR_SEARCH_ENABLED=false`); w
 2. A vector-capable engine (Elasticsearch or Typesense) reachable and healthy.
 3. Setting `VECTOR_SEARCH_ENABLED=true`, then, per searchable model, recreating the index so the `embedding` field is mapped at the correct dimension and backfilling the documents. The `Modules\Core\Search\Console` commands do this: `scout:delete-index {Model}` + `scout:index {Model}` rebuild the index from `getSearchMapping()` (which now carries the `dense_vector` mapping), and `scout:reindex {Model}` queues a `ReindexSearchJob` that re-emits each document through `toSearchableArray()` so the indexing listener generates the `ModelEmbedding` rows (`scout:import` / `scout:flush` / `scout:sync` cover import, flush, and incremental sync). Until this backfill completes, models carry no vectors and hybrid ranking silently degrades to keyword.
 
-Once enabled, `FallbackSearchPlanner` plans a hybrid strategy for non-numeric queries and `EnsembleSearchService` fuses keyword and vector results (RRF + weighted + agreement) before reranking.
+Once enabled, `FallbackSearchPlanner` plans a hybrid strategy for non-numeric queries and `EnsembleSearchService` fuses keyword and vector results (RRF + weighted + agreement) before reranking. A query containing any digit keeps the plan keyword-only, and so does an unbound `ITextEmbedder` (the AI module owns that binding), so vector retrieval needs `VECTOR_SEARCH_ENABLED=true` **and** the AI module. See [SEARCH_RETRIEVAL_PIPELINE.md](./SEARCH_RETRIEVAL_PIPELINE.md).
 
 ## Engine adapters
 

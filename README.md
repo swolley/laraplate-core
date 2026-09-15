@@ -118,15 +118,16 @@ OLLAMA_MODEL="llama3.2:3b"						#ollama model (deprecated - use AI module config
 #search
 SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
 VECTOR_SEARCH_ENABLED=true                      #create embeddings with ai functionalities before indexing in search engine
-EMBEDDING_PROVIDER=openai                       #actually supported embedding generator provider (openai, ollama)
+#embeddings are produced by the AI module: AI_EMBEDDINGS_PROVIDER (default sentence_transformers) and AI_EMBEDDINGS_MODEL select provider and model profile. Core only declares dimension/similarity below.
 SEARCH_ENGINE=elasticsearch						#default search engine
 SEARCH_DATABASE_PG_TRGM_ENABLED=false             #enable PostgreSQL pg_trgm matching for the database Scout driver
 SEARCH_RERANKER_ENABLED=true                      #rerank the fused top-K results (HeuristicReranker; CrossEncoder when AI module installed)
 SEARCH_RERANKER_TOP_K=30                          #how many top results are reranked
-SEARCH_ENSEMBLE_ENABLED=true                      #enable ensemble (keyword+vector+hybrid) fusion
+#SEARCH_ENSEMBLE_ENABLED                          #declared in config/search.php but read by no code today; fusion always runs when more than one strategy executes
 VECTOR_DIMENSION=384							#vector dimension for embeddings
 VECTOR_SIMILARITY=cosine						#vector similarity metric (cosine, dot_product, euclidean)
-VECTOR_DIMENSIONS=1536							#vector dimensions for OpenAI default
+SEARCH_ANALYZER_IT=italian                        #Elasticsearch analyzer for the it locale sub-field
+SEARCH_ANALYZER_EN=english                        #Elasticsearch analyzer for the en locale sub-field
 SCOUT_PREFIX=									#scout index prefix
 SCOUT_QUEUE=true								#enable scout queue
 SCOUT_QUEUE_NAME=indexing						#scout queue name
