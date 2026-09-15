@@ -647,6 +647,18 @@ safeguards to avoid accidental concurrency regressions.
 - API docs outdated: regenerate Swagger/OpenAPI and verify version merge outputs.
 - Translation fallback not kicking in: check `LocaleContext::isFallbackEnabled()` and confirm the default-locale translation row exists.
 
+## Releases
+
+This module is released from the application, not from its own repository: it carries no release scripts and no `cliff.toml`. From the `laraplate` root, `scripts/version.sh` bumps the `version` field of `Modules/Core/composer.json`, regenerates `Modules/Core/CHANGELOG.md` with the application's `cliff.toml`, commits `chore(release): vX.Y.Z` in the module repository, tags it and pushes both.
+
+```bash
+composer run version:dry Core      # print the plan, write nothing
+composer run version:minor Core    # release with a forced level (also version:major, version:patch)
+composer run version:all             # every module with pending commits, then the application
+```
+
+Without a forced level, git-cliff infers it from the conventional commits since the module's last tag. `CHANGELOG.md` lists released versions only. Releasing the module alone does not touch the application; `version:all` records the module in the application with a commit typed after the module's release level. Full reference: `docs/releasing.md` in the application.
+
 ## FAQ prompts for RAG
 
 - How do ACL filters merge when a user has multiple roles?
