@@ -718,18 +718,10 @@ composer refactor           # Run Rector refactoring
 
 ### Version Management
 
-```bash
-# Version bumping
-composer version:major      # Bump major version
-composer version:minor      # Bump minor version
-composer version:patch      # Bump patch version
-```
-
-### Development Setup
+Releases are run from the application, not from the module. From the `laraplate` root:
 
 ```bash
-# Setup Git hooks
-composer setup:hooks
+composer run version:minor Core   # or version:major / version:patch, see docs/releasing.md
 ```
 
 ### Other References
