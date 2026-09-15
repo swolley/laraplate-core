@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Contract checks for {@see \Modules\Core\Models\Concerns\HasVersions} and the overtrue versionable
- * integration. Uses reflection only (no DB): runtime values depend on {@see \Modules\Core\Models\Setting}
+ * Contract checks for {@see Modules\Core\Models\Concerns\HasVersions} and the overtrue versionable
+ * integration. Uses reflection only (no DB): runtime values depend on {@see Modules\Core\Models\Setting}
  * and cache; {@see false} means versioning is disabled for that table in settings.
  */
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;

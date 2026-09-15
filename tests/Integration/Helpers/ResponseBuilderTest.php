@@ -10,7 +10,6 @@ use Illuminate\Support\Collection;
 use Modules\Core\Helpers\ResponseBuilder;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
-
 it('builds a basic ok response from array data', function (): void {
     config(['app.debug' => false]);
 

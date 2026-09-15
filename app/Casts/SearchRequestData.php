@@ -15,7 +15,9 @@ class SearchRequestData extends ListRequestData
 
     public TextMatchPreference $matching = TextMatchPreference::Auto;
 
-    /** @var array<string, mixed> */
+    /**
+     * @var array<string, mixed>
+     */
     public array $matching_options = [];
 
     /**

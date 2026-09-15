@@ -10,7 +10,7 @@ use Modules\Core\Overrides\ContextualValidationException;
 it('reports non-validation throwables without tripping the global context callback', function (): void {
     $handler = app(ExceptionHandler::class);
 
-    $handler->report(new \TypeError('boom'));
+    $handler->report(new TypeError('boom'));
 
     expect(true)->toBeTrue();
 });

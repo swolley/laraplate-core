@@ -602,7 +602,7 @@ if (! function_exists('preview')) {
     /**
      * Getter/Setter for the approvals preview flag.
      *
-     * Storage is chosen by {@see \Modules\Core\Http\Middleware\PreviewMiddleware}:
+     * Storage is chosen by {@see Modules\Core\Http\Middleware\PreviewMiddleware}:
      * - `request` (app / api): the flag lives on the current request only; a missing
      *   `preview` query/body param is off, and the session is never read or written.
      * - `session` (admin): the flag persists across requests until explicitly cleared.

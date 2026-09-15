@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Contracts\ModerationAdapter;
 use Modules\Core\Data\ModerationRequest;
 use Modules\Core\Models\Modification;
@@ -30,7 +31,7 @@ final class ModerationAdapterRegistry
         $adapter = $this->resolve($modification);
 
         if ($adapter === null) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'No moderation adapter registered for modification #' . $modification->getKey(),
             );
         }

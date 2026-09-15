@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Filament\Panel;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\License;

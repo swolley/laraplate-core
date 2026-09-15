@@ -8,7 +8,6 @@ use Modules\Core\Actions\Users\ImpersonateUserAction;
 use Modules\Core\Events\UserImpersonated;
 use Modules\Core\Http\Resources\UserInfoResponse;
 
-
 it('impersonates and dispatches event', function (): void {
     Event::fake();
 

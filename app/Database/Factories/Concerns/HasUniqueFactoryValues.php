@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories\Concerns;
 
-use RuntimeException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 trait HasUniqueFactoryValues

@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Notifications\Notifiable;
@@ -53,6 +52,7 @@ use UnexpectedValueException;
  * @property string|null $name
  * @property string $email
  * @property BelongsToMany $roles
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperUser
  */
@@ -240,24 +240,6 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
     public function isAdmin(): bool
     {
         return $this->resolvingAuthorization(fn (): bool => $this->hasRole(config('permission.roles.admin')));
-    }
-
-    /**
-     * Read this user's own roles and permissions without the per-row select guard biting.
-     *
-     * Those rows live in tables that carry the guard themselves, so asking what somebody may do
-     * would require already knowing it. Reading your own authorization data is not a business read
-     * of the roles table, and the table-level check on that table still stands for callers that
-     * really are listing roles.
-     *
-     * @template TReturn
-     *
-     * @param  callable(): TReturn  $callback
-     * @return TReturn
-     */
-    private function resolvingAuthorization(callable $callback): mixed
-    {
-        return ResolvingAuthorization::resolve($callback);
     }
 
     /**
@@ -530,6 +512,24 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
     protected function getDefaultGuardName(): string
     {
         return 'web';
+    }
+
+    /**
+     * Read this user's own roles and permissions without the per-row select guard biting.
+     *
+     * Those rows live in tables that carry the guard themselves, so asking what somebody may do
+     * would require already knowing it. Reading your own authorization data is not a business read
+     * of the roles table, and the table-level check on that table still stands for callers that
+     * really are listing roles.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    private function resolvingAuthorization(callable $callback): mixed
+    {
+        return ResolvingAuthorization::resolve($callback);
     }
 
     private function isModificationAuthor(Modification $mod): bool

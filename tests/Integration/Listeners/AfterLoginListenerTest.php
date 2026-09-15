@@ -17,7 +17,6 @@ use Modules\Core\Listeners\AfterLoginListener;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 
-
 it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(AfterLoginListener::class);
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Actions\Fortify\CreateNewUser;
 use Modules\Core\Models\User;
 
-
 it('creates user with valid input', function (): void {
     $action = new CreateNewUser;
     $password = 'K9#mP' . bin2hex(random_bytes(12)) . 'xQ!2';

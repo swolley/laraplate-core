@@ -84,7 +84,7 @@ it('clearModelCache clears cache for the given model and returns message', funct
 
     Cache::shouldReceive('store')
         ->once()
-        ->andReturn($repository = \Mockery::mock(CacheRepository::class));
+        ->andReturn($repository = Mockery::mock(CacheRepository::class));
 
     $repository->shouldReceive('clearByEntity')
         ->once()

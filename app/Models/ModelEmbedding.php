@@ -19,6 +19,7 @@ use Override;
  * @property string|null $model_type
  * @property string|null $locale
  * @property string|null $model_key
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperModelEmbedding
  */
@@ -50,6 +51,11 @@ final class ModelEmbedding extends Model
     public function model(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    protected static function newFactory(): ModelEmbeddingFactory
+    {
+        return ModelEmbeddingFactory::new();
     }
 
     /**
@@ -90,11 +96,6 @@ final class ModelEmbedding extends Model
     protected function forLocale(Builder $query, ?string $locale): Builder
     {
         return $locale === null ? $query->whereNull('locale') : $query->where('locale', $locale);
-    }
-
-    protected static function newFactory(): ModelEmbeddingFactory
-    {
-        return ModelEmbeddingFactory::new();
     }
 
     protected function casts(): array

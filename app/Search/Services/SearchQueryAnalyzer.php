@@ -77,7 +77,7 @@ final readonly class SearchQueryAnalyzer
             return SearchTokenKind::Acronym;
         }
 
-        if (mb_strlen($normalized) < $minimumTermLength) {
+        if ($minimumTermLength > mb_strlen($normalized)) {
             return SearchTokenKind::Short;
         }
 

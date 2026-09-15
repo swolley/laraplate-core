@@ -14,4 +14,3 @@ final class ConcreteFixtureImporter implements BulkImporterInterface
         return 1;
     }
 }
-

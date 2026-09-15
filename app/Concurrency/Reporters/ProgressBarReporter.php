@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Concurrency\Reporters;
 
-use Carbon\CarbonInterval;
-use Illuminate\Support\Str;
 use function Laravel\Prompts\progress;
 
+use Carbon\CarbonInterval;
 use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Laravel\Prompts\Progress;
 use Modules\Core\Concurrency\BatchOutcome;
 use Modules\Core\Concurrency\BatchSummary;
@@ -65,7 +65,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function progress(BatchOutcome $outcome): void
     {
-        if (!$this->progress instanceof Progress) {
+        if (! $this->progress instanceof Progress) {
             return;
         }
 
@@ -84,7 +84,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function failure(BatchOutcome $outcome): void
     {
-        if (!$this->progress instanceof Progress) {
+        if (! $this->progress instanceof Progress) {
             return;
         }
 
@@ -95,7 +95,7 @@ final class ProgressBarReporter implements BatchReporter
 
     public function finish(BatchSummary $summary): void
     {
-        if (!$this->progress instanceof Progress) {
+        if (! $this->progress instanceof Progress) {
             return;
         }
 

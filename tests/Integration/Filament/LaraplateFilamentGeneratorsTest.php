@@ -112,7 +112,7 @@ it('emits HasForm and configureForm in generated form source', function (): void
 it('excludes HasForm-owned columns from generated HasDynamicContents forms', function (): void {
     $generator = app(ResourceFormSchemaClassGenerator::class, [
         'fqn' => 'Modules\\CMS\\Filament\\Resources\\Contents\\Schemas\\ContentForm',
-        'modelFqn' => \Modules\CMS\Models\Content::class,
+        'modelFqn' => Modules\CMS\Models\Content::class,
         'parentResourceFqn' => null,
         'isGenerated' => true,
     ]);

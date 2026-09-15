@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Models\ACL;
 
-
 it('getRules merges acl validation rules with trait defaults', function (): void {
     $rules = (new ACL)->getRules();
 

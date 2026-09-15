@@ -6,11 +6,10 @@ namespace Modules\Core\Filament\Utils;
 
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Filament\FilamentTraitResolver;

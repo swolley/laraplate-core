@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Services\DynamicEntityService;
 
-
 beforeEach(function (): void {
     DynamicEntityService::reset();
 });

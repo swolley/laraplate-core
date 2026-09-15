@@ -50,6 +50,11 @@ class ListRequestData extends SelectRequestData
     public protected(set) array $group_by = [];
 
     /**
+     * @var list<string>|null
+     */
+    private ?array $boolean_attributes = null;
+
+    /**
      * @param  string|array<string>  $primaryKey
      * @param  array<string, mixed>  $validated
      */
@@ -180,11 +185,6 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     * @var list<string>|null
-     */
-    private ?array $boolean_attributes = null;
-
-    /**
      * @param  array{property:string,value:mixed,operator:FilterOperator}  $filter
      */
     protected function conformFilterValue(array &$filter): void
@@ -215,21 +215,6 @@ class ListRequestData extends SelectRequestData
         }
 
         $filter['value'] = BooleanInput::coerce($filter['value']);
-    }
-
-    private function isBooleanFilterProperty(string $property): bool
-    {
-        $bare = str_contains($property, '.') ? Str::afterLast($property, '.') : $property;
-
-        return in_array($bare, $this->booleanAttributes(), true);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function booleanAttributes(): array
-    {
-        return $this->boolean_attributes ??= BooleanInput::attributeNames($this->model);
     }
 
     private static function intFromMixed(mixed $value, int $default): int
@@ -304,6 +289,21 @@ class ListRequestData extends SelectRequestData
         }
 
         return $sorts;
+    }
+
+    private function isBooleanFilterProperty(string $property): bool
+    {
+        $bare = str_contains($property, '.') ? Str::afterLast($property, '.') : $property;
+
+        return in_array($bare, $this->booleanAttributes(), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function booleanAttributes(): array
+    {
+        return $this->boolean_attributes ??= BooleanInput::attributeNames($this->model);
     }
 
     /**

@@ -7,8 +7,8 @@ namespace Modules\Core\Search\Services;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\FiltersGroup;
-use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\IQueryIntentParser;
+use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Contracts\ITextEmbedder;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
@@ -46,8 +46,7 @@ final readonly class AdvancedSearchService
         array $sort = [],
         TextMatchPreference|string|null $matching = null,
         array $matchingOptions = [],
-    ): AdvancedSearchResult
-    {
+    ): AdvancedSearchResult {
         $engine = $this->engineFor($model);
 
         if (! $engine instanceof ISearchEngine || ! $engine->supportsOrchestratedSearch()) {

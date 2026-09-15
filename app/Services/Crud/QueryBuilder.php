@@ -59,9 +59,9 @@ final class QueryBuilder
     /**
      * @param  Builder<Model>  $query
      * @param  (callable(string, Builder<Model>): void)|null  $countConstraint  Optional
-     *         hook to constrain each main-model relation-count subquery — the caller
-     *         (CrudService) uses it to apply the related entity's ACL so a `*_count`
-     *         never leaks rows the viewer cannot see. QueryBuilder stays auth-agnostic.
+     *                                                                          hook to constrain each main-model relation-count subquery — the caller
+     *                                                                          (CrudService) uses it to apply the related entity's ACL so a `*_count`
+     *                                                                          never leaks rows the viewer cannot see. QueryBuilder stays auth-agnostic.
      *
      * @throws InvalidArgumentException
      */

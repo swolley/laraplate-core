@@ -6,7 +6,6 @@ use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Services\Crud\QueryBuilder;
 
-
 it('splits column name on last dot', function (): void {
     $builder = new QueryBuilder();
     $ref = new ReflectionClass(QueryBuilder::class);

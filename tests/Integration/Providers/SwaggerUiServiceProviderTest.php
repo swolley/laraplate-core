@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Gate;
 use Modules\Core\Providers\SwaggerUiServiceProvider;
 
-
 beforeEach(function (): void {
     $this->provider = new SwaggerUiServiceProvider(app());
 });

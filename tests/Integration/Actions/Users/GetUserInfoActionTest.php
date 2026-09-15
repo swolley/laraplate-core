@@ -6,7 +6,6 @@ use Illuminate\Foundation\Auth\User;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Http\Resources\UserInfoResponse;
 
-
 it('returns user info and checks license', function (): void {
     // Use a plain Auth User so AfterLoginListener::checkUserLicense runs but does not
     // perform license logic (it requires Modules\Core\Models\User and other conditions).

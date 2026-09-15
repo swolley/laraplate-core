@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 
-
 it('normalize_path uses directory separators', function (): void {
     expect(normalize_path('foo/bar\\baz'))->toContain(DIRECTORY_SEPARATOR);
 });

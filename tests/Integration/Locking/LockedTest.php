@@ -7,7 +7,6 @@ use Modules\Core\Locking\Locked;
 use Modules\Core\Tests\Stubs\Locking\PlainLockModel;
 use Modules\Core\Tests\Stubs\Locking\TraitLockModel;
 
-
 it('reads locking configuration values from config repository', function (): void {
     config()->set('core.locking.lock_at_column', 'la');
     config()->set('core.locking.lock_by_column', 'lb');

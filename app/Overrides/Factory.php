@@ -6,12 +6,12 @@ namespace Modules\Core\Overrides;
 
 use Illuminate\Database\Eloquent\Factories\Factory as BaseFactory;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Database\Factories\Concerns\HasDynamicContentFactory;
-use Modules\Core\Models\Concerns\HasDynamicContents;
-use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Database\Factories\Concerns\HasTranslationsFactory;
 use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
+use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Concerns\HasDynamicContents;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Override;
 use RuntimeException;
 

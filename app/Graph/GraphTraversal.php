@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Graph;
 
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -66,7 +66,7 @@ final class GraphTraversal
         foreach ($relationPaths as $path) {
             $segments = explode('.', $path);
 
-            if (count($segments) > $depth) {
+            if ($depth < count($segments)) {
                 throw ValidationException::withMessages(['relations' => 'Relation path exceeds depth.']);
             }
 
@@ -96,7 +96,7 @@ final class GraphTraversal
      */
     private function walk(Model $source, string $sourceNodeId, array $segments, string $fullPath, int $limit, int $relationLimit, string $nodeDetail, Request $request, array $branch): void
     {
-        if ($segments === [] || count($this->nodes) >= $limit) {
+        if ($segments === [] || $limit <= count($this->nodes)) {
             return;
         }
 
@@ -128,7 +128,7 @@ final class GraphTraversal
             }
         }
 
-        if ($targets->count() > $relationLimit) {
+        if ($relationLimit < $targets->count()) {
             $this->markTruncated('relation_limit');
             $targets = $targets->take($relationLimit);
         }
@@ -138,7 +138,7 @@ final class GraphTraversal
                 continue;
             }
 
-            if (count($this->nodes) >= $limit) {
+            if ($limit <= count($this->nodes)) {
                 $this->markTruncated('limit');
 
                 return;

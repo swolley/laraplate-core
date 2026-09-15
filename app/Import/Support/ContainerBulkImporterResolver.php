@@ -20,7 +20,7 @@ final readonly class ContainerBulkImporterResolver implements BulkImporterResolv
     ) {
         if (! is_a($this->contract, BulkImporterInterface::class, true)) {
             throw new InvalidArgumentException(
-                "Importer contract [{$this->contract}] must extend ".BulkImporterInterface::class.'.',
+                "Importer contract [{$this->contract}] must extend " . BulkImporterInterface::class . '.',
             );
         }
     }

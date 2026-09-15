@@ -13,11 +13,11 @@ use Override;
  *
  * Deliberately extends the base Eloquent {@see Model}, not
  * {@see \Modules\Core\Overrides\Model}: that base class bakes in
- * {@see \Modules\Core\Models\Concerns\HasVersions} and soft deletes, and the
+ * {@see Concerns\HasVersions} and soft deletes, and the
  * ledger must stay writable even while a seeder is repairing the very
  * settings that govern those capabilities. Adding either trait here would
  * create a bootstrap dependency that fails exactly when the ledger is most
- * needed. {@see \Modules\Core\Models\OutboxEvent} follows the same pattern
+ * needed. {@see OutboxEvent} follows the same pattern
  * for the same reason.
  *
  * @property int $id
@@ -28,16 +28,21 @@ use Override;
  * @property \Illuminate\Support\Carbon $started_at
  * @property \Illuminate\Support\Carbon|null $finished_at
  * @property string|null $error
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperSeedRun
  */
 final class SeedRun extends Model
 {
-    /** @var string */
+    /**
+     * @var string
+     */
     #[Override]
     protected $table = CoreTables::SeedRuns->value;
 
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     #[Override]
     protected $fillable = [
         'run_id',

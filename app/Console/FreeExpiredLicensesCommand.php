@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use InvalidArgumentException;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\Command;
 use Override;
-use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
 final class FreeExpiredLicensesCommand extends Command

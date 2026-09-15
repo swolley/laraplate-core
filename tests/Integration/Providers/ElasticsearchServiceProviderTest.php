@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Providers\ElasticsearchServiceProvider;
 use Modules\Core\Services\ElasticsearchService;
 
-
 beforeEach(function (): void {
     $this->provider = new ElasticsearchServiceProvider(app());
 });

@@ -128,6 +128,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
 
             if ($properties !== []) {
                 $mapped = [];
+
                 foreach ($properties as $name => $definition) {
                     $mapped[$name] = is_array($definition) ? $this->stringifyFieldMeta($definition) : $definition;
                 }

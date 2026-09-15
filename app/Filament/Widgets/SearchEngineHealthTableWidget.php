@@ -12,8 +12,8 @@ use Laravel\Scout\EngineManager;
 use Laravel\Scout\Searchable;
 use Modules\Core\Filament\Pages\CacheHealth;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Throwable;
 use Override;
+use Throwable;
 
 final class SearchEngineHealthTableWidget extends Widget
 {

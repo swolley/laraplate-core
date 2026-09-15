@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Providers\CommandListenerProvider;
 
-
 beforeEach(function (): void {
     $this->provider = new CommandListenerProvider(app());
 });

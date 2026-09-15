@@ -42,6 +42,112 @@ final readonly class ScoutSearchConstraintApplier
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $group
+     */
+    private static function applyAdvancedFiltersToEloquent(mixed $query, array $group): void
+    {
+        self::applyAdvancedFiltersGroupToEloquent($query, $group);
+    }
+
+    /**
+     * @param  array<string, mixed>  $group
+     */
+    private static function applyAdvancedFiltersGroupToEloquent(mixed $query, array $group, string $boolean = 'and'): void
+    {
+        $method = $boolean === WhereClause::Or->value ? 'orWhere' : 'where';
+
+        $query->{$method}(static function (mixed $nested_query) use ($group): void {
+            $child_boolean = ($group['operator'] ?? WhereClause::And->value) === WhereClause::Or->value
+                ? WhereClause::Or->value
+                : WhereClause::And->value;
+
+            foreach (($group['filters'] ?? []) as $filter) {
+                if (! is_array($filter)) {
+                    continue;
+                }
+
+                if (isset($filter['filters'])) {
+                    self::applyAdvancedFiltersGroupToEloquent($nested_query, $filter, $child_boolean);
+
+                    continue;
+                }
+
+                self::applyAdvancedFilterToEloquent($nested_query, $filter, $child_boolean);
+            }
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     */
+    private static function applyAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
+    {
+        if (is_string($filter['relation'] ?? null) && is_string($filter['relation_field'] ?? null)) {
+            self::applyRelationAdvancedFilterToEloquent($query, $filter, $boolean);
+
+            return;
+        }
+
+        $field = (string) ($filter['field'] ?? '');
+        $operator = (string) ($filter['operator'] ?? '');
+        $value = $filter['value'] ?? null;
+        $where = $boolean === WhereClause::Or->value ? 'orWhere' : 'where';
+        $where_in = $boolean === WhereClause::Or->value ? 'orWhereIn' : 'whereIn';
+        $where_not_in = $boolean === WhereClause::Or->value ? 'orWhereNotIn' : 'whereNotIn';
+        $where_between = $boolean === WhereClause::Or->value ? 'orWhereBetween' : 'whereBetween';
+
+        match ($operator) {
+            FilterOperator::Equals->value => $query->{$where}($field, '=', $value),
+            FilterOperator::In->value => $query->{$where_in}($field, is_array($value) ? $value : [$value]),
+            FilterOperator::NotEquals->value => $query->{$where_not_in}($field, is_array($value) ? $value : [$value]),
+            FilterOperator::Great->value,
+            FilterOperator::GreatEquals->value,
+            FilterOperator::Less->value,
+            FilterOperator::LessEquals->value => $query->{$where}($field, $operator, $value),
+            FilterOperator::Between->value => $query->{$where_between}($field, is_array($value) ? array_values($value) : [$value, $value]),
+            default => throw new InvalidArgumentException(self::FILTER_ERROR),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     */
+    private static function applyRelationAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
+    {
+        $relation = (string) $filter['relation'];
+        $relation_field = (string) $filter['relation_field'];
+        $operator = (string) ($filter['operator'] ?? '');
+        $value = $filter['value'] ?? null;
+        $negative = $operator === FilterOperator::NotEquals->value;
+        $method = match (true) {
+            $negative && $boolean === WhereClause::Or->value => 'orWhereDoesntHave',
+            $negative => 'whereDoesntHave',
+            $boolean === WhereClause::Or->value => 'orWhereHas',
+            default => 'whereHas',
+        };
+
+        $query->{$method}($relation, static function (mixed $relation_query) use ($relation_field, $operator, $value): void {
+            if ($operator === FilterOperator::NotEquals->value) {
+                if (is_array($value)) {
+                    $relation_query->whereIn($relation_field, $value);
+
+                    return;
+                }
+
+                $relation_query->where($relation_field, '=', $value);
+
+                return;
+            }
+
+            self::applyAdvancedFilterToEloquent($relation_query, [
+                'field' => $relation_field,
+                'operator' => $operator,
+                'value' => $value,
+            ], WhereClause::And->value);
+        });
+    }
+
     private function applyFilters(mixed $builder, FiltersGroup $filters, Model $model): void
     {
         if ($filters->operator === WhereClause::Or) {
@@ -59,6 +165,7 @@ final readonly class ScoutSearchConstraintApplier
                 }
 
                 $this->applyFilters($builder, $filter, $model);
+
                 continue;
             }
 
@@ -183,112 +290,6 @@ final readonly class ScoutSearchConstraintApplier
         });
 
         $builder->options['_advanced_filters_query_attached'] = true;
-    }
-
-    /**
-     * @param  array<string, mixed>  $group
-     */
-    private static function applyAdvancedFiltersToEloquent(mixed $query, array $group): void
-    {
-        self::applyAdvancedFiltersGroupToEloquent($query, $group);
-    }
-
-    /**
-     * @param  array<string, mixed>  $group
-     */
-    private static function applyAdvancedFiltersGroupToEloquent(mixed $query, array $group, string $boolean = 'and'): void
-    {
-        $method = $boolean === WhereClause::Or->value ? 'orWhere' : 'where';
-
-        $query->{$method}(static function (mixed $nested_query) use ($group): void {
-            $child_boolean = ($group['operator'] ?? WhereClause::And->value) === WhereClause::Or->value
-                ? WhereClause::Or->value
-                : WhereClause::And->value;
-
-            foreach (($group['filters'] ?? []) as $filter) {
-                if (! is_array($filter)) {
-                    continue;
-                }
-
-                if (isset($filter['filters'])) {
-                    self::applyAdvancedFiltersGroupToEloquent($nested_query, $filter, $child_boolean);
-
-                    continue;
-                }
-
-                self::applyAdvancedFilterToEloquent($nested_query, $filter, $child_boolean);
-            }
-        });
-    }
-
-    /**
-     * @param  array<string, mixed>  $filter
-     */
-    private static function applyAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
-    {
-        if (is_string($filter['relation'] ?? null) && is_string($filter['relation_field'] ?? null)) {
-            self::applyRelationAdvancedFilterToEloquent($query, $filter, $boolean);
-
-            return;
-        }
-
-        $field = (string) ($filter['field'] ?? '');
-        $operator = (string) ($filter['operator'] ?? '');
-        $value = $filter['value'] ?? null;
-        $where = $boolean === WhereClause::Or->value ? 'orWhere' : 'where';
-        $where_in = $boolean === WhereClause::Or->value ? 'orWhereIn' : 'whereIn';
-        $where_not_in = $boolean === WhereClause::Or->value ? 'orWhereNotIn' : 'whereNotIn';
-        $where_between = $boolean === WhereClause::Or->value ? 'orWhereBetween' : 'whereBetween';
-
-        match ($operator) {
-            FilterOperator::Equals->value => $query->{$where}($field, '=', $value),
-            FilterOperator::In->value => $query->{$where_in}($field, is_array($value) ? $value : [$value]),
-            FilterOperator::NotEquals->value => $query->{$where_not_in}($field, is_array($value) ? $value : [$value]),
-            FilterOperator::Great->value,
-            FilterOperator::GreatEquals->value,
-            FilterOperator::Less->value,
-            FilterOperator::LessEquals->value => $query->{$where}($field, $operator, $value),
-            FilterOperator::Between->value => $query->{$where_between}($field, is_array($value) ? array_values($value) : [$value, $value]),
-            default => throw new InvalidArgumentException(self::FILTER_ERROR),
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $filter
-     */
-    private static function applyRelationAdvancedFilterToEloquent(mixed $query, array $filter, string $boolean): void
-    {
-        $relation = (string) $filter['relation'];
-        $relation_field = (string) $filter['relation_field'];
-        $operator = (string) ($filter['operator'] ?? '');
-        $value = $filter['value'] ?? null;
-        $negative = $operator === FilterOperator::NotEquals->value;
-        $method = match (true) {
-            $negative && $boolean === WhereClause::Or->value => 'orWhereDoesntHave',
-            $negative => 'whereDoesntHave',
-            $boolean === WhereClause::Or->value => 'orWhereHas',
-            default => 'whereHas',
-        };
-
-        $query->{$method}($relation, static function (mixed $relation_query) use ($relation_field, $operator, $value): void {
-            if ($operator === FilterOperator::NotEquals->value) {
-                if (is_array($value)) {
-                    $relation_query->whereIn($relation_field, $value);
-
-                    return;
-                }
-
-                $relation_query->where($relation_field, '=', $value);
-
-                return;
-            }
-
-            self::applyAdvancedFilterToEloquent($relation_query, [
-                'field' => $relation_field,
-                'operator' => $operator,
-                'value' => $value,
-            ], WhereClause::And->value);
-        });
     }
 
     private function fieldName(Model $model, string $property): ?string

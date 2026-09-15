@@ -103,7 +103,7 @@ it('cache:warm is not triggered on boot when warm_on_boot is false', function ()
     Cache::forget($cache_key);
 
     // Re-boot the application — warm_on_boot is false, so cache should remain empty
-    $this->app->booted(function () use ($cache_key): void {
+    $this->app->booted(function (): void {
         // The warm_on_boot hook should NOT have populated the cache
         // We cannot assert absence here because other tests may have warmed it,
         // but we can assert the config is respected (no exception thrown)

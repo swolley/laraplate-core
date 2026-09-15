@@ -33,7 +33,7 @@ final class ImpersonationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user' => ['required', 'number', 'exists:'.CoreTables::Users->value.',id'],
+            'user' => ['required', 'number', 'exists:' . CoreTables::Users->value . ',id'],
         ];
     }
 }

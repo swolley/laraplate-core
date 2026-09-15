@@ -27,9 +27,10 @@ final class CrudApiExposure
      * @template TReturn
      *
      * @param  callable(): TReturn  $callback
-     * @return TReturn
      *
      * @throws Throwable
+     *
+     * @return TReturn
      */
     public static function runEnabled(callable $callback): mixed
     {

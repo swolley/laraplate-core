@@ -272,4 +272,3 @@ it('lets the holder update the record it has taken charge of', function (): void
 
     expect($target->fresh()?->name)->toBe('edited by the holder');
 });
-

@@ -49,7 +49,7 @@ trait ReadonlyModel
             }
 
             throw new ReadOnlyModelException(
-                sprintf('Cannot create model [%s]: the model is read-only.', $model::class)
+                sprintf('Cannot create model [%s]: the model is read-only.', $model::class),
             );
         });
 
@@ -59,7 +59,7 @@ trait ReadonlyModel
             }
 
             throw new ReadOnlyModelException(
-                sprintf('Cannot update model [%s]: the model is read-only.', $model::class)
+                sprintf('Cannot update model [%s]: the model is read-only.', $model::class),
             );
         });
 
@@ -69,7 +69,7 @@ trait ReadonlyModel
             }
 
             throw new ReadOnlyModelException(
-                sprintf('Cannot delete model [%s]: the model is read-only.', $model::class)
+                sprintf('Cannot delete model [%s]: the model is read-only.', $model::class),
             );
         });
 
@@ -80,7 +80,7 @@ trait ReadonlyModel
                 }
 
                 throw new ReadOnlyModelException(
-                    sprintf('Cannot restore model [%s]: the model is read-only.', $model::class)
+                    sprintf('Cannot restore model [%s]: the model is read-only.', $model::class),
                 );
             });
         }
@@ -92,7 +92,7 @@ trait ReadonlyModel
                 }
 
                 throw new ReadOnlyModelException(
-                    sprintf('Cannot force-delete model [%s]: the model is read-only.', $model::class)
+                    sprintf('Cannot force-delete model [%s]: the model is read-only.', $model::class),
                 );
             });
         }

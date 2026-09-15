@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Database\Factories;
 
+use DateTimeInterface;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Override;
 
 /**
@@ -74,7 +75,7 @@ final class UserFactory extends Factory
     /**
      * User valid from now until the given end datetime.
      */
-    public function temporary(\DateTimeInterface $valid_to): static
+    public function temporary(DateTimeInterface $valid_to): static
     {
         return $this->state(fn () => [
             'valid_from' => now()->subDay(),

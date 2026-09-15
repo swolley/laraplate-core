@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\ListRequestData;
-use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Models\User;
+use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use ReflectionMethod;
 
 final class CrudOperationsHarness

@@ -26,7 +26,7 @@ final readonly class FacetLabelSource
      * @param  ?string  $translationRelation  A HasMany translation relation on the related model (e.g. `translations`)
      *                                        whose locale-scoped row carries the label; null for a direct column.
      * @param  ?string  $translationColumn  The label column on the translation row (e.g. `name`), required when
-     *                                       `$translationRelation` is set.
+     *                                      `$translationRelation` is set.
      */
     public function __construct(
         public string $relatedClass,

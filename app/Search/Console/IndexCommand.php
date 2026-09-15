@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use function in_array;
+
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\EngineManager;
@@ -31,7 +33,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
         try {
             $model = $this->getModelClass();
 
-            if (\in_array($model, ['', '0', false], true)) {
+            if (in_array($model, ['', '0', false], true)) {
                 return Command::INVALID;
             }
 
@@ -42,7 +44,7 @@ final class IndexCommand extends \Laravel\Scout\Console\IndexCommand
             parent::handle($manager);
 
             // If the model uses the HasCache trait, invalidate the cache
-            if (\in_array(HasCache::class, class_uses_recursive($model), true)) {
+            if (in_array(HasCache::class, class_uses_recursive($model), true)) {
                 new $model()->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model);
             }

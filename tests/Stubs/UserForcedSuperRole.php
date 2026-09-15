@@ -34,7 +34,7 @@ final class UserForcedSuperRole extends User
 
     protected static function newFactory(): UserFactory
     {
-        UserFactory::guessModelNamesUsing(static fn (): string => static::class);
+        UserFactory::guessModelNamesUsing(static fn (): string => self::class);
 
         return UserFactory::new();
     }

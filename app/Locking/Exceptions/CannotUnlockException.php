@@ -6,6 +6,4 @@ namespace Modules\Core\Locking\Exceptions;
 
 use RuntimeException;
 
-final class CannotUnlockException extends RuntimeException
-{
-}
+final class CannotUnlockException extends RuntimeException {}

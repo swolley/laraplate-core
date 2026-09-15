@@ -73,5 +73,4 @@ final class LocaleContext
     {
         self::$cached_default_locale = null;
     }
-
 }

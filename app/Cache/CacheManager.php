@@ -8,7 +8,6 @@ use Illuminate\Cache\CacheManager as BaseCacheManager;
 use Illuminate\Contracts\Cache\Store;
 use Illuminate\Foundation\Application;
 
-
 final class CacheManager extends BaseCacheManager
 {
     /**

@@ -25,7 +25,7 @@ final readonly class FilesystemImportPluginDiscovery implements ImportPluginDisc
     ) {
         if (! is_a($this->contract, BulkImporterInterface::class, true)) {
             throw new InvalidArgumentException(
-                "Importer contract [{$this->contract}] must extend ".BulkImporterInterface::class.'.',
+                "Importer contract [{$this->contract}] must extend " . BulkImporterInterface::class . '.',
             );
         }
     }
@@ -48,7 +48,7 @@ final readonly class FilesystemImportPluginDiscovery implements ImportPluginDisc
             return null;
         }
 
-        $autoload = $root.'/vendor/autoload.php';
+        $autoload = $root . '/vendor/autoload.php';
 
         return is_file($autoload) ? $autoload : null;
     }
@@ -57,13 +57,13 @@ final readonly class FilesystemImportPluginDiscovery implements ImportPluginDisc
     {
         $root ??= $this->root();
 
-        if ($root === null || ! is_dir($root.'/src')) {
+        if ($root === null || ! is_dir($root . '/src')) {
             return [];
         }
 
         $found = [];
 
-        foreach ($this->phpFiles($root.'/src') as $file) {
+        foreach ($this->phpFiles($root . '/src') as $file) {
             $fqcn = $this->classNameFromPhpFile($file->getPathname());
 
             if ($fqcn === null || ! class_exists($fqcn)) {
@@ -123,6 +123,6 @@ final readonly class FilesystemImportPluginDiscovery implements ImportPluginDisc
 
         $class = $matches[1];
 
-        return $namespace === null || $namespace === '' ? $class : $namespace.'\\'.$class;
+        return $namespace === null || $namespace === '' ? $class : $namespace . '\\' . $class;
     }
 }

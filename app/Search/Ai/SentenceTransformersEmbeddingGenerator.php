@@ -6,11 +6,11 @@ namespace Modules\Core\Search\Ai;
 
 use GuzzleHttp\Client;
 use InvalidArgumentException;
-use Modules\Core\Search\Exceptions\EmbeddingsException;
 use JsonException;
 use LLPhant\Embeddings\Document;
 use LLPhant\Embeddings\DocumentUtils;
 use LLPhant\Embeddings\EmbeddingGenerator\EmbeddingGeneratorInterface;
+use Modules\Core\Search\Exceptions\EmbeddingsException;
 use Psr\Http\Client\ClientExceptionInterface;
 
 final class SentenceTransformersEmbeddingGenerator implements EmbeddingGeneratorInterface

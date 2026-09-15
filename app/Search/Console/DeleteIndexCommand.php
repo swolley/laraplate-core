@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use function in_array;
+
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Console\DeleteIndexCommand as BaseDeleteIndexCommand;
@@ -30,7 +32,7 @@ final class DeleteIndexCommand extends BaseDeleteIndexCommand
         try {
             $model = $this->getModelClass();
 
-            if (\in_array($model, ['', '0', false], true)) {
+            if (in_array($model, ['', '0', false], true)) {
                 return Command::INVALID;
             }
 

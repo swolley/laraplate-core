@@ -74,8 +74,6 @@ final class ModuleColor
         }
 
         /** @var array<int|string, string> $color */
-        $color = constant(Color::class . '::' . $palette);
-
-        return $color;
+        return constant(Color::class . '::' . $palette);
     }
 }

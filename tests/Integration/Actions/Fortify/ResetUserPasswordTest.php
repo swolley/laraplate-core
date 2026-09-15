@@ -7,7 +7,6 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Models\User;
 
-
 it('resets user password with valid input', function (): void {
     $user = User::factory()->create(['password' => Hash::make('old')]);
     $action = new ResetUserPassword();

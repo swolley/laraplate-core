@@ -6,7 +6,6 @@ namespace Modules\Core\Search\Jobs;
 
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
-use Modules\Core\Search\Exceptions\ReindexException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,6 +14,7 @@ use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Search\Exceptions\ReindexException;
 use Throwable;
 
 final class FinalizeReindexJob implements ShouldQueue

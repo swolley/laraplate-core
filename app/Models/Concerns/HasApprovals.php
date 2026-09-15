@@ -20,6 +20,7 @@ use TypeError;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
  * @phpstan-require-implements \Modules\Core\Contracts\IModeratableModel
  *
  * @phpstan-type HasApprovalsType HasApprovals
@@ -27,6 +28,60 @@ use TypeError;
 trait HasApprovals
 {
     use RequiresApproval;
+
+    /**
+     * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
+     *
+     * @param  Model&self  $item
+     */
+    public static function captureSave($item): bool
+    {
+        $diff = collect($item->getDirty())
+            ->transform(static function ($change, $key) use ($item): array {
+                return [
+                    'original' => $item->getOriginal($key),
+                    'modified' => $item->{$key},
+                ];
+            })->all();
+
+        $has_modification_pending = $item->modifications()
+            ->activeOnly()
+            ->where('md5', md5(json_encode($diff)))
+            ->first();
+
+        $modifier = $item->modifier();
+
+        /** @var class-string<Modification|ApprovalModification> $modification_model */
+        $modification_model = config('approval.models.modification', Modification::class);
+
+        $modification = $has_modification_pending ?? new $modification_model();
+        $modification->active = true;
+        $modification->modifications = $diff;
+        $modification->approvers_required = $item->approversRequired;
+        $modification->disapprovers_required = $item->disapproversRequired;
+        $modification->md5 = md5(json_encode($diff));
+
+        if ($modifier && ($modifier_class = $modifier::class)) {
+            $modifier_instance = new $modifier_class();
+
+            $modification->modifier_id = $modifier->{$modifier_instance->getKeyName()};
+            $modification->modifier_type = $modifier_class;
+        }
+
+        if (is_null($item->{$item->getKeyName()})) {
+            $modification->is_update = false;
+        }
+
+        if ($has_modification_pending) {
+            $modification->save();
+        } else {
+            $item->modifications()->save($modification);
+        }
+
+        $item->applyAuthorApproveCredit($modification);
+
+        return false;
+    }
 
     public function initializeHasApprovals(): void
     {
@@ -73,60 +128,6 @@ trait HasApprovals
         );
     }
 
-    /**
-     * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
-     *
-     * @param  Model&self  $item
-     */
-    public static function captureSave($item): bool
-    {
-        $diff = collect($item->getDirty())
-            ->transform(static function ($change, $key) use ($item): array {
-                return [
-                    'original' => $item->getOriginal($key),
-                    'modified' => $item->$key,
-                ];
-            })->all();
-
-        $has_modification_pending = $item->modifications()
-            ->activeOnly()
-            ->where('md5', md5(json_encode($diff)))
-            ->first();
-
-        $modifier = $item->modifier();
-
-        /** @var class-string<Modification|ApprovalModification> $modification_model */
-        $modification_model = config('approval.models.modification', Modification::class);
-
-        $modification = $has_modification_pending ?? new $modification_model();
-        $modification->active = true;
-        $modification->modifications = $diff;
-        $modification->approvers_required = $item->approversRequired;
-        $modification->disapprovers_required = $item->disapproversRequired;
-        $modification->md5 = md5(json_encode($diff));
-
-        if ($modifier && ($modifier_class = $modifier::class)) {
-            $modifier_instance = new $modifier_class();
-
-            $modification->modifier_id = $modifier->{$modifier_instance->getKeyName()};
-            $modification->modifier_type = $modifier_class;
-        }
-
-        if (is_null($item->{$item->getKeyName()})) {
-            $modification->is_update = false;
-        }
-
-        if ($has_modification_pending) {
-            $modification->save();
-        } else {
-            $item->modifications()->save($modification);
-        }
-
-        $item->applyAuthorApproveCredit($modification);
-
-        return false;
-    }
-
     protected function getPreviewAttribute(): ?array
     {
         // preview(), not session('preview'): on app/api the flag is request-scoped and
@@ -169,11 +170,7 @@ trait HasApprovals
         /** @var User|null $user */
         $user = Auth::user();
 
-        if ($user instanceof User && $this->writerHasApproveCredit($user) && $this->approversRequired <= 1) {
-            return false;
-        }
-
-        return true;
+        return ! ($user instanceof User && $this->writerHasApproveCredit($user) && $this->approversRequired <= 1);
     }
 
     /**

@@ -14,7 +14,7 @@ final class SeedCommand extends BaseSeedCommand
 {
     use ResolvesDevSeedScale;
 
-    #[\Override]
+    #[Override]
     protected $description = 'Seed the database with records. <fg=green>(⚡ Modules\Core)</fg=green>';
 
     #[Override]

@@ -12,7 +12,9 @@ final class FakeBulkImporter implements BulkImporterInterface
 {
     public const string TABLE = 'core_fake_import_rows';
 
-    /** @var array<string, mixed> */
+    /**
+     * @var array<string, mixed>
+     */
     public static array $arguments = [];
 
     public function __construct(

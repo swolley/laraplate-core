@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
+
 use Illuminate\Console\Command;
 use Modules\Core\Import\Contracts\BulkImporterResolverInterface;
 use Modules\Core\Import\Contracts\ConnectionAwareBulkImporterInterface;
@@ -12,9 +15,6 @@ use Modules\Core\Import\Support\BulkImportRunner;
 use Override;
 use Symfony\Component\Console\Input\InputOption;
 use Throwable;
-
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\select;
 
 abstract class AbstractImportCommand extends Command
 {

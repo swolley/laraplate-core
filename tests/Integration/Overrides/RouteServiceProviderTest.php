@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Str;
 use Modules\Core\Providers\RouteServiceProvider as CoreRouteServiceProvider;
 
-
 it('getPrefix returns slug of module name for Core', function (): void {
     $provider = new CoreRouteServiceProvider(app());
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use function in_array;
+
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Cache\HasCache;
@@ -12,11 +14,9 @@ use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 use Symfony\Component\Console\Command\Command;
 
-
 final class SearchReindexCommand extends \Modules\Core\Overrides\Command
 {
     use SearchableCommandUtils;
-
 
     #[Override]
     protected $signature = 'scout:reindex {model? : The model to reindex}';
@@ -29,7 +29,7 @@ final class SearchReindexCommand extends \Modules\Core\Overrides\Command
         try {
             $model = $this->getModelClass();
 
-            if (\in_array($model, ['', '0', false], true)) {
+            if (in_array($model, ['', '0', false], true)) {
                 return Command::INVALID;
             }
 
@@ -39,7 +39,7 @@ final class SearchReindexCommand extends \Modules\Core\Overrides\Command
             $this->info('Reindexing has been queued for model ' . $model);
 
             // If the model uses the HasCache trait, invalidate the cache
-            if (\in_array(HasCache::class, class_uses_recursive($model), true)) {
+            if (in_array(HasCache::class, class_uses_recursive($model), true)) {
                 new $model()->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model);
             }

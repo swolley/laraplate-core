@@ -79,6 +79,20 @@ final class RouteServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Define the "api" routes for the application.
+     *
+     * These routes are typically stateless.
+     */
+    #[Override]
+    protected function mapApiRoutes(): void
+    {
+        // Deferred for the same reason as mapWebRoutes().
+        $this->app->booted(function (): void {
+            $this->registerApiRoutes();
+        });
+    }
+
     private function registerDeferredWebRoutes(): void
     {
         $name_prefix = $this->getPrefix();
@@ -102,20 +116,6 @@ final class RouteServiceProvider extends ServiceProvider
         // Loads routes/web.php, which holds the generic CRUD catch-all. Kept last so the more
         // specific Core routes above win the match.
         parent::mapWebRoutes();
-    }
-
-    /**
-     * Define the "api" routes for the application.
-     *
-     * These routes are typically stateless.
-     */
-    #[Override]
-    protected function mapApiRoutes(): void
-    {
-        // Deferred for the same reason as mapWebRoutes().
-        $this->app->booted(function (): void {
-            $this->registerApiRoutes();
-        });
     }
 
     private function registerApiRoutes(): void

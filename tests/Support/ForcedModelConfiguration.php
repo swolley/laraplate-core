@@ -6,15 +6,16 @@ namespace Modules\Core\Tests\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
+use RuntimeException;
 
 /**
  * Discovers Eloquent models that pin Core feature flags in the class body (not via Settings).
@@ -44,7 +45,7 @@ final class ForcedModelConfiguration
 
                 $property_reflection = $reflection->getProperty($property);
 
-                if ($property_reflection->getDeclaringClass()->getName() !== $model_class) {
+                if ($model_class !== $property_reflection->getDeclaringClass()->getName()) {
                     continue;
                 }
 
@@ -96,7 +97,28 @@ final class ForcedModelConfiguration
             return $property_reflection->getDefaultValue();
         }
 
-        throw new \RuntimeException("Property [{$property}] on " . $instance::class . ' has no default value.');
+        throw new RuntimeException("Property [{$property}] on " . $instance::class . ' has no default value.');
+    }
+
+    public static function classSourceDeclaresDefault(ReflectionClass $class, string $property_name, mixed $expected): bool
+    {
+        $source = file_get_contents($class->getFileName());
+
+        if ($source === false) {
+            return false;
+        }
+
+        $needle = match (true) {
+            is_bool($expected) => '$' . $property_name . ' = ' . ($expected ? 'true' : 'false'),
+            $expected instanceof VersionStrategy => '$' . $property_name . ' = VersionStrategy::' . $expected->name,
+            default => null,
+        };
+
+        if ($needle === null) {
+            return false;
+        }
+
+        return str_contains($source, $needle);
     }
 
     /**
@@ -150,26 +172,5 @@ final class ForcedModelConfiguration
     private static function modelUsesCapability(string $model_class, string $trait): bool
     {
         return in_array($trait, class_uses_recursive($model_class), true);
-    }
-
-    public static function classSourceDeclaresDefault(ReflectionClass $class, string $property_name, mixed $expected): bool
-    {
-        $source = file_get_contents($class->getFileName());
-
-        if ($source === false) {
-            return false;
-        }
-
-        $needle = match (true) {
-            is_bool($expected) => '$' . $property_name . ' = ' . ($expected ? 'true' : 'false'),
-            $expected instanceof VersionStrategy => '$' . $property_name . ' = VersionStrategy::' . $expected->name,
-            default => null,
-        };
-
-        if ($needle === null) {
-            return false;
-        }
-
-        return str_contains($source, $needle);
     }
 }

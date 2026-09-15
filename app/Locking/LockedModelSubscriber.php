@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Locking;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Notifications\Events\NotificationSending;
+use Illuminate\Support\Facades\Auth;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 
 final class LockedModelSubscriber

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Actions\Users;
 
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Auth\User;
 use Modules\Core\Http\Resources\UserInfoResponse;
 use Modules\Core\Listeners\AfterLoginListener;
 

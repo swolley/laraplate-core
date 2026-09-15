@@ -43,7 +43,7 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
 
     // Last in the group on purpose. This is the catch-all for module-registered
     // domain verbs, and Laravel matches in registration order with no notion of
-    // specificity, so every literal verb above must be tried first. The 
+    // specificity, so every literal verb above must be tried first. The
     // graph group carry an extra path segment and never reach it.
     Route::post('/{action}/{module}/{entity}', [CrudController::class, 'domainAction'])
         ->name('domain-action');

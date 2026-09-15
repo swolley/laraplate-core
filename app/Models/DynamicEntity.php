@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Modules\Core\Exceptions\AmbiguousModelException;
+use Exception;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
+use Modules\Core\Exceptions\AmbiguousModelException;
 use Modules\Core\Inspector\Entities\Column;
 use Modules\Core\Inspector\Entities\ForeignKey;
 use Modules\Core\Inspector\Entities\Index;
@@ -24,6 +25,7 @@ use UnexpectedValueException;
 
 /**
  * @property string|Collection<int, string> $primaryKey
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperDynamicEntity
  */
@@ -57,7 +59,7 @@ final class DynamicEntity extends Model
      *
      * @param  array<string, mixed>  $attributes
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function resolve(string $tableName, ?string $connection = null, array $attributes = [], ?Request $request = null, ?string $module = null): EloquentModel
     {
@@ -69,7 +71,7 @@ final class DynamicEntity extends Model
      *
      * @throws InvalidArgumentException
      * @throws DirectoryNotFoundException
-     * @throws \Exception
+     * @throws Exception
      *
      * @return class-string<EloquentModel>|null
      */
@@ -177,6 +179,7 @@ final class DynamicEntity extends Model
         }
 
         $parent_default_rules = $rules[Model::DEFAULT_RULE] ?? [];
+
         if (! is_array($parent_default_rules)) {
             $parent_default_rules = [];
         }
@@ -200,7 +203,7 @@ final class DynamicEntity extends Model
     /**
      * @param  list<class-string<EloquentModel>>  $models
      *
-     * @throws \Exception
+     * @throws Exception
      *
      * @return class-string<EloquentModel>|null
      */
@@ -447,7 +450,7 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     private function setReverseRelationsInfo(Request $request): void
     {
@@ -467,13 +470,13 @@ final class DynamicEntity extends Model
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     private function setReverseRelationInfo(string $relationName): void
     {
         $resolved_model = self::resolve($relationName, $this->getConnectionName());
 
-        if (! $resolved_model instanceof DynamicEntity) {
+        if (! $resolved_model instanceof self) {
             return;
         }
 

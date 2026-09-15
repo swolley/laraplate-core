@@ -16,7 +16,7 @@ interface IReranker
      * Score query-document pairs for reranking.
      *
      * @param  list<array{query: string, text: string}>  $pairs
-     * @return list<float>  Scores in [0, 1] range, same order as input pairs
+     * @return list<float> Scores in [0, 1] range, same order as input pairs
      */
     public function score(array $pairs): array;
 }

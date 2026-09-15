@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
-
 
 beforeEach(function (): void {
     Schema::create('soft_deletes_stub', function (Blueprint $table): void {

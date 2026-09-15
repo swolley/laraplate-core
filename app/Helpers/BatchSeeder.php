@@ -125,32 +125,6 @@ abstract class BatchSeeder extends Seeder
     }
 
     /**
-     * Drop every configured Redis connection after fork.
-     *
-     * {@see \Illuminate\Redis\RedisManager::purge()} with no argument only
-     * clears the `default` connection. The cache store uses `cache` (see
-     * config/cache.php), so leaving it inherited after pcntl_fork lets parent
-     * and children share a TCP socket — replies can be stolen and a GET for an
-     * int generation counter can unserialize as an Eloquent Collection.
-     */
-    private function purgeForkedRedisConnections(): void
-    {
-        if (! app()->bound('redis')) {
-            return;
-        }
-
-        $redis = app('redis');
-
-        foreach (array_keys(config('database.redis', [])) as $name) {
-            if (in_array($name, ['client', 'options'], true)) {
-                continue;
-            }
-
-            $redis->purge($name);
-        }
-    }
-
-    /**
      * Create the data in batches sequentially.
      *
      * @param  class-string<Model>  $modelClass  The model class to create the data for
@@ -337,6 +311,32 @@ abstract class BatchSeeder extends Seeder
                 /** @phpstan-ignore staticMethod.notFound */
                 $was_enabled ? $model_class::enableVersioning() : $model_class::disableVersioning();
             }
+        }
+    }
+
+    /**
+     * Drop every configured Redis connection after fork.
+     *
+     * {@see \Illuminate\Redis\RedisManager::purge()} with no argument only
+     * clears the `default` connection. The cache store uses `cache` (see
+     * config/cache.php), so leaving it inherited after pcntl_fork lets parent
+     * and children share a TCP socket — replies can be stolen and a GET for an
+     * int generation counter can unserialize as an Eloquent Collection.
+     */
+    private function purgeForkedRedisConnections(): void
+    {
+        if (! app()->bound('redis')) {
+            return;
+        }
+
+        $redis = app('redis');
+
+        foreach (array_keys(config('database.redis', [])) as $name) {
+            if (in_array($name, ['client', 'options'], true)) {
+                continue;
+            }
+
+            $redis->purge($name);
         }
     }
 

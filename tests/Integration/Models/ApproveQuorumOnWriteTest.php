@@ -35,7 +35,7 @@ function quorumApproverUser(HasApprovalsStubModel $model): array
     $permission_name = PermissionName::forModel($model, 'approve');
     Permission::findOrCreate($permission_name, 'web');
     $user->givePermissionTo($permission_name);
-    app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+    app()[Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
     return [$user, $permission_name];
 }

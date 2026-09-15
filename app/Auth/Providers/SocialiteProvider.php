@@ -17,6 +17,7 @@ use Override;
 final class SocialiteProvider implements IAuthenticationProvider
 {
     use ValidatesUserAccount;
+
     #[Override]
     public function canHandle(Request $request): bool
     {
@@ -113,5 +114,4 @@ final class SocialiteProvider implements IAuthenticationProvider
     {
         return 'social';
     }
-
 }

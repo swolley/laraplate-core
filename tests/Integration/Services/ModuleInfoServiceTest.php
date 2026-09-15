@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Services\Docs\ModuleInfoService;
 
-
 it('isModuleEnabled falls back to Module facade when no closure provided', function (): void {
     $service = new ModuleInfoService(
         modulesProvider: static fn () => ['Core'],

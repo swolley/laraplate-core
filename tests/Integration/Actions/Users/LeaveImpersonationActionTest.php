@@ -8,7 +8,6 @@ use Modules\Core\Actions\Users\LeaveImpersonationAction;
 use Modules\Core\Events\UserLeftImpersonation;
 use Modules\Core\Http\Resources\UserInfoResponse;
 
-
 it('leaves impersonation and dispatches event', function (): void {
     Event::fake();
 

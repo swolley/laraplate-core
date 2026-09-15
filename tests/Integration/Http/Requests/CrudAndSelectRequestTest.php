@@ -6,7 +6,6 @@ use Illuminate\Routing\Route;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\SelectRequest;
 
-
 it('crud request exposes base rules, primary key and parsed payload', function (): void {
     $request = new class() extends CrudRequest
     {

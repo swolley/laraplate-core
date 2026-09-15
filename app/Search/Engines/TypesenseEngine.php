@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Engines;
 
 use Exception;
-use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
-use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -15,8 +13,10 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\TypesenseEngine as BaseTypesenseEngine;
 use Modules\Core\Search\Contracts\ISearchEngine;
-use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\DTOs\TextMatchOptions;
+use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
+use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
+use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Search\Traits\Searchable;
@@ -223,54 +223,6 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             'min_len_2typo' => $options->twoEditMinimumTermLength,
             'prioritize_exact_match' => $options->exactMatchBoost > 0.0,
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $filter
-     */
-    private function buildAdvancedSearchFilter(array $filter): string
-    {
-        if (isset($filter['filters']) && is_array($filter['filters'])) {
-            $joiner = ($filter['operator'] ?? 'and') === 'or' ? ' || ' : ' && ';
-            $parts = array_values(array_filter(array_map(
-                fn (mixed $item): string => is_array($item) ? $this->buildAdvancedSearchFilter($item) : '',
-                $filter['filters'],
-            )));
-            $joined = implode($joiner, $parts);
-
-            return ($filter['operator'] ?? 'and') === 'or' ? sprintf('(%s)', $joined) : $joined;
-        }
-
-        $field = (string) ($filter['field'] ?? '');
-        $operator = (string) ($filter['operator'] ?? '=');
-        $value = $filter['value'] ?? null;
-
-        return match ($operator) {
-            '=' => sprintf('%s:=%s', $field, $this->formatTypesenseFilterValue($value)),
-            'in' => sprintf('%s:[%s]', $field, implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), is_array($value) ? $value : [$value]))),
-            '!=' => sprintf('%s:!=%s', $field, is_array($value) ? '[' . implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), $value)) . ']' : $this->formatTypesenseFilterValue($value)),
-            '>' => sprintf('%s:>%s', $field, $this->formatTypesenseFilterValue($value)),
-            '>=' => sprintf('%s:>=%s', $field, $this->formatTypesenseFilterValue($value)),
-            '<' => sprintf('%s:<%s', $field, $this->formatTypesenseFilterValue($value)),
-            '<=' => sprintf('%s:<=%s', $field, $this->formatTypesenseFilterValue($value)),
-            'between' => sprintf(
-                '%s:>=%s && %s:<=%s',
-                $field,
-                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[0] ?? null : null),
-                $field,
-                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[1] ?? null : null),
-            ),
-            default => '',
-        };
-    }
-
-    private function formatTypesenseFilterValue(mixed $value): string
-    {
-        if (is_string($value)) {
-            return sprintf('"%s"', $value);
-        }
-
-        return is_scalar($value) ? (string) $value : '';
     }
 
     #[Override]
@@ -540,6 +492,54 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
     public function stats(): array
     {
         return $this->typesense->collections->retrieve();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filter
+     */
+    private function buildAdvancedSearchFilter(array $filter): string
+    {
+        if (isset($filter['filters']) && is_array($filter['filters'])) {
+            $joiner = ($filter['operator'] ?? 'and') === 'or' ? ' || ' : ' && ';
+            $parts = array_values(array_filter(array_map(
+                fn (mixed $item): string => is_array($item) ? $this->buildAdvancedSearchFilter($item) : '',
+                $filter['filters'],
+            )));
+            $joined = implode($joiner, $parts);
+
+            return ($filter['operator'] ?? 'and') === 'or' ? sprintf('(%s)', $joined) : $joined;
+        }
+
+        $field = (string) ($filter['field'] ?? '');
+        $operator = (string) ($filter['operator'] ?? '=');
+        $value = $filter['value'] ?? null;
+
+        return match ($operator) {
+            '=' => sprintf('%s:=%s', $field, $this->formatTypesenseFilterValue($value)),
+            'in' => sprintf('%s:[%s]', $field, implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), is_array($value) ? $value : [$value]))),
+            '!=' => sprintf('%s:!=%s', $field, is_array($value) ? '[' . implode(',', array_map(fn (mixed $item): string => $this->formatTypesenseFilterValue($item), $value)) . ']' : $this->formatTypesenseFilterValue($value)),
+            '>' => sprintf('%s:>%s', $field, $this->formatTypesenseFilterValue($value)),
+            '>=' => sprintf('%s:>=%s', $field, $this->formatTypesenseFilterValue($value)),
+            '<' => sprintf('%s:<%s', $field, $this->formatTypesenseFilterValue($value)),
+            '<=' => sprintf('%s:<=%s', $field, $this->formatTypesenseFilterValue($value)),
+            'between' => sprintf(
+                '%s:>=%s && %s:<=%s',
+                $field,
+                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[0] ?? null : null),
+                $field,
+                $this->formatTypesenseFilterValue(is_array($value) ? array_values($value)[1] ?? null : null),
+            ),
+            default => '',
+        };
+    }
+
+    private function formatTypesenseFilterValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            return sprintf('"%s"', $value);
+        }
+
+        return is_scalar($value) ? (string) $value : '';
     }
 
     /**

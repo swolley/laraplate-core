@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 it('resolves app swagger docs in the main resources directory', function (): void {
     expect(swagger_doc_path('App'))->toBe(resource_path('swagger/App-swagger.json'));
 });

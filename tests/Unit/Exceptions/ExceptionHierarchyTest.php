@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use Modules\Core\Exceptions\AmbiguousModelException;
 use Modules\Core\Exceptions\ConfigurationException;
+use Modules\Core\Locking\Exceptions\CannotUnlockException;
+use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Search\Exceptions\ElasticsearchException;
 use Modules\Core\Search\Exceptions\EmbeddingsException;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\ReindexException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
-use Modules\Core\Locking\Exceptions\CannotUnlockException;
-use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Search\Exceptions\SearchException;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 

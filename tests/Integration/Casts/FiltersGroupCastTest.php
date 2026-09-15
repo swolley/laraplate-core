@@ -8,7 +8,6 @@ use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
 
-
 it('hydrates group from json string and dehydrates back to json', function (): void {
     $cast = new FiltersGroupCast();
     $model = new ACL();

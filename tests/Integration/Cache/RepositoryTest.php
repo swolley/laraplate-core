@@ -14,7 +14,6 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
-
 it('getCacheTags prepends app name and supports string/array tags', function (): void {
     $store = Mockery::mock(Store::class);
     $repository = new Repository($store);
@@ -71,7 +70,7 @@ it('tryByRequest unwraps ResponseBuilder response when remember callback runs', 
 
 it('clear methods flush and forget through tags for entity, request, user and group', function (): void {
     $repository = new Repository(new ArrayStore());
-    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
+    config()->set('auth.providers.users.model', User::class);
 
     $cacheable = new class extends Model
     {
@@ -103,7 +102,7 @@ it('private helpers compute request key and duration variants', function (): voi
     config()->set('cache.threshold', 10);
 
     $repository = new Repository(new ArrayStore());
-    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
+    config()->set('auth.providers.users.model', User::class);
 
     $request = Request::create('/api/key', 'GET', ['b' => '2', 'a' => ['z' => '3', 'c' => '1']]);
     $user = User::factory()->create();
@@ -166,7 +165,7 @@ it('tryByRequest supports entity arrays with class strings and plain return valu
 
 it('clear methods support class-string entities and role/user key helpers branches', function (): void {
     $repository = new Repository(new ArrayStore());
-    config()->set('auth.providers.users.model', Modules\Core\Models\User::class);
+    config()->set('auth.providers.users.model', User::class);
     $request = Request::create('/api/clear-string', 'GET', ['a' => '1']);
     $request->setUserResolver(fn (): User => User::factory()->create());
 

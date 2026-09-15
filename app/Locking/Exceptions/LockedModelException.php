@@ -6,6 +6,4 @@ namespace Modules\Core\Locking\Exceptions;
 
 use RuntimeException;
 
-final class LockedModelException extends RuntimeException
-{
-}
+final class LockedModelException extends RuntimeException {}

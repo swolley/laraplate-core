@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Models\Role;
 
-
 it('role model has correct structure', function (): void {
     $reflection = new ReflectionClass(Role::class);
     $source = file_get_contents($reflection->getFileName());

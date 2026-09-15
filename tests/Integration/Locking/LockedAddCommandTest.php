@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Filesystem\Filesystem;
-use Modules\Core\Locking\Console\LockedAddCommand;
 use Modules\Core\Tests\Stubs\Locking\LockedAddCommandTestDouble;
 use Symfony\Component\Console\Command\Command as BaseCommand;
-
 
 function locking_stub_path(): string
 {

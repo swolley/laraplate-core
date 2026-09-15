@@ -6,7 +6,7 @@ use Modules\Core\Import\Contracts\BulkImporterInterface;
 use Modules\Core\Import\Support\FilesystemImportPluginDiscovery;
 
 it('discovers only concrete implementations of the configured contract', function (): void {
-    $root = dirname(__DIR__, 2).'/Stubs/ImportPluginFixtures';
+    $root = dirname(__DIR__, 2) . '/Stubs/ImportPluginFixtures';
 
     $discovery = new FilesystemImportPluginDiscovery(
         label: 'fixture-importers',
@@ -29,7 +29,7 @@ it('discovers only concrete implementations of the configured contract', functio
 it('returns no plugin details when the configured root does not exist', function (): void {
     $discovery = new FilesystemImportPluginDiscovery(
         label: 'missing-importers',
-        defaultRoot: sys_get_temp_dir().'/missing-importers-'.uniqid('', true),
+        defaultRoot: sys_get_temp_dir() . '/missing-importers-' . uniqid('', true),
     );
 
     expect($discovery->root())->toBeNull()

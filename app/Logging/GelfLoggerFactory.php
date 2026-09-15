@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Logging;
 
-use InvalidArgumentException;
 use Gelf\Publisher;
 use Gelf\Transport\IgnoreErrorTransportWrapper;
 use Hedii\LaravelGelfLogger\GelfLoggerFactory as BaseGelfLoggerGelfLoggerFactory;
+use InvalidArgumentException;
 use Monolog\Formatter\GelfMessageFormatter;
 use Monolog\Handler\GelfHandler;
 use Monolog\Logger;

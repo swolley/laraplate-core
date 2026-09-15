@@ -6,7 +6,6 @@ use Illuminate\Cache\ArrayStore;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Cache\Repository;
 
-
 it('returns bound cache store for default driver', function (): void {
     config(['cache.default' => 'array']);
     $manager = new CacheManager($this->app);

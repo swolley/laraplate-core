@@ -51,7 +51,7 @@ it('prevents creating a read-only model', function (): void {
 
 it('allows create when bypass is active', function (): void {
     $model = ReadonlyModelStub::withoutReadOnlyGuards(
-        fn () => ReadonlyModelStub::query()->create(['name' => 'allowed'])
+        fn () => ReadonlyModelStub::query()->create(['name' => 'allowed']),
     );
 
     expect($model->exists)->toBeTrue()
@@ -60,7 +60,7 @@ it('allows create when bypass is active', function (): void {
 
 it('prevents updating a read-only model', function (): void {
     $model = ReadonlyModelStub::withoutReadOnlyGuards(
-        fn () => ReadonlyModelStub::query()->create(['name' => 'original'])
+        fn () => ReadonlyModelStub::query()->create(['name' => 'original']),
     );
 
     $model->name = 'changed';
@@ -70,7 +70,7 @@ it('prevents updating a read-only model', function (): void {
 
 it('prevents deleting a read-only model', function (): void {
     $model = ReadonlyModelStub::withoutReadOnlyGuards(
-        fn () => ReadonlyModelStub::query()->create(['name' => 'to-delete'])
+        fn () => ReadonlyModelStub::query()->create(['name' => 'to-delete']),
     );
 
     expect(fn () => $model->delete())->toThrow(ReadOnlyModelException::class, 'Cannot delete model');
@@ -78,7 +78,7 @@ it('prevents deleting a read-only model', function (): void {
 
 it('prevents restoring a soft-deleted read-only model', function (): void {
     $model = ReadonlySoftDeletingStub::withoutReadOnlyGuards(
-        fn () => ReadonlySoftDeletingStub::query()->create(['name' => 'trash-me'])
+        fn () => ReadonlySoftDeletingStub::query()->create(['name' => 'trash-me']),
     );
 
     ReadonlySoftDeletingStub::withoutReadOnlyGuards(fn () => $model->delete());
@@ -90,7 +90,7 @@ it('prevents restoring a soft-deleted read-only model', function (): void {
 
 it('prevents force-deleting a read-only model', function (): void {
     $model = ReadonlySoftDeletingStub::withoutReadOnlyGuards(
-        fn () => ReadonlySoftDeletingStub::query()->create(['name' => 'force-me'])
+        fn () => ReadonlySoftDeletingStub::query()->create(['name' => 'force-me']),
     );
 
     ReadonlySoftDeletingStub::withoutReadOnlyGuards(fn () => $model->delete());

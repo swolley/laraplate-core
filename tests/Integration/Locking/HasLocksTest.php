@@ -9,7 +9,6 @@ use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\Locking\LockableTestModel;
 
-
 beforeEach(function (): void {
     Schema::dropIfExists('lockable_test_models');
     Schema::create('lockable_test_models', function (Blueprint $table): void {

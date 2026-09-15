@@ -16,9 +16,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class FacetAccessorStubModel extends Model
 {
-    protected $table = 'facet_accessor_stub';
-
     public $timestamps = false;
+
+    protected $table = 'facet_accessor_stub';
 
     protected $fillable = ['tier'];
 

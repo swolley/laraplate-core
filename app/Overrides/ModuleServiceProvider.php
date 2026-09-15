@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
-use Modules\Core\Exceptions\ConfigurationException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Str;
+use Modules\Core\Exceptions\ConfigurationException;
 use Nwidart\Modules\Facades\Module;
 use Nwidart\Modules\Traits\PathNamespace;
 use Override;
@@ -67,13 +67,6 @@ class ModuleServiceProvider extends ServiceProvider
         }
     }
 
-    protected function registerDefaultTranslationPath(string $lang_path): void
-    {
-        $this->callAfterResolving('translator', function ($translator) use ($lang_path): void {
-            $translator->addPath($lang_path);
-        });
-    }
-
     /**
      * Get the services provided by the provider.
      */
@@ -104,6 +97,13 @@ class ModuleServiceProvider extends ServiceProvider
         // subfolder, so without this the module scaffold views cannot be compiled and
         // `php artisan view:cache` fails on them.
         Blade::anonymousComponentPath($sourcePath, $this->nameLower);
+    }
+
+    protected function registerDefaultTranslationPath(string $lang_path): void
+    {
+        $this->callAfterResolving('translator', function ($translator) use ($lang_path): void {
+            $translator->addPath($lang_path);
+        });
     }
 
     /**

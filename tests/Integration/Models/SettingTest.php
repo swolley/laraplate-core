@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 
-
 it('creates setting via factory with default attributes', function (): void {
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'test_setting',

@@ -17,6 +17,7 @@ use Override;
  *
  * @method static whereDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, float $distance)
  * @method static orderByDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, string $direction = 'asc')
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperPlace
  */
@@ -149,7 +150,7 @@ class Place extends Model
     }
 
     /**
-     * Match {@see \Modules\Core\Models\Concerns\HasPlace::shouldPersistPlaceGeolocationGeometry}: avoid spatial bindings on SQLite tests.
+     * Match {@see Concerns\HasPlace::shouldPersistPlaceGeolocationGeometry}: avoid spatial bindings on SQLite tests.
      */
     private function geometryColumnSupportsSpatialBinding(): bool
     {

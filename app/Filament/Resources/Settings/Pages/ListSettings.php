@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Setting;
-use Modules\Core\Services\ForcedVersionStrategySettings;
 use Override;
 
 final class ListSettings extends ListRecords

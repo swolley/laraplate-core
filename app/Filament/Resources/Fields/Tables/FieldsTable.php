@@ -7,10 +7,10 @@ namespace Modules\Core\Filament\Resources\Fields\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Collection;
-use Modules\Core\Models\Field;
-use Modules\Core\Filament\Utils\HasTable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Modules\Core\Filament\Utils\HasTable;
+use Modules\Core\Models\Field;
 
 final class FieldsTable
 {

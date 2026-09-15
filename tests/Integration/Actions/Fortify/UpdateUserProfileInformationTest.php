@@ -7,7 +7,6 @@ use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
 use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\User;
 
-
 it('updates user name and email when email unchanged', function (): void {
     $user = User::factory()->create([
         'name' => 'Old Name',

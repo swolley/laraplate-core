@@ -7,7 +7,6 @@ use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\UniqueFactoryHarness;
 use Modules\Core\Tests\Stubs\UniqueFactoryQueryThrows;
 
-
 it('returns first candidate when model and column are omitted', function (): void {
     $harness = new UniqueFactoryHarness;
     $i = 0;

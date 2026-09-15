@@ -7,7 +7,7 @@ use Modules\Core\Seeding\ModuleStateResolver;
 
 /**
  * nwidart/laravel-modules keys `Module::all()`/`allEnabled()` by
- * `strtolower($name)` ({@see \Nwidart\Modules\FileRepository::scan()}), while
+ * `strtolower($name)` ({@see Nwidart\Modules\FileRepository::scan()}), while
  * `core_settings.module` stores the module's declared case (e.g. `Core`,
  * `MES`). A resolver that compares the raw name against those arrays with
  * `array_key_exists()` would never match a real module and would misclassify

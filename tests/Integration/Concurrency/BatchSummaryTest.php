@@ -7,7 +7,7 @@ use Modules\Core\Concurrency\BatchSummary;
 
 it('reports counts and throughput', function (): void {
     $success = BatchOutcome::success('a', 100, 1.0);
-    $failure = BatchOutcome::failure('b', 0, 0.5, new \RuntimeException('x'));
+    $failure = BatchOutcome::failure('b', 0, 0.5, new RuntimeException('x'));
 
     $summary = new BatchSummary(
         outcomes: [$success],

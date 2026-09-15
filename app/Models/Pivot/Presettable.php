@@ -25,16 +25,6 @@ abstract class Presettable extends Pivot
 {
     use SoftDeletes;
 
-    /**
-     * Memoized result of {@see self::getFieldsFromSnapshot()}.
-     */
-    private ?Collection $hydrated_snapshot_fields = null;
-
-    /**
-     * The snapshot the memoized fields were built from, so a changed snapshot rebuilds.
-     */
-    private ?string $hydrated_snapshot_key = null;
-
     #[Override]
     final public $incrementing = true;
 
@@ -58,6 +48,16 @@ abstract class Presettable extends Pivot
     ];
 
     /**
+     * Memoized result of {@see self::getFieldsFromSnapshot()}.
+     */
+    private ?Collection $hydrated_snapshot_fields = null;
+
+    /**
+     * The snapshot the memoized fields were built from, so a changed snapshot rebuilds.
+     */
+    private ?string $hydrated_snapshot_key = null;
+
+    /**
      * @return BelongsTo<Preset, $this>
      */
     final public function preset(): BelongsTo
@@ -66,27 +66,11 @@ abstract class Presettable extends Pivot
     }
 
     /**
-     * @return class-string<Preset>
-     */
-    protected function presetModelClass(): string
-    {
-        return Preset::class;
-    }
-
-    /**
      * @return BelongsTo<Entity, $this>
      */
     final public function entity(): BelongsTo
     {
         return $this->belongsTo($this->entityModelClass());
-    }
-
-    /**
-     * @return class-string<Entity>
-     */
-    protected function entityModelClass(): string
-    {
-        return Entity::class;
     }
 
     /**
@@ -151,6 +135,22 @@ abstract class Presettable extends Pivot
                 ->where('entity_id', $presettable->entity_id)
                 ->max('version') + 1;
         });
+    }
+
+    /**
+     * @return class-string<Preset>
+     */
+    protected function presetModelClass(): string
+    {
+        return Preset::class;
+    }
+
+    /**
+     * @return class-string<Entity>
+     */
+    protected function entityModelClass(): string
+    {
+        return Entity::class;
     }
 
     final protected function casts(): array

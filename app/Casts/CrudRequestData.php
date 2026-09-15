@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Casts;
 
-use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use Modules\Core\Models\DynamicEntity;
 
 class CrudRequestData

@@ -39,6 +39,7 @@ use Override;
  * @property int $failed_rows
  * @property \Illuminate\Support\Carbon|null $started_at
  * @property \Illuminate\Support\Carbon|null $finished_at
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperImportSession
  */

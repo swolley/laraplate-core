@@ -24,14 +24,6 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 trait HasVersionedRelations
 {
-    /**
-     * @return list<RelationDescriptor>
-     */
-    protected function versionedRelations(): array
-    {
-        return [];
-    }
-
     public function versionedRelationDescriptor(string $relation): ?RelationDescriptor
     {
         foreach ($this->versionedRelations() as $descriptor) {
@@ -160,6 +152,14 @@ trait HasVersionedRelations
     public function versionedRelationMembership(string $relation): array
     {
         return $this->replayMembership($relation, null);
+    }
+
+    /**
+     * @return list<RelationDescriptor>
+     */
+    protected function versionedRelations(): array
+    {
+        return [];
     }
 
     /**

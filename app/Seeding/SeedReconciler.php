@@ -53,7 +53,7 @@ final class SeedReconciler
 
             if ($definition->initial !== [] && (
                 $current->getAttribute('seeded_value') === null
-                || $current->getAttribute('module') !== $definition->module
+                || $definition->module !== $current->getAttribute('module')
             )) {
                 // Reuse the full row, not a bare {column, module, seeded_value}
                 // tuple: upsert() still performs a real INSERT under the hood,

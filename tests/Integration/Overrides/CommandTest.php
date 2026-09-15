@@ -6,7 +6,6 @@ use Illuminate\Console\Command as BaseCommand;
 use Illuminate\Foundation\Application;
 use Modules\Core\Overrides\Command;
 
-
 it('constructs without starting benchmark when running unit tests', function (): void {
     app()->instance('runningUnitTests', true);
 

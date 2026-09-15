@@ -6,6 +6,4 @@ namespace Modules\Core\Search\Exceptions;
 
 use RuntimeException;
 
-class SearchException extends RuntimeException
-{
-}
+class SearchException extends RuntimeException {}

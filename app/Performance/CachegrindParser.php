@@ -26,6 +26,7 @@ final class CachegrindParser
 
         /** @var array<int|string, string> $names */
         $names = [];
+
         /** @var array<int|string, int> $self */
         $self = [];
         $current = null;

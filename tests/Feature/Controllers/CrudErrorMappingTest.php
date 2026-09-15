@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Auth;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;

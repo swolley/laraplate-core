@@ -49,6 +49,17 @@ final class ModuleSeedCommand extends BaseModuleSeedCommand
     }
 
     /**
+     * @return array<int, array{0: string, 1: string|null, 2: int, 3: string, 4?: mixed}>
+     */
+    #[Override]
+    protected function getOptions(): array
+    {
+        return array_merge(parent::getOptions(), [
+            ['dev', null, InputOption::VALUE_NONE, 'Run the module development seeder (fake data) instead of the production seeder'],
+        ], $this->devSeedScaleOptions());
+    }
+
+    /**
      * Derive the module's development seeder class from its production one:
      * `Modules\Core\Database\Seeders\CoreDatabaseSeeder`
      * -> `Modules\Core\Database\Seeders\DevCoreDatabaseSeeder`.
@@ -67,16 +78,5 @@ final class ModuleSeedCommand extends BaseModuleSeedCommand
             'Dev' . $studly . 'DatabaseSeeder',
             $production,
         );
-    }
-
-    /**
-     * @return array<int, array{0: string, 1: string|null, 2: int, 3: string, 4?: mixed}>
-     */
-    #[Override]
-    protected function getOptions(): array
-    {
-        return array_merge(parent::getOptions(), [
-            ['dev', null, InputOption::VALUE_NONE, 'Run the module development seeder (fake data) instead of the production seeder'],
-        ], $this->devSeedScaleOptions());
     }
 }

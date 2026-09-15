@@ -10,7 +10,7 @@ use Modules\Core\Tests\Stubs\Locking\OptimisticLockModel;
 use Modules\Core\Tests\Stubs\Locking\PlainLockModel;
 
 /**
- * @return array<string, \Filament\Schemas\Components\Component>
+ * @return array<string, Filament\Schemas\Components\Component>
  */
 function componentsByName(Schema $schema): array
 {

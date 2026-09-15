@@ -8,7 +8,6 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Fortify\UpdateUserPassword;
 use Modules\Core\Models\User;
 
-
 it('updates user password when current password is correct', function (): void {
     $user = User::factory()->create(['password' => Hash::make('CurrentPassword123!')]);
     Auth::login($user);

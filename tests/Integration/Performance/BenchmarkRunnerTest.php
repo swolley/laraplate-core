@@ -39,6 +39,7 @@ it('reports positive duration and peak memory', function (): void {
     $report = $runner->run(static function (): void {
         // trivial work
         $x = 0;
+
         for ($i = 0; $i < 1000; $i++) {
             $x += $i;
         }

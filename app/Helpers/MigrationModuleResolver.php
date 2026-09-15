@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Nwidart\Modules\Facades\Module;
+use Throwable;
 
 /**
  * Resolves the owning module for a migration file path or migration name.
@@ -34,7 +35,7 @@ final class MigrationModuleResolver
                     return file_module($file);
                 }
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'App';
         }
 

@@ -16,6 +16,7 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\User;
 use Override;
 use Spatie\Permission\Models\Role;
+use UnitEnum;
 
 /**
  * @template TDuration of Closure|DateInterval|DateTimeInterface|int|array<int|string, mixed>|null
@@ -45,52 +46,15 @@ final class Repository extends BaseRepository
     /**
      * @param  string  $key
      * @param  int|array<int, DateInterval|DateTimeInterface|int|string>|null  $ttl  List of two items uses Laravel {@see parent::flexible()}; other arrays are normalized to seconds (e.g. named durations from config).
+     *
      * @template TCacheValue
+     *
      * @param  Closure(): TCacheValue  $callback
      * @return TCacheValue
      */
     public function remember($key, $ttl, Closure $callback): mixed // @pest-ignore-type
     {
         return $this->executeRemember($key, $ttl, $callback);
-    }
-
-    /**
-     * @template TCacheValue
-     *
-     * @param  string|\UnitEnum  $key
-     * @param  Closure(): TCacheValue  $callback
-     * @return TCacheValue
-     */
-    private function executeRemember(string|\UnitEnum $key, mixed $ttl, Closure $callback): mixed
-    {
-        if (is_array($ttl)) {
-            if (count($ttl) === 2 && is_numeric($ttl[0] ?? null) && is_numeric($ttl[1] ?? null)) {
-                return parent::flexible($key, [(int) $ttl[0], (int) $ttl[1]], $callback);
-            }
-
-            return parent::remember($key, $this->resolveDurationConfigToSeconds($ttl), $callback);
-        }
-
-        if ($ttl === null) {
-            $threshold = $this->getThreshold();
-            $base_seconds = $this->resolveDefaultCacheSeconds();
-
-            if ($threshold !== null && $threshold !== 0) {
-                return parent::flexible($key, [$threshold, $base_seconds], $callback);
-            }
-
-            return parent::remember($key, $base_seconds, $callback);
-        }
-
-        if (is_int($ttl) || $ttl instanceof DateInterval || $ttl instanceof DateTimeInterface || $ttl instanceof Closure) {
-            return parent::remember($key, $ttl, $callback);
-        }
-
-        if (is_numeric($ttl)) {
-            return parent::remember($key, (int) $ttl, $callback);
-        }
-
-        return parent::remember($key, $this->resolveDefaultCacheSeconds(), $callback);
     }
 
     // #[Override]
@@ -151,39 +115,6 @@ final class Repository extends BaseRepository
         $ttl = $duration ?? $this->resolveDefaultCacheSeconds();
 
         return $this->remember($key, $ttl, fn () => $this->unwrapCallbackResult($callback()));
-    }
-
-    /**
-     * @template TCacheValue
-     *
-     * @param  TCacheValue|ResponseBuilder  $data
-     * @return TCacheValue|JsonResponse
-     */
-    private function unwrapCallbackResult(mixed $data): mixed
-    {
-        if ($data instanceof ResponseBuilder) {
-            return $data->getResponse();
-        }
-
-        return $data;
-    }
-
-    /**
-     * @param  Model|class-string<Model>|mixed  $model
-     */
-    private function resolveModel(mixed $model): ?Model
-    {
-        if ($model instanceof Model) {
-            return $model;
-        }
-
-        if (! is_string($model) || $model === '') {
-            return null;
-        }
-
-        $instance = new $model();
-
-        return $instance instanceof Model ? $instance : null;
     }
 
     /**
@@ -310,6 +241,77 @@ final class Repository extends BaseRepository
                 }
             }
         }
+    }
+
+    /**
+     * @template TCacheValue
+     *
+     * @param  Closure(): TCacheValue  $callback
+     * @return TCacheValue
+     */
+    private function executeRemember(string|UnitEnum $key, mixed $ttl, Closure $callback): mixed
+    {
+        if (is_array($ttl)) {
+            if (count($ttl) === 2 && is_numeric($ttl[0] ?? null) && is_numeric($ttl[1] ?? null)) {
+                return parent::flexible($key, [(int) $ttl[0], (int) $ttl[1]], $callback);
+            }
+
+            return parent::remember($key, $this->resolveDurationConfigToSeconds($ttl), $callback);
+        }
+
+        if ($ttl === null) {
+            $threshold = $this->getThreshold();
+            $base_seconds = $this->resolveDefaultCacheSeconds();
+
+            if ($threshold !== null && $threshold !== 0) {
+                return parent::flexible($key, [$threshold, $base_seconds], $callback);
+            }
+
+            return parent::remember($key, $base_seconds, $callback);
+        }
+
+        if (is_int($ttl) || $ttl instanceof DateInterval || $ttl instanceof DateTimeInterface || $ttl instanceof Closure) {
+            return parent::remember($key, $ttl, $callback);
+        }
+
+        if (is_numeric($ttl)) {
+            return parent::remember($key, (int) $ttl, $callback);
+        }
+
+        return parent::remember($key, $this->resolveDefaultCacheSeconds(), $callback);
+    }
+
+    /**
+     * @template TCacheValue
+     *
+     * @param  TCacheValue|ResponseBuilder  $data
+     * @return TCacheValue|JsonResponse
+     */
+    private function unwrapCallbackResult(mixed $data): mixed
+    {
+        if ($data instanceof ResponseBuilder) {
+            return $data->getResponse();
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param  Model|class-string<Model>|mixed  $model
+     */
+    private function resolveModel(mixed $model): ?Model
+    {
+        if ($model instanceof Model) {
+            return $model;
+        }
+
+        if (! is_string($model) || $model === '') {
+            return null;
+        }
+
+        $instance = new $model();
+
+        return $instance instanceof Model ? $instance : null;
     }
 
     /**

@@ -9,7 +9,6 @@ use Modules\Core\Http\Requests\SearchRequest;
 use Modules\Core\Http\Requests\TranslationsRequest;
 use Modules\Core\Search\Enums\TextMatchPreference;
 
-
 it('login request defines expected validation rules', function (): void {
     $rules = (new LoginRequest())->rules();
 

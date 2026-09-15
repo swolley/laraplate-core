@@ -8,7 +8,6 @@ use Modules\Core\Listeners\IndexModelFallbackListener;
 use Modules\Core\Models\Setting;
 use Modules\Core\Tests\Fixtures\StubSearchableModel;
 
-
 it('does nothing when event is already handled', function (): void {
     Bus::fake();
 

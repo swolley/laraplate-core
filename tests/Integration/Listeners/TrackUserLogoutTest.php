@@ -13,7 +13,6 @@ use Modules\Core\Listeners\TrackUserLogout;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;
 
-
 it('listener has correct class structure', function (): void {
     $reflection = new ReflectionClass(TrackUserLogout::class);
 

@@ -17,6 +17,7 @@ use Override;
  * @property string $uuid
  * @property VersionSetKind $kind
  * @property int|null $reverted_from_set_id
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperVersionSet
  */

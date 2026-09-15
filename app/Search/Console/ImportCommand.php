@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use function in_array;
+
 use Exception;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Log;
@@ -24,7 +26,6 @@ final class ImportCommand extends BaseImportCommand
             {--fresh : Flush the index before importing}
             {--c|chunk= : The number of records to import at a time (Defaults to configuration value: `scout.chunk.searchable`)}';
 
-
     #[Override]
     protected $description = 'Import the given model into the search index <fg=green>(⚡ Modules\Core)</fg=green>';
 
@@ -34,7 +35,7 @@ final class ImportCommand extends BaseImportCommand
         try {
             $model = $this->getModelClass();
 
-            if (\in_array($model, ['', '0', false], true)) {
+            if (in_array($model, ['', '0', false], true)) {
                 return Command::INVALID;
             }
 

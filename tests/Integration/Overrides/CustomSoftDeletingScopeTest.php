@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 
-
 it('applies scope with is_deleted false', function (): void {
     $scope = new CustomSoftDeletingScope();
     $model = new Setting();

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Seeding;
 
+use function class_uses_recursive;
+use function models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -14,9 +17,6 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionClass;
 use Throwable;
-
-use function class_uses_recursive;
-use function models;
 
 final class ModelCapabilityScanner
 {

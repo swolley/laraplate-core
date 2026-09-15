@@ -38,9 +38,7 @@ function seedNodeFor(string $seederClass): SeedNode
     $nodes = collect(seedNodes());
 
     /** @var SeedNode $node */
-    $node = $nodes->firstOrFail(fn (SeedNode $n): bool => $n->seederClass === $seederClass);
-
-    return $node;
+    return $nodes->firstOrFail(fn (SeedNode $n): bool => $n->seederClass === $seederClass);
 }
 
 it('orders MES after ERP, which module priority alone got wrong', function (): void {

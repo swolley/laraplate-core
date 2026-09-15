@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Database\Factories\Concerns\HasTranslationsFactory;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;

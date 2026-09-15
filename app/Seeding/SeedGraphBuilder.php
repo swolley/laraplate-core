@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Seeding;
 
+use function module_path;
+use function modules;
+
 use Illuminate\Support\Str;
 use Modules\Core\Seeding\Contracts\DeclaresSeedDependencies;
 use Nwidart\Modules\Facades\Module;
-
-use function modules;
-use function module_path;
 
 final class SeedGraphBuilder
 {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Actions\Settings\GetVersionInfoAction;
 use Modules\Core\Services\Docs\VersionService;
 
-
 it('returns version data', function (): void {
     $service = new class extends VersionService
     {

@@ -46,7 +46,7 @@ final class EnvironmentIndicatorPlugin implements Plugin
                     'entries' => ModuleVersionCatalog::make()->entries(),
                 ])->render();
 
-                return '<div class="flex items-center gap-2">'.implode('', $parts).'</div>';
+                return '<div class="flex items-center gap-2">' . implode('', $parts) . '</div>';
             },
         );
     }

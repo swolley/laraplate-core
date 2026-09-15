@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use Modules\Core\Models\Role;
-use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Services\Crud\CrudService;
 use Symfony\Component\HttpFoundation\Response;
 
 /**

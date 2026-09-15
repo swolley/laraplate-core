@@ -24,6 +24,25 @@ final class CapturingApplicationContentProvider implements ApplicationContentRet
 
     public function __construct(public ApplicationContentSourceDescriptor $source) {}
 
+    public static function defaultHit(int $key = 1): ApplicationContentHit
+    {
+        return new ApplicationContentHit(
+            'core-user-' . $key,
+            'core.users',
+            'core',
+            'users',
+            $key,
+            'Visible application information.',
+            'Visible record',
+            '/app/core/users/' . $key,
+            'en',
+            'lexical',
+            0.8,
+            null,
+            false,
+        );
+    }
+
     public function descriptor(): ApplicationContentSourceDescriptor
     {
         return $this->source;
@@ -44,25 +63,6 @@ final class CapturingApplicationContentProvider implements ApplicationContentRet
             $query->source,
             [self::defaultHit()],
             'lexical',
-            false,
-        );
-    }
-
-    public static function defaultHit(int $key = 1): ApplicationContentHit
-    {
-        return new ApplicationContentHit(
-            'core-user-'.$key,
-            'core.users',
-            'core',
-            'users',
-            $key,
-            'Visible application information.',
-            'Visible record',
-            '/app/core/users/'.$key,
-            'en',
-            'lexical',
-            0.8,
-            null,
             false,
         );
     }

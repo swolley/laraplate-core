@@ -153,21 +153,21 @@ return new class() extends Migration
             $table_expr = "substr(name, instr(name, '.') + 1, CASE WHEN instr(substr(name, instr(name, '.') + 1), '.') > 0 THEN instr(substr(name, instr(name, '.') + 1), '.') - 1 ELSE 0 END)";
             $module_expr = "CASE WHEN instr(({$table_expr}), '_') > 0 THEN substr(({$table_expr}), 1, instr(({$table_expr}), '_') - 1) ELSE ({$table_expr}) END";
 
-            $connection->statement(sprintf("
+            $connection->statement(sprintf('
                 CREATE TRIGGER %s
                 AFTER INSERT ON %s
                 BEGIN
                     UPDATE %s SET module_name = %s WHERE id = NEW.id;
                 END
-            ", $grammar->wrap('permissions_set_module_name'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
+            ', $grammar->wrap('permissions_set_module_name'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
 
-            $connection->statement(sprintf("
+            $connection->statement(sprintf('
                 CREATE TRIGGER %s
                 AFTER UPDATE OF name ON %s
                 BEGIN
                     UPDATE %s SET module_name = %s WHERE id = NEW.id;
                 END
-            ", $grammar->wrap('permissions_update_module_name'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
+            ', $grammar->wrap('permissions_update_module_name'), $wrapped_permissions_table, $wrapped_permissions_table, $module_expr));
         } else {
             throw new RuntimeException('Unsupported database driver');
         }

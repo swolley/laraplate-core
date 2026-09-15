@@ -133,6 +133,32 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return parent::search($builder);
     }
 
+    public function paginateUsingDatabase(Builder $builder, $perPage, $pageName, $page): LengthAwarePaginator
+    {
+        if (! $this->isVectorSearch($builder)) {
+            return parent::paginateUsingDatabase($builder, $perPage, $pageName, $page);
+        }
+
+        $page = (int) ($page ?: Paginator::resolveCurrentPage($pageName));
+        $perPage = (int) ($perPage ?: $builder->model->getPerPage());
+        $matches = $this->filterVectorMatchesByModelConstraints(
+            $builder,
+            $this->vectorMatches($builder, PHP_INT_MAX),
+        );
+        $page_matches = array_slice($matches, max(0, ($page - 1) * $perPage), $perPage);
+
+        return new LengthAwarePaginator(
+            items: $this->vectorModelsFromMatches($builder, $page_matches),
+            total: count($matches),
+            perPage: $perPage,
+            currentPage: $page,
+            options: [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => $pageName,
+            ],
+        );
+    }
+
     /**
      * @param  list<string>  $columns
      * @param  list<string>  $prefixColumns
@@ -206,32 +232,6 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
                 });
             }
         });
-    }
-
-    public function paginateUsingDatabase(Builder $builder, $perPage, $pageName, $page): LengthAwarePaginator
-    {
-        if (! $this->isVectorSearch($builder)) {
-            return parent::paginateUsingDatabase($builder, $perPage, $pageName, $page);
-        }
-
-        $page = (int) ($page ?: Paginator::resolveCurrentPage($pageName));
-        $perPage = (int) ($perPage ?: $builder->model->getPerPage());
-        $matches = $this->filterVectorMatchesByModelConstraints(
-            $builder,
-            $this->vectorMatches($builder, PHP_INT_MAX),
-        );
-        $page_matches = array_slice($matches, max(0, ($page - 1) * $perPage), $perPage);
-
-        return new LengthAwarePaginator(
-            items: $this->vectorModelsFromMatches($builder, $page_matches),
-            total: count($matches),
-            perPage: $perPage,
-            currentPage: $page,
-            options: [
-                'path' => Paginator::resolveCurrentPath(),
-                'pageName' => $pageName,
-            ],
-        );
     }
 
     /**

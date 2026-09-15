@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -15,10 +16,8 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use App\Models\User;
 use Modules\Core\Services\AclResolverService;
 use Modules\Core\Services\Authorization\AuthorizationService;
-
 
 beforeEach(function (): void {
     Cache::flush();

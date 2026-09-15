@@ -5,12 +5,12 @@ declare(strict_types=1);
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Modules\Core\Casts\FieldType;
-use Modules\Core\Enums\CoreTables;
-use Modules\Core\Console\CreateEntityCommand;
 use Modules\CMS\Casts\EntityType;
 use Modules\CMS\Models\Entity;
 use Modules\CMS\Models\Preset;
+use Modules\Core\Casts\FieldType;
+use Modules\Core\Console\CreateEntityCommand;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Field;
 
 beforeEach(function (): void {

@@ -43,7 +43,7 @@ final readonly class ModuleVersionCatalog
         ];
 
         foreach ($this->installedModuleNames() as $name) {
-            $composer_path = $this->modules_path.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.'composer.json';
+            $composer_path = $this->modules_path . DIRECTORY_SEPARATOR . $name . DIRECTORY_SEPARATOR . 'composer.json';
             $enabled = (bool) ($this->is_module_enabled)($name);
 
             $entries[] = new ModuleVersionEntry(
@@ -67,7 +67,7 @@ final readonly class ModuleVersionCatalog
 
         $names = [];
 
-        foreach (glob($this->modules_path.DIRECTORY_SEPARATOR.'*', GLOB_ONLYDIR) ?: [] as $path) {
+        foreach (glob($this->modules_path . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR) ?: [] as $path) {
             $names[] = Str::afterLast($path, DIRECTORY_SEPARATOR);
         }
 

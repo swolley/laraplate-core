@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Routing\Route;
 use Modules\Core\Http\Requests\ModifyRequest;
 
-
 it('normalizeRules splits piped strings and drops empty segments', function (): void {
     $request = new ModifyRequest();
     $method = new ReflectionMethod(ModifyRequest::class, 'normalizeRules');

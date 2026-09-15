@@ -22,9 +22,7 @@ abstract class ApplicationTestCase extends \Tests\TestCase
     /**
      * Skip migrate:fresh for tests that only need the container.
      */
-    protected function refreshTestDatabase(): void
-    {
-    }
+    protected function refreshTestDatabase(): void {}
 
     private function ensureCoolsamModulesResourceAlias(): void
     {

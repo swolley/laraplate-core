@@ -7,9 +7,6 @@ use Modules\Core\Import\Exceptions\RowImportException;
 use Modules\Core\Import\Support\RelationValueResolver;
 use Modules\Core\Import\ValueObjects\ImportRelationField;
 
-/**
- * @param  array<string, int>  $known
- */
 function relationField(OnMissingRelation $onMissing, bool $multiple = true, string $separator = ','): ImportRelationField
 {
     return new ImportRelationField('tags', 'Tags', 'tags', multiple: $multiple, separator: $separator, onMissing: $onMissing);

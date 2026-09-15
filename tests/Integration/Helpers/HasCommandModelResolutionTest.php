@@ -10,7 +10,6 @@ use Modules\Core\Tests\Stubs\Console\HasCommandModelResolutionTestCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
-
 function bind_command_input(Command $command, array $args): void
 {
     $input = new ArrayInput($args);

@@ -11,10 +11,14 @@ use ReflectionClass;
 
 final class ForcedVersionStrategySettings
 {
-    /** @var list<string>|null */
+    /**
+     * @var list<string>|null
+     */
     private ?array $names = null;
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     */
     public function names(): array
     {
         if ($this->names !== null) {
@@ -22,20 +26,24 @@ final class ForcedVersionStrategySettings
         }
 
         $names = [];
+
         foreach (models(onlyActive: false) as $model_class) {
             if (! is_subclass_of($model_class, Model::class) || ! in_array(HasVersions::class, class_uses_recursive($model_class), true)) {
                 continue;
             }
             $reflection = new ReflectionClass($model_class);
+
             if (! $reflection->hasProperty('versionStrategy')) {
                 continue;
             }
             $property = $reflection->getProperty('versionStrategy');
-            if ($property->getDeclaringClass()->getName() !== $model_class
+
+            if ($model_class !== $property->getDeclaringClass()->getName()
                 || ! $property->hasDefaultValue()
                 || $property->getDefaultValue() !== VersionStrategy::DIFF) {
                 continue;
             }
+
             /** @var Model $model */
             $model = $reflection->newInstanceWithoutConstructor();
             $names[] = PerModelSettingResolver::nameFor('version_strategy', $model->getTable());

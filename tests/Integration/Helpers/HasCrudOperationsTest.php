@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\CrudOperationsHarness;
-
 
 /**
  * @param  array<string, mixed>  $props

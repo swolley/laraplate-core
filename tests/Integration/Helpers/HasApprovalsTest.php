@@ -15,7 +15,6 @@ use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
-
 beforeEach(function (): void {
     Schema::create('has_approvals_stub', function (Blueprint $table): void {
         $table->id();

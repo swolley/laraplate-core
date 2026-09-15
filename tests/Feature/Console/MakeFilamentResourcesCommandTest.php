@@ -15,7 +15,7 @@ it('rejects laraplate-owned modules', function (): void {
 
 it('accepts App and skips existing resources under no-interaction', function (): void {
     $resource_dir = app_path('Filament/Resources/Users');
-    $resource_path = $resource_dir.DIRECTORY_SEPARATOR.'UserResource.php';
+    $resource_path = $resource_dir . DIRECTORY_SEPARATOR . 'UserResource.php';
 
     File::ensureDirectoryExists($resource_dir);
     File::put($resource_path, "<?php\n\n// probe stub\n");
@@ -61,8 +61,8 @@ PHP);
         $models = $method->invoke($command, 'App');
 
         expect($models)
-            ->toContain(\App\Models\User::class)
-            ->not->toContain(\App\Models\FilamentMakeResourcesPivotProbe::class);
+            ->toContain(App\Models\User::class)
+            ->not->toContain(App\Models\FilamentMakeResourcesPivotProbe::class);
     } finally {
         File::delete($pivot_path);
         HelpersCache::clearModels();

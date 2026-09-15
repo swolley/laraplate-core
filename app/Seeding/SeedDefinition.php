@@ -16,18 +16,26 @@ use LogicException;
  */
 final class SeedDefinition
 {
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     public array $identity = [];
 
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     public array $structural = [];
 
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     public array $initial = [];
 
     public ?string $module = null;
 
-    /** @var list<array<string,mixed>> */
+    /**
+     * @var list<array<string,mixed>>
+     */
     public array $rows = [];
 
     /**
@@ -85,6 +93,7 @@ final class SeedDefinition
      * do not fire Eloquent events, and this is a rule about the data anyway.
      *
      * @param  list<array<string,mixed>>  $rows
+     *
      * @throws InvalidArgumentException If a row has a missing, null, empty, or duplicate identity value.
      */
     public function rows(array $rows): self

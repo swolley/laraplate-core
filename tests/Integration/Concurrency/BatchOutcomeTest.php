@@ -22,7 +22,7 @@ it('builds a successful outcome', function (): void {
 });
 
 it('builds a failure outcome from a generic throwable', function (): void {
-    $exception = new \RuntimeException('boom');
+    $exception = new RuntimeException('boom');
 
     $outcome = BatchOutcome::failure(taskId: 'task_x', units: 0, duration: 0.1, e: $exception);
 
@@ -30,13 +30,13 @@ it('builds a failure outcome from a generic throwable', function (): void {
     expect($outcome->taskId)->toBe('task_x');
     expect($outcome->error)->toBeArray();
     expect($outcome->error['message'])->toBe('boom');
-    expect($outcome->error['class'])->toBe(\RuntimeException::class);
+    expect($outcome->error['class'])->toBe(RuntimeException::class);
     expect($outcome->error)->toHaveKeys(['file', 'line', 'trace']);
     expect($outcome->queryCount)->toBe(0);
 });
 
 it('exposes failure trace through batch execution exception', function (): void {
-    $exception = new \RuntimeException('boom');
+    $exception = new RuntimeException('boom');
     $outcome = BatchOutcome::failure(taskId: 'task_x', units: 0, duration: 0.1, e: $exception);
 
     $batch_exception = new BatchExecutionFailedException($outcome);

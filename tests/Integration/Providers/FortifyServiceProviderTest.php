@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
-use Illuminate\Validation\ValidationException;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Modules\Core\Auth\Services\AuthenticationService;
 use Modules\Core\Models\Permission;
@@ -16,7 +16,9 @@ use Modules\Core\Models\User;
 use Modules\Core\Providers\FortifyServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 
-/** An AuthenticationService whose single provider authenticates `$user` successfully. */
+/**
+ * An AuthenticationService whose single provider authenticates `$user` successfully.
+ */
 function scopeAuthService(User $user): AuthenticationService
 {
     return new AuthenticationService([
@@ -46,7 +48,6 @@ function scopeAuthService(User $user): AuthenticationService
         },
     ]);
 }
-
 
 beforeEach(function (): void {
     $this->provider = new FortifyServiceProvider(app());

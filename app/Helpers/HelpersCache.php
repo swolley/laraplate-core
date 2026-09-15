@@ -19,6 +19,11 @@ use Illuminate\Support\Facades\Cache;
 final class HelpersCache
 {
     /**
+     * Cache-key prefix for the cross-request persistent model discovery layer.
+     */
+    private const MODELS_CACHE_PREFIX = 'core.helpers.models.';
+
+    /**
      * @var array<string, list<class-string<Model>>>
      */
     private static array $models = [];
@@ -27,11 +32,6 @@ final class HelpersCache
      * @var array<string, list<string>>
      */
     private static array $connections = [];
-
-    /**
-     * Cache-key prefix for the cross-request persistent model discovery layer.
-     */
-    private const MODELS_CACHE_PREFIX = 'core.helpers.models.';
 
     private function __construct() {}
 

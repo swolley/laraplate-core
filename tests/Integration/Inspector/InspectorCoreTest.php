@@ -35,7 +35,6 @@ use Modules\Core\Inspector\Entities\Index;
 use Modules\Core\Inspector\Inspect;
 use Modules\Core\Inspector\Types\DoctrineTypeEnum;
 
-
 it('column entity computes unsigned and length metadata', function (): void {
     $unsigned = new Column('qty', collect([]), null, 'unsignedInteger');
     $with_length = new Column('name', collect([]), null, 'string(120)');

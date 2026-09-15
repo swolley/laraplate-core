@@ -46,7 +46,9 @@ final class SeedOrchestrator
         . 'connection. If this node writes to another connection, verify its state manually '
         . 'before resuming.';
 
-    /** @var list<SeedNode>|null */
+    /**
+     * @var list<SeedNode>|null
+     */
     private ?array $nodes = null;
 
     private ?Command $command = null;

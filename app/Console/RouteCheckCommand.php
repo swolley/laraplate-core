@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use function Laravel\Prompts\table;
+
 use Illuminate\Contracts\Console\PromptsForMissingInput;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -13,8 +15,6 @@ use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-
-use function Laravel\Prompts\table;
 
 /**
  * Resolves a relative URL the way the router does at runtime.
@@ -39,17 +39,6 @@ final class RouteCheckCommand extends Command implements PromptsForMissingInput
 
     #[Override]
     protected $description = 'Show which route actually handles a relative URL. <fg=green>(⚡ Modules\Core)</fg=green>';
-
-    /**
-     * @return array<string, array{string, string}>
-     */
-    #[Override]
-    protected function promptForMissingArgumentsUsing(): array
-    {
-        return [
-            'url' => ['Which relative URL should be resolved?', 'app/crud/select/ai/conversations'],
-        ];
-    }
 
     public function handle(): int
     {
@@ -97,6 +86,17 @@ final class RouteCheckCommand extends Command implements PromptsForMissingInput
         table(['Field', 'Value'], $this->rows($data));
 
         return BaseCommand::SUCCESS;
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    #[Override]
+    protected function promptForMissingArgumentsUsing(): array
+    {
+        return [
+            'url' => ['Which relative URL should be resolved?', 'app/crud/select/ai/conversations'],
+        ];
     }
 
     /**

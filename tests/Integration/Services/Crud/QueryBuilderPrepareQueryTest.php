@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -17,10 +18,8 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use App\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Support\PermissionName;
-
 
 /**
  * @param  array<int,Column>  $columns

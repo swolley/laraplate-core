@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Actions\Settings\GetSiteConfigsAction;
 
-
 it('builds settings array', function (): void {
     $settings = [
         (object) ['name' => 'foo', 'value' => 'bar'],

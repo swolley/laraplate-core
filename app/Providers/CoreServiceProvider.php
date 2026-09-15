@@ -38,7 +38,6 @@ use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProvide
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Cache\CacheManager as CoreCacheManager;
 use Modules\Core\Console\PruneMediaDraftsCommand;
-use Modules\Core\Locking\Console\ModelLockSweepCommand;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
@@ -59,6 +58,7 @@ use Modules\Core\Import\Importers\UserImporter;
 use Modules\Core\Import\Support\EntityImporterRegistry;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Listeners\SendImportFinishedNotification;
+use Modules\Core\Locking\Console\ModelLockSweepCommand;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;

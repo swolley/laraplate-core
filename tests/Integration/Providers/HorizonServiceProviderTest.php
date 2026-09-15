@@ -7,7 +7,6 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Providers\HorizonServiceProvider;
 
-
 beforeEach(function (): void {
     $this->provider = new HorizonServiceProvider(app());
 });

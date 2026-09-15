@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Scout\EngineManager;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Locking\Locked;
@@ -21,10 +20,10 @@ use Modules\Core\Providers\FortifyServiceProvider;
 use Modules\Core\Providers\RouteServiceProvider;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Tests\Stubs\UserForcedSuperRole;
 use Typesense\Client as TypesenseClient;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
-
 
 beforeEach(function (): void {
     $this->provider = new CoreServiceProvider(app());
@@ -203,6 +202,7 @@ it('loadCronJobsFromDatabase ignores stale SchemaInspector when cron table was d
 
 it('loadCronJobsFromDatabase returns empty array on exceptions', function (): void {
     $cron_table = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
+
     // Table may already be gone from the previous regression test in this file.
     if (Schema::hasTable($cron_table)) {
         Schema::drop($cron_table);

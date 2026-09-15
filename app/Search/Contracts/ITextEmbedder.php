@@ -14,7 +14,7 @@ interface ITextEmbedder
     /**
      * Generate an embedding vector for the given text.
      *
-     * @return list<float>  Embedding vector
+     * @return list<float> Embedding vector
      */
     public function embed(string $text): array;
 }

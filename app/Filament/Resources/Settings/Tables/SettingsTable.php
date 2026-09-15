@@ -12,10 +12,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
-use Modules\Core\Filament\Resources\Settings\SettingResource;
-use Modules\Core\Casts\SettingTypeEnum;
 
 final class SettingsTable
 {
@@ -49,9 +49,9 @@ final class SettingsTable
                     TextColumn::make('value')
                         ->alignCenter()
                         ->state(static fn (Setting $record): mixed => match ($record->type) {
-                                SettingTypeEnum::Boolean => $record->value ? 'true' : 'false',
-                                default => $record->value,
-                            }),
+                            SettingTypeEnum::Boolean => $record->value ? 'true' : 'false',
+                            default => $record->value,
+                        }),
                 ]);
             },
             filters: static function (Collection $default_filters): void {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Tests\Stubs\Console\HasCommandUtilsTestCommand;
 
-
 it('returns null when attribute is not in validations', function (): void {
     $command = new HasCommandUtilsTestCommand;
 

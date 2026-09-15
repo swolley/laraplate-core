@@ -6,6 +6,4 @@ namespace Modules\Core\Exceptions;
 
 use LogicException;
 
-final class AmbiguousModelException extends LogicException
-{
-}
+final class AmbiguousModelException extends LogicException {}

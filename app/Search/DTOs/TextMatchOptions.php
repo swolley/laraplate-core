@@ -21,11 +21,17 @@ final readonly class TextMatchOptions
         public int $fuzzyTokenLimit = 1,
         public bool $identifierTypos = false,
         public string $query = '',
-        /** @var list<string> */
+        /**
+         * @var list<string>
+         */
         public array $requiredTerms = [],
-        /** @var list<string> */
+        /**
+         * @var list<string>
+         */
         public array $requiredPhrases = [],
-        /** @var list<string> */
+        /**
+         * @var list<string>
+         */
         public array $fields = [],
     ) {}
 

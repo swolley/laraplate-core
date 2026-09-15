@@ -25,8 +25,7 @@ final readonly class BulkImportRunner
         bool $dryRun,
         callable $import,
         ?ConnectionInterface $connection = null,
-    ): int
-    {
+    ): int {
         if (! $dryRun) {
             return $import();
         }
@@ -44,7 +43,7 @@ final readonly class BulkImportRunner
 
     private function rollbackToLevel(ConnectionInterface $connection, int $initial_level): void
     {
-        while ($connection->transactionLevel() > $initial_level) {
+        while ($initial_level < $connection->transactionLevel()) {
             $connection->rollBack();
         }
     }

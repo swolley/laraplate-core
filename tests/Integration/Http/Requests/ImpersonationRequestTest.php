@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\Core\Http\Requests\ImpersonationRequest;
 
-
 it('returns validation rules with user required', function (): void {
     $request = new ImpersonationRequest;
     $rules = $request->rules();

@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Setting;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Overrides\LocaleScope;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
 
 function configureFakeTranslatableFallback(bool $enabled): void

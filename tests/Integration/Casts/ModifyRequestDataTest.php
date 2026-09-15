@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Http\Requests\ModifyRequest;
 
-
 it('__get returns value from changes when key exists', function (): void {
     $request = new ModifyRequest(request: ['foo' => 'bar']);
 

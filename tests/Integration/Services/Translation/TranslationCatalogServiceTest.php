@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Filesystem\Filesystem;
 use Modules\Core\Services\Translation\TranslationCatalogService;
 
-
 it('sorts languages with default locale first', function (): void {
     $service = new TranslationCatalogService(
         languagesProvider: fn () => ['/path/de', '/path/en', '/path/it'],

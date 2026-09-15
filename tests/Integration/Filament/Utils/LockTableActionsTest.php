@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Filament\Actions\ActionGroup;
 use Filament\Tables\Contracts\HasTable as HasTableContract;
 use Filament\Tables\Table;
-use App\Models\User;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Tests\Unit\Filament\Utils\CoreHasTableTraitHarness;

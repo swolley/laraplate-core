@@ -8,15 +8,16 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Modules\Core\Enums\CoreTables;
-use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
 /**
  * @property string $command
- * @property string|\Modules\Core\Casts\CronExpression $schedule
+ * @property string|CronExpressionCast $schedule
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperCronJob
  */

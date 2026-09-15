@@ -42,7 +42,9 @@ final class DomainActionRegistry
         'cache-clear' => null,
     ];
 
-    /** @var array<class-string<Model>, array<string, callable>> */
+    /**
+     * @var array<class-string<Model>, array<string, callable>>
+     */
     private array $handlers = [];
 
     public function register(string $model_class, string $action, callable $handler): void

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Laravel\Scout\Engines\Engine as ScoutEngine;
-use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Engines\ElasticsearchEngine;

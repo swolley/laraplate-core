@@ -9,9 +9,9 @@ use Modules\Core\Models\Concerns\HasDynamicContents;
 it('stores and reads dynamic fields from components for models using HasDynamicContents', function (): void {
     $presettable = new class
     {
-        public function getFieldsFromSnapshot(): \Illuminate\Database\Eloquent\Collection
+        public function getFieldsFromSnapshot(): Illuminate\Database\Eloquent\Collection
         {
-            return new \Illuminate\Database\Eloquent\Collection([(object) ['name' => 'public_email']]);
+            return new Illuminate\Database\Eloquent\Collection([(object) ['name' => 'public_email']]);
         }
     };
 
@@ -22,17 +22,6 @@ it('stores and reads dynamic fields from components for models using HasDynamicC
         protected $table = 'fake_dynamic_contents';
 
         protected $guarded = [];
-
-        protected function getComponentsAttribute(): array
-        {
-            return json_decode((string) ($this->attributes['components'] ?? '{}'), true) ?? [];
-        }
-
-        protected function setComponentsAttribute(array $components): void
-        {
-            $current = $this->getComponentsAttribute();
-            $this->attributes['components'] = json_encode(array_merge($current, $components));
-        }
 
         public static function getEntityType(): IDynamicEntityTypable
         {
@@ -59,7 +48,7 @@ it('stores and reads dynamic fields from components for models using HasDynamicC
                         return null;
                     }
 
-                    return new static;
+                    return new self;
                 }
 
                 public function toScalar(): string
@@ -72,6 +61,17 @@ it('stores and reads dynamic fields from components for models using HasDynamicC
         public static function getEntityModelClass(): string
         {
             return Model::class;
+        }
+
+        protected function getComponentsAttribute(): array
+        {
+            return json_decode((string) ($this->attributes['components'] ?? '{}'), true) ?? [];
+        }
+
+        protected function setComponentsAttribute(array $components): void
+        {
+            $current = $this->getComponentsAttribute();
+            $this->attributes['components'] = json_encode(array_merge($current, $components));
         }
     };
 

@@ -16,6 +16,7 @@ use Override;
  * @property string $disapprover_type
  * @property string|null $reason
  * @property array<string, mixed>|null $meta
+ *
  * @mixin \Eloquent
  * @mixin IdeHelperDisapproval
  */

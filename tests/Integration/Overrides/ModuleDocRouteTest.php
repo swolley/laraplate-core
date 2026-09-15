@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Routing\Route;
 use Modules\Core\Overrides\ModuleDocRoute;
 
-
 it('constructs from Laravel route', function (): void {
     $route = new Route(['GET'], '/test', fn () => null);
     $route->name('core.api.foo');

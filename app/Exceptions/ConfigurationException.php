@@ -6,6 +6,4 @@ namespace Modules\Core\Exceptions;
 
 use RuntimeException;
 
-final class ConfigurationException extends RuntimeException
-{
-}
+final class ConfigurationException extends RuntimeException {}

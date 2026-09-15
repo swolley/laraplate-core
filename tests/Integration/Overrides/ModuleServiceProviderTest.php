@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Overrides\ModuleServiceProvider;
 use Modules\Core\Console\AbstractImportCommand;
-
+use Modules\Core\Overrides\ModuleServiceProvider;
 
 it('registerDefaultTranslationPath registers translator paths after resolution', function (): void {
     $lang_path = resource_path('lang/modules/core');

@@ -10,12 +10,18 @@ namespace Modules\Core\Import\Enums;
  */
 enum OnMissingRelation: string
 {
-    /** Create the related record from the token (requires a create callback). */
+    /**
+     * Create the related record from the token (requires a create callback).
+     */
     case Create = 'create';
 
-    /** Silently drop the unmatched token. */
+    /**
+     * Silently drop the unmatched token.
+     */
     case Skip = 'skip';
 
-    /** Fail the row with a {@see \Modules\Core\Import\Exceptions\RowImportException}. */
+    /**
+     * Fail the row with a {@see \Modules\Core\Import\Exceptions\RowImportException}.
+     */
     case Error = 'error';
 }

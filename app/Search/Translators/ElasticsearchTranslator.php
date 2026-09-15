@@ -37,6 +37,7 @@ class ElasticsearchTranslator implements ISchemaTranslator
         // Handle Object field with locale_properties (per-language text with analyzers)
         if ($field->type === FieldType::Object && is_array($field->options['locale_properties'] ?? null)) {
             $properties = [];
+
             foreach ($field->options['locale_properties'] as $locale => $definition) {
                 $properties[(string) $locale] = [
                     'type' => 'text',

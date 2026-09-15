@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Listeners;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Auth\Access\AuthorizationException;
 use Lab404\Impersonate\Models\Impersonate;
 use Modules\Core\Models\License;
 use Modules\Core\Models\User;

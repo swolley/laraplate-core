@@ -16,7 +16,7 @@ final readonly class DatabaseTextMatchCompiler
         $like = $options->prefix ? $query . '%' : '%' . $query . '%';
         $portable = sprintf('LOWER(%s) LIKE LOWER(?)', $column);
 
-        if ($driver !== 'pgsql' || ! $options->typoTolerance || $options->maxEdits === 0 || mb_strlen($query) < $options->minimumTermLength) {
+        if ($driver !== 'pgsql' || ! $options->typoTolerance || $options->maxEdits === 0 || $options->minimumTermLength > mb_strlen($query)) {
             return [
                 'sql' => $portable,
                 'bindings' => [$like],

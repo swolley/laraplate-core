@@ -83,14 +83,6 @@ final class Inspect
         Cache::forget(self::cacheKeyWithoutTags($key_name));
     }
 
-    private static function supportsTaggedCache(mixed $cache): bool
-    {
-        return is_object($cache)
-            && method_exists($cache, 'supportsTags')
-            && $cache->supportsTags()
-            && method_exists($cache, 'getCacheTags');
-    }
-
     /**
      * Retrieve the columns of a particular table for a given database connection.
      *
@@ -170,6 +162,14 @@ final class Inspect
         $foreigns = self::foreignKeys($table, $schema);
 
         return $foreigns->first(fn (ForeignKey $foreign): bool => $foreign->name === $name);
+    }
+
+    private static function supportsTaggedCache(mixed $cache): bool
+    {
+        return is_object($cache)
+            && method_exists($cache, 'supportsTags')
+            && $cache->supportsTags()
+            && method_exists($cache, 'getCacheTags');
     }
 
     private static function cacheKeyWithoutTags(string $key_name): string

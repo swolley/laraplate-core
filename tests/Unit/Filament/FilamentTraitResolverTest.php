@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\CMS\Filament\Utils\HasRecords as CmsHasRecords;
 use Modules\CMS\Filament\Utils\HasTable as CmsHasTable;
 use Modules\CMS\Models\Content;
+use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Filament\Utils\HasForm as CoreHasForm;
 use Modules\Core\Filament\Utils\HasRecords as CoreHasRecords;
 use Modules\Core\Filament\Utils\HasTable as CoreHasTable;

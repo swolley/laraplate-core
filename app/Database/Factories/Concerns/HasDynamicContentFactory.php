@@ -127,6 +127,7 @@ trait HasDynamicContentFactory
 
         foreach ($fields as $field) {
             $value = $components_array[$field->name] ?? $field->pivot->default;
+
             if ($field->is_translatable ?? false) {
                 $translatable[$field->name] = $value;
             } else {
@@ -158,7 +159,7 @@ trait HasDynamicContentFactory
      * fields are static per presettable, so this collapses ~15 queries per
      * record into a single warm-up load per entity type.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Field>
+     * @return Collection<int, Field>
      */
     private function resolvePresetFields(Model $model): Collection
     {

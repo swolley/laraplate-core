@@ -14,7 +14,6 @@ use Modules\Core\Models\User;
 use Modules\Core\Tests\Stubs\HandleSocialLoginActionTestUserDouble;
 use Symfony\Component\HttpFoundation\Response;
 
-
 afterEach(function (): void {
     Mockery::close();
 });

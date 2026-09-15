@@ -20,7 +20,6 @@ use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Fixtures\QueryBuilderOwner;
 
-
 /**
  * @param  array<int,Column>  $columns
  * @param  array<int,string|array{name:string}>  $relations

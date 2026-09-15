@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\ApplicationContent;
 
+use InvalidArgumentException;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderInterface;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
 use Modules\Core\ApplicationContent\Data\ApplicationContentSourceDescriptor;
@@ -40,7 +41,7 @@ final class ApplicationContentRetrievalProviderRegistry implements ApplicationCo
     {
         try {
             $source = ApplicationContentSourceDescriptor::normalizeSource($source);
-        } catch (\InvalidArgumentException) {
+        } catch (InvalidArgumentException) {
             return null;
         }
 
@@ -51,7 +52,7 @@ final class ApplicationContentRetrievalProviderRegistry implements ApplicationCo
     {
         try {
             $source = ApplicationContentSourceDescriptor::normalizeSource($source);
-        } catch (\InvalidArgumentException) {
+        } catch (InvalidArgumentException) {
             return null;
         }
 

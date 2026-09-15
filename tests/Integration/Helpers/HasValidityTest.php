@@ -6,7 +6,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Tests\Stubs\ValidityStubModel;
 
-
 beforeEach(function (): void {
     Schema::create('validity_stub', function (Blueprint $table): void {
         $table->id();

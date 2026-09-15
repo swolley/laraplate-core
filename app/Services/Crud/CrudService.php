@@ -6,6 +6,9 @@ namespace Modules\Core\Services\Crud;
 
 use Approval\Traits\RequiresApproval;
 use BadMethodCallException;
+use Carbon\Carbon;
+use DateTimeInterface;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -25,12 +28,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Fluent;
-use Carbon\Carbon;
-use DateTimeInterface;
-use Illuminate\Contracts\Auth\Authenticatable;
-use Modules\Core\Locking\Exceptions\LockedModelException;
-use Modules\Core\Locking\LockIntent;
-use Modules\Core\Locking\Locked;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Authorization\RetrievedSelectGuard;
@@ -50,6 +47,9 @@ use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
+use Modules\Core\Locking\Exceptions\LockedModelException;
+use Modules\Core\Locking\Locked;
+use Modules\Core\Locking\LockIntent;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
@@ -2577,7 +2577,7 @@ class CrudService
         $found_count = 0;
         $affected_records = new Collection();
 
-        $model->getConnection()->transaction(function () use ($found_records, $affected_records, $intent, $operation, $requestData, $is_single, &$found_count): void {
+        $model->getConnection()->transaction(function () use ($found_records, $affected_records, $intent, $requestData, $is_single, &$found_count): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
 
@@ -3051,5 +3051,4 @@ class CrudService
 
         return $query;
     }
-
 }

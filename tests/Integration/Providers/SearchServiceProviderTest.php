@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
+use Laravel\Scout\EngineManager;
 use Modules\Core\Providers\SearchServiceProvider;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Services\AdvancedSearchService;
-use Laravel\Scout\EngineManager;
-
 
 beforeEach(function (): void {
     $this->provider = new SearchServiceProvider(app());

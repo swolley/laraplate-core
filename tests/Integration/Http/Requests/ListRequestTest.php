@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Routing\Route;
 use Modules\Core\Http\Requests\ListRequest;
 
-
 it('prepareForValidation parses sort filters and group_by json strings', function (): void {
     $request = ListRequest::create('/core/api/list/settings', 'GET', [
         'sort' => '[{"property":"name","direction":"asc"}]',

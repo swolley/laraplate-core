@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Console;
 
+use function in_array;
+
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Console\FlushCommand as BaseFlushCommand;
@@ -17,7 +19,6 @@ final class FlushCommand extends BaseFlushCommand
     use HasBenchmark;
     use SearchableCommandUtils;
 
-    
     #[Override]
     protected $signature = 'scout:flush {model? : Class name of the model to flush}';
 
@@ -28,9 +29,9 @@ final class FlushCommand extends BaseFlushCommand
     public function handle(): int
     {
         try {
-        $model = $this->getModelClass();
+            $model = $this->getModelClass();
 
-            if (\in_array($model, ['', '0', false], true)) {
+            if (in_array($model, ['', '0', false], true)) {
                 return Command::INVALID;
             }
 

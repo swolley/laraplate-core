@@ -10,6 +10,7 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Settings\Pages\CreateSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
@@ -17,7 +18,6 @@ use Modules\Core\Filament\Resources\Settings\Schemas\SettingForm;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\ForcedVersionStrategySettings;
-use Illuminate\Database\Eloquent\Builder;
 use Override;
 use UnitEnum;
 

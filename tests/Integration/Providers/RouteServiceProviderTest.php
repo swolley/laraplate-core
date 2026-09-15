@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Core\Providers\RouteServiceProvider;
 
-
 beforeEach(function (): void {
     $this->provider = new RouteServiceProvider(app());
 });

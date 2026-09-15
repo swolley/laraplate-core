@@ -19,6 +19,11 @@ final readonly class AdvancedSearchResult
         public array $meta = [],
     ) {}
 
+    public static function empty(int $page = 1, int $perPage = 25, array $meta = []): self
+    {
+        return new self([], 0, $page, $perPage, 0, $meta);
+    }
+
     /**
      * @return list<string>
      */
@@ -28,10 +33,5 @@ final readonly class AdvancedSearchResult
             static fn (array $hit): string => $hit['id'],
             $this->hits,
         ));
-    }
-
-    public static function empty(int $page = 1, int $perPage = 25, array $meta = []): self
-    {
-        return new self([], 0, $page, $perPage, 0, $meta);
     }
 }

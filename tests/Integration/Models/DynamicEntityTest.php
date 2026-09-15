@@ -12,7 +12,6 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Services\DynamicEntityService;
 
-
 beforeEach(function (): void {
     DynamicEntityService::reset();
 });

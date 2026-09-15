@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Notifications\PendingApprovalsNotification;
 use ReflectionClass;
 use Throwable;

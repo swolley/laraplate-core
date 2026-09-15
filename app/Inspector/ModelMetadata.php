@@ -7,13 +7,13 @@ namespace Modules\Core\Inspector;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Models\Concerns\SortableTrait;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionClass;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
