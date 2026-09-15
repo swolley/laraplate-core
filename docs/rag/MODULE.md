@@ -495,6 +495,14 @@ Runtime configuration lives in `Setting` (`Core\Models\Setting` with `HasApprova
 
 The Settings UI exposes only genuinely configurable rows. Class-forced DIFF strategies are intentionally absent even if stale rows remain in the database.
 
+Settings are cached **per group**, not as one blob. `PerModelSettingResolver` stores each
+`group_name` under its own key and keeps a lightweight `name => group_name` index so the read API
+stays name-based. `SettingsCacheCoordinator` exposes `flushGroup()`, `flushGroups()` and
+`registerGroupInvalidator()` alongside the wholesale `flushAll()`, and `SettingObserver` calls
+`flushSetting()` on save and delete. So an ordinary edit invalidates the one group it touched, and
+saving a row also syncs runtime config. Reach for `flushAll()` only when a change genuinely crosses
+every group.
+
 ```mermaid
 flowchart LR
   SettingsTable["settings table"]
