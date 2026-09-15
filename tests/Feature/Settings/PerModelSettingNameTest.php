@@ -7,7 +7,7 @@ use Modules\Core\Services\PerModelSettingResolver;
 
 it('builds the same name whether or not the prefix carries a trailing separator', function (string $prefix): void {
     expect(PerModelSettingResolver::nameFor($prefix, 'cms_contents'))
-        ->toBe(PerModelSettingResolver::nameFor(rtrim($prefix, '_.'), 'cms_contents'));
+        ->toBe(PerModelSettingResolver::nameFor(mb_rtrim($prefix, '_.'), 'cms_contents'));
 })->with([
     'soft_deletes_',
     'version_strategy_',

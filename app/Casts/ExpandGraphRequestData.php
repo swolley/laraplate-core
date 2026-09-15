@@ -49,6 +49,6 @@ final class ExpandGraphRequestData extends DetailRequestData
             return 1;
         }
 
-        return max(array_map(static fn (string $relation): int => substr_count($relation, '.') + 1, $relations));
+        return max(array_map(static fn (string $relation): int => mb_substr_count($relation, '.') + 1, $relations));
     }
 }

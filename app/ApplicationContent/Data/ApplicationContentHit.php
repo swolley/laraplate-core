@@ -56,18 +56,18 @@ final readonly class ApplicationContentHit
             || ! $this->hasValidEncoding($this->excerpt)
             || ! $this->hasValidEncoding($this->label)
             || ($this->revision !== null && ! $this->hasValidEncoding($this->revision))
-            || trim($this->id) === '' || mb_strlen($this->id) > 200
+            || mb_trim($this->id) === '' || mb_strlen($this->id) > 200
             || (is_string($this->recordKey) && (! $this->hasValidEncoding($this->recordKey)
-                || trim($this->recordKey) === ''
+                || mb_trim($this->recordKey) === ''
                 || mb_strlen($this->recordKey) > 255))
-            || trim($this->excerpt) === '' || mb_strlen($this->excerpt) > $maximum_excerpt
-            || trim($this->label) === '' || mb_strlen($this->label) > $maximum_label
-            || mb_strlen($this->canonicalReference) > $maximum_reference
+            || mb_trim($this->excerpt) === '' || $maximum_excerpt < mb_strlen($this->excerpt)
+            || mb_trim($this->label) === '' || $maximum_label < mb_strlen($this->label)
+            || $maximum_reference < mb_strlen($this->canonicalReference)
             || preg_match('#^/app(?:/[A-Za-z0-9][A-Za-z0-9_-]*)+$#', $this->canonicalReference) !== 1
             || preg_match('/^[a-z]{2,3}(?:[-_][A-Z]{2})?$/', $this->locale) !== 1
             || preg_match('/^[a-z][a-z0-9_]{0,63}$/', $this->strategy) !== 1
             || ($this->score !== null && (! is_finite($this->score) || $this->score < 0 || $this->score > 1))
-            || ($this->revision !== null && (trim($this->revision) === '' || mb_strlen($this->revision) > 200))) {
+            || ($this->revision !== null && (mb_trim($this->revision) === '' || mb_strlen($this->revision) > 200))) {
             throw new InvalidArgumentException('Application content evidence is invalid.');
         }
 
@@ -77,7 +77,7 @@ final readonly class ApplicationContentHit
 
     private static function identifier(string $value): string
     {
-        $value = mb_strtolower(trim($value));
+        $value = mb_strtolower(mb_trim($value));
 
         if (preg_match('/^[a-z][a-z0-9_]{0,63}$/', $value) !== 1) {
             throw new InvalidArgumentException('Application content evidence identifier is invalid.');

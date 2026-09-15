@@ -80,7 +80,7 @@ final readonly class ApplicationContentSourceDescriptor
 
     public static function normalizeSource(string $source): string
     {
-        $source = mb_strtolower(trim($source));
+        $source = mb_strtolower(mb_trim($source));
 
         if (preg_match('/^[a-z][a-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,63}$/', $source) !== 1) {
             throw new InvalidArgumentException('Application content source is invalid.');
@@ -91,7 +91,7 @@ final readonly class ApplicationContentSourceDescriptor
 
     private static function normalizeIdentifier(string $value, string $name): string
     {
-        $value = mb_strtolower(trim($value));
+        $value = mb_strtolower(mb_trim($value));
 
         if (preg_match('/^[a-z][a-z0-9_]{0,63}$/', $value) !== 1) {
             throw new InvalidArgumentException("Application content {$name} is invalid.");

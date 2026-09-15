@@ -82,7 +82,7 @@ final class TranslationsCheckCommand extends Command
     private function sortTranslations(array &$grouped_translations, string $lang, string $file, array &$to_be_ignored_files): void
     {
         $langname = basename($lang);
-        $lang_directory = rtrim($lang, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $lang_directory = mb_rtrim($lang, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         $contains_requires = Str::contains(file_get_contents($file), 'require(__DIR__');
         $labels = require $file;
@@ -194,8 +194,8 @@ final class TranslationsCheckCommand extends Command
             return $file;
         }
 
-        $relative_path = substr($file, strlen($lang_directory));
+        $relative_path = mb_substr($file, mb_strlen($lang_directory));
 
-        return dirname(rtrim($lang_directory, DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $relative_path;
+        return dirname(mb_rtrim($lang_directory, DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $relative_path;
     }
 }

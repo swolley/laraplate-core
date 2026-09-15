@@ -9,8 +9,8 @@ it('Core RAG MODULE.md includes mermaid diagrams for core flows', function (): v
 
     $content = (string) file_get_contents($path);
 
-    expect(substr_count($content, '```mermaid'))->toBeGreaterThanOrEqual(11)
-        ->and(substr_count($content, '```mermaid'))->toEqual(substr_count($content, "```\n"))
+    expect(mb_substr_count($content, '```mermaid'))->toBeGreaterThanOrEqual(11)
+        ->and(mb_substr_count($content, '```mermaid'))->toEqual(mb_substr_count($content, "```\n"))
         ->and($content)->toContain('### Module boundaries')
         ->and($content)->toContain('### Identity, authentication and license')
         ->and($content)->toContain('### Authorization: roles, permissions and ACLs')

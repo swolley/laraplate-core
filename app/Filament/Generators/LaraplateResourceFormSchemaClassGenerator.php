@@ -47,7 +47,7 @@ final class LaraplateResourceFormSchemaClassGenerator extends ResourceFormSchema
 
         $filament_body = preg_replace('/^return /', '', $filament_body, 1) ?? $filament_body;
 
-        $filament_expression = rtrim(rtrim((string) $filament_body), ';');
+        $filament_expression = mb_rtrim(mb_rtrim((string) $filament_body), ';');
 
         $method = $class->addMethod('configure')
             ->setPublic()

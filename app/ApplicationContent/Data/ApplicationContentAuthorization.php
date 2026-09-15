@@ -13,7 +13,7 @@ final readonly class ApplicationContentAuthorization
         public string $permissionName,
         public ?FiltersGroup $filters,
     ) {
-        if (trim($this->permissionName) === '') {
+        if (mb_trim($this->permissionName) === '') {
             throw new InvalidArgumentException('Application content authorization is invalid.');
         }
     }

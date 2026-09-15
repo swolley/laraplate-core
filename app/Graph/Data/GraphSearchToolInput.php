@@ -22,7 +22,7 @@ final readonly class GraphSearchToolInput extends GraphToolInput
     ) {
         parent::__construct($module, $entity, $relations, $depth, $relationLimit);
 
-        if (trim($this->query) === '' || mb_strlen($this->query) > 500) {
+        if (mb_trim($this->query) === '' || mb_strlen($this->query) > 500) {
             throw new InvalidArgumentException('Graph tool search query is invalid.');
         }
 

@@ -36,7 +36,27 @@ final class PerModelSettingResolver
      */
     public static function nameFor(string $prefix, string $table): string
     {
-        return rtrim($prefix, '_.') . '_' . $table;
+        return mb_rtrim($prefix, '_.') . '_' . $table;
+    }
+
+    public static function cacheKey(): string
+    {
+        return CacheManager::key('settings', 'by_name');
+    }
+
+    public static function groupCacheKey(string $group_name): string
+    {
+        return CacheManager::key('settings', 'group', $group_name);
+    }
+
+    public static function nameIndexCacheKey(): string
+    {
+        return CacheManager::key('settings', 'name_index');
+    }
+
+    public static function legacyTableCacheKey(): string
+    {
+        return CacheManager::key('settings');
     }
 
     /**
@@ -189,26 +209,6 @@ final class PerModelSettingResolver
     {
         Cache::forget(self::nameIndexCacheKey());
         $this->name_index = null;
-    }
-
-    public static function cacheKey(): string
-    {
-        return CacheManager::key('settings', 'by_name');
-    }
-
-    public static function groupCacheKey(string $group_name): string
-    {
-        return CacheManager::key('settings', 'group', $group_name);
-    }
-
-    public static function nameIndexCacheKey(): string
-    {
-        return CacheManager::key('settings', 'name_index');
-    }
-
-    public static function legacyTableCacheKey(): string
-    {
-        return CacheManager::key('settings');
     }
 
     /**

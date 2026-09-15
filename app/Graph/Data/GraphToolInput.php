@@ -36,7 +36,7 @@ abstract readonly class GraphToolInput
         foreach ($this->relations as $relation) {
             if (! is_string($relation)
                 || preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/', $relation) !== 1
-                || substr_count($relation, '.') + 1 > $this->depth) {
+                || $this->depth < mb_substr_count($relation, '.') + 1) {
                 throw new InvalidArgumentException('Graph tool relation is invalid or exceeds the requested depth.');
             }
         }

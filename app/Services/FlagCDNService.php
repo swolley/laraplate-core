@@ -11,45 +11,6 @@ use Illuminate\Support\Facades\Http;
 final readonly class FlagCDNService
 {
     /**
-     * Map locale codes to FlagCDN country codes.
-     *
-     * The mapping is defined in module lang files:
-     * - `Modules/Core/lang/{language}/app.php` can expose `flag => 'gb'` (or any other FlagCDN code)
-     * - if missing, we fallback to the base language code (e.g. `de`, `it`, ...)
-     */
-    private function mapLocaleToFlagLocale(string $locale): string
-    {
-        $normalized = strtolower(trim($locale));
-        $language_code = strtolower(strtok(str_replace('_', '-', $normalized), '-')) ?: $normalized;
-
-        static $cache = [];
-        if (isset($cache[$language_code])) {
-            return $cache[$language_code];
-        }
-
-        $module_root = dirname(__DIR__, 2);
-        $lang_file = sprintf('%s/lang/%s/app.php', $module_root, $language_code);
-
-        $flag_locale = null;
-
-        if (is_file($lang_file)) {
-            /** @var array<string,mixed> $translations */
-            $translations = require $lang_file;
-
-            $candidate = $translations['flag'] ?? null;
-            if (is_string($candidate)) {
-                $candidate = strtolower(trim($candidate));
-
-                if ($candidate !== '') {
-                    $flag_locale = $candidate;
-                }
-            }
-        }
-
-        return $cache[$language_code] = $flag_locale ?? $language_code;
-    }
-
-    /**
      * Get flag URL for a locale, downloading and caching it locally if needed.
      *
      * @param  string  $locale  The locale code (e.g., 'it', 'en')
@@ -142,5 +103,46 @@ final readonly class FlagCDNService
     public function getFlagsDirectory(): string
     {
         return public_path('flags');
+    }
+
+    /**
+     * Map locale codes to FlagCDN country codes.
+     *
+     * The mapping is defined in module lang files:
+     * - `Modules/Core/lang/{language}/app.php` can expose `flag => 'gb'` (or any other FlagCDN code)
+     * - if missing, we fallback to the base language code (e.g. `de`, `it`, ...)
+     */
+    private function mapLocaleToFlagLocale(string $locale): string
+    {
+        $normalized = mb_strtolower(mb_trim($locale));
+        $language_code = mb_strtolower(strtok(str_replace('_', '-', $normalized), '-')) ?: $normalized;
+
+        static $cache = [];
+
+        if (isset($cache[$language_code])) {
+            return $cache[$language_code];
+        }
+
+        $module_root = dirname(__DIR__, 2);
+        $lang_file = sprintf('%s/lang/%s/app.php', $module_root, $language_code);
+
+        $flag_locale = null;
+
+        if (is_file($lang_file)) {
+            /** @var array<string,mixed> $translations */
+            $translations = require $lang_file;
+
+            $candidate = $translations['flag'] ?? null;
+
+            if (is_string($candidate)) {
+                $candidate = mb_strtolower(mb_trim($candidate));
+
+                if ($candidate !== '') {
+                    $flag_locale = $candidate;
+                }
+            }
+        }
+
+        return $cache[$language_code] = $flag_locale ?? $language_code;
     }
 }

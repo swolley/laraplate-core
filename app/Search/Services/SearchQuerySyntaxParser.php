@@ -24,7 +24,7 @@ final readonly class SearchQuerySyntaxParser
         $free = [];
         $required_terms = [];
         $required_phrases = [];
-        $length = strlen($query);
+        $length = mb_strlen($query);
         $offset = 0;
 
         while ($offset < $length) {
@@ -53,7 +53,7 @@ final readonly class SearchQuerySyntaxParser
                     continue;
                 }
 
-                $free[] = trim($this->unescape(substr($query, $quoted_offset + 1)));
+                $free[] = mb_trim($this->unescape(mb_substr($query, $quoted_offset + 1)));
 
                 break;
             }
@@ -64,7 +64,7 @@ final readonly class SearchQuerySyntaxParser
                 $end++;
             }
 
-            $token = $this->unescape(substr($query, $offset, $end - $offset));
+            $token = $this->unescape(mb_substr($query, $offset, $end - $offset));
 
             if (str_starts_with($token, '+') && mb_strlen($token) > 1) {
                 $required_terms[] = mb_substr($token, 1);
@@ -76,7 +76,7 @@ final readonly class SearchQuerySyntaxParser
         }
 
         return new ParsedSearchQuery(
-            freeText: trim(implode(' ', array_filter($free, static fn (string $value): bool => $value !== ''))),
+            freeText: mb_trim(implode(' ', array_filter($free, static fn (string $value): bool => $value !== ''))),
             requiredTerms: array_values(array_unique(array_filter($required_terms, static fn (string $value): bool => $value !== ''))),
             requiredPhrases: array_values(array_unique($required_phrases)),
         );
@@ -88,7 +88,7 @@ final readonly class SearchQuerySyntaxParser
     private function readQuoted(string $query, int $quoteOffset): array
     {
         $value = '';
-        $length = strlen($query);
+        $length = mb_strlen($query);
         $offset = $quoteOffset + 1;
 
         while ($offset < $length) {
@@ -100,7 +100,7 @@ final readonly class SearchQuerySyntaxParser
             }
 
             if ($query[$offset] === '"') {
-                return [trim($value), $offset + 1, true];
+                return [mb_trim($value), $offset + 1, true];
             }
 
             $value .= $query[$offset];

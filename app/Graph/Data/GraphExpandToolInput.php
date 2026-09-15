@@ -23,7 +23,7 @@ final readonly class GraphExpandToolInput extends GraphToolInput
         parent::__construct($module, $entity, $relations, $depth, $relationLimit);
 
         if ($this->relations === []
-            || (is_string($this->recordKey) && trim($this->recordKey) === '')
+            || (is_string($this->recordKey) && mb_trim($this->recordKey) === '')
             || $this->limit < 1
             || $this->limit > 25) {
             throw new InvalidArgumentException('Graph tool expand input is outside the allowed range.');

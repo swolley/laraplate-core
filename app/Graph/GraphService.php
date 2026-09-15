@@ -126,7 +126,7 @@ final class GraphService
             return [$requestData->graphRelations, false];
         }
 
-        $module = strtolower((string) $requestData->module);
+        $module = mb_strtolower((string) $requestData->module);
         $provider = $this->providers->providerFor($module, $requestData->mainEntity);
         $relations = $provider?->defaultRelations($module, $requestData->mainEntity) ?? [];
 

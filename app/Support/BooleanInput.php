@@ -87,7 +87,7 @@ final class BooleanInput
             return false;
         }
 
-        $cast = strtolower(str_contains($cast, ':') ? strstr($cast, ':', true) ?: $cast : $cast);
+        $cast = mb_strtolower(str_contains($cast, ':') ? mb_strstr($cast, ':', true) ?: $cast : $cast);
 
         return $cast === 'bool' || $cast === 'boolean';
     }
@@ -99,7 +99,7 @@ final class BooleanInput
                 continue;
             }
 
-            if (strtolower(trim(explode(':', $rule, 2)[0])) === 'boolean') {
+            if (mb_strtolower(mb_trim(explode(':', $rule, 2)[0])) === 'boolean') {
                 return true;
             }
         }

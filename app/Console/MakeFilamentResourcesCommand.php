@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
-use function Laravel\Prompts\confirm;
+use function app_path;
 use function class_uses_trait;
 use function is_laraplate_owned_module;
+use function Laravel\Prompts\confirm;
 use function models;
 use function module_path;
 
@@ -105,7 +106,7 @@ final class MakeFilamentResourcesCommand extends Command
             }
 
             if (! confirm(
-                label: class_basename($model_class).'Resource already exists. Overwrite?',
+                label: class_basename($model_class) . 'Resource already exists. Overwrite?',
                 default: false,
             )) {
                 $this->components->warn("{$model_class}: skipped");
@@ -117,7 +118,7 @@ final class MakeFilamentResourcesCommand extends Command
         }
 
         $basename = class_basename($model_class);
-        $model_namespace = (string) Str::of($model_class)->beforeLast('\\'.$basename);
+        $model_namespace = (string) Str::of($model_class)->beforeLast('\\' . $basename);
 
         $parameters = [
             'model' => $basename,
@@ -171,7 +172,7 @@ final class MakeFilamentResourcesCommand extends Command
 
     private function normalizeModule(string $module): string
     {
-        $trimmed = trim($module);
+        $trimmed = mb_trim($module);
 
         if ($trimmed === '' || strcasecmp($trimmed, 'App') === 0) {
             return 'App';
@@ -191,10 +192,10 @@ final class MakeFilamentResourcesCommand extends Command
 
         if ($module === 'App') {
             // Leading `\` avoids Modules\Core\Console\app_path() test overrides.
-            return \app_path($relative);
+            return app_path($relative);
         }
 
-        return module_path($module, 'app/'.$relative);
+        return module_path($module, 'app/' . $relative);
     }
 
     private function resourceNamespace(string $module): string
@@ -203,7 +204,7 @@ final class MakeFilamentResourcesCommand extends Command
             return 'App\\Filament\\Resources';
         }
 
-        return 'Modules\\'.$module.'\\Filament\\Resources';
+        return 'Modules\\' . $module . '\\Filament\\Resources';
     }
 
     /**

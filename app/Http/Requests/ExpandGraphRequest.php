@@ -38,7 +38,7 @@ final class ExpandGraphRequest extends DetailRequest
                 }
 
                 foreach ($this->input('relations', []) as $relation) {
-                    if (is_string($relation) && substr_count($relation, '.') + 1 > $depth) {
+                    if (is_string($relation) && $depth < mb_substr_count($relation, '.') + 1) {
                         $validator->errors()->add('relations', 'Relation paths cannot be deeper than depth.');
                     }
                 }

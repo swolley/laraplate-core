@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -120,7 +120,7 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         $scope = $request->input('scope');
 
-        if (! is_string($scope) || trim($scope) === '') {
+        if (! is_string($scope) || mb_trim($scope) === '') {
             return;
         }
 
@@ -146,6 +146,7 @@ final class FortifyServiceProvider extends ServiceProvider
 
                 if (config('auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
+
                     if (isset($result['license']->uuid)) {
                         session()->put('license_uuid', $result['license']->uuid);
                     }

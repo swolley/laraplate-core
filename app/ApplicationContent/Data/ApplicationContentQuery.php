@@ -25,7 +25,7 @@ final readonly class ApplicationContentQuery
         int $limit,
     ) {
         $this->source = ApplicationContentSourceDescriptor::normalizeSource($source);
-        $this->query = trim($query);
+        $this->query = mb_trim($query);
         $maximum_query_chars = min(
             self::HARD_MAX_QUERY_CHARS,
             max(1, (int) config('application-content.max_query_chars', 2000)),
@@ -33,7 +33,7 @@ final readonly class ApplicationContentQuery
 
         if ($this->query === ''
             || ! mb_check_encoding($this->query, 'UTF-8')
-            || mb_strlen($this->query) > $maximum_query_chars) {
+            || $maximum_query_chars < mb_strlen($this->query)) {
             throw new InvalidArgumentException('Application content query is invalid.');
         }
 
