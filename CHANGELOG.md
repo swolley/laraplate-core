@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [1.77.0] - 2026-09-15
 
 ### 🚀 Features
 
@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 - *(core)* Say that settings cache invalidates per group
 - *(search)* Document the retrieval pipeline and in-app notifications
+- *(changelog)* Regenerate with the corrected git-cliff configuration
+- Releases are run from the application
 
 ### 🎨 Styling
 
