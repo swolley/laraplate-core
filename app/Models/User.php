@@ -73,7 +73,9 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
     }
     use HasValidity;
     use HasVersions;
-    use Impersonate;
+    use Impersonate {
+        isImpersonated as private isImpersonatedTrait;
+    }
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
@@ -257,6 +259,19 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmai
         }
 
         return $this->isValid($at ?? Date::now());
+    }
+
+    /**
+     * Whether the current session is impersonating a user.
+     *
+     * Typed redeclaration of the trait method, which declares no return type.
+     * The state is session-backed, not a property of this row: it answers
+     * "is this request an impersonation" and is therefore identical for every
+     * user instance, and false wherever there is no session (console, queue).
+     */
+    public function isImpersonated(): bool
+    {
+        return $this->isImpersonatedTrait();
     }
 
     public function canImpersonate(): bool

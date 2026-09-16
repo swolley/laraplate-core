@@ -433,6 +433,18 @@ it('getImpersonator returns self when not impersonating', function (): void {
     expect($user->getImpersonator()->is($user))->toBeTrue();
 });
 
+it('isImpersonated reflects the impersonation manager state', function (): void {
+    $user = User::factory()->create();
+
+    expect($user->isImpersonated())->toBeFalse();
+
+    $this->mock(ImpersonateManager::class, function ($mock): void {
+        $mock->shouldReceive('isImpersonating')->andReturnTrue();
+    });
+
+    expect($user->isImpersonated())->toBeTrue();
+});
+
 it('resolves approval permission from modifiable type when relation is missing', function (): void {
     $user = User::factory()->create();
     $modification = Modification::query()->create([
