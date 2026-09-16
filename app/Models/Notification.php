@@ -14,9 +14,6 @@ use Illuminate\Notifications\DatabaseNotification;
  * mirrors the `data->scope` key so a module-scoped tray can filter at the database
  * level. The mirror is maintained here — on save — rather than in every producer,
  * and stays portable across PostgreSQL and SQLite (no DB-specific generated column).
- *
- * @mixin \Eloquent
- * @mixin IdeHelperNotification
  */
 final class Notification extends DatabaseNotification
 {

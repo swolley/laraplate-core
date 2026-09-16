@@ -23,12 +23,6 @@ use Override;
 use Symfony\Component\Finder\Exception\DirectoryNotFoundException;
 use UnexpectedValueException;
 
-/**
- * @property string|Collection<int, string> $primaryKey
- *
- * @mixin \Eloquent
- * @mixin IdeHelperDynamicEntity
- */
 final class DynamicEntity extends Model
 {
     // no need to override table here, it's dynamically injected by code

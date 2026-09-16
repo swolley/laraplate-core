@@ -19,18 +19,6 @@ use Override;
  * create a bootstrap dependency that fails exactly when the ledger is most
  * needed. {@see OutboxEvent} follows the same pattern
  * for the same reason.
- *
- * @property int $id
- * @property string $run_id
- * @property string $node
- * @property string $status
- * @property string|null $content_hash
- * @property \Illuminate\Support\Carbon $started_at
- * @property \Illuminate\Support\Carbon|null $finished_at
- * @property string|null $error
- *
- * @mixin \Eloquent
- * @mixin IdeHelperSeedRun
  */
 final class SeedRun extends Model
 {

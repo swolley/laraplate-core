@@ -17,13 +17,6 @@ use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
-/**
- * @property-read object $options
- *
- * @mixin \Illuminate\Database\Eloquent\Model
- * @mixin \Eloquent
- * @mixin IdeHelperField
- */
 #[ObservedBy(FieldObserver::class)]
 final class Field extends Model
 {

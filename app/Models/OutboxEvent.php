@@ -10,20 +10,6 @@ use Override;
 
 /**
  * Transactional integration event awaiting publication to an external transport.
- *
- * @property int $id
- * @property string $event_id
- * @property string $event_type
- * @property string $aggregate_type
- * @property string $aggregate_id
- * @property array<string, mixed> $payload
- * @property \Carbon\CarbonImmutable $occurred_at
- * @property \Carbon\CarbonImmutable|null $published_at
- * @property int $publish_attempts
- * @property string|null $last_error
- *
- * @mixin \Eloquent
- * @mixin IdeHelperOutboxEvent
  */
 final class OutboxEvent extends Model
 {

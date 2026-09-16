@@ -12,10 +12,6 @@ use Modules\Core\Observers\ModelHasRoleObserver;
 use Override;
 
 #[ObservedBy([ModelHasRoleObserver::class])]
-/**
- * @mixin \Eloquent
- * @mixin IdeHelperModelHasRole
- */
 final class ModelHasRole extends MorphPivot
 {
     use HasFactory;

@@ -19,29 +19,6 @@ use Override;
  * chosen target entity and column mapping, the run status and the per-outcome
  * counters. It is the durable record a preview reads from, the queued job advances,
  * and the UI polls for progress.
- *
- * @property int $id
- * @property int|null $user_id
- * @property string $entity_key
- * @property ImportSourceFormat $source_format
- * @property string $file_disk
- * @property string $file_path
- * @property string $original_filename
- * @property ImportSessionStatus $status
- * @property list<string>|null $detected_columns
- * @property array<string, string>|null $mapping
- * @property array<string, mixed>|null $options
- * @property int|null $total_rows
- * @property int $processed_rows
- * @property int $created_rows
- * @property int $updated_rows
- * @property int $skipped_rows
- * @property int $failed_rows
- * @property \Illuminate\Support\Carbon|null $started_at
- * @property \Illuminate\Support\Carbon|null $finished_at
- *
- * @mixin \Eloquent
- * @mixin IdeHelperImportSession
  */
 final class ImportSession extends Model
 {

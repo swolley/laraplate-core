@@ -19,19 +19,6 @@ use Override;
  * Tracks the provenance of any record: which external source it originates from
  * (imported entities) or a manual attribution. Also acts as the import identity
  * registry, mapping an external source id to a local record.
- *
- * @property int $id
- * @property string $referable_type
- * @property int $referable_id
- * @property string $source_key
- * @property string|null $source_label
- * @property string|null $external_id
- * @property string|null $fingerprint
- * @property string|null $url
- * @property CarbonImmutable|null $source_updated_at
- *
- * @mixin \Eloquent
- * @mixin IdeHelperRecordOrigin
  */
 final class RecordOrigin extends Model
 {

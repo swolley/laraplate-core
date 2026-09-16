@@ -17,12 +17,6 @@ use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 use Overtrue\LaravelVersionable\VersionStrategy;
 
-/**
- * @property VersionStrategy $version_strategy
- *
- * @mixin \Illuminate\Database\Eloquent\Model
- * @mixin IdeHelperVersion
- */
 final class Version extends OvertrueVersion
 {
     use HasFactory;

@@ -12,17 +12,6 @@ use Modules\Core\Database\Factories\ModelEmbeddingFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
-/**
- * @property int|null $id
- * @property array<int, float>|null $embedding
- * @property int|null $model_id
- * @property string|null $model_type
- * @property string|null $locale
- * @property string|null $model_key
- *
- * @mixin \Eloquent
- * @mixin IdeHelperModelEmbedding
- */
 final class ModelEmbedding extends Model
 {
     use HasFactory;

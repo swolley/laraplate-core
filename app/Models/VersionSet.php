@@ -12,15 +12,6 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionSetKind;
 use Override;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property VersionSetKind $kind
- * @property int|null $reverted_from_set_id
- *
- * @mixin \Eloquent
- * @mixin IdeHelperVersionSet
- */
 final class VersionSet extends Model
 {
     /**

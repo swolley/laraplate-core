@@ -26,10 +26,6 @@ use Override;
 use Spatie\EloquentSortable\Sortable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-/**
- * @mixin \Eloquent
- * @mixin IdeHelperTaxonomy
- */
 abstract class Taxonomy extends Model implements Sortable
 {
     // region Traits

@@ -15,10 +15,6 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
-/**
- * @mixin \Eloquent
- * @mixin IdeHelperPermission
- */
 final class Permission extends ModelsPermission
 {
     use HasCache;

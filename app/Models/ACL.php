@@ -26,20 +26,6 @@ use Override;
  * - If a role has NO ACL → inherit from parent role
  * - If unrestricted=true → no filters applied (full access)
  * - Multiple non-hierarchical roles → combine with OR (union)
- *
- * @property int $id
- * @property int $permission_id
- * @property int|null $role_id
- * @property FiltersGroup|null $filters
- * @property array<string, mixed>|null $sort
- * @property string|null $description
- * @property bool $unrestricted
- * @property int $priority
- * @property bool $is_active
- *
- * @mixin \Illuminate\Database\Eloquent\Model
- * @mixin \Eloquent
- * @mixin IdeHelperACL
  */
 #[ObservedBy([AclObserver::class])]
 final class ACL extends Model

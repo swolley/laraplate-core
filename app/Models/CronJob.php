@@ -14,13 +14,6 @@ use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
-/**
- * @property string $command
- * @property string|CronExpressionCast $schedule
- *
- * @mixin \Eloquent
- * @mixin IdeHelperCronJob
- */
 final class CronJob extends Model
 {
     // region Traits

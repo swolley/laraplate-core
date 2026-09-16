@@ -14,12 +14,6 @@ use Override;
 
 /**
  * Canonical postal / geographic payload shared across modules (e.g. Cms Location, Business Site).
- *
- * @method static whereDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, float $distance)
- * @method static orderByDistance(\MatanYadaev\EloquentSpatial\Objects\Point $point, string $direction = 'asc')
- *
- * @mixin \Eloquent
- * @mixin IdeHelperPlace
  */
 class Place extends Model
 {

@@ -15,15 +15,6 @@ use Override;
  * One row that could not be imported: its 1-based position, the field → messages
  * that explain why, and the raw mapped row. Together these back the downloadable
  * per-row failure report and let a user fix the source and re-import.
- *
- * @property int $id
- * @property int $import_session_id
- * @property int $row_number
- * @property array<string, list<string>> $errors
- * @property array<string, string>|null $raw
- *
- * @mixin \Eloquent
- * @mixin IdeHelperImportRowError
  */
 final class ImportRowError extends Model
 {
