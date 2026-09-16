@@ -22,11 +22,14 @@ return new class extends Migration
             $table->string('source_key')->comment('Machine key of the origin source, e.g. naxos_api');
             $table->string('source_label')->nullable()->comment('Human-readable name of the origin source');
             $table->string('external_id')->nullable()->comment('Identifier of the record in the origin source, null for manual origins');
+            $table->char('fingerprint', 64)->nullable();
             $table->string('url', 2048)->nullable()->comment('Link to the record in the origin source');
+            $table->timestamp('source_updated_at')->nullable();
 
             MigrateUtils::timestamps($table, hasCreateUpdate: true);
 
             $table->unique(['referable_type', 'source_key', 'external_id'], "{$table_name}_identity_UN");
+            $table->index(['source_key', 'source_updated_at'], "{$table_name}_source_updated_IDX");
         });
     }
 

@@ -35,6 +35,13 @@ return new class() extends Migration
             $table->addColumn('enum', 'type', ['allowed' => $types, 'length' => 20])->comment('The type of the setting');
             $table->string('group_name')->nullable(false)->index("{$settings_table}_group_name_IDX")->comment('The group name of the setting');
             $table->string('description')->nullable(false)->comment('The description of the setting');
+            $table->string('module')
+                ->nullable(true)
+                ->index("{$settings_table}_module_IDX")
+                ->comment('Owning module, null when the setting was not written by a seeder');
+            $table->json('seeded_value')
+                ->nullable(true)
+                ->comment('Last value written by the seeder; drift is value !== seeded_value');
 
             MigrateUtils::timestamps(
                 $table,

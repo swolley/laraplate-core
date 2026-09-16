@@ -31,6 +31,7 @@ return new class() extends Migration
 
             $table->foreign(['modification_id'])->references('id')->on(CoreTables::Modifications->value)->cascadeOnDelete();
             $table->index(['disapprover_id', 'disapprover_type'], "{$disapprovals_table}_disapproverable_IDX");
+            $table->unique(['modification_id', 'disapprover_id', 'disapprover_type'], 'disapprovals_actor_vote_uq');
         });
     }
 
