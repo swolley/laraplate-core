@@ -32,6 +32,7 @@ return new class extends Migration
 
             $table->unique(['entity_id', 'name', 'deleted_at'], "{$presets_table}_UN");
             $table->unique(['entity_id', 'id'], "{$presets_table}_ids_UN");
+            MigrateUtils::prefixIndex($table, 'template_id');
         });
     }
 

@@ -41,6 +41,7 @@ return new class() extends Migration
             );
 
             $table->foreign('license_id', "{$users_table}_licenses_FK")->references('id')->on(CoreTables::Licenses->value)->nullOnDelete();
+            MigrateUtils::prefixIndex($table, 'license_id');
         });
     }
 

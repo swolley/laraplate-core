@@ -36,6 +36,7 @@ return new class extends Migration
             $table->index(['permission_id', 'deleted_at'], "{$acls_table}_permissions_IDX");
             $table->index(['permission_id', 'is_active', 'deleted_at'], "{$acls_table}_active_IDX");
             $table->index(['permission_id', 'role_id', 'is_active', 'deleted_at'], "{$acls_table}_role_active_IDX");
+            MigrateUtils::prefixIndex($table, 'role_id');
 
             MigrateUtils::timestamps(
                 $table,

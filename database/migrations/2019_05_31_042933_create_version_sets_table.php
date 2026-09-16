@@ -42,6 +42,8 @@ return new class() extends Migration
 
             $table->unique('uuid', 'vsets_uuid_UN');
             $table->index(['root_type', 'root_id'], 'vsets_root_IDX');
+            MigrateUtils::prefixIndex($table, 'user_id');
+            MigrateUtils::prefixIndex($table, 'reverted_from_set_id');
             $reverted_from_foreign_key = $table->foreign('reverted_from_set_id', 'vsets_reverted_FK')
                 ->references('id')
                 ->on($table_name);

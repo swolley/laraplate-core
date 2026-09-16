@@ -43,6 +43,7 @@ return new class extends Migration
             MigrateUtils::timestamps($table, hasCreateUpdate: true);
 
             $table->index(['entity_key', 'status'], "{$table_name}_entity_status_IDX");
+            MigrateUtils::prefixIndex($table, 'user_id');
         });
     }
 

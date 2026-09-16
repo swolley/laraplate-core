@@ -40,6 +40,9 @@ return new class extends Migration
             // Unique constraints for name and slug are now in taxonomies_translations table (per locale)
             $table->unique(['id', 'parent_id'], "{$taxonomies_table}_parent_UN");
             $table->unique(['id', 'entity_id'], "{$taxonomies_table}_entity_UN");
+            MigrateUtils::prefixIndex($table, 'entity_id');
+            MigrateUtils::prefixIndex($table, 'presettable_id');
+            MigrateUtils::prefixIndex($table, 'parent_id');
         });
 
         // Evita auto-relazione (categoria che punta sé stessa)

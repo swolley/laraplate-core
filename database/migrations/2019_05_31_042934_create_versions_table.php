@@ -52,6 +52,7 @@ return new class() extends Migration
             );
 
             $table->index(['versionable_id', 'versionable_type'], "{$table_name}_versionable_IDX");
+            MigrateUtils::prefixIndex($table, 'user_id');
             $table->unique(['version_set_id', 'sequence'], 'versions_set_sequence_UN');
             $table->foreign('version_set_id', 'versions_set_FK')
                 ->references('id')

@@ -201,6 +201,7 @@ return new class() extends Migration
         $schema->table($roles_table, function (Blueprint $table) use ($roles_table): void {
             $table->unsignedBigInteger('parent_id')->nullable()->comment('The parent id of the role');
             $table->foreign('parent_id', "{$roles_table}_parent_role_FK")->references('id')->on($roles_table)->nullOnDelete();
+            MigrateUtils::prefixIndex($table, 'parent_id');
         });
 
         $schema->create($model_has_permissions_table, function (Blueprint $table) use ($connection, $model_has_permissions_table, $columnNames, $pivotPermission, $teams, $permissions_table): void {
@@ -292,6 +293,7 @@ return new class() extends Migration
             );
 
             $table->primary([$pivotPermission, $pivotRole], "{$role_has_permissions_table}_primary");
+            MigrateUtils::prefixIndex($table, $pivotRole);
         });
 
         app('cache')

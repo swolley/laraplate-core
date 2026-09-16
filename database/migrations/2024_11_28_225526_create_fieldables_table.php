@@ -30,6 +30,7 @@ return new class extends Migration
             );
 
             $table->unique(['preset_id', 'field_id'], "{$fieldables_table}_UN");
+            MigrateUtils::prefixIndex($table, 'field_id');
         });
     }
 
