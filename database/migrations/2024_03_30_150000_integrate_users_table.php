@@ -29,6 +29,9 @@ return new class() extends Migration
                 $table->timestamp('two_factor_confirmed_at')->after('two_factor_recovery_codes')->nullable()->comment('The two factor confirmed date of the user');
             }
 
+            $table->boolean('is_first_login')->default(true)->comment('Whether the account still needs the first-login onboarding flow');
+            $table->json('preferences')->nullable()->comment('Server-persisted UI preferences (theme, density, layout) synced from the SPA');
+
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
