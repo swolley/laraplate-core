@@ -415,12 +415,19 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         /** @var array<string, mixed> $searchable */
         $searchable = $builder->model->toSearchableArray();
 
+        // Scout declares both as a bare `array`; they are column names, and the
+        // parent signature asks for list<string>.
+        /** @var list<string> $prefix_columns */
+        $prefix_columns = array_values($this->getPrefixColumns($builder));
+        /** @var list<string> $full_text_columns */
+        $full_text_columns = array_values($this->getFullTextColumns($builder));
+
         /** @var EloquentBuilder<Model> */
         return $this->initializeSearchQuery(
             $builder,
             array_keys($searchable),
-            $this->getPrefixColumns($builder),
-            $this->getFullTextColumns($builder),
+            $prefix_columns,
+            $full_text_columns,
         );
     }
 
