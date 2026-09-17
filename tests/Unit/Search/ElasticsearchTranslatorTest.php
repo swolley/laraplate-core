@@ -25,6 +25,19 @@ it('maps a locale object field to per-language analyzers', function (): void {
         ->and($title['properties']['en'])->toMatchArray(['type' => 'text', 'analyzer' => 'english']);
 });
 
+it('maps a geocode field to a bare geo_point without the obsolete lat_lon parameter', function (): void {
+    $schema = new SchemaDefinition('cms_locations');
+    $schema->addField(new FieldDefinition('geocode', FieldType::Geocode, [IndexType::Filterable]));
+
+    $mapping = (new ElasticsearchTranslator)->translate($schema);
+    $geocode = $mapping['mappings']['properties']['geocode'];
+
+    // lat_lon was removed in Elasticsearch 5.0; emitting it makes index
+    // creation fail with mapper_parsing_exception on any modern cluster.
+    expect($geocode['type'])->toBe('geo_point')
+        ->and($geocode)->not->toHaveKey('lat_lon');
+});
+
 it('maps a vector-carrying array field to a nested dense_vector', function (): void {
     $schema = new SchemaDefinition('cms_contents');
     $schema->addField(new FieldDefinition('embeddings', FieldType::Array, [IndexType::Searchable, IndexType::Vector], [
