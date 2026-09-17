@@ -625,7 +625,8 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [matanyadaev/laravel-eloquent-spatial](https://github.com/matanyadaev/laravel-eloquent-spatial): Spatial types for Eloquent.
 
--   **Development and Testing:**
+-   **Development and Testing** (declared by the application, not by this module — the module's
+    `require-dev` was removed on 2026-09-15 and the toolchain lives in the root `composer.json`):
 
     -   [pestphp/pest](https://github.com/pestphp/pest) (+ stressless, type-coverage, laravel plugins).
     -   [laravel/pint](https://github.com/laravel/pint): Code style fixer.
