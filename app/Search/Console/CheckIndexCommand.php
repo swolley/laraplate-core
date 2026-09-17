@@ -61,12 +61,24 @@ final class CheckIndexCommand extends Command
 
                 // Existence is not enough: a field whose type drifted (e.g. text -> object)
                 // keeps the index present but breaks every write. Engines exposing
-                // checkIndexStructure validate the live mapping against the model schema.
-                $structure_ok = ! is_callable([$engine, 'checkIndexStructure']) || (bool) $engine->checkIndexStructure($model_instance);
+                // structureMismatches list the fields whose live mapping diverges.
+                $mismatches = is_callable([$engine, 'structureMismatches'])
+                    ? (array) $engine->structureMismatches($model_instance)
+                    : [];
 
-                if (! $structure_ok) {
+                if ($mismatches !== []) {
                     $structure_mismatches[] = $model;
-                    $this->warn('Model ' . $model . ' has a stale index structure: the live mapping no longer matches the model schema. Recreate the index (scout:delete-index then scout:index) — reindexing alone will not fix a changed field type.');
+
+                    $this->warn('Model ' . $model . ' has a stale index structure; the live mapping no longer matches the model schema:');
+
+                    foreach ($mismatches as $mismatch) {
+                        $this->warn('  - ' . $mismatch);
+                    }
+
+                    $this->warn('  A changed field type cannot be patched — recreate the index (drops and rebuilds it):');
+                    $this->line(sprintf('  php artisan scout:delete-index "%s" && php artisan scout:index "%s"', $model, $model));
+                    $this->warn('  If the only differences are new/missing fields, patch without dropping data instead:');
+                    $this->line(sprintf('  php artisan scout:sync-mapping "%s"', $model));
                 }
             }
 
@@ -84,7 +96,7 @@ final class CheckIndexCommand extends Command
             }
 
             if ($structure_mismatches !== []) {
-                $this->error('Stale index structure (recreate with scout:delete-index then scout:index): ' . implode(', ', $structure_mismatches));
+                $this->error('Stale index structure detected for: ' . implode(', ', $structure_mismatches));
 
                 return BaseCommand::FAILURE;
             }

@@ -680,6 +680,20 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     public function checkIndexStructure(string|Model $model): bool
     {
+        return $this->structureMismatches($model) === [];
+    }
+
+    /**
+     * The declared-vs-live mapping mismatches for a model's index, as
+     * human-readable lines (dotted field paths). Empty when the structure
+     * matches and — failing open — when the index is missing, its mapping is
+     * unreadable, or the model exposes no schema, so only a genuine, existing
+     * divergence is reported.
+     *
+     * @return list<string>
+     */
+    public function structureMismatches(string|Model $model): array
+    {
         try {
             if ($model instanceof Model) {
                 $instance = $model;
@@ -688,15 +702,15 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                 $instance = new $model();
                 $collection = $instance->searchableAs();
             } else {
-                return true;
+                return [];
             }
 
             if ($collection === null || ! method_exists($instance, 'getSearchMapping')) {
-                return true;
+                return [];
             }
 
             if (! $this->indexManager->exists($collection)) {
-                return true;
+                return [];
             }
 
             $expected = $instance->getSearchMapping();
@@ -707,12 +721,12 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             $live_properties = ElasticsearchService::getInstance()->getMapping($collection);
 
             if ($expected_properties === [] || $live_properties === []) {
-                return true;
+                return [];
             }
 
-            return MappingStructureComparator::matches($expected_properties, $live_properties);
+            return MappingStructureComparator::diff($expected_properties, $live_properties);
         } catch (Exception) {
-            return true;
+            return [];
         }
     }
 

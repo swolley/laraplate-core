@@ -49,3 +49,32 @@ it('detects a drifted object sub-field type', function (): void {
 
     expect(MappingStructureComparator::matches($expected, $live))->toBeFalse();
 });
+
+it('diff describes a drifted top-level field type', function (): void {
+    $expected = ['title' => ['type' => 'object', 'properties' => ['it' => ['type' => 'text']]]];
+    $live = ['title' => ['type' => 'text']];
+
+    expect(MappingStructureComparator::diff($expected, $live))
+        ->toBe(["field 'title' is 'text' in the live index but the model declares 'object'"]);
+});
+
+it('diff reports a missing field and a drifted object sub-field with dotted paths', function (): void {
+    $expected = [
+        'title' => ['type' => 'object', 'properties' => ['it' => ['type' => 'text'], 'en' => ['type' => 'text']]],
+        'embeddings' => ['type' => 'nested'],
+    ];
+    $live = [
+        'title' => ['properties' => ['it' => ['type' => 'text'], 'en' => ['type' => 'keyword']]],
+    ];
+
+    expect(MappingStructureComparator::diff($expected, $live))
+        ->toContain("field 'title.en' is 'keyword' in the live index but the model declares 'text'")
+        ->toContain("field 'embeddings' is declared by the model but missing from the live index");
+});
+
+it('diff is empty when the structure matches', function (): void {
+    $expected = ['title' => ['type' => 'text']];
+    $live = ['title' => ['type' => 'text'], 'extra' => ['type' => 'keyword']];
+
+    expect(MappingStructureComparator::diff($expected, $live))->toBe([]);
+});
