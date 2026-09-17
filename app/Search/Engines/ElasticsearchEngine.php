@@ -130,7 +130,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                 $mapped = [];
 
                 foreach ($properties as $name => $definition) {
-                    $mapped[$name] = is_array($definition) ? $this->stringifyFieldMeta($definition) : $definition;
+                    $mapped[$name] = is_array($definition) ? self::sanitizeMappingProperty($definition) : $definition;
                 }
 
                 ElasticsearchService::getInstance()->createIndex(
@@ -780,19 +780,34 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     /**
-     * Cast a field's `meta` values to strings before the mapping reaches
-     * Elasticsearch: ES field `meta` accepts only string values, while the
-     * schema translator keeps app-facing flags (e.g. `filterable`) as booleans
-     * for the in-memory constraint layer. Defensive — the `embedding` vector
-     * field carries no meta today, but this keeps the applied mapping ES-valid
-     * if it ever does.
+     * Make a translated field definition valid for Elasticsearch before the
+     * mapping reaches the cluster. Applied recursively to a property and its
+     * `properties`/`fields` subtrees.
+     *
+     * Two rules:
+     *  - `object` and `nested` field types accept neither `meta` nor `index`
+     *    (nor `doc_values`); ES rejects the whole mapping with a 400 otherwise
+     *    (`mapper_parsing_exception ... unsupported parameters`). The schema
+     *    translator still emits those keys on relation fields
+     *    (tags/contributors/categories/locations) because the in-app constraint
+     *    layer reads them back from `getSearchMapping()`
+     *    (see ScoutSearchConstraintApplier); they are therefore stripped here,
+     *    at index-creation time, rather than at the translator.
+     *  - leaf field `meta` accepts only string values, while the translator
+     *    keeps app-facing flags (e.g. `filterable`) as booleans; cast them.
+     *    Leaf `index`/`doc_values` (including a `dense_vector`'s `index: true`)
+     *    are valid and kept.
      *
      * @param  array<string, mixed>  $field
      * @return array<string, mixed>
      */
-    private function stringifyFieldMeta(array $field): array
+    private static function sanitizeMappingProperty(array $field): array
     {
-        if (isset($field['meta']) && is_array($field['meta'])) {
+        $type = $field['type'] ?? null;
+
+        if ($type === 'object' || $type === 'nested') {
+            unset($field['meta'], $field['index'], $field['doc_values']);
+        } elseif (isset($field['meta']) && is_array($field['meta'])) {
             $field['meta'] = array_map(
                 static fn (mixed $value): string => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value,
                 $field['meta'],
@@ -802,7 +817,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if (isset($field['properties']) && is_array($field['properties'])) {
             foreach ($field['properties'] as $name => $sub) {
                 if (is_array($sub)) {
-                    $field['properties'][$name] = $this->stringifyFieldMeta($sub);
+                    $field['properties'][$name] = self::sanitizeMappingProperty($sub);
                 }
             }
         }
@@ -810,7 +825,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if (isset($field['fields']) && is_array($field['fields'])) {
             foreach ($field['fields'] as $name => $sub) {
                 if (is_array($sub)) {
-                    $field['fields'][$name] = $this->stringifyFieldMeta($sub);
+                    $field['fields'][$name] = self::sanitizeMappingProperty($sub);
                 }
             }
         }

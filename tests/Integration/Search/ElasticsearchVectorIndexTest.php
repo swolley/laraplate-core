@@ -108,7 +108,10 @@ it('orders a paginated vector search by similarity, not by id', function (): voi
  * `embedding` field. Before this fix, ES dynamically mapped everything else,
  * so per-language analyzers (title.it/title.en) and the nested `embeddings`
  * dense_vector sub-field were never applied and the analyzers/kNN field could
- * not exist. Skips when Elasticsearch is not the configured engine or is
+ * not exist. It must also strip `meta`/`index` from `nested`/`object` relation
+ * fields (`tags`): ES rejects those parameters on those types, so applying the
+ * unsanitised mapping fails with a 400 mapper_parsing_exception (the cutover
+ * blocker). Skips when Elasticsearch is not the configured engine or is
  * unreachable, so it is a no-op in CI without ES.
  */
 it('applies the full field mapping, including locale analyzers and a nested vector, on index creation', function (): void {
@@ -138,13 +141,21 @@ it('applies the full field mapping, including locale analyzers and a nested vect
 
         $title = $properties['title'] ?? null;
         $embeddings = $properties['embeddings'] ?? null;
+        $tags = $properties['tags'] ?? null;
 
         expect($title)->not->toBeNull()
             ->and($title['properties']['it']['analyzer'])->toBe('italian')
             ->and($title['properties']['en']['analyzer'])->toBe('english')
             ->and($embeddings)->not->toBeNull()
             ->and($embeddings['type'])->toBe('nested')
-            ->and($embeddings['properties']['vector']['type'])->toBe('dense_vector');
+            ->and($embeddings['properties']['vector']['type'])->toBe('dense_vector')
+            // The relation field is applied as a nested type with no meta/index
+            // on the container (ES would 400 otherwise); its sub-properties stay.
+            ->and($tags)->not->toBeNull()
+            ->and($tags['type'])->toBe('nested')
+            ->and($tags)->not->toHaveKey('meta')
+            ->and($tags['properties']['id']['type'])->toBe('integer')
+            ->and($tags['properties']['name']['type'])->toBe('keyword');
     } finally {
         try {
             $service->deleteIndex($index);
