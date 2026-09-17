@@ -40,9 +40,10 @@ final class CheckIndexCommand extends Command
                 $modeles = array_filter(models(), static fn (string $model): bool => in_array(Searchable::class, class_uses_recursive($model), true));
             }
 
-            $wrong_or_missing_indexes = [];
+            $missing_indexes = [];
+            $structure_mismatches = [];
 
-            foreach ($modeles as &$model) {
+            foreach ($modeles as $model) {
                 $this->info('Checking model ' . $model);
                 $model_instance = new $model();
                 $engine = $model_instance->searchableUsing();
@@ -52,22 +53,40 @@ final class CheckIndexCommand extends Command
                 $index_ok = ! is_callable([$engine, 'checkIndex']) || (bool) $engine->checkIndex($model_instance);
 
                 if (! $index_ok) {
-                    $wrong_or_missing_indexes[] = $model;
+                    $missing_indexes[] = $model;
                     $this->warn('Model ' . $model . ' has a wrong or missing index.');
+
+                    continue;
+                }
+
+                // Existence is not enough: a field whose type drifted (e.g. text -> object)
+                // keeps the index present but breaks every write. Engines exposing
+                // checkIndexStructure validate the live mapping against the model schema.
+                $structure_ok = ! is_callable([$engine, 'checkIndexStructure']) || (bool) $engine->checkIndexStructure($model_instance);
+
+                if (! $structure_ok) {
+                    $structure_mismatches[] = $model;
+                    $this->warn('Model ' . $model . ' has a stale index structure: the live mapping no longer matches the model schema. Recreate the index (scout:delete-index then scout:index) — reindexing alone will not fix a changed field type.');
                 }
             }
 
-            if ($wrong_or_missing_indexes === []) {
+            if ($missing_indexes === [] && $structure_mismatches === []) {
                 $this->info('All models have the correct indexes.');
 
                 return BaseCommand::SUCCESS;
             }
 
-            if (confirm('Do you want to reindex the unmatched models?')) {
+            if ($missing_indexes !== [] && confirm('Do you want to reindex the models with a missing index?')) {
                 Bus::chain(
-                    collect($wrong_or_missing_indexes)->map(static fn (string $model): object => new ReindexSearchJob($model)),
+                    collect($missing_indexes)->map(static fn (string $model): object => new ReindexSearchJob($model)),
                 )->dispatch();
-                $this->info('Reindexing has been queued for the unmatched models.');
+                $this->info('Reindexing has been queued for the models with a missing index.');
+            }
+
+            if ($structure_mismatches !== []) {
+                $this->error('Stale index structure (recreate with scout:delete-index then scout:index): ' . implode(', ', $structure_mismatches));
+
+                return BaseCommand::FAILURE;
             }
 
             return BaseCommand::SUCCESS;

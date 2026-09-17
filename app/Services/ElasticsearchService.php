@@ -11,6 +11,7 @@ use Elastic\Elasticsearch\Exception\MissingParameterException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Search\Exceptions\ElasticsearchException;
+use Throwable;
 
 final class ElasticsearchService
 {
@@ -130,6 +131,30 @@ final class ElasticsearchService
             ]);
 
             throw new ElasticsearchException('Error deleting index: ' . $e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Read the live field mapping (`properties`) of an index. Returns an empty
+     * array when the index is missing or unreadable, so callers can treat an
+     * empty result as "cannot validate" rather than "structure is wrong".
+     *
+     * @return array<string, mixed>
+     */
+    public function getMapping(string $index): array
+    {
+        try {
+            $response = $this->client->indices()->getMapping(['index' => $index])->asArray();
+            $properties = $response[$index]['mappings']['properties'] ?? null;
+
+            return is_array($properties) ? $properties : [];
+        } catch (Throwable $e) {
+            Log::error('Elasticsearch get mapping error', [
+                'index' => $index,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
         }
     }
 

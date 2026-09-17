@@ -19,6 +19,7 @@ use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Schema\MappingStructureComparator;
 use Modules\Core\Search\Services\SearchQueryAnalyzer;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
@@ -663,6 +664,55 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
             return $this->indexManager->exists($collection);
         } catch (Exception) {
             return false;
+        }
+    }
+
+    /**
+     * Verify the live index mapping still matches the model's declared schema.
+     *
+     * checkIndex() only proves the index exists; it cannot see that a field's
+     * type drifted (e.g. `title` was `text` and the model now declares an
+     * `object` with per-locale sub-fields), which makes every write fail with a
+     * document_parsing_exception. This compares declared field types against the
+     * live mapping and returns false when they diverge. Missing indexes and
+     * unreadable mappings fail open, so only a genuine, existing mismatch is
+     * flagged.
+     */
+    public function checkIndexStructure(string|Model $model): bool
+    {
+        try {
+            if ($model instanceof Model) {
+                $instance = $model;
+                $collection = $this->resolveSearchableCollectionName($model);
+            } elseif (class_exists($model)) {
+                $instance = new $model();
+                $collection = $instance->searchableAs();
+            } else {
+                return true;
+            }
+
+            if ($collection === null || ! method_exists($instance, 'getSearchMapping')) {
+                return true;
+            }
+
+            if (! $this->indexManager->exists($collection)) {
+                return true;
+            }
+
+            $expected = $instance->getSearchMapping();
+            $expected_properties = is_array($expected['mappings']['properties'] ?? null)
+                ? $expected['mappings']['properties']
+                : [];
+
+            $live_properties = ElasticsearchService::getInstance()->getMapping($collection);
+
+            if ($expected_properties === [] || $live_properties === []) {
+                return true;
+            }
+
+            return MappingStructureComparator::matches($expected_properties, $live_properties);
+        } catch (Exception) {
+            return true;
         }
     }
 
