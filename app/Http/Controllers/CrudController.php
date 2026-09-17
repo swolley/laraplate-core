@@ -353,7 +353,7 @@ class CrudController extends Controller
         $model = $requestData->model;
 
         try {
-            $record = $model->newQuery()->findOrFail($request->input('id'));
+            $record = $model->newQuery()->whereKey($request->input('id'))->firstOrFail();
 
             /** @var \Modules\Core\Models\User $user */
             $user = $request->user();

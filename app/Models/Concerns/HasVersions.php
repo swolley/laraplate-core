@@ -293,7 +293,7 @@ trait HasVersions
      */
     public function revertToVersion(int|string $id): bool
     {
-        $version = $this->versions()->findOrFail($id);
+        $version = $this->versions()->whereKey($id)->firstOrFail();
 
         return (bool) app(VersionSetManagerInterface::class)->run(
             VersionSetRoot::forModel($this),

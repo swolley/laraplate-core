@@ -53,7 +53,7 @@ final class NotificationController extends Controller
      */
     public function markRead(Request $request, string $notification): JsonResponse
     {
-        $model = $this->user($request)->notifications()->findOrFail($notification);
+        $model = $this->user($request)->notifications()->whereKey($notification)->firstOrFail();
         $model->markAsRead();
 
         return response()->json(['data' => $this->present($model)]);
