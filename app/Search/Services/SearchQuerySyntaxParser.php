@@ -24,11 +24,18 @@ final readonly class SearchQuerySyntaxParser
         $free = [];
         $required_terms = [];
         $required_phrases = [];
-        $length = mb_strlen($query);
+
+        // Scanning happens over characters, never over the raw string. `$query[$i]`
+        // indexes bytes, so on an accented query a byte offset and a
+        // character-counting mb_* call disagree by one position per accent, and the
+        // parser hands back fragments of the words it was given: "città" arrives as
+        // "tà", and the phrase after it loses its first characters too.
+        $chars = mb_str_split($query);
+        $length = count($chars);
         $offset = 0;
 
         while ($offset < $length) {
-            while ($offset < $length && ctype_space($query[$offset])) {
+            while ($offset < $length && ctype_space($chars[$offset])) {
                 $offset++;
             }
 
@@ -36,12 +43,12 @@ final readonly class SearchQuerySyntaxParser
                 break;
             }
 
-            $quoted_offset = $query[$offset] === '"'
+            $quoted_offset = $chars[$offset] === '"'
                 ? $offset
-                : (($query[$offset] === '+' && ($query[$offset + 1] ?? null) === '"') ? $offset + 1 : null);
+                : (($chars[$offset] === '+' && ($chars[$offset + 1] ?? null) === '"') ? $offset + 1 : null);
 
             if ($quoted_offset !== null) {
-                [$phrase, $next_offset, $closed] = $this->readQuoted($query, $quoted_offset);
+                [$phrase, $next_offset, $closed] = $this->readQuoted($chars, $quoted_offset);
 
                 if ($closed) {
                     if ($phrase !== '') {
@@ -53,18 +60,18 @@ final readonly class SearchQuerySyntaxParser
                     continue;
                 }
 
-                $free[] = mb_trim($this->unescape(mb_substr($query, $quoted_offset + 1)));
+                $free[] = mb_trim($this->unescape(implode('', array_slice($chars, $quoted_offset + 1))));
 
                 break;
             }
 
             $end = $offset;
 
-            while ($end < $length && ! ctype_space($query[$end])) {
+            while ($end < $length && ! ctype_space($chars[$end])) {
                 $end++;
             }
 
-            $token = $this->unescape(mb_substr($query, $offset, $end - $offset));
+            $token = $this->unescape(implode('', array_slice($chars, $offset, $end - $offset)));
 
             if (str_starts_with($token, '+') && mb_strlen($token) > 1) {
                 $required_terms[] = mb_substr($token, 1);
@@ -83,27 +90,28 @@ final readonly class SearchQuerySyntaxParser
     }
 
     /**
+     * @param  list<string>  $chars  the query split into characters
      * @return array{0: string, 1: int, 2: bool}
      */
-    private function readQuoted(string $query, int $quoteOffset): array
+    private function readQuoted(array $chars, int $quoteOffset): array
     {
         $value = '';
-        $length = mb_strlen($query);
+        $length = count($chars);
         $offset = $quoteOffset + 1;
 
         while ($offset < $length) {
-            if ($query[$offset] === '\\' && ($query[$offset + 1] ?? null) !== null) {
-                $value .= $query[$offset + 1];
+            if ($chars[$offset] === '\\' && ($chars[$offset + 1] ?? null) !== null) {
+                $value .= $chars[$offset + 1];
                 $offset += 2;
 
                 continue;
             }
 
-            if ($query[$offset] === '"') {
+            if ($chars[$offset] === '"') {
                 return [mb_trim($value), $offset + 1, true];
             }
 
-            $value .= $query[$offset];
+            $value .= $chars[$offset];
             $offset++;
         }
 

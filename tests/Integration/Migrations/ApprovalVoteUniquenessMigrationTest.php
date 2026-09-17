@@ -8,25 +8,46 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 
-it('deduplicates historical approval votes before enforcing one vote per actor', function (): void {
-    $connection_name = 'approval-vote-migration-affinity';
-    config()->set("database.connections.{$connection_name}", [
+/**
+ * One actor, one vote per modification. The rule used to arrive in two steps: a
+ * migration deduplicating the historical rows, then a second one adding the
+ * unique index. The second was folded into the create migrations, which now
+ * declare `approvals_actor_vote_uq` and its disapproval twin, so a fresh
+ * database enforces the rule from the first migration onwards.
+ *
+ * The deduplication migration is still here and still runs against databases
+ * that predate the rule, which is what the first test covers. The second covers
+ * what the folded index buys: the duplicate can no longer be written at all.
+ */
+function approvalVoteTestConnection(string $name): Illuminate\Database\Connection
+{
+    config()->set("database.connections.{$name}", [
         'driver' => 'sqlite',
         'database' => ':memory:',
         'prefix' => '',
         'foreign_key_constraints' => false,
     ]);
-    DB::purge($connection_name);
+    DB::purge($name);
 
-    $connection = DB::connection($connection_name);
+    return DB::connection($name);
+}
+
+/**
+ * @return array<string, array{0: string, 1: string}>
+ */
+function approvalVoteTables(): array
+{
+    return [
+        (new Approval())->getTable() => ['approver_id', 'approver_type'],
+        (new Disapproval())->getTable() => ['disapprover_id', 'disapprover_type'],
+    ];
+}
+
+it('deduplicates historical approval votes, keeping the latest', function (): void {
+    $connection = approvalVoteTestConnection('approval-vote-dedup-affinity');
     $schema = $connection->getSchemaBuilder();
-    $approval_table = (new Approval())->getTable();
-    $disapproval_table = (new Disapproval())->getTable();
 
-    foreach ([
-        $approval_table => ['approver_id', 'approver_type'],
-        $disapproval_table => ['disapprover_id', 'disapprover_type'],
-    ] as $table_name => [$actor_id, $actor_type]) {
+    foreach (approvalVoteTables() as $table_name => [$actor_id, $actor_type]) {
         $schema->create($table_name, static function (Blueprint $table) use ($actor_id, $actor_type): void {
             $table->id();
             $table->unsignedBigInteger('modification_id');
@@ -42,72 +63,50 @@ it('deduplicates historical approval votes before enforcing one vote per actor',
     }
 
     $deduplicate = require module_path('Core', 'database/migrations/2026_08_03_201200_deduplicate_approval_votes.php');
-    $add_constraints = require module_path('Core', 'database/migrations/2026_08_03_201206_add_unique_actor_constraints_to_approval_votes.php');
 
-    app('migrator')->usingConnection($connection_name, static function () use (
-        $add_constraints,
-        $approval_table,
-        $connection,
-        $deduplicate,
-        $disapproval_table,
-        $schema,
-    ): void {
+    app('migrator')->usingConnection('approval-vote-dedup-affinity', static function () use ($deduplicate): void {
         $deduplicate->up();
 
-        $connection->table($approval_table)->insert([
-            'id' => 3,
-            'modification_id' => 10,
-            'approver_id' => 20,
-            'approver_type' => 'user',
-            'reason' => 'approval inserted during deploy',
-        ]);
-        $connection->table($disapproval_table)->insert([
-            'id' => 3,
-            'modification_id' => 10,
-            'disapprover_id' => 20,
-            'disapprover_type' => 'user',
-            'reason' => 'disapproval inserted during deploy',
-        ]);
-
+        // Running it twice is what a redeploy does; it must stay a no-op.
         $deduplicate->up();
-        $schema->table($approval_table, static function (Blueprint $table): void {
-            $table->unique(
-                ['modification_id', 'approver_id', 'approver_type'],
-                'approvals_actor_vote_uq',
-            );
-        });
-        $connection->table($disapproval_table)->insert([
-            'id' => 4,
-            'modification_id' => 10,
-            'disapprover_id' => 20,
-            'disapprover_type' => 'user',
-            'reason' => 'disapproval inserted after partial DDL',
-        ]);
-
-        $add_constraints->up();
-
-        expect($connection->table($approval_table)->pluck('reason')->all())->toBe(['approval inserted during deploy'])
-            ->and($connection->table($disapproval_table)->pluck('reason')->all())->toBe(['disapproval inserted after partial DDL'])
-            ->and(fn () => $connection->table($approval_table)->insert([
-                'modification_id' => 10,
-                'approver_id' => 20,
-                'approver_type' => 'user',
-                'reason' => 'duplicate',
-            ]))->toThrow(QueryException::class)
-            ->and(fn () => $connection->table($disapproval_table)->insert([
-                'modification_id' => 10,
-                'disapprover_id' => 20,
-                'disapprover_type' => 'user',
-                'reason' => 'duplicate',
-            ]))->toThrow(QueryException::class);
-
-        $add_constraints->down();
-
-        expect(fn () => $connection->table($approval_table)->insert([
-            'modification_id' => 10,
-            'approver_id' => 20,
-            'approver_type' => 'user',
-            'reason' => 'allowed after rollback',
-        ]))->not->toThrow(QueryException::class);
     });
+
+    foreach (array_keys(approvalVoteTables()) as $table_name) {
+        expect($connection->table($table_name)->pluck('reason')->all())->toBe(['latest']);
+    }
+});
+
+it('refuses a second vote from the same actor once the index is in place', function (): void {
+    $connection = approvalVoteTestConnection('approval-vote-unique-affinity');
+    $schema = $connection->getSchemaBuilder();
+
+    foreach (approvalVoteTables() as $table_name => [$actor_id, $actor_type]) {
+        $schema->create($table_name, static function (Blueprint $table) use ($actor_id, $actor_type, $table_name): void {
+            $table->id();
+            $table->unsignedBigInteger('modification_id');
+            $table->unsignedBigInteger($actor_id);
+            $table->string($actor_type);
+            $table->text('reason')->nullable();
+            $table->unique(['modification_id', $actor_id, $actor_type], "{$table_name}_actor_vote_uq");
+        });
+
+        $connection->table($table_name)->insert([
+            'modification_id' => 10, $actor_id => 20, $actor_type => 'user', 'reason' => 'first',
+        ]);
+    }
+
+    foreach (approvalVoteTables() as $table_name => [$actor_id, $actor_type]) {
+        expect(fn () => $connection->table($table_name)->insert([
+            'modification_id' => 10, $actor_id => 20, $actor_type => 'user', 'reason' => 'duplicate',
+        ]))->toThrow(QueryException::class);
+    }
+});
+
+it('declares the unique index in the create migrations', function (): void {
+    foreach ([
+        'database/migrations/2024_03_30_161513_create_approvals_table.php' => 'approvals_actor_vote_uq',
+        'database/migrations/2024_03_30_161513_create_disapprovals_table.php' => 'disapprovals_actor_vote_uq',
+    ] as $migration => $index_name) {
+        expect((string) file_get_contents(module_path('Core', $migration)))->toContain($index_name);
+    }
 });
