@@ -34,6 +34,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
@@ -50,7 +51,7 @@ use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, IValidatableModel, MustVerifyEmail
+class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail
 {
     use ApprovesChanges;
 

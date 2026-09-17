@@ -6,6 +6,7 @@ namespace Modules\Core\Models\Pivot;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
@@ -14,7 +15,7 @@ use Modules\Core\Overrides\Pivot;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 
-abstract class Presettable extends Pivot
+abstract class Presettable extends Pivot implements ISoftDeletableModel
 {
     use SoftDeletes;
 

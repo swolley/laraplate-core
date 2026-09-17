@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Database\Factories\RoleFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -25,7 +26,7 @@ use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-final class Role extends BaseRole implements ILockableModel
+final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
 {
     use HasCache;
     use HasFactory;
