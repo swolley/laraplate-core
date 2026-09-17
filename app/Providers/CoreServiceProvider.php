@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Console\RouteListCommand as LaravelRouteListCommand;
+use Illuminate\Queue\Console\MonitorCommand as LaravelQueueMonitorCommand;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
@@ -67,6 +68,7 @@ use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
+use Modules\Core\Overrides\QueueMonitorCommand;
 use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Performance\SubprocessBootSampler;
@@ -622,6 +624,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
             $this->app->singleton(LaravelRouteListCommand::class, static function (Application $app): RouteListCommand {
                 return new RouteListCommand($app['router']);
+            });
+
+            $this->app->singleton(LaravelQueueMonitorCommand::class, static function (Application $app): QueueMonitorCommand {
+                return new QueueMonitorCommand($app['queue'], $app['events']);
             });
         });
     }
