@@ -32,6 +32,10 @@ function resolveFactor(SeedCommand $command): float
     return $method->invoke($command);
 }
 
+it('resolves --pico to a thousandth-scale factor', function (): void {
+    expect(resolveFactor(seedCommandWithInput(['--dev' => true, '--pico' => true])))->toBe(0.001);
+});
+
 it('resolves --micro to a hundredth-scale factor', function (): void {
     expect(resolveFactor(seedCommandWithInput(['--dev' => true, '--micro' => true])))->toBe(0.01);
 });
@@ -48,11 +52,15 @@ it('resolves --max to a full-scale factor', function (): void {
     expect(resolveFactor(seedCommandWithInput(['--dev' => true, '--max' => true])))->toBe(1.0);
 });
 
-it('defaults to micro scale when no flag is set', function (): void {
-    expect(resolveFactor(seedCommandWithInput(['--dev' => true])))->toBe(0.01);
+it('defaults to pico scale when no flag is set', function (): void {
+    expect(resolveFactor(seedCommandWithInput(['--dev' => true])))->toBe(0.001);
 });
 
-it('lets --micro win over every other flag', function (): void {
+it('lets --pico win over every other flag', function (): void {
+    expect(resolveFactor(seedCommandWithInput(['--dev' => true, '--pico' => true, '--micro' => true, '--min' => true, '--mid' => true, '--max' => true])))->toBe(0.001);
+});
+
+it('lets --micro win over the coarser flags', function (): void {
     expect(resolveFactor(seedCommandWithInput(['--dev' => true, '--micro' => true, '--min' => true, '--mid' => true, '--max' => true])))->toBe(0.01);
 });
 

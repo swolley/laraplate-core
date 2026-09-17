@@ -84,14 +84,24 @@ trait Searchable
             // Emit event instead of calling job directly
             // Listeners will handle pre-processing (embeddings, translations, etc.)
             // and finalize listener will dispatch IndexInSearchJob when all are completed
-            $event = new ModelRequiresIndexing($model, $sync);
-            event($event);
+            //
+            // Tolerated per model, because in sync mode a listener runs IndexInSearchJob
+            // here and that job rethrows so a queue worker can retry it. Without this
+            // the rethrow leaves the two guarded blocks below untouched and takes the
+            // domain write down with it, which is the opposite of what they promise.
+            $this->degradeWhenSearchEngineUnreachable(
+                'dispatch indexing',
+                function () use ($model, $sync): void {
+                    $event = new ModelRequiresIndexing($model, $sync);
+                    event($event);
 
-            // Save event in cache for the finalize listener
-            if (! $sync) {
-                $cache_key = "model_indexing:{$model->getTable()}:{$model->getKey()}";
-                \Illuminate\Support\Facades\Cache::put($cache_key, $event, now()->addMinutes(10));
-            }
+                    // Save event in cache for the finalize listener
+                    if (! $sync) {
+                        $cache_key = "model_indexing:{$model->getTable()}:{$model->getKey()}";
+                        \Illuminate\Support\Facades\Cache::put($cache_key, $event, now()->addMinutes(10));
+                    }
+                },
+            );
         }
 
         // If sync mode, the finalize listener will handle everything synchronously
@@ -119,8 +129,15 @@ trait Searchable
 
         foreach ($models as $model) {
             // Emit event for sync mode
-            $event = new ModelRequiresIndexing($model, true);
-            event($event);
+            //
+            // Guarded for the same reason as in queueMakeSearchable(): the listener
+            // runs IndexInSearchJob inline, and that job rethrows.
+            $this->degradeWhenSearchEngineUnreachable(
+                'dispatch indexing',
+                static function () use ($model): void {
+                    event(new ModelRequiresIndexing($model, true));
+                },
+            );
 
             // In sync mode, listeners will handle everything synchronously
             // The finalize listener will dispatch IndexInSearchJob immediately

@@ -21,7 +21,8 @@ trait ResolvesDevSeedScale
 {
     /**
      * Dev-seed volume multipliers by scale flag, in precedence order: the first
-     * flag present wins. Absent flags fall through to the full (max) target.
+     * flag present wins. With no flag set the smallest (pico) target is used, so
+     * an unqualified dev seed stays cheap.
      */
     private const array DEV_SEED_SCALE_FACTORS = ['pico' => 0.001, 'micro' => 0.01, 'min' => 0.1, 'mid' => 0.5, 'max' => 1.0];
 
@@ -31,18 +32,18 @@ trait ResolvesDevSeedScale
     protected function devSeedScaleOptions(): array
     {
         return [
-            ['pico', null, InputOption::VALUE_NONE, 'Scale dev record volume to 0.1% of the target count'],
+            ['pico', null, InputOption::VALUE_NONE, 'Scale dev record volume to 0.1% of the target count (default)'],
             ['micro', null, InputOption::VALUE_NONE, 'Scale dev record volume to 1% of the target count'],
             ['min', null, InputOption::VALUE_NONE, 'Scale dev record volume to 10% of the target count'],
             ['mid', null, InputOption::VALUE_NONE, 'Scale dev record volume to 50% of the target count'],
-            ['max', null, InputOption::VALUE_NONE, 'Scale dev record volume to 100% of the target count (default)'],
+            ['max', null, InputOption::VALUE_NONE, 'Scale dev record volume to 100% of the target count'],
         ];
     }
 
     /**
      * Resolve the dev-seed volume multiplier from the scale flags. Precedence
-     * follows {@see self::DEV_SEED_SCALE_FACTORS}; with no flag set the full
-     * (max) target is used.
+     * follows {@see self::DEV_SEED_SCALE_FACTORS}; with no flag set the smallest
+     * (pico) target is used.
      */
     protected function resolveDevSeedScale(): float
     {
