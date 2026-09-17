@@ -26,6 +26,8 @@ use Override;
  * - If a role has NO ACL → inherit from parent role
  * - If unrestricted=true → no filters applied (full access)
  * - Multiple non-hierarchical roles → combine with OR (union)
+ *
+ * @mixin IdeHelperACL
  */
 #[ObservedBy([AclObserver::class])]
 final class ACL extends Model

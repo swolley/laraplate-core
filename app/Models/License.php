@@ -17,6 +17,9 @@ use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 
+/**
+ * @mixin IdeHelperLicense
+ */
 final class License extends Model
 {
     use HasFactory;

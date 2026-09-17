@@ -10,6 +10,8 @@ use Override;
 
 /**
  * Transactional integration event awaiting publication to an external transport.
+ *
+ * @mixin IdeHelperOutboxEvent
  */
 final class OutboxEvent extends Model
 {

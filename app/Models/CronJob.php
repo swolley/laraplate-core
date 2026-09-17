@@ -14,6 +14,9 @@ use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
+/**
+ * @mixin IdeHelperCronJob
+ */
 final class CronJob extends Model
 {
     // region Traits

@@ -16,6 +16,9 @@ use Modules\Core\Overrides\Pivot;
 use Override;
 use Spatie\EloquentSortable\Sortable;
 
+/**
+ * @mixin IdeHelperFieldable
+ */
 #[ObservedBy([FieldableObserver::class, DynamicContentMetadataObserver::class])]
 final class Fieldable extends Pivot implements Sortable
 {

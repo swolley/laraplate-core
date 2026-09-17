@@ -19,6 +19,8 @@ use Override;
  * create a bootstrap dependency that fails exactly when the ledger is most
  * needed. {@see OutboxEvent} follows the same pattern
  * for the same reason.
+ *
+ * @mixin IdeHelperSeedRun
  */
 final class SeedRun extends Model
 {

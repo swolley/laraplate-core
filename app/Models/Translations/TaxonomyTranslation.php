@@ -10,6 +10,9 @@ use Modules\Core\Overrides\Model;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
 use Override;
 
+/**
+ * @mixin IdeHelperTaxonomyTranslation
+ */
 final class TaxonomyTranslation extends Model implements ITranslated
 {
     use HasSlug;

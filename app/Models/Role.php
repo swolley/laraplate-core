@@ -24,6 +24,9 @@ use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
+/**
+ * @mixin IdeHelperRole
+ */
 final class Role extends BaseRole
 {
     use HasCache;

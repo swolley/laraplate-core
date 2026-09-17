@@ -9,6 +9,9 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
 
+/**
+ * @mixin IdeHelperApproval
+ */
 final class Approval extends BaseApproval
 {
     use HasModerationMeta;

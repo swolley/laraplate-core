@@ -16,6 +16,9 @@ use Modules\Core\Observers\SettingObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
+/**
+ * @mixin IdeHelperSetting
+ */
 #[ObservedBy(SettingObserver::class)]
 final class Setting extends Model
 {

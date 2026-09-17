@@ -17,6 +17,9 @@ use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
+/**
+ * @mixin IdeHelperField
+ */
 #[ObservedBy(FieldObserver::class)]
 final class Field extends Model
 {

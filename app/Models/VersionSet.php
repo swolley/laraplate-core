@@ -12,6 +12,9 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionSetKind;
 use Override;
 
+/**
+ * @mixin IdeHelperVersionSet
+ */
 final class VersionSet extends Model
 {
     /**

@@ -47,6 +47,9 @@ use Override;
 use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
+/**
+ * @mixin IdeHelperUser
+ */
 #[ObservedBy([UserObserver::class])]
 class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmail
 {
