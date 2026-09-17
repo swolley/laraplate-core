@@ -42,6 +42,7 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Contracts\ProvidesFacetLabelSources;
 use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
@@ -2677,7 +2678,7 @@ class CrudService
     /**
      * @return bool whether anything was written
      */
-    private function applyLock(Model $record, LockIntent $intent, bool $is_single): bool
+    private function applyLock(ILockableModel&Model $record, LockIntent $intent, bool $is_single): bool
     {
         $locked = new Locked();
         $owner = $record->getAttribute($locked->lockedByColumn());
@@ -2751,7 +2752,7 @@ class CrudService
     /**
      * @return bool whether anything was written
      */
-    private function applyUnlock(Model $record, ModifyRequestData $requestData, bool $is_single): bool
+    private function applyUnlock(ILockableModel&Model $record, ModifyRequestData $requestData, bool $is_single): bool
     {
         if (! $record->isLocked()) {
             // Already in the target state. Not an error, and not a 304 either: the envelope says so

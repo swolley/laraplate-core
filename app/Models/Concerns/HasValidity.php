@@ -11,9 +11,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
 use InvalidFormatException;
+use Modules\Core\Contracts\IValidatableModel;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
+ * @phpstan-require-implements IValidatableModel
  */
 trait HasValidity
 {

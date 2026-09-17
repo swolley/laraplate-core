@@ -11,9 +11,6 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Observers\ModelHasRoleObserver;
 use Override;
 
-/**
- * @mixin IdeHelperModelHasRole
- */
 #[ObservedBy([ModelHasRoleObserver::class])]
 final class ModelHasRole extends MorphPivot
 {

@@ -9,9 +9,6 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
 
-/**
- * @mixin IdeHelperDisapproval
- */
 final class Disapproval extends BaseDisapproval
 {
     use HasModerationMeta;

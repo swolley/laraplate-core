@@ -9,9 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
-/**
- * @mixin IdeHelperModification
- */
 final class Modification extends ApprovalModification
 {
     use HasFactory;

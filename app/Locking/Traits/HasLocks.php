@@ -10,12 +10,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Services\PerModelSettingResolver;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
+ * @phpstan-require-implements ILockableModel
  */
 trait HasLocks
 {

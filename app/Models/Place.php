@@ -15,7 +15,6 @@ use Override;
 /**
  * Canonical postal / geographic payload shared across modules (e.g. Cms Location, Business Site).
  *
- * @mixin IdeHelperPlace
  */
 class Place extends Model
 {

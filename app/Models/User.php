@@ -33,6 +33,8 @@ use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Database\Factories\UserFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -47,11 +49,8 @@ use Override;
 use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
-/**
- * @mixin IdeHelperUser
- */
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmail
+class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmail, ILockableModel, IValidatableModel
 {
     use ApprovesChanges;
 

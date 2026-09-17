@@ -20,7 +20,6 @@ use Override;
  * counters. It is the durable record a preview reads from, the queued job advances,
  * and the UI polls for progress.
  *
- * @mixin IdeHelperImportSession
  */
 final class ImportSession extends Model
 {

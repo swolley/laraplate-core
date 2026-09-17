@@ -6,8 +6,8 @@ namespace Modules\Core\Filament\Utils;
 
 use Filament\Actions\Action;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\User;
 
@@ -68,7 +68,7 @@ trait HasRecordLease
     {
         $record = $this->getRecord();
 
-        if (! $record instanceof Model || new Locked()->doesNotUseHasLocks($record)) {
+        if (! $record instanceof ILockableModel || new Locked()->doesNotUseHasLocks($record)) {
             return;
         }
 

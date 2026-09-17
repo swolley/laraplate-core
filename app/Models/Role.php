@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Database\Factories\RoleFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -24,10 +25,7 @@ use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-/**
- * @mixin IdeHelperRole
- */
-final class Role extends BaseRole
+final class Role extends BaseRole implements ILockableModel
 {
     use HasCache;
     use HasFactory;

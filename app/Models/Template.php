@@ -10,9 +10,6 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Overrides\Model;
 use Override;
 
-/**
- * @mixin IdeHelperTemplate
- */
 final class Template extends Model
 {
     /**

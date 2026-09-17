@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Database\Factories\EntityFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -27,7 +29,7 @@ use Override;
  * @property IDynamicEntityTypable $type
  */
 #[ObservedBy(DynamicContentMetadataObserver::class)]
-abstract class Entity extends Model
+abstract class Entity extends Model implements ILockableModel, IActivatableModel
 {
     // region Traits
     use HasActivation {

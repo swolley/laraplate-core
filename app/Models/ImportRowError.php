@@ -16,7 +16,6 @@ use Override;
  * that explain why, and the raw mapped row. Together these back the downloadable
  * per-row failure report and let a user fix the source and re-import.
  *
- * @mixin IdeHelperImportRowError
  */
 final class ImportRowError extends Model
 {

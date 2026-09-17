@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Casts\ObjectCast;
+use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasApprovals;
@@ -17,11 +18,8 @@ use Modules\Core\Observers\FieldObserver;
 use Modules\Core\Overrides\Model;
 use Override;
 
-/**
- * @mixin IdeHelperField
- */
 #[ObservedBy(FieldObserver::class)]
-final class Field extends Model
+final class Field extends Model implements IActivatableModel
 {
     // region Traits
     use HasActivation {

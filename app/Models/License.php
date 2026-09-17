@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
+use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Database\Factories\LicenseFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasValidations;
@@ -17,10 +18,7 @@ use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\HasVersions;
 use Override;
 
-/**
- * @mixin IdeHelperLicense
- */
-final class License extends Model
+final class License extends Model implements IValidatableModel
 {
     use HasFactory;
     use HasValidations {

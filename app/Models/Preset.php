@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Cache\HasCache;
+use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasActivation;
@@ -29,7 +30,7 @@ use Override;
  * @property int|string|null $template_id
  */
 #[ObservedBy(DynamicContentMetadataObserver::class)]
-abstract class Preset extends Model
+abstract class Preset extends Model implements IActivatableModel
 {
     use HasActivation {
         HasActivation::casts as private activationCasts;

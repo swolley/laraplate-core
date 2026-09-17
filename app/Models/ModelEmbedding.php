@@ -12,9 +12,6 @@ use Modules\Core\Database\Factories\ModelEmbeddingFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
-/**
- * @mixin IdeHelperModelEmbedding
- */
 final class ModelEmbedding extends Model
 {
     use HasFactory;

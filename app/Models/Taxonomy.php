@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
+use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -26,7 +29,7 @@ use Override;
 use Spatie\EloquentSortable\Sortable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-abstract class Taxonomy extends Model implements Sortable
+abstract class Taxonomy extends Model implements Sortable, ILockableModel, IActivatableModel, IValidatableModel
 {
     // region Traits
     use HasActivation {

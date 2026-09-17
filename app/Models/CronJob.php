@@ -6,6 +6,8 @@ namespace Modules\Core\Models;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Casts\CronExpression as CronExpressionCast;
+use Modules\Core\Contracts\IActivatableModel;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Database\Factories\CronJobFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -14,10 +16,7 @@ use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
-/**
- * @mixin IdeHelperCronJob
- */
-final class CronJob extends Model
+final class CronJob extends Model implements ILockableModel, IActivatableModel
 {
     // region Traits
     use HasActivation {

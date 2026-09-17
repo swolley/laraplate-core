@@ -35,6 +35,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
+use Modules\Core\Contracts\IActivatableModel;
+use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Helpers\LocaleContext;
@@ -308,13 +311,13 @@ trait HasTable
                 IconColumn::make('is_locked')
                     ->boolean()
                     ->alignCenter()
-                    ->icon(static fn (Model $record): ?string => match (true) {
+                    ->icon(static fn (ILockableModel&Model $record): ?string => match (true) {
                         ! $record->isLocked() => null,
                         $record->{$record->getLockedByColumn()} === null => 'laraplate-snowflake',
                         default => 'heroicon-o-lock-closed',
                     })
                     ->tooltip(
-                        static function (Model $record): ?string {
+                        static function (ILockableModel&Model $record): ?string {
                             if (! $record->isLocked()) {
                                 return null;
                             }
@@ -438,13 +441,13 @@ trait HasTable
                 Action::make('activate')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedCheckCircle)
-                    ->action(static function (Model $record): void {
+                    ->action(static function (IActivatableModel&Model $record): void {
                         $record->activate();
                     }),
                 Action::make('deactivate')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedXCircle)
-                    ->action(static function (Model $record): void {
+                    ->action(static function (IActivatableModel&Model $record): void {
                         $record->deactivate();
                     }),
             );
@@ -455,21 +458,21 @@ trait HasTable
                 Action::make('publish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedPlay)
-                    ->action(static function (Model $record): void {
+                    ->action(static function (IValidatableModel&Model $record): void {
                         $valid_from_column = $record::validFromKey();
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_from_column => now(), $valid_to_column => null]);
                         $record->refresh();
                     })
-                    ->disabled(static fn (Model $record) => $record->isValid())
-                    ->color(static fn (Model $record): string => $record->isValid() ? 'gray' : 'success')
+                    ->disabled(static fn (IValidatableModel&Model $record) => $record->isValid())
+                    ->color(static fn (IValidatableModel&Model $record): string => $record->isValid() ? 'gray' : 'success')
                     ->requiresConfirmation(),
                 Action::make('unpublish')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedStop)
-                    ->color(static fn (Model $record): string => $record->isDraft() ? 'gray' : 'warning')
-                    ->disabled(static fn (Model $record) => $record->isDraft())
-                    ->action(static function (Model $record): void {
+                    ->color(static fn (IValidatableModel&Model $record): string => $record->isDraft() ? 'gray' : 'warning')
+                    ->disabled(static fn (IValidatableModel&Model $record) => $record->isDraft())
+                    ->action(static function (IValidatableModel&Model $record): void {
                         $valid_to_column = $record::validToKey();
                         $record->update([$valid_to_column => now()]);
                         $record->refresh();
@@ -502,9 +505,9 @@ trait HasTable
                         ->hiddenLabel()
                         ->icon(Heroicon::OutlinedNoSymbol)
                         ->color('warning')
-                        ->visible(static fn (Model $record): bool => ! $record->isLocked())
+                        ->visible(static fn (ILockableModel&Model $record): bool => ! $record->isLocked())
                         ->requiresConfirmation()
-                        ->action(static function (Model $record): void {
+                        ->action(static function (ILockableModel&Model $record): void {
                             // No user: an ownerless lock is a freeze, which blocks everybody.
                             $record->lock();
                         }),
@@ -515,7 +518,7 @@ trait HasTable
                         ->color('warning')
                         ->requiresConfirmation()
                         ->action(static function (Collection $records): void {
-                            $records->each(static fn (Model $record) => $record->isLocked() ? null : $record->lock());
+                            $records->each(static fn (ILockableModel&Model $record) => $record->isLocked() ? null : $record->lock());
                         }),
                 );
             }
@@ -525,9 +528,9 @@ trait HasTable
                     Action::make('unfreeze')
                         ->hiddenLabel()
                         ->icon(Heroicon::OutlinedLockOpen)
-                        ->visible(static fn (Model $record): bool => $record->isLocked())
+                        ->visible(static fn (ILockableModel&Model $record): bool => $record->isLocked())
                         ->requiresConfirmation()
-                        ->action(static function (Model $record): void {
+                        ->action(static function (ILockableModel&Model $record): void {
                             // The permission has already established the right to lift somebody
                             // else's lock, so the trait's own owner check would only get in the way.
                             $record->forceUnlock();
@@ -538,7 +541,7 @@ trait HasTable
                         ->icon(Heroicon::OutlinedLockOpen)
                         ->requiresConfirmation()
                         ->action(static function (Collection $records): void {
-                            $records->each(static fn (Model $record) => $record->isLocked() ? $record->forceUnlock() : null);
+                            $records->each(static fn (ILockableModel&Model $record) => $record->isLocked() ? $record->forceUnlock() : null);
                         }),
                 );
             }

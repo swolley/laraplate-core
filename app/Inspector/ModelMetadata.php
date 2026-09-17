@@ -7,10 +7,10 @@ namespace Modules\Core\Inspector;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Modules\Core\Cache\HasCache;
-use Modules\Core\Locking\Traits\HasLocks;
-use Modules\Core\Models\Concerns\HasActivation;
+use Modules\Core\Contracts\IActivatableModel;
+use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Models\Concerns\HasTranslations;
-use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\SortableTrait;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -74,9 +74,12 @@ final readonly class ModelMetadata
             keyName: $instance->getKeyName(),
             keyType: $instance->getKeyType(),
             hasSoftDeletes: (isset($traits[SoftDeletes::class]) && $instance->softDeletesEnabledBySettings()) || isset($traits[BaseSoftDeletes::class]),
-            hasValidity: isset($traits[HasValidity::class]),
-            hasActivation: isset($traits[HasActivation::class]),
-            hasLocks: isset($traits[HasLocks::class]),
+            // Asked of the contract, not of the trait that satisfies it: a model can
+            // gain validity, activation or locking from somewhere else, and generic
+            // callers narrow on these interfaces anyway.
+            hasValidity: is_a($class, IValidatableModel::class, true),
+            hasActivation: is_a($class, IActivatableModel::class, true),
+            hasLocks: is_a($class, ILockableModel::class, true),
             hasSorts: isset($traits[SortableTrait::class]) || isset($traits[BaseSortableTrait::class]),
             hasSearchable: isset($traits[Searchable::class]),
             hasTranslations: isset($traits[HasTranslations::class]),

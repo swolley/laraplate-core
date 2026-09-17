@@ -6,9 +6,12 @@ namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Contracts\IActivatableModel;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ *
+ * @phpstan-require-implements IActivatableModel
  */
 trait HasActivation
 {

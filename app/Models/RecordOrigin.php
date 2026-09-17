@@ -20,7 +20,6 @@ use Override;
  * (imported entities) or a manual attribution. Also acts as the import identity
  * registry, mapping an external source id to a local record.
  *
- * @mixin IdeHelperRecordOrigin
  */
 final class RecordOrigin extends Model
 {
