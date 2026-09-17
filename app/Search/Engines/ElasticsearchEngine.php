@@ -716,6 +716,63 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
     }
 
+    /**
+     * Additively patch an existing index mapping with the model's current schema.
+     *
+     * Elasticsearch mapping updates are additive: new fields (for example a
+     * `title.<locale>` sub-field introduced when a new language is added) are
+     * created with their analyzer instead of being inferred by dynamic mapping,
+     * while unchanged fields are a no-op. A field whose type actually changed
+     * cannot be patched and is rejected by Elasticsearch, so this returns false
+     * to signal that the index must be recreated instead. It never drops data;
+     * a missing index is left to createIndex().
+     */
+    public function syncMapping(string|Model $model): bool
+    {
+        try {
+            if ($model instanceof Model) {
+                $instance = $model;
+                $collection = $this->resolveSearchableCollectionName($model);
+            } elseif (class_exists($model)) {
+                $instance = new $model();
+                $collection = $instance->searchableAs();
+            } else {
+                return false;
+            }
+
+            if ($collection === null || ! method_exists($instance, 'getSearchMapping')) {
+                return false;
+            }
+
+            if (! $this->indexManager->exists($collection)) {
+                return false;
+            }
+
+            $schema = $instance->getSearchMapping();
+            $properties = is_array($schema['mappings']['properties'] ?? null)
+                ? $schema['mappings']['properties']
+                : [];
+
+            if ($properties === []) {
+                return true;
+            }
+
+            $mapped = [];
+
+            foreach ($properties as $name => $definition) {
+                $mapped[$name] = is_array($definition) ? self::sanitizeMappingProperty($definition) : $definition;
+            }
+
+            // On an existing index ElasticsearchService::createIndex performs an
+            // additive putMapping rather than a recreate, so no data is dropped.
+            ElasticsearchService::getInstance()->createIndex($collection, [], ['properties' => $mapped]);
+
+            return true;
+        } catch (Exception) {
+            return false;
+        }
+    }
+
     //    /**
     //     * @throws ClientResponseException
     //     * @throws ServerResponseException
