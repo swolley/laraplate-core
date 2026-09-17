@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Traits\Searchable;
 
 /**
@@ -12,7 +13,7 @@ use Modules\Core\Search\Traits\Searchable;
  * applies an explicit `dense_vector` embedding mapping to a dedicated index
  * (never the real application indices).
  */
-class VectorMappingStubModel extends Model
+class VectorMappingStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

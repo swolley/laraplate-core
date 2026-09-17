@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Traits\Searchable;
 
@@ -13,7 +14,7 @@ use Modules\Core\Search\Traits\Searchable;
  * Searchable::toSearchableArray() agnostic `embeddings` array against real
  * ModelEmbedding rows (no real search server or Content-sized model needed).
  */
-class VectorEmbeddingsArrayStubModel extends Model
+class VectorEmbeddingsArrayStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

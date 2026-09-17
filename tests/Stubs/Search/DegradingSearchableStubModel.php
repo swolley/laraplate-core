@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Traits\Searchable;
 
 /**
  * Searchable model whose engine is injected, so indexing failures can be
  * exercised without a running search server.
  */
-class DegradingSearchableStubModel extends Model
+class DegradingSearchableStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

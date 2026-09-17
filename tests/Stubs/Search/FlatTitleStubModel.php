@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Traits\Searchable;
 
 /**
@@ -14,7 +15,7 @@ use Modules\Core\Search\Traits\Searchable;
  * keep resolving `fields` to the literal `title`/`*`, not a `title.*` locale
  * wildcard that would never match a flat field.
  */
-class FlatTitleStubModel extends Model
+class FlatTitleStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

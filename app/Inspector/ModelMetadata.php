@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\SortableTrait;
 use Modules\Core\Search\Traits\Searchable;
-use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionClass;
 use Spatie\EloquentSortable\SortableTrait as BaseSortableTrait;
 
@@ -73,7 +73,7 @@ final readonly class ModelMetadata
             incrementing: $instance->getIncrementing(),
             keyName: $instance->getKeyName(),
             keyType: $instance->getKeyType(),
-            hasSoftDeletes: (isset($traits[SoftDeletes::class]) && $instance->softDeletesEnabledBySettings()) || isset($traits[BaseSoftDeletes::class]),
+            hasSoftDeletes: ($instance instanceof ISoftDeletableModel && $instance->softDeletesEnabledBySettings()) || isset($traits[BaseSoftDeletes::class]),
             // Asked of the contract, not of the trait that satisfies it: a model can
             // gain validity, activation or locking from somewhere else, and generic
             // callers narrow on these interfaces anyway.

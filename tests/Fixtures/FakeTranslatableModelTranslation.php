@@ -23,4 +23,3 @@ class FakeTranslatableModelTranslation extends Model implements ITranslated
         'components' => 'array',
     ];
 }
-

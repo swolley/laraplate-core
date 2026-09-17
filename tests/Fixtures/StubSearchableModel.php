@@ -15,11 +15,11 @@ final class StubSearchableModel extends Model
 {
     use Searchable;
 
+    public $incrementing = true;
+
     protected $table = 'settings';
 
     protected $guarded = [];
-
-    public $incrementing = true;
 
     public function getKey()
     {

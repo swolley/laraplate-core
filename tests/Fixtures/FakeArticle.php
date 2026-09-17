@@ -10,6 +10,7 @@ use Modules\Core\Models\Concerns\HasTranslations;
 class FakeArticle extends Model
 {
     use HasTranslations;
+
     protected $table = 'articles';
 
     protected $fillable = [

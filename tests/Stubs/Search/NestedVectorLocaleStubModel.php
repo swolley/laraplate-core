@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Traits\Searchable;
 
 /**
@@ -14,7 +15,7 @@ use Modules\Core\Search\Traits\Searchable;
  * field (ordering by similarity) and applies an optional document-level
  * `locales` filter to the knn query without filtering individual vectors.
  */
-class NestedVectorLocaleStubModel extends Model
+class NestedVectorLocaleStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

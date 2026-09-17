@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Traits\Searchable;
 
 /**
@@ -14,7 +15,7 @@ use Modules\Core\Search\Traits\Searchable;
  * `embeddings` nested `dense_vector` sub-field, shaped exactly like
  * ElasticsearchTranslator::translateField() would produce them.
  */
-class FullMappingStubModel extends Model
+class FullMappingStubModel extends Model implements ISearchableModel
 {
     use Searchable;
 

@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
-use Modules\Core\Tests\Fixtures\FakeTranslatableModelFactory;
 
 class FakeTranslatableModel extends Model
 {
@@ -42,4 +41,3 @@ class FakeTranslatableModel extends Model
         return FakeTranslatableModelFactory::new();
     }
 }
-

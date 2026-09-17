@@ -37,6 +37,8 @@ use InvalidArgumentException as GlobalInvalidArgumentException;
 use LogicException;
 use Modules\Core\Contracts\IActivatableModel;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\ISearchableModel;
+use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Contracts\IValidatableModel;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Filament\FilamentTraitResolver;
@@ -102,7 +104,7 @@ trait HasTable
             self::formatTableDateTimeValue($record->{$updated_at_column}),
         );
 
-        if ($hasSoftDeletes) {
+        if ($hasSoftDeletes && $record instanceof ISoftDeletableModel) {
             $deleted_at_column = $record->getDeletedAtColumn() ?? 'deleted_at';
             $deleted_at = $record->{$deleted_at_column};
 
@@ -552,7 +554,7 @@ trait HasTable
                 Action::make('reindex')
                     ->hiddenLabel()
                     ->icon(Heroicon::ArrowPath)
-                    ->action(static function (Model $record): void {
+                    ->action(static function (ISearchableModel&Model $record): void {
                         $record->reindex();
                     }),
             );
@@ -560,7 +562,7 @@ trait HasTable
                 BulkAction::make('reindex')
                     ->icon(Heroicon::ArrowPath)
                     ->action(static function (Collection $records): void {
-                        $records->each(static fn (Model $record) => $record->reindex());
+                        $records->each(static fn (ISearchableModel&Model $record) => $record->reindex());
                     }),
             );
         }
@@ -660,7 +662,7 @@ trait HasTable
         $default_filters = collect([]);
 
         // FILTERS
-        if ($hasSoftDeletes && self::checkPermissionCached($user, $permissionsPrefix . '.restore')) {
+        if ($hasSoftDeletes && $model_instance instanceof ISoftDeletableModel && self::checkPermissionCached($user, $permissionsPrefix . '.restore')) {
             $deleted_at_column = $model_instance->getDeletedAtColumn();
             $default_filters->push(
                 // TrashedFilter::make(),

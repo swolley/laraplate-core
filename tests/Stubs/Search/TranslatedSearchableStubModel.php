@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Search\Traits\Searchable;
 use Override;
@@ -19,7 +20,7 @@ use Override;
  * no translation row of their own instead of silently reusing the
  * default-locale translation for every available locale.
  */
-class TranslatedSearchableStubModel extends Model
+class TranslatedSearchableStubModel extends Model implements ISearchableModel
 {
     use HasTranslations;
     use Searchable;

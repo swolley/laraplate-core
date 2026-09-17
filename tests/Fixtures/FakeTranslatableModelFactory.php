@@ -41,4 +41,3 @@ final class FakeTranslatableModelFactory extends Factory
         ];
     }
 }
-
