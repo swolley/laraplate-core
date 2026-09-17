@@ -8,7 +8,6 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Observers\AclObserver;
@@ -26,7 +25,6 @@ use Override;
  * - If a role has NO ACL → inherit from parent role
  * - If unrestricted=true → no filters applied (full access)
  * - Multiple non-hierarchical roles → combine with OR (union)
- *
  */
 #[ObservedBy([AclObserver::class])]
 final class ACL extends Model

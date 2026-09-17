@@ -29,7 +29,7 @@ use Override;
  * @property IDynamicEntityTypable $type
  */
 #[ObservedBy(DynamicContentMetadataObserver::class)]
-abstract class Entity extends Model implements ILockableModel, IActivatableModel
+abstract class Entity extends Model implements IActivatableModel, ILockableModel
 {
     // region Traits
     use HasActivation {

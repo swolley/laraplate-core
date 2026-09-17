@@ -29,7 +29,7 @@ use Override;
 use Spatie\EloquentSortable\Sortable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
-abstract class Taxonomy extends Model implements Sortable, ILockableModel, IActivatableModel, IValidatableModel
+abstract class Taxonomy extends Model implements IActivatableModel, ILockableModel, IValidatableModel, Sortable
 {
     // region Traits
     use HasActivation {

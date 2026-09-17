@@ -30,8 +30,8 @@ final readonly class ApplicationContentSourceDescriptor
         public array $intentCategories,
     ) {
         $this->source = self::normalizeSource($source);
-        $this->module = self::normalizeIdentifier($module, 'module');
-        $this->entity = self::normalizeIdentifier($entity, 'entity');
+        $this->module = $this->normalizeIdentifier($module, 'module');
+        $this->entity = $this->normalizeIdentifier($entity, 'entity');
 
         if (! array_is_list($this->supportedLocales)
             || $this->supportedLocales === []
@@ -89,7 +89,7 @@ final readonly class ApplicationContentSourceDescriptor
         return $source;
     }
 
-    private static function normalizeIdentifier(string $value, string $name): string
+    private function normalizeIdentifier(string $value, string $name): string
     {
         $value = mb_strtolower(mb_trim($value));
 

@@ -14,7 +14,6 @@ use Override;
 
 /**
  * Canonical postal / geographic payload shared across modules (e.g. Cms Location, Business Site).
- *
  */
 class Place extends Model
 {

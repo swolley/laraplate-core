@@ -76,7 +76,7 @@ final class ModelSoftDeletesAddCommand extends Command
      * a maintenance command, so the change must apply immediately instead of
      * queueing a modification nobody is going to approve.
      */
-    private static function writeSoftDeletesSetting(Setting $prototype, string $table, bool $enabled): void
+    private function writeSoftDeletesSetting(Setting $prototype, string $table, bool $enabled): void
     {
         $setting = $prototype->newQuery()->firstOrNew([
             'name' => PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table),
@@ -188,7 +188,7 @@ final class ModelSoftDeletesAddCommand extends Command
             return false;
         }
 
-        self::writeSoftDeletesSetting($setting, $table, $enabled);
+        $this->writeSoftDeletesSetting($setting, $table, $enabled);
 
         return true;
     }

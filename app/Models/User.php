@@ -50,7 +50,7 @@ use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, HasOnceHash, MustVerifyEmail, ILockableModel, IValidatableModel
+class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, IValidatableModel, MustVerifyEmail
 {
     use ApprovesChanges;
 

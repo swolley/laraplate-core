@@ -15,7 +15,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
 /**
  * The shared media model owned by Core (the app-wide `media_model`). Any module
  * that uses {@see \Modules\Core\Helpers\HasMedia} stores rows here.
- *
  */
 final class Media extends BaseMedia
 {

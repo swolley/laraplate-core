@@ -39,7 +39,7 @@ final class DomainActionDispatcher
         );
 
         throw_unless(
-            $user->can(self::policyMethodFor($action), $record),
+            $user->can($this->policyMethodFor($action), $record),
             AuthorizationException::class,
             'User not allowed to perform this action',
         );
@@ -52,7 +52,7 @@ final class DomainActionDispatcher
      * method is camelCase, so `force_post` authorizes against `forcePost`.
      * Names already in camelCase pass through unchanged.
      */
-    private static function policyMethodFor(string $action): string
+    private function policyMethodFor(string $action): string
     {
         return Str::camel($action);
     }

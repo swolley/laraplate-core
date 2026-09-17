@@ -19,7 +19,6 @@ use Override;
  * chosen target entity and column mapping, the run status and the per-outcome
  * counters. It is the durable record a preview reads from, the queued job advances,
  * and the UI polls for progress.
- *
  */
 final class ImportSession extends Model
 {

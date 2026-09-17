@@ -65,13 +65,13 @@ class ListRequestData extends SelectRequestData
         $this->extractPagination($validated);
 
         if (! isset($this->limit)) {
-            $this->limit = self::intFromMixed($validated['limit'] ?? null, $this->pagination);
+            $this->limit = $this->intFromMixed($validated['limit'] ?? null, $this->pagination);
         }
 
         $this->count = isset($validated['count']) && (bool) $validated['count'];
         $this->totals = array_key_exists('totals', $validated) && (bool) $validated['totals'];
-        $this->sort = $this->conformSorts(self::sortInput($validated['sort'] ?? []));
-        $this->relations = $this->conformRelations(self::stringList($validated['relations'] ?? []));
+        $this->sort = $this->conformSorts($this->sortInput($validated['sort'] ?? []));
+        $this->relations = $this->conformRelations($this->stringList($validated['relations'] ?? []));
 
         $filters = $validated['filters'] ?? null;
 
@@ -81,7 +81,7 @@ class ListRequestData extends SelectRequestData
             $this->filters = null;
         }
 
-        $group_by = self::stringList($validated['group_by'] ?? []);
+        $group_by = $this->stringList($validated['group_by'] ?? []);
 
         if ($group_by !== []) {
             $this->addGroupsToColumns($group_by);
@@ -132,9 +132,9 @@ class ListRequestData extends SelectRequestData
     {
         if (isset($validated['pagination']) || isset($validated['page'])) {
             $default_pagination = $this->getDefaultPagination();
-            $this->take = self::intFromMixed($validated['pagination'] ?? null, $default_pagination);
-            $this->pagination = self::intFromMixed($validated['pagination'] ?? null, $default_pagination);
-            $this->page = self::intFromMixed($validated['page'] ?? null, 1);
+            $this->take = $this->intFromMixed($validated['pagination'] ?? null, $default_pagination);
+            $this->pagination = $this->intFromMixed($validated['pagination'] ?? null, $default_pagination);
+            $this->page = $this->intFromMixed($validated['page'] ?? null, 1);
             $this->skip = ($this->page - 1) * $this->pagination;
             $this->from = $this->skip + 1;
             // `to` is the inclusive index of the last row on the page, so a page of
@@ -142,17 +142,17 @@ class ListRequestData extends SelectRequestData
             // slices with take(to - from + 1), which must equal `pagination`.
             $this->to = $this->from + $this->pagination - 1;
         } elseif (isset($validated['from']) || isset($validated['to'])) {
-            $this->from = self::intFromMixed($validated['from'] ?? null, 1);
+            $this->from = $this->intFromMixed($validated['from'] ?? null, 1);
             $this->skip = $this->from - 1;
-            $this->to = array_key_exists('to', $validated) ? self::intFromMixed($validated['to'], 0) : null;
+            $this->to = array_key_exists('to', $validated) ? $this->intFromMixed($validated['to'], 0) : null;
 
             if ($this->to !== null && $this->to !== 0) {
                 $this->take = $this->to - $this->from;
                 $this->pagination = $this->to - $this->from;
             }
         } elseif (isset($validated['limit'])) {
-            $this->take = self::intFromMixed($validated['limit'], 1);
-            $this->limit = self::intFromMixed($validated['limit'], 1);
+            $this->take = $this->intFromMixed($validated['limit'], 1);
+            $this->limit = $this->intFromMixed($validated['limit'], 1);
             $this->page = 1;
             $this->skip = 0;
             $this->pagination = $this->limit;
@@ -217,7 +217,7 @@ class ListRequestData extends SelectRequestData
         $filter['value'] = BooleanInput::coerce($filter['value']);
     }
 
-    private static function intFromMixed(mixed $value, int $default): int
+    private function intFromMixed(mixed $value, int $default): int
     {
         if (is_int($value)) {
             return $value;
@@ -237,7 +237,7 @@ class ListRequestData extends SelectRequestData
     /**
      * @return array<int, string>
      */
-    private static function stringList(mixed $value): array
+    private function stringList(mixed $value): array
     {
         if (! is_array($value)) {
             return [];
@@ -257,7 +257,7 @@ class ListRequestData extends SelectRequestData
     /**
      * @return array<int, string|array{property:string,direction:SortDirection|string}>
      */
-    private static function sortInput(mixed $value): array
+    private function sortInput(mixed $value): array
     {
         if (! is_array($value)) {
             return [];

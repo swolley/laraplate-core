@@ -10,7 +10,6 @@ use Override;
 
 /**
  * Transactional integration event awaiting publication to an external transport.
- *
  */
 final class OutboxEvent extends Model
 {

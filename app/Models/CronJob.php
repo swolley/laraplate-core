@@ -16,7 +16,7 @@ use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
 use Override;
 
-final class CronJob extends Model implements ILockableModel, IActivatableModel
+final class CronJob extends Model implements IActivatableModel, ILockableModel
 {
     // region Traits
     use HasActivation {

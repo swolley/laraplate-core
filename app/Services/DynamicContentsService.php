@@ -215,7 +215,7 @@ final class DynamicContentsService
     {
         $this->entities_cache = [];
         $this->forgetRegisteredMemoKeys(self::$registered_entity_memo_keys);
-        self::forgetMemoCacheKey('entities');
+        $this->forgetMemoCacheKey('entities');
         $this->bumpMetadataGeneration();
     }
 
@@ -227,7 +227,7 @@ final class DynamicContentsService
     {
         $this->presets_cache = [];
         $this->forgetRegisteredMemoKeys(self::$registered_preset_memo_keys);
-        self::forgetMemoCacheKey('presets');
+        $this->forgetMemoCacheKey('presets');
         $this->bumpMetadataGeneration();
     }
 
@@ -239,7 +239,7 @@ final class DynamicContentsService
     {
         $this->presettables_cache = [];
         $this->forgetRegisteredMemoKeys(self::$registered_presettable_memo_keys);
-        self::forgetMemoCacheKey('presettables');
+        $this->forgetMemoCacheKey('presettables');
         $this->bumpMetadataGeneration();
     }
 
@@ -254,9 +254,9 @@ final class DynamicContentsService
         $this->forgetRegisteredMemoKeys(self::$registered_entity_memo_keys);
         $this->forgetRegisteredMemoKeys(self::$registered_preset_memo_keys);
         $this->forgetRegisteredMemoKeys(self::$registered_presettable_memo_keys);
-        self::forgetMemoCacheKey('entities');
-        self::forgetMemoCacheKey('presets');
-        self::forgetMemoCacheKey('presettables');
+        $this->forgetMemoCacheKey('entities');
+        $this->forgetMemoCacheKey('presets');
+        $this->forgetMemoCacheKey('presettables');
         $this->bumpMetadataGeneration();
     }
 
@@ -264,7 +264,7 @@ final class DynamicContentsService
      * Laravel's memoized cache layer keeps values in process memory; `cache:clear` only flushes
      * the underlying store, so stale memo entries must be forgotten explicitly.
      */
-    private static function forgetMemoCacheKey(string $key): void
+    private function forgetMemoCacheKey(string $key): void
     {
         Cache::forget($key);
         Cache::memo()->forget($key);
@@ -276,7 +276,7 @@ final class DynamicContentsService
     private function forgetRegisteredMemoKeys(array &$in_memory_keys): void
     {
         foreach ($in_memory_keys as $key) {
-            self::forgetMemoCacheKey($key);
+            $this->forgetMemoCacheKey($key);
         }
 
         $in_memory_keys = [];

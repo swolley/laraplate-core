@@ -22,8 +22,8 @@ abstract readonly class GraphToolInput
         public int $depth,
         public int $relationLimit,
     ) {
-        self::assertIdentifier($this->module, 'module');
-        self::assertIdentifier($this->entity, 'entity');
+        $this->assertIdentifier($this->module, 'module');
+        $this->assertIdentifier($this->entity, 'entity');
 
         if ($this->depth < 1 || $this->depth > self::MAX_DEPTH) {
             throw new InvalidArgumentException('Graph tool depth is outside the allowed range.');
@@ -42,7 +42,7 @@ abstract readonly class GraphToolInput
         }
     }
 
-    private static function assertIdentifier(string $value, string $name): void
+    private function assertIdentifier(string $value, string $name): void
     {
         if (preg_match('/^[A-Za-z][A-Za-z0-9_]*$/', $value) !== 1) {
             throw new InvalidArgumentException("Graph tool {$name} is invalid.");

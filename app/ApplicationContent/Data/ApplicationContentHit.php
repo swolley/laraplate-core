@@ -36,8 +36,8 @@ final readonly class ApplicationContentHit
         public bool $truncated,
     ) {
         $this->source = ApplicationContentSourceDescriptor::normalizeSource($source);
-        $this->module = self::identifier($module);
-        $this->entity = self::identifier($entity);
+        $this->module = $this->identifier($module);
+        $this->entity = $this->identifier($entity);
 
         $maximum_excerpt = min(
             self::HARD_MAX_EXCERPT_CHARS,
@@ -75,7 +75,7 @@ final readonly class ApplicationContentHit
         $this->assertPlainText($this->label);
     }
 
-    private static function identifier(string $value): string
+    private function identifier(string $value): string
     {
         $value = mb_strtolower(mb_trim($value));
 

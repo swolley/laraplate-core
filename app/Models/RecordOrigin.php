@@ -19,7 +19,6 @@ use Override;
  * Tracks the provenance of any record: which external source it originates from
  * (imported entities) or a manual attribution. Also acts as the import identity
  * registry, mapping an external source id to a local record.
- *
  */
 final class RecordOrigin extends Model
 {
