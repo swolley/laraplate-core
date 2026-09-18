@@ -37,7 +37,7 @@ final class SettingFactory extends Factory
         $type = fake()->randomElement(SettingTypeEnum::cases())->value;
 
         return [
-            'name' => fake()->word(),
+            'name' => fake()->word() . '-' . fake()->randomNumber(10, true),
             'value' => match ($type) {
                 SettingTypeEnum::Boolean => fake()->boolean(),
                 SettingTypeEnum::Integer => fake()->randomNumber(),
