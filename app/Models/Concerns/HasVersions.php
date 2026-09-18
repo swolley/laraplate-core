@@ -64,7 +64,12 @@ trait HasVersions
     private ?array $pending_version_update = null;
 
     /**
-     * @var array{strategy: VersionStrategy, original: array<string, mixed>}|null
+     * The delete captured on `deleting`, written on `deleted`. A hard delete keeps
+     * the whole image and has no strategy to apply; a soft delete records the one
+     * column that moved. The declared shape said neither, and named a `strategy`
+     * key the hard branch never sets.
+     *
+     * @var array{mode: 'hard', original: array<string, mixed>}|array{mode: 'soft', strategy: VersionStrategy, deleted_at_column: string, original: array<string, mixed>}|null
      */
     private ?array $pending_version_delete = null;
 
@@ -126,9 +131,10 @@ trait HasVersions
             return false;
         }
 
-        // xxx: fix break change
+        // Three ERP models declare their own rule; the method is protected, so it
+        // cannot live on a contract and method_exists is what asks for it.
         if (method_exists($this, 'shouldVersioning')) {
-            return call_user_func([$this, 'shouldVersioning']);
+            return (bool) $this->shouldVersioning();
         }
 
         $versionableAttributes = $this->getVersionableAttributes($version_strategy);
@@ -137,6 +143,10 @@ trait HasVersions
         return Arr::hasAny($this->getDirty(), array_keys($versionableAttributes));
     }
 
+    /**
+     * @param  array<string, mixed>  $replacements
+     * @return array<string, mixed>
+     */
     public function getOriginalVersionableAttributes(VersionStrategy $strategy, array $replacements = []): array
     {
         $versionable = $this->getVersionable();
@@ -289,7 +299,7 @@ trait HasVersions
 
         $strategy = $raw === false
             ? false
-            : ($raw instanceof VersionStrategy ? $raw : VersionStrategy::from((string) $raw));
+            : ($raw instanceof VersionStrategy ? $raw : VersionStrategy::from(is_scalar($raw) ? (string) $raw : ''));
 
         // Store in L1 for subsequent calls within the same request
         self::$version_strategy_cache[$model_class] = $strategy;
@@ -378,12 +388,17 @@ trait HasVersions
 
     /**
      * alias for created_by.
+     *
+     * @return Attribute<Model|null, never>
      */
     protected function creator(): Attribute
     {
         return $this->createdBy();
     }
 
+    /**
+     * @return Attribute<Model|null, never>
+     */
     protected function createdBy(): Attribute
     {
         return Attribute::make(
@@ -398,6 +413,9 @@ trait HasVersions
         );
     }
 
+    /**
+     * @return Attribute<Model|null, never>
+     */
     protected function modifiedBy(): Attribute
     {
         return Attribute::make(
