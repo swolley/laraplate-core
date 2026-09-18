@@ -44,10 +44,17 @@ trait HasVersions
 
     // protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
+    /** @var list<string> */
     protected array $dontVersionable = ['created_at', 'updated_at'/* , 'deleted_at' */, 'last_login_at'];
 
     protected bool $asyncVersioning = true;
 
+    /**
+     * Attribute names whose value is stored encrypted in the version row. A list
+     * of column names, which is what VersionChange::encryptSelected() expects.
+     *
+     * @var list<string>
+     */
     protected array $encryptedVersionable = [];
 
     /**
@@ -100,7 +107,13 @@ trait HasVersions
         $columns = $this->dontVersionable;
 
         if (method_exists($this, 'lockVersionColumn')) {
-            $columns[] = static::lockVersionColumn();
+            // Only models using HasOptimisticLocking carry the method, and it is
+            // reached through method_exists, so its return type is unknown here.
+            $lock_version_column = static::lockVersionColumn();
+
+            if (is_string($lock_version_column)) {
+                $columns[] = $lock_version_column;
+            }
         }
 
         return array_values(array_unique($columns));
@@ -198,7 +211,7 @@ trait HasVersions
     }
 
     /**
-     * @param  Model&HasVersions  $model
+     * @param  self  $model
      */
     public function createInitialVersion(Model $model): ?Version
     {
@@ -212,7 +225,7 @@ trait HasVersions
         //     return $model->firstVersion()->first();
         // }
 
-        /** @var Model&HasVersions $model */
+        /** @var self $model */
         $contents = $model->filterVersionableImage($model->getAttributes());
 
         return resolve(VersionWriterInterface::class)->write(new VersionChange(
@@ -221,7 +234,7 @@ trait HasVersions
             originalContents: [],
             contents: VersionChange::encryptSelected($contents, $model->encryptedVersionable),
             strategy: VersionStrategy::SNAPSHOT,
-            time: $model->updated_at,
+            time: $model->getAttribute('updated_at') instanceof DateTimeInterface ? $model->getAttribute('updated_at') : null,
             userId: $model->getVersionUserId(),
             encryptedAttributes: $model->encryptedVersionable,
         ));
@@ -313,29 +326,29 @@ trait HasVersions
     protected static function bootHasVersions(): void
     {
         static::created(function (Model $model): void {
-            /** @var Model&HasVersions $model */
+            /** @var self $model */
             if (static::$versioning) {
                 $model->createInitialVersion($model);
             }
         });
 
         static::updating(function (Model $model): void {
-            /** @var Model&HasVersions $model */
+            /** @var self $model */
             $model->capturePendingVersionUpdate();
         });
 
         static::updated(function (Model $model): void {
-            /** @var Model&HasVersions $model */
+            /** @var self $model */
             $model->writePendingVersionUpdate();
         });
 
         static::deleting(function (Model $model): void {
-            /** @var Model&HasVersions $model */
+            /** @var self $model */
             $model->capturePendingVersionDelete();
         });
 
         static::deleted(function (Model $model): void {
-            /** @var Model&HasVersions $model */
+            /** @var self $model */
             $model->writePendingVersionDelete();
         });
     }

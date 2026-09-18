@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Contracts;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * A model whose rows are retired rather than removed, and whose soft deletion can
@@ -16,9 +17,9 @@ use Illuminate\Database\Eloquent\Builder;
  * declared: generic code taking an `Illuminate\Database\Eloquent\Model` cannot know
  * that, and asked for `getDeletedAtColumn()` on faith.
  *
- * @method static Builder<static> onlyTrashed()
- * @method static Builder<static> withTrashed()
- * @method static Builder<static> withoutTrashed()
+ * @method static Builder<Model&static> onlyTrashed()
+ * @method static Builder<Model&static> withTrashed()
+ * @method static Builder<Model&static> withoutTrashed()
  */
 interface ISoftDeletableModel
 {

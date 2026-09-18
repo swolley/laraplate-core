@@ -6,6 +6,7 @@ namespace Modules\Core\Contracts;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
@@ -14,8 +15,18 @@ use Illuminate\Support\Carbon;
  *
  * Supplied in full by {@see \Modules\Core\Models\Concerns\HasValidity}.
  *
- * @method static Builder<static> valid()
- * @method static Builder<static> published()
+ * The query scopes HasValidity declares with #[Scope]. Named here because generic
+ * code holds a Builder it cannot type to a concrete model, and an intersection
+ * with this contract is what tells the analyser the scopes are there.
+ *
+ * @method static Builder<Model&static> valid()
+ * @method static Builder<Model&static> published()
+ * @method static Builder<Model&static> draft()
+ * @method static Builder<Model&static> scheduled()
+ * @method static Builder<Model&static> expired()
+ * @method static Builder<Model&static> validityOrdered()
+ * @method static Builder<Model&static> validAt(Carbon $date)
+ * @method static Builder<Model&static> expiredAt(Carbon $date)
  */
 interface IValidatableModel
 {

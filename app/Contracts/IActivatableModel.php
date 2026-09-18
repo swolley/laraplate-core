@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Contracts;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * A model carrying an on/off flag, whose column it names itself.
@@ -13,8 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
  * code asks for this contract rather than for an Eloquent Model, so a table that
  * renders an activation toggle states the requirement it actually has.
  *
- * @method static Builder<static> active()
- * @method static Builder<static> inactive()
+ * @method static Builder<Model&static> active()
+ * @method static Builder<Model&static> inactive()
  */
 interface IActivatableModel
 {

@@ -6,6 +6,7 @@ namespace Modules\Core\Contracts;
 
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\User;
 
 /**
@@ -17,8 +18,14 @@ use Modules\Core\Models\User;
  * is there. Generic code (Filament tables, CrudService) receives models it cannot
  * name, and `instanceof ILockableModel` is both the runtime check and the type.
  *
- * @method static Builder<static> locked()
- * @method static Builder<static> notLocked()
+ * The query scopes HasLocks declares with #[Scope]. Named here because generic
+ * code holds a Builder it cannot type to a concrete model, and an intersection
+ * with this contract is what tells the analyser the scopes are there.
+ *
+ * @method static Builder<Model&static> locked()
+ * @method static Builder<Model&static> unlocked()
+ * @method static Builder<Model&static> lockedBy(User $user)
+ * @method static Builder<Model&static> unlockedBy(User $user)
  */
 interface ILockableModel
 {

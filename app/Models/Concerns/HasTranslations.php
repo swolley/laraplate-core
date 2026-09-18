@@ -384,7 +384,7 @@ trait HasTranslations
 
         // Handle saved event to save translations (after model has ID)
         static::saved(function (Model $model): void {
-            /** @var Model&HasTranslations $model */
+            /** @var self $model */
             $model->savePendingTranslations();
         });
 
