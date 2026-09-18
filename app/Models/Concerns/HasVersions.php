@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
+use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -106,14 +107,12 @@ trait HasVersions
     {
         $columns = $this->dontVersionable;
 
-        if (method_exists($this, 'lockVersionColumn')) {
-            // Only models using HasOptimisticLocking carry the method, and it is
-            // reached through method_exists, so its return type is unknown here.
-            $lock_version_column = static::lockVersionColumn();
-
-            if (is_string($lock_version_column)) {
-                $columns[] = $lock_version_column;
-            }
+        // Only models that version their writes carry the column, and the contract
+        // is what says so. Called through $this rather than static: the narrowing
+        // applies to the instance, and static:: would be read as the bare trait
+        // user again.
+        if ($this instanceof IOptimisticLockableModel) {
+            $columns[] = $this::lockVersionColumn();
         }
 
         return array_values(array_unique($columns));
@@ -240,16 +239,31 @@ trait HasVersions
         ));
     }
 
+    /**
+     * The user a version is attributed to, or null when the record carries no such
+     * column. Deliberately not falling back to auth()->id() the way the package
+     * does: a version written by a queue worker or a seeder has no user behind it,
+     * and naming whoever happens to be logged in would be a lie.
+     *
+     * @return int|null
+     */
     public function getVersionUserId()
     {
         $user_key = $this->getUserForeignKeyName();
 
-        if (isset($this['attributes'][$user_key])) {
-            return $this->getAttribute($this->getUserForeignKeyName());
+        // Was isset($this['attributes'][$user_key]), which reads an attribute
+        // literally named "attributes" through ArrayAccess: it does not exist, so
+        // the branch never ran and every version was stored with no author.
+        if (! array_key_exists($user_key, $this->getAttributes())) {
+            return null;
         }
 
-        // return auth()->id();
-        return null;
+        // VersionChange stores it as ?int, which is what every user key in this
+        // application is; anything else means the column holds something a version
+        // row cannot reference.
+        $user_id = $this->getAttribute($user_key);
+
+        return is_numeric($user_id) ? (int) $user_id : null;
     }
 
     public function getVersionStrategy(): VersionStrategy|false

@@ -347,3 +347,23 @@ it('does not query DB or access persistent cache on second call for any model cl
     Illuminate\Support\Facades\Cache::shouldNotHaveReceived('remember');
     Illuminate\Support\Facades\Cache::shouldNotHaveReceived('rememberForever');
 })->repeat(10);
+
+it('attributes a version to the record own user column, and to nobody when there is none', function (): void {
+    Schema::create(VersionedArticle::TABLE, function (Blueprint $table): void {
+        $table->id();
+        $table->string('title');
+        $table->unsignedBigInteger('user_id')->nullable();
+        $table->timestamps();
+    });
+
+    // The guard used to read $this['attributes'], an attribute literally named
+    // "attributes" that no model has, so this always answered null.
+    $owned = VersionedArticle::query()->create(['title' => 'owned', 'user_id' => 42]);
+    expect($owned->getVersionUserId())->toBe(42);
+
+    $unowned = VersionedArticle::query()->create(['title' => 'unowned']);
+    expect($unowned->getVersionUserId())->toBeNull();
+
+    $without_column = new VersionableStub();
+    expect($without_column->getVersionUserId())->toBeNull();
+});

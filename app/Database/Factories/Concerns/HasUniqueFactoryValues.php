@@ -17,6 +17,7 @@ trait HasUniqueFactoryValues
      * Generate a unique value using faker with database fallback.
      *
      * @param  callable  $fakerCall  The faker callable(e.g., fn() => fake()->unique()->email())
+     * @param  callable(): string  $fakerCall  Produces one candidate value per call
      * @param  class-string<Model>|null  $modelClass  The model class to check uniqueness against
      * @param  string|null  $column  The column to check for uniqueness
      * @param  int  $maxAttempts  Maximum attempts before using fallback
@@ -67,7 +68,13 @@ trait HasUniqueFactoryValues
             }
         }
 
-        return head($attempting_values);
+        $value = head($attempting_values);
+
+        // The loop above always pushes at least one candidate, so an empty list here
+        // would mean every one of them collided and was diffed away.
+        throw_unless(is_string($value), RuntimeException::class, 'Failed to generate a unique value after ' . $maxAttempts . ' attempts');
+
+        return $value;
     }
 
     /**
@@ -138,6 +145,10 @@ trait HasUniqueFactoryValues
         );
     }
 
+    /**
+     * @param  callable(): string  $fakerCall
+     * @return list<string>
+     */
     private function generateFallbackValues(int $total, callable $fakerCall): array
     {
         $fallback_values = [];
@@ -153,6 +164,9 @@ trait HasUniqueFactoryValues
      * Generate a fallback value when unique() is exhausted.
      *
      * @param  callable  $fakerCall  The original faker callable
+     */
+    /**
+     * @param  callable(): string  $fakerCall
      */
     private function generateFallbackValue(callable $fakerCall): string
     {
