@@ -761,8 +761,27 @@ composer lint               # Fix code style and generate IDE helpers
 
 # Static analysis
 composer check              # Run PHPStan analysis
+composer check:debt         # Count the errors the baseline is holding
 composer fix                # Run PHPStan analysis with auto-fix
 composer refactor           # Run Rector refactoring
+```
+
+`composer check` includes `phpstan-baseline.neon`, so it answers one question:
+did this change make things worse. `[OK] No errors` means nothing new, not
+nothing wrong. It is the one to run before a commit and in CI.
+
+`composer check:debt` runs the same analysis with that include removed and
+reports what is still frozen, broken down by identifier with the number of
+distinct places each one comes from. A large count over few places is a single
+fact reported once per class using a trait, which is usually where the cheap
+fixes are. Add `-- --quiet` for the number alone.
+
+Never add an entry to the baseline by hand. Fix the code, or, when a rule
+genuinely cannot see something that is correct, add a scoped `ignoreErrors` entry
+to `phpstan.neon` with the reason next to it, then regenerate:
+
+```bash
+vendor/bin/phpstan analyse --memory-limit=4G --generate-baseline phpstan-baseline.neon
 ```
 
 ### Version Management
