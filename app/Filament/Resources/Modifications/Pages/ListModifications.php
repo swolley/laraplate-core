@@ -69,7 +69,11 @@ final class ListModifications extends ListRecords
 
         $this->groups[] = Group::make('modifiable_type')
             ->label('Model')
-            ->getTitleFromRecordUsing(fn (Model $record): string => ucfirst($record->modifiable_type));
+            ->getTitleFromRecordUsing(function (Model $record): string {
+                $type = $record->getAttribute('modifiable_type');
+
+                return is_string($type) ? ucfirst($type) : '';
+            });
 
         return $tabs;
     }

@@ -101,7 +101,7 @@ final class DynamicContentsService
      * Fetch available entities for a given type.
      * Uses in-memory cache first, then external cache, then database.
      *
-     * @return Collection<Entity>
+     * @return Collection<int, Entity>
      */
     public function fetchAvailableEntities(IDynamicEntityTypable $type): Collection
     {
@@ -136,7 +136,7 @@ final class DynamicContentsService
      * Fetch available presets for a given type.
      * Uses in-memory cache first, then external cache, then database.
      *
-     * @return Collection<Preset>
+     * @return Collection<int, Preset>
      */
     public function fetchAvailablePresets(IDynamicEntityTypable $type): Collection
     {
@@ -171,7 +171,7 @@ final class DynamicContentsService
      * Fetch available presettables for a given type.
      * Uses in-memory cache first, then external cache, then database.
      *
-     * @return Collection<Presettable>
+     * @return Collection<int, Presettable>
      */
     public function fetchAvailablePresettables(IDynamicEntityTypable $type): Collection
     {

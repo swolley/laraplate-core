@@ -82,7 +82,7 @@ trait HasDynamicContentFactory
      */
     private function fillDynamicContents(Model $model, array $forcedValues = []): void
     {
-        throw_unless($model->entity_id, RuntimeException::class, 'No entity specified for model: ' . $model::class);
+        throw_unless($model->getAttribute('entity_id'), RuntimeException::class, 'No entity specified for model: ' . $model::class);
 
         $fields = $this->resolvePresetFields($model);
 
@@ -136,7 +136,7 @@ trait HasDynamicContentFactory
         }
 
         if ($translatable !== []) {
-            $model->components = $translatable;
+            $model->setAttribute('components', $translatable);
         }
 
         // setAttribute routes 'shared_components' to parent::setAttribute (not translatable,
@@ -148,7 +148,7 @@ trait HasDynamicContentFactory
             && $model->getRawOriginal('slug') === null
             && method_exists($model, 'generateSlug')
         ) {
-            $model->slug = $model->generateSlug();
+            $model->setAttribute('slug', $model->generateSlug());
         }
     }
 
@@ -166,12 +166,13 @@ trait HasDynamicContentFactory
         $type = $model::getEntityType();
         $service = DynamicContentsService::getInstance();
 
-        $presettable = $service->fetchAvailablePresettables($type)->firstWhere('id', $model->presettable_id);
+        $presettable_id = $model->getAttribute('presettable_id');
+        $presettable = $service->fetchAvailablePresettables($type)->firstWhere('id', $presettable_id);
 
         throw_unless(
             $presettable,
             RuntimeException::class,
-            sprintf('No cached presettable [%s] for model [%s].', $model->presettable_id, $model::class),
+            sprintf('No cached presettable [%s] for model [%s].', is_scalar($presettable_id) ? $presettable_id : '?', $model::class),
         );
 
         $preset = $service->fetchAvailablePresets($type)->firstWhere('id', $presettable->preset_id);

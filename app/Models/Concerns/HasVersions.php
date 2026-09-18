@@ -301,7 +301,11 @@ trait HasVersions
             new VersionSetOptions(
                 kind: VersionSetKind::Revert,
                 actor: $this->getVersionUserId(),
-                revertedFrom: $version->version_set_id,
+                // The column is nullable, and VersionSetOptions itself refuses a null
+                // on a revert; passing it through keeps that check where it belongs.
+                revertedFrom: is_numeric($version_set_id = $version->getAttribute('version_set_id'))
+                    ? (int) $version_set_id
+                    : null,
             ),
         );
     }

@@ -267,11 +267,10 @@ trait HasTable
 
             $default_columns->push(
                 ImageColumn::make('translations.locale')
-                    ->state(fn (Model $record): array => collect($record->translations)
-                        ->map(fn (Model $translation): string => url($flag_cdn_service->getUrl($translation->locale, 40, 30, 'webp')))
-                        ->filter()
-                        ->values()
-                        ->all())
+                    // The column is built for whichever model the resource declares, so
+                    // the relation is reachable only by name: getRelationValue() reads the
+                    // loaded one and falls back to loading it, as the magic property does.
+                    ->state(fn (Model $record): array => self::translationFlagUrls($record, $flag_cdn_service))
                     ->stacked()
                     ->overlap(1)
                     ->limit(3)
@@ -835,5 +834,36 @@ trait HasTable
         }
 
         return Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Flag image URLs for a record's translations, one per locale it carries.
+     *
+     * Written out rather than inlined in the column closure because every value on
+     * the way is untyped: the relation is reached by name, its entries are models
+     * whose `locale` column no type declares, and a non-string there means the row
+     * is unusable rather than renderable.
+     *
+     * @return list<string>
+     */
+    private static function translationFlagUrls(Model $record, FlagCDNService $flag_cdn_service): array
+    {
+        $translations = $record->getRelationValue('translations');
+
+        if (! is_iterable($translations)) {
+            return [];
+        }
+
+        $urls = [];
+
+        foreach ($translations as $translation) {
+            $locale = $translation instanceof Model ? $translation->getAttribute('locale') : null;
+
+            if (is_string($locale) && $locale !== '') {
+                $urls[] = url($flag_cdn_service->getUrl($locale, 40, 30, 'webp'));
+            }
+        }
+
+        return $urls;
     }
 }

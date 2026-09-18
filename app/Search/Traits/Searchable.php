@@ -6,6 +6,7 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
@@ -190,7 +191,7 @@ trait Searchable
         // Add embeddings if available (agnostic array: no locale in ES, one entry per ModelEmbedding row)
         if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
             $vectors = $this->embeddings()->get()
-                ->map(static fn ($e): array => ['vector' => $e->embedding])
+                ->map(static fn (Model $e): array => ['vector' => $e->getAttribute('embedding')])
                 ->values()->all();
 
             if ($vectors !== []) {
