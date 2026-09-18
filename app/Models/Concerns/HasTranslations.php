@@ -59,13 +59,15 @@ trait HasTranslations
      * Cached translatable fields to avoid creating new instances.
      * Key: model class name, Value: array of translatable fields.
      *
-     * @var array<class-string, array<string>>
+     * @var array<class-string, list<string>>
      */
     protected static array $cached_translatable_fields = [];
 
     /**
      * Get translatable fields for this model.
      * Cached to avoid creating new instances and potential recursion.
+     *
+     * @return list<string>
      */
     public static function getTranslatableFields(): array
     {
@@ -73,10 +75,12 @@ trait HasTranslations
 
         // Cache per classe per evitare ricorsione durante l'inizializzazione
         if (! isset(static::$cached_translatable_fields[$model_class])) {
-            static::$cached_translatable_fields[$model_class] = array_filter(
+            // array_filter keeps the original keys, and the fields are read by
+            // position everywhere they are used.
+            static::$cached_translatable_fields[$model_class] = array_values(array_filter(
                 (new (static::getTranslationModelClass()))->getFillable(),
                 static fn (string $field): bool => $field !== 'locale' && ! str_ends_with($field, '_id'),
-            );
+            ));
         }
 
         return static::$cached_translatable_fields[$model_class];
@@ -230,6 +234,8 @@ trait HasTranslations
 
     /**
      * Set translation for specific locale.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function setTranslation(string $locale, array $data): self
     {
@@ -252,6 +258,8 @@ trait HasTranslations
 
     /**
      * Update translation for specific locale.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function updateTranslation(string $locale, array $data): self
     {
@@ -271,13 +279,20 @@ trait HasTranslations
     /**
      * Get all translations.
      *
-     * @return Collection<TTranslationModel>
+     * Stated as a collection of models rather than of TTranslationModel: the
+     * relation is reached by name, so what it holds is only known to be models.
+     *
+     * @return Collection<int, Model>
      */
     public function getAllTranslations(): Collection
     {
         return $this->translations;
     }
 
+    /**
+     * @param  array<string, mixed>|null  $parsed
+     * @return array<string, mixed>
+     */
     public function toArray(?array $parsed = null): array
     {
         $content = $parsed ?? (method_exists(parent::class, 'toArray') ? parent::toArray() : $this->attributesToArray());
@@ -391,7 +406,9 @@ trait HasTranslations
         static::created(function (Model $model): void {
             // Check if default translation exists
             $default_locale = config('app.locale');
+            $default_locale = is_string($default_locale) ? $default_locale : null;
 
+            /** @var self $model */
             if (! $model->hasTranslation($default_locale)) {
                 return;
             }
@@ -404,7 +421,8 @@ trait HasTranslations
         static::updated(function (Model $model): void {
             // Only translate if default translation was modified
             $default_locale = config('app.locale');
-            $default_translation = $model->getTranslation($default_locale);
+            /** @var self $model */
+            $default_translation = $model->getTranslation(is_string($default_locale) ? $default_locale : null);
 
             if (! $default_translation || ! $default_translation->wasChanged()) {
                 return;
@@ -419,6 +437,8 @@ trait HasTranslations
     /**
      * Eloquent accessor for locale attribute.
      * This makes locale available in toArray() and JSON serialization.
+     *
+     * @return Attribute<string, never>
      */
     protected function locale(): Attribute
     {
@@ -583,7 +603,7 @@ trait HasTranslations
             // Check the already-loaded translations collection before issuing a new query
             $loaded_translations = $this->relationLoaded('translations') ? $this->getRelationValue('translations') : null;
 
-            if ($loaded_translations !== null) {
+            if ($loaded_translations instanceof Collection) {
                 $default_translation = $loaded_translations->firstWhere('locale', $default_locale);
 
                 if ($default_translation && isset($default_translation->{$key})) {
