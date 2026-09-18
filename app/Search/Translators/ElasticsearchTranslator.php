@@ -108,7 +108,6 @@ class ElasticsearchTranslator implements ISchemaTranslator
             ],
             FieldType::Geocode => [
                 'type' => 'geo_point',
-                'lat_lon' => true,
             ],
         };
 

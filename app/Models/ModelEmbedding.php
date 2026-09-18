@@ -24,6 +24,7 @@ final class ModelEmbedding extends Model
         'embedding',
         'locale',
         'model_key',
+        'content_hash',
     ];
 
     /**

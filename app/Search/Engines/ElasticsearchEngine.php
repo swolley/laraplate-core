@@ -19,6 +19,7 @@ use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
 use Modules\Core\Search\Exceptions\SearchCollectionResolutionException;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
+use Modules\Core\Search\Schema\MappingStructureComparator;
 use Modules\Core\Search\Services\SearchQueryAnalyzer;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
@@ -130,7 +131,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                 $mapped = [];
 
                 foreach ($properties as $name => $definition) {
-                    $mapped[$name] = is_array($definition) ? $this->stringifyFieldMeta($definition) : $definition;
+                    $mapped[$name] = is_array($definition) ? self::sanitizeMappingProperty($definition) : $definition;
                 }
 
                 ElasticsearchService::getInstance()->createIndex(
@@ -666,6 +667,126 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         }
     }
 
+    /**
+     * Verify the live index mapping still matches the model's declared schema.
+     *
+     * checkIndex() only proves the index exists; it cannot see that a field's
+     * type drifted (e.g. `title` was `text` and the model now declares an
+     * `object` with per-locale sub-fields), which makes every write fail with a
+     * document_parsing_exception. This compares declared field types against the
+     * live mapping and returns false when they diverge. Missing indexes and
+     * unreadable mappings fail open, so only a genuine, existing mismatch is
+     * flagged.
+     */
+    public function checkIndexStructure(string|Model $model): bool
+    {
+        return $this->structureMismatches($model) === [];
+    }
+
+    /**
+     * The declared-vs-live mapping mismatches for a model's index, as
+     * human-readable lines (dotted field paths). Empty when the structure
+     * matches and — failing open — when the index is missing, its mapping is
+     * unreadable, or the model exposes no schema, so only a genuine, existing
+     * divergence is reported.
+     *
+     * @return list<string>
+     */
+    public function structureMismatches(string|Model $model): array
+    {
+        try {
+            if ($model instanceof Model) {
+                $instance = $model;
+                $collection = $this->resolveSearchableCollectionName($model);
+            } elseif (class_exists($model)) {
+                $instance = new $model();
+                $collection = $instance->searchableAs();
+            } else {
+                return [];
+            }
+
+            if ($collection === null || ! method_exists($instance, 'getSearchMapping')) {
+                return [];
+            }
+
+            if (! $this->indexManager->exists($collection)) {
+                return [];
+            }
+
+            $expected = $instance->getSearchMapping();
+            $expected_properties = is_array($expected['mappings']['properties'] ?? null)
+                ? $expected['mappings']['properties']
+                : [];
+
+            $live_properties = ElasticsearchService::getInstance()->getMapping($collection);
+
+            if ($expected_properties === [] || $live_properties === []) {
+                return [];
+            }
+
+            return MappingStructureComparator::diff($expected_properties, $live_properties);
+        } catch (Exception) {
+            return [];
+        }
+    }
+
+    /**
+     * Additively patch an existing index mapping with the model's current schema.
+     *
+     * Elasticsearch mapping updates are additive: new fields (for example a
+     * `title.<locale>` sub-field introduced when a new language is added) are
+     * created with their analyzer instead of being inferred by dynamic mapping,
+     * while unchanged fields are a no-op. A field whose type actually changed
+     * cannot be patched and is rejected by Elasticsearch, so this returns false
+     * to signal that the index must be recreated instead. It never drops data;
+     * a missing index is left to createIndex().
+     */
+    public function syncMapping(string|Model $model): bool
+    {
+        try {
+            if ($model instanceof Model) {
+                $instance = $model;
+                $collection = $this->resolveSearchableCollectionName($model);
+            } elseif (class_exists($model)) {
+                $instance = new $model();
+                $collection = $instance->searchableAs();
+            } else {
+                return false;
+            }
+
+            if ($collection === null || ! method_exists($instance, 'getSearchMapping')) {
+                return false;
+            }
+
+            if (! $this->indexManager->exists($collection)) {
+                return false;
+            }
+
+            $schema = $instance->getSearchMapping();
+            $properties = is_array($schema['mappings']['properties'] ?? null)
+                ? $schema['mappings']['properties']
+                : [];
+
+            if ($properties === []) {
+                return true;
+            }
+
+            $mapped = [];
+
+            foreach ($properties as $name => $definition) {
+                $mapped[$name] = is_array($definition) ? self::sanitizeMappingProperty($definition) : $definition;
+            }
+
+            // On an existing index ElasticsearchService::createIndex performs an
+            // additive putMapping rather than a recreate, so no data is dropped.
+            ElasticsearchService::getInstance()->createIndex($collection, [], ['properties' => $mapped]);
+
+            return true;
+        } catch (Exception) {
+            return false;
+        }
+    }
+
     //    /**
     //     * @throws ClientResponseException
     //     * @throws ServerResponseException
@@ -780,19 +901,34 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     /**
-     * Cast a field's `meta` values to strings before the mapping reaches
-     * Elasticsearch: ES field `meta` accepts only string values, while the
-     * schema translator keeps app-facing flags (e.g. `filterable`) as booleans
-     * for the in-memory constraint layer. Defensive — the `embedding` vector
-     * field carries no meta today, but this keeps the applied mapping ES-valid
-     * if it ever does.
+     * Make a translated field definition valid for Elasticsearch before the
+     * mapping reaches the cluster. Applied recursively to a property and its
+     * `properties`/`fields` subtrees.
+     *
+     * Two rules:
+     *  - `object` and `nested` field types accept neither `meta` nor `index`
+     *    (nor `doc_values`); ES rejects the whole mapping with a 400 otherwise
+     *    (`mapper_parsing_exception ... unsupported parameters`). The schema
+     *    translator still emits those keys on relation fields
+     *    (tags/contributors/categories/locations) because the in-app constraint
+     *    layer reads them back from `getSearchMapping()`
+     *    (see ScoutSearchConstraintApplier); they are therefore stripped here,
+     *    at index-creation time, rather than at the translator.
+     *  - leaf field `meta` accepts only string values, while the translator
+     *    keeps app-facing flags (e.g. `filterable`) as booleans; cast them.
+     *    Leaf `index`/`doc_values` (including a `dense_vector`'s `index: true`)
+     *    are valid and kept.
      *
      * @param  array<string, mixed>  $field
      * @return array<string, mixed>
      */
-    private function stringifyFieldMeta(array $field): array
+    private static function sanitizeMappingProperty(array $field): array
     {
-        if (isset($field['meta']) && is_array($field['meta'])) {
+        $type = $field['type'] ?? null;
+
+        if ($type === 'object' || $type === 'nested') {
+            unset($field['meta'], $field['index'], $field['doc_values']);
+        } elseif (isset($field['meta']) && is_array($field['meta'])) {
             $field['meta'] = array_map(
                 static fn (mixed $value): string => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value,
                 $field['meta'],
@@ -802,7 +938,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if (isset($field['properties']) && is_array($field['properties'])) {
             foreach ($field['properties'] as $name => $sub) {
                 if (is_array($sub)) {
-                    $field['properties'][$name] = $this->stringifyFieldMeta($sub);
+                    $field['properties'][$name] = self::sanitizeMappingProperty($sub);
                 }
             }
         }
@@ -810,7 +946,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         if (isset($field['fields']) && is_array($field['fields'])) {
             foreach ($field['fields'] as $name => $sub) {
                 if (is_array($sub)) {
-                    $field['fields'][$name] = $this->stringifyFieldMeta($sub);
+                    $field['fields'][$name] = self::sanitizeMappingProperty($sub);
                 }
             }
         }
