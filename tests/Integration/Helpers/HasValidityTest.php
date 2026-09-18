@@ -115,6 +115,28 @@ it('expiring lets a model declare its own window', function (): void {
         ->and(ValidityStubModel::expiring()->count())->toBe(0);
 });
 
+it('expiredAt returns what was already expired on that date', function (): void {
+    ValidityStubModel::create(['name' => 'long-gone', 'valid_from' => now()->subDays(30), 'valid_to' => now()->subDays(20)]);
+    ValidityStubModel::create(['name' => 'recently-gone', 'valid_from' => now()->subDays(10), 'valid_to' => now()->subDay()]);
+    ValidityStubModel::create(['name' => 'current', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDay()]);
+    ValidityStubModel::create(['name' => 'perpetual', 'valid_from' => now()->subDay(), 'valid_to' => null]);
+
+    // The scope used to compose expired() with validAt(), asking for rows past
+    // their validity and still valid on the same date, so now() returned nothing.
+    expect(ValidityStubModel::expiredAt(now())->pluck('name')->all())->toBe(['long-gone', 'recently-gone'])
+        ->and(ValidityStubModel::expiredAt(now()->subDays(15))->pluck('name')->all())->toBe(['long-gone'])
+        ->and(ValidityStubModel::expiredAt(now()->subDays(25))->pluck('name')->all())->toBe([]);
+});
+
+it('expired agrees with expiredAt(now())', function (): void {
+    ValidityStubModel::create(['name' => 'gone', 'valid_from' => now()->subDays(10), 'valid_to' => now()->subDay()]);
+    ValidityStubModel::create(['name' => 'current', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDay()]);
+
+    expect(ValidityStubModel::expired()->pluck('name')->all())
+        ->toBe(ValidityStubModel::expiredAt(now())->pluck('name')->all())
+        ->toBe(['gone']);
+});
+
 it('validAt is callable as a scope with the date now() returns', function (): void {
     ValidityStubModel::create(['name' => 'past', 'valid_from' => now()->subDays(10), 'valid_to' => now()->subDays(5)]);
     ValidityStubModel::create(['name' => 'current', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDay()]);

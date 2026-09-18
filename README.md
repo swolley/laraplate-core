@@ -310,6 +310,8 @@ class ... extends Model
 
 `HasValidity` declares the scopes `valid`, `expired`, `scheduled`, `draft`, `published`, `expiring`, `validAt`, `expiredAt` and `validityOrdered`.
 
+`validAt($date)` and `expiredAt($date)` are the two that take a moment in time: the first returns what was in force then, the second what had already lapsed by then. `expired()` is `expiredAt(now())`.
+
 `expiring` answers the question the other scopes do not: which rows are valid now but stop being valid soon. A row with no `valid_to` never expires and is never returned.
 
 ```php

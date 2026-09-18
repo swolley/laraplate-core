@@ -221,7 +221,7 @@ trait HasValidity
     #[Scope]
     protected function expired(Builder $query): Builder
     {
-        return $query->withoutGlobalScope('valid')->whereNotNull($this->qualifyColumn(static::$valid_to_column))->where($this->qualifyColumn(static::$valid_to_column), '<', now());
+        return $query->expiredAt(now());
     }
 
     /**
@@ -236,7 +236,13 @@ trait HasValidity
     #[Scope]
     protected function expiredAt(Builder $query, CarbonInterface $date): Builder
     {
-        return $query->expired()->validAt($date);
+        // Was expired()->validAt($date), which asked for rows past their validity
+        // and still valid on the same date: a contradiction for now(), and for any
+        // earlier date a window ("expired between then and now") rather than the
+        // state the name promises. Expired at a date is valid_to before that date.
+        return $query->withoutGlobalScope('valid')
+            ->whereNotNull($this->qualifyColumn(static::$valid_to_column))
+            ->where($this->qualifyColumn(static::$valid_to_column), '<', $date);
     }
 
     /**
