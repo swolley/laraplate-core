@@ -32,6 +32,11 @@ final class ElasticsearchService
     private static ?self $instance = null;
 
     /**
+     * Whether the server version was already asserted this process.
+     */
+    private static bool $version_asserted = false;
+
+    /**
      * Create a new elasticsearch service instance.
      */
     private function __construct()
@@ -48,6 +53,67 @@ final class ElasticsearchService
     }
 
     /**
+     * Whether an Elasticsearch major version falls within the supported range.
+     */
+    public static function majorIsSupported(int $major, int $min, int $max): bool
+    {
+        return $major >= $min && $major <= $max;
+    }
+
+    /**
+     * The Elasticsearch server version string (e.g. "8.19.21"), or null when it
+     * cannot be read. Reading failures never throw, so a transient error does
+     * not block callers.
+     */
+    public function serverVersion(): ?string
+    {
+        try {
+            $version = $this->client->info()->asArray()['version']['number'] ?? null;
+
+            return is_string($version) && $version !== '' ? $version : null;
+        } catch (Throwable $e) {
+            Log::error('Elasticsearch version read error', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Reject, once per process, a cluster whose major version is outside the
+     * supported range, with a message naming the actual and expected versions.
+     * An unreadable version fails open rather than blocking on a transient error.
+     *
+     * @throws ElasticsearchException
+     */
+    public function assertSupportedVersion(): void
+    {
+        if (self::$version_asserted) {
+            return;
+        }
+
+        $version = $this->serverVersion();
+
+        if ($version === null) {
+            return;
+        }
+
+        $major = (int) explode('.', $version)[0];
+        $min = (int) config('elastic.client.supported_major.min', 8);
+        $max = (int) config('elastic.client.supported_major.max', 8);
+
+        if (! self::majorIsSupported($major, $min, $max)) {
+            throw new ElasticsearchException(sprintf(
+                'Unsupported Elasticsearch server version %s (major %d); this application supports major %s. Point ELASTIC_HOST at a supported cluster or adjust elastic.client.supported_major.',
+                $version,
+                $major,
+                $min === $max ? (string) $min : sprintf('%d-%d', $min, $max),
+            ));
+        }
+
+        self::$version_asserted = true;
+    }
+
+    /**
      * Create or update index.
      *
      * @param  string  $index  Index name
@@ -59,6 +125,10 @@ final class ElasticsearchService
     public function createIndex(string $index, array $settings = [], array $mappings = []): bool
     {
         try {
+            // Reject an unsupported cluster here, at the edge where a version
+            // mismatch would otherwise surface as a cryptic mapping error.
+            $this->assertSupportedVersion();
+
             // Check if the index already exists
             $exists = $this->client->indices()->exists(['index' => $index])->asBool();
 

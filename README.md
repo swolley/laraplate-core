@@ -156,6 +156,8 @@ ELASTIC_LOG_ENABLED=false						#elasticsearch logging enabled
 ELASTIC_LOG_LEVEL=error							#elasticsearch log level
 ELASTIC_RETRY_ON_CONFLICT=3						#elasticsearch retry on conflict
 ELASTIC_BULK_SIZE=500							#elasticsearch bulk size
+ELASTIC_SUPPORTED_MAJOR_MIN=8					#lowest supported elasticsearch server major version
+ELASTIC_SUPPORTED_MAJOR_MAX=8					#highest supported elasticsearch server major version
 ELASTIC_SCOUT_DRIVER_REFRESH_DOCUMENTS=false	#elasticsearch scout driver refresh documents
 
 #typesense
