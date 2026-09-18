@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @method static Builder<Model&static> active()
  * @method static Builder<Model&static> inactive()
+ * @method Builder<Model&static> scopeActive(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeInactive(Builder<Model&static> $query)
  */
 interface IActivatableModel
 {

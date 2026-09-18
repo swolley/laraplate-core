@@ -20,6 +20,16 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder<Model&static> onlyTrashed()
  * @method static Builder<Model&static> withTrashed()
  * @method static Builder<Model&static> withoutTrashed()
+ *
+ * The three below are not scopes: SoftDeletingScope::extend() macros them onto
+ * the builder. The scope-prefixed tag is simply the form Larastan reads when
+ * resolving a call made on a Builder, and what it states is true either way:
+ * a model declaring this contract answers these on its query.
+ *
+ * @method Builder<Model&static> scopeOnlyTrashed(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeWithTrashed(Builder<Model&static> $query, bool $withTrashed = true)
+ * @method Builder<Model&static> scopeWithoutTrashed(Builder<Model&static> $query)
+ * @method int scopeRestore(Builder<Model&static> $query)
  */
 interface ISoftDeletableModel
 {

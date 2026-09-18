@@ -26,8 +26,25 @@ use Illuminate\Support\Carbon;
  * @method static Builder<Model&static> expired()
  * @method static Builder<Model&static> expiring(?int $within_hours = null)
  * @method static Builder<Model&static> validityOrdered()
- * @method static Builder<Model&static> validAt(Carbon $date)
- * @method static Builder<Model&static> expiredAt(Carbon $date)
+ * @method static Builder<Model&static> validAt(CarbonInterface $date)
+ * @method static Builder<Model&static> expiredAt(CarbonInterface $date)
+ *
+ * Named again with the scope prefix, which is the form Larastan looks for when
+ * the call is made on a Builder rather than on the model: BuilderHelper reads
+ * `scope` . ucfirst($method) off the method tags of every class in the builder's
+ * model type, this interface included. Without them, generic code holding a
+ * Builder<Model&IValidatableModel> gets "undefined method" for each one.
+ *
+ * @method Builder<Model&static> scopeValid(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopePublished(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeDraft(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeScheduled(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeExpired(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeExpiring(Builder<Model&static> $query, ?int $within_hours = null)
+ * @method Builder<Model&static> scopeValidityOrdered(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeValidAt(Builder<Model&static> $query, CarbonInterface $date)
+ * @method Builder<Model&static> scopeExpiredAt(Builder<Model&static> $query, CarbonInterface $date)
+ * @method Builder<Model&static> scopeWithValidityFilter(Builder<Model&static> $query, CarbonInterface $date)
  */
 interface IValidatableModel
 {

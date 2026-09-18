@@ -23,6 +23,10 @@ use Modules\Core\Models\User;
  * with this contract is what tells the analyser the scopes are there.
  *
  * @method static Builder<Model&static> locked()
+ * @method Builder<Model&static> scopeLocked(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeUnlocked(Builder<Model&static> $query)
+ * @method Builder<Model&static> scopeLockedBy(Builder<Model&static> $query, User $user)
+ * @method Builder<Model&static> scopeUnlockedBy(Builder<Model&static> $query, User $user)
  * @method static Builder<Model&static> unlocked()
  * @method static Builder<Model&static> lockedBy(User $user)
  * @method static Builder<Model&static> unlockedBy(User $user)

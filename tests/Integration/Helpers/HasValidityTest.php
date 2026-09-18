@@ -114,3 +114,14 @@ it('expiring lets a model declare its own window', function (): void {
         ->and(LongLivedValidityStubModel::expiring()->count())->toBe(1)
         ->and(ValidityStubModel::expiring()->count())->toBe(0);
 });
+
+it('validAt is callable as a scope with the date now() returns', function (): void {
+    ValidityStubModel::create(['name' => 'past', 'valid_from' => now()->subDays(10), 'valid_to' => now()->subDays(5)]);
+    ValidityStubModel::create(['name' => 'current', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDay()]);
+
+    // Two defects met on this line: withValidityFilter, which validAt delegates to,
+    // carried no #[Scope] and so threw BadMethodCallException, and the date was typed
+    // Illuminate\Support\Carbon while now() returns a CarbonImmutable here.
+    expect(ValidityStubModel::validAt(now())->pluck('name')->all())->toBe(['current'])
+        ->and(ValidityStubModel::validAt(now()->subDays(7))->pluck('name')->all())->toBe(['past']);
+});

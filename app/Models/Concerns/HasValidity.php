@@ -234,7 +234,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
-    protected function expiredAt(Builder $query, Carbon $date): Builder
+    protected function expiredAt(Builder $query, CarbonInterface $date): Builder
     {
         return $query->expired()->validAt($date);
     }
@@ -249,7 +249,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
-    protected function validAt(Builder $query, Carbon $date): Builder
+    protected function validAt(Builder $query, CarbonInterface $date): Builder
     {
         return $query->withoutGlobalScope('valid')->withValidityFilter($date);
     }
@@ -310,7 +310,8 @@ trait HasValidity
      *
      * @return Builder<static>
      */
-    protected function withValidityFilter(Builder $query, Carbon $date): Builder
+    #[Scope]
+    protected function withValidityFilter(Builder $query, CarbonInterface $date): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', $date)->where(function ($q) use ($date): void {
             $q->where($this->qualifyColumn(static::$valid_to_column), '>=', $date)->orWhereNull($this->qualifyColumn(static::$valid_to_column));

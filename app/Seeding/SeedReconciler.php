@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Seeding;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ISoftDeletableModel;
 
 final class SeedReconciler
 {
@@ -22,9 +24,17 @@ final class SeedReconciler
         /** @var Model $model */
         $model = new $model_class();
 
-        $existing = $model_class::query()
-            ->withoutGlobalScopes()
-            ->withTrashed()
+        // withTrashed() exists only on a soft-deletable model's builder, and a
+        // definition can name any model, so the call is made when the contract says
+        // it is there rather than on faith.
+        $existing_query = $model_class::query()->withoutGlobalScopes();
+
+        if (is_a($model_class, ISoftDeletableModel::class, true)) {
+            /** @var Builder<Model&ISoftDeletableModel> $existing_query */
+            $existing_query->withTrashed();
+        }
+
+        $existing = $existing_query
             ->whereIn($column, array_column($definition->rows, $column))
             ->get()
             ->keyBy($column);
@@ -47,7 +57,7 @@ final class SeedReconciler
                 continue;
             }
 
-            if ($current->trashed()) {
+            if ($current instanceof ISoftDeletableModel && $current->trashed()) {
                 $restored[] = $key;
             }
 
@@ -98,7 +108,10 @@ final class SeedReconciler
                 $model_class::query()->upsert($upsert_payload, [$column], $definition->structural);
             }
 
-            if ($restored !== []) {
+            // A row can only be in $restored when it was found trashed above, which
+            // this model must be soft-deletable for, so the guard here is the
+            // analyser's rather than a second runtime condition.
+            if ($restored !== [] && is_a($model_class, ISoftDeletableModel::class, true)) {
                 $model_class::query()
                     ->withoutGlobalScopes()
                     ->withTrashed()

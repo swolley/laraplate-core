@@ -683,16 +683,25 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
-                        // 'all' => $query->withTrashed(),
-                        'none' => $query->withoutTrashed(),
-                        'only' => $query->onlyTrashed(),
-                        'today' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', today()),
-                        'week' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfWeek()),
-                        'month' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfMonth()),
-                        'year' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfYear()),
-                        default => $query->withoutGlobalScope('deleted'),
-                    })),
+                    // Built only when the model is soft-deletable, so the query is one
+                    // over a soft-deletable model. Saying so is what resolves the
+                    // trashed scopes: see ISoftDeletableModel.
+                    ->query(static function (Builder $query, array $data) use ($deleted_at_column): Builder {
+                        /** @var Builder<Model&ISoftDeletableModel> $query */
+                        return $query->when($data['value'], static function (Builder $query, mixed $value) use ($deleted_at_column): Builder {
+                            /** @var Builder<Model&ISoftDeletableModel> $query */
+                            return match ($value) {
+                                // 'all' => $query->withTrashed(),
+                                'none' => $query->withoutTrashed(),
+                                'only' => $query->onlyTrashed(),
+                                'today' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', today()),
+                                'week' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfWeek()),
+                                'month' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfMonth()),
+                                'year' => $query->onlyTrashed()->whereDate($deleted_at_column, '>=', now()->startOfYear()),
+                                default => $query->withoutGlobalScope('deleted'),
+                            };
+                        });
+                    }),
             );
         }
 
@@ -715,7 +724,11 @@ trait HasTable
                         'month' => 'Month',
                         'year' => 'Year',
                     ])
-                    ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
+                    ->query(static function (Builder $query, array $data) use ($locked_at_column): Builder {
+                        /** @var Builder<Model&ILockableModel> $query */
+                        return $query->when($data['value'], static function (Builder $query, mixed $value) use ($locked_at_column): Builder {
+                            /** @var Builder<Model&ILockableModel> $query */
+                            return match ($value) {
                         // `onlyLocked` and `withoutLocked` were never defined anywhere: every branch
                         // of this filter threw. The scopes are `locked` and `unlocked`, and they
                         // account for expiry, so the filter now agrees with the model.
@@ -726,7 +739,9 @@ trait HasTable
                         'month' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
                         'year' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
                         default => $query,
-                    })),
+                            };
+                        });
+                    }),
             );
         }
 
@@ -753,14 +768,17 @@ trait HasTable
                         'expired' => 'Expired',
                         'draft' => 'Draft',
                     ])
-                    ->query(static fn (Builder $query, array $data): Builder => match ($data['value']) {
-                        // 'all' => $query,
-                        'valid' => $query->valid(),
-                        'scheduled' => $query->scheduled(),
-                        'expiring' => $query->expiring(),
-                        'expired' => $query->expired(),
-                        'draft' => $query->draft(),
-                        default => $query,
+                    ->query(static function (Builder $query, array $data): Builder {
+                        /** @var Builder<Model&IValidatableModel> $query */
+                        return match ($data['value']) {
+                            // 'all' => $query,
+                            'valid' => $query->valid(),
+                            'scheduled' => $query->scheduled(),
+                            'expiring' => $query->expiring(),
+                            'expired' => $query->expired(),
+                            'draft' => $query->draft(),
+                            default => $query,
+                        };
                     }),
             );
         }
