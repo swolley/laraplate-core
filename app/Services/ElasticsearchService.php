@@ -9,8 +9,10 @@ use Elastic\Elasticsearch\ClientBuilder;
 use Elastic\Elasticsearch\Exception\ClientResponseException;
 use Elastic\Elasticsearch\Exception\MissingParameterException;
 use Elastic\Elasticsearch\Exception\ServerResponseException;
+use Elastic\Elasticsearch\Response\Elasticsearch;
 use Illuminate\Support\Facades\Log;
 use Modules\Core\Search\Exceptions\ElasticsearchException;
+use RuntimeException;
 use Throwable;
 
 final class ElasticsearchService
@@ -275,6 +277,12 @@ final class ElasticsearchService
             ];
 
             $response = $this->client->get($params);
+
+            // The client returns Elasticsearch|Promise because it also speaks async.
+            // This service is synchronous throughout; a Promise here would mean the
+            // client was built in a mode nothing in this application asks for.
+            throw_unless($response instanceof Elasticsearch, RuntimeException::class,
+                'Elasticsearch returned an asynchronous response, which this service does not support.');
 
             return $response->asArray();
         } catch (ClientResponseException $e) {

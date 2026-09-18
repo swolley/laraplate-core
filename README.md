@@ -688,22 +688,37 @@ The Core Module provides several useful scripts for development and maintenance:
 
 ### Code Quality and Testing
 
-Run commands from the **Core module root** after `composer install`. Tests use `phpunit.xml` with `bootstrap="vendor/autoload.php"` (same idea as other Laraplate modules), so a local `vendor/` directory is required when working in the submodule.
+**Run everything from the application root, not from the module.** The module has no
+runner of its own: it declares no `require-dev`, ships no `phpunit.xml`, and has no
+`vendor/` directory. Its test cases extend the application's, and the application's
+`phpunit.xml` globs `Modules/*/tests/...` into the three suites, so a new module needs no
+configuration to be picked up.
 
 ```bash
-# Run all tests and quality checks
-composer test
+php artisan test --compact Modules/Core/tests        # the whole module
+php artisan test --compact Modules/Core/tests/Unit   # one suite of it
+php artisan test --compact --testsuite=Unit          # the fast suite, every module
 
-# Run specific test suites
-composer test:unit          # Run unit tests with coverage
-composer test:type-coverage # Check type coverage (target: 100%)
-composer test:typos         # Check for typos in code
-composer test:lint          # Check code style
-composer test:types         # Run PHPStan analysis
-composer test:refactor      # Run Rector refactoring
+composer test                 # the full test and quality pipeline
+composer test:type-coverage   # type coverage (target: 100%)
+composer test:typos           # typo check
+composer test:lint            # Pint + Rector dry-run
+composer test:types           # PHPStan
+composer test:refactor        # Rector
 ```
 
-**Test database:** By default tests use an in-memory SQLite database. The PHP extension `pdo_sqlite` is required (e.g. on Arch: `php-sqlite`). If it is not available, the suite falls back to MySQL: set `DB_HOST`, `DB_DATABASE` (e.g. `core_test`), `DB_USERNAME`, `DB_PASSWORD` and ensure the database exists.
+**The three suites** are classified by the bootstrap each test needs, not by what it
+tests: `Unit` runs under a minimal TestCase with no application and no database;
+`Integration` and `Feature` run under the full shell. `tests/UnitShell` holds what needs
+the shell *without* a wrapping transaction — tests that manage their own database
+lifecycle — and the `Integration` suite globs it.
+
+**Test database:** tests use an in-memory SQLite database, so `pdo_sqlite` is required
+(on Arch: `php-sqlite`).
+
+**Memory:** the full suite needs more than the default 2G and dies about two thirds of
+the way through. Run it as `php -d memory_limit=-1 vendor/bin/pest --compact`, or per
+suite.
 
 ### Code Quality Tools
 

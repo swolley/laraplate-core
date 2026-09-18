@@ -18,8 +18,8 @@ namespace Modules\Core\Search\Schema;
 final class MappingStructureComparator
 {
     /**
-     * @param  array<string, mixed>  $expected  Declared `properties` map.
-     * @param  array<string, mixed>  $live  Live Elasticsearch `properties` map.
+     * @param  array<array-key, mixed>  $expected  Declared `properties` map.
+     * @param  array<array-key, mixed>  $live  Live Elasticsearch `properties` map.
      */
     public static function matches(array $expected, array $live): bool
     {
@@ -31,8 +31,8 @@ final class MappingStructureComparator
      * missing or has a different type. Field paths are dotted, so a drifted
      * per-locale sub-field reads as `title.en`.
      *
-     * @param  array<string, mixed>  $expected  Declared `properties` map.
-     * @param  array<string, mixed>  $live  Live Elasticsearch `properties` map.
+     * @param  array<array-key, mixed>  $expected  Declared `properties` map.
+     * @param  array<array-key, mixed>  $live  Live Elasticsearch `properties` map.
      * @return list<string>
      */
     public static function diff(array $expected, array $live, string $prefix = ''): array
@@ -85,7 +85,7 @@ final class MappingStructureComparator
      * fields and reports only their `properties`, so an entry carrying
      * `properties` and no `type` is treated as an object.
      *
-     * @param  array<string, mixed>  $definition
+     * @param  array<array-key, mixed>  $definition
      */
     private static function type(array $definition): ?string
     {

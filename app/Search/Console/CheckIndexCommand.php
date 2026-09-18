@@ -9,6 +9,7 @@ use function Laravel\Prompts\confirm;
 use Exception;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Search\Jobs\ReindexSearchJob;
 use Modules\Core\Search\Traits\Searchable;
@@ -46,11 +47,16 @@ final class CheckIndexCommand extends Command
             foreach ($modeles as $model) {
                 $this->info('Checking model ' . $model);
                 $model_instance = new $model();
+
+                if (! $model_instance instanceof ISearchableModel) {
+                    continue;
+                }
+
                 $engine = $model_instance->searchableUsing();
 
                 // Index-existence verification lives on the engine (e.g. ElasticsearchEngine::checkIndex);
                 // engines without it (e.g. the database engine) are treated as always valid.
-                $index_ok = ! is_callable([$engine, 'checkIndex']) || (bool) $engine->checkIndex($model_instance);
+                $index_ok = ! method_exists($engine, 'checkIndex') || (bool) $engine->checkIndex($model_instance);
 
                 if (! $index_ok) {
                     $missing_indexes[] = $model;
@@ -62,7 +68,9 @@ final class CheckIndexCommand extends Command
                 // Existence is not enough: a field whose type drifted (e.g. text -> object)
                 // keeps the index present but breaks every write. Engines exposing
                 // structureMismatches list the fields whose live mapping diverges.
-                $mismatches = is_callable([$engine, 'structureMismatches'])
+                // method_exists rather than is_callable: both hold here, and only one
+                // narrows $engine to an object carrying the method.
+                $mismatches = method_exists($engine, 'structureMismatches')
                     ? (array) $engine->structureMismatches($model_instance)
                     : [];
 

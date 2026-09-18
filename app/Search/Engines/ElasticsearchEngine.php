@@ -919,7 +919,11 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      *    Leaf `index`/`doc_values` (including a `dense_vector`'s `index: true`)
      *    are valid and kept.
      *
-     * @param  array<string, mixed>  $field
+     * The mapping comes from JSON, where a key can be numeric: narrowing a value with
+     * is_array() yields a plain array, not one with guaranteed string keys, and every
+     * call site was reported for a guarantee the data does not carry.
+     *
+     * @param  array<array-key, mixed>  $field
      * @return array<string, mixed>
      */
     private static function sanitizeMappingProperty(array $field): array

@@ -419,6 +419,7 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         // parent signature asks for list<string>.
         /** @var list<string> $prefix_columns */
         $prefix_columns = array_values($this->getPrefixColumns($builder));
+
         /** @var list<string> $full_text_columns */
         $full_text_columns = array_values($this->getFullTextColumns($builder));
 

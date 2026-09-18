@@ -82,7 +82,10 @@ trait HasBenchmark
         try {
             if (isset($this->startQueries)) {
                 // Get row count after we've stopped tracking queries
-                $queriesCount = $this->getQueryCount($this->benchmarkConnection) - $this->startQueries + ($this->startQueries > 0 ? -1 : 0); // Subtract the Questions query itself
+                // $benchmarkConnection is nullable: without one there are no queries to count.
+                $queriesCount = $this->benchmarkConnection instanceof Connection
+                    ? $this->getQueryCount($this->benchmarkConnection) - $this->startQueries + ($this->startQueries > 0 ? -1 : 0) // Subtract the Questions query itself
+                    : 0;
             } else {
                 $queriesCount = 0;
             }
@@ -99,7 +102,8 @@ trait HasBenchmark
             $this->benchmarkConnection->flushQueryLog();
         }
 
-        $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime);
+        // bootTime is null until the framework reports it; zero is the honest reading.
+        $this->composeOutput($executionTime, $usage, $queriesCount, $rowDiff, $this->bootTime ?? 0.0);
     }
 
     protected function stepBenchmarkAndRestart(): void
@@ -220,13 +224,19 @@ trait HasBenchmark
             }
         }
 
-        Log::debug(preg_replace("/\<bg=[\w-]+;fg=[\w-]+\>|\<\/\>/", '', $output));
+        Log::debug(preg_replace("/\<bg=[\w-]+;fg=[\w-]+\>|\<\/\>/", '', $output) ?? $output);
     }
 
     /**
      * Add a formatted block to the output.
      */
-    private function addBlockToOutput(string &$output, array &$outputValues, string $blockName, mixed $blockValue, string $blockBgColor, string $blockFgColor, bool $isInConsole): void
+    /**
+     * The values end up in sprintf(), which takes scalars: typing them as mixed only
+     * moves the complaint one call down.
+     *
+     * @param  list<bool|float|int|string|null>  $outputValues
+     */
+    private function addBlockToOutput(string &$output, array &$outputValues, string $blockName, bool|float|int|string|null $blockValue, string $blockBgColor, string $blockFgColor, bool $isInConsole): void
     {
         if ($blockName !== '' && $blockName !== '0') {
             $blockName .= ' ';

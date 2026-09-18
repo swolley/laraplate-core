@@ -62,9 +62,7 @@ function invokeEsSanitizeMappingProperty(array $field): array
     $method = new ReflectionMethod(ElasticsearchEngine::class, 'sanitizeMappingProperty');
 
     /** @var array<string, mixed> $result */
-    $result = $method->invoke(null, $field);
-
-    return $result;
+    return $method->invoke(null, $field);
 }
 
 it('confirms the translator itself still emits meta and index on relation nested fields', function (): void {

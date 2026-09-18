@@ -6,6 +6,7 @@ namespace Modules\Core\Console\Concerns;
 
 use function Laravel\Prompts\select;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 trait HasCommandModelResolution
@@ -58,11 +59,15 @@ trait HasCommandModelResolution
 
     private function getModelFromCommand(string $optionName): ?string
     {
-        return match (true) {
+        $value = match (true) {
             $this->hasArgument($optionName) => $this->argument($optionName),
             $this->hasOption($optionName) => $this->option($optionName),
             default => null,
         };
+
+        // argument() and option() return mixed: an array here means the option was
+        // declared repeatable, which this resolver does not handle.
+        return is_string($value) ? $value : null;
     }
 
     /**
@@ -70,11 +75,15 @@ trait HasCommandModelResolution
      */
     private function askForUserInput(string $optionName, array $all_models): string
     {
-        return select(
+        // select() returns int|string: with a list of class names the key is an int,
+        // and the caller wants the name.
+        $choice = select(
             label: sprintf('What is the %s?', $optionName),
             options: $all_models,
             required: true,
         );
+
+        return is_string($choice) ? $choice : ($all_models[$choice] ?? '');
     }
 
     /**

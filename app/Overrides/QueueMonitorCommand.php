@@ -32,8 +32,13 @@ final class QueueMonitorCommand extends BaseMonitorCommand
      */
     protected $description = 'Monitor queue sizes; --all covers every Horizon queue <fg=green>(⚡ Modules\Core)</fg=green>';
 
+    /**
+     * Laravel's MonitorCommand::handle() declares no return type and returns nothing,
+     * so an override that returns an exit code has to say so: without the `: int`,
+     * every `return self::FAILURE` here is read as returning a value from a void method.
+     */
     #[Override]
-    public function handle()
+    public function handle(): int
     {
         $benchmark = ! app()->runningUnitTests();
 
@@ -54,7 +59,10 @@ final class QueueMonitorCommand extends BaseMonitorCommand
                 return self::FAILURE;
             }
 
-            return parent::handle();
+            // The parent returns nothing; the exit code is this command's to report.
+            parent::handle();
+
+            return self::SUCCESS;
         } finally {
             if ($benchmark) {
                 $this->endBenchmark();
@@ -69,17 +77,24 @@ final class QueueMonitorCommand extends BaseMonitorCommand
      */
     public function configuredQueues(): string
     {
-        $connection = (string) config('queue.default', 'redis');
+        $default_connection = config('queue.default', 'redis');
+        $connection = is_string($default_connection) ? $default_connection : 'redis';
 
-        $queues = (new Collection(config('horizon.defaults', [])))->pluck('queue')
-            ->merge((new Collection(config('horizon.environments.' . app()->environment(), [])))->pluck('queue'))
+        // config() returns mixed, and Collection wants an array: a non-array value here
+        // means the Horizon config is malformed, and an empty list is the honest reading.
+        $horizon_defaults = config('horizon.defaults', []);
+        $horizon_environment = config('horizon.environments.' . app()->environment(), []);
+
+        $queues = (new Collection(is_array($horizon_defaults) ? $horizon_defaults : []))->pluck('queue')
+            ->merge((new Collection(is_array($horizon_environment) ? $horizon_environment : []))->pluck('queue'))
             ->flatten()
             ->filter(fn ($queue): bool => is_string($queue) && $queue !== '')
             ->unique()
             ->values();
 
         if ($queues->isEmpty()) {
-            $queues = new Collection([(string) config("queue.connections.{$connection}.queue", 'default')]);
+            $connection_queue = config("queue.connections.{$connection}.queue", 'default');
+            $queues = new Collection([is_string($connection_queue) ? $connection_queue : 'default']);
         }
 
         return $queues->map(fn (string $queue): string => "{$connection}:{$queue}")->implode(',');
