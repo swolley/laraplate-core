@@ -743,11 +743,14 @@ trait HasTable
             $default_filters->add(
                 SelectFilter::make('is_valid')
                     ->label('Valid')
+                    // No 'Expiring' option: it called an `expiring` scope that exists
+                    // nowhere, so choosing it threw BadMethodCallException on every
+                    // table. Restoring it means first deciding what "expiring" is,
+                    // since HasValidity has no notion of a nearness threshold.
                     ->options([
                         // 'all' => 'All',
                         'valid' => 'Valid',
                         'scheduled' => 'Scheduled',
-                        'expiring' => 'Expiring',
                         'expired' => 'Expired',
                         'draft' => 'Draft',
                     ])
@@ -755,7 +758,6 @@ trait HasTable
                         // 'all' => $query,
                         'valid' => $query->valid(),
                         'scheduled' => $query->scheduled(),
-                        'expiring' => $query->expiring(),
                         'expired' => $query->expired(),
                         'draft' => $query->draft(),
                         default => $query,
