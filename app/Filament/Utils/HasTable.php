@@ -794,8 +794,11 @@ trait HasTable
         }
 
         if ($model_instance->timestamps) {
-            $created_at_column = $model_instance->getCreatedAtColumn();
-            $updated_at_column = $model_instance->getUpdatedAtColumn();
+            // Both are nullable: a model with $timestamps = false returns null, and
+            // every whereDate() below needs a column name. The same fallback the
+            // record actions use.
+            $created_at_column = $model_instance->getCreatedAtColumn() ?? 'created_at';
+            $updated_at_column = $model_instance->getUpdatedAtColumn() ?? 'updated_at';
             $default_filters->push(
                 SelectFilter::make($created_at_column)
                     ->label('Created at')
