@@ -50,6 +50,10 @@ final class Fieldable extends Pivot implements Sortable
     ];
 
     #[Scope]
+    /**
+     * @param  Builder<Fieldable>  $query
+     * @return Builder<Fieldable>
+     */
     protected function ordered(Builder $query): Builder
     {
         return $query->orderBy('order_column', 'asc');

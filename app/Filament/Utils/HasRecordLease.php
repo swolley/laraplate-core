@@ -104,7 +104,7 @@ trait HasRecordLease
                 : __('app.locking.held.frozen_until', ['until' => (string) $until]);
         }
 
-        $owner = User::query()->find($owner_id)?->name ?? (string) $owner_id;
+        $owner = User::query()->whereKey($owner_id)->first()?->name ?? (string) $owner_id;
 
         return $until === null
             ? __('app.locking.held.by', ['user' => $owner])

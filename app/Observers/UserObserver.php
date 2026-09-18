@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Observers;
 
-use Illuminate\Foundation\Auth\User;
+use Modules\Core\Models\User;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 

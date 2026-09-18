@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Modules\Core\Auth\Concerns\ReadsSocialiteTokens;
 use Modules\Core\Auth\Concerns\ValidatesUserAccount;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
 use Override;
 
 final class SocialiteProvider implements IAuthenticationProvider
 {
+    use ReadsSocialiteTokens;
     use ValidatesUserAccount;
 
     #[Override]
@@ -45,14 +47,16 @@ final class SocialiteProvider implements IAuthenticationProvider
                 ];
             }
 
+            $tokens = $this->socialiteTokens($socialUser);
+
             $defaults = [
                 'name' => $socialUser->getName(),
                 'username' => $socialUser->getNickname(),
                 'email' => $socialUser->getEmail(),
                 'social_service' => $request->provider,
-                'social_token' => $socialUser->token,
-                'social_refresh_token' => $socialUser->refreshToken,
-                'social_token_secret' => $socialUser->tokenSecret,
+                'social_token' => $tokens['token'],
+                'social_refresh_token' => $tokens['refresh_token'],
+                'social_token_secret' => $tokens['token_secret'],
             ];
 
             if (! User::query()->where('social_id', $socialUser->getId())->exists()) {

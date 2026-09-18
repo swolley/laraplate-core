@@ -6,6 +6,7 @@ namespace Modules\Core\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Models\Permission;
+use Modules\Core\Models\Role;
 use Override;
 
 final class UserInfoResponse extends JsonResource
@@ -29,7 +30,7 @@ final class UserInfoResponse extends JsonResource
                 }
             }
 
-            $roles = $this->resource->roles->map(static fn (object $role) => $role->name);
+            $roles = $this->resource->roles->map(static fn (Role $role): mixed => $role->name);
 
             return [
                 'id' => $this->resource->id,

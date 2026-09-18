@@ -19,6 +19,9 @@ use ReflectionClass;
 
 trait HasRecords
 {
+    /**
+     * @var list<\Filament\Tables\Grouping\Group|string>
+     */
     private array $groups = [];
 
     /**

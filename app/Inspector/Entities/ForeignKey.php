@@ -14,8 +14,8 @@ final readonly class ForeignKey
     public ?string $foreignConnection;
 
     /**
-     * @param  Collection<string>  $columns
-     * @param  Collection<string>  $foreignColumns
+     * @param  Collection<int, string>  $columns
+     * @param  Collection<int, string>  $foreignColumns
      */
     public function __construct(
         public string $name,
@@ -47,14 +47,34 @@ final readonly class ForeignKey
         }
     }
 
+    /**
+     * @return Collection<int, string>
+     */
     public function localColumnNames(): Collection
     {
-        return $this->columns->map(static fn (object|string $column): string => is_object($column) ? $column->name : $column);
+        return $this->columns->map(self::columnName(...));
     }
 
+    /**
+     * @return Collection<int, string>
+     */
     public function foreignColumnNames(): Collection
     {
-        return $this->foreignColumns->map(static fn (object|string $column): string => is_object($column) ? $column->name : $column);
+        return $this->foreignColumns->map(self::columnName(...));
+    }
+
+    /**
+     * A column entry is the name itself. Inspectors that hand back objects carrying
+     * one are still accepted, which is what {@see \Modules\Core\Inspector\Inspect}
+     * never produces and the inspector tests exercise directly.
+     */
+    private static function columnName(object|string $column): string
+    {
+        if (is_string($column)) {
+            return $column;
+        }
+
+        return property_exists($column, 'name') && is_string($column->name) ? $column->name : '';
     }
 
     public function isComposite(): bool

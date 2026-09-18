@@ -416,6 +416,7 @@ trait HasLocks
      * if any, has not passed.
      *
      * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     #[Scope]
     protected function locked(Builder $query): Builder
@@ -432,6 +433,7 @@ trait HasLocks
 
     /**
      * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     #[Scope]
     protected function lockedBy(Builder $query, User $user): Builder
@@ -441,6 +443,7 @@ trait HasLocks
 
     /**
      * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     #[Scope]
     protected function unlocked(Builder $query): Builder
@@ -455,6 +458,7 @@ trait HasLocks
 
     /**
      * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     #[Scope]
     protected function unlockedBy(Builder $query, User $user): Builder

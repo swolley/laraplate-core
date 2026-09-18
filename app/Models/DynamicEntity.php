@@ -343,10 +343,6 @@ final class DynamicEntity extends Model
             $foreign_column_names = $fk->foreignColumnNames()->values()->all();
 
             foreach ($fk->localColumnNames()->values()->all() as $idx => $local_column) {
-                if (! is_string($local_column)) {
-                    continue;
-                }
-
                 $foreign_column = $foreign_column_names[$idx] ?? null;
 
                 if (! is_string($foreign_column)) {

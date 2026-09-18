@@ -10,10 +10,13 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Socialite\Contracts\User as SocialUser;
+use Modules\Core\Auth\Concerns\ReadsSocialiteTokens;
 use Modules\Core\Events\SocialLoginCompleted;
 
 final readonly class HandleSocialLoginAction
 {
+    use ReadsSocialiteTokens;
+
     /**
      * @param  callable(SocialUser,string):Authenticatable  $userUpserter
      */
@@ -27,6 +30,8 @@ final readonly class HandleSocialLoginAction
         /** @var SocialUser $socialUser */
         $socialUser = $this->socialite->driver($service)->user();
 
+        $tokens = $this->socialiteTokens($socialUser);
+
         $user = $this->userUpserter
             ? ($this->userUpserter)($socialUser, $service)
             : user_class()::query()->updateOrCreate([
@@ -36,9 +41,9 @@ final readonly class HandleSocialLoginAction
                 'username' => $socialUser->getNickname(),
                 'email' => $socialUser->getEmail(),
                 'social_service' => $service,
-                'social_token' => $socialUser->token,
-                'social_refresh_token' => $socialUser->refreshToken ?? null,
-                'social_token_secret' => $socialUser->tokenSecret ?? null,
+                'social_token' => $tokens['token'],
+                'social_refresh_token' => $tokens['refresh_token'],
+                'social_token_secret' => $tokens['token_secret'],
             ]);
 
         Auth::login($user);

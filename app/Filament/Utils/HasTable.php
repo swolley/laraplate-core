@@ -130,6 +130,9 @@ trait HasTable
      * @throws LogicException
      * @throws BindingResolutionException
      * @throws InvalidArgumentException
+     * @param  list<string>  $fixedActions  Action names kept out of the grouped menu,
+     *                                        matched against Action::getName().
+     *
      * @throws GlobalInvalidArgumentException
      */
     protected static function configureTable(Table $table, ?callable $columns = null, ?callable $actions = null, array $fixedActions = [], ?callable $filters = null): Table
@@ -249,7 +252,7 @@ trait HasTable
         ?callable $columns,
         Model $model_instance,
     ): void {
-        /** @var Collection<Column> $default_columns */
+        /** @var Collection<int, Column> $default_columns */
         $default_columns = collect([]);
 
         // if ($columns === null) {
@@ -417,6 +420,9 @@ trait HasTable
         });
     }
 
+    /**
+     * @param  list<string>  $fixedActions
+     */
     private static function configureActions(
         Table $table,
         bool $hasSoftDeletes,
@@ -430,12 +436,12 @@ trait HasTable
         string $permissionsPrefix,
         ?User $user,
     ): void {
-        /** @var Collection<Action> $default_actions */
+        /** @var Collection<int, Action> $default_actions */
         $default_actions = collect([
             ViewAction::make()->hiddenLabel()->modal(true),
         ]);
 
-        /** @var Collection<BulkAction> $default_bulk_actions */
+        /** @var Collection<int, BulkAction> $default_bulk_actions */
         $default_bulk_actions = collect([]);
 
         if ($hasActivation) {

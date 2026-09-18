@@ -211,6 +211,10 @@ abstract class Taxonomy extends Model implements IActivatableModel, ILockableMod
     }
 
     #[Scope]
+    /**
+     * @param  Builder<Taxonomy>  $query
+     * @return Builder<Taxonomy>
+     */
     final protected function ordered(Builder $query): Builder
     {
         $model = $query->getModel();

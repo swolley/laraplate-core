@@ -78,18 +78,27 @@ final class License extends Model implements IValidatableModel
     }
 
     #[Scope]
+    /**
+     * @param  Builder<License>  $query
+     */
     protected function free(Builder $query): void
     {
         $query->doesntHave('user');
     }
 
     #[Scope]
+    /**
+     * @param  Builder<License>  $query
+     */
     protected function occupied(Builder $query): void
     {
         $query->has('user');
     }
 
     #[Scope]
+    /**
+     * @param  Builder<License>  $query
+     */
     protected function expired(Builder $query): void
     {
         $query->whereNotNull('valid_to')

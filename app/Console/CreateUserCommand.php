@@ -120,9 +120,9 @@ final class CreateUserCommand extends Command
                     $total_users_created++;
 
                     $created_users[] = [
-                        'username' => $user->username,
-                        'name' => $user->name,
-                        'email' => $user->email,
+                        'username' => $user->getAttribute('username'),
+                        'name' => $user->getAttribute('name'),
+                        'email' => $user->getAttribute('email'),
                         'password' => $password,
                         'roles' => $all_roles->filter(fn (mixed $name, int|string $id): bool => in_array($id, $roles, true))->pluck('name')->implode(', '),
                         'permissions' => $all_permissions->filter(fn (mixed $name, int|string $id): bool => in_array($id, $permissions, true))->pluck('name')->implode(', '),

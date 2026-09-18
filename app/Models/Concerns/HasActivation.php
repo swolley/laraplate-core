@@ -15,6 +15,9 @@ use Modules\Core\Contracts\IActivatableModel;
  */
 trait HasActivation
 {
+    /**
+     * @var string
+     */
     protected static $activation_column = 'is_active';
 
     public static function activationColumn(): string
@@ -46,12 +49,20 @@ trait HasActivation
         ];
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function active(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$activation_column), true);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     #[Scope]
     protected function inactive(Builder $query): Builder
     {
