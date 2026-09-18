@@ -12,8 +12,6 @@ use Modules\Core\Models\Setting;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\PerModelSettingResolver;
 
-uses(Tests\TestCase::class);
-
 it('overlays dot-named settings onto runtime config', function (): void {
     $config = new Repository([
         'ai' => [

@@ -6,8 +6,6 @@ use Illuminate\Database\DatabaseManager;
 use Modules\Core\Helpers\BatchSeeder;
 use Modules\Core\Models\License;
 
-uses(Tests\TestCase::class);
-
 function makeVersioningSeeder(): BatchSeeder
 {
     return new class(app(DatabaseManager::class)) extends BatchSeeder

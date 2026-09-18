@@ -9,8 +9,6 @@ use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\ERP\Services\Company\ErpCompanySettings;
 use Modules\MES\Database\Seeders\MESDatabaseSeeder;
 
-uses(Tests\TestCase::class);
-
 it('keeps runtime setting names within the Setting model name limit', function (): void {
     $all_names = collect([
         ...CoreDatabaseSeeder::runtimeSettingDefinitions(),

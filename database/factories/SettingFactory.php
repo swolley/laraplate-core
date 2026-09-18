@@ -37,7 +37,12 @@ final class SettingFactory extends Factory
         $type = fake()->randomElement(SettingTypeEnum::cases())->value;
 
         return [
-            'name' => fake()->word() . '-' . fake()->randomNumber(10, true),
+            // Microseconds, as an integer: the name column is unique and fake()->word()
+            // alone collides. Not `microtime(true)` as-is — its decimal point would make
+            // the name read as dot-notation, which DatabaseConfigOverlay treats as a
+            // config overlay candidate. And not randomNumber(10, true), which cannot work
+            // at all: ten strict digits exceed mt_getrandmax().
+            'name' => fake()->word() . '-' . (int) (microtime(true) * 1_000_000),
             'value' => match ($type) {
                 SettingTypeEnum::Boolean => fake()->boolean(),
                 SettingTypeEnum::Integer => fake()->randomNumber(),

@@ -5,8 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\DatabaseManager;
 use Modules\Core\Helpers\BatchSeeder;
 
-uses(Tests\TestCase::class);
-
 afterEach(function (): void {
     app()->forgetInstance(BatchSeeder::SCALE_CONTAINER_KEY);
 });

@@ -13,8 +13,6 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Services\DynamicContentsService;
 
-uses(Tests\TestCase::class);
-
 beforeEach(function (): void {
     config()->set('cache.default', 'array');
     Cache::flush();

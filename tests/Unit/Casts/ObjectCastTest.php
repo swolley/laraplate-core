@@ -5,8 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\ObjectCast;
 
-uses(Tests\TestCase::class);
-
 afterEach(fn () => Mockery::close());
 
 it('normalizes json array to stdClass', function (): void {
