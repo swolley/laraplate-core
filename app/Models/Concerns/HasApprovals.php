@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models\Concerns;
 
 use Approval\Models\Modification as ApprovalModification;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
@@ -30,6 +31,25 @@ trait HasApprovals
     use RequiresApproval;
 
     /**
+     * Declared again only for its generics. RequiresApproval returns a bare
+     * MorphMany, so nothing downstream knows what is on the other end, and the
+     * scopes the Modification model carries (activeOnly, inactiveOnly) resolve
+     * against Model instead. The body is the package's, with the configured class
+     * checked before it is used as one.
+     *
+     * @return MorphMany<ApprovalModification, $this>
+     */
+    public function modifications(): MorphMany
+    {
+        $configured = config('approval.models.modification', ApprovalModification::class);
+        $modification_class = is_string($configured) && is_a($configured, ApprovalModification::class, true)
+            ? $configured
+            : ApprovalModification::class;
+
+        return $this->morphMany($modification_class, 'modifiable');
+    }
+
+    /**
      * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
      *
      * @param  Model&self  $item
@@ -46,7 +66,7 @@ trait HasApprovals
 
         $has_modification_pending = $item->modifications()
             ->activeOnly()
-            ->where('md5', md5(json_encode($diff)))
+            ->where('md5', md5(json_encode($diff, JSON_THROW_ON_ERROR)))
             ->first();
 
         $modifier = $item->modifier();
@@ -59,7 +79,7 @@ trait HasApprovals
         $modification->modifications = $diff;
         $modification->approvers_required = $item->approversRequired;
         $modification->disapprovers_required = $item->disapproversRequired;
-        $modification->md5 = md5(json_encode($diff));
+        $modification->md5 = md5(json_encode($diff, JSON_THROW_ON_ERROR));
 
         if ($modifier && ($modifier_class = $modifier::class)) {
             $modifier_instance = new $modifier_class();
@@ -128,6 +148,9 @@ trait HasApprovals
         );
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     protected function getPreviewAttribute(): ?array
     {
         // preview(), not session('preview'): on app/api the flag is request-scoped and

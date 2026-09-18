@@ -40,6 +40,13 @@ trait HasValidations
 {
     public const DEFAULT_RULE = 'always';
 
+    /**
+     * Validation rules per operation: 'create', 'update' and the DEFAULT_RULE
+     * bucket that applies to both. A rule is whatever Validator accepts, which is
+     * a string, an array of them, or a Rule object.
+     *
+     * @var array<string, array<string, mixed>>
+     */
     protected $rules = [
         'create' => [],
         'update' => [],
@@ -89,6 +96,9 @@ trait HasValidations
         return $attributes;
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
     public function getRules(): array
     {
         $primary_key = $this->getKeyName();
@@ -105,6 +115,9 @@ trait HasValidations
         return $rules;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getOperationRules(?string $operation = null): array
     {
         $rules = $this->getRules();
@@ -136,9 +149,11 @@ trait HasValidations
 
                 $attributes = array_merge($attributes, $components);
 
-                if (isset($this->attributes['shared_components'])) {
-                    $shared = json_decode((string) $this->attributes['shared_components'], true);
-                    $attributes = array_merge($attributes, $shared ?? []);
+                $shared_components = $this->attributes['shared_components'] ?? null;
+
+                if (is_string($shared_components)) {
+                    $shared = json_decode($shared_components, true);
+                    $attributes = array_merge($attributes, is_array($shared) ? $shared : []);
                 }
             }
 
@@ -183,6 +198,7 @@ trait HasValidations
             throw_unless(static::checkUserCanDo($model, 'select'), AuthorizationException::class, 'User cannot select ' . $model->getTable());
         });
         static::creating(function (Model $model): void {
+            /** @var self $model */
             throw_unless(static::checkUserCanDo($model, 'insert'), AuthorizationException::class, 'User cannot insert ' . $model->getTable());
 
             if (! $model->shouldSkipValidation()) {
@@ -190,6 +206,7 @@ trait HasValidations
             }
         });
         static::updating(function (Model $model): void {
+            /** @var self $model */
             throw_unless(static::checkUserCanDo($model, 'update'), AuthorizationException::class, 'User cannot update ' . $model->getTable());
 
             if (! $model->isDirty('deleted_at') && ! $model->shouldSkipValidation()) {

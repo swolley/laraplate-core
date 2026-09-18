@@ -85,7 +85,12 @@ trait HasDynamicContents
      */
     public static function getPresettableClass(): string
     {
-        return static::getModuleModelClass(Presettable::class);
+        // getModuleModelClass rewrites the namespace by hand, so what comes back is
+        // a class name the analyser cannot tie to anything: a module that has not
+        // defined its own falls back to Core's.
+        $class = static::getModuleModelClass(Presettable::class);
+
+        return is_a($class, Presettable::class, true) ? $class : Presettable::class;
     }
 
     /**
