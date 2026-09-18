@@ -24,12 +24,18 @@ use Illuminate\Support\Carbon;
  * @method static Builder<Model&static> draft()
  * @method static Builder<Model&static> scheduled()
  * @method static Builder<Model&static> expired()
+ * @method static Builder<Model&static> expiring(?int $within_hours = null)
  * @method static Builder<Model&static> validityOrdered()
  * @method static Builder<Model&static> validAt(Carbon $date)
  * @method static Builder<Model&static> expiredAt(Carbon $date)
  */
 interface IValidatableModel
 {
+    /**
+     * The default window, in hours, for the `expiring` scope on this model.
+     */
+    public static function expiringWithinHours(): int;
+
     public static function validFromKey(): string;
 
     public static function validToKey(): string;

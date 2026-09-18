@@ -52,6 +52,17 @@ return [
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'soft_deletes_expiration_days' => env('SOFT_DELETES_EXPIRATION_DAYS'),
 
+    /*
+     * How near an expiry has to be for HasValidity's `expiring` scope to report a
+     * record, when the caller names no window of its own. Hours, because the right
+     * answer differs by model: a task expires in days, a licence in months, so a
+     * model can override it with `protected static int $expiring_within_hours`.
+     */
+    'validity' => [
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'expiring_within_hours' => (int) env('CORE_VALIDITY_EXPIRING_WITHIN_HOURS', 48),
+    ],
+
     'extended_class_suffix' => '_extended',
 
     'editor' => env('APP_EDITOR', 'VSCode'),

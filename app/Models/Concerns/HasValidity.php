@@ -154,6 +154,62 @@ trait HasValidity
     }
 
     /**
+     * Records that are valid now but stop being valid within the given window.
+     *
+     * Neither `valid` nor `expired` answers "what is about to lapse", which is the
+     * question a licence or a price list is usually asked. The window is in hours
+     * and resolved in three steps, nearest first: the argument, the model's own
+     * $expiring_within_hours, then core.validity.expiring_within_hours. A model
+     * whose rows live for years is expected to widen it; the default suits a
+     * record measured in days.
+     *
+     * Rows with no valid_to never expire and are never returned.
+     *
+     * @param  Builder<static>  $query
+     * @param  int|null  $within_hours  Window size; null uses the model's own, then the configured default.
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function expiring(Builder $query, ?int $within_hours = null): Builder
+    {
+        $hours = $within_hours ?? static::expiringWithinHours();
+
+        if ($hours < 1) {
+            throw new InvalidArgumentException('The expiring window must be at least one hour.');
+        }
+
+        $valid_to = $this->qualifyColumn(static::$valid_to_column);
+
+        return $query->valid()
+            ->whereNotNull($valid_to)
+            ->where($valid_to, '<=', now()->addHours($hours));
+    }
+
+    /**
+     * The default expiring window for this model, in hours.
+     *
+     * Read off a static property when the model declares one, so a model can say
+     * what "soon" means for its own rows without every caller repeating it.
+     */
+    public static function expiringWithinHours(): int
+    {
+        if (property_exists(static::class, 'expiring_within_hours')) {
+            $own = static::$expiring_within_hours;
+
+            if (is_int($own) && $own > 0) {
+                return $own;
+            }
+        }
+
+        $configured = config('core.validity.expiring_within_hours', 48);
+
+        return is_numeric($configured) && (int) $configured > 0 ? (int) $configured : 48;
+    }
+
+    /**
      * Expired records.
      *
      * @param  Builder<static>  $query

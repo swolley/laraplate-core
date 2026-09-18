@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Tests\Stubs\LongLivedValidityStubModel;
 use Modules\Core\Tests\Stubs\ValidityStubModel;
 
 beforeEach(function (): void {
@@ -73,4 +74,43 @@ it('unpublish clears valid_from and valid_to in memory and persists when saved',
     $model->refresh();
     expect($model->valid_from)->toBeNull()
         ->and($model->valid_to)->toBeNull();
+});
+
+it('expiring returns only records whose validity ends inside the window', function (): void {
+    $soon = ValidityStubModel::create(['name' => 'soon', 'valid_from' => now()->subDay(), 'valid_to' => now()->addHours(5)]);
+    ValidityStubModel::create(['name' => 'later', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDays(10)]);
+    ValidityStubModel::create(['name' => 'perpetual', 'valid_from' => now()->subDay(), 'valid_to' => null]);
+    ValidityStubModel::create(['name' => 'already-expired', 'valid_from' => now()->subDays(5), 'valid_to' => now()->subDay()]);
+    ValidityStubModel::create(['name' => 'not-started', 'valid_from' => now()->addDay(), 'valid_to' => now()->addHours(30)]);
+
+    expect(ValidityStubModel::expiring()->pluck('id')->all())->toBe([$soon->id]);
+});
+
+it('expiring widens to the window the caller asks for', function (): void {
+    ValidityStubModel::create(['name' => 'soon', 'valid_from' => now()->subDay(), 'valid_to' => now()->addHours(5)]);
+    ValidityStubModel::create(['name' => 'next-week', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDays(6)]);
+
+    expect(ValidityStubModel::expiring()->count())->toBe(1)
+        ->and(ValidityStubModel::expiring(24 * 7)->count())->toBe(2);
+});
+
+it('expiring falls back to the configured window and rejects a window under an hour', function (): void {
+    config(['core.validity.expiring_within_hours' => 2]);
+    ValidityStubModel::create(['name' => 'in-one-hour', 'valid_from' => now()->subDay(), 'valid_to' => now()->addHour()]);
+    ValidityStubModel::create(['name' => 'in-three-hours', 'valid_from' => now()->subDay(), 'valid_to' => now()->addHours(3)]);
+
+    expect(ValidityStubModel::expiringWithinHours())->toBe(2)
+        ->and(ValidityStubModel::expiring()->count())->toBe(1);
+
+    expect(fn (): mixed => ValidityStubModel::expiring(0)->count())
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('expiring lets a model declare its own window', function (): void {
+    ValidityStubModel::create(['name' => 'in-ten-days', 'valid_from' => now()->subDay(), 'valid_to' => now()->addDays(10)]);
+
+    expect(LongLivedValidityStubModel::expiringWithinHours())->toBe(720)
+        ->and(ValidityStubModel::expiringWithinHours())->toBe(48)
+        ->and(LongLivedValidityStubModel::expiring()->count())->toBe(1)
+        ->and(ValidityStubModel::expiring()->count())->toBe(0);
 });

@@ -306,6 +306,39 @@ class ... extends Model
 }
 ```
 
+#### Query scopes and the expiring window
+
+`HasValidity` declares the scopes `valid`, `expired`, `scheduled`, `draft`, `published`, `expiring`, `validAt`, `expiredAt` and `validityOrdered`.
+
+`expiring` answers the question the other scopes do not: which rows are valid now but stop being valid soon. A row with no `valid_to` never expires and is never returned.
+
+```php
+// The model's own window
+Licence::expiring()->get();
+
+// An explicit one, in hours
+Licence::expiring(24 * 30)->get();
+```
+
+The window is resolved nearest first: the argument, then the model's own `$expiring_within_hours`, then `core.validity.expiring_within_hours`.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` | `48` | Hours of lead time for `expiring()` when no window is given. |
+
+The default suits a record measured in days. A model whose rows live for months is expected to widen it for itself, rather than moving the default for everyone:
+
+```php
+class Licence extends Model
+{
+    use HasValidity;
+
+    protected static int $expiring_within_hours = 720; // 30 days
+}
+```
+
+The `Expiring` option in the Filament table filter calls the scope with no argument, so each resource shows what that model considers near.
+
 #### Temporary users (`Core\Models\User`)
 
 `User` uses `HasValidity` so accounts can expire automatically at `valid_to` without soft-delete or manual deactivation.
@@ -642,7 +675,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 ### Environment (principali variabili)
 
 -   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
--   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24).
+-   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
 -   Search: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (embeddings generation requires AI module).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 
