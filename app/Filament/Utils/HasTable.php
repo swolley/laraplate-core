@@ -295,7 +295,7 @@ trait HasTable
             );
         }
 
-        if ($hasActivation) {
+        if ($model_instance instanceof IActivatableModel) {
             $default_columns->add(
                 IconColumn::make($model_instance::activationColumn())
                     ->boolean()
@@ -705,7 +705,7 @@ trait HasTable
             );
         }
 
-        if ($hasLocks) {
+        if ($model_instance instanceof ILockableModel) {
             $locked_at_column = $model_instance->getLockedAtColumn();
             $default_filters->push(
                 // TernaryFilter::make('is_locked')
@@ -745,7 +745,7 @@ trait HasTable
             );
         }
 
-        if ($hasActivation) {
+        if ($model_instance instanceof IActivatableModel) {
             $default_filters->add(
                 TernaryFilter::make($model_instance::activationColumn())
                     ->label('Active')

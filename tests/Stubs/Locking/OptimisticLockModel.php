@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Locking;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 
 /**
@@ -13,7 +14,7 @@ use Modules\Core\Locking\Traits\HasOptimisticLocking;
  * @property string|null $note
  * @property int|null $lock_version
  */
-final class OptimisticLockModel extends Model
+final class OptimisticLockModel extends Model implements IOptimisticLockableModel
 {
     use HasOptimisticLocking;
 

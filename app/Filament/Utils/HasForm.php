@@ -11,7 +11,9 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\IDynamicContentModel;
 use Modules\Core\Contracts\IDynamicEntityTypable;
+use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasDynamicContents;
@@ -40,8 +42,10 @@ trait HasForm
             return $schema;
         }
 
-        if (class_uses_trait($model_class, HasOptimisticLocking::class)) {
-            /** @var class-string<Model&HasOptimisticLocking> $model_class */
+        // Asked of the contract rather than of the trait that satisfies it: a trait
+        // is not a type, so the annotation it forced here resolved to nothing and
+        // took the lock column's own type with it.
+        if (is_a($model_class, IOptimisticLockableModel::class, true)) {
             $schema->components([
                 // Re-declaring components replaces the list, so carry the
                 // resource's own fields over instead of dropping them.
@@ -50,16 +54,13 @@ trait HasForm
             ]);
         }
 
-        if (! class_uses_trait($model_class, HasDynamicContents::class)) {
+        if (! is_a($model_class, IDynamicContentModel::class, true)) {
             return $schema;
         }
 
-        /** @var class-string<Model&HasDynamicContents> $model_class */
+        // The contract types the return, so the instanceof that used to stand here
+        // was always true: the check it looked like it performed was never one.
         $entity_type = $model_class::getEntityType();
-
-        if (! $entity_type instanceof IDynamicEntityTypable) {
-            return $schema;
-        }
 
         $owned = FilamentTraitResolver::formColumnsOwnedByHasForm($model_class);
         $existing = array_values(array_filter(
@@ -80,7 +81,7 @@ trait HasForm
     }
 
     /**
-     * @param  class-string<Model&HasDynamicContents>  $model_class
+     * @param  class-string<Model&IDynamicContentModel>  $model_class
      * @return list<Component>
      */
     private static function dynamicEntityPresetComponents(string $model_class, IDynamicEntityTypable $entity_type): array
