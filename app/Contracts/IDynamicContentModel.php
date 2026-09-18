@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Contracts;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
 use Modules\Core\Models\Entity;
+use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 
 /**
@@ -33,4 +36,15 @@ interface IDynamicContentModel
      * @return Collection<int, Preset>
      */
     public static function fetchAvailablePresets(IDynamicEntityTypable $type): Collection;
+
+    /**
+     * The entity/preset pair this record's contents are built from.
+     *
+     * The related class is resolved per module through getPresettableClass(),
+     * which returns the module's own subclass of Core's Presettable, so that is
+     * what the relation is stated against.
+     *
+     * @return BelongsTo<Presettable, Model>
+     */
+    public function presettable(): BelongsTo;
 }

@@ -142,7 +142,14 @@ trait HasTable
 
         self::loadUserPermissionsForTable($user);
 
+        // getModel() is nullable, and both calls below would have failed on null:
+        // the registry with a type error, ReflectionClass with a fatal.
         $model = $table->getModel();
+
+        if ($model === null) {
+            return $table;
+        }
+
         $meta = ModelMetadataRegistry::getInstance()->get($model);
         $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
         $permissions_prefix = sprintf('%s.%s', PermissionName::normalizeConnection($meta->connection), $meta->table);
@@ -466,9 +473,12 @@ trait HasTable
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedPlay)
                     ->action(static function (IValidatableModel&Model $record): void {
-                        $valid_from_column = $record::validFromKey();
-                        $valid_to_column = $record::validToKey();
-                        $record->update([$valid_from_column => now(), $valid_to_column => null]);
+                        // setAttribute rather than update([...]): the column names come
+                        // from the model at runtime, and update() is typed to the
+                        // columns a model declares.
+                        $record->setAttribute($record::validFromKey(), now());
+                        $record->setAttribute($record::validToKey(), null);
+                        $record->save();
                         $record->refresh();
                     })
                     ->disabled(static fn (IValidatableModel&Model $record) => $record->isValid())
@@ -480,8 +490,8 @@ trait HasTable
                     ->color(static fn (IValidatableModel&Model $record): string => $record->isDraft() ? 'gray' : 'warning')
                     ->disabled(static fn (IValidatableModel&Model $record) => $record->isDraft())
                     ->action(static function (IValidatableModel&Model $record): void {
-                        $valid_to_column = $record::validToKey();
-                        $record->update([$valid_to_column => now()]);
+                        $record->setAttribute($record::validToKey(), now());
+                        $record->save();
                         $record->refresh();
                     })
                     ->requiresConfirmation(),
@@ -525,7 +535,11 @@ trait HasTable
                         ->color('warning')
                         ->requiresConfirmation()
                         ->action(static function (Collection $records): void {
-                            $records->each(static fn (ILockableModel&Model $record) => $record->isLocked() ? null : $record->lock());
+                            foreach ($records as $record) {
+                                if ($record instanceof ILockableModel && ! $record->isLocked()) {
+                                    $record->lock();
+                                }
+                            }
                         }),
                 );
             }
@@ -548,7 +562,11 @@ trait HasTable
                         ->icon(Heroicon::OutlinedLockOpen)
                         ->requiresConfirmation()
                         ->action(static function (Collection $records): void {
-                            $records->each(static fn (ILockableModel&Model $record) => $record->isLocked() ? $record->forceUnlock() : null);
+                            foreach ($records as $record) {
+                                if ($record instanceof ILockableModel && $record->isLocked()) {
+                                    $record->forceUnlock();
+                                }
+                            }
                         }),
                 );
             }
@@ -567,7 +585,11 @@ trait HasTable
                 BulkAction::make('reindex')
                     ->icon(Heroicon::ArrowPath)
                     ->action(static function (Collection $records): void {
-                        $records->each(static fn (ISearchableModel&Model $record) => $record->reindex());
+                        foreach ($records as $record) {
+                            if ($record instanceof ISearchableModel) {
+                                $record->reindex();
+                            }
+                        }
                     }),
             );
         }
@@ -629,7 +651,11 @@ trait HasTable
 
         $fixed_actions_list = [];
         $grouped_actions_list = [];
-        $default_actions->keyBy(static fn (Action $action): ?string => $action->getName());
+        // keyBy returns a new collection rather than rekeying this one, so discarding
+        // the result left the loop below iterating over integer keys and the
+        // in_array() against $fixedActions could never match: every action fell
+        // through to the group, whatever the caller asked to keep fixed.
+        $default_actions = $default_actions->keyBy(static fn (Action $action): string => (string) $action->getName());
 
         foreach ($default_actions as $name => $action) {
             if ($fixedActions !== [] && in_array($name, $fixedActions, true)) {
@@ -852,7 +878,11 @@ trait HasTable
             return $value->format('Y-m-d H:i:s');
         }
 
-        if ($value === null || $value === '') {
+        if (! is_string($value) && ! is_int($value)) {
+            return '';
+        }
+
+        if ($value === '') {
             return '';
         }
 

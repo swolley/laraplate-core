@@ -104,13 +104,17 @@ trait HasForm
 
                     $record = $component->getRecord();
 
-                    if (! $record instanceof Model) {
+                    // The relation belongs to the contract, not to Model: a record
+                    // without it has nothing to hydrate from.
+                    if (! $record instanceof IDynamicContentModel) {
                         return;
                     }
 
+                    // getRelationValue() returns whatever is loaded, so the type is
+                    // only known once it is a model.
                     $presettable = $record->getRelationValue('presettable') ?? $record->presettable()->first();
 
-                    if ($presettable !== null) {
+                    if ($presettable instanceof Model) {
                         $component->state($presettable->getAttribute('entity_id'));
                     }
                 })
@@ -128,7 +132,7 @@ trait HasForm
                     }
 
                     return $model_class::fetchAvailablePresets($entity_type)
-                        ->where('entity_id', (int) $entity_id)
+                        ->where('entity_id', is_numeric($entity_id) ? (int) $entity_id : 0)
                         ->pluck('name', 'id')
                         ->all();
                 })
@@ -145,18 +149,24 @@ trait HasForm
 
                     $record = $component->getRecord();
 
-                    if (! $record instanceof Model) {
+                    // The relation belongs to the contract, not to Model: a record
+                    // without it has nothing to hydrate from.
+                    if (! $record instanceof IDynamicContentModel) {
                         return;
                     }
 
+                    // getRelationValue() returns whatever is loaded, so the type is
+                    // only known once it is a model.
                     $presettable = $record->getRelationValue('presettable') ?? $record->presettable()->first();
 
-                    if ($presettable !== null) {
+                    if ($presettable instanceof Model) {
                         $component->state($presettable->getAttribute('preset_id'));
                     }
                 })
                 ->afterStateUpdated(static function (Set $set, Get $get, mixed $state) use ($model_class, $entity_type): void {
-                    if (blank($state)) {
+                    // The form state is whatever the client sent, so a non-numeric
+                    // value is a state with no preset behind it.
+                    if (blank($state) || ! is_numeric($state)) {
                         $set('presettable_id', null);
 
                         return;

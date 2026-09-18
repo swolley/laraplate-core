@@ -8,6 +8,7 @@ use Filament\Actions\CreateAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ trait HasRecords
     /**
      * Measure fetch time and share it for the pagination overview (e.g. "Mostrati da 1 a 10 di 15,021 risultati in 0.12 s").
      *
-     * @return Collection<int, mixed>|Paginator|CursorPaginator
+     * @return Collection<int, Model>|Paginator<int, Model>|CursorPaginator<int, Model>
      */
     public function getTableRecords(): Collection|Paginator|CursorPaginator
     {
@@ -44,9 +45,18 @@ trait HasRecords
     {
         $model = self::getResource()::getModel();
         $model_instance = new ReflectionClass($model)->newInstanceWithoutConstructor();
+        $user = Auth::user();
+
+        // The page is behind the panel's auth middleware, so a null user here means
+        // the request never should have reached it: offering no create action is the
+        // safe reading, and newInstanceWithoutConstructor() gives back a bare object.
+        if ($user === null || ! $model_instance instanceof Model) {
+            return [];
+        }
+
         // `insert` is the registered action name; `create` was never seeded, so the
         // check always failed for anyone but a super admin (Gate::before).
-        $can_create = Auth::user()->can(PermissionName::forModel($model_instance, ActionEnum::Insert->value));
+        $can_create = $user->can(PermissionName::forModel($model_instance, ActionEnum::Insert->value));
 
         return $can_create ? [
             CreateAction::make()->icon(Heroicon::OutlinedPlus),
