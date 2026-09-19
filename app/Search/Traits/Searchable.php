@@ -203,7 +203,11 @@ trait Searchable
 
         // Add embeddings if available (agnostic array: no locale in ES, one entry per ModelEmbedding row)
         if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
-            $vectors = $this->embeddings()->get()
+            // Reuse the eager-loaded relation on the bulk path (adaptiveBulkIndex
+            // pre-loads it) and query only when it is not loaded, so serializing a
+            // chunk does not fire one embeddings query per model.
+            $embeddings = $this->relationLoaded('embeddings') ? $this->getRelation('embeddings') : $this->embeddings()->get();
+            $vectors = $embeddings
                 ->map(static fn (Model $e): array => ['vector' => $e->getAttribute('embedding')])
                 ->values()->all();
 
@@ -251,12 +255,22 @@ trait Searchable
         $result = [];
         $locales = $locale !== null ? [$locale] : LocaleContext::getAvailable();
 
+        // Reuse the eager-loaded translations relation (bulk path) so this does not
+        // fire one query per locale per model; getTranslation() always queries, so
+        // fall back to it only when the relation is not loaded (per-model path).
+        $loaded_translations = $this->relationLoaded('translations')
+            ? $this->getRelation('translations')->keyBy('locale')
+            : null;
+
         foreach ($locales as $loc) {
             // with_fallback: false — a locale with no translation row of its own must be
             // skipped, not silently resolved to the default-locale translation. Fallback
             // is on by default (Content), so getTranslation($loc) alone would return the
             // same default-locale row for every available locale, mislabeling embeddings.
-            $translation = $this->getTranslation($loc, with_fallback: false);
+            // The loaded relation, keyed by locale, gives the own-locale row (no fallback).
+            $translation = $loaded_translations !== null
+                ? ($loaded_translations[$loc] ?? null)
+                : $this->getTranslation($loc, with_fallback: false);
 
             if (! $translation) {
                 continue;
@@ -411,6 +425,13 @@ trait Searchable
      */
     private function bulkQueueMakeSearchable(Collection $models): void
     {
+        // Eager-load the relations both passes read per model (embeddings for the
+        // freshness check and the vector serialization, translations for the
+        // embeddable text), so the chunk costs a couple of queries instead of a
+        // handful per model. The pre-process listener and adaptiveBulkIndex share
+        // these same instances, so the loads are reused across both.
+        $this->eagerLoadForIndexing($models);
+
         $this->degradeWhenSearchEngineUnreachable(
             'bulk pre-process',
             fn (): mixed => event(new ModelsRequireIndexing($models, true)),
@@ -420,6 +441,47 @@ trait Searchable
             'bulk index',
             fn (): mixed => $this->adaptiveBulkIndex($models),
         );
+    }
+
+    /**
+     * Eager-load, in one query each, the relations the bulk indexing passes read
+     * per model. Homogeneous chunk: the first model decides which relations exist.
+     * `loadMissing` leaves already-loaded relations untouched.
+     *
+     * @param  Collection<int, static>  $models
+     */
+    private function eagerLoadForIndexing(Collection $models): void
+    {
+        $sample = $models->first();
+
+        if ($sample === null) {
+            return;
+        }
+
+        // Wrap in an Eloquent collection (the chunk may be a base collection) to
+        // reach load/loadMissing; both load onto the shared model instances, so
+        // $models and every later chunk see the relations too.
+        $chunk = $sample->newCollection($models->all());
+
+        $relations = [];
+
+        if (method_exists($sample, 'embeddings')) {
+            $relations[] = 'embeddings';
+        }
+
+        if (class_uses_trait($sample, HasTranslations::class)) {
+            $relations[] = 'translations';
+        }
+
+        if ($relations !== []) {
+            $chunk->loadMissing($relations);
+        }
+
+        // The model's own Scout hook for preloading the relations its
+        // toSearchableArray() reads (contributors, taxonomies, ...). Our direct
+        // engine write bypasses Scout, which calls this before update(), so invoke
+        // it here for that eager-load side effect on the shared instances.
+        $sample->makeSearchableUsing($chunk);
     }
 
     /**
