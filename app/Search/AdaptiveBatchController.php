@@ -33,6 +33,7 @@ final class AdaptiveBatchController
         private readonly int $rampStep = 4,
         private readonly int $maxRetriesAtFloor = 3,
         private readonly float $backoffSeconds = 0.5,
+        private readonly ?int $startBatch = null,
         ?Closure $clock = null,
         ?Closure $sleeper = null,
     ) {
@@ -56,7 +57,7 @@ final class AdaptiveBatchController
     public function run(array $items, Closure $process, ?int $maxBatchBytes = null, ?Closure $sizeOf = null): array
     {
         $results = [];
-        $batch = $this->minBatch;
+        $batch = max($this->minBatch, min($this->maxBatch, $this->startBatch ?? $this->minBatch));
         $index = 0;
         $count = count($items);
         $failuresAtFloor = 0;

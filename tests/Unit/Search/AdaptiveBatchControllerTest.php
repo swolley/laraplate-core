@@ -132,6 +132,26 @@ it('gives up after repeated failures at the floor', function (): void {
     expect($sizes)->toBe([1, 1, 1]);
 });
 
+it('starts from startBatch and halves it under strain', function (): void {
+    $sizes = [];
+
+    $controller = new AdaptiveBatchController(
+        minBatch: 1,
+        maxBatch: 16,
+        targetLatencySeconds: 5.0,
+        rampStep: 4,
+        startBatch: 8,
+        clock: static fn (): float => 0.0,
+        sleeper: static fn (float $s): null => null,
+    );
+
+    // First call (the size-8 start) throws, forcing a halved retry from the same offset.
+    $controller->run(range(1, 20), recordingProcess($sizes, [0]));
+
+    expect($sizes[0])->toBe(8)
+        ->and($sizes[1])->toBe(4);
+});
+
 it('respects the byte cap even when the count would allow more', function (): void {
     $sizes = [];
 
