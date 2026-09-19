@@ -6,6 +6,7 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
@@ -176,6 +177,28 @@ trait Searchable
     public function makeAllSearchableUsing(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->withoutGlobalScope(\Modules\Core\Overrides\LocaleScope::class);
+    }
+
+    /**
+     * Scout hook, run before a chunk is written to the engine: eager-load the
+     * relations toSearchableArray() reads, declared by the model's
+     * toSearchableWith() when it has one, so serializing the chunk does not fire
+     * those relations one query per model. loadMissing keeps whatever an earlier
+     * pass already loaded. A model without toSearchableWith(), or a plain
+     * (non-Eloquent) collection, is returned untouched.
+     *
+     * @param  Collection<int, static>  $models
+     * @return Collection<int, static>
+     */
+    public function makeSearchableUsing(Collection $models): Collection
+    {
+        if (! $models instanceof EloquentCollection || ! method_exists($this, 'toSearchableWith')) {
+            return $models;
+        }
+
+        $with = $this->toSearchableWith();
+
+        return $with === [] ? $models : $models->loadMissing($with);
     }
 
     /**
