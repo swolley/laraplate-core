@@ -39,6 +39,8 @@ return new class extends Migration
             $table->string('locale')->nullable()->comment('Translation locale this vector was derived from; null for non-translated models');
             $table->string('model_key')->nullable()->comment('Embedding model profile key that produced this vector');
             $table->index(['model_type', 'model_id', 'locale'], "{$model_embeddings_table}_model_locale_IDX");
+            $table->string('content_hash', 64)->nullable()
+                ->comment('SHA-256 of the embedded text; lets indexing skip re-embedding unchanged content');
 
             MigrateUtils::timestamps(
                 $table,
