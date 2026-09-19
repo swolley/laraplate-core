@@ -17,6 +17,16 @@ return [
     'model_connections' => [],
 
     /**
+     * Per-minute rate limits for Core-defined job queues (see RouteServiceProvider).
+     * `embeddings` throttles calls to the embedding service; keep it low when the
+     * service saturates under load, raise it for faster bulk backfills.
+     */
+    'queue_rate_limits' => [
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'embeddings' => (int) env('EMBEDDINGS_QUEUE_RATE_PER_MINUTE', 10),
+    ],
+
+    /**
      * optimistic locking table column.
      */
     'locking' => [

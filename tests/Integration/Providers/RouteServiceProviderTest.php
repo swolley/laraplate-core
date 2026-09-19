@@ -62,6 +62,15 @@ it('embeddings limiter returns 10 per minute', function (): void {
         ->and($result->maxAttempts)->toBe(10);
 });
 
+it('embeddings limiter reads its per-minute cap from config', function (): void {
+    config()->set('core.queue_rate_limits.embeddings', 42);
+    $this->provider->boot();
+
+    $result = RateLimiter::limiter('embeddings')();
+
+    expect($result->maxAttempts)->toBe(42);
+});
+
 it('versions limiter caps at 120 jobs per minute', function (): void {
     $this->provider->boot();
 

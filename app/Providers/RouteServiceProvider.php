@@ -35,8 +35,10 @@ final class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(30); // 30 job al minuto
         });
 
-        RateLimiter::for('embeddings', static function () {
-            return Limit::perMinute(10); // 10 embedding jobs per minute (0.16 per second)
+        RateLimiter::for('embeddings', static function (): Limit {
+            // Configurable so a bulk backfill can be sped up without a code change;
+            // default 10/min (0.16/s) keeps a fragile embedding service from saturating.
+            return Limit::perMinute((int) config('core.queue_rate_limits.embeddings', 10));
         });
 
         RateLimiter::for('indexing', static fn () => app()->environment('production') ? [
