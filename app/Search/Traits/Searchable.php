@@ -8,14 +8,17 @@ use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
 use Modules\Core\Events\ModelRequiresIndexing;
+use Modules\Core\Events\ModelsRequireIndexing;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
+use Modules\Core\Search\AdaptiveBatchController;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Schema\FieldDefinition;
@@ -79,9 +82,19 @@ trait Searchable
             $models = collect([$models]);
         }
 
+        $collection = $models instanceof Collection ? $models->values() : collect($models)->values();
         $sync = ! config('scout.queue');
 
-        foreach ($models as $model) {
+        // Bulk import (many models at once): pre-process the whole chunk in one
+        // batched pass and write the engine in adaptive batches, instead of the
+        // per-model event fan-out kept for a real-time single save.
+        if (! $sync && $collection->count() > 1) {
+            $this->bulkQueueMakeSearchable($collection);
+
+            return;
+        }
+
+        foreach ($collection as $model) {
             // Emit event instead of calling job directly
             // Listeners will handle pre-processing (embeddings, translations, etc.)
             // and finalize listener will dispatch IndexInSearchJob when all are completed
@@ -112,7 +125,7 @@ trait Searchable
             // if no pre-processing is required
             $this->degradeWhenSearchEngineUnreachable(
                 'index models',
-                fn (): mixed => $this->baseQueueMakeSearchable($models),
+                fn (): mixed => $this->baseQueueMakeSearchable($collection),
             );
         }
     }
@@ -387,6 +400,51 @@ trait Searchable
     public function getEmbedFields(): array
     {
         return $this->embed ?? [];
+    }
+
+    /**
+     * Bulk path: pre-process every model in the chunk together (a listener may
+     * embed them in one batched call), then write the engine in adaptive
+     * batches. The per-model event fan-out is skipped here on purpose.
+     *
+     * @param  Collection<int, static>  $models
+     */
+    private function bulkQueueMakeSearchable(Collection $models): void
+    {
+        $this->degradeWhenSearchEngineUnreachable(
+            'bulk pre-process',
+            fn (): mixed => event(new ModelsRequireIndexing($models, true)),
+        );
+
+        $this->degradeWhenSearchEngineUnreachable(
+            'bulk index',
+            fn (): mixed => $this->adaptiveBulkIndex($models),
+        );
+    }
+
+    /**
+     * Write the collection to the engine in adaptive batches: the batch size
+     * grows on fast writes and shrinks on a slow or failing one, so it stays
+     * driver-agnostic (each engine's own bulk handles the chunk) and behaves on
+     * any server without tuning.
+     *
+     * @param  Collection<int, static>  $models
+     */
+    private function adaptiveBulkIndex(Collection $models): void
+    {
+        $engine = $this->searchableUsing();
+        $max = max(1, (int) config('core.bulk_index_batch', 100));
+
+        $controller = new AdaptiveBatchController(minBatch: 1, maxBatch: $max, startBatch: $max);
+
+        $controller->run(
+            $models->all(),
+            function (array $chunk) use ($engine): array {
+                $engine->update($this->newCollection($chunk));
+
+                return [];
+            },
+        );
     }
 
     /**

@@ -136,6 +136,7 @@ SCOUT_QUEUE_TIMEOUT=120							#scout queue timeout
 SCOUT_QUEUE_BACKOFF=30,60,120					#scout queue backoff times
 SCOUT_QUEUE_MAX_EXCEPTIONS=3					#real errors before an indexing job fails (rate-limit releases do not count)
 EMBEDDINGS_QUEUE_RATE_PER_MINUTE=10				#embedding jobs per minute; raise for faster bulk backfills, keep low if the embedding service saturates
+BULK_INDEX_BATCH=100							#optimistic batch size for bulk (scout:import) reindexing; the adaptive batcher shrinks it when the engine strains
 SCOUT_QUEUE_RETRY_UNTIL_MINUTES=720				#retry window; lets rate-limited indexing jobs wait for a slot instead of dying with MaxAttemptsExceeded
 SCOUT_IDENTIFY=false							#identify user in search engine
 

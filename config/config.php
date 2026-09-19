@@ -27,6 +27,14 @@ return [
     ],
 
     /**
+     * Ceiling for how many models a bulk (scout:import) reindex writes to the
+     * search engine per request. The adaptive batcher starts here and shrinks
+     * when the engine strains, so this only caps the optimistic batch size.
+     */
+    // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+    'bulk_index_batch' => (int) env('BULK_INDEX_BATCH', 100),
+
+    /**
      * optimistic locking table column.
      */
     'locking' => [
