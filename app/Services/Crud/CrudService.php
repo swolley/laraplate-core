@@ -43,6 +43,7 @@ use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Contracts\ProvidesDefaultSearchFilters;
 use Modules\Core\Contracts\ProvidesFacetLabelSources;
 use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
@@ -2235,6 +2236,12 @@ class CrudService
         /** @var class-string<Model> $model_class */
         $model_class = $model::class;
         $builder = $model_class::search($requestData->qs);
+
+        if ($model instanceof ProvidesDefaultSearchFilters) {
+            foreach ($model->defaultSearchFilters() as $field => $value) {
+                $builder->where($field, $value);
+            }
+        }
 
         $this->auth->injectAclFilters($requestData, $permissionName);
 
