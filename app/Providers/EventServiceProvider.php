@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Providers;
 
+use Illuminate\Auth\Events\Attempting;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Cache;
@@ -39,6 +41,15 @@ final class EventServiceProvider extends ServiceProvider
         ],
         ModificationPreProcessingCompleted::class => [
             \Modules\Core\Listeners\FinalizeModificationModerationListener::class,
+        ],
+        // Listed by hand: event discovery only scans the application's own app/Listeners, never a
+        // module's, so these never ran while they relied on it.
+        Attempting::class => [
+            \Modules\Core\Listeners\LogoutOtherDevicesListener::class . '@handleAttempting',
+        ],
+        Login::class => [
+            \Modules\Core\Listeners\AfterLoginListener::class,
+            \Modules\Core\Listeners\LogoutOtherDevicesListener::class . '@handleLogin',
         ],
     ];
 

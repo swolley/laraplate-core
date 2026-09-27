@@ -29,10 +29,7 @@ trait ValidatesUserAccount
                 ->doesntHave('user')
                 ->first();
 
-            if (
-                ! $available_license
-                && $user->roles->where('name', 'superadmin')->isEmpty()
-            ) {
+            if (! $available_license && ! $user->isSuperAdmin()) {
                 return 'No free licenses available';
             }
         }

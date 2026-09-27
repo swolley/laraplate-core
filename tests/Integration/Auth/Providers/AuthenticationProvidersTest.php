@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User as AppUser;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Auth\Providers\SocialiteProvider;
 use Modules\Core\Models\License;
@@ -83,6 +84,27 @@ it('authenticates credentials and covers invalid and license branches', function
     ]));
     expect($license_error['success'])->toBeFalse()
         ->and($license_error['error'])->toBe('No free licenses available');
+});
+
+it('lets a super admin in when no license is free', function (): void {
+    config(['auth.enable_user_licenses' => true, 'permission.roles.superadmin' => 'superadmin']);
+    License::query()->delete();
+
+    $user = AppUser::factory()->create([
+        'email' => 'root@example.test',
+        'password' => Hash::make('secret'),
+        'license_id' => null,
+        'email_verified_at' => now(),
+    ]);
+    $user->assignRole(Role::findOrCreate('superadmin', 'web'));
+
+    $result = (new FortifyCredentialsProvider())->authenticate(request()->duplicate([
+        'email' => 'root@example.test',
+        'password' => 'secret',
+    ]));
+
+    expect($result['error'])->toBeNull()
+        ->and($result['success'])->toBeTrue();
 });
 
 it('returns email-not-verified and license-available success branches for fortify', function (): void {
@@ -194,34 +216,15 @@ it('returns conflict when email exists with another account type', function (): 
         'username' => 'taken-social',
         'password' => Hash::make('secret'),
     ])->save();
-    $social_user_conflict = new class
-    {
-        public string $token = 'token';
-
-        public ?string $refreshToken = 'refresh-token';
-
-        public ?string $tokenSecret = 'secret';
-
-        public function getEmail(): string
-        {
-            return 'taken-social@example.test';
-        }
-
-        public function getId(): string
-        {
-            return 'social-1';
-        }
-
-        public function getName(): string
-        {
-            return 'Social User';
-        }
-
-        public function getNickname(): string
-        {
-            return 'social_user';
-        }
-    };
+    $social_user_conflict = (new SocialiteUser)
+        ->map([
+            'id' => 'social-1',
+            'name' => 'Social User',
+            'nickname' => 'social_user',
+            'email' => 'taken-social@example.test',
+        ])
+        ->setToken('token')
+        ->setRefreshToken('refresh-token');
     $driver_mock = Mockery::mock();
     $driver_mock->shouldReceive('user')->once()->andReturn($social_user_conflict);
     Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
@@ -233,34 +236,15 @@ it('returns conflict when email exists with another account type', function (): 
 
 it('authenticates social user successfully when data is valid', function (): void {
     $provider = new SocialiteProvider();
-    $social_user_success = new class
-    {
-        public string $token = 'token-success';
-
-        public ?string $refreshToken = 'refresh-success';
-
-        public ?string $tokenSecret = 'secret-success';
-
-        public function getEmail(): string
-        {
-            return 'new-social@example.test';
-        }
-
-        public function getId(): string
-        {
-            return 'social-2';
-        }
-
-        public function getName(): string
-        {
-            return 'New Social';
-        }
-
-        public function getNickname(): string
-        {
-            return 'new_social';
-        }
-    };
+    $social_user_success = (new SocialiteUser)
+        ->map([
+            'id' => 'social-2',
+            'name' => 'New Social',
+            'nickname' => 'new_social',
+            'email' => 'new-social@example.test',
+        ])
+        ->setToken('token-success')
+        ->setRefreshToken('refresh-success');
     $driver_mock = Mockery::mock();
     $driver_mock->shouldReceive('user')->once()->andReturn($social_user_success);
     Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
@@ -276,34 +260,15 @@ it('authenticates social user successfully when data is valid', function (): voi
 it('covers socialite license error and enabled-license success branches', function (): void {
     $provider = new SocialiteProvider();
 
-    $social_user = new class
-    {
-        public string $token = 'token-social-license';
-
-        public ?string $refreshToken = 'refresh-social-license';
-
-        public ?string $tokenSecret = 'secret-social-license';
-
-        public function getEmail(): string
-        {
-            return 'licensed-social@example.test';
-        }
-
-        public function getId(): string
-        {
-            return 'social-license-id';
-        }
-
-        public function getName(): string
-        {
-            return 'Licensed Social';
-        }
-
-        public function getNickname(): string
-        {
-            return 'licensed_social';
-        }
-    };
+    $social_user = (new SocialiteUser)
+        ->map([
+            'id' => 'social-license-id',
+            'name' => 'Licensed Social',
+            'nickname' => 'licensed_social',
+            'email' => 'licensed-social@example.test',
+        ])
+        ->setToken('token-social-license')
+        ->setRefreshToken('refresh-social-license');
 
     $driver_mock = Mockery::mock();
     $driver_mock->shouldReceive('user')->twice()->andReturn($social_user);

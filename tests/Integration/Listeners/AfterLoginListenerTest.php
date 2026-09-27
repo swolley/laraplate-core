@@ -83,7 +83,12 @@ it('listener handle updates last_login_at and logs when user does not use Impers
             return null;
         }
 
-        public function update(array $attributes = []): bool
+        public function forceFill(array $attributes): static
+        {
+            return $this;
+        }
+
+        public function save(): bool
         {
             return true;
         }
@@ -100,8 +105,8 @@ it('listener handle updates last_login_at and logs when user does not use Impers
     Log::shouldHaveReceived('info')->once()->with('{username} logged in', ['username' => 'testuser']);
 });
 
-it('listener handle logs out other devices when unlocked', function (): void {
-    Auth::shouldReceive('logoutOtherDevices')->once()->with('secret');
+it('listener handle leaves the other devices to the password-aware listener', function (): void {
+    Auth::shouldReceive('logoutOtherDevices')->never();
     Log::spy();
 
     $user = new class() implements Authenticatable
@@ -144,7 +149,12 @@ it('listener handle logs out other devices when unlocked', function (): void {
             return null;
         }
 
-        public function update(array $attributes = []): bool
+        public function forceFill(array $attributes): static
+        {
+            return $this;
+        }
+
+        public function save(): bool
         {
             return true;
         }
@@ -166,7 +176,7 @@ it('listener source contains license-check and impersonation branches', function
 
     expect($source)->toContain('whereDoesntHave(\'user\')')
         ->and($source)->toContain('associate($available_licenses)')
-        ->and($source)->toContain('elseif ($user->isImpersonated())')
+        ->and($source)->toContain('$user->isImpersonated()')
         ->and($source)->toContain('{impersonator} is impersonating {impersonated}');
 });
 
@@ -217,4 +227,16 @@ it('handle logs impersonation context for impersonated users', function (): void
         '{impersonator} is impersonating {impersonated}',
         ['impersonator' => 'impersonator-user', 'impersonated' => 'impersonated-user'],
     );
+});
+
+it('records the login of a real user even while the account is locked', function (): void {
+    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('auth.enable_user_licenses', false);
+
+    $user = User::factory()->create(['last_login_at' => null]);
+    $user->lock();
+
+    Auth::login($user);
+
+    expect($user->fresh()?->last_login_at)->not->toBeNull();
 });

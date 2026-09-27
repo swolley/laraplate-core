@@ -59,6 +59,7 @@ use Modules\Core\Import\Events\ImportSessionFailed;
 use Modules\Core\Import\Importers\UserImporter;
 use Modules\Core\Import\Support\EntityImporterRegistry;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Listeners\LogoutOtherDevicesListener;
 use Modules\Core\Listeners\SendImportFinishedNotification;
 use Modules\Core\Locking\Console\ModelLockSweepCommand;
 use Modules\Core\Locking\LockAwareUserProvider;
@@ -192,6 +193,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // is served by a long-lived worker.
         $this->app->scoped(DynamicContentsService::class);
         $this->app->scoped(DynamicEntityService::class);
+
+        // Carries the password from Attempting to Login within one request, and never past it.
+        $this->app->scoped(LogoutOtherDevicesListener::class);
 
         $this->app->register(GeocodingServiceProvider::class);
 
