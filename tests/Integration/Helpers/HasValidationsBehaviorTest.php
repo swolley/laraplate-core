@@ -405,7 +405,8 @@ it('checks user permissions when a permission row exists', function (): void {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
     $user->shouldReceive('can')->with($permission_name)->andReturn(true);
-    Auth::login($user);
+    // setUser, not login: login() fires Login and AfterLoginListener would persist this unsaved mock.
+    Auth::setUser($user);
 
     $method = new ReflectionMethod(HasValidations::class, 'checkUserCanDo');
     $allowed = $method->invoke(null, $model, $operation);

@@ -235,7 +235,8 @@ it('uses and caches the permission model connection independently of the authori
         $user->shouldReceive('isSuperAdmin')->andReturn(false);
         $user->shouldReceive('can')->with($permission_name)->andReturn(false);
         $user->shouldReceive('can')->with($affinity_permission_name)->andReturn(false);
-        Illuminate\Support\Facades\Auth::login($user);
+        // setUser, not login: login() fires Login and AfterLoginListener would persist this unsaved mock.
+        Illuminate\Support\Facades\Auth::setUser($user);
 
         $queried_connections = [];
         $permission_query_count = 0;
