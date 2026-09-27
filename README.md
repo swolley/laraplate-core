@@ -783,13 +783,16 @@ Releases are run from the application, not from the module. From the `laraplate`
 composer run version:minor Core   # or version:major / version:patch, see docs/releasing.md
 ```
 
-### Other References
+### Third-party code
 
-Core Module takes inspiration from, but does not directly require, libraries such as:
+Core contains code derived from these MIT-licensed libraries, which it does not require as dependencies. Each license, with the upstream commit the code was taken from, is kept in [`LICENSES/`](LICENSES/), and the derived files carry a note in their header:
 
--   [sfolador/laravel-locked](https://github.com/sfolador/laravel-locked)
--   [reshadman/laravel-optimistic-locking](https://github.com/reshadman/laravel-optimistic-locking)
--   [vicgutt/laravel-inspect-db](https://github.com/VicGUTT/laravel-inspect-db)
+-   [sfolador/laravel-locked](https://github.com/sfolador/laravel-locked): record locking (`app/Locking`), see [`LICENSES/laravel-locked.md`](LICENSES/laravel-locked.md)
+-   [reshadman/laravel-optimistic-locking](https://github.com/reshadman/laravel-optimistic-locking): optimistic locking (`HasOptimisticLocking`), see [`LICENSES/laravel-optimistic-locking.md`](LICENSES/laravel-optimistic-locking.md)
+
+Core also takes inspiration from, without deriving code from:
+
+-   [vicgutt/laravel-inspect-db](https://github.com/VicGUTT/laravel-inspect-db): schema inspection (`app/Inspector`)
 
 ## Contributing
 

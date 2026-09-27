@@ -9,6 +9,9 @@ use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 
+/**
+ * Derived from sfolador/laravel-locked (MIT), see LICENSES/laravel-locked.md.
+ */
 final class LockedModelSubscriber
 {
     /**

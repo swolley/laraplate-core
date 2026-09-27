@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Locking\Traits\HasLocks;
 use Throwable;
 
+/**
+ * Derived from sfolador/laravel-locked (MIT), see LICENSES/laravel-locked.md.
+ */
 final class Locked
 {
     /**

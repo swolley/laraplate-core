@@ -17,6 +17,9 @@ use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Command\Command as BaseCommand;
 
+/**
+ * Derived from sfolador/laravel-locked (MIT), see LICENSES/laravel-locked.md.
+ */
 class LockedAddCommand extends Command
 {
     #[Override]
