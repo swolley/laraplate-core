@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Helpers;
 
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,7 @@ use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
-    public static string $RECORD_NAME = 'backendModules';
+    public static string $RECORD_NAME = 'core.active_modules';
 
     /**
      * @var class-string
@@ -30,13 +31,13 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     private readonly int $cacheLifetime;
 
-    private readonly \Illuminate\Contracts\Config\Repository $configs;
+    private readonly Repository $configs;
 
     private array $modulesStatuses;
 
     public function __construct(Container $app)
     {
-        $this->configs = $app->make(\Illuminate\Contracts\Config\Repository::class);
+        $this->configs = $app->make(Repository::class);
         $this->cacheKey = $this->config('cache-key', 'modules_db_activator_statuses');
         $this->cacheLifetime = (int) $this->config('cache-lifetime', 3600);
         $this->modulesStatuses = $this->getModulesStatuses();
@@ -45,7 +46,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     /**
      * Checks whether the settings table exists so the database activator can be used.
      * Uses only the DatabaseManager (Schema) so it works before Eloquent's connection
-     * resolver is set. The backendModules record is created on first read by ensureBackendModulesRecord().
+     * resolver is set. The core.active_modules record is created on first read by ensureBackendModulesRecord().
      */
     public static function checkSettingTable(): bool
     {
@@ -99,7 +100,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
-     * Creates or updates the backendModules record (uses Eloquent; call only when app is booted).
+     * Creates or updates the core.active_modules record (uses Eloquent; call only when app is booted).
      */
     public static function seedBackendModules(): Setting
     {
@@ -112,9 +113,11 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 'value' => $all_modules,
                 'choices' => $all_modules,
                 'name' => self::$RECORD_NAME,
+                'module' => class_module(self::class),
                 'type' => 'json',
-                'group_name' => 'backend',
-                'description' => 'backend modules',
+                'group_name' => 'core',
+                'description' => 'application active modules',
+                'seeded_value' => $all_modules,
             ]);
         } elseif (sort($found->choices) !== sort($all_modules)) {
             $found->update(['choices' => $all_modules]);
@@ -203,7 +206,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
-     * Ensures the backendModules row exists (query builder only, no Eloquent).
+     * Ensures the core.active_modules row exists (query builder only, no Eloquent).
      */
     private function ensureBackendModulesRecord(): void
     {
@@ -227,7 +230,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             'choices' => json_encode($all_modules),
             'encrypted' => false,
             'type' => 'json',
-            'group_name' => 'modules',
+            'group_name' => 'core',
             'description' => 'application modules',
             'created_at' => $now,
             'updated_at' => $now,

@@ -10,7 +10,7 @@ it('seeds the vector dimension at the sentence-transformers output length (384)'
     // onto config, so the engine index mapping is created at 384. A mismatch
     // (e.g. the former 768) produces an unusable dense_vector index.
     $definition = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())
-        ->firstWhere('name', 'search.vector_search.dimension');
+        ->firstWhere('name', 'core.search.vector.dimensions');
 
     expect($definition)->not->toBeNull()
         ->and($definition['value'])->toBe(384);

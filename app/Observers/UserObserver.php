@@ -24,14 +24,14 @@ final class UserObserver
 
     public function created(User $user): void
     {
-        if (! $user->hasVerifiedEmail() && config('auth.verify_new_user')) {
+        if (! $user->hasVerifiedEmail() && config('core.auth.verify_new_user')) {
             $user->sendEmailVerificationNotification();
         }
     }
 
     public function deleted(User $user): void
     {
-        if (config('auth.enable_user_licenses') && $user->license_id) {
+        if (config('core.auth.enable_user_licenses') && $user->license_id) {
             $user->license_id = null;
             $user->save();
         }

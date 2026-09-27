@@ -24,17 +24,17 @@ it('keeps runtime setting names within the Setting model name limit', function (
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('auth.enable_user_registration')['value'])->toBeFalse()
-        ->and($definitions->get('auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
-        ->and($definitions->get('core.auto_translate_provider')['value'])->toBe('deepl')
-        ->and($definitions->get('core.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
-        ->and($definitions->get('search.vector_search.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
+    expect($definitions->get('core.auth.enable_user_registration')['value'])->toBeFalse()
+        ->and($definitions->get('core.auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
+        ->and($definitions->get('core.translations.auto_translate_provider')['value'])->toBe('deepl')
+        ->and($definitions->get('core.translations.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
+        ->and($definitions->get('core.search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
 });
 
 it('defines ai runtime settings with current defaults and choices', function (): void {
     $definitions = collect(AIDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('ai.features.embeddings.enabled')['value'])->toBeTrue()
+    expect($definitions->get('ai.features.embeddings.enabled')['value'])->toBeFalse()
         ->and($definitions->get('ai.features.faq.splitter.driver')['value'])->toBe('markdown_aware')
         ->and($definitions->get('ai.features.faq.splitter.driver')['choices'])
         ->toBe(['markdown_aware', 'sentence', 'delimiter'])
@@ -45,9 +45,7 @@ it('defines cms and mes runtime settings with current defaults and choices', fun
     $cmsDefinitions = collect(CMSDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
     $mesDefinitions = collect(MESDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($cmsDefinitions->get('cms.locale.auto_translate')['value'])->toBeFalse()
-        ->and($cmsDefinitions->get('cms.geocoding.cache_ttl')['value'])->toBe(604800)
-        ->and($mesDefinitions->get('mes.rate_limit')['value'])->toBe(60)
+    expect($cmsDefinitions->get('cms.geocoding.cache_ttl')['value'])->toBe(604800)
         ->and($mesDefinitions->get('mes.lot_number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
 });
 

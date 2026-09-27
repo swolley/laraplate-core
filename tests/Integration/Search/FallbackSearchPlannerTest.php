@@ -34,7 +34,7 @@ it('returns a valid plan structure', function (): void {
 });
 
 it('disables vector when VECTOR_SEARCH_ENABLED is false', function (): void {
-    config()->set('search.vector_search.enabled', false);
+    config()->set('core.search.vector.enabled', false);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test query');
@@ -47,7 +47,7 @@ it('disables vector when VECTOR_SEARCH_ENABLED is false', function (): void {
 });
 
 it('enables vector when VECTOR_SEARCH_ENABLED is true and no numbers', function (): void {
-    config()->set('search.vector_search.enabled', true);
+    config()->set('core.search.vector.enabled', true);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test query');
@@ -58,7 +58,7 @@ it('enables vector when VECTOR_SEARCH_ENABLED is true and no numbers', function 
 });
 
 it('disables vector for queries with numbers even if globally enabled', function (): void {
-    config()->set('search.vector_search.enabled', true);
+    config()->set('core.search.vector.enabled', true);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('order 12345');
@@ -77,8 +77,8 @@ it('uses larger size for short queries', function (): void {
 });
 
 it('reads reranker config from search config', function (): void {
-    config()->set('search.features.reranker', true);
-    config()->set('search.reranker.top_k', 50);
+    config()->set('core.search.features.reranker', true);
+    config()->set('core.search.reranker.top_k', 50);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test');
@@ -95,7 +95,7 @@ it('enables the reranker by default under the shipped config', function (): void
 });
 
 it('honours the reranker being explicitly disabled', function (): void {
-    config()->set('search.features.reranker', false);
+    config()->set('core.search.features.reranker', false);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test');

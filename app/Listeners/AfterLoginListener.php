@@ -23,7 +23,7 @@ final class AfterLoginListener
      */
     public static function checkUserLicense(Authenticatable $user): void
     {
-        if (config('auth.enable_user_licenses') && in_array(Impersonate::class, class_uses_recursive($user::class), true) && $user instanceof User && (! $user->isGuest() && ! $user->isSuperAdmin() && $user->license_id === null)) {
+        if (config('core.auth.enable_user_licenses') && in_array(Impersonate::class, class_uses_recursive($user::class), true) && $user instanceof User && (! $user->isGuest() && ! $user->isSuperAdmin() && $user->license_id === null)) {
             $available_licenses = License::query()->whereDoesntHave('user')->first();
 
             throw_if(! $available_licenses, AuthorizationException::class, 'No licenses available');

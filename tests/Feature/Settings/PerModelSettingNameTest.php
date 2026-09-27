@@ -15,7 +15,6 @@ it('builds the same name whether or not the prefix carries a trailing separator'
     'optimistic_lock_',
     'translation_fallback_',
     'auto_translate_',
-    'ai_moderation_',
 ]);
 
 it('separates prefix and table with exactly one underscore', function (): void {
@@ -43,5 +42,4 @@ it('writes the settings under the very name the readers look up', function (stri
     [CoreDatabaseSeeder::OPTIMISTIC_LOCK_NAME_PREFIX, 'optimistic_lock'],
     [CoreDatabaseSeeder::TRANSLATION_FALLBACK_NAME_PREFIX, 'translation_fallback'],
     [CoreDatabaseSeeder::AUTO_TRANSLATE_NAME_PREFIX, 'auto_translate'],
-    [CoreDatabaseSeeder::AI_MODERATION_NAME_PREFIX, 'ai_moderation'],
 ]);

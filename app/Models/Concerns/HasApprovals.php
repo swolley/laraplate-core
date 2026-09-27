@@ -15,14 +15,11 @@ use InvalidArgumentException;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\PermissionName;
 use TypeError;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
- *
- * @phpstan-require-implements \Modules\Core\Contracts\IModeratableModel
  *
  * @phpstan-type HasApprovalsType HasApprovals
  */
@@ -129,23 +126,6 @@ trait HasApprovals
         }
 
         return $preview;
-    }
-
-    /**
-     * Whether AI moderation is enabled for this model.
-     * Reads optional {@see $ai_moderation_enabled} or settings in group {@code moderation}
-     * with name {@code ai_moderation_{table}}. When no setting exists, AI moderation stays disabled.
-     */
-    public function aiModerationEnabledBySettings(): bool
-    {
-        if (property_exists($this, 'ai_moderation_enabled')) {
-            return (bool) $this->ai_moderation_enabled;
-        }
-
-        return app(PerModelSettingResolver::class)->boolean(
-            PerModelSettingResolver::nameFor('ai_moderation', $this->getTable()),
-            default: false,
-        );
     }
 
     /**

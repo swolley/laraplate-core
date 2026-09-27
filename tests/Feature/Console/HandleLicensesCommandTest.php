@@ -10,6 +10,7 @@ use Modules\Core\Console\HandleLicensesCommand;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Overrides\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -33,14 +34,14 @@ it('command class has correct properties', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->getName())->toBe('Modules\Core\Console\HandleLicensesCommand');
-    expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
+    expect($reflection->isSubclassOf(Command::class))->toBeTrue();
 });
 
 it('command can be instantiated', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
 
     expect($reflection->isInstantiable())->toBeTrue();
-    expect($reflection->isSubclassOf(Modules\Core\Overrides\Command::class))->toBeTrue();
+    expect($reflection->isSubclassOf(Command::class))->toBeTrue();
 });
 
 it('command has correct namespace', function (): void {
@@ -112,7 +113,7 @@ it('command shows max sessions setting', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('max_concurrent_sessions');
+    expect($source)->toContain('core.max_concurrent_sessions');
 });
 
 it('command handles license creation', function (): void {
@@ -163,7 +164,7 @@ it('handles close action prompt path without crashing the test runner', function
     $user->license_id = $license->id;
     $user->save();
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'max_concurrent_sessions',
+        'name' => 'core.max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '10',
     ]);
@@ -262,7 +263,7 @@ it('covers listLicenses private method output path', function (): void {
     $user->save();
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'max_concurrent_sessions',
+        'name' => 'core.max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '7',
     ]);
@@ -307,7 +308,7 @@ it('handles list action with existing licenses through handle flow', function ()
     $user->license_id = $license->id;
     $user->save();
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'max_concurrent_sessions',
+        'name' => 'core.max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '5',
     ]);

@@ -95,8 +95,8 @@ it('list request data handles from-to and limit pagination strategies', function
 });
 
 it('list request data merges filters and computes total pages', function (): void {
-    Setting::query()->create(['name' => 'pagination', 'value' => '7']);
-    $request = new ListRequest();
+    Setting::query()->create(['name' => 'core.pagination', 'value' => '7']);
+    $request = new ListRequest;
     $data = new ListRequestData($request, 'setting', ['sort' => []], 'id');
 
     $existing = new FiltersGroup([new Filter('name', 'john', FilterOperator::Equals)], WhereClause::And);

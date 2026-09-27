@@ -9,17 +9,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Casts\WhereClause;
+use Modules\Core\Models\ACL;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Seeder;
 use Modules\Core\Seeding\Contracts\DeclaresSeedDependencies;
 use Modules\Core\Seeding\ModelCapabilities;
 use Modules\Core\Seeding\ModelCapabilityScanner;
-use Modules\Core\Seeding\SeedDefinition;
 use Modules\Core\Seeding\SeedReconciler;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\SettingsCacheCoordinator;
+use Modules\Core\Support\PermissionName;
+use Modules\ERP\Database\Seeders\ERPDatabaseSeeder;
 use Override;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
@@ -40,8 +46,6 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
 
     public const AUTO_TRANSLATE_NAME_PREFIX = 'auto_translate_';
 
-    public const AI_MODERATION_NAME_PREFIX = 'ai_moderation_';
-
     /**
      * @var Collection<string, BaseRole>
      */
@@ -50,7 +54,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     /**
      * `defaultRoles()` assigns permissions that only exist once `permission:refresh` has run, so
      * this node must follow {@see PermissionRefreshSeeder}. That seeder is a separate graph node
-     * (not a private method here) so other modules — {@see \Modules\ERP\Database\Seeders\ERPDatabaseSeeder::ensureDomainPermissions()}
+     * (not a private method here) so other modules — {@see ERPDatabaseSeeder::ensureDomainPermissions()}
      * — can also declare a dependency on it instead of relying on undeclared run order.
      *
      * @return list<class-string>
@@ -80,30 +84,28 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     public static function runtimeSettingDefinitions(): array
     {
         return [
-            self::setting('auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
-            self::setting('auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
-            self::setting('auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
-            self::setting('auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
-            self::setting('auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
+            self::setting('core.auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
+            self::setting('core.auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
+            self::setting('core.auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('core.auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
+            self::setting('core.auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
             self::setting('core.locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
             self::setting('core.locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
             self::setting('core.locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
             self::setting('core.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
             self::setting('core.expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
             self::setting('core.soft_deletes_expiration_days', 0, SettingTypeEnum::Integer, 'core', 'Days before soft-deleted records are purged (0 = never)'),
-            self::setting('core.auto_translate_fallback_to_ai', true, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
-            self::setting('core.translation_cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
-            self::setting('core.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
+            self::setting('core.translations.auto_translate_fallback_to_ai', false, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
+            self::setting('core.translations.cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
+            self::setting('core.translations.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
             self::setting('core.notifications.approvals.enabled', true, SettingTypeEnum::Boolean, 'approvals', 'Enable pending approval notifications'),
-            self::setting('core.notifications.approvals.channels', ['mail'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
+            self::setting('core.notifications.approvals.channels', ['database'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
             self::setting('core.notifications.approvals.default_threshold_hours', 8, SettingTypeEnum::Integer, 'approvals', 'Default hours before pending approval notification'),
-            self::setting('search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
-            self::setting('search.features.ensemble', true, SettingTypeEnum::Boolean, 'search', 'Enable ensemble search'),
-            self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
-            self::setting('search.reranker.weight', 0.5, SettingTypeEnum::Float, 'search', 'Reranker score weight'),
-            self::setting('search.vector_search.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
-            self::setting('search.vector_search.dimension', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
-            self::setting('search.vector_search.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
+            self::setting('core.search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
+            self::setting('core.search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
+            self::setting('core.search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
+            self::setting('core.search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
+            self::setting('core.search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
         ];
     }
 
@@ -115,6 +117,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         Model::unguarded(function (): void {
             $this->defaultSettings();
             $this->defaultRoles();
+            $this->defaultSettingAcls();
             $this->defaultUsers();
             $this->defaultCrons();
         });
@@ -216,6 +219,63 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $this->groups = $role_class::query()->withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
     }
 
+    /**
+     * Seed the row-level ACL that limits the `guest` role to public settings on
+     * `settings.select`. Staff roles have no ACL on that permission and read every setting.
+     */
+    private function defaultSettingAcls(): void
+    {
+        $this->logOperation(ACL::class);
+
+        /** @var class-string<Permission> $permission_class */
+        $permission_class = config('permission.models.permission');
+
+        $guest = $this->groups->get(config('permission.roles.guest'));
+
+        if ($guest === null) {
+            $this->command?->line('    - guest role missing, skipping settings ACL');
+
+            return;
+        }
+
+        $setting = new Setting;
+        $permission_name = PermissionName::forModel($setting, ActionEnum::Select->value);
+
+        $permission = $permission_class::query()->where('name', $permission_name)->first(['id']);
+
+        if ($permission === null) {
+            $this->command?->line("    - permission {$permission_name} missing, skipping settings ACL");
+
+            return;
+        }
+
+        if (ACL::query()->where('permission_id', $permission->id)->where('role_id', $guest->id)->exists()) {
+            $this->command?->line('    - settings guest ACL already exists');
+
+            return;
+        }
+
+        $acl = new ACL;
+        $acl->setSkipValidation(true);
+        $acl->forceFill([
+            'permission_id' => $permission->id,
+            'role_id' => $guest->id,
+            'filters' => new FiltersGroup(
+                filters: [
+                    new Filter("{$setting->getTable()}.is_public", true, FilterOperator::Equals),
+                ],
+                operator: WhereClause::And,
+            ),
+            'description' => 'Guests (anonymous/public) read only public settings.',
+            'unrestricted' => false,
+            'priority' => 100,
+            'is_active' => true,
+        ]);
+        $acl->save();
+
+        $this->command?->line('    - settings guest ACL <fg=green>created</>');
+    }
+
     private function defaultUsers(): void
     {
         $user_class = user_class();
@@ -308,25 +368,25 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::String,
-                'group_name' => 'base',
+                'group_name' => 'core',
                 'description' => 'Lingua default',
             ],
             [
-                'name' => 'pagination',
+                'name' => 'core.pagination',
                 'value' => 20,
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::Integer,
-                'group_name' => 'base',
+                'group_name' => 'core',
                 'description' => 'Paginazione default chiamate',
             ],
             [
-                'name' => 'max_concurrent_sessions',
+                'name' => 'core.max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::Integer,
-                'group_name' => 'base',
+                'group_name' => 'auth',
                 'description' => 'Numero massimo sessioni simultanee',
             ],
         ];
@@ -389,12 +449,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             $rows = $this->deduplicateSharedTableRows($rows, $setting_provenance, $module);
 
             $outcome = app(SeedReconciler::class)->reconcile(
-                SeedDefinition::for(Setting::class)
-                    ->identity(['name'])
-                    ->structural(['type', 'group_name', 'description', 'choices'])
-                    ->initial(['value'])
-                    ->ownedBy($module)
-                    ->rows($rows),
+                self::internalSettingsDefinition($module, $rows),
             );
 
             $created += count($outcome->created);
@@ -523,8 +578,6 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         }
 
         if ($capability->hasApprovals) {
-            $this->seedAiModerationModel($defaultSettings, $instance, $table, $this->getSettingKeyName(self::AI_MODERATION_NAME_PREFIX, $table));
-
             $defaultSettings[] = [
                 'name' => "approval_threshold__{$table}",
                 'value' => $defaultApprovalThreshold,
@@ -644,23 +697,6 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         ];
     }
 
-    private function seedAiModerationModel(array &$defaultSettings, Model $model, string $table, string $keyName): void
-    {
-        if (property_exists($model, 'ai_moderation_enabled')) {
-            return;
-        }
-
-        $defaultSettings[] = [
-            'name' => $keyName,
-            'value' => false,
-            'encrypted' => false,
-            'choices' => null,
-            'type' => SettingTypeEnum::Boolean,
-            'group_name' => 'moderation',
-            'description' => "AI moderation for {$table}",
-        ];
-    }
-
     private function defaultCrons(): void
     {
         $this->logOperation(CronJob::class);
@@ -673,7 +709,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'parameters' => [],
                 'schedule' => '@midnight',
                 'description' => 'Resetta assegnazione licenze login a utenti',
-                'is_active' => (bool) config('auth.enable_user_licenses', false),
+                'is_active' => (bool) config('core.auth.enable_user_licenses', false),
             ],
             [
                 'name' => 'clearResetTokens',

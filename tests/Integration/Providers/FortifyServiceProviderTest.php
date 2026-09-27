@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
@@ -164,16 +166,16 @@ it('registers login rate limiter and builds throttle key from username and ip', 
 
     $limiter = RateLimiter::limiter('login');
     $limit = $limiter($request);
-    $expected_key = Illuminate\Support\Str::transliterate(Illuminate\Support\Str::lower('Tést.User@example.com|127.0.0.1'));
+    $expected_key = Str::transliterate(Str::lower('Tést.User@example.com|127.0.0.1'));
 
-    expect($limit)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class)
+    expect($limit)->toBeInstanceOf(Limit::class)
         ->and($limit->maxAttempts)->toBe(5)
         ->and($limit->key)->toBe($expected_key);
 });
 
 it('authenticates via authentication service and stores license id when enabled', function (): void {
     $this->provider->register();
-    config(['auth.enable_user_licenses' => true]);
+    config(['core.auth.enable_user_licenses' => true]);
     $user = User::factory()->create();
     $license = (object) ['id' => 99, 'uuid' => 'license-uuid-99'];
     $service = new AuthenticationService([

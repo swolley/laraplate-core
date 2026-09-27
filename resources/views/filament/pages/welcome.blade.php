@@ -89,7 +89,7 @@
                                 <div class="text-sm/relaxed w-full">
                                     <i>Enable User registration:</i>
                                     <div class="flex items-center" style="float: right">
-                                        @if (config('auth.enable_user_registration'))
+                                        @if (config('core.auth.enable_user_registration'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
                                             <x-core::cancel-icon style="color: var(--color-gray-600);" />
@@ -101,7 +101,7 @@
                                 <div class="text-sm/relaxed w-full">
                                     <i>Verify new user:</i>
                                     <div class="flex items-center" style="float: right">
-                                        @if (config('auth.verify_new_user'))
+                                        @if (config('core.auth.verify_new_user'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
                                             <x-core::cancel-icon style="color: var(--color-gray-600);" />

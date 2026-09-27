@@ -6,19 +6,24 @@ namespace Modules\Core\Search\Traits;
 
 use Elastic\ScoutDriver\Engine as ElasticEngine;
 use Elastic\ScoutDriverPlus\Searchable as ElasticScoutSearchable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Engines\DatabaseEngine;
 use Laravel\Scout\Engines\TypesenseEngine;
+use Modules\Core\Contracts\IEmbeddableModel;
 use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Events\ModelsRequireIndexing;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
+use Modules\Core\Models\ModelEmbedding;
+use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Search\AdaptiveBatchController;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
@@ -35,9 +40,9 @@ use Throwable;
  * Extended searchable trait that supports multiple engines
  * Provides enhanced functionality for Elasticsearch and Typesense.
  *
- * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
+ * @phpstan-require-extends Model
  *
- * @phpstan-require-implements \Modules\Core\Contracts\IEmbeddableModel
+ * @phpstan-require-implements IEmbeddableModel
  */
 trait Searchable
 {
@@ -113,7 +118,7 @@ trait Searchable
                     // Save event in cache for the finalize listener
                     if (! $sync) {
                         $cache_key = "model_indexing:{$model->getTable()}:{$model->getKey()}";
-                        \Illuminate\Support\Facades\Cache::put($cache_key, $event, now()->addMinutes(10));
+                        Cache::put($cache_key, $event, now()->addMinutes(10));
                     }
                 },
             );
@@ -171,12 +176,12 @@ trait Searchable
      * `withoutGlobalScope` is a no-op for models that never register that
      * scope (e.g. Ticket, Location), so this is safe trait-wide.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
-    public function makeAllSearchableUsing(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    public function makeAllSearchableUsing(Builder $query): Builder
     {
-        return $query->withoutGlobalScope(\Modules\Core\Overrides\LocaleScope::class);
+        return $query->withoutGlobalScope(LocaleScope::class);
     }
 
     /**
@@ -315,7 +320,7 @@ trait Searchable
      */
     public function embeddings(): MorphMany
     {
-        return $this->morphMany(\Modules\Core\Models\ModelEmbedding::class, 'model');
+        return $this->morphMany(ModelEmbedding::class, 'model');
     }
 
     /**
@@ -330,7 +335,7 @@ trait Searchable
 
             foreach ($document as $key => $value) {
                 if ($key === 'embedding') {
-                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector], ['dimensions' => (int) config('search.vector_search.dimension', 384)]));
+                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector], ['dimensions' => (int) config('core.search.vector.dimensions', 384)]));
                 } else {
                     $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::Searchable]));
                 }
@@ -585,12 +590,12 @@ trait Searchable
     private function vectorSearchEnabled(): bool
     {
         /** @phpstan-ignore-next-line false-positive: config loaded via module */
-        if (! Config::has('search.vector_search.enabled')) {
+        if (! Config::has('core.search.vector.enabled')) {
             return false;
         }
 
         /** @phpstan-ignore-next-line false-positive: config loaded via module */
-        return (bool) Config::get('search.vector_search.enabled');
+        return (bool) Config::get('core.search.vector.enabled');
     }
 
     private function getSchemaDefinition(): SchemaDefinition

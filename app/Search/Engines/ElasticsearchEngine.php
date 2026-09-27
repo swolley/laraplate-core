@@ -266,7 +266,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     {
         throw_unless(class_exists($modelClass), InvalidArgumentException::class, sprintf('Class %s does not exist', $modelClass));
 
-        $model_instance = new $modelClass();
+        $model_instance = new $modelClass;
         $query = $this->newQueryIncludingTrashed($modelClass);
 
         // Filters
@@ -627,9 +627,9 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         ];
 
         // Add a vector field if needed
-        if (config('search.vector_search.enabled') && $this->supportsVectorSearch()) {
-            $dimension = config('search.vector_search.dimension', 384);
-            $similarity = config('search.vector_search.similarity', 'cosine');
+        if (config('core.search.vector.enabled') && $this->supportsVectorSearch()) {
+            $dimension = config('core.search.vector.dimensions', 384);
+            $similarity = config('core.search.vector.similarity', 'cosine');
 
             $mapping['mappings']['properties']['embedding'] = [
                 'type' => 'dense_vector',
@@ -699,7 +699,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                 $instance = $model;
                 $collection = $this->resolveSearchableCollectionName($model);
             } elseif (class_exists($model)) {
-                $instance = new $model();
+                $instance = new $model;
                 $collection = $instance->searchableAs();
             } else {
                 return [];
@@ -748,7 +748,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
                 $instance = $model;
                 $collection = $this->resolveSearchableCollectionName($model);
             } elseif (class_exists($model)) {
-                $instance = new $model();
+                $instance = new $model;
                 $collection = $instance->searchableAs();
             } else {
                 return false;

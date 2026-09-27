@@ -11,6 +11,11 @@ use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
+use Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator;
+use Filament\Commands\FileGenerators\Resources\ResourceClassGenerator;
+use Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGenerator;
+use Filament\Commands\FileGenerators\Resources\Schemas\ResourceInfolistSchemaClassGenerator;
+use Filament\Commands\FileGenerators\Resources\Schemas\ResourceTableClassGenerator;
 use Filament\Forms\Components\Toggle;
 use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Scheduling\Schedule;
@@ -44,6 +49,11 @@ use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
+use Modules\Core\Filament\Generators\LaraplateResourceClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceInfolistSchemaClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceTableClassGenerator;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\Contracts\GraphToolGatewayInterface;
 use Modules\Core\Graph\GraphProviderRegistry;
@@ -103,6 +113,8 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Typesense\Client as TypesenseClient;
 use Wotz\SwaggerUi\Http\Controllers\OpenApiJsonController;
+use Yajra\Oci8\Oci8ServiceProvider;
+use Yajra\Oci8\Oci8ValidationServiceProvider;
 
 /**
  * @property Application $app
@@ -233,8 +245,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Search contracts, the database engine and the fallbacks the AI module overrides.
         $this->app->register(SearchServiceProvider::class);
 
-        $oci8_provider = \Yajra\Oci8\Oci8ServiceProvider::class;
-        $oci8_validation_provider = \Yajra\Oci8\Oci8ValidationServiceProvider::class;
+        $oci8_provider = Oci8ServiceProvider::class;
+        $oci8_validation_provider = Oci8ValidationServiceProvider::class;
 
         if (extension_loaded('oci8')
             && class_exists($oci8_provider)
@@ -543,24 +555,24 @@ final class CoreServiceProvider extends ModuleServiceProvider
     private function bindLaraplateFilamentGenerators(): void
     {
         $this->app->bind(
-            \Filament\Commands\FileGenerators\Resources\ResourceClassGenerator::class,
-            \Modules\Core\Filament\Generators\LaraplateResourceClassGenerator::class,
+            ResourceClassGenerator::class,
+            LaraplateResourceClassGenerator::class,
         );
         $this->app->bind(
-            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceTableClassGenerator::class,
-            \Modules\Core\Filament\Generators\LaraplateResourceTableClassGenerator::class,
+            ResourceTableClassGenerator::class,
+            LaraplateResourceTableClassGenerator::class,
         );
         $this->app->bind(
-            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGenerator::class,
-            \Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator::class,
+            ResourceFormSchemaClassGenerator::class,
+            LaraplateResourceFormSchemaClassGenerator::class,
         );
         $this->app->bind(
-            \Filament\Commands\FileGenerators\Resources\Schemas\ResourceInfolistSchemaClassGenerator::class,
-            \Modules\Core\Filament\Generators\LaraplateResourceInfolistSchemaClassGenerator::class,
+            ResourceInfolistSchemaClassGenerator::class,
+            LaraplateResourceInfolistSchemaClassGenerator::class,
         );
         $this->app->bind(
-            \Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator::class,
-            \Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator::class,
+            ResourceListRecordsPageClassGenerator::class,
+            LaraplateResourceListRecordsPageClassGenerator::class,
         );
     }
 
@@ -584,15 +596,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
             Features::updatePasswords(),
         ];
 
-        if (config('auth.enable_user_registration')) {
+        if (config('core.auth.enable_user_registration')) {
             $features[] = Features::registration();
         }
 
-        if (config('auth.verify_new_user')) {
+        if (config('core.auth.verify_new_user')) {
             $features[] = Features::emailVerification();
         }
 
-        if (config('auth.enable_user_2fa')) {
+        if (config('core.auth.enable_user_2fa')) {
             $features[] = Features::twoFactorAuthentication([
                 'confirm' => true,
                 'confirmPassword' => true,

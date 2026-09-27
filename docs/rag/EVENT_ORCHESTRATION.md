@@ -27,7 +27,7 @@ Full technical detail (extra diagrams): `Modules/Core/docs/EVENT_ORCHESTRATION.m
 - Core owns events, cache coordination, finalize/fallback listeners.
 - Domain modules register adapters (e.g. CMS `CommentModerationAdapter` on `ModerationAdapterRegistry`).
 - AI never imports CMS/ERP; it resolves context via the registry.
-- Opt-in per model: `ai_moderation_{table}`, `auto_translate_{table}`; search via `Searchable` + `$embed`.
+- Opt-in per model: `auto_translate_{table}`; AI moderation per entity via the AI module's `ai.features.moderation.entities.{table}`; search via `Searchable` + `$embed`.
 
 ## InternalFlow — search indexing
 
@@ -58,7 +58,7 @@ Models with `Modules\Core\Search\Traits\Searchable` call `queueMakeSearchable()`
 
 | Layer | Keys |
 |-------|------|
-| Scout | `SCOUT_DRIVER`, `search.vector_search.enabled`, model `$embed` |
+| Scout | `SCOUT_DRIVER`, `core.search.vector.enabled`, model `$embed` |
 | AI | `ai.features.embeddings.enabled` |
 | Per model | `auto_translate_{table}` via `PerModelSettingResolver` |
 
@@ -79,7 +79,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 | Core | `Services\ModerationAdapterRegistry` | Resolves adapter by modification |
 | Core | `Data\ModerationInput` / `ModerationRequest` | Neutral input + domain-owned prompts |
 | Core | `Listeners\ModificationModerationFallbackListener` | No-op if `!handled` |
-| Core | `Services\PerModelSettingResolver` | `ai_moderation_*`, `auto_translate_*` |
+| Core | `Services\PerModelSettingResolver` | `auto_translate_*`, `soft_deletes_*`, … |
 | AI | `Listeners\HandleModificationModerationListener` | Dispatches `ApproveModificationJob` |
 | AI | `Jobs\ApproveModificationJob` | LLM vote → `approvals` / `disapprovals` `meta` |
 | CMS | `CommentModerationAdapter` + `CommentModerationPrompt` | Article, optional parent comment, prompts |
@@ -95,7 +95,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 | Layer | Keys |
 |-------|------|
 | AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
-| Per model | Setting `ai_moderation_{table}` (group `moderation`) |
+| Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
 | System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
 
 ### Post-approval
@@ -114,7 +114,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 
 1. Implement `ModerationAdapter` in the domain module (build `ModerationRequest` with domain prompts).
 2. Register on `ModerationAdapterRegistry` in module `ServiceProvider`.
-3. Enable `ai_moderation_{table}` for models using `HasApprovals`.
+3. Enable `ai.features.moderation.entities.{table}` for the entity (only models with a registered `ModerationAdapter` have one).
 4. No AI module code changes required.
 
 ## ErrorsAndTroubleshooting
@@ -123,7 +123,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 |---------|--------|
 | Model never indexed | `Searchable`, Scout driver, `IndexModelFallbackListener` registered |
 | Embeddings missing | `ai.features.embeddings.enabled`, model `$embed`, `GenerateEmbeddingsJob` queue |
-| AI moderation never runs | `ai.features.moderation.enabled`, `system_user_id`, registry builder, `ai_moderation_{table}` |
+| AI moderation never runs | `ai.features.moderation.enabled`, `system_user_id`, registry builder, `ai.features.moderation.entities.{table}` |
 | Comment pending, no AI | `CommentModerationContextBuilder` registered in `CMSServiceProvider` |
 | Humans only (expected) | AI skipped → fallback is no-op; Filament approval still works |
 
@@ -133,5 +133,5 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 - What is ModificationRequiresModeration and who emits it?
 - Difference between search indexing fallback and moderation fallback?
 - How do I add AI moderation for a new model type?
-- What settings control ai_moderation and auto_translate per table?
+- What settings control AI moderation and auto_translate per table?
 - Where does CMS register CommentModerationContextBuilder?

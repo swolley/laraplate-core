@@ -83,10 +83,7 @@ return new class extends Migration
 
     private function vectorDimensions(): int
     {
-        $dimensions = config(
-            'search.vector.dimensions',
-            config('search.vector_search.dimension', self::DEFAULT_VECTOR_DIMENSIONS),
-        );
+        $dimensions = config('core.search.vector.dimensions', self::DEFAULT_VECTOR_DIMENSIONS);
 
         if (! is_numeric($dimensions) || (int) $dimensions < 1) {
             return self::DEFAULT_VECTOR_DIMENSIONS;

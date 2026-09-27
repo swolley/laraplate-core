@@ -6,12 +6,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
-use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
@@ -128,31 +125,6 @@ it('requires approval when user has approve credit but N is greater than 1', fun
     $method->setAccessible(true);
 
     expect($method->invoke($model, ['name' => 'change']))->toBeTrue();
-});
-
-it('uses declared model property for ai moderation', function (): void {
-    $model = new class() extends Illuminate\Database\Eloquent\Model
-    {
-        use HasApprovals;
-
-        protected bool $ai_moderation_enabled = true;
-    };
-
-    expect($model->aiModerationEnabledBySettings())->toBeTrue();
-});
-
-it('reads ai moderation from per model settings', function (): void {
-    Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'ai_moderation_has_approvals_stub',
-        'value' => true,
-        'type' => SettingTypeEnum::Boolean,
-        'group_name' => 'moderation',
-        'description' => 'test',
-    ]);
-
-    app(PerModelSettingResolver::class)->flush();
-
-    expect((new HasApprovalsStubModel)->aiModerationEnabledBySettings())->toBeTrue();
 });
 
 it('merges preview into toArray when preview data exists', function (): void {

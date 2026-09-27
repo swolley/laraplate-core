@@ -68,9 +68,7 @@ LOCKIN_LOCK_AT_COLUMN=locked_at					#column name for the lock date
 LOCKIN_LOCK_BY_COLUMN=locked_user_id			#column name for the lock owner (a users.id)
 LOCKIN_LOCK_UNTIL_COLUMN=locked_until			#column name for the lock deadline; null means it never lapses
 LOCKING_LEASE_TTL=900							#lifetime in seconds of the lease an edit form takes
-LOCKIN_UNLOCK_ALLOWED=true						#enables unlock of locked objects
 LOCKING_CAN_BE_UNLOCKED=						#comma separated list of classes exempt when the above is false
-LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED=true	#refuses saves, deletes and replicates from anybody but the lock holder
 
 #https
 FORCE_HTTPS=false								#enables HTTPS
@@ -109,11 +107,6 @@ SCOUT_DRIVER=typesense                          #actually supperted drivers with
 #embeddings are produced by the AI module: AI_EMBEDDINGS_PROVIDER (default sentence_transformers) and AI_EMBEDDINGS_MODEL select provider and model profile. Core only declares dimension/similarity below.
 SEARCH_ENGINE=elasticsearch						#default search engine
 SEARCH_DATABASE_PG_TRGM_ENABLED=false             #enable PostgreSQL pg_trgm matching for the database Scout driver
-SEARCH_RERANKER_ENABLED=true                      #rerank the fused top-K results (HeuristicReranker; CrossEncoder when AI module installed)
-SEARCH_RERANKER_TOP_K=30                          #how many top results are reranked
-#SEARCH_ENSEMBLE_ENABLED                          #declared in config/search.php but read by no code today; fusion always runs when more than one strategy executes
-VECTOR_DIMENSION=384							#vector dimension for embeddings
-VECTOR_SIMILARITY=cosine						#vector similarity metric (cosine, dot_product, euclidean)
 SEARCH_ANALYZER_IT=italian                        #Elasticsearch analyzer for the it locale sub-field
 SEARCH_ANALYZER_EN=english                        #Elasticsearch analyzer for the en locale sub-field
 SCOUT_PREFIX=									#scout index prefix
@@ -566,7 +559,8 @@ whoever is reading a broken release sees it without reading the source.
 ### Gotchas for seeder and test authors
 
 - **`Setting::query()->forceCreate()` silently no-ops.** `Setting::requiresApprovalWhen()` shadows
-  `HasApprovals`'s version and returns `true` for any fillable-field change, so the approval
+  `HasApprovals`'s version and returns `true` for any fillable-field change other than
+  `description` and `group_name`, so the approval
   package's saving listener cancels every direct create/update on `Setting` — including
   `forceCreate()`. When a seeder test needs a real, already-persisted `Setting` row (for example to
   simulate one written before the reconciler existed), use
@@ -667,7 +661,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 ### Environment (principali variabili)
 
--   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.verify_new_user`, `auth.enable_user_registration`, `auth.enable_user_2fa`, `auth.enable_user_licenses`, `auth.enable_social_login`, `core.dynamic_entities`, `core.dynamic_gridutils`, `core.expose_crud_api`, `core.soft_deletes_expiration_days` (0 = never purge), `search.vector_search.enabled` (embeddings generation requires AI module).
+-   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `core.auth.verify_new_user`, `core.auth.enable_user_registration`, `core.auth.enable_user_2fa`, `core.auth.enable_user_licenses`, `core.auth.enable_social_login`, `core.dynamic_entities`, `core.dynamic_gridutils`, `core.expose_crud_api`, `core.soft_deletes_expiration_days` (0 = never purge), `core.search.vector.enabled` (embeddings generation requires AI module).
 -   Data retention: `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 

@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
-use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -156,11 +155,6 @@ final class ForcedModelConfiguration
                 'prefix' => CoreDatabaseSeeder::AUTO_TRANSLATE_NAME_PREFIX,
                 'group' => 'translations',
                 'capability_trait' => HasTranslations::class,
-            ],
-            'ai_moderation_enabled' => [
-                'prefix' => CoreDatabaseSeeder::AI_MODERATION_NAME_PREFIX,
-                'group' => 'moderation',
-                'capability_trait' => HasApprovals::class,
             ],
         ];
     }

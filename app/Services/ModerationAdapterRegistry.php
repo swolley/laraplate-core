@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use Modules\Core\Contracts\ModerationAdapter;
 use Modules\Core\Data\ModerationRequest;
@@ -19,6 +20,19 @@ final class ModerationAdapterRegistry
     public function register(ModerationAdapter $adapter): void
     {
         $this->adapters[] = $adapter;
+    }
+
+    /**
+     * Models that have a registered adapter, so automated moderation can be offered for them.
+     *
+     * @return list<class-string<Model>>
+     */
+    public function modelClasses(): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (ModerationAdapter $adapter): string => $adapter->modelClass(),
+            $this->adapters,
+        )));
     }
 
     public function supports(Modification $modification): bool

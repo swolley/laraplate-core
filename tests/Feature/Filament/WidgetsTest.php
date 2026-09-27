@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
+use Laravel\Horizon\HorizonServiceProvider;
 use Laravel\Scout\EngineManager;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
@@ -54,10 +56,10 @@ it('builds core stats widget data', function (): void {
 });
 
 it('shows the license widget only when user licenses are enabled', function (): void {
-    config(['auth.enable_user_licenses' => false]);
+    config(['core.auth.enable_user_licenses' => false]);
     expect(CoreStatsWidget::canView())->toBeFalse();
 
-    config(['auth.enable_user_licenses' => true]);
+    config(['core.auth.enable_user_licenses' => true]);
     expect(CoreStatsWidget::canView())->toBeTrue();
 });
 
@@ -212,7 +214,7 @@ it('includes Oracle routing attributes in the core stats database identity', fun
 });
 
 it('returns horizon canView based on service provider availability', function (): void {
-    expect(HorizonStatsWidget::canView())->toBe(class_exists(Laravel\Horizon\HorizonServiceProvider::class));
+    expect(HorizonStatsWidget::canView())->toBe(class_exists(HorizonServiceProvider::class));
 });
 
 it('returns search engine health canView on cache-health route', function (): void {
@@ -221,7 +223,7 @@ it('returns search engine health canView on cache-health route', function (): vo
 
     try {
         expect(SearchEngineHealthTableWidget::canView())->toBeTrue();
-    } catch (Illuminate\Contracts\Container\BindingResolutionException) {
+    } catch (BindingResolutionException) {
         expect(true)->toBeTrue();
     }
 });
@@ -317,7 +319,7 @@ it('returns welcome widget view data', function (): void {
     try {
         $data = $method->invoke($widget);
         expect($data)->toHaveKey('welcome_url');
-    } catch (Illuminate\Contracts\Container\BindingResolutionException) {
+    } catch (BindingResolutionException) {
         expect(true)->toBeTrue();
     }
 });

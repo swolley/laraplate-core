@@ -14,6 +14,7 @@ use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Models\DynamicEntity;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use ReflectionClass;
 use Throwable;
@@ -44,7 +45,9 @@ final class ModelCapabilityScanner
                 continue;
             }
 
-            $traits = class_uses_recursive($model_class);
+            // DynamicEntity binds to a real table at runtime; its own table name is a placeholder,
+            // so it owns no per-table settings (the bound table's settings apply instead).
+            $traits = is_a($model_class, DynamicEntity::class, true) ? [] : class_uses_recursive($model_class);
 
             $scanned[] = new ModelCapabilities(
                 modelClass: $model_class,

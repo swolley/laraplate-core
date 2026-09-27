@@ -26,7 +26,7 @@ Both mirror the same ideas: emit always, optional AI pre-processing, cache coord
 | Core is the bus | Events and registries live in `Modules\Core` |
 | Domain modules register adapters | e.g. CMS registers `CommentModerationContextBuilder` |
 | AI never imports CMS/ERP | AI resolves builders via `ModerationContextBuilderRegistry` |
-| Opt-in per model | Settings: `ai_moderation_{table}`, `auto_translate_{table}`; search: `Searchable` + `$embed` |
+| Opt-in per model | Settings: `auto_translate_{table}`, AI module's `ai.features.moderation.entities.{table}`; search: `Searchable` + `$embed` |
 | Fallback when AI skips | Indexing: Core still runs `IndexInSearchJob`; moderation: humans only (no-op) |
 
 ---
@@ -165,7 +165,7 @@ The `model_indexing` entry has a **10-minute TTL**. If a pre-processing step fin
 
 | Layer | Keys |
 |-------|------|
-| Scout / Core | `SCOUT_DRIVER`, `search.vector_search.enabled`, model `$embed`, `vectorSearchEnabled()` |
+| Scout / Core | `SCOUT_DRIVER`, `core.search.vector.enabled`, model `$embed`, `vectorSearchEnabled()` |
 | AI | `ai.features.embeddings.enabled`, embedding provider env vars |
 | Per model | `auto_translate_{table}` (translations group) via `PerModelSettingResolver` |
 
@@ -233,7 +233,7 @@ sequenceDiagram
     CMS->>Mod: create active modification + diff
     Mod->>Core: saved → ModificationRequiresModeration
     Core->>AI: event
-    AI->>AI: moderation.enabled + registry.supports + ai_moderation_* setting
+    AI->>AI: moderation.enabled + registry.supports + ai.features.moderation.entities.* setting
     AI->>AI: addRequiredPreProcessing(ai_approval)
     AI->>Job: dispatch ApproveModificationJob
     AI->>Core: markAsHandled()
@@ -307,14 +307,14 @@ $this->app->make(ModerationContextBuilderRegistry::class)
 | `Services\ModerationContextBuilderRegistry` | Resolves builder by modification |
 | `Listeners\ModificationModerationFallbackListener` | No-op if `!handled` |
 | `Listeners\FinalizeModificationModerationListener` | Clears cache when steps complete (v1) |
-| `Services\PerModelSettingResolver` | Cached DB flags (`ai_moderation_*`, …) |
+| `Services\PerModelSettingResolver` | Cached DB flags (`auto_translate_*`, …) |
 
 ### Configuration (summary)
 
 | Layer | Keys |
 |-------|------|
 | AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
-| Per model | Setting `ai_moderation_{table}` (group `moderation`) or property `$ai_moderation_enabled` |
+| Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
 | System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
 
 See also:
@@ -349,7 +349,7 @@ See also:
 
 1. Implement `ModerationContextBuilder` in the domain module.
 2. Register it on `ModerationContextBuilderRegistry` in the module `ServiceProvider`.
-3. Seed or enable `ai_moderation_{table}` for models using `HasApprovals`.
+3. Enable `ai.features.moderation.entities.{table}` for the entity (only models with a registered `ModerationAdapter` have one).
 4. No changes required in the AI module.
 
 ---

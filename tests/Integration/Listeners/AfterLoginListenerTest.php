@@ -181,7 +181,7 @@ it('listener source contains license-check and impersonation branches', function
 });
 
 it('checkUserLicense associates first free license when conditions are met', function (): void {
-    config()->set('auth.enable_user_licenses', true);
+    config()->set('core.auth.enable_user_licenses', true);
     config()->set('permission.roles.superadmin', 'superadmin');
 
     $license = License::factory()->create();
@@ -231,7 +231,7 @@ it('handle logs impersonation context for impersonated users', function (): void
 
 it('records the login of a real user even while the account is locked', function (): void {
     config()->set('core.locking.prevent_modifications_on_locked_objects', true);
-    config()->set('auth.enable_user_licenses', false);
+    config()->set('core.auth.enable_user_licenses', false);
 
     $user = User::factory()->create(['last_login_at' => null]);
     $user->lock();

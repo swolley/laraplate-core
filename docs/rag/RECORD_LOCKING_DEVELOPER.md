@@ -97,7 +97,7 @@ Rules that are easy to get wrong:
 unless the acting user is the holder; an ownerless lock matches nobody, which is exactly right.
 
 `core.locking.prevent_modifications_on_locked_objects` is **on by default**
-(`LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED`, also a runtime setting in group `locking`). A lock that
+(runtime setting in group `locking`). A lock that
 enforces nothing is decoration.
 
 The guard has no acting user outside a request, so **on a queue or in the console nobody holds the
@@ -219,9 +219,9 @@ never offer a lease.
 | `core.locking.lock_by_column` | `LOCKIN_LOCK_BY_COLUMN` | `locked_user_id` | who holds it |
 | `core.locking.lock_until_column` | `LOCKIN_LOCK_UNTIL_COLUMN` | `locked_until` | when it lapses |
 | `core.locking.lease_ttl` | `LOCKING_LEASE_TTL` | `900` | lease lifetime in seconds |
-| `core.locking.unlock_allowed` | `LOCKIN_UNLOCK_ALLOWED` | `true` | whether locks may be lifted at all |
+| `core.locking.unlock_allowed` | runtime setting | `true` | whether locks may be lifted at all |
 | `core.locking.can_be_unlocked` | `LOCKING_CAN_BE_UNLOCKED` | empty | classes exempt when the above is false |
-| `core.locking.prevent_modifications_on_locked_objects` | `LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED` | `true` | whether the guard refuses writes |
+| `core.locking.prevent_modifications_on_locked_objects` | runtime setting | `true` | whether the guard refuses writes |
 
 ## Commands
 

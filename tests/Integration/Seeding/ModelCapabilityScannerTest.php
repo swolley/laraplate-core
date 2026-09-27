@@ -7,6 +7,7 @@ use Modules\CMS\Models\Content;
 use Modules\CMS\Models\Tag;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\CronJob;
+use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
@@ -136,4 +137,20 @@ it('logs a warning and keeps scanning when a model fails to resolve, instead of 
                 && ($context['model'] ?? null) === UnresolvableCapabilityModel::class
                 && ($context['exception'] ?? null) instanceof Throwable;
         });
+});
+
+it('gives DynamicEntity no capabilities, since its table is only a runtime placeholder', function (): void {
+    $scanned = app(ModelCapabilityScanner::class)->scan();
+    $byClass = array_column($scanned, null, 'modelClass');
+
+    expect($byClass)->toHaveKey(DynamicEntity::class);
+
+    $dynamic = $byClass[DynamicEntity::class];
+
+    expect($dynamic->hasVersions)->toBeFalse()
+        ->and($dynamic->hasSoftDeletes)->toBeFalse()
+        ->and($dynamic->hasLocks)->toBeFalse()
+        ->and($dynamic->hasOptimisticLocking)->toBeFalse()
+        ->and($dynamic->hasTranslations)->toBeFalse()
+        ->and($dynamic->hasApprovals)->toBeFalse();
 });

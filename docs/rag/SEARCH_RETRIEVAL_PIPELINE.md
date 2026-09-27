@@ -41,12 +41,12 @@ AdvancedSearchService::search()
 ```php
 $is_short   = mb_strlen($query) < 20;
 $has_numbers = (bool) preg_match('/\d/', $query);
-$use_vector  = config('search.vector_search.enabled', false) && ! $has_numbers;
+$use_vector  = config('core.search.vector.enabled', false) && ! $has_numbers;
 ```
 
 | Condition | Strategies executed |
 |-----------|---------------------|
-| `search.vector_search.enabled` = false | `keyword` only |
+| `core.search.vector.enabled` = false | `keyword` only |
 | query contains any digit | `keyword` only |
 | engine without `supportsOrchestratedVectorSearch()` | `keyword` only (plan downgraded by `applyEngineCapabilities()`) |
 | `ITextEmbedder` not bound (AI module absent or search orchestration disabled) | `keyword` only (`$vector === null`) |
@@ -72,7 +72,7 @@ if (($retrieval['use_vector'] ?? false) !== true || ! $this->app->bound(ITextEmb
 `ITextEmbedder` is bound **only** by `AIServiceProvider`, and only when
 `ai.features.search_orchestration.enabled` is true. Without the AI module the interface is unbound,
 the query vector is `null`, and the pipeline stays keyword-only. This is independent of
-`search.vector_search.enabled`: both must hold.
+`core.search.vector.enabled`: both must hold.
 
 What is lost without the AI module, per contract:
 
@@ -122,7 +122,7 @@ failure (for example the cross-encoder service being down) is caught, logged as 
 fused order is returned with `meta['reranked'] = false`. Search never fails because of reranking.
 
 A caller can disable it for one search through the plan (`ranking.use_reranker`); otherwise
-`config('search.features.reranker')` decides.
+`config('core.search.features.reranker')` decides.
 
 ## Response metadata
 
@@ -154,20 +154,18 @@ Consumed at runtime:
 
 | Key | Env | Where it is read |
 |-----|-----|------------------|
-| `search.vector_search.enabled` | runtime setting (Filament > Settings) | `FallbackSearchPlanner`, engines |
-| `search.vector_search.dimension` / `search.vector.dimensions` | `VECTOR_DIMENSION` | ES `dense_vector` mapping |
-| `search.vector.similarity` | `VECTOR_SIMILARITY` | ES mapping |
+| `core.search.vector.enabled` | runtime setting (Filament > Settings) | `FallbackSearchPlanner`, engines |
+| `core.search.vector.dimensions` | runtime setting | ES `dense_vector` mapping |
+| `core.search.vector.similarity` | runtime setting | ES mapping |
 | `search.analyzers` | `SEARCH_ANALYZER_IT`, `SEARCH_ANALYZER_EN` | per-locale text mappings |
-| `search.features.reranker` | `SEARCH_RERANKER_ENABLED` | `EnsembleSearchService` (plan fallback) |
-| `search.reranker.top_k` | `SEARCH_RERANKER_TOP_K` | `EnsembleSearchService` |
+| `core.search.features.reranker` | runtime setting | `EnsembleSearchService` (plan fallback) |
+| `core.search.reranker.top_k` | runtime setting | `EnsembleSearchService` |
 | `search.text_matching.*` | — | `TextMatchOptionsResolver` |
 
 Declared but **not read by any code today** (do not document them as working knobs):
 
 | Key | Env | Status |
 |-----|-----|--------|
-| `search.features.ensemble` | `SEARCH_ENSEMBLE_ENABLED` | never read; fusion always runs when more than one strategy executes |
-| `search.reranker.weight` | `SEARCH_RERANKER_WEIGHT` | never read; the blend is the hardcoded 0.4/0.6 above |
 | `plan.retry_policy.*` | — | produced by both planners, validated by the AI planner, consumed by nobody |
 
 ## Evaluation is an offline loop
@@ -184,7 +182,7 @@ See `Modules/AI/docs/rag/MODULE.md` for datasets, metrics and baseline locations
 
 | Symptom | Check |
 |---------|-------|
-| `strategies_executed = 1` when vectors were expected | digits in the query, `search.vector_search.enabled`, AI module present, engine kNN support |
+| `strategies_executed = 1` when vectors were expected | digits in the query, `core.search.vector.enabled`, AI module present, engine kNN support |
 | `reranked = false` | reranker service reachable; look for the `Reranker failed` warning |
 | `unsupported_driver = true` | Scout driver is not an orchestration-capable `ISearchEngine` |
 | Vector results are noise after a model switch | embeddings carry the old `model_key`; run `ai:embeddings:repair --stale` |
@@ -193,7 +191,7 @@ See `Modules/AI/docs/rag/MODULE.md` for datasets, metrics and baseline locations
 ## FAQ prompts for RAG
 
 - How many retrieval strategies run for a query with a number in it?
-- Why is vector search inactive even though `search.vector_search.enabled` is true?
+- Why is vector search inactive even though `core.search.vector.enabled` is true?
 - Does `matching=tolerant` change how results are fused?
 - Where is the reranker blend defined?
 - Which search configuration keys are declared but unused?

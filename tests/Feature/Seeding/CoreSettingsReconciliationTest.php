@@ -3,10 +3,22 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Casts\ActionEnum;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Database\Seeders\PermissionRefreshSeeder;
+use Modules\Core\Models\ACL;
+use Modules\Core\Models\Permission;
+use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
+use Modules\Core\Models\User;
 use Modules\Core\Seeding\ModelCapabilityScanner;
+use Modules\Core\Services\AclResolverService;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Support\PermissionName;
 
 it('seeds per-model capability settings with the resolver naming', function (): void {
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
@@ -102,15 +114,70 @@ it('is idempotent and leaves operator values untouched on a second run', functio
     // so this assertion is only satisfied if the operator value genuinely
     // survives that realignment rather than coinciding with it.
     Setting::query()->withoutGlobalScopes()
-        ->where('name', 'pagination')
+        ->where('name', 'core.pagination')
         ->update(['value' => json_encode(999), 'description' => 'drifted description']);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'core.pagination')->sole();
 
     expect($setting->value)->toBe(999)
         ->and($setting->description)->toBe('Paginazione default chiamate');
+});
+
+it('marks every seeded setting as internal and realigns rows written before the flag', function (): void {
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    expect(Setting::query()->withoutGlobalScopes()->where('is_internal', false)->exists())->toBeFalse();
+
+    Setting::query()->withoutGlobalScopes()
+        ->where('name', 'core.pagination')
+        ->update(['is_internal' => false, 'value' => json_encode(999)]);
+
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'core.pagination')->sole();
+
+    expect($setting->is_internal)->toBeTrue()
+        ->and($setting->value)->toBe(999);
+});
+
+it('defaults is_internal to false for settings not written by a seeder', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
+
+    expect($setting->fresh()->is_internal)->toBeFalse();
+});
+
+it('seeds a guest ACL that limits settings reads to public ones', function (): void {
+    $this->artisan('db:seed', ['--class' => PermissionRefreshSeeder::class])->assertSuccessful();
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+    $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
+
+    $setting = new Setting;
+    $permission = Permission::query()
+        ->where('name', PermissionName::forModel($setting, ActionEnum::Select->value))
+        ->sole();
+    $guest = Role::query()->where('name', config('permission.roles.guest'))->sole();
+
+    $acl = ACL::query()->where('permission_id', $permission->id)->where('role_id', $guest->id)->sole();
+
+    expect($acl->unrestricted)->toBeFalse()
+        ->and($acl->is_active)->toBeTrue()
+        ->and($acl->filters->toArray())->toBe((new FiltersGroup([
+            new Filter($setting->getTable().'.is_public', true, FilterOperator::Equals),
+        ]))->toArray());
+
+    $guest_user = User::factory()->create();
+    $guest_user->assignRole($guest);
+
+    expect(resolve(AclResolverService::class)->getCombinedFilters($guest_user, $permission))
+        ->toBeInstanceOf(FiltersGroup::class);
+});
+
+it('defaults is_public to false', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create();
+
+    expect($setting->fresh()->is_public)->toBeFalse();
 });
 
 it('no longer force-deletes settings during a run', function (): void {
@@ -145,7 +212,7 @@ it('no longer force-deletes settings during a run', function (): void {
         'name' => $orphan_name,
         'value' => 'DIFF',
         'encrypted' => false,
-        'type' => Modules\Core\Casts\SettingTypeEnum::String,
+        'type' => SettingTypeEnum::String,
         'group_name' => 'base',
         'description' => 'Orphan',
     ]);

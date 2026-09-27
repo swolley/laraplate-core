@@ -409,7 +409,7 @@ class ListRequestData extends SelectRequestData
 
     private function getDefaultPagination(): int
     {
-        $value = app(PerModelSettingResolver::class)->int('pagination', 25);
+        $value = app(PerModelSettingResolver::class)->int('core.pagination', 25);
 
         return max(1, $value);
     }

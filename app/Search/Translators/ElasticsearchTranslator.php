@@ -57,9 +57,9 @@ class ElasticsearchTranslator implements ISchemaTranslator
                 'properties' => [
                     'vector' => [
                         'type' => 'dense_vector',
-                        'dims' => (int) ($vector['dimensions'] ?? config('search.vector.dimensions', 384)),
+                        'dims' => (int) ($vector['dimensions'] ?? config('core.search.vector.dimensions', 384)),
                         'index' => true,
-                        'similarity' => (string) ($vector['similarity'] ?? config('search.vector.similarity', 'cosine')),
+                        'similarity' => (string) ($vector['similarity'] ?? config('core.search.vector.similarity', 'cosine')),
                     ],
                 ],
             ];

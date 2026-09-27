@@ -61,7 +61,7 @@ it('installs and verifies the postgresql vector extension before using vector co
 it('uses configurable vector dimensions with an openai compatible fallback', function (): void {
     $source = modelEmbeddingsMigrationSource();
 
-    expect($source)->toContain("'search.vector.dimensions'")
+    expect($source)->toContain("'core.search.vector.dimensions'")
         ->and($source)->toContain('DEFAULT_VECTOR_DIMENSIONS')
         ->and($source)->not->toContain('$table->vector(\'embedding\', 1536)');
 });

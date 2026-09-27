@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Modules\Core\Search\Engines\ElasticsearchEngine;
+use Modules\Core\Search\Engines\TypesenseEngine;
 
 return [
     /*
@@ -13,26 +15,6 @@ return [
     |
     */
     'default' => env('SEARCH_ENGINE', 'elasticsearch'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Feature flags
-    |--------------------------------------------------------------------------
-    */
-    'features' => [
-        'reranker' => env('SEARCH_RERANKER_ENABLED', true),
-        'ensemble' => env('SEARCH_ENSEMBLE_ENABLED', true),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Reranker configuration
-    |--------------------------------------------------------------------------
-    */
-    'reranker' => [
-        'top_k' => (int) env('SEARCH_RERANKER_TOP_K', 30),
-        'weight' => (float) env('SEARCH_RERANKER_WEIGHT', 0.5),
-    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -94,38 +76,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Vector Search
-    |--------------------------------------------------------------------------
-    |
-    | Configurazioni per la ricerca vettoriale (embedding).
-    |
-    */
-    // Vector/hybrid retrieval is off by default: it needs an online embeddings
-    // provider, a vector-capable engine, and a full embedding backfill/reindex.
-    // `dimension` MUST equal the active embeddings provider's output length
-    // (the default `sentence_transformers` model all-MiniLM-L6-v2 emits 384);
-    // change it in lockstep when switching provider (e.g. OpenAI
-    // text-embedding-3-small = 1536).
-    'vector_search' => [
-        'dimension' => (int) env('VECTOR_DIMENSION', 384),
-        'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Vector Field Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for vector fields in schema translation.
-    |
-    */
-    'vector' => [
-        'dimensions' => (int) env('VECTOR_DIMENSION', 384),
-        'similarity' => env('VECTOR_SIMILARITY', 'cosine'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Locale → analyzer map
     |--------------------------------------------------------------------------
     |
@@ -148,11 +98,11 @@ return [
     */
     'engines' => [
         'elasticsearch' => [
-            'class' => Modules\Core\Search\Engines\ElasticsearchEngine::class,
+            'class' => ElasticsearchEngine::class,
             'index_prefix' => env('ELASTIC_INDEX_PREFIX', ''),
         ],
         'typesense' => [
-            'class' => Modules\Core\Search\Engines\TypesenseEngine::class,
+            'class' => TypesenseEngine::class,
             'index_prefix' => env('TYPESENSE_INDEX_PREFIX', ''),
             'api_key' => env('TYPESENSE_API_KEY'),
             'hosts' => explode(',', env('TYPESENSE_HOSTS', 'http://localhost:8108')),

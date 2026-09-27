@@ -140,7 +140,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | Term                         | Meaning                                                   |
 | ---------------------------- | --------------------------------------------------------- |
 | **Setting**                  | Key/value store (often JSON) for runtime configuration.   |
-| **ModuleDatabaseActivator**  | Enables/disables modules via `backendModules` setting.    |
+| **ModuleDatabaseActivator**  | Enables/disables modules via `core.active_modules` setting.    |
 | **CronJob**                  | Scheduled task definition managed in Filament.            |
 
 

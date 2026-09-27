@@ -14,7 +14,7 @@ use Modules\Core\Tests\Stubs\Search\VectorEmbeddingsArrayStubModel;
  * (nested vector field) already expects.
  */
 beforeEach(function (): void {
-    Config::set('search.vector_search.enabled', true);
+    Config::set('core.search.vector.enabled', true);
 
     Schema::create('core_test_vector_embeddings_stub', function ($table): void {
         $table->id();

@@ -151,15 +151,15 @@ return [
             Features::updatePasswords(),
         ];
 
-        if (config('auth.enable_user_registration')) {
+        if (config('core.auth.enable_user_registration')) {
             $features[] = Features::registration();
         }
 
-        if (config('auth.verify_new_user')) {
+        if (config('core.auth.verify_new_user')) {
             $features[] = Features::emailVerification();
         }
 
-        if (config('auth.enable_user_2fa')) {
+        if (config('core.auth.enable_user_2fa')) {
             $features[] = Features::twoFactorAuthentication([
                 'confirm' => true,
                 'confirmPassword' => true,

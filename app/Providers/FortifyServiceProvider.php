@@ -6,6 +6,7 @@ namespace Modules\Core\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -79,7 +80,7 @@ final class FortifyServiceProvider extends ServiceProvider
         });
 
         /**
-         * @param  \Illuminate\Contracts\Foundation\Application  $app
+         * @param  Application  $app
          */
         $this->app->singleton(AuthenticationService::class, static fn ($app): AuthenticationService => new AuthenticationService([ // @pest-ignore-type
             $app->make(FortifyCredentialsProvider::class),
@@ -144,7 +145,7 @@ final class FortifyServiceProvider extends ServiceProvider
             if ($result['success']) {
                 $this->ensureModuleScope($request, $result['user']);
 
-                if (config('auth.enable_user_licenses') && $result['license']) {
+                if (config('core.auth.enable_user_licenses') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
 
                     if (isset($result['license']->uuid)) {

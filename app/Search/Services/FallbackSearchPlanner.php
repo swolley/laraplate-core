@@ -33,7 +33,7 @@ final readonly class FallbackSearchPlanner implements ISearchPlanner
     {
         $is_short = mb_strlen($query) < 20;
         $has_numbers = (bool) preg_match('/\d/', $query);
-        $vector_globally_enabled = (bool) config('search.vector_search.enabled', false);
+        $vector_globally_enabled = (bool) config('core.search.vector.enabled', false);
         $use_vector = $vector_globally_enabled && ! $has_numbers;
 
         return [
@@ -54,8 +54,8 @@ final readonly class FallbackSearchPlanner implements ISearchPlanner
                 'rrf_weight' => 0.25,
             ],
             'ranking' => [
-                'use_reranker' => (bool) config('search.features.reranker', true),
-                'rerank_top_k' => (int) config('search.reranker.top_k', 30),
+                'use_reranker' => (bool) config('core.search.features.reranker', true),
+                'rerank_top_k' => (int) config('core.search.reranker.top_k', 30),
             ],
             'vector' => [
                 'enabled' => $use_vector,

@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\Sort;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
@@ -30,7 +31,7 @@ class EnsembleSearchService
      *
      * @param  array<string, mixed>  $plan
      * @param  list<float>|null  $vector
-     * @param  array<int, \Modules\Core\Casts\Sort>  $sort
+     * @param  array<int, Sort>  $sort
      */
     public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = [], ?ResolvedTextMatch $textMatch = null): AdvancedSearchResult
     {
@@ -86,8 +87,8 @@ class EnsembleSearchService
 
         $fused = $this->fuseStrategies($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
 
-        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('search.features.reranker', true));
-        $default_rerank_top_k = $this->configInt('search.reranker.top_k', 30);
+        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('core.search.features.reranker', true));
+        $default_rerank_top_k = $this->configInt('core.search.reranker.top_k', 30);
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
 
         if ($use_reranker && $fused !== []) {
@@ -146,7 +147,7 @@ class EnsembleSearchService
 
     /**
      * @param  list<float>|null  $vector
-     * @param  array<int, \Modules\Core\Casts\Sort>  $sort
+     * @param  array<int, Sort>  $sort
      */
     private function executeScoutSearch(Model $model, string $query, ?array $vector, ?FiltersGroup $filters, array $sort, int $window, int $page, int $perPage, string $strategy, string $driver, ?ResolvedTextMatch $textMatch = null): AdvancedSearchResult
     {

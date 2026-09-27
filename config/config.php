@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Database\Eloquent\Model;
 
 return [
     'name' => 'Core',
@@ -12,7 +13,7 @@ return [
      * Frozen: native modules share one schema on one connection. Add no
      * entries. See docs/database-connection-affinity-audit.md.
      *
-     * @var array<class-string<Illuminate\Database\Eloquent\Model>, string>
+     * @var array<class-string<Model>, string>
      */
     'model_connections' => [],
 
@@ -49,11 +50,7 @@ return [
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'lease_ttl' => (int) env('LOCKING_LEASE_TTL', 900),
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-        'unlock_allowed' => env('LOCKIN_UNLOCK_ALLOWED', true),
-        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'can_be_unlocked' => explode(',', (string) env('LOCKING_CAN_BE_UNLOCKED', '')),
-        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
-        'prevent_modifications_on_locked_objects' => env('LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED', true),
     ],
 
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig

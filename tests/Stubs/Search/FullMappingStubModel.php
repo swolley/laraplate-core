@@ -51,7 +51,7 @@ class FullMappingStubModel extends Model implements ISearchableModel
                         'properties' => [
                             'vector' => [
                                 'type' => 'dense_vector',
-                                'dims' => (int) config('search.vector_search.dimension', 384),
+                                'dims' => (int) config('core.search.vector.dimensions', 384),
                                 'index' => true,
                                 'similarity' => 'cosine',
                             ],

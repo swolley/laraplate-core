@@ -15,15 +15,15 @@ it('loads settings once and reuses them for subsequent lookups', function (): vo
     $resolver = app(PerModelSettingResolver::class);
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'ai_moderation_test_table',
+        'name' => 'soft_deletes_test_table',
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'moderation',
         'description' => 'test',
     ]);
 
-    expect($resolver->boolean('ai_moderation_test_table', false))->toBeTrue()
-        ->and($resolver->boolean('ai_moderation_test_table', false))->toBeTrue();
+    expect($resolver->boolean('soft_deletes_test_table', false))->toBeTrue()
+        ->and($resolver->boolean('soft_deletes_test_table', false))->toBeTrue();
 });
 
 it('returns default when setting is missing', function (): void {

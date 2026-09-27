@@ -26,8 +26,8 @@ it('applies the dense_vector embedding mapping to Elasticsearch on index creatio
         $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
     }
 
-    config()->set('search.vector_search.enabled', true);
-    config()->set('search.vector_search.dimension', 384);
+    config()->set('core.search.vector.enabled', true);
+    config()->set('core.search.vector.dimensions', 384);
 
     $service = ElasticsearchService::getInstance();
     $index = VectorMappingStubModel::INDEX;
@@ -69,8 +69,8 @@ it('orders a paginated vector search by similarity, not by id', function (): voi
         $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
     }
 
-    config()->set('search.vector_search.enabled', true);
-    config()->set('search.vector_search.dimension', 384);
+    config()->set('core.search.vector.enabled', true);
+    config()->set('core.search.vector.dimensions', 384);
 
     $service = ElasticsearchService::getInstance();
     $index = VectorMappingStubModel::INDEX;
@@ -127,8 +127,8 @@ it('applies the full field mapping, including locale analyzers and a nested vect
         $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
     }
 
-    config()->set('search.vector_search.enabled', true);
-    config()->set('search.vector_search.dimension', 384);
+    config()->set('core.search.vector.enabled', true);
+    config()->set('core.search.vector.dimensions', 384);
 
     $service = ElasticsearchService::getInstance();
     $index = FullMappingStubModel::INDEX;
@@ -184,8 +184,8 @@ it('orders a paginated vector search by similarity over the nested embeddings fi
         $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
     }
 
-    config()->set('search.vector_search.enabled', true);
-    config()->set('search.vector_search.dimension', 384);
+    config()->set('core.search.vector.enabled', true);
+    config()->set('core.search.vector.dimensions', 384);
 
     $service = ElasticsearchService::getInstance();
     $index = NestedVectorLocaleStubModel::INDEX;
@@ -240,8 +240,8 @@ it('filters a vector search to documents available in the requested locale', fun
         $this->markTestSkipped('Elasticsearch is not reachable: ' . $e->getMessage());
     }
 
-    config()->set('search.vector_search.enabled', true);
-    config()->set('search.vector_search.dimension', 384);
+    config()->set('core.search.vector.enabled', true);
+    config()->set('core.search.vector.dimensions', 384);
 
     $service = ElasticsearchService::getInstance();
     $index = NestedVectorLocaleStubModel::INDEX;

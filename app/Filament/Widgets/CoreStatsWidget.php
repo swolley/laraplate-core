@@ -27,7 +27,7 @@ final class CoreStatsWidget extends BaseWidget
 
     public static function canView(): bool
     {
-        return (bool) config('auth.enable_user_licenses');
+        return (bool) config('core.auth.enable_user_licenses');
     }
 
     public function getColumns(): array

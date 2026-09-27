@@ -241,9 +241,9 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
      */
     public function sync(string $modelClass, ?int $id = null, ?string $from = null): int
     {
-        $this->ensureIndex(new $modelClass());
+        $this->ensureIndex(new $modelClass);
 
-        $model_instance = new $modelClass();
+        $model_instance = new $modelClass;
         $query = $this->newQueryIncludingTrashed($modelClass);
 
         // Filters
@@ -388,7 +388,7 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
             ],
         ];
 
-        $vector_search_enabled = (bool) config('search.vector_search.enabled', false);
+        $vector_search_enabled = (bool) config('core.search.vector.enabled', false);
 
         if ($vector_search_enabled && $this->supportsVectorSearch()) {
             // Typesense vector field configuration
