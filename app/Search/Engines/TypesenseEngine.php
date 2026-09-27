@@ -485,6 +485,12 @@ final class TypesenseEngine extends BaseTypesenseEngine implements ISearchEngine
         ];
     }
 
+    #[Override]
+    public function ping(): bool
+    {
+        return ($this->typesense->health->retrieve()['ok'] ?? false) === true;
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -17,10 +17,25 @@ use Override;
 final class CoreStatsWidget extends BaseWidget
 {
     #[Override]
+    protected static ?int $sort = 12;
+
+    #[Override]
     protected static bool $isLazy = true;
 
     #[Override]
     protected ?string $pollingInterval = null;
+
+    public static function canView(): bool
+    {
+        return (bool) config('auth.enable_user_licenses');
+    }
+
+    public function getColumns(): array
+    {
+        return [
+            'md' => 2,
+        ];
+    }
 
     protected function getStats(): array
     {
@@ -38,7 +53,6 @@ final class CoreStatsWidget extends BaseWidget
                 ->pluck('license_id');
 
             return [
-                'users' => $user->newQuery()->count(),
                 'total' => $license->newQuery()->count(),
                 'active' => $license->newQuery()
                     ->where(static fn ($query) => $query
@@ -52,11 +66,6 @@ final class CoreStatsWidget extends BaseWidget
         });
 
         return [
-            Stat::make('Users', $data['users'])
-                ->description('Total registered users')
-                ->descriptionIcon('heroicon-o-users')
-                ->color('primary')
-                ->descriptionColor('core'),
             Stat::make('Active Licenses', "{$data['active']} / {$data['total']}")
                 ->description('Currently valid licenses')
                 ->descriptionIcon('heroicon-o-key')

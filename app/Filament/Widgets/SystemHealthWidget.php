@@ -4,25 +4,31 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Widgets;
 
-use Exception;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Laravel\Horizon\Contracts\MasterSupervisorRepository;
+use Laravel\Scout\EngineManager;
+use Modules\Core\Search\Contracts\ISearchEngine;
 use Override;
+use Throwable;
 
 final class SystemHealthWidget extends BaseWidget
 {
     #[Override]
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 10;
 
     #[Override]
-    protected ?string $pollingInterval = null;
+    protected ?string $heading = 'Core';
+
+    #[Override]
+    protected ?string $pollingInterval = '60s';
 
     public function getColumns(): array
     {
         return [
-            'md' => 2,
+            'md' => 3,
         ];
     }
 
@@ -31,22 +37,15 @@ final class SystemHealthWidget extends BaseWidget
         $stats = [];
 
         // Cache status
-        try {
-            $cache_key = 'system_health_check_' . time();
-            Cache::put($cache_key, 'ok', 10);
-            $cache_works = Cache::get($cache_key) === 'ok';
-            Cache::forget($cache_key);
+        $cache_store = (string) config('cache.default');
+        $cache_driver = ucfirst((string) config("cache.stores.{$cache_store}.driver", $cache_store));
 
-            $stats[] = Stat::make('Cache', $cache_works ? 'Active' : 'Inactive')
-                ->description($cache_works ? 'Cache is working' : 'Cache is not working')
-                ->descriptionIcon($cache_works ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-                ->color($cache_works ? 'success' : 'danger');
-        } catch (Exception) {
-            $stats[] = Stat::make('Cache', 'Error')
-                ->description('Unable to check cache status')
-                ->descriptionIcon('heroicon-o-exclamation-triangle')
-                ->color('gray');
-        }
+        $cache_works = Cache::store()->ping();
+
+        $stats[] = Stat::make('Cache', $cache_driver)
+            ->description($cache_works ? 'Cache is working' : 'Cache is not working')
+            ->descriptionIcon($cache_works ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+            ->color($cache_works ? 'success' : 'danger');
 
         // Database connections
         // try {
@@ -73,22 +72,83 @@ final class SystemHealthWidget extends BaseWidget
         //         ->color('gray');
         // }
 
-        // Queue status
-        try {
-            $queue_driver = config('queue.default', 'sync');
-            $queue_works = $queue_driver !== 'sync';
+        $stats[] = $this->searchStat();
+        $stats[] = $this->queueStat();
 
-            $stats[] = Stat::make('Queue', ucfirst((string) $queue_driver))
-                ->description($queue_works ? 'Queue is active' : 'Queue is synchronous')
-                ->descriptionIcon($queue_works ? 'heroicon-o-queue-list' : 'heroicon-o-clock')
-                ->color($queue_works ? 'success' : 'gray');
-        } catch (Exception) {
-            $stats[] = Stat::make('Queue', 'Unknown')
-                ->description('Unable to check queue status')
-                ->descriptionIcon('heroicon-o-exclamation-triangle')
+        return $stats;
+    }
+
+    private function queueStat(): Stat
+    {
+        $queue_driver = (string) config('queue.default', 'sync');
+        $queue_label = ucfirst($queue_driver);
+
+        if ($queue_driver === 'sync') {
+            return Stat::make('Queue', $queue_label)
+                ->description('Queue is synchronous')
+                ->descriptionIcon('heroicon-o-clock')
                 ->color('gray');
         }
 
-        return $stats;
+        if ($queue_driver !== 'redis' || ! interface_exists(MasterSupervisorRepository::class)) {
+            return Stat::make('Queue', $queue_label)
+                ->description('Worker status not tracked')
+                ->descriptionIcon('heroicon-o-queue-list')
+                ->color('gray');
+        }
+
+        try {
+            $masters = resolve(MasterSupervisorRepository::class)->all();
+        } catch (Throwable) {
+            return Stat::make('Queue', $queue_label)
+                ->description('Unable to check workers')
+                ->descriptionIcon('heroicon-o-exclamation-triangle')
+                ->color('danger');
+        }
+
+        if ($masters === []) {
+            return Stat::make('Queue', $queue_label)
+                ->description('Horizon is not running')
+                ->descriptionIcon('heroicon-o-x-circle')
+                ->color('danger');
+        }
+
+        if (collect($masters)->contains(static fn (object $master): bool => $master->status === 'paused')) {
+            return Stat::make('Queue', $queue_label)
+                ->description('Horizon is paused')
+                ->descriptionIcon('heroicon-o-pause-circle')
+                ->color('warning');
+        }
+
+        return Stat::make('Queue', $queue_label)
+            ->description('Horizon is running')
+            ->descriptionIcon('heroicon-o-check-circle')
+            ->color('success');
+    }
+
+    private function searchStat(): Stat
+    {
+        $search_driver = config('scout.driver');
+
+        if (! is_string($search_driver) || $search_driver === '' || $search_driver === 'null') {
+            return Stat::make('Search', 'None')
+                ->description('Search is disabled')
+                ->descriptionIcon('heroicon-o-minus-circle')
+                ->color('gray');
+        }
+
+        $search_label = ucfirst($search_driver);
+
+        try {
+            $engine = resolve(EngineManager::class)->engine();
+            $search_works = $engine instanceof ISearchEngine && $engine->ping();
+        } catch (Throwable) {
+            $search_works = false;
+        }
+
+        return Stat::make('Search', $search_label)
+            ->description($search_works ? 'Search engine is working' : 'Search engine is not reachable')
+            ->descriptionIcon($search_works ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+            ->color($search_works ? 'success' : 'danger');
     }
 }

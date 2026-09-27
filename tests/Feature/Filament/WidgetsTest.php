@@ -6,6 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Horizon\Contracts\MasterSupervisorRepository;
+use Laravel\Scout\EngineManager;
 use Modules\Core\Filament\Widgets\CoreStatsWidget;
 use Modules\Core\Filament\Widgets\HorizonStatsWidget;
 use Modules\Core\Filament\Widgets\SearchEngineHealthTableWidget;
@@ -14,6 +16,7 @@ use Modules\Core\Filament\Widgets\WelcomeLinkWidget;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Search\Contracts\ISearchEngine;
 
 beforeEach(function (): void {
     if (! class_exists(App\Models\User::class)) {
@@ -43,12 +46,19 @@ it('builds core stats widget data', function (): void {
 
     $stats = $method->invoke($widget);
 
-    expect($stats)->toHaveCount(3)
+    expect($stats)->toHaveCount(2)
         ->and($property->getDeclaringClass()->getName())->toBe(CoreStatsWidget::class)
         ->and($property->getValue())->toBeTrue()
-        ->and($stats[0]->getValue())->toBe(1)
-        ->and($stats[1]->getValue())->toBe('1 / 1')
-        ->and($stats[2]->getValue())->toBe('1 / 1');
+        ->and($stats[0]->getValue())->toBe('1 / 1')
+        ->and($stats[1]->getValue())->toBe('1 / 1');
+});
+
+it('shows the license widget only when user licenses are enabled', function (): void {
+    config(['auth.enable_user_licenses' => false]);
+    expect(CoreStatsWidget::canView())->toBeFalse();
+
+    config(['auth.enable_user_licenses' => true]);
+    expect(CoreStatsWidget::canView())->toBeTrue();
 });
 
 it('builds core stats without joining models on different connections', function (): void {
@@ -95,9 +105,8 @@ it('builds core stats without joining models on different connections', function
     $method->setAccessible(true);
     $stats = $method->invoke($widget);
 
-    expect($stats[0]->getValue())->toBe(2)
-        ->and($stats[1]->getValue())->toBe('1 / 2')
-        ->and($stats[2]->getValue())->toBe('1 / 1');
+    expect($stats[0]->getValue())->toBe('1 / 2')
+        ->and($stats[1]->getValue())->toBe('1 / 1');
 });
 
 it('isolates cached core stats when a connection name points to another database', function (): void {
@@ -150,7 +159,7 @@ it('isolates cached core stats when a connection name points to another database
             'license_id' => 801,
         ]);
 
-        expect($read_stats()[0]->getValue())->toBe(1);
+        expect($read_stats()[0]->getValue())->toBe('1 / 1');
 
         DB::purge($connection_name);
         $connection_config['database'] = $second_database;
@@ -165,7 +174,7 @@ it('isolates cached core stats when a connection name points to another database
             ['id' => 903, 'license_id' => 803],
         ]);
 
-        expect($read_stats()[0]->getValue())->toBe(2);
+        expect($read_stats()[0]->getValue())->toBe('2 / 2');
     } finally {
         DB::purge($connection_name);
         @unlink($first_database);
@@ -242,8 +251,58 @@ it('returns system health widget columns and stats', function (): void {
     $method->setAccessible(true);
     $stats = $method->invoke($widget);
 
-    expect($columns)->toBe(['md' => 2])
-        ->and($stats)->toHaveCount(2);
+    expect($columns)->toBe(['md' => 3])
+        ->and($stats)->toHaveCount(3)
+        ->and($stats[0]->getValue())->toBe(ucfirst((string) config('cache.stores.' . config('cache.default') . '.driver')));
+});
+
+it('shows cache, queue and search drivers with their status', function (): void {
+    config([
+        'queue.default' => 'sync',
+        'scout.driver' => 'typesense',
+    ]);
+
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('ping')->once()->andReturn(true);
+    app()->instance(EngineManager::class, Mockery::mock(EngineManager::class, ['engine' => $engine]));
+
+    $method = new ReflectionMethod(SystemHealthWidget::class, 'getStats');
+    [$cache, $search, $queue] = $method->invoke(new SystemHealthWidget());
+
+    expect($cache->getColor())->toBe('success')
+        ->and($queue->getValue())->toBe('Sync')
+        ->and($queue->getColor())->toBe('gray')
+        ->and($search->getValue())->toBe('Typesense')
+        ->and($search->getColor())->toBe('success');
+});
+
+it('marks the search engine as unreachable when its health check fails', function (): void {
+    config(['scout.driver' => 'elasticsearch']);
+
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('ping')->once()->andThrow(new RuntimeException('Connection refused'));
+    app()->instance(EngineManager::class, Mockery::mock(EngineManager::class, ['engine' => $engine]));
+
+    $method = new ReflectionMethod(SystemHealthWidget::class, 'getStats');
+    $search = $method->invoke(new SystemHealthWidget())[1];
+
+    expect($search->getValue())->toBe('Elasticsearch')
+        ->and($search->getColor())->toBe('danger');
+});
+
+it('marks the redis queue as down when horizon is not running', function (): void {
+    config(['queue.default' => 'redis', 'scout.driver' => null]);
+
+    $masters = Mockery::mock(MasterSupervisorRepository::class);
+    $masters->shouldReceive('all')->once()->andReturn([]);
+    app()->instance(MasterSupervisorRepository::class, $masters);
+
+    $method = new ReflectionMethod(SystemHealthWidget::class, 'getStats');
+    [, $search, $queue] = $method->invoke(new SystemHealthWidget());
+
+    expect($queue->getValue())->toBe('Redis')
+        ->and($queue->getColor())->toBe('danger')
+        ->and($search->getValue())->toBe('None');
 });
 
 it('keeps welcome widget hidden by default', function (): void {

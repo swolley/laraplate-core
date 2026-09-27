@@ -43,6 +43,11 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         return [];
     }
 
+    public function ping(): bool
+    {
+        return true;
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -14,7 +14,7 @@ use Override;
 final class HorizonStatsWidget extends BaseWidget
 {
     #[Override]
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 11;
 
     #[Override]
     protected ?string $pollingInterval = null;

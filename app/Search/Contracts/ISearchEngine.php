@@ -58,6 +58,11 @@ interface ISearchEngine extends ISearchable // , ISearchAnalytics
 
     public function health(): array;
 
+    /**
+     * Lightweight reachability check, without collecting any statistics.
+     */
+    public function ping(): bool;
+
     public function stats(): array;
 
     public function getName(): string;

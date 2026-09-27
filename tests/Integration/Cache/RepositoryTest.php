@@ -272,3 +272,11 @@ it('clearByEntity does not throw BadMethodCallException when cache driver does n
 
     expect(fn () => $repository->clearByEntity($cacheable))->not->toThrow(BadMethodCallException::class);
 });
+
+it('ping succeeds on a working store and fails when the store throws', function (): void {
+    $failing_store = Mockery::mock(Store::class);
+    $failing_store->shouldReceive('put')->andThrow(new RuntimeException('Connection refused'));
+
+    expect((new Repository(new ArrayStore()))->ping())->toBeTrue()
+        ->and((new Repository($failing_store))->ping())->toBeFalse();
+});

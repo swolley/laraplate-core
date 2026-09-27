@@ -7,6 +7,7 @@ namespace Modules\Core\Cache;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
+use Illuminate\Cache\RedisStore;
 use Illuminate\Cache\Repository as BaseRepository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\User;
 use Override;
 use Spatie\Permission\Models\Role;
+use Throwable;
 use UnitEnum;
 
 /**
@@ -222,6 +224,27 @@ final class Repository extends BaseRepository
             }
         } else {
             $this->tags(self::getCacheTags($role_key))->flush();
+        }
+    }
+
+    /**
+     * Lightweight reachability check of the underlying store: a PING on Redis,
+     * a short write/read round trip on any other driver.
+     */
+    public function ping(): bool
+    {
+        try {
+            if ($this->store instanceof RedisStore) {
+                $this->store->connection()->ping();
+
+                return true;
+            }
+
+            $key = CacheManager::key('health', 'ping');
+
+            return $this->store->put($key, 'ok', 10) && $this->store->get($key) === 'ok';
+        } catch (Throwable) {
+            return false;
         }
     }
 

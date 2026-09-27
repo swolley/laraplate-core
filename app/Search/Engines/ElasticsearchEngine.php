@@ -848,6 +848,14 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
         ];
     }
 
+    #[Override]
+    public function ping(): bool
+    {
+        $response = ElasticsearchService::getInstance()->client->ping();
+
+        return $response instanceof Elasticsearch && $response->asBool();
+    }
+
     /**
      * @return array<string, mixed>
      */
