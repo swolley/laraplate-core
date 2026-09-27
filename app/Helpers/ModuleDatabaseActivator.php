@@ -115,11 +115,11 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 'name' => self::$RECORD_NAME,
                 'module' => class_module(self::class),
                 'type' => 'json',
-                'group_name' => 'modules',
+                'group_name' => 'core',
                 'description' => 'application active modules',
                 'seeded_value' => $all_modules,
             ]);
-        } elseif (sort($found->choices) !== sort($all_modules)) {
+        } elseif (! self::sameModules((array) $found->choices, $all_modules)) {
             $found->update(['choices' => $all_modules]);
         }
 
@@ -206,6 +206,18 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
+     * @param  array<int, mixed>  $left
+     * @param  array<int, mixed>  $right
+     */
+    private static function sameModules(array $left, array $right): bool
+    {
+        sort($left);
+        sort($right);
+
+        return $left === $right;
+    }
+
+    /**
      * Ensures the core.active_modules row exists (query builder only, no Eloquent).
      */
     private function ensureBackendModulesRecord(): void
@@ -239,6 +251,10 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         Log::info("Created settings '{name}' config record", ['name' => self::$RECORD_NAME]);
     }
 
+    /**
+     * Writes the active modules and realigns the choices with the modules on disk,
+     * so the value never holds a module the settings form would reject.
+     */
     private function updateRecordValue(array $value): void
     {
         [$settings_table, $connection] = self::settingsTableAndConnection();
@@ -248,6 +264,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             ->whereNull('deleted_at')
             ->update([
                 'value' => json_encode($value),
+                'choices' => json_encode(self::getAllModulesNames()),
                 'updated_at' => now(),
             ]);
     }
