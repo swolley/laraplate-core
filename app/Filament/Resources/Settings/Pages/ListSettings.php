@@ -8,6 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables\Grouping\Group;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Models\Setting;
@@ -42,7 +43,7 @@ final class ListSettings extends ListRecords
                 continue;
             }
 
-            $label = ucfirst((string) $group);
+            $label = Str::studly((string) $group);
 
             $tabs[$group] = Tab::make($label)
                 ->badge($count)
@@ -51,7 +52,7 @@ final class ListSettings extends ListRecords
 
         $this->groups[] = Group::make('group_name')
             ->label('Group')
-            ->getTitleFromRecordUsing(fn (Setting $record): string => ucfirst($record->group_name));
+            ->getTitleFromRecordUsing(fn (Setting $record): string => Str::studly($record->group_name));
 
         return $tabs;
     }

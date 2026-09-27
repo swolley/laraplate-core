@@ -72,7 +72,7 @@ final class ListModifications extends ListRecords
             ->getTitleFromRecordUsing(function (Model $record): string {
                 $type = $record->getAttribute('modifiable_type');
 
-                return is_string($type) ? ucfirst($type) : '';
+                return is_string($type) ? Str::studly($type) : '';
             });
 
         return $tabs;
