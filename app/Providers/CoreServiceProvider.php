@@ -23,6 +23,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Console\RouteListCommand as LaravelRouteListCommand;
 use Illuminate\Queue\Console\MonitorCommand as LaravelQueueMonitorCommand;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,7 @@ use Modules\Core\Import\Support\EntityImporterRegistry;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Listeners\SendImportFinishedNotification;
 use Modules\Core\Locking\Console\ModelLockSweepCommand;
+use Modules\Core\Locking\LockAwareUserProvider;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
@@ -242,6 +244,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         // bypass all other checks if the user is super admin
         Gate::before(static fn (?CoreUser $user): ?true => $user instanceof CoreUser && $user->isSuperAdmin() ? true : null);
+
+        Auth::provider('eloquent', static fn (Application $app, array $config): LockAwareUserProvider => new LockAwareUserProvider($app['hash'], $config['model']));
     }
 
     /**

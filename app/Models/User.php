@@ -239,6 +239,21 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
     }
 
     /**
+     * Signing in is not an edit.
+     *
+     * A lock on an account stops anybody from restating who that user is, but the framework keeps
+     * its own bookkeeping on the same row: the guard rotates `remember_token` on every login and
+     * logout, and `last_login_at` records the session. Refusing those writes does not protect the
+     * record, it only makes a locked user unable to sign in or out.
+     *
+     * @return list<string>
+     */
+    public function attributesWritableWhileLocked(): array
+    {
+        return ['remember_token', 'last_login_at'];
+    }
+
+    /**
      * Whether the account may sign in at the given moment.
      * Accounts with both validity columns unset are always allowed (legacy behaviour).
      */

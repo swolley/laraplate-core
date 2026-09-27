@@ -9,6 +9,7 @@ declare(strict_types=1);
  * which reports final classes as non-final so Mockery can replace methods.
  */
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockedModelSubscriber;
@@ -133,6 +134,54 @@ test('the saving guard lets the holder of the lease edit the record', function (
     $reloaded->save();
 
     expect($reloaded->fresh()?->name)->toBe('edited by the holder');
+});
+
+test('a locked user can still sign in with remember me', function (): void {
+    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+
+    $user = User::factory()->create(['password' => 'secret-password']);
+    $user->lock();
+
+    expect(Auth::guard('web')->attempt(['email' => $user->email, 'password' => 'secret-password'], remember: true))->toBeTrue();
+    expect($user->fresh()?->remember_token)->not->toBeNull();
+});
+
+test('a locked user can still sign in when the password needs a rehash', function (): void {
+    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+
+    $user = User::factory()->create();
+    $stale_hash = Hash::make('secret-password', ['rounds' => 5]);
+    User::query()->whereKey($user->getKey())->toBase()->update(['password' => $stale_hash]);
+    $user->lock();
+
+    expect(Hash::needsRehash($stale_hash))->toBeTrue()
+        ->and(Auth::guard('web')->attempt(['email' => $user->email, 'password' => 'secret-password']))->toBeTrue()
+        ->and($user->fresh()?->password)->not->toBe($stale_hash);
+});
+
+test('a locked user still refuses a password change outside the login rehash', function (): void {
+    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+
+    $target = User::factory()->create();
+    $target->lock();
+
+    $reloaded = User::query()->findOrFail($target->getKey());
+    $reloaded->password = 'another-password';
+
+    expect(fn (): bool => $reloaded->save())->toThrow(LockedModelException::class);
+});
+
+test('a locked user still refuses an edit mixed with auth bookkeeping', function (): void {
+    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+
+    $target = User::factory()->create();
+    $target->lock();
+
+    $reloaded = User::query()->findOrFail($target->getKey());
+    $reloaded->remember_token = 'rotated';
+    $reloaded->name = 'edited while frozen';
+
+    expect(fn (): bool => $reloaded->save())->toThrow(LockedModelException::class);
 });
 
 test('the deleting guard blocks a frozen record and spares the lease holder', function (): void {
