@@ -33,6 +33,15 @@ final class LicenseResource extends Resource
     #[Override]
     protected static ?int $navigationSort = 6;
 
+    /**
+     * Licenses only exist as a feature when the `auth.licenses.enabled` setting turns it on.
+     */
+    #[Override]
+    public static function canAccess(): bool
+    {
+        return (bool) config('core.auth.licenses.enabled') && parent::canAccess();
+    }
+
     public static function getSlug(?Panel $panel = null): string
     {
         return 'core/licenses';

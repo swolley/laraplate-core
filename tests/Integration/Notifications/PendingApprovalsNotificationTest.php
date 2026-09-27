@@ -6,7 +6,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Notifications\PendingApprovalsNotification;
 
 it('via returns configured channels', function (): void {
-    config(['core.notifications.approvals.channels' => ['mail', 'database']]);
+    config(['core.notifications.channels' => ['mail', 'database']]);
     $notification = new PendingApprovalsNotification(new Collection());
 
     expect($notification->via(new stdClass()))->toBe(['mail', 'database']);

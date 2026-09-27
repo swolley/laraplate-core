@@ -21,7 +21,7 @@ Route::controller(UserController::class)->name('auth.')->group(function (): void
     // Route::patch('/configs', 'updateConfigs')->can('edit')->name('updateConfigs');
     Route::get('/still-here', 'maintainSession')->name('maintainSession');
 
-    if (config('core.auth.enable_social_login')) {
+    if (config('core.auth.social_login.enabled')) {
         $social_services = ['facebook', 'twitter', 'twitter-oauth-2', 'linkedin-openid', 'google', 'github', 'gitlab', 'bitbucket', 'slack', 'slack-openid'];
         Route::get('/{service}/redirect', 'socialLoginRedirect')->whereIn('service', $social_services);
         Route::get('/{service}/callback', 'socialLoginCallback')->whereIn('service', $social_services);

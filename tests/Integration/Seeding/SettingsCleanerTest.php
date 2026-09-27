@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\ModuleState;
 use Modules\Core\Seeding\ModuleStateResolver;
@@ -101,7 +102,7 @@ it('soft deletes unconditionally even when soft_deletes_core_settings is disable
     // performDeleteOnModel(), which downgrades to a forceDelete() whenever
     // soft_deletes_core_settings is false — a row in the very table being
     // cleaned. Prove the cleaner's soft-delete branch does not depend on it.
-    $flag_name = PerModelSettingResolver::nameFor('soft_deletes', (new Setting)->getTable());
+    $flag_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, (new Setting)->getTable());
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => $flag_name,

@@ -26,7 +26,7 @@ Both mirror the same ideas: emit always, optional AI pre-processing, cache coord
 | Core is the bus | Events and registries live in `Modules\Core` |
 | Domain modules register adapters | e.g. CMS registers `CommentModerationContextBuilder` |
 | AI never imports CMS/ERP | AI resolves builders via `ModerationContextBuilderRegistry` |
-| Opt-in per model | Settings: `auto_translate.{table}`, AI module's `ai.features.moderation.entities.{table}`; search: `Searchable` + `$embed` |
+| Opt-in per model | Settings: `translations.auto.{table}`, AI module's `ai.features.moderation.entities.{table}`; search: `Searchable` + `$embed` |
 | Fallback when AI skips | Indexing: Core still runs `IndexInSearchJob`; moderation: humans only (no-op) |
 
 ---
@@ -167,7 +167,7 @@ The `model_indexing` entry has a **10-minute TTL**. If a pre-processing step fin
 |-------|------|
 | Scout / Core | `SCOUT_DRIVER`, `core.search.vector.enabled`, model `$embed`, `vectorSearchEnabled()` |
 | AI | `ai.features.embeddings.enabled`, embedding provider env vars |
-| Per model | `auto_translate.{table}` (translations group) via `PerModelSettingResolver` |
+| Per model | `translations.auto.{table}` (translations group) via `PerModelSettingResolver` |
 
 See also: [Modules/AI/docs/SEARCH_AND_TRANSLATION.md](../AI/docs/SEARCH_AND_TRANSLATION.md).
 
@@ -343,7 +343,7 @@ See also:
 
 1. Add `Searchable` trait and implement `toSearchableArray()` / `$embed`.
 2. Ensure `ai.features.embeddings.enabled` and provider configured.
-3. Optionally enable `auto_translate.{table}` for `TranslatedModelSaved` flow.
+3. Optionally enable `translations.auto.{table}` for `TranslatedModelSaved` flow.
 
 ### New moderatable model
 

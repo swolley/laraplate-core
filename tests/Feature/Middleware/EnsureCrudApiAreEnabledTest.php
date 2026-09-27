@@ -36,7 +36,7 @@ test('middleware uses correct config key', function (): void {
     $reflection = new ReflectionClass(EnsureCrudApiAreEnabled::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('core.expose_crud_api');
+    expect($source)->toContain('core.crud.expose_api');
     expect($source)->toContain('config(');
 });
 
@@ -60,5 +60,5 @@ test('middleware has proper conditional logic', function (): void {
     $reflection = new ReflectionClass(EnsureCrudApiAreEnabled::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('abort_unless(config(\'core.expose_crud_api\'), 403, \'Forbidden\');');
+    expect($source)->toContain('abort_unless(config(\'core.crud.expose_api\'), 403, \'Forbidden\');');
 });

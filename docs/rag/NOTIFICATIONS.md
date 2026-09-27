@@ -24,7 +24,7 @@ Notifications use Laravel's `database` channel with a Core-owned table and model
 
 A notification class opts in by returning `['database']` from `via()`. `ImportFinishedNotification`
 does exactly that; `PendingApprovalsNotification` reads its channels from
-`core.notifications.approvals.channels` (default `['mail']`), so the same producer can reach a
+`core.notifications.channels` (default `['mail']`), so the same producer can reach a
 mailbox, the tray, or both without code changes.
 
 ## HTTP surface

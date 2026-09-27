@@ -7,13 +7,14 @@ namespace Modules\Core\Models\Concerns;
 use function property_exists;
 
 use DateTimeInterface;
-// use Thiagoprz\CompositeKey\HasCompositeKey;
 use Illuminate\Database\Eloquent\Builder;
+// use Thiagoprz\CompositeKey\HasCompositeKey;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
 use Modules\Core\Contracts\IOptimisticLockableModel;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -45,7 +46,9 @@ trait HasVersions
 
     // protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
 
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     protected array $dontVersionable = ['created_at', 'updated_at'/* , 'deleted_at' */, 'last_login_at'];
 
     protected bool $asyncVersioning = true;
@@ -293,7 +296,7 @@ trait HasVersions
             return self::$version_strategy_cache[$model_class];
         }
 
-        $settings_name = PerModelSettingResolver::nameFor('version_strategy', $this->getTable());
+        $settings_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::VERSIONING_NAME_PREFIX, $this->getTable());
 
         $raw = app(PerModelSettingResolver::class)->value($settings_name, false);
 

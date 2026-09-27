@@ -49,7 +49,7 @@ it('getInspectedTable delegates to SchemaInspector and returns null for unknown 
 });
 
 it('resolve throws when dynamic entities are disabled and no concrete model is found', function (): void {
-    config()->set('core.dynamic_entities', false);
+    config()->set('core.crud.dynamic_entities', false);
     $service = DynamicEntityService::getInstance();
 
     expect(fn () => $service->resolve('table_that_does_not_exist_' . bin2hex(random_bytes(4))))
@@ -57,7 +57,7 @@ it('resolve throws when dynamic entities are disabled and no concrete model is f
 });
 
 it('resolve returns concrete model when table maps to existing model', function (): void {
-    config()->set('core.dynamic_entities', false);
+    config()->set('core.crud.dynamic_entities', false);
     $service = DynamicEntityService::getInstance();
 
     $model = $service->resolve('settings', attributes: ['name' => 'my_setting']);
@@ -67,7 +67,7 @@ it('resolve returns concrete model when table maps to existing model', function 
 });
 
 it('resolve uses dynamic entity cache and returns cloned model instances', function (): void {
-    config()->set('core.dynamic_entities', true);
+    config()->set('core.crud.dynamic_entities', true);
     $service = DynamicEntityService::getInstance();
     $table = 'tmp_dynamic_entities_' . bin2hex(random_bytes(4));
 

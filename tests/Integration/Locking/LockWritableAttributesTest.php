@@ -9,7 +9,7 @@ use Modules\Core\Tests\Stubs\Locking\PartiallyWritableLockModel;
 use Modules\Core\Tests\Stubs\Locking\StrictlyLockedTestModel;
 
 beforeEach(function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     Schema::dropIfExists('lockable_test_models');
     Schema::create('lockable_test_models', function (Blueprint $table): void {

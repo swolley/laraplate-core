@@ -14,14 +14,14 @@ use Throwable;
  * Turns the public CRUD API on for the duration of a callback by writing the
  * database setting the per-request overlay reads.
  *
- * {@see config(['core.expose_crud_api' => true])} is not enough: ApplyDatabaseSettingsOverlay
+ * {@see config(['core.crud.expose_api' => true])} is not enough: ApplyDatabaseSettingsOverlay
  * recopies every module setting from the DB onto the config repository at the start of
  * each HTTP request, so a process-level flip is discarded. Callers that need the API
  * open (perf:crud, Feature tests) go through here instead.
  */
 final class CrudApiExposure
 {
-    private const string SETTING_NAME = 'expose_crud_api';
+    private const string SETTING_NAME = 'crud.expose_api';
 
     private const string SETTING_MODULE = 'Core';
 
@@ -79,7 +79,7 @@ final class CrudApiExposure
                 'module' => self::SETTING_MODULE,
                 'value' => $value,
                 'type' => SettingTypeEnum::Boolean,
-                'group_name' => 'core',
+                'group_name' => 'crud',
                 'description' => 'Expose CRUD API endpoints',
             ]);
         }

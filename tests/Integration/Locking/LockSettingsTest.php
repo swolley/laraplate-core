@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\Traits\HasLocks;
@@ -38,7 +39,7 @@ function writeLockSetting(string $table, bool $enabled): void
     // Written straight to the table: `Setting` carries `HasApprovals`, so a write
     // through the model can land in the approval queue instead of the row, and this
     // test is about the reading side.
-    $name = PerModelSettingResolver::nameFor('lock', $table);
+    $name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::LOCK_NAME_PREFIX, $table);
 
     DB::table(CoreTables::Settings->value)->updateOrInsert(
         ['name' => $name],

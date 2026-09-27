@@ -9,6 +9,7 @@ use function Laravel\Prompts\confirm;
 use function models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Setting;
 use Modules\Core\Overrides\Command;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -101,7 +102,7 @@ final class ModelSoftDeletesRefreshCommand extends Command
             return;
         }
 
-        $name = PerModelSettingResolver::nameFor('soft_deletes', $table);
+        $name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $table);
         $setting = $setting_model->newQuery()->where('name', $name)->first();
 
         if ($setting === null) {

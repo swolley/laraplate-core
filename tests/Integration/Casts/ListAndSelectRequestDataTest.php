@@ -95,7 +95,7 @@ it('list request data handles from-to and limit pagination strategies', function
 });
 
 it('list request data merges filters and computes total pages', function (): void {
-    Setting::query()->create(['name' => 'pagination', 'value' => '7']);
+    Setting::query()->create(['name' => 'crud.pagination', 'value' => '7']);
     $request = new ListRequest;
     $data = new ListRequestData($request, 'setting', ['sort' => []], 'id');
 

@@ -25,7 +25,6 @@ use Modules\Core\Seeding\SeedReconciler;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Support\PermissionName;
-use Modules\ERP\Database\Seeders\ERPDatabaseSeeder;
 use Override;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
@@ -34,19 +33,19 @@ use Spatie\Permission\Models\Role as BaseRole;
 
 final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencies
 {
-    public const VERSIONING_NAME_PREFIX = 'version_strategy';
+    public const VERSIONING_NAME_PREFIX = 'versioning.strategy';
 
-    public const SOFT_DELETES_NAME_PREFIX = 'soft_deletes';
+    public const SOFT_DELETES_NAME_PREFIX = 'soft_deletes.enabled';
 
-    public const LOCK_NAME_PREFIX = 'lock';
+    public const LOCK_NAME_PREFIX = 'locking.enabled';
 
-    public const OPTIMISTIC_LOCK_NAME_PREFIX = 'optimistic_lock';
+    public const OPTIMISTIC_LOCK_NAME_PREFIX = 'locking.optimistic';
 
-    public const TRANSLATION_FALLBACK_NAME_PREFIX = 'translation_fallback';
+    public const TRANSLATION_FALLBACK_NAME_PREFIX = 'translations.locale_fallback';
 
-    public const AUTO_TRANSLATE_NAME_PREFIX = 'auto_translate';
+    public const AUTO_TRANSLATE_NAME_PREFIX = 'translations.auto';
 
-    public const APPROVAL_THRESHOLD_NAME_PREFIX = 'approval_threshold';
+    public const APPROVAL_THRESHOLD_NAME_PREFIX = 'notifications.threshold';
 
     /**
      * @var Collection<string, BaseRole>
@@ -86,24 +85,24 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     public static function runtimeSettingDefinitions(): array
     {
         return [
-            self::setting('auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
-            self::setting('auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
-            self::setting('auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
-            self::setting('auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
-            self::setting('auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
+            self::setting('auth.email_verification.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
+            self::setting('auth.registration.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
+            self::setting('auth.two_factor.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('auth.licenses.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
+            self::setting('auth.social_login.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
             self::setting('locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
-            self::setting('locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
-            self::setting('locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
-            self::setting('dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
-            self::setting('expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
-            self::setting('soft_deletes_expiration_days', 0, SettingTypeEnum::Integer, 'core', 'Days before soft-deleted records are purged (0 = never)'),
-            self::setting('translations.auto_translate_fallback_to_ai', false, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
-            self::setting('translations.cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
-            self::setting('translations.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
-            self::setting('notifications.approvals.enabled', true, SettingTypeEnum::Boolean, 'approvals', 'Enable pending approval notifications'),
-            self::setting('notifications.approvals.channels', ['database'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
-            self::setting('notifications.approvals.default_threshold_hours', 8, SettingTypeEnum::Integer, 'approvals', 'Default hours before pending approval notification'),
-            self::setting('search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
+            self::setting('locking.prevent_modifications', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
+            self::setting('locking.prevent_notifications', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
+            self::setting('crud.dynamic_entities', false, SettingTypeEnum::Boolean, 'crud', 'Enable dynamic entities'),
+            self::setting('crud.expose_api', false, SettingTypeEnum::Boolean, 'crud', 'Expose CRUD API endpoints'),
+            self::setting('soft_deletes.expiration_days', 0, SettingTypeEnum::Integer, 'soft_deletes', 'Days before soft-deleted records are purged (0 = never)'),
+            self::setting('translations.fallback_to_ai', false, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
+            self::setting('translations.cache.enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
+            self::setting('translations.provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
+            self::setting('notifications.enabled', true, SettingTypeEnum::Boolean, 'notifications', 'Enable pending approval notifications'),
+            self::setting('notifications.channels', ['database'], SettingTypeEnum::Json, 'notifications', 'Approval notification channels', ['mail', 'database']),
+            self::setting('notifications.threshold.default', 8, SettingTypeEnum::Integer, 'notifications', 'Default hours before pending approval notification'),
+            self::setting('search.reranker.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
             self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
             self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
             self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
@@ -368,28 +367,28 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'name' => 'default_language',
                 'value' => config('app.locale'),
                 'encrypted' => false,
-                'choices' => null,
+                'choices' => translations(onlyActive: false),
                 'type' => SettingTypeEnum::String,
                 'group_name' => 'core',
-                'description' => 'Lingua default',
+                'description' => 'Default language for the application',
             ],
             [
-                'name' => 'pagination',
+                'name' => 'crud.pagination',
                 'value' => 20,
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::Integer,
-                'group_name' => 'core',
-                'description' => 'Paginazione default chiamate',
+                'group_name' => 'crud',
+                'description' => 'Default pagination for API calls',
             ],
             [
-                'name' => 'max_concurrent_sessions',
+                'name' => 'auth.max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::Integer,
                 'group_name' => 'auth',
-                'description' => 'Numero massimo sessioni simultanee',
+                'description' => 'Maximum number of concurrent sessions',
             ],
         ];
 
@@ -404,7 +403,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             $this->command?->warn("    - skipped {$skipped_class}: capabilities could not be resolved (see log)");
         }
 
-        $default_approval_threshold = (int) config('core.notifications.approvals.default_threshold_hours', 8);
+        $default_approval_threshold = (int) config('core.notifications.threshold.default', 8);
 
         // Group derived settings by the module that actually owns the model
         // they describe, not by the module running this seeder: a MES model's
@@ -586,7 +585,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'encrypted' => false,
                 'choices' => null,
                 'type' => SettingTypeEnum::Integer,
-                'group_name' => 'approvals',
+                'group_name' => 'notifications',
                 'description' => "Hours before notification for pending {$table} approvals",
             ];
         }
@@ -711,7 +710,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'parameters' => [],
                 'schedule' => '@midnight',
                 'description' => 'Resetta assegnazione licenze login a utenti',
-                'is_active' => (bool) config('core.auth.enable_user_licenses', false),
+                'is_active' => (bool) config('core.auth.licenses.enabled', false),
             ],
             [
                 'name' => 'clearResetTokens',

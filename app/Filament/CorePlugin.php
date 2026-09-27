@@ -6,9 +6,7 @@ namespace Modules\Core\Filament;
 
 use Coolsam\Modules\Concerns\ModuleFilamentPlugin;
 use Filament\Contracts\Plugin;
-use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
-use Filament\Support\Icons\Heroicon;
 use Modules\Core\Support\ModuleColor;
 
 final class CorePlugin implements Plugin
@@ -31,9 +29,9 @@ final class CorePlugin implements Plugin
     }
 
     /**
-     * Own the module's presence in the panel instead of having the panel list every
-     * module: the navigation group, its icon and the module colour (registered under the
-     * module id, so widgets can paint with it) are all declared here.
+     * Register the module colour under the module id, so widgets can paint with it.
+     * Unlike the optional modules, Core's navigation group is declared by the panel
+     * itself, right after the application groups.
      */
     public function afterRegister(Panel $panel): void
     {
@@ -42,11 +40,5 @@ final class CorePlugin implements Plugin
         if ($color !== null) {
             $panel->colors([$this->getId() => $color]);
         }
-
-        $panel->navigationGroups([
-            NavigationGroup::make()
-                ->label('Core')
-                ->icon(Heroicon::OutlinedBolt),
-        ]);
     }
 }

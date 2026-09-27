@@ -31,7 +31,7 @@ final class PendingApprovalsNotification extends Notification implements ShouldQ
      */
     public function via(object $notifiable): array
     {
-        return config('core.notifications.approvals.channels', ['mail']);
+        return config('core.notifications.channels', ['mail']);
     }
 
     /**

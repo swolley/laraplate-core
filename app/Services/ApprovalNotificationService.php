@@ -34,7 +34,7 @@ final class ApprovalNotificationService
      */
     public function checkAndNotify(): array
     {
-        if (! config('core.notifications.approvals.enabled', true)) {
+        if (! config('core.notifications.enabled', true)) {
             return ['sent' => false, 'pending_count' => 0, 'entities' => []];
         }
 
@@ -64,7 +64,7 @@ final class ApprovalNotificationService
     public function getPendingApprovalsByEntity(): Collection
     {
         $models = $this->getModelsWithApprovals();
-        $default_threshold = config('core.notifications.approvals.default_threshold_hours', 8);
+        $default_threshold = config('core.notifications.threshold.default', 8);
         $result = collect();
 
         foreach ($models as $table => $model_class) {

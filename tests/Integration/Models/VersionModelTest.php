@@ -73,7 +73,7 @@ it('casts contains expected json and datetime mappings', function (): void {
 });
 
 it('createForModel stores connection and table refs for dynamic entities', function (): void {
-    config()->set('core.dynamic_entities', true);
+    config()->set('core.crud.dynamic_entities', true);
     DynamicEntityService::reset();
 
     $table_name = 'tmp_version_dyn_' . bin2hex(random_bytes(4));

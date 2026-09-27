@@ -45,7 +45,7 @@ final class LogoutOtherDevicesListener
         $this->attempted_guard = null;
         $this->attempted_password = null;
 
-        if ($password === null || ! config('core.auth.enable_user_licenses')) {
+        if ($password === null || ! config('core.auth.licenses.enabled')) {
             return;
         }
 

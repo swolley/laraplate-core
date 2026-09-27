@@ -12,8 +12,8 @@ it('reads locking configuration values from config repository', function (): voi
     config()->set('core.locking.lock_by_column', 'lb');
     config()->set('core.locking.unlock_allowed', false);
     config()->set('core.locking.can_be_unlocked', [PlainLockModel::class]);
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
-    config()->set('core.locking.prevent_notifications_to_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
+    config()->set('core.locking.prevent_notifications', true);
 
     $locked = new Locked;
 

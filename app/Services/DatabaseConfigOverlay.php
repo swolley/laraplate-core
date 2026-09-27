@@ -13,8 +13,8 @@ use Throwable;
  * Copies database settings into the runtime config repository.
  *
  * A setting name carries no module prefix: the declaring module lives in its own column, and the
- * config key is `{module}.{name}` (e.g. module `Core` + `auth.enable_user_2fa` is read as
- * `core.auth.enable_user_2fa`). Rows without a module are not overlaid.
+ * config key is `{module}.{name}` (e.g. module `Core` + `auth.two_factor.enabled` is read as
+ * `core.auth.two_factor.enabled`). Rows without a module are not overlaid.
  */
 final readonly class DatabaseConfigOverlay
 {

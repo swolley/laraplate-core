@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Contracts\ILockableModel;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Services\PerModelSettingResolver;
@@ -106,7 +107,7 @@ trait HasLocks
      * `lock_{table}` setting in the `locking` group, mirroring
      * {@see \Modules\Core\SoftDeletes\SoftDeletes::softDeletesEnabledBySettings()}.
      * A model that declares the property pins the answer in code, which is why
-     * {@see \Modules\Core\Database\Seeders\CoreDatabaseSeeder} seeds no setting for it:
+     * {@see CoreDatabaseSeeder} seeds no setting for it:
      * offering a switch that the code overrules would be a lie.
      *
      * With no row, locking stays on. The columns are only ever added to a table by
@@ -121,7 +122,7 @@ trait HasLocks
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            PerModelSettingResolver::nameFor('lock', $this->getTable()),
+            PerModelSettingResolver::nameFor(CoreDatabaseSeeder::LOCK_NAME_PREFIX, $this->getTable()),
             default: true,
         );
     }

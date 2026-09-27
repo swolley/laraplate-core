@@ -69,10 +69,10 @@ it('invalidates settings on model save via observer', function (): void {
 });
 
 it('syncs runtime config on model save via observer after cache flush', function (): void {
-    config(['core.expose_crud_api' => true]);
+    config(['core.crud.expose_api' => true]);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'expose_crud_api',
+        'name' => 'crud.expose_api',
         'module' => 'Core',
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
@@ -80,13 +80,13 @@ it('syncs runtime config on model save via observer after cache flush', function
         'description' => 'Expose CRUD API endpoints',
     ]);
 
-    expect(config('core.expose_crud_api'))->toBeTrue();
+    expect(config('core.crud.expose_api'))->toBeTrue();
 
     $setting->setForcedApprovalUpdate(true);
     $setting->value = false;
     $setting->save();
 
-    expect(config('core.expose_crud_api'))->toBeFalse();
+    expect(config('core.crud.expose_api'))->toBeFalse();
 });
 
 it('does not sync non-overlay settings onto runtime config when saved', function (): void {
@@ -179,7 +179,7 @@ it('forgets derived settings caches when flushing a setting', function (): void 
 
 it('resets versioning caches when the versioning group is affected', function (): void {
     $versioning_setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'version_strategy.coordinator_test',
+        'name' => 'versioning.strategy.coordinator_test',
         'value' => false,
         'type' => SettingTypeEnum::Json,
         'group_name' => 'versioning',

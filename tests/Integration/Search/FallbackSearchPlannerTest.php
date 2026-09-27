@@ -77,7 +77,7 @@ it('uses larger size for short queries', function (): void {
 });
 
 it('reads reranker config from search config', function (): void {
-    config()->set('core.search.features.reranker', true);
+    config()->set('core.search.reranker.enabled', true);
     config()->set('core.search.reranker.top_k', 50);
 
     $planner = new FallbackSearchPlanner;
@@ -95,7 +95,7 @@ it('enables the reranker by default under the shipped config', function (): void
 });
 
 it('honours the reranker being explicitly disabled', function (): void {
-    config()->set('core.search.features.reranker', false);
+    config()->set('core.search.reranker.enabled', false);
 
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test');

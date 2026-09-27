@@ -56,10 +56,10 @@ it('builds core stats widget data', function (): void {
 });
 
 it('shows the license widget only when user licenses are enabled', function (): void {
-    config(['core.auth.enable_user_licenses' => false]);
+    config(['core.auth.licenses.enabled' => false]);
     expect(CoreStatsWidget::canView())->toBeFalse();
 
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     expect(CoreStatsWidget::canView())->toBeTrue();
 });
 

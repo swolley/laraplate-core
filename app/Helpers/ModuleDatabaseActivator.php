@@ -20,7 +20,7 @@ use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
-    public static string $RECORD_NAME = 'active_modules';
+    public static string $RECORD_NAME = 'modules.active';
 
     /**
      * @var class-string
@@ -115,7 +115,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 'name' => self::$RECORD_NAME,
                 'module' => class_module(self::class),
                 'type' => 'json',
-                'group_name' => 'core',
+                'group_name' => 'modules',
                 'description' => 'application active modules',
                 'seeded_value' => $all_modules,
             ]);
@@ -230,7 +230,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             'choices' => json_encode($all_modules),
             'encrypted' => false,
             'type' => 'json',
-            'group_name' => 'core',
+            'group_name' => 'modules',
             'description' => 'application modules',
             'created_at' => $now,
             'updated_at' => $now,

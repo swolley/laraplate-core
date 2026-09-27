@@ -36,19 +36,19 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
 
     $this->app->instance(ApprovalNotificationService::class, $service);
 
-    config(['core.notifications.approvals.enabled' => false]);
+    config(['core.notifications.enabled' => false]);
 
     if (class_exists(HandleTestContext::class)) {
-        HandleTestContext::$config['core.notifications.approvals.enabled'] = false;
+        HandleTestContext::$config['core.notifications.enabled'] = false;
     }
 
     $disabled = checkPendingApprovalsCommandWithOutput(new CheckPendingApprovalsCommand());
     expect($disabled->run(new ArrayInput([]), new BufferedOutput()))->toBe(0);
 
-    config(['core.notifications.approvals.enabled' => true]);
+    config(['core.notifications.enabled' => true]);
 
     if (class_exists(HandleTestContext::class)) {
-        HandleTestContext::$config['core.notifications.approvals.enabled'] = true;
+        HandleTestContext::$config['core.notifications.enabled'] = true;
     }
 
     Modification::query()->delete();
@@ -72,7 +72,7 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
         ],
     ]);
     Setting::query()->withoutGlobalScopes()->updateOrCreate(
-        ['name' => 'approval_threshold.users'],
+        ['name' => 'notifications.threshold.users'],
         ['group_name' => 'core', 'value' => 1],
     );
     expect($service->getPendingApprovalsByEntity()->isEmpty())->toBeFalse();
@@ -94,7 +94,7 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
 });
 
 it('reports when notifications are sent successfully', function (): void {
-    config(['core.notifications.approvals.enabled' => true]);
+    config(['core.notifications.enabled' => true]);
 
     $service = Mockery::mock(ApprovalNotificationService::class);
     $service->shouldReceive('getPendingApprovalsByEntity')

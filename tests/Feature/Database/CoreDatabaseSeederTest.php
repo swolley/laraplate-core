@@ -57,7 +57,7 @@ it('seeds clearUserAssignedLicenses is_active from the runtime license setting',
     $cron = CronJob::query()->withoutGlobalScopes()->where('name', 'clearUserAssignedLicenses')->first();
 
     expect($cron)->not->toBeNull();
-    expect((bool) $cron->is_active)->toBe((bool) config('core.auth.enable_user_licenses', false));
+    expect((bool) $cron->is_active)->toBe((bool) config('core.auth.licenses.enabled', false));
 });
 
 it('writes model-owned seeder records on the owning model connection', function (): void {

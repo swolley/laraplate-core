@@ -24,10 +24,10 @@ it('keeps runtime setting names within the Setting model name limit', function (
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('auth.enable_user_registration')['value'])->toBeFalse()
-        ->and($definitions->get('auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
-        ->and($definitions->get('translations.auto_translate_provider')['value'])->toBe('deepl')
-        ->and($definitions->get('translations.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
+    expect($definitions->get('auth.registration.enabled')['value'])->toBeFalse()
+        ->and($definitions->get('auth.registration.enabled')['type'])->toBe(SettingTypeEnum::Boolean)
+        ->and($definitions->get('translations.provider')['value'])->toBe('deepl')
+        ->and($definitions->get('translations.provider')['choices'])->toBe(['deepl', 'ai'])
         ->and($definitions->get('search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
 });
 
@@ -46,7 +46,7 @@ it('defines cms and mes runtime settings with current defaults and choices', fun
     $mesDefinitions = collect(MESDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
     expect($cmsDefinitions->get('geocoding.cache_ttl')['value'])->toBe(604800)
-        ->and($mesDefinitions->get('lot_number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
+        ->and($mesDefinitions->get('lots.number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
 });
 
 it('keeps erp company-backed settings selectable where appropriate', function (): void {

@@ -13,10 +13,10 @@ use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
 
 function configureFakeTranslatableFallback(bool $enabled): void
 {
-    Setting::query()->where('name', 'translation_fallback.fake_translatable_models')->forceDelete();
+    Setting::query()->where('name', 'translations.locale_fallback.fake_translatable_models')->forceDelete();
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'translation_fallback.fake_translatable_models',
+        'name' => 'translations.locale_fallback.fake_translatable_models',
         'value' => $enabled,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'translations',

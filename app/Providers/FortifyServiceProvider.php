@@ -145,7 +145,7 @@ final class FortifyServiceProvider extends ServiceProvider
             if ($result['success']) {
                 $this->ensureModuleScope($request, $result['user']);
 
-                if (config('core.auth.enable_user_licenses') && $result['license']) {
+                if (config('core.auth.licenses.enabled') && $result['license']) {
                     session()->put('license_id', $result['license']->id);
 
                     if (isset($result['license']->uuid)) {

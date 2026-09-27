@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Modifications\Schemas\ModificationForm;
 use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
 use Override;
 use UnitEnum;
@@ -34,6 +35,15 @@ final class ModificationResource extends Resource
 
     #[Override]
     protected static ?int $navigationSort = 6;
+
+    /**
+     * Modifications only exist when some active model goes through approvals.
+     */
+    #[Override]
+    public static function canAccess(): bool
+    {
+        return self::hasApprovableModels() && parent::canAccess();
+    }
 
     public static function getSlug(?Panel $panel = null): string
     {
@@ -102,5 +112,12 @@ final class ModificationResource extends Resource
     public static function getForceDeleteAnyAuthorizationResponse(): Response
     {
         return Response::deny('Modifications can only be approved or disapproved.');
+    }
+
+    private static function hasApprovableModels(): bool
+    {
+        return once(static fn (): bool => models(
+            filter: static fn (string $model): bool => class_uses_trait($model, HasApprovals::class),
+        ) !== []);
     }
 }

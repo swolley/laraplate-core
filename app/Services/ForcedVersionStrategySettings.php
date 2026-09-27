@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Concerns\HasVersions;
 use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
@@ -46,7 +47,7 @@ final class ForcedVersionStrategySettings
 
             /** @var Model $model */
             $model = $reflection->newInstanceWithoutConstructor();
-            $names[] = PerModelSettingResolver::nameFor('version_strategy', $model->getTable());
+            $names[] = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::VERSIONING_NAME_PREFIX, $model->getTable());
         }
 
         sort($names);

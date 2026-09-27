@@ -43,7 +43,7 @@ it('clears expired soft-deleted rows when configured and skips when disabled', f
         ClearExpiredModelsNoSoftStub::class,
     ]);
 
-    config(['core.soft_deletes_expiration_days' => 5]);
+    config(['core.soft_deletes.expiration_days' => 5]);
     $command = clearExpiredModelsCommandWithOutput(new ClearExpiredModels);
     $command->handle();
 
@@ -51,7 +51,7 @@ it('clears expired soft-deleted rows when configured and skips when disabled', f
         ->and(ClearExpiredModelsSoftStub::withTrashed()->whereKey(2)->exists())->toBeTrue()
         ->and(ClearExpiredModelsSoftStub::withTrashed()->whereKey(3)->exists())->toBeTrue();
 
-    config(['core.soft_deletes_expiration_days' => null]);
+    config(['core.soft_deletes.expiration_days' => null]);
     $command->handle();
 
     Schema::dropIfExists('clear_expired_no_soft_stubs');

@@ -69,7 +69,7 @@ final class DynamicEntityService
 
         // Cache config value to avoid repeated calls
         if ($this->dynamic_entities_enabled === null) {
-            $this->dynamic_entities_enabled = config('core.dynamic_entities', false);
+            $this->dynamic_entities_enabled = config('core.crud.dynamic_entities', false);
         }
 
         throw_unless($this->dynamic_entities_enabled, UnexpectedValueException::class, 'Dynamic tables mapping is not enabled');

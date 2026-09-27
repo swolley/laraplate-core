@@ -139,7 +139,7 @@ it('jsonSerialize removes bcrypt like string values', function (): void {
 });
 
 it('inspect hydrates metadata from a real table definition', function (): void {
-    config()->set('core.dynamic_entities', true);
+    config()->set('core.crud.dynamic_entities', true);
 
     $table = 'dyn_inspect_' . bin2hex(random_bytes(4));
 
@@ -162,7 +162,7 @@ it('inspect hydrates metadata from a real table definition', function (): void {
 });
 
 it('inspect with relations request resolves reverse relations when tables reference each other', function (): void {
-    config()->set('core.dynamic_entities', true);
+    config()->set('core.crud.dynamic_entities', true);
 
     $parent = 'dyn_parent_' . bin2hex(random_bytes(4));
     $child = 'dyn_child_' . bin2hex(random_bytes(4));
@@ -194,7 +194,7 @@ it('inspect with relations request resolves reverse relations when tables refere
 });
 
 it('verifyTableExistence throws when table is missing', function (): void {
-    config()->set('core.dynamic_entities', true);
+    config()->set('core.crud.dynamic_entities', true);
 
     $method = new ReflectionMethod(DynamicEntity::class, 'verifyTableExistence');
     $method->setAccessible(true);
@@ -312,7 +312,7 @@ it('setReverseRelationInfo adds belongsToMany relation for matching reverse entr
     $source = 'dyn_source_' . bin2hex(random_bytes(4));
 
     try {
-        config()->set('core.dynamic_entities', true);
+        config()->set('core.crud.dynamic_entities', true);
         $entity->setTable($target);
         $entity->setConnection(config('database.default'));
 

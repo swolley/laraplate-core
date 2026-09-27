@@ -20,7 +20,7 @@ trait ValidatesUserAccount
 
     private function checkLicense(User $user): ?string
     {
-        if (! config('core.auth.enable_user_licenses')) {
+        if (! config('core.auth.licenses.enabled')) {
             return null;
         }
 

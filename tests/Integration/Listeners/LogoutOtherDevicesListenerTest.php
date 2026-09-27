@@ -17,7 +17,7 @@ beforeEach(function (): void {
 });
 
 it('ends the other sessions of a password login when licenses are on', function (): void {
-    config()->set('core.auth.enable_user_licenses', true);
+    config()->set('core.auth.licenses.enabled', true);
     Event::fake([OtherDeviceLogout::class]);
 
     expect(Auth::guard('web')->attempt(['email' => $this->user->email, 'password' => 'secret-password']))->toBeTrue();
@@ -27,8 +27,8 @@ it('ends the other sessions of a password login when licenses are on', function 
 });
 
 it('ends the other sessions of a locked user too', function (): void {
-    config()->set('core.auth.enable_user_licenses', true);
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.auth.licenses.enabled', true);
+    config()->set('core.locking.prevent_modifications', true);
     $this->user->lock();
     Event::fake([OtherDeviceLogout::class]);
 
@@ -38,7 +38,7 @@ it('ends the other sessions of a locked user too', function (): void {
 });
 
 it('leaves the other sessions alone when licenses are off', function (): void {
-    config()->set('core.auth.enable_user_licenses', false);
+    config()->set('core.auth.licenses.enabled', false);
     Event::fake([OtherDeviceLogout::class]);
 
     expect(Auth::guard('web')->attempt(['email' => $this->user->email, 'password' => 'secret-password']))->toBeTrue();
@@ -48,7 +48,7 @@ it('leaves the other sessions alone when licenses are off', function (): void {
 });
 
 it('leaves the other sessions alone on a login without a password', function (): void {
-    config()->set('core.auth.enable_user_licenses', true);
+    config()->set('core.auth.licenses.enabled', true);
     Event::fake([OtherDeviceLogout::class]);
 
     Auth::guard('web')->login($this->user);
@@ -58,7 +58,7 @@ it('leaves the other sessions alone on a login without a password', function ():
 });
 
 it('leaves the other sessions of a super admin alone', function (): void {
-    config()->set('core.auth.enable_user_licenses', true);
+    config()->set('core.auth.licenses.enabled', true);
     config()->set('permission.roles.superadmin', 'superadmin');
     $root = AppUser::factory()->create(['password' => 'secret-password']);
     $root->assignRole(Role::findOrCreate('superadmin', 'web'));

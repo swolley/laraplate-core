@@ -32,7 +32,7 @@ final class CheckPendingApprovalsCommand extends Command
      */
     public function handle(ApprovalNotificationService $service): int
     {
-        if (! config('core.notifications.approvals.enabled', true)) {
+        if (! config('core.notifications.enabled', true)) {
             $this->info('Approval notifications are disabled.');
 
             return self::SUCCESS;

@@ -15,15 +15,15 @@ it('loads settings once and reuses them for subsequent lookups', function (): vo
     $resolver = app(PerModelSettingResolver::class);
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'soft_deletes.test_table',
+        'name' => 'soft_deletes.enabled.test_table',
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'moderation',
         'description' => 'test',
     ]);
 
-    expect($resolver->boolean('soft_deletes.test_table', false))->toBeTrue()
-        ->and($resolver->boolean('soft_deletes.test_table', false))->toBeTrue();
+    expect($resolver->boolean('soft_deletes.enabled.test_table', false))->toBeTrue()
+        ->and($resolver->boolean('soft_deletes.enabled.test_table', false))->toBeTrue();
 });
 
 it('returns default when setting is missing', function (): void {
@@ -37,19 +37,19 @@ it('reloads from database after flush', function (): void {
     $resolver = app(PerModelSettingResolver::class);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'auto_translate.test_table',
+        'name' => 'translations.auto.test_table',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'translations',
         'description' => 'test',
     ]);
 
-    expect($resolver->boolean('auto_translate.test_table', true))->toBeFalse();
+    expect($resolver->boolean('translations.auto.test_table', true))->toBeFalse();
 
     Setting::query()->whereKey($setting->id)->update(['value' => true]);
     $resolver->flush();
 
-    expect($resolver->boolean('auto_translate.test_table', false))->toBeTrue();
+    expect($resolver->boolean('translations.auto.test_table', false))->toBeTrue();
 });
 
 it('resolves typed values', function (): void {

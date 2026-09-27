@@ -122,7 +122,7 @@ failure (for example the cross-encoder service being down) is caught, logged as 
 fused order is returned with `meta['reranked'] = false`. Search never fails because of reranking.
 
 A caller can disable it for one search through the plan (`ranking.use_reranker`); otherwise
-`config('core.search.features.reranker')` decides.
+`config('core.search.reranker.enabled')` decides.
 
 ## Response metadata
 
@@ -158,7 +158,7 @@ Consumed at runtime:
 | `core.search.vector.dimensions` | runtime setting | ES `dense_vector` mapping |
 | `core.search.vector.similarity` | runtime setting | ES mapping |
 | `search.analyzers` | `SEARCH_ANALYZER_IT`, `SEARCH_ANALYZER_EN` | per-locale text mappings |
-| `core.search.features.reranker` | runtime setting | `EnsembleSearchService` (plan fallback) |
+| `core.search.reranker.enabled` | runtime setting | `EnsembleSearchService` (plan fallback) |
 | `core.search.reranker.top_k` | runtime setting | `EnsembleSearchService` |
 | `search.text_matching.*` | — | `TextMatchOptionsResolver` |
 

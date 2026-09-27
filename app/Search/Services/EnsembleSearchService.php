@@ -87,7 +87,7 @@ class EnsembleSearchService
 
         $fused = $this->fuseStrategies($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
 
-        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('core.search.features.reranker', true));
+        $use_reranker = (bool) ($ranking['use_reranker'] ?? config('core.search.reranker.enabled', true));
         $default_rerank_top_k = $this->configInt('core.search.reranker.top_k', 30);
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
 

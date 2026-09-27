@@ -96,7 +96,7 @@ Rules that are easy to get wrong:
 `eloquent.saving`, `eloquent.deleting`, `eloquent.replicating`. It refuses a write on a locked record
 unless the acting user is the holder; an ownerless lock matches nobody, which is exactly right.
 
-`core.locking.prevent_modifications_on_locked_objects` is **on by default**
+`core.locking.prevent_modifications` is **on by default**
 (runtime setting in group `locking`). A lock that
 enforces nothing is decoration.
 
@@ -221,7 +221,7 @@ never offer a lease.
 | `core.locking.lease_ttl` | `LOCKING_LEASE_TTL` | `900` | lease lifetime in seconds |
 | `core.locking.unlock_allowed` | runtime setting | `true` | whether locks may be lifted at all |
 | `core.locking.can_be_unlocked` | `LOCKING_CAN_BE_UNLOCKED` | empty | classes exempt when the above is false |
-| `core.locking.prevent_modifications_on_locked_objects` | runtime setting | `true` | whether the guard refuses writes |
+| `core.locking.prevent_modifications` | runtime setting | `true` | whether the guard refuses writes |
 
 ## Commands
 

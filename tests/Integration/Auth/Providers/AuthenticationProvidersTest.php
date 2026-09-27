@@ -68,7 +68,7 @@ it('authenticates credentials and covers invalid and license branches', function
     expect($invalid['success'])->toBeFalse()
         ->and($invalid['error'])->toBe('Invalid credentials or user not allowed to login');
 
-    config(['core.auth.enable_user_licenses' => false]);
+    config(['core.auth.licenses.enabled' => false]);
     $success = $provider->authenticate(request()->duplicate([
         'username' => 'fortify-user',
         'password' => 'secret',
@@ -77,7 +77,7 @@ it('authenticates credentials and covers invalid and license branches', function
         ->and($success['success'])->toBeTrue()
         ->and($success['user'])->toBeInstanceOf(User::class);
 
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     License::query()->delete();
     $license_error = $provider->authenticate(request()->duplicate([
         'email' => 'fortify@example.test',
@@ -88,7 +88,7 @@ it('authenticates credentials and covers invalid and license branches', function
 });
 
 it('lets a super admin in when no license is free', function (): void {
-    config(['core.auth.enable_user_licenses' => true, 'permission.roles.superadmin' => 'superadmin']);
+    config(['core.auth.licenses.enabled' => true, 'permission.roles.superadmin' => 'superadmin']);
     License::query()->delete();
 
     $user = AppUser::factory()->create([
@@ -127,7 +127,7 @@ it('returns email-not-verified and license-available success branches for fortif
         'model_id' => $unverified->id,
     ]);
 
-    config(['core.auth.enable_user_licenses' => false]);
+    config(['core.auth.licenses.enabled' => false]);
     $email_error = $provider->authenticate(request()->duplicate([
         'email' => 'unverified@example.test',
         'password' => 'secret',
@@ -151,7 +151,7 @@ it('returns email-not-verified and license-available success branches for fortif
     ]);
 
     License::factory()->create();
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     $licensed_success = $provider->authenticate(request()->duplicate([
         'email' => 'licensed@example.test',
         'password' => 'secret',
@@ -175,7 +175,7 @@ it('covers fortify private email verification and license helper methods', funct
     ]);
     $verify_user->setRelation('roles', collect());
 
-    config(['core.auth.enable_user_licenses' => false]);
+    config(['core.auth.licenses.enabled' => false]);
     expect($verify_method->invoke($provider, $verify_user))->toBeTrue()
         ->and($check_license_method->invoke($provider, $verify_user))->toBeNull();
 });
@@ -187,11 +187,11 @@ it('handles socialite canHandle and enabled/provider name branches', function ()
     expect($provider->canHandle(request()->duplicate(['provider' => 'github'])))->toBeTrue()
         ->and($provider->canHandle(request()->duplicate(['provider' => 'unknown'])))->toBeFalse();
 
-    config(['core.auth.enable_social_login' => true]);
+    config(['core.auth.social_login.enabled' => true]);
     expect($provider->isEnabled())->toBeTrue()
         ->and($provider->getProviderName())->toBe('social');
 
-    config(['core.auth.enable_social_login' => false]);
+    config(['core.auth.social_login.enabled' => false]);
     expect($provider->isEnabled())->toBeFalse();
 });
 
@@ -251,7 +251,7 @@ it('authenticates social user successfully when data is valid', function (): voi
     Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
 
     expect((new AppUser)->getConnection()->getSchemaBuilder()->hasColumn((new AppUser)->getTable(), 'social_id'))->toBeTrue();
-    config(['core.auth.enable_user_licenses' => false]);
+    config(['core.auth.licenses.enabled' => false]);
     $success = $provider->authenticate(request()->duplicate(['provider' => 'github']));
     expect($success['error'])->toBeNull()
         ->and($success['success'])->toBeTrue()
@@ -276,7 +276,7 @@ it('covers socialite license error and enabled-license success branches', functi
     Socialite::shouldReceive('driver')->twice()->with('github')->andReturn($driver_mock);
 
     License::query()->delete();
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     $license_error = $provider->authenticate(request()->duplicate(['provider' => 'github']));
     expect($license_error['success'])->toBeFalse()
         ->and($license_error['error'])->toBe('No free licenses available');
@@ -305,7 +305,7 @@ it('covers socialite private checkLicense helper', function (): void {
     ])->save();
     $user->setRelation('roles', collect([$role]));
 
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     License::query()->delete();
 
     expect($method->invoke($provider, $user))->toBe('No free licenses available');

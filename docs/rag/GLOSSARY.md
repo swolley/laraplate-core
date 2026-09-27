@@ -119,7 +119,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **LocaleContext**         | Request-scoped active locale resolution.             |
 | **LocaleScope**           | Global scope filtering translatable queries by locale. |
 | **TranslatedModelSaved**  | Event triggering optional auto-translation pipeline. |
-| **auto_translate.{table}**| Per-model setting for post-save translation.         |
+| **translations.auto.{table}**| Per-model setting for post-save translation.         |
 
 
 ## Geo and places
@@ -134,7 +134,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 
 ## Platform settings
 
-| **ForcedVersionStrategySettings** | Core resolver for `version_strategy.{table}` names made non-configurable by a concrete model's hardcoded DIFF property. |
+| **ForcedVersionStrategySettings** | Core resolver for `versioning.strategy.{table}` names made non-configurable by a concrete model's hardcoded DIFF property. |
 
 
 | Term                         | Meaning                                                   |

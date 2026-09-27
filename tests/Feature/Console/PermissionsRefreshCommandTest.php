@@ -8,6 +8,7 @@ use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Console\PermissionsRefreshCommand;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\OutboxEvent;
@@ -456,7 +457,7 @@ it('keeps the verbs when locking is only switched off in settings', function ():
     $unlock_name = permissionNameForModel(PermissionsRefreshLockableModel::class, ActionEnum::Unlock);
 
     DB::table(CoreTables::Settings->value)->updateOrInsert(
-        ['name' => PerModelSettingResolver::nameFor('lock', new PermissionsRefreshLockableModel()->getTable())],
+        ['name' => PerModelSettingResolver::nameFor(CoreDatabaseSeeder::LOCK_NAME_PREFIX, new PermissionsRefreshLockableModel()->getTable())],
         [
             'value' => json_encode(false),
             'encrypted' => false,

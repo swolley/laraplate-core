@@ -175,7 +175,7 @@ it('registers login rate limiter and builds throttle key from username and ip', 
 
 it('authenticates via authentication service and stores license id when enabled', function (): void {
     $this->provider->register();
-    config(['core.auth.enable_user_licenses' => true]);
+    config(['core.auth.licenses.enabled' => true]);
     $user = User::factory()->create();
     $license = (object) ['id' => 99, 'uuid' => 'license-uuid-99'];
     $service = new AuthenticationService([

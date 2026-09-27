@@ -23,7 +23,7 @@ it('soft deletes by default when no setting is defined', function (): void {
 
 it('performs hard delete when soft_deletes setting is disabled for the model table', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'soft_deletes.users',
+        'name' => 'soft_deletes.enabled.users',
         'group_name' => 'soft_deletes',
         'type' => SettingTypeEnum::Boolean,
         'value' => false,
@@ -40,7 +40,7 @@ it('performs hard delete when soft_deletes setting is disabled for the model tab
 
 it('returns false from restore when soft deletes persistence is disabled', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'soft_deletes.users',
+        'name' => 'soft_deletes.enabled.users',
         'group_name' => 'soft_deletes',
         'type' => SettingTypeEnum::Boolean,
         'value' => false,

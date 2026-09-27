@@ -22,7 +22,7 @@ it('reads translation fallback from settings when property is not declared', fun
     $model = new FakeTranslatableModel();
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'translation_fallback.' . $model->getTable(),
+        'name' => 'translations.locale_fallback.' . $model->getTable(),
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'translations',

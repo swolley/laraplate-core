@@ -105,7 +105,7 @@ test('subscriber saving method handles locked model logic', function (): void {
  * and never whose lock it was.
  */
 test('the saving guard blocks an edit on a record held by somebody else', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $owner = User::factory()->create();
     $actor = User::factory()->create();
@@ -121,7 +121,7 @@ test('the saving guard blocks an edit on a record held by somebody else', functi
 });
 
 test('the saving guard lets the holder of the lease edit the record', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $actor = User::factory()->create();
     Auth::login($actor);
@@ -137,7 +137,7 @@ test('the saving guard lets the holder of the lease edit the record', function (
 });
 
 test('a locked user can still sign in with remember me', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $user = User::factory()->create(['password' => 'secret-password']);
     $user->lock();
@@ -147,7 +147,7 @@ test('a locked user can still sign in with remember me', function (): void {
 });
 
 test('a locked user can still sign in when the password needs a rehash', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $user = User::factory()->create();
     $stale_hash = Hash::make('secret-password', ['rounds' => 5]);
@@ -160,7 +160,7 @@ test('a locked user can still sign in when the password needs a rehash', functio
 });
 
 test('a locked user still refuses a password change outside the login rehash', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $target = User::factory()->create();
     $target->lock();
@@ -172,7 +172,7 @@ test('a locked user still refuses a password change outside the login rehash', f
 });
 
 test('a locked user still refuses an edit mixed with auth bookkeeping', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $target = User::factory()->create();
     $target->lock();
@@ -185,7 +185,7 @@ test('a locked user still refuses an edit mixed with auth bookkeeping', function
 });
 
 test('the deleting guard blocks a frozen record and spares the lease holder', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $actor = User::factory()->create();
     Auth::login($actor);
@@ -241,7 +241,7 @@ test('subscriber helper method handles array parameters', function (): void {
 });
 
 test('a system write says out loud that it is bypassing the lease', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $owner = User::factory()->create();
     $target = User::factory()->create();
@@ -267,7 +267,7 @@ test('a system write says out loud that it is bypassing the lease', function ():
 });
 
 test('the guard is back on after the bypass, including when it throws', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $owner = User::factory()->create();
     $target = User::factory()->create();
@@ -283,7 +283,7 @@ test('the guard is back on after the bypass, including when it throws', function
 });
 
 test('a nested bypass does not switch the guard back on halfway through', function (): void {
-    config()->set('core.locking.prevent_modifications_on_locked_objects', true);
+    config()->set('core.locking.prevent_modifications', true);
 
     $inner_saw_suspended = Locked::withoutGuard(fn (): bool => Locked::withoutGuard(
         fn (): bool => Locked::guardIsSuspended(),

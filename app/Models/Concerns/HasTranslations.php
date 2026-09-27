@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use LogicException;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Setting;
@@ -342,7 +343,7 @@ trait HasTranslations
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            PerModelSettingResolver::nameFor('translation_fallback', $this->getTable()),
+            PerModelSettingResolver::nameFor(CoreDatabaseSeeder::TRANSLATION_FALLBACK_NAME_PREFIX, $this->getTable()),
             default: true,
         );
     }
@@ -359,7 +360,7 @@ trait HasTranslations
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            PerModelSettingResolver::nameFor('auto_translate', $this->getTable()),
+            PerModelSettingResolver::nameFor(CoreDatabaseSeeder::AUTO_TRANSLATE_NAME_PREFIX, $this->getTable()),
             default: false,
         );
     }
@@ -421,6 +422,7 @@ trait HasTranslations
         static::updated(function (Model $model): void {
             // Only translate if default translation was modified
             $default_locale = config('app.locale');
+
             /** @var self $model */
             $default_translation = $model->getTranslation(is_string($default_locale) ? $default_locale : null);
 

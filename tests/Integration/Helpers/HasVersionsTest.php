@@ -200,7 +200,7 @@ it('uses prefixed grouped settings cache key when resolving version strategy', f
         ->persistedWithoutApprovalCapture()
         ->create([
             'group_name' => 'versioning',
-            'name' => 'version_strategy.users',
+            'name' => 'versioning.strategy.users',
             'value' => 'DIFF',
         ]);
 
@@ -245,7 +245,7 @@ it('invalidates the versioning group settings cache when a versioning Setting is
 
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
-        ->make(['group_name' => 'versioning', 'name' => 'version_strategy.' . fake()->unique()->lexify('????????')]);
+        ->make(['group_name' => 'versioning', 'name' => 'versioning.strategy.' . fake()->unique()->lexify('????????')]);
 
     $setting->setSkipValidation(true);
     $setting->setForcedApprovalUpdate(true);
@@ -262,7 +262,7 @@ it('invalidates the versioning group settings cache when a versioning Setting is
 
     $setting = Modules\Core\Models\Setting::factory()
         ->persistedWithoutApprovalCapture()
-        ->make(['group_name' => 'versioning', 'name' => 'version_strategy.' . fake()->unique()->lexify('????????')]);
+        ->make(['group_name' => 'versioning', 'name' => 'versioning.strategy.' . fake()->unique()->lexify('????????')]);
 
     $setting->setSkipValidation(true);
     $setting->setForcedApprovalUpdate(true);

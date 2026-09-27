@@ -64,7 +64,7 @@ final class EventServiceProvider extends ServiceProvider
     #[Override]
     public function boot(): void
     {
-        // The lock guard was written but never wired up, so `prevent_modifications_on_locked_objects`
+        // The lock guard was written but never wired up, so `locking.prevent_modifications`
         // enforced nothing: a record locked by one user could be saved, deleted or replicated by
         // anybody. Subscribing it here is what makes the setting mean something. It stays off by
         // default, so nothing changes for a deployment that has not asked for it.

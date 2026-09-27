@@ -54,7 +54,7 @@ final readonly class FallbackSearchPlanner implements ISearchPlanner
                 'rrf_weight' => 0.25,
             ],
             'ranking' => [
-                'use_reranker' => (bool) config('core.search.features.reranker', true),
+                'use_reranker' => (bool) config('core.search.reranker.enabled', true),
                 'rerank_top_k' => (int) config('core.search.reranker.top_k', 30),
             ],
             'vector' => [

@@ -187,7 +187,7 @@ final class Locked
     /**
      * Whether saves, deletes, and replicates on locked models should be blocked.
      *
-     * Config: core.locking.prevent_modifications_on_locked_objects (runtime setting, DB overlay).
+     * Config: core.locking.prevent_modifications (runtime setting, DB overlay).
      * Used by {@see LockedModelSubscriber} on eloquent.saving, eloquent.deleting, eloquent.replicating.
      *
      * **On by default.** A lock that enforces nothing is decoration: with this off, a record one
@@ -202,7 +202,7 @@ final class Locked
                 return true;
             }
 
-            return config('core.locking.prevent_modifications_on_locked_objects', true);
+            return config('core.locking.prevent_modifications', true);
         } catch (Throwable) {
             return true;
         }
@@ -217,7 +217,7 @@ final class Locked
     }
 
     /**
-     * Reads core.locking.prevent_notifications_to_locked_objects (name is misleading: returns the "prevent" flag, not "allow").
+     * Reads core.locking.prevent_notifications (name is misleading: returns the "prevent" flag, not "allow").
      *
      * Used by {@see LockedModelSubscriber::notificationSending()}: when this returns true, the listener returns false
      * and cancels the notification before checking whether the notifiable is locked.
@@ -230,7 +230,7 @@ final class Locked
                 return false;
             }
 
-            return config('core.locking.prevent_notifications_to_locked_objects', false);
+            return config('core.locking.prevent_notifications', false);
         } catch (Throwable) {
             return false;
         }

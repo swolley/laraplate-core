@@ -14,7 +14,7 @@ use Modules\Core\Notifications\PendingApprovalsNotification;
 use Modules\Core\Services\ApprovalNotificationService;
 
 it('returns early when approvals notifications are disabled', function (): void {
-    Config::set('core.notifications.approvals.enabled', false);
+    Config::set('core.notifications.enabled', false);
 
     $service = new ApprovalNotificationService();
 
@@ -65,7 +65,7 @@ it('checkAndNotify returns sent=false when no pending approvals are found', func
 });
 
 it('getPendingApprovalsByEntity returns entities over threshold and sorts by count', function (): void {
-    Config::set('core.notifications.approvals.default_threshold_hours', 8);
+    Config::set('core.notifications.threshold.default', 8);
 
     $service = new ApprovalNotificationService();
 
@@ -161,7 +161,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
 
 it('checkAndNotify sends notification when pending approvals exist', function (): void {
     Notification::fake();
-    Config::set('core.notifications.approvals.default_threshold_hours', 1);
+    Config::set('core.notifications.threshold.default', 1);
     Config::set('core.notifications.approvals.recipients.roles', ['approval_admin']);
 
     /** @var Role $role */
@@ -204,7 +204,7 @@ it('checkAndNotify sends notification when pending approvals exist', function ()
 
 it('getThresholdForTable returns the stored setting value', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'approval_threshold.posts',
+        'name' => 'notifications.threshold.posts',
         'value' => '48',
         'type' => SettingTypeEnum::String,
     ]);

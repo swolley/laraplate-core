@@ -150,7 +150,7 @@ TTL expires.
 
 These are registered in `routes/web.php`, not in the shared `routes/crud.php`. They are
 therefore reachable on the session-based `/app` surface only and are never exposed on
-`/api/v1`, regardless of `core.expose_crud_api`.
+`/api/v1`, regardless of `core.crud.expose_api`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|

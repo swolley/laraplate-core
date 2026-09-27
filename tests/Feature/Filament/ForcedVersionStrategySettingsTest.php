@@ -13,10 +13,10 @@ uses(RefreshDatabase::class);
 
 it('hides historical settings for models with class-forced DIFF strategy', function (): void {
     $resolver = app(ForcedVersionStrategySettings::class);
-    expect($resolver->names())->toContain('version_strategy.erp_accounts');
+    expect($resolver->names())->toContain('versioning.strategy.erp_accounts');
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'version_strategy.erp_accounts', 'value' => 'snapshot',
+        'name' => 'versioning.strategy.erp_accounts', 'value' => 'snapshot',
         'type' => SettingTypeEnum::String, 'group_name' => 'versioning',
         'description' => 'Historical stale setting',
     ]);
@@ -28,6 +28,6 @@ it('hides historical settings for models with class-forced DIFF strategy', funct
 
     expect(SettingResource::getEloquentQuery()->pluck('name')->all())
         ->toContain('visible_test_setting')
-        ->not->toContain('version_strategy.erp_accounts')
+        ->not->toContain('versioning.strategy.erp_accounts')
         ->and(SettingResource::form(Schema::make()))->toBeInstanceOf(Schema::class);
 });

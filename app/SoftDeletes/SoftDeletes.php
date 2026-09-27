@@ -9,6 +9,7 @@ use function property_exists;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\Services\PerModelSettingResolver;
 
@@ -78,7 +79,7 @@ trait SoftDeletes
         }
 
         return app(PerModelSettingResolver::class)->boolean(
-            PerModelSettingResolver::nameFor('soft_deletes', $this->getTable()),
+            PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $this->getTable()),
             default: true,
         );
     }

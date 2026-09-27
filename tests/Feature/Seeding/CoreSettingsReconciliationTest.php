@@ -23,7 +23,7 @@ use Modules\Core\Support\PermissionName;
 it('seeds per-model capability settings with the resolver naming', function (): void {
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $name = PerModelSettingResolver::nameFor('version_strategy', (new Setting)->getTable());
+    $name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::VERSIONING_NAME_PREFIX, (new Setting)->getTable());
 
     expect(Setting::query()->withoutGlobalScopes()->where('name', $name)->exists())->toBeTrue();
 });
@@ -32,7 +32,7 @@ it('stamps a derived setting with the module that owns the model, not Core', fun
     // HasVersions/SoftDeletes are baked into every model via the shared
     // Modules\Core\Overrides\Model base class (see the neighboring test's
     // comment), so any model outside Modules\Core is guaranteed to produce a
-    // version_strategy_{table} row. Discover one dynamically instead of
+    // versioning.strategy.{table} row. Discover one dynamically instead of
     // hardcoding a module name, so this does not rot if module contents change.
     $foreign = collect(app(ModelCapabilityScanner::class)->scan())
         ->first(fn ($capability): bool => str_starts_with($capability->modelClass, 'Modules\\')
@@ -41,7 +41,7 @@ it('stamps a derived setting with the module that owns the model, not Core', fun
     expect($foreign)->not->toBeNull('Expected at least one non-Core module model to be scannable.');
 
     $owning_module = explode('\\', $foreign->modelClass)[1];
-    $name = PerModelSettingResolver::nameFor('version_strategy', $foreign->table);
+    $name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::VERSIONING_NAME_PREFIX, $foreign->table);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
@@ -114,15 +114,15 @@ it('is idempotent and leaves operator values untouched on a second run', functio
     // so this assertion is only satisfied if the operator value genuinely
     // survives that realignment rather than coinciding with it.
     Setting::query()->withoutGlobalScopes()
-        ->where('name', 'pagination')
+        ->where('name', 'crud.pagination')
         ->update(['value' => json_encode(999), 'description' => 'drifted description']);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'crud.pagination')->sole();
 
     expect($setting->value)->toBe(999)
-        ->and($setting->description)->toBe('Paginazione default chiamate');
+        ->and($setting->description)->toBe('Default pagination for API calls');
 });
 
 it('marks every seeded setting as internal and realigns rows written before the flag', function (): void {
@@ -131,12 +131,12 @@ it('marks every seeded setting as internal and realigns rows written before the 
     expect(Setting::query()->withoutGlobalScopes()->where('is_internal', false)->exists())->toBeFalse();
 
     Setting::query()->withoutGlobalScopes()
-        ->where('name', 'pagination')
+        ->where('name', 'crud.pagination')
         ->update(['is_internal' => false, 'value' => json_encode(999)]);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'crud.pagination')->sole();
 
     expect($setting->is_internal)->toBeTrue()
         ->and($setting->value)->toBe(999);
@@ -164,7 +164,7 @@ it('seeds a guest ACL that limits settings reads to public ones', function (): v
     expect($acl->unrestricted)->toBeFalse()
         ->and($acl->is_active)->toBeTrue()
         ->and($acl->filters->toArray())->toBe((new FiltersGroup([
-            new Filter($setting->getTable().'.is_public', true, FilterOperator::Equals),
+            new Filter($setting->getTable() . '.is_public', true, FilterOperator::Equals),
         ]))->toArray());
 
     $guest_user = User::factory()->create();
@@ -196,7 +196,7 @@ it('no longer force-deletes settings during a run', function (): void {
     //
     // (HasVersions and SoftDeletes are baked into every model via the
     // shared Modules\Core\Overrides\Model base class — see its trait list —
-    // so version_strategy_* / soft_deletes_* settings are always claimed
+    // so versioning.strategy.* / soft_deletes.enabled.* settings are always claimed
     // and cannot be used to build this scenario.)
     //
     // Setting::query()->forceCreate() silently no-ops in this codebase:

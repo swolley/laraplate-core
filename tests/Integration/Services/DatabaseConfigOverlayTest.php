@@ -27,25 +27,25 @@ it('overlays settings under the namespace of the module that declares them', fun
 
     $overlay->applySettings(new Collection([
         (object) ['name' => 'features.faq.enabled', 'module' => 'AI', 'value' => false],
-        (object) ['name' => 'soft_deletes.core_users', 'module' => 'Core', 'value' => true],
+        (object) ['name' => 'soft_deletes.enabled.core_users', 'module' => 'Core', 'value' => true],
     ]));
 
     expect($config->get('ai.features.faq.enabled'))->toBeFalse()
-        ->and($config->get('core.soft_deletes.core_users'))->toBeTrue()
+        ->and($config->get('core.soft_deletes.enabled.core_users'))->toBeTrue()
         ->and($config->has('features.faq.enabled'))->toBeFalse();
 });
 
 it('applies a single setting model onto runtime config', function (): void {
     $config = new Repository([
         'core' => [
-            'expose_crud_api' => true,
+            'crud.expose_api' => true,
         ],
     ]);
 
     $overlay = new DatabaseConfigOverlay($config);
 
     $setting = new Setting([
-        'name' => 'expose_crud_api',
+        'name' => 'crud.expose_api',
         'module' => 'Core',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
@@ -54,7 +54,7 @@ it('applies a single setting model onto runtime config', function (): void {
 
     $overlay->applySetting($setting);
 
-    expect($config->get('core.expose_crud_api'))->toBeFalse();
+    expect($config->get('core.crud.expose_api'))->toBeFalse();
 });
 
 it('does not apply settings that no module declares', function (): void {
@@ -75,7 +75,7 @@ it('does not apply settings that no module declares', function (): void {
 });
 
 it('builds the config key from the module and the setting name', function (): void {
-    expect(DatabaseConfigOverlay::configKey('Core', 'auth.enable_user_registration'))->toBe('core.auth.enable_user_registration')
+    expect(DatabaseConfigOverlay::configKey('Core', 'auth.registration.enabled'))->toBe('core.auth.registration.enabled')
         ->and(DatabaseConfigOverlay::configKey('Billing', 'invoices.auto_post'))->toBe('billing.invoices.auto_post')
         ->and(DatabaseConfigOverlay::configKey(null, 'default_language'))->toBeNull()
         ->and(DatabaseConfigOverlay::configKey('', 'default_language'))->toBeNull()

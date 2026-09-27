@@ -24,7 +24,7 @@ it('reads auto translate from settings when property is not declared', function 
     $model = new FakeTranslatableModel();
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'auto_translate.' . $model->getTable(),
+        'name' => 'translations.auto.' . $model->getTable(),
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'translations',

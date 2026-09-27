@@ -171,7 +171,7 @@ it('writes soft-delete settings through the Setting model connection', function 
     try {
         expect($method->invoke($command, 'affinity_table', true))->toBeTrue()
             ->and(DB::connection('soft_delete_affinity')->table(CoreTables::Settings->value)
-                ->where('name', 'soft_deletes.affinity_table')
+                ->where('name', 'soft_deletes.enabled.affinity_table')
                 ->exists())->toBeTrue();
     } finally {
         Model::setConnectionResolver($resolver);

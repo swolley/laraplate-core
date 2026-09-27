@@ -31,7 +31,7 @@ final class ClearExpiredModels extends Command
      */
     public function handle(): void
     {
-        $expirationDays = config('core.soft_deletes_expiration_days');
+        $expirationDays = config('core.soft_deletes.expiration_days');
 
         if ($expirationDays) {
             foreach (models() as $model) {

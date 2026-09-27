@@ -27,7 +27,7 @@ Full technical detail (extra diagrams): `Modules/Core/docs/EVENT_ORCHESTRATION.m
 - Core owns events, cache coordination, finalize/fallback listeners.
 - Domain modules register adapters (e.g. CMS `CommentModerationAdapter` on `ModerationAdapterRegistry`).
 - AI never imports CMS/ERP; it resolves context via the registry.
-- Opt-in per model: `auto_translate.{table}`; AI moderation per entity via the AI module's `ai.features.moderation.entities.{table}`; search via `Searchable` + `$embed`.
+- Opt-in per model: `translations.auto.{table}`; AI moderation per entity via the AI module's `ai.features.moderation.entities.{table}`; search via `Searchable` + `$embed`.
 
 ## InternalFlow — search indexing
 
@@ -60,7 +60,7 @@ Models with `Modules\Core\Search\Traits\Searchable` call `queueMakeSearchable()`
 |-------|------|
 | Scout | `SCOUT_DRIVER`, `core.search.vector.enabled`, model `$embed` |
 | AI | `ai.features.embeddings.enabled` |
-| Per model | `auto_translate.{table}` via `PerModelSettingResolver` |
+| Per model | `translations.auto.{table}` via `PerModelSettingResolver` |
 
 ## InternalFlow — modification moderation
 
@@ -108,7 +108,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 
 1. Add `Searchable`, implement `toSearchableArray()` / `$embed`.
 2. Enable `ai.features.embeddings.enabled` and provider.
-3. Optionally `auto_translate.{table}`.
+3. Optionally `translations.auto.{table}`.
 
 ### New moderatable model
 

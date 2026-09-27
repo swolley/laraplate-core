@@ -10,7 +10,7 @@ use Modules\Core\Observers\UserObserver;
 
 it('created sends verification email when config enabled and user unverified', function (): void {
     Notification::fake();
-    config()->set('core.auth.verify_new_user', true);
+    config()->set('core.auth.email_verification.enabled', true);
 
     $user = User::factory()->create(['email_verified_at' => null]);
 
@@ -19,7 +19,7 @@ it('created sends verification email when config enabled and user unverified', f
 
 it('created does not send verification email when config disabled', function (): void {
     Notification::fake();
-    config()->set('core.auth.verify_new_user', false);
+    config()->set('core.auth.email_verification.enabled', false);
 
     $user = User::factory()->create(['email_verified_at' => null]);
 
@@ -28,7 +28,7 @@ it('created does not send verification email when config disabled', function ():
 
 it('created does not send verification email when user already verified', function (): void {
     Notification::fake();
-    config()->set('core.auth.verify_new_user', true);
+    config()->set('core.auth.email_verification.enabled', true);
 
     $user = User::factory()->create(['email_verified_at' => now()]);
 
@@ -36,7 +36,7 @@ it('created does not send verification email when user already verified', functi
 });
 
 it('deleted observer clears license_id when licenses enabled', function (): void {
-    config()->set('core.auth.enable_user_licenses', true);
+    config()->set('core.auth.licenses.enabled', true);
 
     $license = License::factory()->create();
     $user = User::factory()->create(['license_id' => $license->id]);
@@ -51,7 +51,7 @@ it('deleted observer clears license_id when licenses enabled', function (): void
 });
 
 it('deleted observer skips when licenses disabled', function (): void {
-    config()->set('core.auth.enable_user_licenses', false);
+    config()->set('core.auth.licenses.enabled', false);
 
     $license = License::factory()->create();
     $user = User::factory()->create(['license_id' => $license->id]);

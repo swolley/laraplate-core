@@ -37,7 +37,7 @@ final class Media extends BaseMedia implements ISoftDeletableModel
 
     protected function getExpiresAtAttribute(): ?Carbon
     {
-        $expirationDays = config('core.soft_deletes_expiration_days');
+        $expirationDays = config('core.soft_deletes.expiration_days');
 
         return $this->trashed() && $expirationDays ? $this->{self::getDeletedAtColumn()}->addDays($expirationDays) : null;
     }

@@ -7,6 +7,8 @@ use Filament\Facades\Filament;
 use Livewire\Livewire;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
+use Modules\Core\Helpers\HelpersCache;
+use Modules\Core\Models\License;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
@@ -45,7 +47,7 @@ function pendingSettingModification(User $author): array
         'is_update' => true,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
-        'md5' => md5('panel-vote-'.uniqid()),
+        'md5' => md5('panel-vote-' . uniqid()),
         'modifications' => [
             'value' => ['original' => 'original', 'modified' => 'changed'],
         ],
@@ -132,4 +134,25 @@ it('shows the pending change read-only', function (): void {
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
             ),
         ]);
+});
+
+it('hides modifications when no active model goes through approvals', function (): void {
+    modificationPanelUser();
+    HelpersCache::setModels('active', [License::class]);
+
+    try {
+        expect(ModificationResource::canAccess())->toBeFalse();
+
+        Livewire::test(ListModifications::class)->assertForbidden();
+    } finally {
+        HelpersCache::clearModels();
+    }
+});
+
+it('shows modifications when an active model goes through approvals', function (): void {
+    modificationPanelUser();
+
+    expect(ModificationResource::canAccess())->toBeTrue();
+
+    Livewire::test(ListModifications::class)->assertOk();
 });
