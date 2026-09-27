@@ -49,7 +49,8 @@ class Seeder extends BaseSeeder
      * Reconcile definition for the settings a first-party module ships.
      *
      * Every row is stamped `is_internal = true`, and the flag is structural so a
-     * re-seed realigns rows written before it existed.
+     * re-seed realigns rows written before it existed. `group_name` is written on
+     * insert only: operators regroup settings freely and a re-seed keeps their choice.
      *
      * @param  list<array<string,mixed>>  $rows
      */
@@ -57,7 +58,7 @@ class Seeder extends BaseSeeder
     {
         return SeedDefinition::for(Setting::class)
             ->identity(['name'])
-            ->structural(['type', 'group_name', 'description', 'choices', 'is_internal'])
+            ->structural(['type', 'description', 'choices', 'is_internal'])
             ->initial(['value'])
             ->ownedBy($module)
             ->rows(array_map(

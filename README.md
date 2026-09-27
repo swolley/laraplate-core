@@ -424,12 +424,17 @@ model:
 $outcome = app(SeedReconciler::class)->reconcile(
     SeedDefinition::for(Setting::class)
         ->identity(['name'])
-        ->structural(['type', 'group_name', 'description', 'choices'])
+        ->structural(['type', 'description', 'choices', 'is_internal'])
         ->initial(['value'])
         ->ownedBy('Core')
         ->rows($defaultSettings),
 );
 ```
+
+First-party module seeders build this exact definition through
+`Seeder::internalSettingsDefinition($module, $rows)`, which also stamps `is_internal = true`.
+`group_name` is deliberately not structural: it is written when the row is created and then
+belongs to the operator, so a re-seed never undoes a regrouping done in the panel.
 
 - **`identity`** must be exactly one column. A composite identity would need one `OR` clause per
   row, which defeats the fixed query budget the reconciler exists to provide;
