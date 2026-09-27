@@ -10,10 +10,11 @@ use Modules\Core\Models\Setting;
 use Throwable;
 
 /**
- * Copies database settings whose names use Laravel dot notation into the runtime config repository.
+ * Copies database settings into the runtime config repository.
  *
- * Application settings (e.g. default_language, version_strategy_core_users) stay resolver-only
- * and are excluded because they do not contain a dot.
+ * A setting name carries no module prefix: the declaring module lives in its own column, and the
+ * config key is `{module}.{name}` (e.g. module `Core` + `auth.enable_user_2fa` is read as
+ * `core.auth.enable_user_2fa`). Rows without a module are not overlaid.
  */
 final readonly class DatabaseConfigOverlay
 {
@@ -21,9 +22,13 @@ final readonly class DatabaseConfigOverlay
         private Repository $config,
     ) {}
 
-    public static function shouldOverlay(string $name): bool
+    public static function configKey(?string $module, string $name): ?string
     {
-        return $name !== '' && str_contains($name, '.');
+        if ($module === null || $module === '' || $name === '') {
+            return null;
+        }
+
+        return mb_strtolower($module) . '.' . $name;
     }
 
     public function applyFromDatabase(PerModelSettingResolver $settings): void
@@ -53,13 +58,14 @@ final readonly class DatabaseConfigOverlay
     public function applySettings(iterable $settings): void
     {
         foreach ($settings as $setting) {
-            $name = (string) data_get($setting, 'name');
+            $module = data_get($setting, 'module');
+            $key = self::configKey(is_string($module) ? $module : null, (string) data_get($setting, 'name'));
 
-            if (! self::shouldOverlay($name)) {
+            if ($key === null) {
                 continue;
             }
 
-            $this->config->set($name, data_get($setting, 'value'));
+            $this->config->set($key, data_get($setting, 'value'));
         }
     }
 
@@ -68,10 +74,12 @@ final readonly class DatabaseConfigOverlay
      */
     public function applySetting(Setting $setting): void
     {
-        if (! self::shouldOverlay($setting->name)) {
+        $key = self::configKey($setting->module, $setting->name);
+
+        if ($key === null) {
             return;
         }
 
-        $this->config->set($setting->name, $setting->value);
+        $this->config->set($key, $setting->value);
     }
 }

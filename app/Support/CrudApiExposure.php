@@ -15,13 +15,15 @@ use Throwable;
  * database setting the per-request overlay reads.
  *
  * {@see config(['core.expose_crud_api' => true])} is not enough: ApplyDatabaseSettingsOverlay
- * recopies every dotted setting from the DB onto the config repository at the start of
+ * recopies every module setting from the DB onto the config repository at the start of
  * each HTTP request, so a process-level flip is discarded. Callers that need the API
  * open (perf:crud, Feature tests) go through here instead.
  */
 final class CrudApiExposure
 {
-    private const string SETTING_NAME = 'core.expose_crud_api';
+    private const string SETTING_NAME = 'expose_crud_api';
+
+    private const string SETTING_MODULE = 'Core';
 
     /**
      * @template TReturn
@@ -34,7 +36,7 @@ final class CrudApiExposure
      */
     public static function runEnabled(callable $callback): mixed
     {
-        $existing = Setting::query()->where('name', self::SETTING_NAME)->first();
+        $existing = Setting::query()->where('module', self::SETTING_MODULE)->where('name', self::SETTING_NAME)->first();
         $previous = $existing?->value;
         $created = $existing === null;
 
@@ -44,7 +46,7 @@ final class CrudApiExposure
             return $callback();
         } finally {
             if ($created) {
-                Setting::query()->where('name', self::SETTING_NAME)->delete();
+                Setting::query()->where('module', self::SETTING_MODULE)->where('name', self::SETTING_NAME)->delete();
                 self::flushCaches();
             } else {
                 self::write($previous);
@@ -65,7 +67,7 @@ final class CrudApiExposure
 
     private static function write(mixed $value): void
     {
-        $setting = Setting::query()->where('name', self::SETTING_NAME)->first();
+        $setting = Setting::query()->where('module', self::SETTING_MODULE)->where('name', self::SETTING_NAME)->first();
 
         if ($setting instanceof Setting) {
             $setting->setSkipValidation(true);
@@ -74,6 +76,7 @@ final class CrudApiExposure
         } else {
             Setting::factory()->persistedWithoutApprovalCapture()->create([
                 'name' => self::SETTING_NAME,
+                'module' => self::SETTING_MODULE,
                 'value' => $value,
                 'type' => SettingTypeEnum::Boolean,
                 'group_name' => 'core',

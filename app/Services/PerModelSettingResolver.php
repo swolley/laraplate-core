@@ -30,13 +30,13 @@ final class PerModelSettingResolver
     /**
      * Build the canonical name of a per-model setting.
      *
-     * Every writer and reader must go through this method: the prefix constants
-     * are declared both with and without a trailing underscore, and building the
-     * name by hand produced three incompatible spellings for the same setting.
+     * Every writer and reader must go through this method: the name is
+     * `{capability}.{table}` (e.g. `soft_deletes.cms_contents`), whatever trailing
+     * separator the caller's prefix carries.
      */
     public static function nameFor(string $prefix, string $table): string
     {
-        return mb_rtrim($prefix, '_.') . '_' . $table;
+        return mb_rtrim($prefix, '_.') . '.' . $table;
     }
 
     public static function cacheKey(): string

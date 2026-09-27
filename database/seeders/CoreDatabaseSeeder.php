@@ -34,17 +34,19 @@ use Spatie\Permission\Models\Role as BaseRole;
 
 final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencies
 {
-    public const VERSIONING_NAME_PREFIX = 'version_strategy_';
+    public const VERSIONING_NAME_PREFIX = 'version_strategy';
 
-    public const SOFT_DELETES_NAME_PREFIX = 'soft_deletes_';
+    public const SOFT_DELETES_NAME_PREFIX = 'soft_deletes';
 
-    public const LOCK_NAME_PREFIX = 'lock_';
+    public const LOCK_NAME_PREFIX = 'lock';
 
-    public const OPTIMISTIC_LOCK_NAME_PREFIX = 'optimistic_lock_';
+    public const OPTIMISTIC_LOCK_NAME_PREFIX = 'optimistic_lock';
 
-    public const TRANSLATION_FALLBACK_NAME_PREFIX = 'translation_fallback_';
+    public const TRANSLATION_FALLBACK_NAME_PREFIX = 'translation_fallback';
 
-    public const AUTO_TRANSLATE_NAME_PREFIX = 'auto_translate_';
+    public const AUTO_TRANSLATE_NAME_PREFIX = 'auto_translate';
+
+    public const APPROVAL_THRESHOLD_NAME_PREFIX = 'approval_threshold';
 
     /**
      * @var Collection<string, BaseRole>
@@ -84,28 +86,28 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     public static function runtimeSettingDefinitions(): array
     {
         return [
-            self::setting('core.auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
-            self::setting('core.auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
-            self::setting('core.auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
-            self::setting('core.auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
-            self::setting('core.auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
-            self::setting('core.locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
-            self::setting('core.locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
-            self::setting('core.locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
-            self::setting('core.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
-            self::setting('core.expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
-            self::setting('core.soft_deletes_expiration_days', 0, SettingTypeEnum::Integer, 'core', 'Days before soft-deleted records are purged (0 = never)'),
-            self::setting('core.translations.auto_translate_fallback_to_ai', false, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
-            self::setting('core.translations.cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
-            self::setting('core.translations.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
-            self::setting('core.notifications.approvals.enabled', true, SettingTypeEnum::Boolean, 'approvals', 'Enable pending approval notifications'),
-            self::setting('core.notifications.approvals.channels', ['database'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
-            self::setting('core.notifications.approvals.default_threshold_hours', 8, SettingTypeEnum::Integer, 'approvals', 'Default hours before pending approval notification'),
-            self::setting('core.search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
-            self::setting('core.search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
-            self::setting('core.search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
-            self::setting('core.search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
-            self::setting('core.search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
+            self::setting('auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
+            self::setting('auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
+            self::setting('auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
+            self::setting('auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
+            self::setting('locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
+            self::setting('locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
+            self::setting('locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
+            self::setting('dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
+            self::setting('expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
+            self::setting('soft_deletes_expiration_days', 0, SettingTypeEnum::Integer, 'core', 'Days before soft-deleted records are purged (0 = never)'),
+            self::setting('translations.auto_translate_fallback_to_ai', false, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
+            self::setting('translations.cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
+            self::setting('translations.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
+            self::setting('notifications.approvals.enabled', true, SettingTypeEnum::Boolean, 'approvals', 'Enable pending approval notifications'),
+            self::setting('notifications.approvals.channels', ['database'], SettingTypeEnum::Json, 'approvals', 'Approval notification channels', ['mail', 'database']),
+            self::setting('notifications.approvals.default_threshold_hours', 8, SettingTypeEnum::Integer, 'approvals', 'Default hours before pending approval notification'),
+            self::setting('search.features.reranker', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
+            self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
+            self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
+            self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
+            self::setting('search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
         ];
     }
 
@@ -372,7 +374,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'description' => 'Lingua default',
             ],
             [
-                'name' => 'core.pagination',
+                'name' => 'pagination',
                 'value' => 20,
                 'encrypted' => false,
                 'choices' => null,
@@ -381,7 +383,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'description' => 'Paginazione default chiamate',
             ],
             [
-                'name' => 'core.max_concurrent_sessions',
+                'name' => 'max_concurrent_sessions',
                 'value' => PHP_INT_MAX,
                 'encrypted' => false,
                 'choices' => null,
@@ -579,7 +581,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
 
         if ($capability->hasApprovals) {
             $defaultSettings[] = [
-                'name' => "approval_threshold__{$table}",
+                'name' => $this->getSettingKeyName(self::APPROVAL_THRESHOLD_NAME_PREFIX, $table),
                 'value' => $defaultApprovalThreshold,
                 'encrypted' => false,
                 'choices' => null,

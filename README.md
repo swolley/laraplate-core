@@ -188,7 +188,7 @@ SOCIALITE_REDIRECT= 							#socialite redirect
 
 ### Versioning configuration
 
-`version_strategy_{table}` settings are runtime controls only for models that do not pin a strategy in code. When a model declares `versionStrategy = VersionStrategy::DIFF`, `ForcedVersionStrategySettings` excludes any historical matching row from the Settings resource and prevents recreating it through that form. The row is not deleted automatically.
+`version_strategy.{table}` settings are runtime controls only for models that do not pin a strategy in code. When a model declares `versionStrategy = VersionStrategy::DIFF`, `ForcedVersionStrategySettings` excludes any historical matching row from the Settings resource and prevents recreating it through that form. The row is not deleted automatically.
 
 ```php
 <?php
@@ -661,7 +661,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 ### Environment (principali variabili)
 
--   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `core.auth.verify_new_user`, `core.auth.enable_user_registration`, `core.auth.enable_user_2fa`, `core.auth.enable_user_licenses`, `core.auth.enable_social_login`, `core.dynamic_entities`, `core.dynamic_gridutils`, `core.expose_crud_api`, `core.soft_deletes_expiration_days` (0 = never purge), `core.search.vector.enabled` (embeddings generation requires AI module).
+-   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.verify_new_user`, `auth.enable_user_registration`, `auth.enable_user_2fa`, `auth.enable_user_licenses`, `auth.enable_social_login`, `dynamic_entities`, `dynamic_gridutils`, `expose_crud_api`, `soft_deletes_expiration_days` (0 = never purge), `search.vector.enabled` (embeddings generation requires AI module). Settings are listed without the module prefix (the module is a column) and read from config as `core.<name>`.
 -   Data retention: `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 

@@ -123,7 +123,7 @@ final class HandleLicensesCommand extends Command
         }
 
         table(['License', 'Expiration', 'User'], $remapped);
-        $max_sessions = app(PerModelSettingResolver::class)->value('core.max_concurrent_sessions', null);
+        $max_sessions = app(PerModelSettingResolver::class)->value('max_concurrent_sessions', null);
         $this->output->info('Current max sessions available: ' . ($max_sessions === null ? 'unlimited' : (string) $max_sessions));
     }
 

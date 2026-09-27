@@ -44,7 +44,7 @@ it('running cache:warm twice produces the same version_strategies cache state', 
     HasVersions::resetVersionStrategyCache();
 
     // Create some versioning settings
-    Setting::factory()->create(['group_name' => 'versioning', 'name' => 'version_strategy_test_table']);
+    Setting::factory()->create(['group_name' => 'versioning', 'name' => 'version_strategy.test_table']);
 
     $cache_key = CacheManager::key('version_strategies');
 

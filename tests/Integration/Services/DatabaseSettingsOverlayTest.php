@@ -18,7 +18,8 @@ it('overlays dotted settings onto the config repository per request', function (
     config()->set('core.demo_flag', 'boot-value');
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.demo_flag',
+        'name' => 'demo_flag',
+        'module' => 'Core',
         'value' => 'runtime-value',
         'type' => SettingTypeEnum::String,
         'group_name' => 'core_demo',

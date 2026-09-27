@@ -12,11 +12,11 @@ use Modules\Core\Models\Setting;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\PerModelSettingResolver;
 
-it('overlays dot-named settings onto runtime config', function (): void {
+it('overlays settings under the namespace of the module that declares them', function (): void {
     $config = new Repository([
         'ai' => [
             'features' => [
-                'chat' => [
+                'faq' => [
                     'enabled' => true,
                 ],
             ],
@@ -26,12 +26,13 @@ it('overlays dot-named settings onto runtime config', function (): void {
     $overlay = new DatabaseConfigOverlay($config);
 
     $overlay->applySettings(new Collection([
-        (object) ['name' => 'ai.features.chat.enabled', 'value' => false],
-        (object) ['name' => 'soft_deletes_core_users', 'value' => true],
+        (object) ['name' => 'features.faq.enabled', 'module' => 'AI', 'value' => false],
+        (object) ['name' => 'soft_deletes.core_users', 'module' => 'Core', 'value' => true],
     ]));
 
-    expect($config->get('ai.features.chat.enabled'))->toBeFalse()
-        ->and($config->has('soft_deletes_core_users'))->toBeFalse();
+    expect($config->get('ai.features.faq.enabled'))->toBeFalse()
+        ->and($config->get('core.soft_deletes.core_users'))->toBeTrue()
+        ->and($config->has('features.faq.enabled'))->toBeFalse();
 });
 
 it('applies a single setting model onto runtime config', function (): void {
@@ -44,7 +45,8 @@ it('applies a single setting model onto runtime config', function (): void {
     $overlay = new DatabaseConfigOverlay($config);
 
     $setting = new Setting([
-        'name' => 'core.expose_crud_api',
+        'name' => 'expose_crud_api',
+        'module' => 'Core',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'core',
@@ -55,7 +57,7 @@ it('applies a single setting model onto runtime config', function (): void {
     expect($config->get('core.expose_crud_api'))->toBeFalse();
 });
 
-it('does not apply non-overlay setting names onto runtime config', function (): void {
+it('does not apply settings that no module declares', function (): void {
     $config = new Repository([]);
 
     $overlay = new DatabaseConfigOverlay($config);
@@ -69,15 +71,15 @@ it('does not apply non-overlay setting names onto runtime config', function (): 
 
     $overlay->applySetting($setting);
 
-    expect($config->has('default_language'))->toBeFalse();
+    expect($config->all())->toBe([]);
 });
 
-it('treats any dot-notation setting name as a config overlay candidate', function (): void {
-    expect(DatabaseConfigOverlay::shouldOverlay('core.auth.enable_user_registration'))->toBeTrue()
-        ->and(DatabaseConfigOverlay::shouldOverlay('future_module.feature.enabled'))->toBeTrue()
-        ->and(DatabaseConfigOverlay::shouldOverlay('version_strategy_core_users'))->toBeFalse()
-        ->and(DatabaseConfigOverlay::shouldOverlay('default_language'))->toBeFalse()
-        ->and(DatabaseConfigOverlay::shouldOverlay(''))->toBeFalse();
+it('builds the config key from the module and the setting name', function (): void {
+    expect(DatabaseConfigOverlay::configKey('Core', 'auth.enable_user_registration'))->toBe('core.auth.enable_user_registration')
+        ->and(DatabaseConfigOverlay::configKey('Billing', 'invoices.auto_post'))->toBe('billing.invoices.auto_post')
+        ->and(DatabaseConfigOverlay::configKey(null, 'default_language'))->toBeNull()
+        ->and(DatabaseConfigOverlay::configKey('', 'default_language'))->toBeNull()
+        ->and(DatabaseConfigOverlay::configKey('Core', ''))->toBeNull();
 });
 
 it('overlays settings for modules not hardcoded in core', function (): void {
@@ -86,7 +88,7 @@ it('overlays settings for modules not hardcoded in core', function (): void {
     $overlay = new DatabaseConfigOverlay($config);
 
     $overlay->applySettings(new Collection([
-        (object) ['name' => 'billing.invoices.auto_post', 'value' => true],
+        (object) ['name' => 'invoices.auto_post', 'module' => 'Billing', 'value' => true],
     ]));
 
     expect($config->get('billing.invoices.auto_post'))->toBeTrue();

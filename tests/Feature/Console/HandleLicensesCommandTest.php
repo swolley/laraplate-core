@@ -113,7 +113,7 @@ it('command shows max sessions setting', function (): void {
     $reflection = new ReflectionClass(HandleLicensesCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('core.max_concurrent_sessions');
+    expect($source)->toContain('max_concurrent_sessions');
 });
 
 it('command handles license creation', function (): void {
@@ -164,7 +164,7 @@ it('handles close action prompt path without crashing the test runner', function
     $user->license_id = $license->id;
     $user->save();
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.max_concurrent_sessions',
+        'name' => 'max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '10',
     ]);
@@ -263,7 +263,7 @@ it('covers listLicenses private method output path', function (): void {
     $user->save();
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.max_concurrent_sessions',
+        'name' => 'max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '7',
     ]);
@@ -308,7 +308,7 @@ it('handles list action with existing licenses through handle flow', function ()
     $user->license_id = $license->id;
     $user->save();
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.max_concurrent_sessions',
+        'name' => 'max_concurrent_sessions',
         'group_name' => 'core',
         'value' => '5',
     ]);

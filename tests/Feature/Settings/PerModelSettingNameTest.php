@@ -15,16 +15,16 @@ it('builds the same name whether or not the prefix carries a trailing separator'
     'optimistic_lock_',
     'translation_fallback_',
     'auto_translate_',
+    'approval_threshold_',
 ]);
 
-it('separates prefix and table with exactly one underscore', function (): void {
+it('separates capability and table with exactly one dot', function (): void {
     expect(PerModelSettingResolver::nameFor('version_strategy_', 'cms_contents'))
-        ->toBe('version_strategy_cms_contents')
+        ->toBe('version_strategy.cms_contents')
         ->and(PerModelSettingResolver::nameFor('version_strategy', 'cms_contents'))
-        ->toBe('version_strategy_cms_contents')
-        // Commands used to append the table with a dot, producing a third spelling.
+        ->toBe('version_strategy.cms_contents')
         ->and(PerModelSettingResolver::nameFor('version_strategy_.', 'cms_contents'))
-        ->toBe('version_strategy_cms_contents');
+        ->toBe('version_strategy.cms_contents');
 });
 
 /**
@@ -42,4 +42,5 @@ it('writes the settings under the very name the readers look up', function (stri
     [CoreDatabaseSeeder::OPTIMISTIC_LOCK_NAME_PREFIX, 'optimistic_lock'],
     [CoreDatabaseSeeder::TRANSLATION_FALLBACK_NAME_PREFIX, 'translation_fallback'],
     [CoreDatabaseSeeder::AUTO_TRANSLATE_NAME_PREFIX, 'auto_translate'],
+    [CoreDatabaseSeeder::APPROVAL_THRESHOLD_NAME_PREFIX, 'approval_threshold'],
 ]);

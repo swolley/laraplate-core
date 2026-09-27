@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
 use Modules\Core\Notifications\PendingApprovalsNotification;
@@ -162,7 +163,7 @@ final class ApprovalNotificationService
      */
     public function getThresholdForTable(string $table, int $default): int
     {
-        $setting_name = "approval_threshold__{$table}";
+        $setting_name = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::APPROVAL_THRESHOLD_NAME_PREFIX, $table);
 
         return app(PerModelSettingResolver::class)->int($setting_name, $default);
     }

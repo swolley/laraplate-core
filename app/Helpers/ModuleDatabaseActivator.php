@@ -20,7 +20,7 @@ use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
-    public static string $RECORD_NAME = 'core.active_modules';
+    public static string $RECORD_NAME = 'active_modules';
 
     /**
      * @var class-string

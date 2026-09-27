@@ -72,7 +72,8 @@ it('syncs runtime config on model save via observer after cache flush', function
     config(['core.expose_crud_api' => true]);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.expose_crud_api',
+        'name' => 'expose_crud_api',
+        'module' => 'Core',
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'core',
@@ -178,7 +179,7 @@ it('forgets derived settings caches when flushing a setting', function (): void 
 
 it('resets versioning caches when the versioning group is affected', function (): void {
     $versioning_setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'version_strategy_coordinator_test',
+        'name' => 'version_strategy.coordinator_test',
         'value' => false,
         'type' => SettingTypeEnum::Json,
         'group_name' => 'versioning',

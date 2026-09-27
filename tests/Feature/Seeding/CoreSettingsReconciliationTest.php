@@ -114,12 +114,12 @@ it('is idempotent and leaves operator values untouched on a second run', functio
     // so this assertion is only satisfied if the operator value genuinely
     // survives that realignment rather than coinciding with it.
     Setting::query()->withoutGlobalScopes()
-        ->where('name', 'core.pagination')
+        ->where('name', 'pagination')
         ->update(['value' => json_encode(999), 'description' => 'drifted description']);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'core.pagination')->sole();
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
 
     expect($setting->value)->toBe(999)
         ->and($setting->description)->toBe('Paginazione default chiamate');
@@ -131,12 +131,12 @@ it('marks every seeded setting as internal and realigns rows written before the 
     expect(Setting::query()->withoutGlobalScopes()->where('is_internal', false)->exists())->toBeFalse();
 
     Setting::query()->withoutGlobalScopes()
-        ->where('name', 'core.pagination')
+        ->where('name', 'pagination')
         ->update(['is_internal' => false, 'value' => json_encode(999)]);
 
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
-    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'core.pagination')->sole();
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'pagination')->sole();
 
     expect($setting->is_internal)->toBeTrue()
         ->and($setting->value)->toBe(999);

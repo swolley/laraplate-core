@@ -24,35 +24,35 @@ it('keeps runtime setting names within the Setting model name limit', function (
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('core.auth.enable_user_registration')['value'])->toBeFalse()
-        ->and($definitions->get('core.auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
-        ->and($definitions->get('core.translations.auto_translate_provider')['value'])->toBe('deepl')
-        ->and($definitions->get('core.translations.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
-        ->and($definitions->get('core.search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
+    expect($definitions->get('auth.enable_user_registration')['value'])->toBeFalse()
+        ->and($definitions->get('auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
+        ->and($definitions->get('translations.auto_translate_provider')['value'])->toBe('deepl')
+        ->and($definitions->get('translations.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
+        ->and($definitions->get('search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
 });
 
 it('defines ai runtime settings with current defaults and choices', function (): void {
     $definitions = collect(AIDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('ai.features.embeddings.enabled')['value'])->toBeFalse()
-        ->and($definitions->get('ai.features.faq.splitter.driver')['value'])->toBe('markdown_aware')
-        ->and($definitions->get('ai.features.faq.splitter.driver')['choices'])
+    expect($definitions->get('features.embeddings.enabled')['value'])->toBeFalse()
+        ->and($definitions->get('features.faq.splitter.driver')['value'])->toBe('markdown_aware')
+        ->and($definitions->get('features.faq.splitter.driver')['choices'])
         ->toBe(['markdown_aware', 'sentence', 'delimiter'])
-        ->and($definitions->get('ai.features.moderation.approval_mode')['choices'])->toBe(['threshold', 'dual']);
+        ->and($definitions->get('features.moderation.approval_mode')['choices'])->toBe(['threshold', 'dual']);
 });
 
 it('defines cms and mes runtime settings with current defaults and choices', function (): void {
     $cmsDefinitions = collect(CMSDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
     $mesDefinitions = collect(MESDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($cmsDefinitions->get('cms.geocoding.cache_ttl')['value'])->toBe(604800)
-        ->and($mesDefinitions->get('mes.lot_number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
+    expect($cmsDefinitions->get('geocoding.cache_ttl')['value'])->toBe(604800)
+        ->and($mesDefinitions->get('lot_number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
 });
 
 it('keeps erp company-backed settings selectable where appropriate', function (): void {
     $definitions = collect(ErpCompanySettings::globalSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get(ErpCompanySettings::INVOICE_GENERATION_MODE)['choices'])
+    expect($definitions->get(ErpCompanySettings::settingName(ErpCompanySettings::INVOICE_GENERATION_MODE))['choices'])
         ->toBe([
             ErpCompanySettings::INVOICE_GENERATION_MODE_EXPANDED,
             ErpCompanySettings::INVOICE_GENERATION_MODE_COMPACT,

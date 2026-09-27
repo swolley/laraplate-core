@@ -178,6 +178,7 @@ final class SettingsTable
             $ttl,
             static fn (): array => SettingResource::getEloquentQuery()
                 ->select('module')
+                ->whereNotNull('module')
                 ->distinct()
                 ->orderBy('module')
                 ->pluck('module', 'module')

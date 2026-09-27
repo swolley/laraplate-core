@@ -21,7 +21,8 @@ it('lets the database setting win over a process-level config set', function ():
     config()->set('core.expose_crud_api', true);
 
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.expose_crud_api',
+        'name' => 'expose_crud_api',
+        'module' => 'Core',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'core',
@@ -40,7 +41,8 @@ it('lets the database setting win over a process-level config set', function ():
 
 it('enables the crud api for a process by writing the database setting', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'core.expose_crud_api',
+        'name' => 'expose_crud_api',
+        'module' => 'Core',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
         'group_name' => 'core',

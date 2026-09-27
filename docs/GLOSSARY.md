@@ -95,7 +95,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **LocaleContext** | Request-scoped active locale resolution. |
 | **LocaleScope** | Global scope filtering translatable queries by locale. |
 | **TranslatedModelSaved** | Event triggering optional auto-translation pipeline. |
-| **auto_translate_{table}** | Per-model setting for post-save translation. |
+| **auto_translate.{table}** | Per-model setting for post-save translation. |
 
 ## Geo and places
 
@@ -112,7 +112,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | Term | Meaning |
 |------|---------|
 | **Setting** | Key/value store (often JSON) for runtime configuration. |
-| **ModuleDatabaseActivator** | Enables/disables modules via `core.active_modules` setting. |
+| **ModuleDatabaseActivator** | Enables/disables modules via `active_modules` setting. |
 | **CronJob** | Scheduled task definition managed in Filament. |
 
 ## Related reading

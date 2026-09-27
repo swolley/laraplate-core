@@ -204,7 +204,7 @@ it('checkAndNotify sends notification when pending approvals exist', function ()
 
 it('getThresholdForTable returns the stored setting value', function (): void {
     Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'approval_threshold__posts',
+        'name' => 'approval_threshold.posts',
         'value' => '48',
         'type' => SettingTypeEnum::String,
     ]);
