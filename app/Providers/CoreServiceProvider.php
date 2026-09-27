@@ -226,6 +226,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Registration of custom search engines
         $this->registerSearchEngines();
 
+        // Search contracts, the database engine and the fallbacks the AI module overrides.
+        $this->app->register(SearchServiceProvider::class);
+
         $oci8_provider = \Yajra\Oci8\Oci8ServiceProvider::class;
         $oci8_validation_provider = \Yajra\Oci8\Oci8ValidationServiceProvider::class;
 

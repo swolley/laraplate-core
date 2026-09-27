@@ -38,3 +38,9 @@ it('registers the Core database search engine implementation with Scout', functi
 
     expect(app(EngineManager::class)->engine())->toBeInstanceOf(DatabaseEngine::class);
 });
+
+it('is registered by the Core module so the search contracts resolve in the app', function (): void {
+    expect(app()->getProvider(SearchServiceProvider::class))->not->toBeNull()
+        ->and(app()->bound(ISearchEngine::class))->toBeTrue()
+        ->and(app(AdvancedSearchService::class))->toBeInstanceOf(AdvancedSearchService::class);
+});
