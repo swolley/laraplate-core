@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\App;
 use Illuminate\Validation\Rules\Unique;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
@@ -57,6 +58,7 @@ it('type mutator falls back to string for invalid value', function (): void {
 });
 
 it('requiresApprovalWhen returns true when fillable except description is modified', function (): void {
+    settingWrittenOverHttp();
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
@@ -75,6 +77,7 @@ it('requiresApprovalWhen returns false when only description is modified', funct
 });
 
 it('requiresApprovalWhen returns false when only group_name and description are modified', function (): void {
+    settingWrittenOverHttp();
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['name' => 'foo']);
 
     $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
@@ -140,3 +143,15 @@ it('getRules unique name callbacks apply deleted_at scope on create and update',
     expect_unique_rules_apply_deleted_at_scope((new Setting)->getRules()['create']['name']);
     expect_unique_rules_apply_deleted_at_scope($rules['update']['name']);
 });
+
+/**
+ * Approvals never apply to console writes, and tests run in the console: pretend an HTTP
+ * request without an approver so the approval rule is actually exercised.
+ */
+function settingWrittenOverHttp(): void
+{
+    $app = App::getFacadeRoot();
+    $mock = Mockery::mock($app)->makePartial();
+    $mock->shouldReceive('runningInConsole')->andReturn(false);
+    App::swap($mock);
+}

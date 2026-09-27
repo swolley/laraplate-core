@@ -20,7 +20,9 @@ use Override;
 #[ObservedBy(SettingObserver::class)]
 final class Setting extends Model
 {
-    use HasApprovals;
+    use HasApprovals {
+        HasApprovals::requiresApprovalWhen as private requiresApprovalWhenTrait;
+    }
     use HasCache;
 
     /**
@@ -125,13 +127,21 @@ final class Setting extends Model
     }
 
     /**
-     * Presentation-only fields (description, group) are applied directly; any other change needs approval.
+     * Presentation-only fields (description, group) are applied directly. Any other change follows
+     * the shared approval rule: a writer holding the approve permission, when one approval is
+     * enough, saves directly; everybody else goes through approval.
      */
     protected function requiresApprovalWhen(array $modifications): bool
     {
-        return array_intersect(
-            array_diff($this->getFillable(), ['description', 'group_name']),
-            array_keys($modifications),
-        ) !== [];
+        $guarded = array_intersect_key(
+            $modifications,
+            array_flip(array_diff($this->getFillable(), ['description', 'group_name'])),
+        );
+
+        if ($guarded === []) {
+            return false;
+        }
+
+        return $this->requiresApprovalWhenTrait($modifications);
     }
 }

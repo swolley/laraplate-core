@@ -173,6 +173,11 @@ trait HasApprovals
         /** @var User|null $user */
         $user = Auth::user();
 
+        // Whatever a superadmin writes is approved by definition.
+        if ($user instanceof User && $user->isSuperAdmin()) {
+            return false;
+        }
+
         return ! ($user instanceof User && $this->writerHasApproveCredit($user) && $this->approversRequired <= 1);
     }
 

@@ -19,6 +19,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Livewire\Livewire;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
@@ -27,6 +28,9 @@ use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
@@ -44,6 +48,45 @@ function editSettingActor(): User
     Filament::setCurrentPanel('admin');
 
     return $actor;
+}
+
+/**
+ * A panel user who may edit settings but not approve their changes.
+ */
+function editSettingActorWithoutApproval(): User
+{
+    if (! class_exists(App\Models\User::class)) {
+        class_alias(User::class, App\Models\User::class);
+    }
+
+    /** @var App\Models\User $actor */
+    $actor = App\Models\User::query()->create(User::factory()->raw());
+    $actor->assignRole(Role::findOrCreate(config('permission.roles.admin'), 'web'));
+
+    foreach (['select', 'update'] as $action) {
+        $permission = PermissionName::forModel(new Setting, $action);
+        Permission::findOrCreate($permission, 'web');
+        $actor->givePermissionTo($permission);
+    }
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    test()->actingAs($actor);
+    Filament::setCurrentPanel('admin');
+    settingFormOverHttp();
+
+    return $actor;
+}
+
+/**
+ * Approvals never apply to console writes, and tests run in the console.
+ */
+function settingFormOverHttp(): void
+{
+    $app = App::getFacadeRoot();
+    $mock = Mockery::mock($app)->makePartial();
+    $mock->shouldReceive('runningInConsole')->andReturn(false);
+    App::swap($mock);
 }
 
 it('picks the value input from the setting type', function (array $attributes, string $expected_field): void {
@@ -91,7 +134,7 @@ it('round trips a json object through the code editor', function (): void {
 });
 
 it('sends the edited value to approval with its type and without read-only fields', function (): void {
-    editSettingActor();
+    editSettingActorWithoutApproval();
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'edit_form_integer_setting',
@@ -108,7 +151,8 @@ it('sends the edited value to approval with its type and without read-only field
             'description' => 'Updated from the panel',
         ])
         ->call('save')
-        ->assertHasNoFormErrors();
+        ->assertHasNoFormErrors()
+        ->assertNotified('Change sent for approval');
 
     $modification = $setting->modifications()->activeOnly()->sole();
 
@@ -116,6 +160,28 @@ it('sends the edited value to approval with its type and without read-only field
         ->and($modification->modifications['value']['modified'])->toBe(42)
         ->and($modification->modifications['description']['modified'])->toBe('Updated from the panel')
         ->and($setting->fresh()->value)->toBe(5);
+});
+
+it('saves the value directly when the writer can approve settings', function (): void {
+    editSettingActor();
+    settingFormOverHttp();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'edit_form_boolean_setting',
+        'type' => 'boolean',
+        'value' => false,
+        'choices' => null,
+        'group_name' => 'base',
+    ]);
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->fillForm(['value' => true])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified(__('filament-panels::resources/pages/edit-record.notifications.saved.title'));
+
+    expect($setting->fresh()->value)->toBeTrue()
+        ->and($setting->modifications()->activeOnly()->exists())->toBeFalse();
 });
 
 it('suggests existing groups and applies a new one without approval', function (): void {
