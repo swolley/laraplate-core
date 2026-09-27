@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Modules\Core\Cache\HasCache;
@@ -45,11 +46,15 @@ final class Setting extends Model
         'description',
         'module',
         'seeded_value',
+        'is_internal',
+        'is_public',
     ];
 
     #[Override]
     protected $attributes = [
         'encrypted' => false,
+        'is_internal' => false,
+        'is_public' => false,
         'type' => 'string',
         'group_name' => 'base',
     ];
@@ -59,6 +64,8 @@ final class Setting extends Model
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'encrypted' => ['boolean', 'required'],
+            'is_internal' => ['boolean'],
+            'is_public' => ['boolean'],
             'choices' => ['sometimes', 'nullable'],
             'choices.*' => ['filled'],
             'type' => ['required', new Enum(SettingTypeEnum::class)],
@@ -71,7 +78,7 @@ final class Setting extends Model
                 'required',
                 'string',
                 'max:255',
-                /** @var \Illuminate\Database\Query\Builder $query */
+                /** @var Builder $query */
                 Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 }),
@@ -82,7 +89,7 @@ final class Setting extends Model
                 'sometimes',
                 'string',
                 'max:255',
-                /** @var \Illuminate\Database\Query\Builder $query */
+                /** @var Builder $query */
                 Rule::unique(CoreTables::Settings->value)->where(function ($query): void { // @pest-ignore-type
                     $query->where('deleted_at', null);
                 })->ignore($this->id, 'id'),
@@ -107,6 +114,8 @@ final class Setting extends Model
         return [
             'value' => 'json',
             'encrypted' => 'boolean',
+            'is_internal' => 'boolean',
+            'is_public' => 'boolean',
             'choices' => 'array',
             'seeded_value' => 'json',
             'type' => SettingTypeEnum::class,
@@ -115,10 +124,13 @@ final class Setting extends Model
         ];
     }
 
+    /**
+     * Presentation-only fields (description, group) are applied directly; any other change needs approval.
+     */
     protected function requiresApprovalWhen(array $modifications): bool
     {
         return array_intersect(
-            array_filter($this->getFillable(), static fn (string $field): bool => $field !== 'description'),
+            array_diff($this->getFillable(), ['description', 'group_name']),
             array_keys($modifications),
         ) !== [];
     }

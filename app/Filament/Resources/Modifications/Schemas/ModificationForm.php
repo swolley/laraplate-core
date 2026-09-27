@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Modifications\Schemas;
 
+use Closure;
+use Filament\Forms\Components\CodeEditor;
+use Filament\Forms\Components\CodeEditor\Enums\Language;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Modules\Core\Filament\Utils\HasForm;
+use Modules\Core\Models\Modification;
 
+/**
+ * Read-only view of a pending change: the panel votes on modifications, it never edits them.
+ */
 final class ModificationForm
 {
     use HasForm;
@@ -18,29 +26,47 @@ final class ModificationForm
         self::configureForm($schema);
 
         return $schema
+            ->disabled()
             ->components([
-                TextInput::make('modifiable_id')
-                    ->numeric(),
-                TextInput::make('modifiable_type'),
-                TextInput::make('modifier_id')
-                    ->numeric(),
-                TextInput::make('modifier_type'),
-                Toggle::make('active')
-                    ->required(),
-                Toggle::make('is_update')
-                    ->required(),
-                TextInput::make('approvers_required')
-                    ->required()
-                    ->numeric()
-                    ->default(1),
-                TextInput::make('disapprovers_required')
-                    ->required()
-                    ->numeric()
-                    ->default(1),
-                TextInput::make('md5')
-                    ->required(),
-                TextInput::make('modifications')
-                    ->required(),
+                Grid::make(2)
+                    ->schema([
+                        TextInput::make('modifiable_type')
+                            ->formatStateUsing(self::fromRecord('modifiable_type')),
+                        TextInput::make('modifiable_id')
+                            ->formatStateUsing(self::fromRecord('modifiable_id')),
+                        TextInput::make('modifier_type')
+                            ->formatStateUsing(self::fromRecord('modifier_type')),
+                        TextInput::make('modifier_id')
+                            ->formatStateUsing(self::fromRecord('modifier_id')),
+                    ])
+                    ->columnSpanFull(),
+                Grid::make(4)
+                    ->schema([
+                        Toggle::make('active')
+                            ->inline(false)
+                            ->formatStateUsing(self::fromRecord('active')),
+                        Toggle::make('is_update')
+                            ->inline(false)
+                            ->formatStateUsing(self::fromRecord('is_update')),
+                        TextInput::make('approvers_required')
+                            ->formatStateUsing(self::fromRecord('approvers_required')),
+                        TextInput::make('disapprovers_required')
+                            ->formatStateUsing(self::fromRecord('disapprovers_required')),
+                    ])
+                    ->columnSpanFull(),
+                CodeEditor::make('modifications')
+                    ->language(Language::Json)
+                    ->formatStateUsing(static fn (?Modification $record): string => json_encode($record?->modifications, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '')
+                    ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * Read the attribute from the record: most modification columns are in the model's `$hidden`
+     * list, so they never reach the form state through serialization.
+     */
+    private static function fromRecord(string $attribute): Closure
+    {
+        return static fn (?Modification $record): mixed => $record?->getAttribute($attribute);
     }
 }

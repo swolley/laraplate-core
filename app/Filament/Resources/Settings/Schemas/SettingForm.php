@@ -4,13 +4,27 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Settings\Schemas;
 
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\CodeEditor;
+use Filament\Forms\Components\CodeEditor\Enums\Language;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Schema;
+use JsonException;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Filament\Utils\HasForm;
+use Modules\Core\Models\Setting;
 
+/**
+ * Settings are seeded: only the group, the value and the description can be edited.
+ * The value input follows the setting type, which is itself read-only.
+ */
 final class SettingForm
 {
     use HasForm;
@@ -19,41 +33,172 @@ final class SettingForm
     {
         self::configureForm($schema);
 
-        $typeOptions = [];
-
-        foreach (SettingTypeEnum::cases() as $case) {
-            $typeOptions[$case->value] = $case->name;
-        }
-
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->required()
-                    ->notIn(resolve(\Modules\Core\Services\ForcedVersionStrategySettings::class)->names())
-                    ->maxLength(255),
-                Select::make('group_name')
-                    ->required()
-                    ->searchable()
-                    ->getSearchResultsUsing(fn (): array => $schema->model::query()->select('group_name')->distinct()->pluck('group_name', 'group_name')->toArray())
-                    ->default('general'),
-                Select::make('type')
-                    ->required()
-                    ->options($typeOptions)
-                    ->default(SettingTypeEnum::String->value),
-                TextInput::make('value')
-                    ->required()
-                    ->maxLength(65535),
+                Grid::make(4)
+                    ->schema([
+                        TextInput::make('name')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Select::make('type')
+                            ->options(self::typeOptions())
+                            ->disabled()
+                            ->dehydrated(false),
+                        Toggle::make('encrypted')
+                            ->inline(false)
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('If true, this setting value is encrypted in database'),
+                        Toggle::make('is_internal')
+                            ->label('Internal')
+                            ->inline(false)
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Shipped by a first-party module seeder'),
+                    ])
+                    ->columnSpanFull(),
+                Grid::make(4)
+                    ->schema([
+                        TextInput::make('group_name')
+                            ->required()
+                            ->maxLength(50)
+                            ->autocomplete(false)
+                            ->datalist(static fn (): array => Setting::query()
+                                ->select('group_name')
+                                ->distinct()
+                                ->orderBy('group_name')
+                                ->pluck('group_name')
+                                ->all())
+                            ->dehydrateStateUsing(static fn (?string $state): ?string => $state === null ? null : mb_trim($state))
+                            ->helperText('Pick an existing group or type a new one'),
+                        Group::make()
+                            ->schema(static fn (?Setting $record): array => [self::valueField($record)])
+                            ->columnSpan(2),
+                        Toggle::make('is_public')
+                            ->label('Public')
+                            ->inline(false)
+                            ->helperText('Readable by guests'),
+                    ])
+                    ->columnSpanFull(),
                 TextInput::make('description')
                     ->maxLength(255)
                     ->columnSpanFull(),
-                Toggle::make('is_public')
-                    ->required()
-                    ->default(false)
-                    ->helperText('If true, this setting will be accessible via API'),
-                Toggle::make('is_encrypted')
-                    ->required()
-                    ->default(false)
-                    ->helperText('If true, this setting value will be encrypted in database'),
             ]);
+    }
+
+    /**
+     * Build the value input matching the setting type and its allowed choices.
+     */
+    public static function valueField(?Setting $record): Field
+    {
+        $choices = self::choiceOptions($record?->choices);
+
+        return match ($record?->type) {
+            SettingTypeEnum::Boolean => Toggle::make('value'),
+            SettingTypeEnum::Integer => TextInput::make('value')
+                ->required()
+                ->integer()
+                ->dehydrateStateUsing(static fn (mixed $state): int => (int) $state),
+            SettingTypeEnum::Float => TextInput::make('value')
+                ->required()
+                ->numeric()
+                ->step('any')
+                ->dehydrateStateUsing(static fn (mixed $state): float => (float) $state),
+            SettingTypeEnum::Date => DatePicker::make('value')
+                ->required(),
+            SettingTypeEnum::Json => self::jsonValueField($record, $choices),
+            default => $choices !== []
+                ? Select::make('value')->required()->options($choices)
+                : TextInput::make('value')->required()->maxLength(65535),
+        };
+    }
+
+    /**
+     * Pretty print a JSON value for the code editor.
+     */
+    public static function encodeJson(mixed $state): string
+    {
+        return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Decode the code editor content back to the stored value.
+     */
+    public static function decodeJson(mixed $state): mixed
+    {
+        if (! is_string($state) || mb_trim($state) === '') {
+            return null;
+        }
+
+        try {
+            return json_decode($state, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return $state;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $choices
+     */
+    private static function jsonValueField(Setting $record, array $choices): Field
+    {
+        $value = $record->value;
+
+        if ($choices !== [] && is_array($value)) {
+            return CheckboxList::make('value')
+                ->options($choices)
+                ->columns(3);
+        }
+
+        if ($choices !== []) {
+            return Select::make('value')
+                ->required()
+                ->options($choices);
+        }
+
+        if (is_array($value) && array_is_list($value) && array_all($value, static fn (mixed $item): bool => is_scalar($item))) {
+            return TagsInput::make('value');
+        }
+
+        return CodeEditor::make('value')
+            ->language(Language::Json)
+            ->required()
+            ->json()
+            ->formatStateUsing(static fn (mixed $state): string => self::encodeJson($state))
+            ->dehydrateStateUsing(static fn (mixed $state): mixed => self::decodeJson($state));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function choiceOptions(mixed $choices): array
+    {
+        if (! is_array($choices)) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach ($choices as $choice) {
+            if (is_scalar($choice)) {
+                $options[(string) $choice] = (string) $choice;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function typeOptions(): array
+    {
+        $options = [];
+
+        foreach (SettingTypeEnum::cases() as $case) {
+            $options[$case->value] = $case->name;
+        }
+
+        return $options;
     }
 }

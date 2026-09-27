@@ -39,6 +39,14 @@ return new class() extends Migration
                 ->nullable(true)
                 ->index("{$settings_table}_module_IDX")
                 ->comment('Owning module, null when the setting was not written by a seeder');
+            $table->boolean('is_internal')
+                ->nullable(false)
+                ->default(false)
+                ->comment('Written by a first-party module seeder');
+            $table->boolean('is_public')
+                ->nullable(false)
+                ->default(false)
+                ->comment('Readable by guests through the settings ACL');
             $table->json('seeded_value')
                 ->nullable(true)
                 ->comment('Last value written by the seeder; drift is value !== seeded_value');

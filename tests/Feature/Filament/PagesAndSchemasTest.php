@@ -42,21 +42,15 @@ it('wires edit pages to their resources', function (): void {
 it('returns delete header action for edit pages', function (): void {
     $method = new ReflectionMethod(EditRole::class, 'getHeaderActions');
     $method->setAccessible(true);
-    $role_actions = $method->invoke(new EditRole());
-
-    $method = new ReflectionMethod(EditSetting::class, 'getHeaderActions');
-    $method->setAccessible(true);
-    $setting_actions = $method->invoke(new EditSetting());
+    $role_actions = $method->invoke(new EditRole);
 
     $method = new ReflectionMethod(EditUser::class, 'getHeaderActions');
     $method->setAccessible(true);
     $user_actions = $method->invoke(new EditUser());
 
     expect($role_actions)->toHaveCount(1)
-        ->and($setting_actions)->toHaveCount(1)
         ->and($user_actions)->toHaveCount(1)
         ->and($role_actions[0])->toBeInstanceOf(DeleteAction::class)
-        ->and($setting_actions[0])->toBeInstanceOf(DeleteAction::class)
         ->and($user_actions[0])->toBeInstanceOf(DeleteAction::class);
 });
 

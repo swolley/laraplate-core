@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Validation\Rules\Unique;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Factories\SettingFactory;
 use Modules\Core\Models\Setting;
 
 it('creates setting via factory with default attributes', function (): void {
@@ -72,6 +74,15 @@ it('requiresApprovalWhen returns false when only description is modified', funct
     expect($result)->toBeFalse();
 });
 
+it('requiresApprovalWhen returns false when only group_name and description are modified', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['name' => 'foo']);
+
+    $method = new ReflectionMethod(Setting::class, 'requiresApprovalWhen');
+
+    expect($method->invoke($setting, ['group_name' => 'other', 'description' => 'New description']))->toBeFalse()
+        ->and($method->invoke($setting, ['group_name' => 'other', 'value' => 'changed']))->toBeTrue();
+});
+
 it('getRules create rule contains unique constraint closure', function (): void {
     $setting = new Setting;
     $rules = $setting->getRules();
@@ -80,7 +91,7 @@ it('getRules create rule contains unique constraint closure', function (): void 
     $has_unique = false;
 
     foreach ($create_name_rules as $rule) {
-        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
+        if ($rule instanceof Unique) {
             $has_unique = true;
         }
     }
@@ -96,7 +107,7 @@ it('getRules update rule contains unique constraint with ignore', function (): v
     $has_unique = false;
 
     foreach ($update_name_rules as $rule) {
-        if ($rule instanceof Illuminate\Validation\Rules\Unique) {
+        if ($rule instanceof Unique) {
             $has_unique = true;
         }
     }
@@ -119,7 +130,7 @@ it('newFactory returns SettingFactory instance', function (): void {
     $method = new ReflectionMethod(Setting::class, 'newFactory');
     $factory = $method->invoke(null);
 
-    expect($factory)->toBeInstanceOf(Modules\Core\Database\Factories\SettingFactory::class);
+    expect($factory)->toBeInstanceOf(SettingFactory::class);
 });
 
 it('getRules unique name callbacks apply deleted_at scope on create and update', function (): void {

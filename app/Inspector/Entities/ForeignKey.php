@@ -63,6 +63,11 @@ final readonly class ForeignKey
         return $this->foreignColumns->map(self::columnName(...));
     }
 
+    public function isComposite(): bool
+    {
+        return $this->columns->count() > 1;
+    }
+
     /**
      * A column entry is the name itself. Inspectors that hand back objects carrying
      * one are still accepted, which is what {@see \Modules\Core\Inspector\Inspect}
@@ -75,10 +80,5 @@ final readonly class ForeignKey
         }
 
         return property_exists($column, 'name') && is_string($column->name) ? $column->name : '';
-    }
-
-    public function isComposite(): bool
-    {
-        return $this->columns->count() > 1;
     }
 }

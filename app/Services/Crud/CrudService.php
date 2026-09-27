@@ -32,6 +32,7 @@ use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Cache\Repository as CacheRepository;
+use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\CrudRequestData;
 use Modules\Core\Casts\DetailRequestData;
 use Modules\Core\Casts\Filter;
@@ -41,6 +42,7 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
+use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Contracts\ProvidesDefaultSearchFilters;
@@ -52,7 +54,6 @@ use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockIntent;
-use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -70,6 +71,7 @@ use Modules\Core\Services\Crud\DTOs\FacetPage;
 use Modules\Core\Services\Crud\DTOs\FacetQuery;
 use Modules\Core\Services\Crud\DTOs\FacetSort;
 use Modules\Core\Services\Crud\DTOs\PaginationMode;
+use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
@@ -93,7 +95,7 @@ use UnexpectedValueException;
  */
 class CrudService
 {
-    /** @phpstan-use HasCrudOperations<\Illuminate\Database\Eloquent\Model> */
+    /** @phpstan-use HasCrudOperations<Model> */
     use HasCrudOperations;
 
     /**
@@ -1546,10 +1548,9 @@ class CrudService
      * before any write, and normalize the id lists.
      *
      * @param  array<string, mixed>  $relations
+     * @return array<string, list<int>>
      *
      * @throws UnexpectedValueException when a relation is not whitelisted or is not many-to-many
-     *
-     * @return array<string, list<int>>
      */
     private function resolveSyncableRelations(Model $model, array $relations): array
     {
@@ -2483,66 +2484,11 @@ class CrudService
     }
 
     /**
-     * Cast a vote using the modification owner's connection.
-     *
      * @param  "approve"|"disapprove"  $operation
      */
     private function castApprovalVote(User $user, Modification $modification, Model $modifiable, string $operation, ?string $reason): void
     {
-        $connection = $modification->getConnectionName();
-        $is_approval = $operation === 'approve';
-        $modification->setRelation('modifiable', $modifiable);
-
-        if (! $user->isAuthorizedToCastApprovalVote($modification, $is_approval)) {
-            return;
-        }
-
-        $vote = $is_approval
-            ? (new Approval())->setConnection($connection)
-            : (new Disapproval())->setConnection($connection);
-        $opposite_vote = $is_approval
-            ? (new Disapproval())->setConnection($connection)
-            : (new Approval())->setConnection($connection);
-        $actor_id_column = $is_approval ? 'approver_id' : 'disapprover_id';
-        $actor_type_column = $is_approval ? 'approver_type' : 'disapprover_type';
-        $opposite_id_column = $is_approval ? 'disapprover_id' : 'approver_id';
-        $opposite_type_column = $is_approval ? 'disapprover_type' : 'approver_type';
-
-        $opposite_vote->newQuery()->where([
-            $opposite_id_column => $user->getKey(),
-            $opposite_type_column => $user::class,
-            'modification_id' => $modification->getKey(),
-        ])->delete();
-
-        $vote->newQuery()->updateOrCreate([
-            $actor_id_column => $user->getKey(),
-            $actor_type_column => $user::class,
-            'modification_id' => $modification->getKey(),
-        ], [
-            'reason' => $reason,
-        ]);
-
-        $modification->refresh();
-        $remaining = $is_approval
-            ? $modification->approversRemaining
-            : $modification->disapproversRemaining;
-
-        if ($remaining !== 0) {
-            return;
-        }
-
-        if ($modification->modifiable_id === null) {
-            throw_unless(is_string($modification->modifiable_type), LogicException::class, 'Modifiable type is required.');
-            $modifiable_type = $modification->modifiable_type;
-
-            /** @var Model $modifiable */
-            $modifiable = (new $modifiable_type())->setConnection($connection);
-        } else {
-            /** @var Model $modifiable */
-            $modifiable = $modification->modifiable;
-        }
-
-        $modifiable->applyModificationChanges($modification, $is_approval);
+        resolve(ModificationVoteService::class)->cast($user, $modification, $operation === 'approve', $reason, $modifiable);
     }
 
     /**
@@ -2872,7 +2818,7 @@ class CrudService
             : sprintf('%s until %s.', $who, Carbon::parse($until)->toIso8601String());
     }
 
-    private function applyComputedMethods(mixed $data, ListRequestData|\Modules\Core\Casts\SelectRequestData $request_data): void
+    private function applyComputedMethods(mixed $data, ListRequestData|SelectRequestData $request_data): void
     {
         $methods_by_relation = $this->extractMethodColumns($request_data);
 
@@ -2898,13 +2844,13 @@ class CrudService
     /**
      * @return array<string,array<int,string>>
      */
-    private function extractMethodColumns(\Modules\Core\Casts\SelectRequestData $request_data): array
+    private function extractMethodColumns(SelectRequestData $request_data): array
     {
         $methods_by_relation = [];
         $main_entity = $request_data->model->getTable();
 
         foreach ($request_data->columns ?? [] as $column) {
-            if ($column->type !== \Modules\Core\Casts\ColumnType::Method) {
+            if ($column->type !== ColumnType::Method) {
                 continue;
             }
 

@@ -10,8 +10,9 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Filament\Resources\Settings\Pages\CreateSetting;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
 use Modules\Core\Filament\Resources\Settings\Schemas\SettingForm;
@@ -67,8 +68,43 @@ final class SettingResource extends Resource
     {
         return [
             'index' => ListSettings::route('/'),
-            'create' => CreateSetting::route('/create'),
             'edit' => EditSetting::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Settings are owned by seeders: the panel may edit them but never create new ones.
+     */
+    #[Override]
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny('Settings are created by seeders.');
+    }
+
+    /**
+     * Settings are owned by seeders: the panel never deletes them.
+     */
+    #[Override]
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny('Settings are managed by seeders.');
+    }
+
+    #[Override]
+    public static function getDeleteAnyAuthorizationResponse(): Response
+    {
+        return Response::deny('Settings are managed by seeders.');
+    }
+
+    #[Override]
+    public static function getForceDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny('Settings are managed by seeders.');
+    }
+
+    #[Override]
+    public static function getForceDeleteAnyAuthorizationResponse(): Response
+    {
+        return Response::deny('Settings are managed by seeders.');
     }
 }

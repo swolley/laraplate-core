@@ -8,7 +8,9 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Seeder as BaseSeeder;
 use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Database\Seeders\Concerns\HasSeedersUtils;
+use Modules\Core\Helpers\BatchSeeder;
 use Modules\Core\Models\Setting;
+use Modules\Core\Seeding\SeedDefinition;
 
 class Seeder extends BaseSeeder
 {
@@ -16,7 +18,7 @@ class Seeder extends BaseSeeder
     use HasSeedersUtils;
 
     /**
-     * Environment variable set by {@see \Modules\Core\Helpers\BatchSeeder::bootstrapChildProcess}
+     * Environment variable set by {@see BatchSeeder::bootstrapChildProcess}
      * in fork workers so destructors skip benchmark output (shared STDOUT with parent).
      */
     public const string PARALLEL_BATCH_WORKER_ENV = 'LARAPLE_PARALLEL_BATCH_WORKER';
@@ -41,6 +43,27 @@ class Seeder extends BaseSeeder
         if (config('app.debug') && ! $this->disableBenchmark) {
             $this->endBenchmark();
         }
+    }
+
+    /**
+     * Reconcile definition for the settings a first-party module ships.
+     *
+     * Every row is stamped `is_internal = true`, and the flag is structural so a
+     * re-seed realigns rows written before it existed.
+     *
+     * @param  list<array<string,mixed>>  $rows
+     */
+    protected static function internalSettingsDefinition(string $module, array $rows): SeedDefinition
+    {
+        return SeedDefinition::for(Setting::class)
+            ->identity(['name'])
+            ->structural(['type', 'group_name', 'description', 'choices', 'is_internal'])
+            ->initial(['value'])
+            ->ownedBy($module)
+            ->rows(array_map(
+                static fn (array $row): array => [...$row, 'is_internal' => true],
+                $rows,
+            ));
     }
 
     /**

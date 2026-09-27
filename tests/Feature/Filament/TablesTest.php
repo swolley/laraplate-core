@@ -6,6 +6,8 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Modules\CMS\Models\Comment;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
@@ -19,6 +21,7 @@ use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
 use Modules\Core\Filament\Utils\HasTable as HasTableTrait;
 use Modules\Core\Models\ACL;
+use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -40,7 +43,7 @@ beforeEach(function (): void {
     $admin_role = Role::factory()->create(['name' => 'admin']);
     $admin->roles()->attach($admin_role);
 
-    Illuminate\Support\Facades\Auth::login($admin);
+    Auth::login($admin);
 });
 
 it('builds cached distinct options for permissions table filters', function (): void {
@@ -65,6 +68,129 @@ it('builds cached group options for settings filters', function (): void {
 
     expect($options)->toHaveKey('base')
         ->and($options)->toHaveKey('security');
+});
+
+it('renders boolean settings value column as an icon', function (bool $value): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'boolean',
+        'value' => $value,
+    ]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    $column = $table->getColumns()['value']->record($setting->fresh());
+
+    $html = $column->toEmbeddedHtml();
+
+    expect($html)->toContain('<svg')->toContain('fi-icon');
+
+    if ($value) {
+        expect($html)->toContain('fi-color-success');
+    } else {
+        expect($html)->not->toContain('fi-color-success');
+    }
+})->with([
+    'true' => [true],
+    'false' => [false],
+]);
+
+it('renders flat list settings value column as badges', function (): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'json',
+        'value' => ['alpha', 'beta'],
+    ]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    $column = $table->getColumns()['value']->record($setting->fresh());
+
+    expect($column->isBadge())->toBeTrue()
+        ->and($column->toEmbeddedHtml())
+        ->toContain('fi-badge')
+        ->toContain('alpha')
+        ->toContain('beta');
+});
+
+it('does not render nested or associative settings values as badges', function (array $value): void {
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'json',
+        'value' => $value,
+    ]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    expect($table->getColumns()['value']->record($setting->fresh())->isBadge())->toBeFalse();
+})->with([
+    'associative' => [['key' => 'value']],
+    'nested' => [[['a'], ['b']]],
+    'empty' => [[]],
+]);
+
+it('exposes encrypted instead of the missing is_encrypted column', function (): void {
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    expect($table->getColumns())->toHaveKey('encrypted')
+        ->not->toHaveKey('is_encrypted')
+        ->and($table->getFilters())->toHaveKey('encrypted')
+        ->not->toHaveKey('is_encrypted');
+});
+
+it('renders is_internal as a green check only when set, hidden by default and filterable', function (): void {
+    $internal = Setting::factory()->persistedWithoutApprovalCapture()->create(['is_internal' => true]);
+    $external = Setting::factory()->persistedWithoutApprovalCapture()->create(['is_internal' => false]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    $column = $table->getColumns()['is_internal'];
+
+    expect($column->isToggledHiddenByDefault())->toBeTrue()
+        ->and($column->record($internal->fresh())->toEmbeddedHtml())
+        ->toContain('<svg')
+        ->toContain('fi-color-success')
+        ->and($column->record($external->fresh())->toEmbeddedHtml())
+        ->not->toContain('<svg')
+        ->and($table->getFilters())->toHaveKey('is_internal');
+});
+
+it('renders is_public as a green check only when set, visible by default and filterable', function (): void {
+    $public = Setting::factory()->persistedWithoutApprovalCapture()->create(['is_public' => true]);
+    $private = Setting::factory()->persistedWithoutApprovalCapture()->create(['is_public' => false]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Setting::query());
+
+    SettingsTable::configure($table);
+
+    $column = $table->getColumns()['is_public'];
+
+    expect($column->isToggledHiddenByDefault())->toBeFalse()
+        ->and($column->record($public->fresh())->toEmbeddedHtml())
+        ->toContain('<svg')
+        ->toContain('fi-color-success')
+        ->and($column->record($private->fresh())->toEmbeddedHtml())
+        ->not->toContain('<svg')
+        ->and($table->getFilters())->toHaveKey('is_public');
 });
 
 it('applies settings default sort callback', function (): void {
@@ -130,9 +256,9 @@ it('executes users table reset password action closure', function (): void {
 });
 
 it('configures stacked image overlap to 1 for translations locale', function (): void {
-    $translatable_model = new class extends Illuminate\Database\Eloquent\Model
+    $translatable_model = new class extends Model
     {
-        use Modules\Core\Models\Concerns\HasTranslations;
+        use HasTranslations;
 
         protected $table = 'test_translatable_models';
 

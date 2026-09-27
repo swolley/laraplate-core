@@ -7,6 +7,7 @@ namespace Modules\Core\Locking;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable as UserContract;
 use Override;
+use SensitiveParameter;
 
 /**
  * The Eloquent user provider, registered under the `eloquent` driver name so every guard gets it.
@@ -22,7 +23,7 @@ use Override;
 final class LockAwareUserProvider extends EloquentUserProvider
 {
     #[Override]
-    public function rehashPasswordIfRequired(UserContract $user, #[\SensitiveParameter] array $credentials, bool $force = false): void
+    public function rehashPasswordIfRequired(UserContract $user, #[SensitiveParameter] array $credentials, bool $force = false): void
     {
         Locked::withoutGuard(fn () => parent::rehashPasswordIfRequired($user, $credentials, $force));
     }

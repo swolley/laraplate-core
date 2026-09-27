@@ -126,13 +126,12 @@ trait HasTable
      * @param  ?callable(Collection<string,Column> $columns):void  $columns
      * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
      * @param  ?callable(Collection<string,Filter> $default_filters):void  $filters
+     * @param  list<string>  $fixedActions  Action names kept out of the grouped menu,
+     *                                      matched against Action::getName().
      *
      * @throws LogicException
      * @throws BindingResolutionException
      * @throws InvalidArgumentException
-     * @param  list<string>  $fixedActions  Action names kept out of the grouped menu,
-     *                                        matched against Action::getName().
-     *
      * @throws GlobalInvalidArgumentException
      */
     protected static function configureTable(Table $table, ?callable $columns = null, ?callable $actions = null, array $fixedActions = [], ?callable $filters = null): Table

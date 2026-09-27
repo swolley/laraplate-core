@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Filament\Schemas\Schema;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
@@ -22,24 +21,12 @@ it('defines Filament pages for settings', function (): void {
 
     expect($pages)
         ->toHaveKey('index')
-        ->and($pages)->toHaveKey('create')
-        ->and($pages)->toHaveKey('edit');
+        ->and($pages)->toHaveKey('edit')
+        ->and($pages)->not->toHaveKey('create');
 });
 
-it('setting resource has required form fields', function (): void {
-    $schema = SettingResource::form(new Schema());
-    $components = $schema->getComponents();
-
-    $names = array_map(static fn ($component): ?string => method_exists($component, 'getName') ? $component->getName() : null, $components);
-
-    expect($components)->toHaveCount(7)
-        ->and($names)->toContain('name')
-        ->and($names)->toContain('value')
-        ->and($names)->toContain('type')
-        ->and($names)->toContain('group_name')
-        ->and($names)->toContain('description')
-        ->and($names)->toContain('is_public')
-        ->and($names)->toContain('is_encrypted');
+it('does not allow creating settings from the panel', function (): void {
+    expect(SettingResource::canCreate())->toBeFalse();
 });
 
 it('setting resource has required table columns', function (): void {

@@ -11,9 +11,9 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-// use Modules\Core\Filament\Resources\Modifications\Pages\CreateModification;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Filament\Resources\Modifications\Pages\EditModification;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Modifications\Schemas\ModificationForm;
 use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
@@ -62,8 +62,45 @@ final class ModificationResource extends Resource
     {
         return [
             'index' => ListModifications::route('/'),
-            // 'create' => CreateModification::route('/create'),
-            'edit' => EditModification::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Modifications are written by the approval flow: the panel only votes on them.
+     */
+    #[Override]
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny('Modifications are created by the approval flow.');
+    }
+
+    #[Override]
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny('Modifications can only be approved or disapproved.');
+    }
+
+    #[Override]
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny('Modifications can only be approved or disapproved.');
+    }
+
+    #[Override]
+    public static function getDeleteAnyAuthorizationResponse(): Response
+    {
+        return Response::deny('Modifications can only be approved or disapproved.');
+    }
+
+    #[Override]
+    public static function getForceDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny('Modifications can only be approved or disapproved.');
+    }
+
+    #[Override]
+    public static function getForceDeleteAnyAuthorizationResponse(): Response
+    {
+        return Response::deny('Modifications can only be approved or disapproved.');
     }
 }

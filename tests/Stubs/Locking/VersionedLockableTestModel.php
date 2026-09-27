@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Locking;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Contracts\IOptimisticLockableModel;
+use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 
 /**
