@@ -80,17 +80,17 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     public static function runtimeSettingDefinitions(): array
     {
         return [
-            self::setting('core.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
-            self::setting('core.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
-            self::setting('core.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
-            self::setting('core.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
-            self::setting('core.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
+            self::setting('auth.verify_new_user', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
+            self::setting('auth.enable_user_registration', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
+            self::setting('auth.enable_user_2fa', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('auth.enable_user_licenses', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
+            self::setting('auth.enable_social_login', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
             self::setting('core.locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),
             self::setting('core.locking.prevent_modifications_on_locked_objects', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
             self::setting('core.locking.prevent_notifications_to_locked_objects', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
             self::setting('core.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
-            self::setting('core.dynamic_gridutils', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic grid utilities'),
             self::setting('core.expose_crud_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
+            self::setting('core.soft_deletes_expiration_days', 0, SettingTypeEnum::Integer, 'core', 'Days before soft-deleted records are purged (0 = never)'),
             self::setting('core.auto_translate_fallback_to_ai', true, SettingTypeEnum::Boolean, 'translations', 'Fallback to AI translation when the primary provider fails'),
             self::setting('core.translation_cache_enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
             self::setting('core.auto_translate_provider', 'deepl', SettingTypeEnum::String, 'translations', 'Default translation provider', ['deepl', 'ai']),
@@ -673,7 +673,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'parameters' => [],
                 'schedule' => '@midnight',
                 'description' => 'Resetta assegnazione licenze login a utenti',
-                'is_active' => (bool) config('core.enable_user_licenses', false),
+                'is_active' => (bool) config('auth.enable_user_licenses', false),
             ],
             [
                 'name' => 'clearResetTokens',

@@ -58,7 +58,7 @@ Models with `Modules\Core\Search\Traits\Searchable` call `queueMakeSearchable()`
 
 | Layer | Keys |
 |-------|------|
-| Scout | `SCOUT_DRIVER`, `VECTOR_SEARCH_ENABLED`, model `$embed` |
+| Scout | `SCOUT_DRIVER`, `search.vector_search.enabled`, model `$embed` |
 | AI | `ai.features.embeddings.enabled` |
 | Per model | `auto_translate_{table}` via `PerModelSettingResolver` |
 

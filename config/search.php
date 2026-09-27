@@ -107,7 +107,6 @@ return [
     // change it in lockstep when switching provider (e.g. OpenAI
     // text-embedding-3-small = 1536).
     'vector_search' => [
-        'enabled' => env('VECTOR_SEARCH_ENABLED', false),
         'dimension' => (int) env('VECTOR_DIMENSION', 384),
         'similarity' => env('VECTOR_SIMILARITY', 'cosine'), // cosine, dot_product, euclidean
     ],

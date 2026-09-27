@@ -110,7 +110,7 @@ final class SocialiteProvider implements IAuthenticationProvider
     #[Override]
     public function isEnabled(): bool
     {
-        return config('auth.providers.socialite.enabled', false);
+        return config('auth.enable_social_login', false);
     }
 
     #[Override]

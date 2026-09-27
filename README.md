@@ -60,11 +60,6 @@ php artisan module:install Core
 
 ```env
 #users
-VERIFY_NEW_USER=true							#enables email verification for new users
-ENABLE_USER_REGISTRATION=true					#enables user registration
-ENABLE_SOCIAL_LOGIN=true						#enables social login
-ENABLE_USER_LICENSE=false						#enables user licenses
-ENABLE_USER_2FA=false							#enables two-factor authentication
 AUTH_MODEL=App\Models\User				#authentication model
 
 #locking
@@ -76,12 +71,6 @@ LOCKING_LEASE_TTL=900							#lifetime in seconds of the lease an edit form takes
 LOCKIN_UNLOCK_ALLOWED=true						#enables unlock of locked objects
 LOCKING_CAN_BE_UNLOCKED=						#comma separated list of classes exempt when the above is false
 LOCKING_PREVENT_MODIFICATIONS_ON_LOCKED=true	#refuses saves, deletes and replicates from anybody but the lock holder
-LOCKING_PREVENT_MODIFICATIONS_TO_LOCKED=false	#prevents notifications to locked objects
-
-#entities
-ENABLE_DYNAMIC_ENTITIES=false					#enables dynamic entities
-ENABLE_DYNAMIC_GRIDUTILS=false					#enables dynamic gridutils
-EXPOSE_CRUD_API=false							#enables CRUD API
 
 #https
 FORCE_HTTPS=false								#enables HTTPS
@@ -117,7 +106,6 @@ OLLAMA_MODEL="llama3.2:3b"						#ollama model (deprecated - use AI module config
 
 #search
 SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
-VECTOR_SEARCH_ENABLED=true                      #create embeddings with ai functionalities before indexing in search engine
 #embeddings are produced by the AI module: AI_EMBEDDINGS_PROVIDER (default sentence_transformers) and AI_EMBEDDINGS_MODEL select provider and model profile. Core only declares dimension/similarity below.
 SEARCH_ENGINE=elasticsearch						#default search engine
 SEARCH_DATABASE_PG_TRGM_ENABLED=false             #enable PostgreSQL pg_trgm matching for the database Scout driver
@@ -182,7 +170,6 @@ CACHE_DURATION_LONG=3600						#long cache duration in seconds
 
 #app
 APP_LOGO=										#application logo
-SOFT_DELETES_EXPIRATION_DAYS=					#soft deletes expiration days
 
 #social login
 FACEBOOK_CLIENT_ID=								#facebook client id
@@ -680,9 +667,8 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 ### Environment (principali variabili)
 
--   Feature toggles: `ENABLE_USER_REGISTRATION`, `ENABLE_SOCIAL_LOGIN`, `ENABLE_USER_LICENSES`, `ENABLE_USER_2FA`, `VERIFY_NEW_USER`, `ENABLE_DYNAMIC_ENTITIES`, `ENABLE_DYNAMIC_GRIDUTILS`, `EXPOSE_CRUD_API`, `FORCE_HTTPS`.
--   Data retention: `SOFT_DELETES_EXPIRATION_DAYS`, `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
--   Search: `VECTOR_SEARCH_ENABLED`, `VECTOR_SEARCH_PROVIDER` (embeddings generation requires AI module).
+-   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.verify_new_user`, `auth.enable_user_registration`, `auth.enable_user_2fa`, `auth.enable_user_licenses`, `auth.enable_social_login`, `core.dynamic_entities`, `core.dynamic_gridutils`, `core.expose_crud_api`, `core.soft_deletes_expiration_days` (0 = never purge), `search.vector_search.enabled` (embeddings generation requires AI module).
+-   Data retention: `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 
 ### Additional Functionalities

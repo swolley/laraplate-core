@@ -165,7 +165,7 @@ The `model_indexing` entry has a **10-minute TTL**. If a pre-processing step fin
 
 | Layer | Keys |
 |-------|------|
-| Scout / Core | `SCOUT_DRIVER`, `VECTOR_SEARCH_ENABLED`, model `$embed`, `vectorSearchEnabled()` |
+| Scout / Core | `SCOUT_DRIVER`, `search.vector_search.enabled`, model `$embed`, `vectorSearchEnabled()` |
 | AI | `ai.features.embeddings.enabled`, embedding provider env vars |
 | Per model | `auto_translate_{table}` (translations group) via `PerModelSettingResolver` |
 

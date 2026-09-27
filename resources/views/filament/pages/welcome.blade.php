@@ -89,7 +89,7 @@
                                 <div class="text-sm/relaxed w-full">
                                     <i>Enable User registration:</i>
                                     <div class="flex items-center" style="float: right">
-                                        @if (config('core.enable_user_registration'))
+                                        @if (config('auth.enable_user_registration'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
                                             <x-core::cancel-icon style="color: var(--color-gray-600);" />
@@ -101,7 +101,7 @@
                                 <div class="text-sm/relaxed w-full">
                                     <i>Verify new user:</i>
                                     <div class="flex items-center" style="float: right">
-                                        @if (config('core.verify_new_user'))
+                                        @if (config('auth.verify_new_user'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
                                             <x-core::cancel-icon style="color: var(--color-gray-600);" />
@@ -113,7 +113,7 @@
                                 <div class="text-sm/relaxed w-full">
                                     <i>Enable dynamic entities:</i>
                                     <div class="flex items-center" style="float: right">
-                                        @if (config('crud.dynamic_entities'))
+                                        @if (config('core.dynamic_entities'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
                                         @else
                                             <x-core::cancel-icon style="color: var(--color-gray-600);" />

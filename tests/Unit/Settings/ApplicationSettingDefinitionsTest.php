@@ -24,8 +24,8 @@ it('keeps runtime setting names within the Setting model name limit', function (
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('core.enable_user_registration')['value'])->toBeFalse()
-        ->and($definitions->get('core.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
+    expect($definitions->get('auth.enable_user_registration')['value'])->toBeFalse()
+        ->and($definitions->get('auth.enable_user_registration')['type'])->toBe(SettingTypeEnum::Boolean)
         ->and($definitions->get('core.auto_translate_provider')['value'])->toBe('deepl')
         ->and($definitions->get('core.auto_translate_provider')['choices'])->toBe(['deepl', 'ai'])
         ->and($definitions->get('search.vector_search.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);

@@ -580,15 +580,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
             Features::updatePasswords(),
         ];
 
-        if (config('core.enable_user_registration')) {
+        if (config('auth.enable_user_registration')) {
             $features[] = Features::registration();
         }
 
-        if (config('core.verify_new_user')) {
+        if (config('auth.verify_new_user')) {
             $features[] = Features::emailVerification();
         }
 
-        if (config('core.enable_user_2fa')) {
+        if (config('auth.enable_user_2fa')) {
             $features[] = Features::twoFactorAuthentication([
                 'confirm' => true,
                 'confirmPassword' => true,

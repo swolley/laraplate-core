@@ -73,7 +73,7 @@ it('does not apply non-overlay setting names onto runtime config', function (): 
 });
 
 it('treats any dot-notation setting name as a config overlay candidate', function (): void {
-    expect(DatabaseConfigOverlay::shouldOverlay('core.enable_user_registration'))->toBeTrue()
+    expect(DatabaseConfigOverlay::shouldOverlay('auth.enable_user_registration'))->toBeTrue()
         ->and(DatabaseConfigOverlay::shouldOverlay('future_module.feature.enabled'))->toBeTrue()
         ->and(DatabaseConfigOverlay::shouldOverlay('version_strategy_core_users'))->toBeFalse()
         ->and(DatabaseConfigOverlay::shouldOverlay('default_language'))->toBeFalse()

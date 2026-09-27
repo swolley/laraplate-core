@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Observers;
 
-use Modules\Core\Models\User;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
+use Modules\Core\Models\User;
 
 final class UserObserver
 {
@@ -24,7 +24,7 @@ final class UserObserver
 
     public function created(User $user): void
     {
-        if (! $user->hasVerifiedEmail() && config('core.verify_new_user')) {
+        if (! $user->hasVerifiedEmail() && config('auth.verify_new_user')) {
             $user->sendEmailVerificationNotification();
         }
     }

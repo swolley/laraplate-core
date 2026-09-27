@@ -8,7 +8,7 @@ use Modules\Core\Models\User;
 
 it('created sends verification email when config enabled and user unverified', function (): void {
     Notification::fake();
-    config()->set('core.verify_new_user', true);
+    config()->set('auth.verify_new_user', true);
 
     $user = User::factory()->create(['email_verified_at' => null]);
 
@@ -17,7 +17,7 @@ it('created sends verification email when config enabled and user unverified', f
 
 it('created does not send verification email when config disabled', function (): void {
     Notification::fake();
-    config()->set('core.verify_new_user', false);
+    config()->set('auth.verify_new_user', false);
 
     $user = User::factory()->create(['email_verified_at' => null]);
 
@@ -26,7 +26,7 @@ it('created does not send verification email when config disabled', function ():
 
 it('created does not send verification email when user already verified', function (): void {
     Notification::fake();
-    config()->set('core.verify_new_user', true);
+    config()->set('auth.verify_new_user', true);
 
     $user = User::factory()->create(['email_verified_at' => now()]);
 

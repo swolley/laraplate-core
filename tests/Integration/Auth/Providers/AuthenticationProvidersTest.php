@@ -164,11 +164,11 @@ it('handles socialite canHandle and enabled/provider name branches', function ()
     expect($provider->canHandle(request()->duplicate(['provider' => 'github'])))->toBeTrue()
         ->and($provider->canHandle(request()->duplicate(['provider' => 'unknown'])))->toBeFalse();
 
-    config(['auth.providers.socialite.enabled' => true]);
+    config(['auth.enable_social_login' => true]);
     expect($provider->isEnabled())->toBeTrue()
         ->and($provider->getProviderName())->toBe('social');
 
-    config(['auth.providers.socialite.enabled' => false]);
+    config(['auth.enable_social_login' => false]);
     expect($provider->isEnabled())->toBeFalse();
 });
 
