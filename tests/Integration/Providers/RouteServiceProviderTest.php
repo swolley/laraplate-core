@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Core\Providers\RouteServiceProvider;
 
@@ -52,7 +53,9 @@ it('translations limiter returns 30 per minute', function (): void {
     expect($result)->toBeInstanceOf(Illuminate\Cache\RateLimiting\Limit::class);
 });
 
-it('embeddings limiter returns 10 per minute', function (): void {
+it('embeddings limiter defaults to 10 per minute when no cap is configured', function (): void {
+    // The config value comes from EMBEDDINGS_QUEUE_RATE_PER_MINUTE, which a local .env may set.
+    config()->set('core.queue_rate_limits', Arr::except(config('core.queue_rate_limits', []), 'embeddings'));
     $this->provider->boot();
 
     $limiter = RateLimiter::limiter('embeddings');

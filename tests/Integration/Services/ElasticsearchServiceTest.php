@@ -256,6 +256,7 @@ it('creates index when missing', function (): void {
 
 it('creates index with settings and mappings when missing', function (): void {
     $mock_client = makeClientWithResponses([
+        serverInfoResponse('8.15.0'),
         new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
     ]);
@@ -272,6 +273,7 @@ it('creates index with settings and mappings when missing', function (): void {
 
 it('updates mappings and settings when index exists', function (): void {
     $mock_client = makeClientWithResponses([
+        serverInfoResponse('8.15.0'),
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
@@ -289,6 +291,7 @@ it('updates mappings and settings when index exists', function (): void {
 
 it('returns true when index exists and no updates are provided', function (): void {
     $mock_client = makeClientWithResponses([
+        serverInfoResponse('8.15.0'),
         new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
     ]);
 
@@ -300,6 +303,7 @@ it('returns true when index exists and no updates are provided', function (): vo
 
 it('throws ElasticsearchException when createIndex fails', function (): void {
     $mock_client = makeClientWithResponses([
+        serverInfoResponse('8.15.0'),
         new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
         new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
     ]);
@@ -309,6 +313,28 @@ it('throws ElasticsearchException when createIndex fails', function (): void {
 
     $service->createIndex('my-index');
 })->throws(ElasticsearchException::class);
+
+it('refuses to create an index on an unsupported Elasticsearch major', function (): void {
+    $mock_client = makeClientWithResponses([
+        serverInfoResponse('7.17.0'),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+
+    ElasticsearchService::getInstance()->createIndex('my-index');
+})->throws(ElasticsearchException::class, 'Unsupported Elasticsearch server version 7.17.0');
+
+it('fails open and creates the index when the server version cannot be read', function (): void {
+    $mock_client = makeClientWithResponses([
+        new Response(500, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['error' => 'boom'])),
+        new Response(404, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME]),
+        new Response(200, [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME], json_encode(['acknowledged' => true])),
+    ]);
+
+    setElasticsearchInstance($mock_client);
+
+    expect(ElasticsearchService::getInstance()->createIndex('my-index'))->toBeTrue();
+});
 
 it('deletes index gracefully if missing', function (): void {
     $mock_client = makeClientWithResponses([
@@ -648,4 +674,19 @@ function resetElasticsearchSingleton(): void
     $reflection = new ReflectionClass(ElasticsearchService::class);
     $instance_property = $reflection->getProperty('instance');
     $instance_property->setValue(null, null);
+
+    // The supported-version check runs once per process, so every test starts unchecked.
+    $reflection->getProperty('version_asserted')->setValue(null, false);
+}
+
+/**
+ * Response of the cluster info endpoint, which createIndex() reads to check the server major.
+ */
+function serverInfoResponse(string $version): Response
+{
+    return new Response(
+        200,
+        [Elasticsearch::HEADER_CHECK => Elasticsearch::PRODUCT_NAME, 'Content-Type' => 'application/json'],
+        json_encode(['version' => ['number' => $version]]),
+    );
 }
