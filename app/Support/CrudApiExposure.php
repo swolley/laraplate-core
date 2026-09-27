@@ -79,7 +79,7 @@ final class CrudApiExposure
                 'module' => self::SETTING_MODULE,
                 'value' => $value,
                 'type' => SettingTypeEnum::Boolean,
-                'group_name' => 'crud',
+                'group_name' => 'core',
                 'description' => 'Expose CRUD API endpoints',
             ]);
         }
