@@ -35,6 +35,8 @@ final class ListSettings extends ListRecords
             'all' => Tab::make('All')->badge($counts['all']),
         ];
 
+        ksort($counts_by_group);
+
         foreach ($counts_by_group as $group => $count) {
             if ($count === 0) {
                 continue;

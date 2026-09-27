@@ -39,7 +39,8 @@ final class SettingsTable
                         ->toggleable(isToggledHiddenByDefault: false),
                     TextColumn::make('group_name')
                         ->searchable()
-                        ->sortable(),
+                        ->sortable()
+                        ->hidden(),
                     TextColumn::make('name')
                         ->searchable()
                         ->sortable(),
