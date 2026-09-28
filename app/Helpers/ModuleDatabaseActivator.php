@@ -109,16 +109,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $all_modules = self::getAllModulesNames();
 
         if (! $found) {
-            $found = $model::create([
-                'value' => $all_modules,
-                'choices' => $all_modules,
-                'name' => self::$RECORD_NAME,
-                'module' => class_module(self::class),
-                'type' => 'json',
-                'group_name' => 'core',
-                'description' => 'application active modules',
-                'seeded_value' => $all_modules,
-            ]);
+            $found = $model::create(self::createBackendModulesRecord($all_modules));
         } elseif (! self::sameModules((array) $found->choices, $all_modules)) {
             $found->update(['choices' => $all_modules]);
         }
@@ -183,6 +174,22 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $this->setActiveByName($module->getName(), false);
     }
 
+    private static function createBackendModulesRecord(array $allModules): array
+    {
+        return [
+            'value' => $allModules,
+            'choices' => $allModules,
+            'name' => self::$RECORD_NAME,
+            'module' => class_module(self::class),
+            'type' => 'json',
+            'group_name' => 'core',
+            'description' => 'application active modules',
+            'seeded_value' => $allModules,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
     /**
      * @return array{string, Connection}
      */
@@ -236,17 +243,12 @@ final class ModuleDatabaseActivator implements ActivatorInterface
         $all_modules = self::getAllModulesNames();
         $now = now();
 
-        $connection->table($settings_table)->insertOrIgnore([
-            'name' => self::$RECORD_NAME,
-            'value' => json_encode($all_modules),
-            'choices' => json_encode($all_modules),
-            'encrypted' => false,
-            'type' => 'json',
-            'group_name' => 'modules',
-            'description' => 'application modules',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $record = self::createBackendModulesRecord($all_modules);
+        $record['value'] = json_encode($record['value']);
+        $record['choices'] = json_encode($record['choices']);
+        $record['seeded_value'] = json_encode($record['seeded_value']);
+
+        $connection->table($settings_table)->insertOrIgnore($record);
 
         Log::info("Created settings '{name}' config record", ['name' => self::$RECORD_NAME]);
     }
