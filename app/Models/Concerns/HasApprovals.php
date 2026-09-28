@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
-use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -29,7 +28,53 @@ use TypeError;
  */
 trait HasApprovals
 {
-    use RequiresApproval;
+    /**
+     * How many approvals mark the captured write as accepted.
+     */
+    protected int $approversRequired = 1;
+
+    /**
+     * How many disapprovals mark it as rejected.
+     */
+    protected int $disapproversRequired = 1;
+
+    /**
+     * Whether an approved diff is written to the model.
+     */
+    protected bool $updateWhenApproved = true;
+
+    /**
+     * Whether a decided modification is dropped rather than deactivated. Both keep the
+     * package's declared defaults; {@see initializeHasApprovals()} raises
+     * $deleteWhenDisapproved for every model and Content lowers both. Task 6 of the
+     * approvals plan removes the pair, so a decided modification is always kept.
+     */
+    protected bool $deleteWhenApproved = true;
+
+    protected bool $deleteWhenDisapproved = false;
+
+    /**
+     * Set while an approved modification is being written, so the listener lets it through.
+     */
+    private bool $forcedApprovalUpdate = false;
+
+    /**
+     * Intercept every save and capture it when the writer may not apply it alone.
+     *
+     * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
+     */
+    public static function bootHasApprovals(): void
+    {
+        static::saving(static function (Model $item): ?bool {
+            if (! $item->isForcedApprovalUpdate() && $item->requiresApprovalWhen($item->getDirtyForApproval()) === true) {
+                return static::captureSave($item);
+            }
+
+            $item->setForcedApprovalUpdate(false);
+
+            return null;
+        });
+    }
 
     /**
      * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
@@ -38,7 +83,7 @@ trait HasApprovals
      */
     public static function captureSave($item): bool
     {
-        $diff = collect($item->getDirty())
+        $diff = collect($item->getDirtyForApproval())
             ->transform(static function ($change, $key) use ($item): array {
                 return [
                     'original' => $item->getOriginal($key),
@@ -80,6 +125,26 @@ trait HasApprovals
         $item->applyAuthorApproveCredit($modification);
 
         return false;
+    }
+
+    public function isForcedApprovalUpdate(): bool
+    {
+        return $this->forcedApprovalUpdate;
+    }
+
+    public function setForcedApprovalUpdate(bool $forced = true): void
+    {
+        $this->forcedApprovalUpdate = $forced;
+    }
+
+    /**
+     * Whoever is writing, recorded on the modification as its author.
+     */
+    public function modifier(): ?Model
+    {
+        $user = Auth::user();
+
+        return $user instanceof Model ? $user : null;
     }
 
     /**
@@ -148,6 +213,18 @@ trait HasApprovals
         }
 
         return $preview;
+    }
+
+    /**
+     * The change set a capture decides on. `getDirty()` for most models; a model whose write
+     * goes through a staging area (translations, pending scores) folds it in here, as
+     * {@see \Modules\CMS\Models\Comment::getDirtyForApproval()} does.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getDirtyForApproval(): array
+    {
+        return $this->getDirty();
     }
 
     /**

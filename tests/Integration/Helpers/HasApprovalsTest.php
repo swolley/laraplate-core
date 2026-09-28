@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
+use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
+use Modules\Core\Tests\Support\HttpContext;
 
 beforeEach(function (): void {
     Schema::create('has_approvals_stub', function (Blueprint $table): void {
@@ -148,4 +150,42 @@ it('merges preview into toArray when preview data exists', function (): void {
     $array = $fresh->toArray();
 
     expect($array['name'] ?? null)->toBe('from-modification');
+});
+
+it('no longer relies on the laravel-approval traits', function (): void {
+    expect(class_uses_recursive(HasApprovalsStubModel::class))
+        ->not->toHaveKey('Approval\Traits\RequiresApproval')
+        ->and(class_uses_recursive(User::class))
+        ->not->toHaveKey('Approval\Traits\ApprovesChanges')
+        ->and(class_uses_recursive(HasApprovalsStubModel::class))->toHaveKey(HasApprovals::class);
+});
+
+it('never captures what a superadmin writes, whatever the approvals required', function (): void {
+    HttpContext::pretendHttpRequest();
+
+    $superadmin = User::factory()->create();
+    $superadmin->assignRole(Role::findOrCreate(config('permission.roles.superadmin'), 'web'));
+    Auth::login($superadmin);
+
+    $model = new HasApprovalsStubModel;
+    $model->setApproversRequired(3);
+
+    $method = new ReflectionMethod($model, 'requiresApprovalWhen');
+
+    expect($method->invoke($model, ['name' => 'next']))->toBeFalse();
+});
+
+it('captures the write of a user who holds no approve credit', function (): void {
+    // Seed the record first: once capture is on, the create would be captured too.
+    $model = HasApprovalsStubModel::query()->create(['name' => 'before']);
+
+    HttpContext::pretendHttpRequest();
+    Auth::login(User::factory()->create());
+
+    $model->name = 'after';
+
+    expect($model->save())->toBeFalse()
+        ->and($model->fresh()->name)->toBe('before')
+        ->and($model->modifications()->activeOnly()->sole()->modifications)
+        ->toBe(['name' => ['original' => 'before', 'modified' => 'after']]);
 });

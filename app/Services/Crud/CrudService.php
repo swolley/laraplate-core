@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Crud;
 
-use Approval\Traits\RequiresApproval;
 use BadMethodCallException;
 use Carbon\Carbon;
 use DateTimeInterface;
@@ -54,6 +53,7 @@ use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockIntent;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -1548,9 +1548,10 @@ class CrudService
      * before any write, and normalize the id lists.
      *
      * @param  array<string, mixed>  $relations
-     * @return array<string, list<int>>
      *
      * @throws UnexpectedValueException when a relation is not whitelisted or is not many-to-many
+     *
+     * @return array<string, list<int>>
      */
     private function resolveSyncableRelations(Model $model, array $relations): array
     {
@@ -2168,7 +2169,7 @@ class CrudService
 
     private function useHasApproval(Model $model): bool
     {
-        return class_uses_trait($model, RequiresApproval::class);
+        return class_uses_trait($model, HasApprovals::class);
     }
 
     private function hasHistory(Model $model): bool

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Events\QueryExecuted;
@@ -23,6 +22,7 @@ use Modules\Core\Casts\ModifyRequestData;
 use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -904,7 +904,7 @@ it('history returns record and version history for versionable models', function
 
     $hist_model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use Versionable;
 
         protected $table = 'crud_cov_hist_one';
@@ -1051,7 +1051,7 @@ it('approve and disapprove run modification workflows', function (): void {
 
     $approval_model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $table = 'crud_cov_approval';
@@ -1150,7 +1150,7 @@ it('approves the modification on the target model connection', function (): void
 
     $model = (new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $table = 'crud_cov_approval_affinity';
@@ -1198,7 +1198,7 @@ it('approves the modification on the target model connection', function (): void
 
     $failing_model = (new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $table = 'crud_cov_approval_affinity';
@@ -1284,7 +1284,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
 
     $model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $connection = 'crud_approval_denied_secondary';
@@ -1422,7 +1422,7 @@ it('does not cast an unauthorized disapproval vote on the target model connectio
 
     $model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $connection = 'crud_disapproval_denied_secondary';
@@ -1499,7 +1499,7 @@ it('disapprove iterates active modifications when no modification id is passed',
 
     $approval_model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $table = 'crud_cov_approval';
@@ -1556,7 +1556,7 @@ it('approve throws when no active modifications exist', function (): void {
 
     $approval_model = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
         use SoftDeletes;
 
         protected $table = 'crud_cov_approval';

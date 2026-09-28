@@ -9,7 +9,6 @@ use function config;
 use function models;
 use function user_class;
 
-use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -17,6 +16,7 @@ use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
@@ -196,7 +196,7 @@ final class PermissionsRefreshCommand extends Command
                 }
 
                 // permessi di approvazione
-                if ($permission === ActionEnum::Approve && ! class_uses_trait($model, RequiresApproval::class)) {
+                if ($permission === ActionEnum::Approve && ! class_uses_trait($model, HasApprovals::class)) {
                     if (! in_array($permission_name, $declared_permissions, true) && in_array($permission_name, $found_permissions, true) && $permission_class::query()->where('name', $permission_name)->delete()) {
                         if (! $quiet_mode) {
                             $this->line(sprintf("<fg=red>Deleted</> '%s' permission", $permission_name));

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Approval\Traits\RequiresApproval;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -10,6 +9,7 @@ use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\SelectRequestData;
+use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
@@ -49,7 +49,7 @@ it('detects models using recursive, approval, and history traits', function (): 
 
     $approvable = new class extends Model
     {
-        use RequiresApproval;
+        use HasApprovals;
     };
 
     $versioned = new class extends Model

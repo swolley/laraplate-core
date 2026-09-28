@@ -38,7 +38,6 @@ it('user model uses correct traits', function (): void {
     $reflection = new ReflectionClass(User::class);
     $traits = $reflection->getTraitNames();
 
-    expect($traits)->toContain('Approval\\Traits\\ApprovesChanges');
     expect($traits)->toContain('Illuminate\\Database\\Eloquent\\Factories\\HasFactory');
     expect($traits)->toContain('Modules\\Core\\Locking\\Traits\\HasLocks');
     expect($traits)->toContain('Spatie\\Permission\\Traits\\HasRoles');
@@ -52,6 +51,8 @@ it('user model uses correct traits', function (): void {
 it('user model has required methods', function (): void {
     $reflection = new ReflectionClass(User::class);
 
+    expect($reflection->hasMethod('approve'))->toBeTrue();
+    expect($reflection->hasMethod('disapprove'))->toBeTrue();
     expect($reflection->hasMethod('license'))->toBeTrue();
     expect($reflection->hasMethod('isSuperAdmin'))->toBeTrue();
     expect($reflection->hasMethod('isAdmin'))->toBeTrue();

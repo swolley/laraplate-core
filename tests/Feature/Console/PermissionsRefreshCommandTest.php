@@ -141,7 +141,7 @@ it('command handles approval permissions', function (): void {
     $reflection = new ReflectionClass(PermissionsRefreshCommand::class);
     $source = file_get_contents($reflection->getFileName());
 
-    expect($source)->toContain('RequiresApproval');
+    expect($source)->toContain('HasApprovals');
     expect($source)->toContain('ActionEnum::Approve');
 });
 

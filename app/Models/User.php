@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Approval\Traits\ApprovesChanges;
 use Carbon\CarbonInterface;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -53,8 +52,6 @@ use UnexpectedValueException;
 #[ObservedBy([UserObserver::class])]
 class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail
 {
-    use ApprovesChanges;
-
     /** @use HasFactory<UserFactory> */
     use HasFactory;
     use HasLocks;
