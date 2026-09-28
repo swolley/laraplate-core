@@ -56,7 +56,9 @@
     "livewire/livewire": "^4.3",
     "filament/spatie-laravel-media-library-plugin": "^5.6.3",
     "spatie/fork": "^1.2.7",
-    "yajra/laravel-oci8": "^12.11"
+    "yajra/laravel-oci8": "^12.11",
+    "james-heinrich/getid3": "^1.9",
+    "smalot/pdfparser": "^2.12"
   },
   "scripts": {
     "update:requirements": [

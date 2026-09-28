@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
 use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Observers\MediaMetadataObserver;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
@@ -17,6 +19,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
  * The shared media model owned by Core (the app-wide `media_model`). Any module
  * that uses {@see \Modules\Core\Helpers\HasMedia} stores rows here.
  */
+#[ObservedBy(MediaMetadataObserver::class)]
 final class Media extends BaseMedia implements ISoftDeletableModel
 {
     /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<static>> */
