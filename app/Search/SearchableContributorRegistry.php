@@ -44,6 +44,25 @@ final class SearchableContributorRegistry
     }
 
     /**
+     * Merged embeddable text contributed for a model instance (space-joined,
+     * non-null parts only). Empty string when no contributor adds text.
+     */
+    public function embeddableTextFor(Model $model): string
+    {
+        $parts = [];
+
+        foreach ($this->forClass($model::class) as $contributor) {
+            $text = $contributor->embeddableText($model);
+
+            if (is_string($text) && $text !== '') {
+                $parts[] = $text;
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
+    /**
      * Merged index-mapping field definitions contributed for a model class.
      *
      * @param  class-string  $modelClass

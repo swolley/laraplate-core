@@ -39,4 +39,11 @@ interface ISearchableContributor
      * @return list<FieldDefinition>
      */
     public function searchableMapping(): array;
+
+    /**
+     * Text this contributor adds to the model's embeddable content (the vector
+     * source), or null when it contributes none. Lets AI-derived text (transcript,
+     * idea, intent) join the standalone media vector without Core reading it.
+     */
+    public function embeddableText(Model $model): ?string;
 }

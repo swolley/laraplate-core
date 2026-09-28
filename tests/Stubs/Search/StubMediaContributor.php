@@ -37,4 +37,9 @@ final class StubMediaContributor implements ISearchableContributor
             new FieldDefinition('intent', FieldType::Text, [IndexType::Searchable]),
         ];
     }
+
+    public function embeddableText(Model $model): ?string
+    {
+        return 'freshness inform';
+    }
 }
