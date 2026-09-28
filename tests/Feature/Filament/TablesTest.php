@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
@@ -420,4 +422,28 @@ it('renders deleted timestamp row only when deleted_at is set', function (): voi
         ->and($deleted_html)
         ->toContain('Deleted:')
         ->toContain($deleted_at->format('Y-m-d H:i:s'));
+});
+
+it('adds reload and clear filters buttons to the toolbar next to the bulk actions', function (): void {
+    $superadmin = App\Models\User::query()->create(User::factory()->raw());
+    $superadmin->assignRole(Role::findOrCreate(config('permission.roles.superadmin'), 'web'));
+    Auth::login($superadmin);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => User::query());
+
+    UsersTable::configure($table);
+
+    $toolbar_actions = collect($table->getToolbarActions());
+    $handlers = $toolbar_actions
+        ->filter(static fn (object $action): bool => $action instanceof Action)
+        ->mapWithKeys(static fn (Action $action): array => [$action->getName() => $action->getLivewireClickHandler()]);
+
+    expect($handlers->all())->toBe([
+        'reloadTable' => '$refresh',
+        'clearTableFilters' => 'removeTableFilters',
+    ])
+        ->and($toolbar_actions->first())->toBeInstanceOf(BulkActionGroup::class)
+        ->and($table->getAction('clearTableFilters')?->getIcon())->toBe('laraplate-eraser');
 });

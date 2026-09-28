@@ -194,6 +194,8 @@ trait HasTable
             $user,
         );
 
+        self::configureToolbarActions($table);
+
         self::configureFilters(
             $table,
             $has_soft_deletes,
@@ -675,6 +677,35 @@ trait HasTable
                 BulkActionGroup::make($default_bulk_actions->all()),
             ]);
         }
+    }
+
+    /**
+     * Pushed after configureActions(), whose toolbarActions() call replaces whatever the
+     * toolbar held. Both buttons call Livewire directly, as Filament's own remove-all
+     * filter indicator does: nothing to mount, and removeTableFilters() also clears the
+     * global and per-column searches and rewrites the filters persisted in session.
+     */
+    private static function configureToolbarActions(Table $table): void
+    {
+        $table->pushToolbarActions([
+            Action::make('reloadTable')
+                ->label('Reload')
+                ->tooltip('Reload')
+                ->icon(Heroicon::OutlinedArrowPath)
+                ->color('gray')
+                ->iconButton()
+                ->action('$refresh')
+                ->livewireTarget('$refresh'),
+            Action::make('clearTableFilters')
+                ->label('Clear all filters')
+                ->tooltip('Clear all filters')
+                // Heroicons has no eraser: Core draws it in the same grammar, as for the snowflake.
+                ->icon('laraplate-eraser')
+                ->color('gray')
+                ->iconButton()
+                ->action('removeTableFilters')
+                ->livewireTarget('removeTableFilters,removeTableFilter'),
+        ]);
     }
 
     private static function configureFilters(

@@ -602,6 +602,7 @@ When building new module features, reuse these primitives instead of re-implemen
 
 ### For product/admin teams
 
+- Every Filament list built on `HasTable::configureTable()` carries two toolbar buttons: **Reload** re-queries the rows keeping page, sort and filters; **Clear all filters** removes every removable filter plus the global and per-column searches, and overwrites the filters persisted in session. Relation managers that build their table without `configureTable()` do not get them.
 - Manage users/roles/ACL/settings in Filament resources. The ACL form edits `filters` as JSON in a code editor (the nested `FiltersGroup` shape, validated by `Rules\QueryBuilder` before save) and `sort` as a repeater of property/direction rows; the list orders by `priority` descending.
 - Use approval queues and preview when moderation is enabled.
 - Keep module activation and runtime settings under change-control.

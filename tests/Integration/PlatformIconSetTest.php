@@ -11,17 +11,21 @@ it('serves the platform icon set under its own prefix', function (): void {
     expect($svg)->toContain('viewBox="0 0 24 24"');
 });
 
-it('draws the freeze icon in the same grammar as the Heroicons beside it', function (): void {
-    // The panel puts this icon in a column next to lock-closed and lock-open. A filled path or a
-    // different box would read as heavier than its neighbours at the size a table cell gives it.
-    $ours = file_get_contents(module_path('Core', 'resources/svg/snowflake.svg'));
-    $theirs = file_get_contents(base_path('vendor/blade-ui-kit/blade-heroicons/resources/svg/o-lock-closed.svg'));
+it('draws each platform icon in the same grammar as the Heroicons beside it', function (string $icon, string $neighbour): void {
+    // The panel puts these icons next to Heroicons: the snowflake in a column with lock-closed and
+    // lock-open, the eraser in the table toolbar with arrow-path. A filled path or a different box
+    // would read as heavier than its neighbours at the size a table cell or a toolbar gives it.
+    $ours = file_get_contents(module_path('Core', sprintf('resources/svg/%s.svg', $icon)));
+    $theirs = file_get_contents(base_path(sprintf('vendor/blade-ui-kit/blade-heroicons/resources/svg/%s.svg', $neighbour)));
 
     foreach (['viewBox="0 0 24 24"', 'fill="none"', 'stroke="currentColor"', 'stroke-width="1.5"'] as $attribute) {
         expect($ours)->toContain($attribute)
             ->and($theirs)->toContain($attribute);
     }
-});
+})->with([
+    'freeze' => ['snowflake', 'o-lock-closed'],
+    'clear filters' => ['eraser', 'o-arrow-path'],
+]);
 
 it('claims its prefix only once, so registering the provider again does not throw', function (): void {
     // Blade Icons refuses a set whose prefix is already taken, and this provider is registered a
