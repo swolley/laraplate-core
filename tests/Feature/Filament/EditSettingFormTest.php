@@ -27,10 +27,7 @@ use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
-use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Support\HttpContext;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
@@ -46,34 +43,6 @@ function editSettingActor(): User
 
     test()->actingAs($actor);
     Filament::setCurrentPanel('admin');
-
-    return $actor;
-}
-
-/**
- * A panel user who may edit settings but not approve their changes.
- */
-function editSettingActorWithoutApproval(): User
-{
-    if (! class_exists(App\Models\User::class)) {
-        class_alias(User::class, App\Models\User::class);
-    }
-
-    /** @var App\Models\User $actor */
-    $actor = App\Models\User::query()->create(User::factory()->raw());
-    $actor->assignRole(Role::findOrCreate(config('permission.roles.admin'), 'web'));
-
-    foreach (['select', 'update'] as $action) {
-        $permission = PermissionName::forModel(new Setting, $action);
-        Permission::findOrCreate($permission, 'web');
-        $actor->givePermissionTo($permission);
-    }
-
-    app(PermissionRegistrar::class)->forgetCachedPermissions();
-
-    test()->actingAs($actor);
-    Filament::setCurrentPanel('admin');
-    HttpContext::pretendHttpRequest();
 
     return $actor;
 }
@@ -123,7 +92,7 @@ it('round trips a json object through the code editor', function (): void {
 });
 
 it('sends the edited value to approval with its type and without read-only fields', function (): void {
-    editSettingActorWithoutApproval();
+    HttpContext::panelActorWithoutApproval(new Setting, ['select', 'update']);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'edit_form_integer_setting',
@@ -269,7 +238,7 @@ it('lays out the edit form in rows', function (): void {
 it('sends an is_public change from the form to approval', function (): void {
     // Not editSettingActor(): a superadmin write is never captured, so there would be no
     // modification to read back.
-    editSettingActorWithoutApproval();
+    HttpContext::panelActorWithoutApproval(new Setting, ['select', 'update']);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'type' => 'string',

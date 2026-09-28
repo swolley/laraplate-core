@@ -81,14 +81,46 @@ final class ModificationsTable
                 $default_actions->push(
                     self::voteAction(approval: true),
                     self::voteAction(approval: false),
+                    self::withdrawAction(),
                 );
             },
-            fixedActions: ['approve', 'disapprove'],
+            fixedActions: ['approve', 'disapprove', 'withdraw'],
         )
             ->defaultGroup(
                 Group::make('modifiable_type')
                     ->label('Modifiable Type'),
             );
+    }
+
+    /**
+     * Withdraw a pending request, available only to its author until it is decided.
+     */
+    public static function withdrawAction(): Action
+    {
+        return Action::make('withdraw')
+            ->label('Withdraw')
+            ->icon(Heroicon::OutlinedArrowUturnLeft)
+            ->color('gray')
+            ->requiresConfirmation()
+            ->visible(static function (Modification $record): bool {
+                $user = Auth::user();
+
+                return $record->active
+                    && $user instanceof User
+                    && $record->modifier_type === $user::class
+                    && (string) $record->modifier_id === (string) $user->getKey();
+            })
+            ->action(static function (Modification $record): void {
+                $user = Auth::user();
+                throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+
+                resolve(ModificationVoteService::class)->withdraw($user, $record);
+
+                Notification::make()
+                    ->title('Request withdrawn')
+                    ->success()
+                    ->send();
+            });
     }
 
     /**

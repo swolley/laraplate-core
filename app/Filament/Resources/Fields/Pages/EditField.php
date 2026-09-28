@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\Fields\Pages;
 
-use Filament\Actions\DeleteAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Fields\FieldResource;
 use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
+use Modules\Core\Filament\Utils\ReportsApprovalOutcome;
 use Override;
 
 final class EditField extends EditRecord
 {
     use HasCloseOrCancelFormAction;
+    use ReportsApprovalOutcome;
 
     #[Override]
     protected static string $resource = FieldResource::class;
@@ -22,9 +21,9 @@ final class EditField extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
-            ForceDeleteAction::make(),
-            RestoreAction::make(),
+            self::approvalAwareDeleteAction(),
+            self::approvalAwareForceDeleteAction(),
+            self::approvalAwareRestoreAction(),
         ];
     }
 }
