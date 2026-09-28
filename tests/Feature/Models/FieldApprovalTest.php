@@ -31,6 +31,7 @@ it('requires approval for field changes by a user without approve credit', funct
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->with($permission)->andReturn(false);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
 
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
@@ -47,6 +48,7 @@ it('does not require approval for field changes when user has approve credit and
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
 
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
