@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Approvals\PendingDeletionStrategy;
 use Modules\Core\Events\ModificationApproved;
+use Modules\Core\Events\ModificationRejected;
+use Modules\Core\Events\ModificationWithdrawn;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
@@ -36,7 +39,8 @@ final class ModificationVoteService
     /**
      * Cast a vote using the modification owner's connection. The vote and, when it completes
      * the quorum, the application of the decision run in one transaction: if applying fails,
-     * the vote is rolled back and the request stays pending.
+     * the vote is rolled back and the request stays pending. The decision's event fires once
+     * the transaction commits.
      *
      * @return bool false when the user is not authorized to vote
      */
@@ -51,7 +55,9 @@ final class ModificationVoteService
      */
     public function applyAuthorCredit(Modification $modification, Model $modifiable): void
     {
-        $modification->getConnection()->transaction(function () use ($modification, $modifiable): void {
+        $connection = $modification->getConnection();
+
+        $connection->transaction(function () use ($modification, $modifiable): void {
             $modifiable->applyModificationChanges($modification, true);
 
             if ($modification->operation->isDeletion()) {
@@ -59,7 +65,35 @@ final class ModificationVoteService
             }
         });
 
-        event(new ModificationApproved($modification, $modifiable));
+        $connection->afterCommit(static fn () => event(new ModificationApproved($modification, $modifiable)));
+    }
+
+    /**
+     * Withdraw a request before its decision: the modification and every vote on it are
+     * deleted, and the record stays as it was. Only the author may withdraw.
+     *
+     * @throws AuthorizationException when the user is not the author
+     * @throws LogicException when the request is already decided
+     */
+    public function withdraw(User $user, Modification $modification): void
+    {
+        throw_unless(
+            $modification->modifier_type === $user::class && (string) $modification->modifier_id === (string) $user->getKey(),
+            AuthorizationException::class,
+            'Only the author can withdraw a request.',
+        );
+        throw_unless($modification->active, LogicException::class, 'A decided request cannot be withdrawn.');
+
+        $modifiable = $this->recordOf($modification);
+        $connection = $modification->getConnection();
+
+        $connection->transaction(static function () use ($modification): void {
+            $modification->approvals()->delete();
+            $modification->disapprovals()->delete();
+            $modification->delete();
+        });
+
+        $connection->afterCommit(static fn () => event(new ModificationWithdrawn($modification, $modifiable)));
     }
 
     private function castInTransaction(User $user, Modification $modification, bool $approval, ?string $reason, ?Model $modifiable): bool
@@ -108,23 +142,16 @@ final class ModificationVoteService
             return true;
         }
 
-        if ($modification->modifiable_id === null) {
+        $record = $this->recordOf($modification);
+
+        if ($record instanceof Model) {
+            $target = $record;
+        } else {
             throw_unless(is_string($modification->modifiable_type), LogicException::class, 'Modifiable type is required.');
             $modifiable_type = $modification->modifiable_type;
 
             /** @var Model $target */
             $target = (new $modifiable_type)->setConnection($connection);
-        } else {
-            /**
-             * The voter decides on the record, so no scope may hide it from them: not the
-             * soft-delete one (a restore targets a trashed record), not the pending-deletion one.
-             *
-             * @var Model $target
-             */
-            $target = $modification->modifiable()
-                ->withoutGlobalScope(PendingDeletionStrategy::HIDE_SCOPE)
-                ->when($modification->operation === Operation::Restore, static fn (Builder $query): Builder => $query->withTrashed())
-                ->first();
         }
 
         $target->applyModificationChanges($modification, $approval);
@@ -133,7 +160,28 @@ final class ModificationVoteService
             $this->rejectPendingUpdatesOf($modification, $user);
         }
 
+        $modification->getConnection()->afterCommit(static fn () => event($approval
+            ? new ModificationApproved($modification, $target)
+            : new ModificationRejected($modification, $record)));
+
         return true;
+    }
+
+    /**
+     * The record a modification is about, or null for a create. The voter decides on the
+     * record, so no scope may hide it: not the soft-delete one (a restore targets a trashed
+     * record), not the pending-deletion one.
+     */
+    private function recordOf(Modification $modification): ?Model
+    {
+        if ($modification->modifiable_id === null) {
+            return null;
+        }
+
+        return $modification->modifiable()
+            ->withoutGlobalScope(PendingDeletionStrategy::HIDE_SCOPE)
+            ->when($modification->operation === Operation::Restore, static fn (Builder $query): Builder => $query->withTrashed())
+            ->first();
     }
 
     /**
