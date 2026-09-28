@@ -92,6 +92,7 @@ use Modules\Core\Performance\SubprocessBootSampler;
 use Modules\Core\Search\DeferredSearchIndexing;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
+use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
@@ -231,6 +232,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         // Singleton so the import command and the Searchable hook share one run.
         $this->app->singleton(DeferredSearchIndexing::class);
+
+        // Singleton so every module registering a searchable-document contributor
+        // at boot writes into the same registry the Searchable trait resolves from.
+        $this->app->singleton(SearchableContributorRegistry::class);
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);

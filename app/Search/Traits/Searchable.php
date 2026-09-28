@@ -33,6 +33,7 @@ use Modules\Core\Search\Schema\FieldType;
 use Modules\Core\Search\Schema\IndexType;
 use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\Search\Schema\SchemaManager;
+use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\SearchEngineAvailability;
 use Throwable;
@@ -270,6 +271,11 @@ trait Searchable
                 $array['embeddings'] = $vectors;
             }
         }
+
+        // Generic contributor seam (M4a): registered modules add their own fields
+        // for this model without Core knowing them. Base keys win; empty registry
+        // is a no-op.
+        $array += app(SearchableContributorRegistry::class)->fieldsFor($this);
 
         return $array;
     }
@@ -627,7 +633,15 @@ trait Searchable
 
     private function getSchemaDefinition(): SchemaDefinition
     {
-        return new SchemaDefinition($this->getTable());
+        $schema = new SchemaDefinition($this->getTable());
+
+        // Generic contributor seam (M4a): add registered contributors' mapping
+        // fields to the model's index schema. Empty registry is a no-op.
+        foreach (app(SearchableContributorRegistry::class)->mappingFor(static::class) as $field) {
+            $schema->addField($field);
+        }
+
+        return $schema;
     }
 
     /**
