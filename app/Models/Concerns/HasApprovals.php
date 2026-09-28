@@ -7,6 +7,7 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
@@ -14,6 +15,7 @@ use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
 use TypeError;
 
@@ -60,14 +62,23 @@ trait HasApprovals
     private bool $forcedApprovalUpdate = false;
 
     /**
-     * Intercept every save and capture it when the writer may not apply it alone.
+     * The request the last intercepted operation was turned into, so the caller can tell a
+     * captured write from one that happened.
+     */
+    private ?Modification $pendingModification = null;
+
+    /**
+     * Intercept every save, delete and restore, and capture it when the writer may not apply
+     * it alone. Laravel's forceDelete() fires `deleting` too (with isForceDeleting() true), so
+     * listening to `deleting` covers both kinds of deletion; a restore refused by `restoring`
+     * never reaches the save it would have made. A model without soft deletes has no restore.
      *
      * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
      */
     public static function bootHasApprovals(): void
     {
         static::saving(static function (Model $item): ?bool {
-            if (! $item->isForcedApprovalUpdate() && $item->requiresApprovalWhen($item->getDirtyForApproval()) === true) {
+            if ($item->shouldCapture($item->exists ? Operation::Update : Operation::Create) && $item->requiresApprovalWhen($item->getDirtyForApproval()) === true) {
                 return static::captureSave($item);
             }
 
@@ -75,6 +86,63 @@ trait HasApprovals
 
             return null;
         });
+
+        static::deleting(static function (Model $item): ?bool {
+            $operation = $item->deletionOperation();
+
+            return $item->shouldCapture($operation) && $item->requiresApprovalForOperation($operation)
+                ? static::captureOperation($item, $operation)
+                : null;
+        });
+
+        if (! method_exists(static::class, 'restoring')) {
+            return;
+        }
+
+        static::restoring(static function (Model $item): ?bool {
+            if (! $item->trashed()) {
+                return null;
+            }
+
+            return $item->shouldCapture(Operation::Restore) && $item->requiresApprovalForOperation(Operation::Restore)
+                ? static::captureOperation($item, Operation::Restore)
+                : null;
+        });
+    }
+
+    /**
+     * Turn a delete, force delete or restore into a request waiting for approval. The request
+     * carries no diff, only the operation; repeating it updates the pending one.
+     *
+     * @param  Model&self  $item
+     */
+    public static function captureOperation(Model $item, Operation $operation): bool
+    {
+        $existing = $item->pendingOperationRequest($operation);
+
+        $modification = $existing ?? new Modification();
+        $modification->active = true;
+        $modification->operation = $operation;
+        $modification->modifications = [];
+        $modification->approvers_required = $item->approversRequired;
+        $modification->disapprovers_required = $item->disapproversRequired;
+        $modification->md5 = md5($operation->value . '|' . $item::class . '|' . $item->getKey());
+
+        $modifier = $item->modifier();
+
+        if ($modifier !== null) {
+            $modification->modifier()->associate($modifier);
+        }
+
+        if ($existing === null) {
+            $item->modifications()->save($modification);
+        } else {
+            $modification->save();
+        }
+
+        $item->pendingModification = $modification;
+
+        return false;
     }
 
     /**
@@ -121,9 +189,40 @@ trait HasApprovals
             $item->modifications()->save($modification);
         }
 
+        $item->pendingModification = $modification;
         $item->applyAuthorApproveCredit($modification);
 
         return false;
+    }
+
+    /**
+     * @return list<Operation>
+     */
+    public function approvalOperations(): array
+    {
+        return Operation::cases();
+    }
+
+    /**
+     * The request the last intercepted operation on this instance became, or null when the
+     * operation ran.
+     */
+    public function pendingModification(): ?Modification
+    {
+        return $this->pendingModification;
+    }
+
+    /**
+     * Whether the operation would be sent for approval, without running it.
+     */
+    public function wouldRequireApproval(Operation $operation): bool
+    {
+        return $this->shouldCapture($operation) && $this->requiresApprovalForOperation($operation);
+    }
+
+    public function pendingOperationRequest(Operation $operation): ?Modification
+    {
+        return $this->modifications()->activeOnly()->where('operation', $operation->value)->first();
     }
 
     public function isForcedApprovalUpdate(): bool
@@ -259,12 +358,28 @@ trait HasApprovals
      */
     protected function requiresApprovalWhen($modifications): bool
     {
-        // TODO: need to verify if console operations must be approved or not
-        if (App::runningInConsole()) {
-            return false;
-        }
+        return $modifications !== [] && $this->approvalGate();
+    }
 
-        if ($modifications === []) {
+    /**
+     * Whether this operation needs approval. Default: the shared rule, which knows nothing
+     * about fields, so an operation without a diff needs no special case. A model overrides
+     * this to exempt some states, as Content does for drafts.
+     */
+    protected function requiresApprovalForOperation(Operation $operation): bool
+    {
+        return $this->approvalGate();
+    }
+
+    /**
+     * The shared write rule, with no change set in it: console never needs approval, a
+     * superadmin never does, and a writer holding `approve` does not when one approval is
+     * enough. Extracted so requiresApprovalWhen() and requiresApprovalForOperation() share
+     * it without either having to fake the other's argument.
+     */
+    protected function approvalGate(): bool
+    {
+        if (App::runningInConsole()) {
             return false;
         }
 
@@ -277,6 +392,31 @@ trait HasApprovals
         }
 
         return ! ($user instanceof User && $this->writerHasApproveCredit($user) && $this->approversRequired <= 1);
+    }
+
+    protected function shouldCapture(Operation $operation): bool
+    {
+        return ! $this->isForcedApprovalUpdate() && in_array($operation, $this->approvalOperations(), true);
+    }
+
+    /**
+     * Soft delete unless the model has none, the caller forces the deletion, or the table's
+     * soft delete is switched off in settings: then the row would really go.
+     */
+    protected function deletionOperation(): Operation
+    {
+        $traits = class_uses_recursive($this);
+        $soft = isset($traits[EloquentSoftDeletes::class]) || isset($traits[SoftDeletes::class]);
+
+        if (! $soft || (method_exists($this, 'isForceDeleting') && $this->isForceDeleting())) {
+            return Operation::ForceDelete;
+        }
+
+        if (method_exists($this, 'softDeletesEnabledBySettings') && ! $this->softDeletesEnabledBySettings()) {
+            return Operation::ForceDelete;
+        }
+
+        return Operation::Delete;
     }
 
     /**
