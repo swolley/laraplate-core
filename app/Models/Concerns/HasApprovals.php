@@ -15,6 +15,7 @@ use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
 use TypeError;
@@ -45,16 +46,6 @@ trait HasApprovals
      * Whether an approved diff is written to the model.
      */
     protected bool $updateWhenApproved = true;
-
-    /**
-     * Whether a decided modification is dropped rather than deactivated. Both keep the
-     * package's declared defaults; {@see initializeHasApprovals()} raises
-     * $deleteWhenDisapproved for every model and Content lowers both. Task 6 of the
-     * approvals plan removes the pair, so a decided modification is always kept.
-     */
-    protected bool $deleteWhenApproved = true;
-
-    protected bool $deleteWhenDisapproved = false;
 
     /**
      * Set while an approved modification is being written, so the listener lets it through.
@@ -140,7 +131,8 @@ trait HasApprovals
             $modification->save();
         }
 
-        $item->pendingModification = $modification;
+        $item->applyAuthorApproveCredit($modification);
+        $item->pendingModification = $modification->active ? $modification : null;
 
         return false;
     }
@@ -189,8 +181,8 @@ trait HasApprovals
             $item->modifications()->save($modification);
         }
 
-        $item->pendingModification = $modification;
         $item->applyAuthorApproveCredit($modification);
+        $item->pendingModification = $modification->active ? $modification : null;
 
         return false;
     }
@@ -205,7 +197,7 @@ trait HasApprovals
 
     /**
      * The request the last intercepted operation on this instance became, or null when the
-     * operation ran.
+     * operation ran, including when the author's own credit completed the quorum at once.
      */
     public function pendingModification(): ?Modification
     {
@@ -260,12 +252,33 @@ trait HasApprovals
 
     /**
      * Apply a decided modification to the model, or record the decision when nothing is
-     * applied. The body is the package's; only the modification type changed.
+     * applied. An approved delete, force delete or restore runs the operation; an approved
+     * create or update writes its diff. Either way the modification is deactivated and kept.
+     * Called only by ModificationVoteService, which wraps it in the vote's transaction.
      *
      * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
      */
     public function applyModificationChanges(Modification $modification, bool $approved): void
     {
+        if ($approved && ! $modification->operation->carriesDiff()) {
+            $this->setForcedApprovalUpdate(true);
+
+            try {
+                match ($modification->operation) {
+                    Operation::Delete => $this->delete(),
+                    Operation::ForceDelete => method_exists($this, 'forceDelete') ? $this->forceDelete() : $this->delete(),
+                    Operation::Restore => $this->restore(),
+                    default => null,
+                };
+            } finally {
+                $this->setForcedApprovalUpdate(false);
+            }
+
+            $this->settleModification($modification);
+
+            return;
+        }
+
         if ($approved && $this->updateWhenApproved) {
             $this->setForcedApprovalUpdate(true);
 
@@ -275,13 +288,13 @@ trait HasApprovals
 
             $this->save();
 
-            $this->settleModification($modification, $this->deleteWhenApproved);
+            $this->settleModification($modification);
 
             return;
         }
 
         if ($approved === false) {
-            $this->settleModification($modification, $this->deleteWhenDisapproved);
+            $this->settleModification($modification);
         }
     }
 
@@ -291,8 +304,6 @@ trait HasApprovals
             $this->append('preview');
             $this->makeHidden('preview');
         }
-
-        $this->deleteWhenDisapproved = true;
     }
 
     public function toArray(?array $parsed = null): array
@@ -458,21 +469,15 @@ trait HasApprovals
         $modification->refresh();
 
         if ((int) $modification->approversRemaining === 0) {
-            $this->applyModificationChanges($modification, true);
+            resolve(ModificationVoteService::class)->applyAuthorCredit($modification, $this);
         }
     }
 
     /**
-     * A decided modification is either dropped or deactivated, never left active.
+     * A decided modification is deactivated and kept, so the decision stays on record.
      */
-    private function settleModification(Modification $modification, bool $delete): void
+    private function settleModification(Modification $modification): void
     {
-        if ($delete) {
-            $modification->delete();
-
-            return;
-        }
-
         $modification->active = false;
         $modification->save();
     }
