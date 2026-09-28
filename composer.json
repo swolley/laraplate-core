@@ -42,7 +42,6 @@
     "spatie/laravel-permission": "^6.25",
     "staudenmeir/laravel-adjacency-list": "^1.25.2",
     "laravel/socialite": "^5.27",
-    "stephenlake/laravel-approval": "^1.1.4",
     "wotz/laravel-swagger-ui": "^1.2",
     "elasticsearch/elasticsearch": "^8.19",
     "laravel/horizon": "^5.46",
