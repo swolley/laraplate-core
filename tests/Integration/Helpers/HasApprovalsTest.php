@@ -153,10 +153,13 @@ it('merges preview into toArray when preview data exists', function (): void {
 });
 
 it('no longer relies on the laravel-approval traits', function (): void {
-    expect(class_uses_recursive(HasApprovalsStubModel::class))
-        ->not->toHaveKey('Approval\Traits\RequiresApproval')
-        ->and(class_uses_recursive(User::class))
-        ->not->toHaveKey('Approval\Traits\ApprovesChanges')
+    $package_traits = static fn (string $class): array => array_values(array_filter(
+        array_keys(class_uses_recursive($class)),
+        static fn (string $trait): bool => str_starts_with($trait, 'Approval\\'),
+    ));
+
+    expect($package_traits(HasApprovalsStubModel::class))->toBe([])
+        ->and($package_traits(User::class))->toBe([])
         ->and(class_uses_recursive(HasApprovalsStubModel::class))->toHaveKey(HasApprovals::class);
 });
 

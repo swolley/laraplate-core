@@ -60,7 +60,7 @@ final class SettingFactory extends Factory
     }
 
     /**
-     * Skip validation and bypass laravel-approval save interception so the model is written to the database.
+     * Skip validation and bypass the HasApprovals save interception so the model is written to the database.
      * Use in tests (and console seeders) where a real row is required.
      */
     public function persistedWithoutApprovalCapture(): static
