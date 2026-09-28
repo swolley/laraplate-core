@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Filament\Commands\FileGenerators\Resources\Pages\ResourceCreateRecordPageClassGenerator;
+use Filament\Commands\FileGenerators\Resources\Pages\ResourceEditRecordPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\ResourceClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGenerator;
@@ -10,6 +12,7 @@ use Modules\Core\Filament\Generators\LaraplateResourceClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceTableClassGenerator;
+use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
 use Modules\Core\Filament\Utils\HasForm;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Filament\Utils\HasTable;
@@ -134,3 +137,21 @@ it('emits HasRecords on generated list pages', function (): void {
 
     expect($source)->toContain(HasRecords::class);
 });
+
+it('emits HasCloseOrCancelFormAction on generated create and edit pages', function (string $generator_class, array $parameters): void {
+    $source = app($generator_class, $parameters)->generate();
+
+    expect($source)->toContain('use ' . HasCloseOrCancelFormAction::class . ';')
+        ->and($source)->toContain('use HasCloseOrCancelFormAction;');
+})->with([
+    'create page' => [ResourceCreateRecordPageClassGenerator::class, [
+        'fqn' => 'App\\Filament\\Resources\\Settings\\Pages\\CreateSetting',
+        'resourceFqn' => 'App\\Filament\\Resources\\Settings\\SettingResource',
+    ]],
+    'edit page' => [ResourceEditRecordPageClassGenerator::class, [
+        'fqn' => 'App\\Filament\\Resources\\Settings\\Pages\\EditSetting',
+        'resourceFqn' => 'App\\Filament\\Resources\\Settings\\SettingResource',
+        'hasViewOperation' => false,
+        'isSoftDeletable' => false,
+    ]],
+]);

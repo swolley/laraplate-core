@@ -8,6 +8,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
+use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
 use Override;
 
 /**
@@ -16,6 +17,8 @@ use Override;
  */
 final class EditSetting extends EditRecord
 {
+    use HasCloseOrCancelFormAction;
+
     #[Override]
     protected static string $resource = SettingResource::class;
 

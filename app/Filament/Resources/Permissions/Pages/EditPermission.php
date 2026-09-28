@@ -7,10 +7,13 @@ namespace Modules\Core\Filament\Resources\Permissions\Pages;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
+use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
 use Override;
 
 final class EditPermission extends EditRecord
 {
+    use HasCloseOrCancelFormAction;
+
     #[Override]
     protected static string $resource = PermissionResource::class;
 

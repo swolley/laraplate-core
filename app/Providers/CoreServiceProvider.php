@@ -11,6 +11,8 @@ use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
 use Exception;
+use Filament\Commands\FileGenerators\Resources\Pages\ResourceCreateRecordPageClassGenerator;
+use Filament\Commands\FileGenerators\Resources\Pages\ResourceEditRecordPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\ResourceClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGenerator;
@@ -50,6 +52,8 @@ use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Filament\Generators\LaraplateResourceClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceCreateRecordPageClassGenerator;
+use Modules\Core\Filament\Generators\LaraplateResourceEditRecordPageClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceInfolistSchemaClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator;
@@ -573,6 +577,14 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->bind(
             ResourceListRecordsPageClassGenerator::class,
             LaraplateResourceListRecordsPageClassGenerator::class,
+        );
+        $this->app->bind(
+            ResourceCreateRecordPageClassGenerator::class,
+            LaraplateResourceCreateRecordPageClassGenerator::class,
+        );
+        $this->app->bind(
+            ResourceEditRecordPageClassGenerator::class,
+            LaraplateResourceEditRecordPageClassGenerator::class,
         );
     }
 

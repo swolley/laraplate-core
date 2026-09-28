@@ -9,10 +9,13 @@ use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Resources\Pages\EditRecord;
 use Modules\Core\Filament\Resources\Fields\FieldResource;
+use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
 use Override;
 
 final class EditField extends EditRecord
 {
+    use HasCloseOrCancelFormAction;
+
     #[Override]
     protected static string $resource = FieldResource::class;
 
