@@ -26,6 +26,7 @@ use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Search\AdaptiveBatchController;
 use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\DeferredSearchIndexing;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Schema\FieldDefinition;
 use Modules\Core\Search\Schema\FieldType;
@@ -79,6 +80,11 @@ trait Searchable
 
     public function queueMakeSearchable($models): void
     {
+        // A bulk run (an import) records the models and indexes them in bulk later.
+        if (app(DeferredSearchIndexing::class)->defer(is_iterable($models) ? $models : [$models])) {
+            return;
+        }
+
         $this->degradeWhenSearchEngineUnreachable(
             'ensure indexes',
             fn (): mixed => $this->ensureIndexesForModels($models),
@@ -204,6 +210,27 @@ trait Searchable
         $with = $this->toSearchableWith();
 
         return $with === [] ? $models : $models->loadMissing($with);
+    }
+
+    /**
+     * Index the given models of this class through the bulk path now: one
+     * batched pre-process pass (embeddings) and adaptive engine writes,
+     * whatever `scout.queue` says. {@see DeferredSearchIndexing} flushes here.
+     *
+     * @param  Collection<int, static>  $models
+     */
+    public function makeSearchableInBulk(Collection $models): void
+    {
+        if ($models->isEmpty()) {
+            return;
+        }
+
+        $this->degradeWhenSearchEngineUnreachable(
+            'ensure indexes',
+            fn (): mixed => $this->ensureIndexesForModels($models),
+        );
+
+        $this->bulkQueueMakeSearchable($models->values());
     }
 
     /**

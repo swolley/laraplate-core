@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Contracts;
 
+use Illuminate\Support\Collection;
+
 /**
  * A model that is indexed in the search engine.
  *
@@ -18,6 +20,11 @@ namespace Modules\Core\Contracts;
 interface ISearchableModel
 {
     public static function reindex(?int $chunk = null): void;
+
+    /**
+     * @phpstan-return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&self>
+     */
+    public static function makeAllSearchableQuery();
 
     public function ensureIndexExists(): bool;
 
@@ -38,7 +45,29 @@ interface ISearchableModel
      */
     public function searchableAs();
 
+    /**
+     * @phpstan-return bool
+     */
+    public function shouldBeSearchable();
+
+    /**
+     * @phpstan-return int|string
+     */
+    public function getScoutKey();
+
+    /**
+     * @phpstan-return string
+     */
+    public function getScoutKeyName();
+
     public function searchable();
 
     public function unsearchable();
+
+    /**
+     * Index the given models of this class through the bulk path now.
+     *
+     * @param  Collection<int, static>  $models
+     */
+    public function makeSearchableInBulk(Collection $models): void;
 }

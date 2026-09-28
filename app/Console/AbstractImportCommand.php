@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Console;
 
+use const SIGINT;
+use const SIGTERM;
+
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 
@@ -12,6 +15,9 @@ use Modules\Core\Import\Contracts\BulkImporterResolverInterface;
 use Modules\Core\Import\Contracts\ConnectionAwareBulkImporterInterface;
 use Modules\Core\Import\Contracts\ImportPluginDiscoveryInterface;
 use Modules\Core\Import\Support\BulkImportRunner;
+use Modules\Core\Import\Support\ImportInterruptHandler;
+use Modules\Core\Search\DeferredSearchIndexing;
+use Modules\Core\Search\Exceptions\DeferredRunInterruptedException;
 use Override;
 use Symfony\Component\Console\Input\InputOption;
 use Throwable;
@@ -28,7 +34,7 @@ abstract class AbstractImportCommand extends Command
         parent::__construct();
     }
 
-    final public function handle(): int
+    final public function handle(DeferredSearchIndexing $deferredIndexing): int
     {
         $this->maybePromptForImporter();
 
@@ -67,7 +73,9 @@ abstract class AbstractImportCommand extends Command
             $this->warn('Dry-run enabled: the selected database transaction will be rolled back.');
         }
 
-        if ((bool) $this->option('no-search') || $dry_run) {
+        $skip_search = (bool) $this->option('no-search') || $dry_run;
+
+        if ($skip_search) {
             config(['scout.driver' => 'null']);
             $this->warn('Search indexing disabled for this import.');
         }
@@ -75,11 +83,31 @@ abstract class AbstractImportCommand extends Command
         $connection = $importer instanceof ConnectionAwareBulkImporterInterface
             ? $importer->importConnection()
             : null;
-        $imported = $this->runner->run(
-            $dry_run,
-            fn (): int => $importer->import($this->output),
-            $connection,
+        $interrupt_handler = new ImportInterruptHandler(
+            $deferredIndexing,
+            $this->output,
+            $this->input->isInteractive() ? $this->askOnInterrupt(...) : null,
+            static function (int $code): never {
+                exit($code);
+            },
         );
+        $this->trap(static fn (): array => [SIGINT, SIGTERM], $interrupt_handler);
+
+        try {
+            $imported = $deferredIndexing->run(
+                fn (): int => $this->runner->run(
+                    $dry_run,
+                    fn (): int => $importer->import($this->output),
+                    $connection,
+                ),
+                $this->resolveIndexBatch(),
+                discard: $skip_search,
+            );
+        } catch (DeferredRunInterruptedException) {
+            $this->warn('Import interrupted: the records imported so far are indexed.');
+
+            return $interrupt_handler->exitCode();
+        }
 
         $this->info("Imported {$imported} record(s)" . ($dry_run ? ' (dry-run, rolled back).' : '.'));
 
@@ -99,6 +127,7 @@ abstract class AbstractImportCommand extends Command
             ['dry-run', null, InputOption::VALUE_NONE, 'Roll back writes on the importer-selected or default database connection'],
             ['limit', null, InputOption::VALUE_OPTIONAL, 'Maximum number of records to import'],
             ['no-search', null, InputOption::VALUE_NONE, 'Disable search indexing for the duration of the import'],
+            ['index-batch', null, InputOption::VALUE_OPTIONAL, 'Records indexed per bulk search flush (default: scout.chunk.searchable)'],
         ];
     }
 
@@ -177,6 +206,30 @@ abstract class AbstractImportCommand extends Command
         $limit = $this->option('limit');
 
         return $limit === null || $limit === '' ? null : max(0, (int) $limit);
+    }
+
+    private function askOnInterrupt(bool $flushing, int $pending): string
+    {
+        return (string) select(
+            label: 'Import interrupted. What now?',
+            options: [
+                ImportInterruptHandler::FINISH => $flushing
+                    ? 'Finish the bulk indexing in progress, then quit'
+                    : "Index the {$pending} record(s) imported since the last flush, then quit",
+                ImportInterruptHandler::QUIT => 'Quit now and leave them unindexed (scout:import indexes them later)',
+                ImportInterruptHandler::RESUME => 'Resume the import',
+            ],
+            default: ImportInterruptHandler::FINISH,
+        );
+    }
+
+    private function resolveIndexBatch(): int
+    {
+        $batch = $this->option('index-batch');
+
+        return $batch === null || $batch === ''
+            ? max(1, config()->integer('scout.chunk.searchable', 500))
+            : max(1, (int) $batch);
     }
 
     /**

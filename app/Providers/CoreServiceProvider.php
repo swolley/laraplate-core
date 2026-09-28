@@ -89,6 +89,7 @@ use Modules\Core\Overrides\QueueMonitorCommand;
 use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Performance\SubprocessBootSampler;
+use Modules\Core\Search\DeferredSearchIndexing;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Services\Authorization\AuthorizationService;
@@ -227,6 +228,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Singleton so every module registering its importable entities at boot
         // writes into the same registry the import framework later resolves from.
         $this->app->singleton(EntityImporterRegistry::class);
+
+        // Singleton so the import command and the Searchable hook share one run.
+        $this->app->singleton(DeferredSearchIndexing::class);
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);

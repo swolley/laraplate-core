@@ -5,14 +5,20 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Events\ModelRequiresIndexing;
+use Modules\Core\Events\ModelsRequireIndexing;
 use Modules\Core\Import\Support\BulkImportRunner;
 use Modules\Core\Import\Support\ContainerBulkImporterResolver;
 use Modules\Core\Tests\Stubs\Import\FakeBulkImporter;
 use Modules\Core\Tests\Stubs\Import\FakeBulkImporterResolver;
 use Modules\Core\Tests\Stubs\Import\FakeConnectionAwareBulkImporter;
 use Modules\Core\Tests\Stubs\Import\FakeImportPluginDiscovery;
+use Modules\Core\Tests\Stubs\Import\FakeSearchableBulkImporter;
 use Modules\Core\Tests\Stubs\Import\TestImportCommand;
+use Modules\Core\Tests\Stubs\Search\DeferredSearchableStubModel;
+use Modules\Core\Tests\Stubs\Search\RecordingSearchEngineStub;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -46,6 +52,7 @@ it('defines the shared module import command contract without a signature', func
             'dry-run',
             'limit',
             'no-search',
+            'index-batch',
         )
         ->and($definition->getOption('arg')->isArray())->toBeTrue()
         ->and($definition->getOption('dry-run')->acceptValue())->toBeFalse()
@@ -141,6 +148,89 @@ it('validates importer classes through the injected resolver contract', function
 
     expect($status)->toBe(TestImportCommand::FAILURE)
         ->and($output)->toContain('must implement');
+});
+
+it('indexes imported records in bulk flushes of --index-batch', function (): void {
+    DeferredSearchableStubModel::createTable();
+    DeferredSearchableStubModel::$engine = new RecordingSearchEngineStub;
+    config(['scout.queue' => true]);
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $command = new TestImportCommand(
+        app(BulkImportRunner::class),
+        new FakeBulkImporterResolver(app()),
+        new FakeImportPluginDiscovery,
+    );
+
+    try {
+        [$status] = runCoreImportCommand($command, [
+            '--importer' => FakeSearchableBulkImporter::class,
+            '--arg' => ['records=5'],
+            '--index-batch' => 2,
+        ]);
+
+        expect($status)->toBe(TestImportCommand::SUCCESS);
+        expect(DeferredSearchableStubModel::$engine->batch_sizes)->toBe([2, 2, 1]);
+        Event::assertNotDispatched(ModelRequiresIndexing::class);
+    } finally {
+        DeferredSearchableStubModel::dropTable();
+        DeferredSearchableStubModel::$engine = null;
+    }
+});
+
+it('imports without indexing or embedding anything with --no-search', function (): void {
+    DeferredSearchableStubModel::createTable();
+    DeferredSearchableStubModel::$engine = new RecordingSearchEngineStub;
+    config(['scout.queue' => true]);
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $command = new TestImportCommand(
+        app(BulkImportRunner::class),
+        new FakeBulkImporterResolver(app()),
+        new FakeImportPluginDiscovery,
+    );
+
+    try {
+        [$status] = runCoreImportCommand($command, [
+            '--importer' => FakeSearchableBulkImporter::class,
+            '--arg' => ['records=3'],
+            '--no-search' => true,
+        ]);
+
+        expect($status)->toBe(TestImportCommand::SUCCESS);
+        expect(DeferredSearchableStubModel::query()->count())->toBe(3);
+        expect(DeferredSearchableStubModel::$engine->update_calls)->toBe(0);
+        Event::assertNotDispatched(ModelRequiresIndexing::class);
+        Event::assertNotDispatched(ModelsRequireIndexing::class);
+    } finally {
+        DeferredSearchableStubModel::dropTable();
+        DeferredSearchableStubModel::$engine = null;
+    }
+});
+
+it('stops an interrupted import with status 130 after indexing what it imported', function (): void {
+    DeferredSearchableStubModel::createTable();
+    DeferredSearchableStubModel::$engine = new RecordingSearchEngineStub;
+    config(['scout.queue' => true]);
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $command = new TestImportCommand(
+        app(BulkImportRunner::class),
+        new FakeBulkImporterResolver(app()),
+        new FakeImportPluginDiscovery,
+    );
+
+    try {
+        [$status, $output] = runCoreImportCommand($command, [
+            '--importer' => FakeSearchableBulkImporter::class,
+            '--arg' => ['records=5', 'interruptAfter=2'],
+        ]);
+
+        expect($status)->toBe(130);
+        expect($output)->toContain('Import interrupted');
+        expect(DeferredSearchableStubModel::query()->count())->toBe(2);
+        expect(DeferredSearchableStubModel::$engine->batch_sizes)->toBe([2]);
+    } finally {
+        DeferredSearchableStubModel::dropTable();
+        DeferredSearchableStubModel::$engine = null;
+    }
 });
 
 it('does not register a runnable Core import command', function (): void {

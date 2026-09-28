@@ -37,7 +37,8 @@ Do not declare `$signature`. Core defines the shared options through `getOptions
 - `--arg=*`: repeatable importer constructor argument in `key=value` form;
 - `--dry-run`: roll back writes on the connection declared by the importer, or the default connection;
 - `--limit=`: non-negative import limit passed to the importer;
-- `--no-search`: disable Scout indexing for the process.
+- `--no-search`: import without search indexing: no document is written and no embedding is generated;
+- `--index-batch=`: distinct records indexed per bulk search flush (default `scout.chunk.searchable`, 500).
 
 Module marker interfaces should extend `Modules\Core\Import\Contracts\BulkImporterInterface`. Configure the module resolver and discovery with that marker so a command rejects importers targeting another module before execution.
 
@@ -51,7 +52,22 @@ Importers must call module services for protected domain mutations. They must no
 
 `BulkImportRunner` opens a transaction on the connection returned by an optional `ConnectionAwareBulkImporterInterface`, falling back to the current default connection, and restores its previous transaction nesting level. This rolls back database writes made on that connection only.
 
-It does not roll back other connections, files, object storage, queued work, HTTP calls, or other external side effects. Importers receive `dryRun` as a named constructor parameter and are responsible for suppressing non-transactional effects. The command disables Scout when dry-run is active.
+It does not roll back other connections, files, object storage, queued work, HTTP calls, or other external side effects. Importers receive `dryRun` as a named constructor parameter and are responsible for suppressing non-transactional effects. The command disables search indexing when dry-run is active.
+
+## Search indexing during an import
+
+The command runs the importer inside `Modules\Core\Search\DeferredSearchIndexing::run()`. While it runs, a `searchable()` call made by Scout's observer (or by the AI single-locale re-embed listener) does not index anything: it records the model class and its scout key. A searchable model saved inside a transaction is also recorded at save time, so an interruption between the commit and Scout's after-commit callbacks loses none of the models that transaction wrote. Several saves of the same record collapse into one entry, and only keys are kept in memory.
+
+The recorded records are indexed through the bulk path every `--index-batch` distinct records and once at the end. A flush reloads them by key through the model's Scout import query (`makeAllSearchableQuery()`), skips rows deleted in the meantime or no longer searchable, then calls `makeSearchableInBulk()`: one `ModelsRequireIndexing` pre-process pass (embeddings for every stale locale in one batched call) and adaptive engine writes. It runs in the import process, not on the `indexing` / `embeddings` queues, so their rate limiters do not apply.
+
+- A threshold flush never runs inside an open transaction: it waits for the commit, and a rollback leaves the keys pending for the next flush.
+- When the importer throws, the records already committed are flushed before the exception propagates.
+- Records become searchable in blocks, not one by one.
+- Ctrl+C (SIGINT), when records are waiting to be indexed, asks what to do: index them and quit (the default; a flush already in progress is finished), quit at once, or resume the import. Indexing and quitting rolls back the record being imported at that moment and exits with status 130. SIGTERM, or a run started with `--no-interaction` or without a terminal, indexes and quits without asking (status 143 for SIGTERM). A second Ctrl+C while indexing quits at once. `Import\Support\ImportInterruptHandler` implements this; it needs the `pcntl` extension.
+- Quitting at once, `kill -9`, or a fatal error (out of memory) leave up to `--index-batch` minus one records unindexed; recover them with `scout:import {Model}` (and `ai:embeddings:repair` when vectors are enabled).
+- With `--no-search` or `--dry-run` the recorded calls are dropped instead. Removals (`unsearchable()`) are never deferred.
+
+Other bulk code can use the same service: `app(DeferredSearchIndexing::class)->run($callback, $batchSize, discard: false)`. A nested `run()` joins the outer one. `interrupt()` stops a run by throwing `Search\Exceptions\DeferredRunInterruptedException`, at once or right after the flush in progress; the run indexes what it recorded while the exception propagates. The exception deliberately extends `Exception`, not `RuntimeException`, so code wrapping runtime failures into row errors does not swallow it.
 
 ## Imports versus synchronization
 

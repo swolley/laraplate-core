@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Tests\Stubs\Search;
 
+use Closure;
 use Illuminate\Support\Collection;
 
 /**
@@ -22,6 +23,11 @@ final class RecordingSearchEngineStub
      */
     public array $batch_sizes = [];
 
+    /**
+     * Called at the start of every update(), to act while a write is in progress.
+     */
+    public ?Closure $onUpdate = null;
+
     public function indexExists(string $index): bool
     {
         return true;
@@ -34,6 +40,10 @@ final class RecordingSearchEngineStub
      */
     public function update(mixed $models): void
     {
+        if ($this->onUpdate instanceof Closure) {
+            ($this->onUpdate)();
+        }
+
         $this->update_calls++;
         $this->batch_sizes[] = $models instanceof Collection ? $models->count() : (is_countable($models) ? count($models) : 1);
     }
