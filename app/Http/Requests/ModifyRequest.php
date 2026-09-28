@@ -88,7 +88,16 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
         /** @phpstan-ignore method.notFound */
         $is_delete = Str::contains($this->url(), '/delete/');
 
-        if (class_uses_trait($this->model, HasValidations::class) && ! $is_delete) {
+        // A withdrawal names the request to drop and writes nothing on the record, so the
+        // model's own rules do not apply to it.
+        /** @phpstan-ignore method.notFound */
+        $is_withdraw = Str::contains($this->url(), '/withdraw/');
+
+        if ($is_withdraw) {
+            $to_merge['modification'] = ['required', 'integer'];
+        }
+
+        if (class_uses_trait($this->model, HasValidations::class) && ! $is_delete && ! $is_withdraw) {
             /** @phpstan-ignore method.notFound */
             $main_entity = $this->resolveMainEntity();
 

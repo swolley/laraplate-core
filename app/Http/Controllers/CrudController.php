@@ -17,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use LogicException;
+use Modules\Core\Approvals\PendingDeletionLock;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\CrudRequest;
@@ -267,6 +269,36 @@ class CrudController extends Controller
     }
 
     /**
+     * The author withdraws a request before its decision. A decided request cannot be
+     * withdrawn any more: that clashes with its current state, hence 409.
+     */
+    final public function withdraw(ModifyRequest $request): Response
+    {
+        $requestData = $request->parsed();
+
+        try {
+            return $this->buildResponse($this->crudService->withdraw($requestData), $request);
+        } catch (LogicException $ex) {
+            // Only the bare class: its subclasses (invalid argument, domain rule, bad method)
+            // keep the answers handleServiceCall() gives them.
+            if ($ex::class === LogicException::class) {
+                return $this->buildResponse(
+                    new CrudResult(
+                        data: null,
+                        error: $ex->getMessage(),
+                        statusCode: Response::HTTP_CONFLICT,
+                    ),
+                    $request,
+                );
+            }
+
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        } catch (Throwable $ex) {
+            return $this->handleServiceCall(fn () => throw $ex, $request, $requestData->model, shouldCache: false);
+        }
+    }
+
+    /**
      * List active modifications awaiting approval for the given entity.
      */
     final public function pendingApprovals(PendingApprovalsRequest $request): Response
@@ -461,6 +493,17 @@ class CrudController extends Controller
                     data: null,
                     error: $ex->getMessage(),
                     statusCode: Response::HTTP_INTERNAL_SERVER_ERROR,
+                ),
+                $request,
+            );
+        } catch (PendingDeletionLock $ex) {
+            // The record's deletion waits for approval, and a Block model refuses changes until
+            // the decision: the write clashes with the record's current state.
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $ex->getMessage(),
+                    statusCode: Response::HTTP_CONFLICT,
                 ),
                 $request,
             );

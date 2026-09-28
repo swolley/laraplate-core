@@ -701,6 +701,12 @@ class CrudService
 
         throw_unless($created, LogicException::class, 'Record not created');
 
+        $captured = $this->pendingRequestOf($created);
+
+        if ($captured instanceof Modification) {
+            return $this->capturedResult([$captured]);
+        }
+
         $error = $discarded_values === [] ? null : implode(', ', $discarded_values);
 
         return new CrudResult(
@@ -726,10 +732,11 @@ class CrudService
         $relations = $this->resolveSyncableRelations($model, $requestData->relations);
 
         $updated_records = new Collection();
+        $captured = [];
         $found_count = 0;
         $lock_version = $this->requestedLockVersion($requestData);
 
-        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, $lock_version, &$found_count): void {
+        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, $lock_version, &$found_count, &$captured): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
 
@@ -741,6 +748,11 @@ class CrudService
 
                 /** @psalm-suppress InvalidArgument */
                 $mutated = (bool) $found_record->update($changes);
+                $pending = $mutated ? null : $this->pendingRequestOf($found_record);
+
+                if ($pending instanceof Modification) {
+                    $captured[] = $pending;
+                }
 
                 if ($relations !== []) {
                     $this->syncModelRelations($found_record, $relations);
@@ -755,6 +767,10 @@ class CrudService
         throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
 
         $error = $this->filterExpectedDiscardedForError($discarded_values, $requestData);
+
+        if ($captured !== []) {
+            return $this->capturedResult($captured, $found_count === 1 ? null : $updated_records, $error);
+        }
 
         return new CrudResult(
             data: $updated_records,
@@ -775,16 +791,23 @@ class CrudService
 
         $found_count = 0;
         $deleted_count = 0;
-        $model->getConnection()->transaction(function () use ($found_records, &$found_count, &$deleted_count): void {
+        $captured = [];
+        $model->getConnection()->transaction(function () use ($found_records, &$found_count, &$deleted_count, &$captured): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
 
                 if ($found_record->forceDelete()) {
                     $deleted_count++;
+                } elseif (($pending = $this->pendingRequestOf($found_record)) instanceof Modification) {
+                    $captured[] = $pending;
                 }
             }
         });
         throw_if($found_count === 0 && $requestData->request->has('id'), ModelNotFoundException::class, 'No model Found');
+
+        if ($captured !== []) {
+            return $this->capturedResult($captured, $found_count === 1 ? null : ['deleted' => $deleted_count]);
+        }
 
         return new CrudResult(
             data: ['deleted' => $deleted_count],
@@ -812,14 +835,26 @@ class CrudService
         )->firstOrFail();
 
         if ($is_activate) {
-            throw_if(! method_exists($found_record, 'restore') || ! $found_record->restore(), LogicException::class, 'Record not activated');
+            throw_unless(method_exists($found_record, 'restore'), LogicException::class, 'Record not activated');
+
+            if (! $found_record->restore()) {
+                $captured = $this->pendingRequestOf($found_record);
+                throw_unless($captured instanceof Modification, LogicException::class, 'Record not activated');
+
+                return $this->capturedResult([$captured]);
+            }
 
             return new CrudResult(
                 data: $found_record,
             );
         }
 
-        throw_unless($found_record->delete(), LogicException::class, 'Record not inactivated');
+        if (! $found_record->delete()) {
+            $captured = $this->pendingRequestOf($found_record);
+            throw_unless($captured instanceof Modification, LogicException::class, 'Record not inactivated');
+
+            return $this->capturedResult([$captured]);
+        }
 
         return new CrudResult(
             data: $found_record,
@@ -844,6 +879,33 @@ class CrudService
     public function disapprove(ModifyRequestData $requestData): CrudResult
     {
         return $this->doApproveOperation($requestData, 'disapprove');
+    }
+
+    /**
+     * Withdraw a request the caller authored, before its decision. The record needs only to be
+     * readable: the request is the author's own, and the vote service refuses anybody else.
+     */
+    public function withdraw(ModifyRequestData $requestData): CrudResult
+    {
+        $model = $requestData->model;
+        $this->auth->ensurePermission($requestData->request, $model->getTable(), 'select', $model->getConnectionName());
+
+        $modification_key = $requestData->changes['modification'] ?? null;
+        throw_unless(is_int($modification_key) || is_string($modification_key), InvalidArgumentException::class, 'The modification to withdraw is required.');
+
+        $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+
+        $modification = (new Modification())->setConnection($model->getConnectionName())->newQuery()
+            ->where('modifiable_type', $model::class)
+            ->whereKey($modification_key)
+            ->firstOrFail();
+
+        resolve(ModificationVoteService::class)->withdraw($user, $modification);
+
+        return new CrudResult(
+            data: ['withdrawn' => $modification->getKey()],
+        );
     }
 
     public function lock(ModifyRequestData $requestData): CrudResult
@@ -2481,6 +2543,34 @@ class CrudService
 
         return new CrudResult(
             data: $found_record,
+        );
+    }
+
+    /**
+     * The request a write on this record was just turned into, or null when the write ran.
+     */
+    private function pendingRequestOf(Model $record): ?Modification
+    {
+        return method_exists($record, 'pendingModification') ? $record->pendingModification() : null;
+    }
+
+    /**
+     * A write sent for approval answers 202 with the request. A single-record write carries the
+     * request itself; a multi-record one lists the requests next to what was applied directly.
+     *
+     * @param  non-empty-list<Modification>  $captured
+     */
+    private function capturedResult(array $captured, mixed $applied = null, ?string $error = null): CrudResult
+    {
+        $requests = array_map(
+            static fn (Modification $modification): array => ['modification' => $modification->getKey(), 'operation' => $modification->operation->value],
+            $captured,
+        );
+
+        return new CrudResult(
+            data: $applied === null && count($requests) === 1 ? $requests[0] : ['modifications' => $requests, 'applied' => $applied],
+            error: $error,
+            statusCode: Response::HTTP_ACCEPTED,
         );
     }
 
