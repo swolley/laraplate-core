@@ -29,14 +29,18 @@ enum CoreTables: string
     case ImportSessions = 'core_import_sessions';
     case ImportRowErrors = 'core_import_row_errors';
 
+    // Approvals: the schema came from stephenlake/laravel-approval, but the mechanism now lives in
+    // Core (app/Approvals, HasApprovals, ModificationVoteService) and the package is on its way out,
+    // so the tables are ours and carry the module prefix like any other Core table.
+    case Modifications = 'core_modifications';
+    case Approvals = 'core_approvals';
+    case Disapprovals = 'core_disapprovals';
+
     // generic or vendors models
     case Roles = 'vend_roles';
     case Permissions = 'vend_permissions';
     case VersionSets = 'vend_versions_sets';
     case Versions = 'vend_versions';
-    case Modifications = 'vend_modifications';
-    case Approvals = 'vend_approvals';
-    case Disapprovals = 'vend_disapprovals';
     case Media = 'vend_media';
 
     // do not modify because they are used in the Laravel core environment

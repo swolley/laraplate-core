@@ -133,7 +133,7 @@ it('writes soft-delete settings through the Setting model connection', function 
         $table->string('guard_name')->default('web');
         $table->timestamps();
     });
-    Schema::connection('soft_delete_affinity')->create('vend_modifications', function (Illuminate\Database\Schema\Blueprint $table): void {
+    Schema::connection('soft_delete_affinity')->create('core_modifications', function (Illuminate\Database\Schema\Blueprint $table): void {
         $table->id();
         $table->string('modifiable_type')->nullable();
         $table->string('modifiable_id')->nullable();
