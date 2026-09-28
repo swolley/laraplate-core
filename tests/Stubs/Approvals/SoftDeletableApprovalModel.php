@@ -24,6 +24,11 @@ final class SoftDeletableApprovalModel extends Model
      */
     public static ?int $approvers = null;
 
+    /**
+     * @var list<string>
+     */
+    public static array $writable = [];
+
     protected $table = 'approvals_soft_stub';
 
     protected $fillable = ['name'];
@@ -40,5 +45,10 @@ final class SoftDeletableApprovalModel extends Model
     public function approvalOperations(): array
     {
         return self::$operations ?? Operation::cases();
+    }
+
+    public function attributesWritableWhilePendingDeletion(): array
+    {
+        return self::$writable;
     }
 }

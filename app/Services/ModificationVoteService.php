@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Modules\Core\Approvals\Operation;
+use Modules\Core\Approvals\PendingDeletionStrategy;
 use Modules\Core\Events\ModificationApproved;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
@@ -113,10 +115,16 @@ final class ModificationVoteService
             /** @var Model $target */
             $target = (new $modifiable_type)->setConnection($connection);
         } else {
-            /** @var Model $target A restore targets a trashed record, which the relation's scope hides. */
-            $target = $modification->operation === Operation::Restore
-                ? $modification->modifiable()->withTrashed()->first()
-                : $modification->modifiable;
+            /**
+             * The voter decides on the record, so no scope may hide it from them: not the
+             * soft-delete one (a restore targets a trashed record), not the pending-deletion one.
+             *
+             * @var Model $target
+             */
+            $target = $modification->modifiable()
+                ->withoutGlobalScope(PendingDeletionStrategy::HIDE_SCOPE)
+                ->when($modification->operation === Operation::Restore, static fn (Builder $query): Builder => $query->withTrashed())
+                ->first();
         }
 
         $target->applyModificationChanges($modification, $approval);

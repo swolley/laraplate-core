@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes as EloquentSoftDeletes;
@@ -12,6 +14,8 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Modules\Core\Approvals\Operation;
+use Modules\Core\Approvals\PendingDeletionLock;
+use Modules\Core\Approvals\PendingDeletionStrategy;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -63,12 +67,22 @@ trait HasApprovals
      * it alone. Laravel's forceDelete() fires `deleting` too (with isForceDeleting() true), so
      * listening to `deleting` covers both kinds of deletion; a restore refused by `restoring`
      * never reaches the save it would have made. A model without soft deletes has no restore.
+     * While a deletion waits, a Block model refuses to save and a Hide model is filtered out
+     * for the users who cannot decide on it.
      *
      * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
      */
     public static function bootHasApprovals(): void
     {
         static::saving(static function (Model $item): ?bool {
+            if ($item->exists && ! $item->isForcedApprovalUpdate() && $item->pendingDeletionStrategy() === PendingDeletionStrategy::Block) {
+                $blocked = array_diff(array_keys($item->getDirty()), $item->attributesWritableWhilePendingDeletion(), [$item->getUpdatedAtColumn()]);
+
+                if ($blocked !== [] && $item->modifications()->activeOnly()->whereIn('operation', [Operation::Delete->value, Operation::ForceDelete->value])->exists()) {
+                    throw PendingDeletionLock::for($item::class, $item->getKey());
+                }
+            }
+
             if ($item->shouldCapture($item->exists ? Operation::Update : Operation::Create) && $item->requiresApprovalWhen($item->getDirtyForApproval()) === true) {
                 return static::captureSave($item);
             }
@@ -84,6 +98,30 @@ trait HasApprovals
             return $item->shouldCapture($operation) && $item->requiresApprovalForOperation($operation)
                 ? static::captureOperation($item, $operation)
                 : null;
+        });
+
+        static::addGlobalScope(PendingDeletionStrategy::HIDE_SCOPE, static function (Builder $query): void {
+            $model = $query->getModel();
+
+            if ($model->pendingDeletionStrategy() !== PendingDeletionStrategy::Hide) {
+                return;
+            }
+
+            $user = Auth::user();
+
+            // Nobody authenticated: console, queues, jobs, search indexing, exports. They see
+            // everything, exactly as capture is skipped in console. Hide answers "who may not
+            // see a record they cannot decide on", which is a question about a person; a
+            // pending deletion must not quietly change what background work reads.
+            if (! $user instanceof User) {
+                return;
+            }
+
+            if ($user->isSuperAdmin() || $user->can(PermissionName::forModel($model, 'approve')) || $user->can(PermissionName::forModel($model, 'disapprove'))) {
+                return;
+            }
+
+            $query->withoutPendingDeletion();
         });
 
         if (! method_exists(static::class, 'restoring')) {
@@ -193,6 +231,26 @@ trait HasApprovals
     public function approvalOperations(): array
     {
         return Operation::cases();
+    }
+
+    /**
+     * How the record behaves while its deletion waits for approval. Block by default: the
+     * record stays visible and refuses changes.
+     */
+    public function pendingDeletionStrategy(): PendingDeletionStrategy
+    {
+        return PendingDeletionStrategy::Block;
+    }
+
+    /**
+     * Attributes that system writes may still change on a Block record whose deletion waits,
+     * such as counters or sync timestamps. `updated_at` is always writable.
+     *
+     * @return list<string>
+     */
+    public function attributesWritableWhilePendingDeletion(): array
+    {
+        return [];
     }
 
     /**
@@ -358,6 +416,19 @@ trait HasApprovals
         }
 
         return $preview;
+    }
+
+    /**
+     * Records with no deletion waiting for approval.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function withoutPendingDeletion(Builder $query): void
+    {
+        $query->whereDoesntHave('modifications', static fn (Builder $modifications): Builder => $modifications
+            ->where('active', true)
+            ->whereIn('operation', [Operation::Delete->value, Operation::ForceDelete->value]));
     }
 
     /**
