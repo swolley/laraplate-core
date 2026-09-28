@@ -197,6 +197,26 @@ it('register throws when name is not Core and Core module not found', function (
         ->toThrow(Exception::class, 'Core is required and must be enabled');
 });
 
+it('register throws when a module.json required module is not enabled', function (): void {
+    $core = Mockery::mock(Nwidart\Modules\Laravel\Module::class);
+    $current = Mockery::mock(Nwidart\Modules\Laravel\Module::class);
+    $current->shouldReceive('get')->with('requires', [])->andReturn(['Ghost']);
+
+    Nwidart\Modules\Facades\Module::shouldReceive('find')->with('Core')->andReturn($core);
+    Nwidart\Modules\Facades\Module::shouldReceive('find')->with('DepMod')->andReturn($current);
+    Nwidart\Modules\Facades\Module::shouldReceive('find')->with('Ghost')->andReturnNull();
+
+    $provider = new class(app()) extends ModuleServiceProvider
+    {
+        public string $name = 'DepMod';
+
+        public string $nameLower = 'depmod';
+    };
+
+    expect(fn () => $provider->register())
+        ->toThrow(Exception::class, 'requires the Ghost module');
+});
+
 it('register for core registers event and route service providers', function (): void {
     $provider = new class(app()) extends ModuleServiceProvider
     {

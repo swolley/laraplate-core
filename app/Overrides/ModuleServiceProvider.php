@@ -31,9 +31,7 @@ class ModuleServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        if ($this->name !== 'Core') {
-            throw_unless(Module::find('Core'), ConfigurationException::class, 'Core is required and must be enabled');
-        }
+        $this->assertRequiredModulesEnabled();
 
         $this->registerConfig();
 
@@ -97,6 +95,34 @@ class ModuleServiceProvider extends ServiceProvider
         // subfolder, so without this the module scaffold views cannot be compiled and
         // `php artisan view:cache` fails on them.
         Blade::anonymousComponentPath($sourcePath, $this->nameLower);
+    }
+
+    /**
+     * Every non-Core module requires Core, plus each module listed in its `module.json` "requires".
+     * All must be enabled, or the application is misconfigured — fail loud at registration rather than
+     * with an obscure error the first time the missing dependency is touched.
+     */
+    protected function assertRequiredModulesEnabled(): void
+    {
+        if ($this->name === 'Core') {
+            return;
+        }
+
+        throw_unless(Module::find('Core'), ConfigurationException::class, 'Core is required and must be enabled');
+
+        $requires = Module::find($this->name)->get('requires', []);
+
+        foreach ((is_array($requires) ? $requires : []) as $required) {
+            if (! is_string($required) || $required === 'Core') {
+                continue;
+            }
+
+            throw_unless(
+                Module::find($required),
+                ConfigurationException::class,
+                "The {$this->name} module requires the {$required} module, which must be enabled.",
+            );
+        }
     }
 
     protected function registerDefaultTranslationPath(string $lang_path): void
