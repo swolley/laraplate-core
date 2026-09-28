@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Approval\Models\Disapproval as BaseDisapproval;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
 
-final class Disapproval extends BaseDisapproval
+/**
+ * One vote against a captured write.
+ *
+ * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
+ */
+final class Disapproval extends Model
 {
     use HasModerationMeta;
 
@@ -18,4 +25,26 @@ final class Disapproval extends BaseDisapproval
      */
     #[Override]
     protected $table = CoreTables::Disapprovals->value;
+
+    /**
+     * @var list<string>
+     */
+    #[Override]
+    protected $guarded = ['id'];
+
+    /**
+     * @return MorphTo<Model, $this>
+     */
+    public function disapprover(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * @return BelongsTo<Modification, $this>
+     */
+    public function modification(): BelongsTo
+    {
+        return $this->belongsTo(Modification::class);
+    }
 }

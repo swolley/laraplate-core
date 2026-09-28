@@ -4,12 +4,26 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Approval\Models\Modification as ApprovalModification;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
-final class Modification extends ApprovalModification
+/**
+ * A write captured before it happened, with the votes cast on it.
+ *
+ * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
+ * The relations, the remaining-vote counters and the active/inactive scopes were the
+ * package's; the unused parts of its model (`forceApprovalUpdate()`, the
+ * `approvalsRemaining`/`disapprovalsRemaining` aliases, the `changes`/`creations`
+ * scopes) were not brought over.
+ */
+final class Modification extends Model
 {
     use HasFactory;
 
@@ -18,6 +32,12 @@ final class Modification extends ApprovalModification
      */
     #[Override]
     protected $table = CoreTables::Modifications->value;
+
+    /**
+     * @var list<string>
+     */
+    #[Override]
+    protected $guarded = ['id'];
 
     /**
      * @var array<int,string>
@@ -36,6 +56,43 @@ final class Modification extends ApprovalModification
         'approvers_required',
         'disapprovers_required',
     ];
+
+    /**
+     * The record the captured write belongs to. Null while a `create` waits for approval:
+     * there is no record yet.
+     *
+     * @return MorphTo<Model, $this>
+     */
+    public function modifiable(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Whoever asked for the write. Only they may withdraw the request.
+     *
+     * @return MorphTo<Model, $this>
+     */
+    public function modifier(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * @return HasMany<Approval, $this>
+     */
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(Approval::class);
+    }
+
+    /**
+     * @return HasMany<Disapproval, $this>
+     */
+    public function disapprovals(): HasMany
+    {
+        return $this->hasMany(Disapproval::class);
+    }
 
     /**
      * Latest vote meta from approvals or disapprovals (e.g. AI moderation payload).
@@ -78,5 +135,53 @@ final class Modification extends ApprovalModification
 
         /** @var array<string, mixed>|null */
         return $latest->meta;
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function activeOnly(Builder $query): void
+    {
+        $query->where('active', true);
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function inactiveOnly(Builder $query): void
+    {
+        $query->where('active', false);
+    }
+
+    /**
+     * How many approvals are still missing before the decision is complete.
+     *
+     * @return Attribute<int, never>
+     */
+    protected function approversRemaining(): Attribute
+    {
+        return Attribute::get(fn (): int => (int) $this->approvers_required - $this->approvals()->count());
+    }
+
+    /**
+     * @return Attribute<int, never>
+     */
+    protected function disapproversRemaining(): Attribute
+    {
+        return Attribute::get(fn (): int => (int) $this->disapprovers_required - $this->disapprovals()->count());
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Override]
+    protected function casts(): array
+    {
+        return [
+            'modifications' => 'json',
+            'active' => 'boolean',
+        ];
     }
 }

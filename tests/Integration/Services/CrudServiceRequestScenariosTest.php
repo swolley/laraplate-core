@@ -1205,7 +1205,7 @@ it('approves the modification on the target model connection', function (): void
 
         protected $guarded = [];
 
-        public function applyModificationChanges(Approval\Models\Modification $modification, bool $approved): void
+        public function applyModificationChanges(Modification $modification, bool $approved): void
         {
             throw new RuntimeException('forced approval failure');
         }
@@ -1349,7 +1349,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
         ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7401)->value('active'))->toBe(1)
         ->and($row->fresh()?->title)->toBe('approval sentinel')
         ->and(Modules\Core\Models\Approval::query()->where('modification_id', 7401)->count())->toBe(0)
-        ->and(Modification::query()->whereKey(7401)->value('active'))->toBe(1);
+        ->and(Modification::query()->whereKey(7401)->value('active'))->toBeTrue();
 
     $disapprove_permission = Permission::query()->create([
         'name' => 'crud_approval_denied_secondary.crud_cov_approval_affinity_denied.disapprove',
@@ -1480,7 +1480,7 @@ it('does not cast an unauthorized disapproval vote on the target model connectio
         ->and($schema->getConnection()->table((new Modification)->getTable())->where('id', 7402)->value('active'))->toBe(1)
         ->and($row->fresh()?->title)->toBe('disapproval sentinel')
         ->and(Modules\Core\Models\Disapproval::query()->where('modification_id', 7402)->count())->toBe(0)
-        ->and(Modification::query()->whereKey(7402)->value('active'))->toBe(1);
+        ->and(Modification::query()->whereKey(7402)->value('active'))->toBeTrue();
 });
 
 it('disapprove iterates active modifications when no modification id is passed', function (): void {

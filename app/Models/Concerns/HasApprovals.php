@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
-use Approval\Models\Modification as ApprovalModification;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Approval\Traits\RequiresApproval;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
@@ -19,6 +18,11 @@ use Modules\Core\Support\PermissionName;
 use TypeError;
 
 /**
+ * Captures a write that its author may not apply alone, as a Modification waiting for approval.
+ *
+ * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md: the capture
+ * body, the modifications relation and applyModificationChanges() were the package's.
+ *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  *
  * @phpstan-type HasApprovalsType HasApprovals
@@ -26,25 +30,6 @@ use TypeError;
 trait HasApprovals
 {
     use RequiresApproval;
-
-    /**
-     * Declared again only for its generics. RequiresApproval returns a bare
-     * MorphMany, so nothing downstream knows what is on the other end, and the
-     * scopes the Modification model carries (activeOnly, inactiveOnly) resolve
-     * against Model instead. The body is the package's, with the configured class
-     * checked before it is used as one.
-     *
-     * @return MorphMany<ApprovalModification, $this>
-     */
-    public function modifications(): MorphMany
-    {
-        $configured = config('approval.models.modification', ApprovalModification::class);
-        $modification_class = is_string($configured) && is_a($configured, ApprovalModification::class, true)
-            ? $configured
-            : ApprovalModification::class;
-
-        return $this->morphMany($modification_class, 'modifiable');
-    }
 
     /**
      * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
@@ -68,10 +53,7 @@ trait HasApprovals
 
         $modifier = $item->modifier();
 
-        /** @var class-string<Modification|ApprovalModification> $modification_model */
-        $modification_model = config('approval.models.modification', Modification::class);
-
-        $modification = $has_modification_pending ?? new $modification_model();
+        $modification = $has_modification_pending ?? new Modification();
         $modification->active = true;
         $modification->modifications = $diff;
         $modification->approvers_required = $item->approversRequired;
@@ -98,6 +80,46 @@ trait HasApprovals
         $item->applyAuthorApproveCredit($modification);
 
         return false;
+    }
+
+    /**
+     * Declared again over RequiresApproval, which returns a bare MorphMany against a
+     * configurable class: nothing downstream knew what was on the other end, and the
+     * scopes the Modification model carries (activeOnly, inactiveOnly) resolved against
+     * Model instead. The class is no longer configurable because the model is ours.
+     *
+     * @return MorphMany<Modification, $this>
+     */
+    public function modifications(): MorphMany
+    {
+        return $this->morphMany(Modification::class, 'modifiable');
+    }
+
+    /**
+     * Apply a decided modification to the model, or record the decision when nothing is
+     * applied. The body is the package's; only the modification type changed.
+     *
+     * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
+     */
+    public function applyModificationChanges(Modification $modification, bool $approved): void
+    {
+        if ($approved && $this->updateWhenApproved) {
+            $this->setForcedApprovalUpdate(true);
+
+            foreach ($modification->modifications as $key => $change) {
+                $this->{$key} = $change['modified'];
+            }
+
+            $this->save();
+
+            $this->settleModification($modification, $this->deleteWhenApproved);
+
+            return;
+        }
+
+        if ($approved === false) {
+            $this->settleModification($modification, $this->deleteWhenDisapproved);
+        }
     }
 
     public function initializeHasApprovals(): void
@@ -193,7 +215,7 @@ trait HasApprovals
      * When N > 1 and the writer holds approve permission, record one automatic Approval
      * (meta source: author_approve_permission). Does not apply when N = 1 (no mod created).
      */
-    protected function applyAuthorApproveCredit(Modification|ApprovalModification $modification): void
+    protected function applyAuthorApproveCredit(Modification $modification): void
     {
         if ((int) $modification->approvers_required <= 1) {
             return;
@@ -222,5 +244,20 @@ trait HasApprovals
         if ((int) $modification->approversRemaining === 0) {
             $this->applyModificationChanges($modification, true);
         }
+    }
+
+    /**
+     * A decided modification is either dropped or deactivated, never left active.
+     */
+    private function settleModification(Modification $modification, bool $delete): void
+    {
+        if ($delete) {
+            $modification->delete();
+
+            return;
+        }
+
+        $modification->active = false;
+        $modification->save();
     }
 }

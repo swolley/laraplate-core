@@ -15,6 +15,9 @@ use Modules\Core\Models\User;
  * Casts an approval or disapproval vote on a pending modification and applies it once the quorum is reached.
  *
  * Shared by the CRUD API and the Filament panel so both vote through the same rules.
+ *
+ * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md: it took over the
+ * voting and application the package's ApprovesChanges trait performed on the user model.
  */
 final class ModificationVoteService
 {

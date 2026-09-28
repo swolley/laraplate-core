@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
-use Approval\Models\Modification;
 use Approval\Traits\ApprovesChanges;
 use Carbon\CarbonInterface;
 use Filament\Models\Contracts\FilamentUser;
@@ -44,6 +43,7 @@ use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Observers\UserObserver;
+use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
 use Override;
@@ -460,13 +460,35 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
     }
 
     /**
-     * Run the package authorization hook before a connection-scoped vote is cast.
+     * Run the authorization hook before a connection-scoped vote is cast.
      */
     public function isAuthorizedToCastApprovalVote(Modification $modification, bool $approval): bool
     {
         return $approval
             ? $this->authorizedToApprove($modification)
             : $this->authorizedToDisapprove($modification);
+    }
+
+    /**
+     * Cast a vote in favour. Every caller goes through ModificationVoteService, which owns the
+     * vote rules, the transaction and the application of a completed decision.
+     *
+     * Replaces the identically named method of the laravel-approval ApprovesChanges trait,
+     * which recorded and applied the vote itself.
+     *
+     * @return bool false when this user may not cast the vote
+     */
+    public function approve(Modification $modification, ?string $reason = null): bool
+    {
+        return resolve(ModificationVoteService::class)->cast($this, $modification, true, $reason);
+    }
+
+    /**
+     * @return bool false when this user may not cast the vote
+     */
+    public function disapprove(Modification $modification, ?string $reason = null): bool
+    {
+        return resolve(ModificationVoteService::class)->cast($this, $modification, false, $reason);
     }
 
     protected static function newFactory(): UserFactory
