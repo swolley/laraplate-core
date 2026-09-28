@@ -71,6 +71,7 @@ it('requires approval when not in console and user cannot bypass approval', func
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->with($permission)->andReturn(false);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
 
@@ -100,6 +101,7 @@ it('does not require approval when user has approve credit and N is 1', function
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
 
@@ -118,6 +120,7 @@ it('requires approval when user has approve credit but N is greater than 1', fun
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
 

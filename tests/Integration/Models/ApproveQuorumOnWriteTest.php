@@ -121,6 +121,7 @@ it('still requires approval when writer lacks approve credit even if admin role 
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('can')->andReturn(false);
+    $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
 
     $model = new HasApprovalsStubModel;

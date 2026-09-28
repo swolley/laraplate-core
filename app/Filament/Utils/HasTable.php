@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Utils;
 
-use App\Models\User;
 use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -44,6 +43,7 @@ use Modules\Core\Events\TranslatedModelSaved;
 use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Inspector\ModelMetadataRegistry;
+use Modules\Core\Models\User;
 use Modules\Core\Services\FlagCDNService;
 use Modules\Core\Support\PermissionName;
 use PHPUnit\Event\InvalidArgumentException;
@@ -754,16 +754,16 @@ trait HasTable
                         return $query->when($data['value'], static function (Builder $query, mixed $value) use ($locked_at_column): Builder {
                             /** @var Builder<Model&ILockableModel> $query */
                             return match ($value) {
-                        // `onlyLocked` and `withoutLocked` were never defined anywhere: every branch
-                        // of this filter threw. The scopes are `locked` and `unlocked`, and they
-                        // account for expiry, so the filter now agrees with the model.
-                        'none' => $query->unlocked(),
-                        'only' => $query->locked(),
-                        'today' => $query->locked()->whereDate($locked_at_column, '<=', today()),
-                        'week' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
-                        'month' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
-                        'year' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
-                        default => $query,
+                                // `onlyLocked` and `withoutLocked` were never defined anywhere: every branch
+                                // of this filter threw. The scopes are `locked` and `unlocked`, and they
+                                // account for expiry, so the filter now agrees with the model.
+                                'none' => $query->unlocked(),
+                                'only' => $query->locked(),
+                                'today' => $query->locked()->whereDate($locked_at_column, '<=', today()),
+                                'week' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfWeek()),
+                                'month' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfMonth()),
+                                'year' => $query->locked()->whereDate($locked_at_column, '<=', now()->startOfYear()),
+                                default => $query,
                             };
                         });
                     }),

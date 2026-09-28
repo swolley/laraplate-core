@@ -278,7 +278,9 @@ it('lays out the edit form in rows', function (): void {
 });
 
 it('sends an is_public change from the form to approval', function (): void {
-    editSettingActor();
+    // Not editSettingActor(): a superadmin write is never captured, so there would be no
+    // modification to read back.
+    editSettingActorWithoutApproval();
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'type' => 'string',
@@ -290,7 +292,9 @@ it('sends an is_public change from the form to approval', function (): void {
     Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
         ->fillForm(['is_public' => true])
         ->call('save')
-        ->assertHasNoFormErrors();
+        ->assertHasNoFormErrors()
+        ->assertNotified('Change sent for approval');
 
-    expect($setting->modifications()->activeOnly()->sole()->modifications['is_public']['modified'])->toBeTrue();
+    expect($setting->modifications()->activeOnly()->sole()->modifications['is_public']['modified'])->toBeTrue()
+        ->and($setting->fresh()->is_public)->toBeFalse();
 });
