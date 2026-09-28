@@ -19,7 +19,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\App;
 use Livewire\Livewire;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
@@ -29,6 +28,7 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Tests\Support\HttpContext;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -73,20 +73,9 @@ function editSettingActorWithoutApproval(): User
 
     test()->actingAs($actor);
     Filament::setCurrentPanel('admin');
-    settingFormOverHttp();
+    HttpContext::pretendHttpRequest();
 
     return $actor;
-}
-
-/**
- * Approvals never apply to console writes, and tests run in the console.
- */
-function settingFormOverHttp(): void
-{
-    $app = App::getFacadeRoot();
-    $mock = Mockery::mock($app)->makePartial();
-    $mock->shouldReceive('runningInConsole')->andReturn(false);
-    App::swap($mock);
 }
 
 it('picks the value input from the setting type', function (array $attributes, string $expected_field): void {
@@ -164,7 +153,7 @@ it('sends the edited value to approval with its type and without read-only field
 
 it('saves the value directly when the writer can approve settings', function (): void {
     editSettingActor();
-    settingFormOverHttp();
+    HttpContext::pretendHttpRequest();
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
         'name' => 'edit_form_boolean_setting',
