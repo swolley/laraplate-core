@@ -789,6 +789,7 @@ Core contains code derived from these MIT-licensed libraries, which it does not 
 
 -   [sfolador/laravel-locked](https://github.com/sfolador/laravel-locked): record locking (`app/Locking`), see [`LICENSES/laravel-locked.md`](LICENSES/laravel-locked.md)
 -   [reshadman/laravel-optimistic-locking](https://github.com/reshadman/laravel-optimistic-locking): optimistic locking (`HasOptimisticLocking`), see [`LICENSES/laravel-optimistic-locking.md`](LICENSES/laravel-optimistic-locking.md)
+-   [cloudcake/laravel-approval](https://github.com/cloudcake/laravel-approval): approvals (`HasApprovals`, `Modification`, `ModificationVoteService`), see [`LICENSES/laravel-approval.md`](LICENSES/laravel-approval.md). Still required in `composer.json` as `stephenlake/laravel-approval` while the last references to its classes are removed; the requirement goes when they do.
 
 Core also takes inspiration from, without deriving code from:
 
