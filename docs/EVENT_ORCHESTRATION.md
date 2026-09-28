@@ -198,7 +198,8 @@ flowchart LR
         Mod[Modification]
         Ev[ModificationRequiresModeration]
         Reg[ModerationContextBuilderRegistry]
-        EvA[ModificationApproved]
+        Vote[ModificationVoteService]
+        EvA[ModificationApproved / Rejected / Withdrawn]
     end
     subgraph AI
         L[HandleModificationModerationListener]
@@ -212,7 +213,8 @@ flowchart LR
     L --> J
     J --> Reg
     J --> S
-    Comment --> EvA
+    Mod --> Vote
+    Vote --> EvA
 ```
 
 ### Sequence (comment + AI enabled)
@@ -243,8 +245,9 @@ sequenceDiagram
     Job->>Vote: system user approve/disapprove + meta JSON
     Job->>Core: ModificationPreProcessingCompleted(ai_approval)
     Note over User,Vote: Humans may still approve/reject in Filament
-    User->>CMS: human approve
-    CMS->>Core: ModificationApproved(modification, comment)
+    User->>Core: human approve (ModificationVoteService.cast)
+    Core->>CMS: Comment.applyModificationChanges() in the vote's transaction
+    Core->>Core: after commit: ModificationApproved(modification, comment)
 ```
 
 ### Fallback (no AI)
@@ -260,15 +263,27 @@ sequenceDiagram
 
 Unlike indexing, there is **no** automated fallback step when AI skips moderation.
 
+### Decision events
+
+`ModificationVoteService` is the only emitter of the three decision events, for every model with
+`HasApprovals`, and fires each through `afterCommit()` on the modification's connection, so no
+listener runs before the decision is committed:
+
+| Event | Fired by | `modifiable` |
+|-------|----------|--------------|
+| `ModificationApproved` | `cast()` when an approving vote completes the quorum; `applyAuthorCredit()` when the author's own credit does | The record, after the diff is written or the operation run |
+| `ModificationRejected` | `cast()` when a rejecting vote completes the quorum | The record, or `null` for a rejected create |
+| `ModificationWithdrawn` | `withdraw()`, after the author drops the request and its votes | The record, or `null` for a create |
+
 ### Post-approval: translations
 
 ```mermaid
 sequenceDiagram
-    participant CMS as Comment applyModificationChanges
+    participant Svc as ModificationVoteService
     participant Core as ModificationApproved
     participant AI as HandleModificationApprovedTranslationListener
 
-    CMS->>Core: event(modification, modifiable)
+    Svc->>Core: event(modification, modifiable) after commit
     AI->>AI: HasTranslations + auto_translate_* ?
     AI->>AI: dispatch TranslateModelJob
 ```
@@ -301,7 +316,9 @@ $this->app->make(ModerationContextBuilderRegistry::class)
 | Class | Role |
 |-------|------|
 | `Events\ModificationRequiresModeration` | Same orchestration pattern as indexing |
-| `Events\ModificationApproved` | `Modification` + `Model $modifiable` after apply |
+| `Events\ModificationApproved` | `Modification` + `Model $modifiable`, fired by `ModificationVoteService` after the approval commits |
+| `Events\ModificationRejected` | `Modification` + `?Model $modifiable`, fired after a rejection commits |
+| `Events\ModificationWithdrawn` | `Modification` + `?Model $modifiable`, fired after the author withdraws |
 | `Events\ModificationPreProcessingCompleted` | e.g. `ai_approval` step done |
 | `Contracts\ModerationContextBuilder` | Domain adapter interface |
 | `Services\ModerationContextBuilderRegistry` | Resolves builder by modification |

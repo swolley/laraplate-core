@@ -158,6 +158,7 @@ therefore reachable on the session-based `/app` surface only and are never expos
 | `/app/crud/inactivate/{module}/{entity}` | PATCH | Soft delete record |
 | `/app/crud/approve/{module}/{entity}` | PATCH | Approve pending modification |
 | `/app/crud/disapprove/{module}/{entity}` | PATCH | Reject pending modification |
+| `/app/crud/withdraw/{module}/{entity}` | PATCH | Withdraw your own pending modification (`modification` = its id) |
 | `/app/crud/lock/{module}/{entity}` | PATCH | Lock record for editing |
 | `/app/crud/unlock/{module}/{entity}` | PATCH | Unlock record |
 
@@ -591,15 +592,16 @@ class Article extends Model
 Lock/unlock via `PATCH /app/crud/lock/{module}/{entity}` and `PATCH /app/crud/unlock/{module}/{entity}`.
 Both are governed by the `{connection}.{table}.lock` permission.
 
-### RequiresApproval (Approval Workflow)
+### HasApprovals (Approval Workflow)
 
-Models using `RequiresApproval` trait support modification approval:
+Models using Core's `HasApprovals` trait send the writes their author may not apply alone
+(creates, updates, deletes, force deletes, restores) to approval instead of applying them:
 
 ```php
 class Article extends Model
 {
-    use RequiresApproval;
-    
+    use HasApprovals;
+
     protected function requiresApprovalWhen(array $modifications): bool
     {
         return isset($modifications['status']);
@@ -607,7 +609,20 @@ class Article extends Model
 }
 ```
 
-Approve/reject via `/api/v1/approve/{entity}` and `/api/v1/disapprove/{entity}`.
+What the API answers:
+
+| Situation | Status | Body `data` |
+|-----------|--------|-------------|
+| Insert, update, delete, activate or inactivate captured for approval | `202 Accepted` | `{modification, operation}` for one record; `{modifications: [...], applied}` when a multi-record write captured some of them |
+| Save of a record whose deletion waits for approval (`Block` models) | `409 Conflict` | error message |
+| Withdraw by the request's author | `200` | `{withdrawn: id}` |
+| Withdraw by anybody else | `401` | error message (every `AuthorizationException` answers 401) |
+| Withdraw of a request already decided | `409 Conflict` | error message |
+
+Approve, reject and withdraw via `PATCH /app/crud/approve|disapprove|withdraw/{module}/{entity}`.
+Withdraw needs `select` on the entity and the `modification` id; only the request's author may
+withdraw it. See the approvals section of `docs/rag/MODULE.md` for who is captured and what a
+pending deletion does to the record.
 
 ## File Structure
 

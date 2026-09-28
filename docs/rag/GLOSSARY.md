@@ -68,8 +68,10 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | ---------------------- | ----------------------------------------------------------------- |
 | **SoftDeletes**        | Logical delete with `deleted_at`; refresh command syncs DB triggers. |
 | **HasVersions**        | Immutable version history via `Version` rows.                     |
-| **HasApprovals**       | Pending-change workflow via `Modification` + approve/disapprove votes. |
-| **Modification**       | Diff record for a modifiable model awaiting approval.             |
+| **HasApprovals**       | Captures creates, updates, deletes, force deletes and restores its author may not apply alone as `Modification` requests decided by votes. |
+| **Modification**       | A request awaiting approval: its `operation` and, for creates and updates, the diff. Kept inactive once decided. |
+| **PendingDeletionStrategy** | What a record whose deletion waits looks like: `Block` (visible, refuses saves) or `Hide` (filtered for users who cannot decide). |
+| **Withdrawal**         | The author drops their own pending request and its votes before the decision. |
 | **HasValidity**        | `valid_from` / `valid_to` temporal validity window.               |
 | **HasLocks**           | Application-level record lock on business events.                 |
 | **HasOptimisticLocking** | Concurrency guard via version column.                           |

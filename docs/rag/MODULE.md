@@ -183,7 +183,7 @@ flowchart TB
 
 ### Record lifecycle traits stack
 
-A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes.enabled.{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `versioning.strategy.{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (uses Approval `RequiresApproval` and `Modification` model + `preview` flag), `HasValidity` (`valid_from`/`valid_to` columns plus scopes `valid()`, `expired()`, `scheduled()`, `draft()`; some models such as CMS `Content` also add a `valid` global scope in `booted()`), `HasLocks` (`locked_at`/`locked_user_id`/`locked_until`; `is_locked` is computed, not stored — see `RECORD_LOCKING_DEVELOPER.md`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
+A Core model can compose any subset of: `SoftDeletes` (`deleted_at` + `is_deleted` runtime toggleable via `soft_deletes.enabled.{table}` setting), `HasVersions` (uses `Overtrue\LaravelVersionable` underneath, toggled by `versioning.strategy.{table}` in group `versioning` and supports DIFF or SNAPSHOT), `HasApprovals` (captures creates, updates, deletes, force deletes and restores as `Modification` requests, plus a `preview` flag), `HasValidity` (`valid_from`/`valid_to` columns plus scopes `valid()`, `expired()`, `scheduled()`, `draft()`; some models such as CMS `Content` also add a `valid` global scope in `booted()`), `HasLocks` (`locked_at`/`locked_user_id`/`locked_until`; `is_locked` is computed, not stored — see `RECORD_LOCKING_DEVELOPER.md`), and `HasOptimisticLocking` (`lock_version`). The state diagram below summarises how a row moves through these phases when traits are stacked together (e.g. as on `User` or CMS `Content`).
 
 ```mermaid
 stateDiagram-v2
@@ -192,7 +192,10 @@ stateDiagram-v2
   Versioned --> PendingApproval: edit triggers requiresApprovalWhen
   Versioned --> Live: edit not requiring approval
   PendingApproval --> Live: Modification approved
-  PendingApproval --> Reverted: Modification disapproved (deleteWhenDisapproved)
+  PendingApproval --> Live: Modification disapproved or withdrawn (row unchanged)
+  Live --> PendingDeletion: delete captured for approval
+  PendingDeletion --> Trashed: deletion approved
+  PendingDeletion --> Live: deletion disapproved or withdrawn
   Live --> Locked: HasLocks acquired
   Locked --> Live: released by its holder, lifted with `unlock`, or lapsed at `locked_until`
   Live --> StaleConflict: lock_version mismatch
@@ -241,30 +244,45 @@ flowchart LR
 
 ### Approvals and preview
 
-`HasApprovals` wraps the Approval package's `RequiresApproval` and adds a `preview` flag driven by request middleware + session. When `requiresApprovalWhen()` returns true (default: any modification by a non-admin/super-admin in HTTP context), the change is persisted as a `Modification` instead of touching the row. While `preview()` is true, the trait appends a `preview` accessor that overlays pending modifications on top of stored attributes via `toArray()`. Disapproval triggers `deleteWhenDisapproved`. Domain models can narrow the rule (e.g. CMS `Content` only requires approval when the validity window changes; Core `Setting` requires approval on any field other than `description` and `group_name`). Votes go through `ModificationVoteService`, shared by the CRUD `approve`/`disapprove` operations and the Filament panel. In the panel, modifications are read-only: no create, edit or delete; the only actions are Approve and Disapprove (with an optional reason), shown to users allowed to vote and never to the modification's author.
+`HasApprovals` (Core's own trait, derived from `cloudcake/laravel-approval`, see `LICENSES/laravel-approval.md`) intercepts every write its author may not apply alone and turns it into a `Modification` request instead of touching the row. It listens to `saving` (create, update), `deleting` (delete and force delete: Laravel's `forceDelete()` fires `deleting` too) and, on soft-deletable models, `restoring`. Each request records its `operation` (`Operation::Create|Update|Delete|ForceDelete|Restore`); creates and updates carry a diff, the other three carry none. Repeating the same pending operation updates the existing request.
+
+**Who is captured.** Nothing in the console (seeders, queues, commands). Nothing a superadmin writes. A writer holding the table's `approve` permission writes directly when one approval is enough; with more approvals required, their write is captured and credited with one automatic approval (`meta.source = author_approve_permission`), applied at once when that completes the quorum. Everybody else is captured. Models narrow the rule: `requiresApprovalWhen(array $diff)` for saves (CMS `Content` only on validity changes; Core `Setting` on any field other than `description` and `group_name`), `requiresApprovalForOperation(Operation)` for deletes and restores (CMS `Content` deletes drafts and expired contents directly), and `approvalOperations()` for which operations are captured at all (CMS `Comment` captures only creates and updates: an author deletes their own comment).
+
+**While a deletion waits.** `pendingDeletionStrategy()` decides: `Block` (default) keeps the record visible and refuses every save with `PendingDeletionLock`, except the attributes listed by `attributesWritableWhilePendingDeletion()` and `updated_at`; `Hide` filters the record out for authenticated users who hold neither `approve` nor `disapprove` on its table (global scope `PendingDeletionStrategy::HIDE_SCOPE`; local scope `withoutPendingDeletion()`). With nobody authenticated (console, queues, indexing, exports) nothing is hidden.
+
+**Deciding.** Votes go through `ModificationVoteService`, the only place a decision is applied. `cast()` records the vote and, when it completes the quorum, applies the decision in the same transaction: an approved create or update writes its diff, an approved delete, force delete or restore runs it, and an approved deletion rejects the record's pending updates (`reason = record deleted`). If applying fails, the vote is rolled back and the request stays pending. A decided request is deactivated and kept, with its votes, as the trail. The author never votes on their own request.
+
+**Withdrawing.** `ModificationVoteService::withdraw()` lets the author, and only the author, drop a request before its decision: the request and its votes are deleted and the record stays as it was.
+
+**Events.** After the transaction commits the service fires `ModificationApproved`, `ModificationRejected` or `ModificationWithdrawn` (see `EVENT_ORCHESTRATION.md`). `ModificationRequiresModeration` still fires when a request is created.
+
+**Outcome on each surface.** `pendingModification()` on the instance returns the request its last write became, or `null` when the write ran; `wouldRequireApproval(Operation)` answers without writing. The Filament edit pages of approval models (trait `Filament\Utils\ReportsApprovalOutcome`) label delete, force delete and restore as requests when they would be captured, report "sent for approval" instead of a save or delete that did not happen, and explain a save refused by a pending deletion. Modifications is read-only apart from Approve and Disapprove (voters, never the author) and Withdraw (the author, while the request is active). The CRUD API answers `202` with `{modification, operation}` for a captured write, `409` for a save refused by a pending deletion, and exposes `PATCH /app/crud/withdraw/{module}/{entity}` (see `CRUD_SYSTEM.md`). AI CRUD tools answer `status: pending_approval` with the request id.
+
+**Limit.** Only model events are intercepted: mass query updates and deletes (`Model::query()->update()`, `->delete()`) bypass approvals.
+
+While `preview()` is true (request middleware + session), the trait appends a `preview` accessor that overlays pending modifications on top of stored attributes via `toArray()`.
 
 ```mermaid
 flowchart TB
-  Edit[Model edit]
-  RequiresChk["requiresApprovalWhen?"]
+  Write["save / delete / forceDelete / restore"]
+  Gate["console? superadmin? approve credit with N = 1?<br/>model rule?"]
   ApplyDirect[Persist directly]
-  Mod[Modification row]
-  Apprv["User.authorizedToApprove?"]
-  Approve[Approve]
-  Disapp[Disapprove]
-  Apply[Replay modifications]
-  Drop["Delete (deleteWhenDisapproved)"]
-  Preview[preview accessor]
-  PreviewMid["preview() session/middleware"]
+  Mod["Modification (operation, diff)"]
+  Vote["ModificationVoteService.cast()"]
+  Apply["Apply in the vote's transaction<br/>write diff or run the operation"]
+  Keep["Deactivate and keep the request"]
+  Withdraw["withdraw() by the author<br/>request and votes deleted"]
+  Events["ModificationApproved / Rejected / Withdrawn<br/>after commit"]
 
-  Edit --> RequiresChk
-  RequiresChk -->|no| ApplyDirect
-  RequiresChk -->|yes| Mod
-  Mod --> Apprv
-  Apprv -->|yes| Approve --> Apply
-  Apprv -->|no| Disapp --> Drop
-  PreviewMid --> Preview
-  Preview -.->|reads| Mod
+  Write --> Gate
+  Gate -->|no approval needed| ApplyDirect
+  Gate -->|captured| Mod
+  Mod --> Vote
+  Vote -->|approved| Apply --> Keep
+  Vote -->|disapproved| Keep
+  Mod --> Withdraw
+  Keep --> Events
+  Withdraw --> Events
 ```
 
 ### Dynamic entities, presets and fields
@@ -316,7 +334,7 @@ flowchart LR
 
 ### CRUD pipeline
 
-`CrudService` is the unified entry for list/detail/history/tree/search/insert/update/delete. Each read operation runs in this order: (1) `AuthorizationService::ensurePermission()` (super-admin bypass + `hasPermissionTo`), (2) `AuthorizationService::injectAclFilters()` which merges the resolved `FiltersGroup` (AND with caller filters) into request data, (3) `QueryBuilder::prepareQuery()` builds the Eloquent query (filters/sort/relations/cursor), (4) execution either by pagination, range, or others, with optional `applyComputedMethods` and `applyGroupBy`, returning a `CrudResult` with `CrudMeta`. Write operations stack lock checks (`HasLocks`/`HasOptimisticLocking`) and approval routing (`RequiresApproval`).
+`CrudService` is the unified entry for list/detail/history/tree/search/insert/update/delete. Each read operation runs in this order: (1) `AuthorizationService::ensurePermission()` (super-admin bypass + `hasPermissionTo`), (2) `AuthorizationService::injectAclFilters()` which merges the resolved `FiltersGroup` (AND with caller filters) into request data, (3) `QueryBuilder::prepareQuery()` builds the Eloquent query (filters/sort/relations/cursor), (4) execution either by pagination, range, or others, with optional `applyComputedMethods` and `applyGroupBy`, returning a `CrudResult` with `CrudMeta`. Write operations stack lock checks (`HasLocks`/`HasOptimisticLocking`) and approval routing (`HasApprovals`: a captured write answers `202`, a save refused by a pending deletion `409`).
 
 **List counting modes.** A paginated list (`page`) defaults to **look-ahead**: it skips the `COUNT(*)`, over-fetches one row (`pagination + 1`), trims it, and returns `hasMore` — `totalRecords`/`totalPages` are omitted. Pass `totals=true` to opt into the **counted** mode, which computes the exact total and returns `totalRecords`/`totalPages`. Look-ahead is sort-agnostic (works for any ordering, unlike keyset cursors) and suits infinite-scroll / "load more" UIs; numbered-page UIs pass `totals=true`. `CrudMeta.mode` (`counted`|`lookahead`, surfaced as `meta.mode`) advertises which one applied, so the client renders the right footer without inferring it from field presence. A full `get` (no `page`/`from`/`limit`/`count`) still derives the total from the fetched rows without a `COUNT(*)`. Facet distribution counts (`facetCounts`) group real base-table columns in SQL and fall back to an in-memory count only for computed accessors.
 

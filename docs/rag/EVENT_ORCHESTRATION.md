@@ -73,7 +73,9 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 | Layer | Class | Role |
 |-------|-------|------|
 | Core | `Events\ModificationRequiresModeration` | Same orchestration pattern as indexing |
-| Core | `Events\ModificationApproved` | After `applyModificationChanges()` |
+| Core | `Events\ModificationApproved` | Fired by `ModificationVoteService` after the approving vote's transaction commits, for every model |
+| Core | `Events\ModificationRejected` | Fired by `ModificationVoteService` after a rejecting vote commits; `modifiable` is null for a rejected create |
+| Core | `Events\ModificationWithdrawn` | Fired by `ModificationVoteService::withdraw()` after the author drops a request; the modification and its votes are already deleted |
 | Core | `Events\ModificationPreProcessingCompleted` | e.g. `ai_approval` done |
 | Core | `Contracts\ModerationAdapter` | Domain adapter (returns `ModerationRequest`) |
 | Core | `Services\ModerationAdapterRegistry` | Resolves adapter by modification |
@@ -98,9 +100,9 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 | Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
 | System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
 
-### Post-approval
+### Post-decision
 
-`Comment::applyModificationChanges()` emits `ModificationApproved` → AI `HandleModificationApprovedTranslationListener` may dispatch `TranslateModelJob` when `auto_translate_*` is enabled.
+`ModificationVoteService` is the only emitter of the decision events: `cast()` fires `ModificationApproved` or `ModificationRejected`, `applyAuthorCredit()` fires `ModificationApproved` when the author's own credit completes the quorum, and `withdraw()` fires `ModificationWithdrawn`. Each fires through `afterCommit()`, so a listener never sees the record before the decision is committed. `ModificationApproved` → AI `HandleModificationApprovedTranslationListener` may dispatch `TranslateModelJob` when `auto_translate_*` is enabled.
 
 ## HowToUse — extend
 
