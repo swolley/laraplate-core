@@ -156,8 +156,8 @@ therefore reachable on the session-based `/app` surface only and are never expos
 |----------|--------|-------------|
 | `/app/crud/activate/{module}/{entity}` | PATCH | Restore soft-deleted record |
 | `/app/crud/inactivate/{module}/{entity}` | PATCH | Soft delete record |
-| `/app/crud/approve/{module}/{entity}` | PATCH | Approve pending modification |
-| `/app/crud/disapprove/{module}/{entity}` | PATCH | Reject pending modification |
+| `/app/crud/approve/{module}/{entity}` | PATCH | Approve pending modifications of the record `id` |
+| `/app/crud/disapprove/{module}/{entity}` | PATCH | Reject pending modifications of the record `id` |
 | `/app/crud/withdraw/{module}/{entity}` | PATCH | Withdraw your own pending modification (`modification` = its id) |
 | `/app/crud/lock/{module}/{entity}` | PATCH | Lock record for editing |
 | `/app/crud/unlock/{module}/{entity}` | PATCH | Unlock record |
@@ -620,6 +620,10 @@ What the API answers:
 | Withdraw of a request already decided | `409 Conflict` | error message |
 
 Approve, reject and withdraw via `PATCH /app/crud/approve|disapprove|withdraw/{module}/{entity}`.
+A vote acts on one record (`id`): without `modification` it votes on every active request of
+that record, oldest first; with `modification` (one id or a list of ids) only on those, which
+must all belong to the record (`404` otherwise) and still be pending (`409` otherwise). An
+optional `reason` (max 255 characters) is stored on each vote.
 Withdraw needs `select` on the entity and the `modification` id; only the request's author may
 withdraw it. See the approvals section of `docs/rag/MODULE.md` for who is captured and what a
 pending deletion does to the record.

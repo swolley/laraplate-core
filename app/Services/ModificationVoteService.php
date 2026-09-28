@@ -42,7 +42,7 @@ final class ModificationVoteService
      * the vote is rolled back and the request stays pending. The decision's event fires once
      * the transaction commits.
      *
-     * @return bool false when the user is not authorized to vote
+     * @return bool false when the user is not authorized to vote or the request is already decided
      */
     public function cast(User $user, Modification $modification, bool $approval, ?string $reason = null, ?Model $modifiable = null): bool
     {
@@ -104,7 +104,8 @@ final class ModificationVoteService
             $modification->setRelation('modifiable', $modifiable);
         }
 
-        if (! $user->isAuthorizedToCastApprovalVote($modification, $approval)) {
+        // A decided request is never voted on again: applying it twice would rerun its diff or operation.
+        if (! $modification->active || ! $user->isAuthorizedToCastApprovalVote($modification, $approval)) {
             return false;
         }
 

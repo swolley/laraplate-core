@@ -7,6 +7,7 @@ namespace Modules\Core\Services\Crud;
 use BadMethodCallException;
 use Carbon\Carbon;
 use DateTimeInterface;
+use DomainException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -2507,35 +2508,29 @@ class CrudService
         $connection = $found_record->getConnection();
         $modification_prototype = (new Modification())->setConnection($connection->getName());
 
-        $connection->transaction(function () use ($requestData, $model, $found_record, $user, $operation, $modification_prototype): void {
-            if (isset($requestData->changes['modification'])) {
-                $modification = $modification_prototype->newQuery()
-                    ->where('modifiable_type', $model::class)
-                    ->where('modifiable_id', $requestData->primaryKey)
-                    ->whereKey($requestData->changes['modification'])
-                    ->lockForUpdate()
-                    ->sole();
+        $requested = $requestData->changes['modification'] ?? null;
+        $reason = $requestData->changes['reason'] ?? null;
+        $vote_reason = is_string($reason) ? $reason : null;
 
-                $reason = $requestData->changes['reason'] ?? null;
-                $vote_reason = is_string($reason) ? $reason : null;
-                $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
+        $connection->transaction(function () use ($found_record, $user, $operation, $modification_prototype, $requested, $vote_reason): void {
+            $modifications = $modification_prototype->newQuery()
+                ->where('modifiable_type', $found_record::class)
+                ->where('modifiable_id', $found_record->getKey());
+
+            if (is_array($requested)) {
+                // Only the named requests, and every one of them must belong to this record.
+                $modifications = $modifications->whereKey($requested)->lockForUpdate()->get();
+
+                throw_if($modifications->count() !== count($requested), ModelNotFoundException::class, 'No modification found for this record with the given id');
+                throw_if($modifications->contains(static fn (Modification $modification): bool => ! $modification->active), DomainException::class, 'A decided request cannot be voted on.');
             } else {
-                $modifications = $modification_prototype->newQuery()
-                    ->where('modifiable_type', $found_record::class)
-                    ->where('modifiable_id', $found_record->getKey())
-                    ->activeOnly()
-                    ->oldest()
-                    ->lockForUpdate()
-                    ->cursor();
+                $modifications = $modifications->activeOnly()->oldest()->lockForUpdate()->get();
 
                 throw_if($modifications->isEmpty(), LogicException::class, sprintf('No modifications to be %sd', $operation));
+            }
 
-                $reason = $requestData->changes['reason'] ?? null;
-                $vote_reason = is_string($reason) ? $reason : null;
-
-                foreach ($modifications as $modification) {
-                    $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
-                }
+            foreach ($modifications as $modification) {
+                $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
             }
         });
 

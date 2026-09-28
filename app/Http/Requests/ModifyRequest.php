@@ -88,16 +88,30 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
         /** @phpstan-ignore method.notFound */
         $is_delete = Str::contains($this->url(), '/delete/');
 
-        // A withdrawal names the request to drop and writes nothing on the record, so the
-        // model's own rules do not apply to it.
+        // A withdrawal or a vote names the requests it acts on and writes nothing on the record
+        // itself, so the model's own rules do not apply to it.
         /** @phpstan-ignore method.notFound */
         $is_withdraw = Str::contains($this->url(), '/withdraw/');
+
+        /** @phpstan-ignore method.notFound */
+        $is_vote = Str::contains($this->url(), ['/approve/', '/disapprove/']);
 
         if ($is_withdraw) {
             $to_merge['modification'] = ['required', 'integer'];
         }
 
-        if (class_uses_trait($this->model, HasValidations::class) && ! $is_delete && ! $is_withdraw) {
+        if ($is_vote) {
+            // One request id or a list of them; none votes on every active request of the record.
+            if ($this->has('modification') && ! is_array($this->input('modification'))) {
+                $this->merge(['modification' => [$this->input('modification')]]);
+            }
+
+            $to_merge['modification'] = ['sometimes', 'array', 'min:1'];
+            $to_merge['modification.*'] = ['integer', 'distinct'];
+            $to_merge['reason'] = ['sometimes', 'nullable', 'string', 'max:255'];
+        }
+
+        if (class_uses_trait($this->model, HasValidations::class) && ! $is_delete && ! $is_withdraw && ! $is_vote) {
             /** @phpstan-ignore method.notFound */
             $main_entity = $this->resolveMainEntity();
 

@@ -113,3 +113,16 @@ it('applies a deletion whose quorum the author credit completes, through the ser
         ->and($modification->fresh()->active)->toBeFalse()
         ->and($modification->fresh()->approvals()->count())->toBe(2);
 });
+
+it('never votes again on a decided request', function (): void {
+    Auth::login($this->author);
+    $this->record->delete();
+    $modification = $this->record->pendingModification();
+    resolve(ModificationVoteService::class)->cast($this->approver, $modification, false);
+
+    $voted = resolve(ModificationVoteService::class)->cast($this->approver, $modification->fresh(), true);
+
+    expect($voted)->toBeFalse()
+        ->and($this->record->fresh()->trashed())->toBeFalse()
+        ->and($modification->fresh()->approvals()->exists())->toBeFalse();
+});
