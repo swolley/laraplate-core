@@ -29,8 +29,8 @@ use Throwable;
  * only ever write default-connection models — while nodes that write elsewhere
  * remain responsible for wrapping those specific writes in their own
  * transaction derived from that connection, exactly as {@see
- * \Modules\Core\Overrides\Seeder::seedSettingDefinitions()} already does and as
- * the project's connection-affinity architecture tests already require of every
+ * \Modules\Core\Database\Seeders\CoreDatabaseSeeder::defaultRoles()} already does
+ * and as the project's connection-affinity architecture tests already require of every
  * production seeder (no `DB::transaction(` inside a seeder file). This class
  * does not change or relax that requirement; it adds a backstop for the
  * default connection on top of it.

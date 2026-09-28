@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Overrides;
 
+use function is_laraplate_owned_module;
+
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Seeder as BaseSeeder;
 use Modules\Core\Console\Concerns\HasBenchmark;
@@ -46,61 +48,32 @@ class Seeder extends BaseSeeder
     }
 
     /**
-     * Reconcile definition for the settings a first-party module ships.
+     * Reconcile definition for the settings a module ships.
      *
-     * Every row is stamped `is_internal = true`, and the flag is structural so a
-     * re-seed realigns rows written before it existed. `group_name` is written on
-     * insert only: operators regroup settings freely and a re-seed keeps their choice.
+     * `is_internal` follows the declaring module's ownership, not the fact that a
+     * seeder wrote the row: {@see is_laraplate_owned_module()} reads `module.json`
+     * `laraplate_owned`, falling back to a `swolley/laraplate-*` composer name. A
+     * third-party module shipping its own settings through this definition gets
+     * `is_internal = false`. The flag is structural, so a re-seed realigns rows
+     * written before it existed and follows a module that changes ownership.
+     * `group_name` is written on insert only: operators regroup settings freely and
+     * a re-seed keeps their choice.
      *
      * @param  list<array<string,mixed>>  $rows
      */
     protected static function internalSettingsDefinition(string $module, array $rows): SeedDefinition
     {
+        $is_internal = is_laraplate_owned_module($module);
+
         return SeedDefinition::for(Setting::class)
             ->identity(['name'])
             ->structural(['type', 'description', 'choices', 'is_internal'])
             ->initial(['value'])
             ->ownedBy($module)
             ->rows(array_map(
-                static fn (array $row): array => [...$row, 'is_internal' => true],
+                static fn (array $row): array => [...$row, 'is_internal' => $is_internal],
                 $rows,
             ));
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $definitions
-     */
-    protected function seedSettingDefinitions(array $definitions): void
-    {
-        if ($definitions === []) {
-            return;
-        }
-
-        $existing = Setting::query()
-            ->withoutGlobalScopes()
-            ->whereIn('name', array_column($definitions, 'name'))
-            ->select(['name'])
-            ->pluck('name')
-            ->flip()
-            ->all();
-
-        $newDefinitions = array_filter(
-            $definitions,
-            static fn (array $definition): bool => ! isset($existing[$definition['name']]),
-        );
-
-        if ($newDefinitions === []) {
-            $this->command?->line('    - runtime settings already exist');
-
-            return;
-        }
-
-        (new Setting)->getConnection()->transaction(function () use ($newDefinitions): void {
-            foreach ($newDefinitions as $definition) {
-                Setting::factory()->persistedWithoutApprovalCapture()->create($definition);
-                $this->command?->line("    - {$definition['name']} <fg=green>created</>");
-            }
-        });
     }
 
     /**
