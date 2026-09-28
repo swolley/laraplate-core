@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -32,7 +33,7 @@ it('lists active modifications for an entity when the user can approve', functio
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 1,
         'md5' => md5('pending-inbox'),
@@ -47,7 +48,7 @@ it('lists active modifications for an entity when the user can approve', functio
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => false,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('inactive-inbox'),

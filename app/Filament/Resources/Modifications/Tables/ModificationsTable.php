@@ -36,6 +36,9 @@ final class ModificationsTable
                         ->searchable(),
                     TextColumn::make('modifiable_type')
                         ->searchable(),
+                    TextColumn::make('operation')
+                        ->badge()
+                        ->sortable(),
                     TextColumn::make('modifier.name')
                         ->searchable()
                         ->sortable(),

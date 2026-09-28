@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Notification;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Console\CheckPendingApprovalsCommand;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
@@ -62,7 +63,7 @@ it('covers CheckPendingApprovalsCommand branches', function (): void {
             'modifier_id' => 1,
             'modifier_type' => User::class,
             'active' => true,
-            'is_update' => true,
+            'operation' => Operation::Update,
             'approvers_required' => 1,
             'disapprovers_required' => 1,
             'md5' => md5('a'),

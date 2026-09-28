@@ -140,7 +140,7 @@ it('writes soft-delete settings through the Setting model connection', function 
         $table->json('modifications')->nullable();
         $table->string('md5')->nullable();
         $table->boolean('active')->default(true);
-        $table->boolean('is_update')->default(false);
+        $table->string('operation', 16)->default('create');
         $table->timestamps();
     });
 

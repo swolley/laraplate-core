@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
@@ -20,7 +22,7 @@ it('counts the approvals and disapprovals still needed', function (): void {
         'modifiable_type' => User::class,
         'modifiable_id' => $user->id,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 1,
         'md5' => md5('counts'),
@@ -45,7 +47,7 @@ it('casts active to a boolean and the diff to an array', function (): void {
         'modifiable_type' => User::class,
         'modifiable_id' => $user->id,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('casts'),
@@ -67,7 +69,7 @@ it('reads the modifier and the modifiable through their morph relations', functi
         'modifier_type' => User::class,
         'modifier_id' => $user->id,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('morphs'),
@@ -84,4 +86,25 @@ it('reads the modifier and the modifiable through their morph relations', functi
         ->and($modification->modifier->is($user))->toBeTrue()
         ->and($modification->disapprovals()->sole()->disapprover->is($user))->toBeTrue()
         ->and($modification->disapproversRemaining)->toBe(0);
+});
+
+it('stores the operation it carries', function (): void {
+    $user = User::factory()->create();
+    $modification = Modification::query()->create([
+        'modifiable_type' => User::class,
+        'modifiable_id' => $user->id,
+        'active' => true,
+        'operation' => Operation::Delete,
+        'approvers_required' => 1,
+        'disapprovers_required' => 1,
+        'md5' => md5('delete'),
+        'modifications' => [],
+    ]);
+
+    expect($modification->fresh()->operation)->toBe(Operation::Delete)
+        ->and(Operation::Delete->isDeletion())->toBeTrue()
+        ->and(Operation::ForceDelete->isDeletion())->toBeTrue()
+        ->and(Operation::Update->carriesDiff())->toBeTrue()
+        ->and(Operation::Restore->carriesDiff())->toBeFalse()
+        ->and(Schema::hasColumn($modification->getTable(), 'is_update'))->toBeFalse();
 });

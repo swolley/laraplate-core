@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Modules\CMS\Models\Comment;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
@@ -17,7 +18,7 @@ it('returns latest automated vote meta from approval or disapproval', function (
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => false,
+        'operation' => Operation::Create,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('meta-test'),
@@ -57,7 +58,7 @@ it('returns null when no vote has meta', function (): void {
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => false,
+        'operation' => Operation::Create,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('no-meta'),

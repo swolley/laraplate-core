@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
@@ -86,7 +87,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
         'modifiable_type' => Setting::class,
         'modifiable_id' => 1,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['name' => ['original' => 'a', 'modified' => 'b']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,
@@ -99,7 +100,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
         'modifiable_type' => Setting::class,
         'modifiable_id' => 2,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['name' => ['original' => 'c', 'modified' => 'd']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,
@@ -112,7 +113,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
         'modifiable_type' => Setting::class,
         'modifiable_id' => 3,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['name' => ['original' => 'e', 'modified' => 'f']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,
@@ -126,7 +127,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
         'modifiable_type' => User::class,
         'modifiable_id' => 1,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['email' => ['original' => 'a', 'modified' => 'b']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,
@@ -139,7 +140,7 @@ it('getPendingApprovalsByEntity returns entities over threshold and sorts by cou
         'modifiable_type' => User::class,
         'modifiable_id' => 2,
         'active' => false,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['email' => ['original' => 'x', 'modified' => 'y']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,
@@ -184,7 +185,7 @@ it('checkAndNotify sends notification when pending approvals exist', function ()
         'modifiable_type' => Setting::class,
         'modifiable_id' => 1,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'modifications' => ['name' => ['original' => 'a', 'modified' => 'b']],
         'approvers_required' => 1,
         'disapprovers_required' => 1,

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
@@ -33,7 +34,7 @@ it('returns the latest soft-kept disapproval for the modifier', function (): voi
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => false,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('rejected-banner'),
@@ -57,7 +58,7 @@ it('returns the latest soft-kept disapproval for the modifier', function (): voi
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('still-active'),

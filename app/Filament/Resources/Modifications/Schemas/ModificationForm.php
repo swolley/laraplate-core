@@ -45,9 +45,9 @@ final class ModificationForm
                         Toggle::make('active')
                             ->inline(false)
                             ->formatStateUsing(self::fromRecord('active')),
-                        Toggle::make('is_update')
-                            ->inline(false)
-                            ->formatStateUsing(self::fromRecord('is_update')),
+                        TextInput::make('operation')
+                            ->formatStateUsing(self::fromRecord('operation'))
+                            ->disabled(),
                         TextInput::make('approvers_required')
                             ->formatStateUsing(self::fromRecord('approvers_required')),
                         TextInput::make('disapprovers_required')

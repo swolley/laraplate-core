@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Scout\Engines\Engine as ScoutEngine;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\DetailRequestData;
@@ -1076,7 +1077,7 @@ it('approve and disapprove run modification workflows', function (): void {
         'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 2,
         'md5' => md5(json_encode(['title' => 'next'])),
@@ -1122,7 +1123,7 @@ it('approves the modification on the target model connection', function (): void
         $table->unsignedBigInteger('modifier_id')->nullable();
         $table->string('modifier_type')->nullable();
         $table->boolean('active')->default(true);
-        $table->boolean('is_update')->default(true);
+        $table->string('operation', 16)->default('update');
         $table->unsignedInteger('approvers_required')->default(1);
         $table->unsignedInteger('disapprovers_required')->default(1);
         $table->string('md5');
@@ -1172,7 +1173,7 @@ it('approves the modification on the target model connection', function (): void
         'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 2,
         'md5' => md5('affinity'),
@@ -1256,7 +1257,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
         $table->unsignedBigInteger('modifier_id')->nullable();
         $table->string('modifier_type')->nullable();
         $table->boolean('active')->default(true);
-        $table->boolean('is_update')->default(true);
+        $table->string('operation', 16)->default('update');
         $table->unsignedInteger('approvers_required')->default(1);
         $table->unsignedInteger('disapprovers_required')->default(1);
         $table->string('md5');
@@ -1315,7 +1316,7 @@ it('keeps one owner-scoped vote per actor while its reason and direction change'
         'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 2,
         'md5' => md5('unauthorized approval'),
@@ -1394,7 +1395,7 @@ it('does not cast an unauthorized disapproval vote on the target model connectio
         $table->unsignedBigInteger('modifier_id')->nullable();
         $table->string('modifier_type')->nullable();
         $table->boolean('active')->default(true);
-        $table->boolean('is_update')->default(true);
+        $table->string('operation', 16)->default('update');
         $table->unsignedInteger('approvers_required')->default(1);
         $table->unsignedInteger('disapprovers_required')->default(1);
         $table->string('md5');
@@ -1456,7 +1457,7 @@ it('does not cast an unauthorized disapproval vote on the target model connectio
         'modifier_id' => $user->getKey(),
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('unauthorized disapproval'),
@@ -1524,7 +1525,7 @@ it('disapprove iterates active modifications when no modification id is passed',
         'modifier_id' => $author->getKey(),
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 2,
         'md5' => md5(json_encode(['title' => 'a'])),

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Modules\CMS\Models\Comment;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 
@@ -15,7 +16,7 @@ it('exposes active and modifier identity but keeps quorum columns hidden', funct
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => false,
+        'operation' => Operation::Create,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('visibility-test'),

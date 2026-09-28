@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Helpers\HelpersCache;
@@ -44,7 +45,7 @@ function pendingSettingModification(User $author): array
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 1,
         'disapprovers_required' => 1,
         'md5' => md5('panel-vote-' . uniqid()),

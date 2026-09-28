@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Events\ModificationRequiresModeration;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -18,7 +19,7 @@ it('emits ModificationRequiresModeration when an active modification is created'
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => false,
+        'operation' => Operation::Create,
         'md5' => md5('emit-test'),
         'modifications' => ['name' => ['original' => 'a', 'modified' => 'b']],
     ]);

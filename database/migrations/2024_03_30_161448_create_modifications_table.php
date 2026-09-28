@@ -23,7 +23,7 @@ return new class() extends Migration
             $table->unsignedBigInteger('modifier_id')->nullable()->comment('The id of the modifier model');
             $table->string('modifier_type')->nullable()->comment('The type of the modifier model');
             $table->boolean('active')->default(true)->comment('Whether the modification is active');
-            $table->boolean('is_update')->default(true)->comment('Whether the modification is an update');
+            $table->string('operation', 16)->default('update')->comment('The operation the modification carries');
             $table->unsignedInteger('approvers_required')->default(1)->comment('The number of approvers required');
             $table->unsignedInteger('disapprovers_required')->default(1)->comment('The number of disapprovers required');
             $table->string('md5')->comment('The md5 hash of the modifications');
@@ -35,6 +35,7 @@ return new class() extends Migration
             );
 
             $table->index(['modifier_id', 'modifier_type'], "{$modifications_table}_modifierable_IDX");
+            $table->index(['modifiable_type', 'modifiable_id', 'active', 'operation'], "{$modifications_table}_pending_IDX");
         });
     }
 

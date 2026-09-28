@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -112,9 +113,7 @@ trait HasApprovals
             $modification->modifier_type = $modifier_class;
         }
 
-        if (is_null($item->{$item->getKeyName()})) {
-            $modification->is_update = false;
-        }
+        $modification->operation = $item->{$item->getKeyName()} === null ? Operation::Create : Operation::Update;
 
         if ($has_modification_pending) {
             $modification->save();

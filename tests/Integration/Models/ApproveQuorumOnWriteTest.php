@@ -6,6 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -101,7 +102,7 @@ it('rejects a further approve vote by the modification author', function (): voi
         'modifier_id' => $user->getKey(),
         'modifier_type' => $user::class,
         'active' => true,
-        'is_update' => true,
+        'operation' => Operation::Update,
         'approvers_required' => 2,
         'disapprovers_required' => 1,
         'md5' => md5('self-vote'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Filament\Panel;
 use Illuminate\Auth\Access\AuthorizationException;
 use Lab404\Impersonate\Services\ImpersonateManager;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Modification;
@@ -453,7 +454,7 @@ it('resolves approval permission from modifiable type when relation is missing',
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
         'active' => true,
-        'is_update' => false,
+        'operation' => Operation::Create,
         'md5' => md5('approval-perm'),
         'modifications' => [],
     ]);

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Approvals\Operation;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
@@ -52,7 +53,7 @@ final class Modification extends Model
         // `active` and the modifier identity (modifier_id/type) stay visible so an
         // eager-loaded modifications relation lets the UI flag records with a
         // pending (active) modification and tell whether the viewer authored it.
-        'is_update',
+        'operation',
         'approvers_required',
         'disapprovers_required',
     ];
@@ -182,6 +183,7 @@ final class Modification extends Model
         return [
             'modifications' => 'json',
             'active' => 'boolean',
+            'operation' => Operation::class,
         ];
     }
 }
