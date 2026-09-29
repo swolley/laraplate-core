@@ -159,6 +159,7 @@ therefore reachable on the session-based `/app` surface only and are never expos
 | `/app/crud/approve/{module}/{entity}` | PATCH | Approve pending modifications of the record `id` |
 | `/app/crud/disapprove/{module}/{entity}` | PATCH | Reject pending modifications of the record `id` |
 | `/app/crud/withdraw/{module}/{entity}` | PATCH | Withdraw your own pending modification (`modification` = its id) |
+| `/app/crud/pending-approvals` | GET | Every pending modification you can vote on, on any entity, plus your own: each row carries `entity`, `operation`, `is_mine` and `can_vote` |
 | `/app/crud/lock/{module}/{entity}` | PATCH | Lock record for editing |
 | `/app/crud/unlock/{module}/{entity}` | PATCH | Unlock record |
 
@@ -618,6 +619,17 @@ What the API answers:
 | Withdraw by the request's author | `200` | `{withdrawn: id}` |
 | Withdraw by anybody else | `401` | error message (every `AuthorizationException` answers 401) |
 | Withdraw of a request already decided | `409 Conflict` | error message |
+
+Pending requests are listed by `GET /app/crud/pending-approvals` (every entity) and
+`GET /app/crud/pending-approvals/{module}/{entity}` (one entity, `approve` required). Who sees what:
+
+- a superadmin sees every pending request;
+- a user holding `approve` or `disapprove` on a table sees the requests on that table, narrowed by
+  the table's ACL on `approve` to the records they may decide on (a pending create, which has no
+  record yet, is always listed);
+- everybody sees their own requests (`is_mine`), never offered a vote on them (`can_vote` false);
+- on top of all this, the ACL of `core_modifications` on `select` applies to the roles holding
+  that permission, for restrictions such as `modifier_id = @user.id` or a department filter.
 
 Approve, reject and withdraw via `PATCH /app/crud/approve|disapprove|withdraw/{module}/{entity}`.
 A vote acts on one record (`id`): without `modification` it votes on every active request of

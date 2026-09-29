@@ -36,6 +36,7 @@ use Modules\Core\Locking\Exceptions\CannotUnlockException;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Exceptions\MissingLockVersionException;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
+use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DomainActionDispatcher;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
@@ -314,6 +315,23 @@ class CrudController extends Controller
     }
 
     /**
+     * Every pending request the current user can vote on, on any entity, plus their own.
+     */
+    final public function allPendingApprovals(Request $request): Response
+    {
+        return $this->handleServiceCall(
+            function () use ($request): CrudResult {
+                $user = $request->user();
+                throw_unless($user instanceof User, AuthorizationException::class, 'Authenticated user is required.');
+
+                return $this->crudService->allPendingApprovals($user);
+            },
+            $request,
+            shouldCache: false,
+        );
+    }
+
+    /**
      * Latest soft-kept disapproval for the current user as modifier of a record.
      */
     final public function latestDisapproval(LatestDisapprovalRequest $request): Response
@@ -387,7 +405,7 @@ class CrudController extends Controller
         try {
             $record = $model->newQuery()->whereKey($request->input('id'))->firstOrFail();
 
-            /** @var \Modules\Core\Models\User $user */
+            /** @var User $user */
             $user = $request->user();
 
             $result = $dispatcher->dispatch($record, $request->action(), $user, $request->payload());

@@ -27,6 +27,7 @@ Route::name('crud.')->prefix('/crud')->group(function (): void {
         Route::patch('/approve/{module}/{entity}', 'approve')->name('approve');
         Route::patch('/disapprove/{module}/{entity}', 'disapprove')->name('disapprove');
         Route::patch('/withdraw/{module}/{entity}', 'withdraw')->name('withdraw');
+        Route::get('/pending-approvals', 'allPendingApprovals')->name('pending-approvals.all');
         Route::get('/pending-approvals/{module}/{entity}', 'pendingApprovals')->name('pending-approvals');
         Route::get('/latest-disapproval/{module}/{entity}', 'latestDisapproval')->name('latest-disapproval');
         Route::patch('/activate/{module}/{entity}', 'activate')->name('activate');

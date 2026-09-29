@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Fluent;
 use InvalidArgumentException;
 use LogicException;
+use Modules\Core\Approvals\PendingDeletionStrategy;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Cache\Repository as CacheRepository;
 use Modules\Core\Casts\ColumnType;
@@ -57,6 +58,7 @@ use Modules\Core\Locking\LockIntent;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\Search\Contracts\IAuthorizesSearchRehydration;
@@ -75,6 +77,7 @@ use Modules\Core\Services\Crud\DTOs\FacetSort;
 use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
+use Modules\Core\Support\PermissionName;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
@@ -954,33 +957,13 @@ class CrudService
         $connection = $model->getConnectionName();
         $modification_prototype = (new Modification())->setConnection($connection);
 
-        $modifications = $modification_prototype->newQuery()
-            ->where('modifiable_type', $model::class)
-            ->activeOnly()
+        $query = $this->decidableModifications($modification_prototype->newQuery()->activeOnly(), $model)
             ->with(['modifiable', 'modifier'])
-            ->oldest()
-            ->get();
+            ->oldest();
 
-        $rows = $modifications->map(static function (Modification $modification): Fluent {
-            $modifiable = $modification->modifiable;
-            $label = null;
+        $modifications = $this->aclFilteredIfDefined($query, PermissionName::forModel(new Modification(), 'select'))->get();
 
-            if ($modifiable instanceof Model) {
-                $attributes = $modifiable->getAttributes();
-                $label = $attributes['title'] ?? $attributes['name'] ?? null;
-            }
-
-            return new Fluent([
-                'id' => $modification->modifiable_id,
-                'modification_id' => $modification->getKey(),
-                'title' => $label,
-                'created_at' => $modification->getAttribute('created_at'),
-                'approvers_required' => $modification->approvers_required,
-                'approvers_remaining' => $modification->approversRemaining,
-                'modifier_id' => $modification->modifier_id,
-                'modifier_type' => $modification->modifier_type,
-            ]);
-        })->values();
+        $rows = $modifications->map(self::pendingApprovalRow(...))->values();
 
         return new CrudResult(
             data: $rows,
@@ -997,6 +980,60 @@ class CrudService
     /**
      * Soft-kept disapproval for the authenticated modifier on one record (editor rejection banner).
      */
+    /**
+     * Every pending request the user can vote on, on any entity, plus their own. Voting follows
+     * the table's `approve` or `disapprove` permission; the author never votes on their request.
+     */
+    public function allPendingApprovals(User $user): CrudResult
+    {
+        $votable_types = Modification::query()
+            ->activeOnly()
+            ->distinct()
+            ->pluck('modifiable_type')
+            ->filter(static fn (mixed $type): bool => is_string($type) && class_exists($type) && is_subclass_of($type, Model::class)
+                && ($user->can(PermissionName::forModel(new $type(), 'approve')) || $user->can(PermissionName::forModel(new $type(), 'disapprove'))))
+            ->values()
+            ->all();
+
+        $query = Modification::query()
+            ->activeOnly()
+            ->where(function (Builder $visible) use ($votable_types, $user): void {
+                foreach ($votable_types as $type) {
+                    $visible->orWhere(fn (Builder $votable): Builder => $this->decidableModifications($votable, new $type()));
+                }
+
+                $visible->orWhere(static fn (Builder $mine): Builder => $mine->where('modifier_type', $user::class)->where('modifier_id', $user->getKey()));
+            })
+            ->with(['modifiable', 'modifier'])
+            ->oldest();
+
+        $modifications = $this->aclFilteredIfDefined($query, PermissionName::forModel(new Modification(), 'select'))->get();
+
+        $rows = $modifications->map(static function (Modification $modification) use ($user): Fluent {
+            $row = self::pendingApprovalRow($modification);
+            $type = $modification->modifiable_type;
+            $is_mine = $modification->modifier_type === $user::class && (string) $modification->modifier_id === (string) $user->getKey();
+
+            $row['modifiable_type'] = $type;
+            $row['entity'] = is_string($type) && class_exists($type) ? (new $type())->getTable() : null;
+            $row['operation'] = $modification->operation->value;
+            $row['is_mine'] = $is_mine;
+            // Somebody else's request is listed only when the user may decide on it.
+            $row['can_vote'] = ! $is_mine;
+
+            return $row;
+        })->values();
+
+        return new CrudResult(
+            data: $rows,
+            meta: new CrudMeta(
+                totalRecords: $rows->count(),
+                currentRecords: $rows->count(),
+                cachedAt: Date::now(),
+            ),
+        );
+    }
+
     public function latestDisapproval(CrudRequestData $requestData): CrudResult
     {
         $model = $requestData->model;
@@ -1068,6 +1105,58 @@ class CrudService
                 cachedAt: Date::now(),
             ),
         );
+    }
+
+    /**
+     * One pending request as the inbox lists it: the record, its label and the quorum still missing.
+     */
+    private static function pendingApprovalRow(Modification $modification): Fluent
+    {
+        $modifiable = $modification->modifiable;
+        $label = null;
+
+        if ($modifiable instanceof Model) {
+            $attributes = $modifiable->getAttributes();
+            $label = $attributes['title'] ?? $attributes['name'] ?? null;
+        }
+
+        return new Fluent([
+            'id' => $modification->modifiable_id,
+            'modification_id' => $modification->getKey(),
+            'title' => $label,
+            'created_at' => $modification->getAttribute('created_at'),
+            'approvers_required' => $modification->approvers_required,
+            'approvers_remaining' => $modification->approversRemaining,
+            'modifier_id' => $modification->modifier_id,
+            'modifier_type' => $modification->modifier_type,
+        ]);
+    }
+
+    /**
+     * Narrow a modifications query to the requests on $model's table the user may decide on: the
+     * table's `approve` ACL restricts which records, and a pending create, which has no record yet
+     * for the ACL to read, stays in. A trashed record awaiting a restore, or one hidden while its
+     * deletion waits, is still a record to decide on.
+     *
+     * @param  Builder<Modification>  $query
+     * @return Builder<Modification>
+     */
+    private function decidableModifications(Builder $query, Model $model): Builder
+    {
+        $query->where('modifiable_type', $model::class);
+
+        $permission = PermissionName::forModel($model, 'approve');
+
+        if (! $this->permissionExists($permission) || ! $this->auth->getAclFilters($permission) instanceof FiltersGroup) {
+            return $query;
+        }
+
+        $records = $this->aclFiltered(
+            $this->newQueryWithTrashed($model)->withoutGlobalScope(PendingDeletionStrategy::HIDE_SCOPE)->select($model->getQualifiedKeyName()),
+            $permission,
+        );
+
+        return $query->where(static fn (Builder $decidable): Builder => $decidable->whereNull('modifiable_id')->orWhereIn('modifiable_id', $records));
     }
 
     /**
@@ -2871,6 +2960,20 @@ class CrudService
      * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
+    /**
+     * Apply a permission's ACL when the permission exists. The pending-approvals lists read
+     * permissions the user need not hold, and a permission nobody defined has no ACL to apply.
+     */
+    private function aclFilteredIfDefined(Builder $query, string $permission_name): Builder
+    {
+        return $this->permissionExists($permission_name) ? $this->aclFiltered($query, $permission_name) : $query;
+    }
+
+    private function permissionExists(string $permission_name): bool
+    {
+        return Permission::query()->where('name', $permission_name)->exists();
+    }
+
     private function aclFiltered(Builder $query, string $permission_name): Builder
     {
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
