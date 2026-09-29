@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use Laravel\Scout\ModelObserver;
 use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Search\Exceptions\DeferredRunInterruptedException;
+use Modules\Core\Search\Jobs\IndexDeferredSearchChunkJob;
 use Throwable;
 
 /**
@@ -20,6 +22,11 @@ use Throwable;
  * `batchSize` distinct models and once at the end. Only keys are held in
  * memory: the models are reloaded when flushed, and rows deleted in the
  * meantime are skipped.
+ *
+ * When `scout.queue` is on and the queue is not the sync one, a flush only
+ * queues one {@see IndexDeferredSearchChunkJob} per chunk of keys, so the
+ * operation does not wait for embeddings and engine writes. Otherwise the
+ * flush indexes each chunk in place.
  *
  * A threshold flush never runs inside an open database transaction: it waits
  * for the commit, and a rollback leaves the keys pending for the next flush.
@@ -54,6 +61,14 @@ final class DeferredSearchIndexing
     private int $pendingCount = 0;
 
     /**
+     * Told about every flushed chunk: model class, record count, whether it
+     * was queued rather than indexed, and the time the chunk took.
+     *
+     * @var (Closure(class-string<Model&ISearchableModel>, int, bool, float): void)|null
+     */
+    private ?Closure $onFlush = null;
+
+    /**
      * Run the callback with indexing deferred, then flush what it left pending.
      * In discard mode the captured calls are dropped: nothing is indexed and
      * nothing is embedded. A nested call joins the outer run.
@@ -61,9 +76,10 @@ final class DeferredSearchIndexing
      * @template TResult
      *
      * @param  callable(): TResult  $callback
+     * @param  (Closure(class-string<Model&ISearchableModel>, int, bool, float): void)|null  $onFlush
      * @return TResult
      */
-    public function run(callable $callback, int $batchSize, bool $discard = false): mixed
+    public function run(callable $callback, int $batchSize, bool $discard = false, ?Closure $onFlush = null): mixed
     {
         if ($this->active) {
             return $callback();
@@ -72,6 +88,7 @@ final class DeferredSearchIndexing
         $this->active = true;
         $this->discard = $discard;
         $this->batchSize = max(1, $batchSize);
+        $this->onFlush = $onFlush;
         $this->listenForSaves();
 
         try {
@@ -185,10 +202,23 @@ final class DeferredSearchIndexing
         $this->pendingCount = 0;
         $this->flushing = true;
 
+        $queued = $this->flushesToQueue();
+
         try {
             foreach ($pending as $class => $keys) {
                 foreach (array_chunk(array_keys($keys), $this->batchSize) as $chunk) {
-                    $this->indexChunk($class, $chunk);
+                    $started_at = hrtime(true);
+
+                    if ($queued) {
+                        IndexDeferredSearchChunkJob::dispatch($class, $chunk);
+                        $count = count($chunk);
+                    } else {
+                        $count = $this->indexChunk($class, $chunk);
+                    }
+
+                    if ($this->onFlush instanceof Closure) {
+                        ($this->onFlush)($class, $count, $queued, (hrtime(true) - $started_at) / 1_000_000);
+                    }
                 }
             }
         } finally {
@@ -200,6 +230,33 @@ final class DeferredSearchIndexing
 
             throw new DeferredRunInterruptedException('The deferred search indexing run was interrupted.');
         }
+    }
+
+    /**
+     * Reload one chunk through Scout's import query (the same scopes
+     * `scout:import` drops) and index it through the bulk path. Returns how
+     * many records were indexed: rows gone or no longer searchable are skipped.
+     *
+     * @param  class-string<Model&ISearchableModel>  $class
+     * @param  list<int|string>  $keys
+     */
+    public function indexChunk(string $class, array $keys): int
+    {
+        $instance = new $class;
+
+        $models = $class::makeAllSearchableQuery()
+            ->whereIn($instance->qualifyColumn($instance->getScoutKeyName()), $keys)
+            ->get()
+            ->filter(static fn (ISearchableModel $model): bool => $model->shouldBeSearchable())
+            ->values();
+
+        if ($models->isEmpty()) {
+            return 0;
+        }
+
+        $instance->makeSearchableInBulk($models);
+
+        return $models->count();
     }
 
     /**
@@ -248,27 +305,18 @@ final class DeferredSearchIndexing
     }
 
     /**
-     * Reload one chunk through Scout's import query (the same scopes
-     * `scout:import` drops) and index it through the bulk path.
-     *
-     * @param  class-string<Model&ISearchableModel>  $class
-     * @param  list<int|string>  $keys
+     * Whether a flush hands its chunks to the queue: only when Scout indexes
+     * through a queue and that queue does not run jobs in-process anyway.
      */
-    private function indexChunk(string $class, array $keys): void
+    private function flushesToQueue(): bool
     {
-        $instance = new $class;
-
-        $models = $class::makeAllSearchableQuery()
-            ->whereIn($instance->qualifyColumn($instance->getScoutKeyName()), $keys)
-            ->get()
-            ->filter(static fn (ISearchableModel $model): bool => $model->shouldBeSearchable())
-            ->values();
-
-        if ($models->isEmpty()) {
-            return;
+        if (! config('scout.queue')) {
+            return false;
         }
 
-        $instance->makeSearchableInBulk($models);
+        $connection = config()->string('queue.default');
+
+        return config("queue.connections.{$connection}.driver") !== 'sync';
     }
 
     private function reset(): void
@@ -277,6 +325,7 @@ final class DeferredSearchIndexing
         $this->discard = false;
         $this->interruptAfterFlush = false;
         $this->batchSize = 1;
+        $this->onFlush = null;
         $this->pending = [];
         $this->pendingCount = 0;
     }

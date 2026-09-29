@@ -102,6 +102,7 @@ abstract class AbstractImportCommand extends Command
                 ),
                 $this->resolveIndexBatch(),
                 discard: $skip_search,
+                onFlush: $this->reportSearchFlush(...),
             );
         } catch (DeferredRunInterruptedException) {
             $this->warn('Import interrupted: the records imported so far are indexed.');
@@ -221,6 +222,19 @@ abstract class AbstractImportCommand extends Command
             ],
             default: ImportInterruptHandler::FINISH,
         );
+    }
+
+    /**
+     * One line per flushed chunk, so the operator sees when the bulk indexing
+     * runs and whether it was queued or done in place.
+     */
+    private function reportSearchFlush(string $class, int $count, bool $queued, float $milliseconds): void
+    {
+        $model = class_basename($class);
+
+        $this->line($queued
+            ? "<fg=gray>Search: queued {$count} {$model} record(s) for bulk indexing</>"
+            : sprintf('<fg=gray>Search: indexed %d %s record(s) in %.0fms</>', $count, $model, $milliseconds));
     }
 
     private function resolveIndexBatch(): int

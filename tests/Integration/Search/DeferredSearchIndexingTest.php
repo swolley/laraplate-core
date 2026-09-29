@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Events\ModelsRequireIndexing;
 use Modules\Core\Search\DeferredSearchIndexing;
 use Modules\Core\Search\Exceptions\DeferredRunInterruptedException;
+use Modules\Core\Search\Jobs\IndexDeferredSearchChunkJob;
 use Modules\Core\Tests\Stubs\Search\DeferredSearchableStubModel;
 use Modules\Core\Tests\Stubs\Search\RecordingSearchEngineStub;
 
@@ -168,4 +170,55 @@ it('finishes the flush in progress on interrupt without losing a model its commi
     expect($run)->toThrow(DeferredRunInterruptedException::class);
     expect(DeferredSearchableStubModel::query()->count())->toBe(3);
     expect(DeferredSearchableStubModel::$engine->batch_sizes)->toBe([2, 1]);
+});
+
+it('reports every chunk it indexes', function (): void {
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $reports = [];
+
+    app(DeferredSearchIndexing::class)->run(function (): void {
+        foreach (range(1, 3) as $index) {
+            saveDeferredStub("row-{$index}");
+        }
+    }, batchSize: 2, onFlush: static function (string $class, int $count, bool $queued) use (&$reports): void {
+        $reports[] = [$class, $count, $queued];
+    });
+
+    expect($reports)->toBe([
+        [DeferredSearchableStubModel::class, 2, false],
+        [DeferredSearchableStubModel::class, 1, false],
+    ]);
+});
+
+it('queues each chunk by key instead of indexing it when the search queue is asynchronous', function (): void {
+    config(['queue.default' => 'redis']);
+    Queue::fake([IndexDeferredSearchChunkJob::class]);
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $reports = [];
+
+    app(DeferredSearchIndexing::class)->run(function (): void {
+        foreach (range(1, 3) as $index) {
+            saveDeferredStub("row-{$index}");
+        }
+    }, batchSize: 2, onFlush: static function (string $class, int $count, bool $queued) use (&$reports): void {
+        $reports[] = [$count, $queued];
+    });
+
+    Queue::assertPushed(IndexDeferredSearchChunkJob::class, 2);
+    Queue::assertPushed(IndexDeferredSearchChunkJob::class, static fn (IndexDeferredSearchChunkJob $job): bool => $job->modelClass === DeferredSearchableStubModel::class && $job->keys === [1, 2]);
+    Queue::assertPushed(IndexDeferredSearchChunkJob::class, static fn (IndexDeferredSearchChunkJob $job): bool => $job->keys === [3]);
+    expect(DeferredSearchableStubModel::$engine->update_calls)->toBe(0)
+        ->and($reports)->toBe([[2, true], [1, true]]);
+});
+
+it('indexes the queued chunk in bulk when its job runs', function (): void {
+    Event::fake([ModelRequiresIndexing::class, ModelsRequireIndexing::class]);
+    $first = saveDeferredStub('a');
+    $second = saveDeferredStub('b');
+
+    (new IndexDeferredSearchChunkJob(DeferredSearchableStubModel::class, [$first->getKey(), $second->getKey()]))
+        ->handle(app(DeferredSearchIndexing::class));
+
+    Event::assertDispatchedTimes(ModelsRequireIndexing::class, 1);
+    expect(DeferredSearchableStubModel::$engine->batch_sizes)->toBe([2]);
 });

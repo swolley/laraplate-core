@@ -162,7 +162,7 @@ it('indexes imported records in bulk flushes of --index-batch', function (): voi
     );
 
     try {
-        [$status] = runCoreImportCommand($command, [
+        [$status, $output] = runCoreImportCommand($command, [
             '--importer' => FakeSearchableBulkImporter::class,
             '--arg' => ['records=5'],
             '--index-batch' => 2,
@@ -170,6 +170,8 @@ it('indexes imported records in bulk flushes of --index-batch', function (): voi
 
         expect($status)->toBe(TestImportCommand::SUCCESS);
         expect(DeferredSearchableStubModel::$engine->batch_sizes)->toBe([2, 2, 1]);
+        expect(mb_substr_count($output, 'Search: indexed 2 DeferredSearchableStubModel record(s)'))->toBe(2)
+            ->and($output)->toContain('Search: indexed 1 DeferredSearchableStubModel record(s)');
         Event::assertNotDispatched(ModelRequiresIndexing::class);
     } finally {
         DeferredSearchableStubModel::dropTable();
