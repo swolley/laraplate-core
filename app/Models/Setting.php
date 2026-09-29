@@ -15,6 +15,7 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Observers\SettingObserver;
 use Modules\Core\Overrides\Model;
+use Modules\Core\Rules\SettingValue;
 use Override;
 
 #[ObservedBy(SettingObserver::class)]
@@ -79,6 +80,7 @@ final class Setting extends Model
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'encrypted' => ['boolean', 'required'],
+            'value' => [new SettingValue()],
             'is_internal' => ['boolean'],
             'is_public' => ['boolean'],
             'choices' => ['sometimes', 'nullable'],
@@ -130,6 +132,23 @@ final class Setting extends Model
         $offered = array_map(static fn (mixed $choice): ?string => is_scalar($choice) ? (string) $choice : null, $choices);
 
         return ! in_array((string) $value, $offered, true);
+    }
+
+    /**
+     * The value is stored as JSON: validate what it decodes to, as the form and the API send it.
+     *
+     * @return array<string, mixed>
+     */
+    #[Override]
+    public function getAttributesForValidation(): array
+    {
+        $attributes = parent::getAttributesForValidation();
+
+        if (array_key_exists('value', $attributes)) {
+            $attributes['value'] = $this->value;
+        }
+
+        return $attributes;
     }
 
     protected static function newFactory(): SettingFactory

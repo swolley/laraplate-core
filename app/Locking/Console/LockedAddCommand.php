@@ -143,7 +143,7 @@ class LockedAddCommand extends Command
             ['name' => $key_name],
             [
                 'name' => $key_name,
-                'value' => json_encode($enabled),
+                'value' => $enabled,
                 'encrypted' => false,
                 'type' => SettingTypeEnum::Boolean,
                 'group_name' => 'locking',

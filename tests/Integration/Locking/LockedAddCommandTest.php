@@ -63,7 +63,8 @@ it('locked add command writes migration file when target does not exist', functi
     $command->argNamespace = 'Modules\\Core\\Models';
     $command->stubPath = locking_stub_path();
 
-    expect($command->handle())->toBe(BaseCommand::SUCCESS);
+    expect($command->handle())->toBe(BaseCommand::SUCCESS)
+        ->and(Modules\Core\Models\Setting::query()->where('name', 'locking.enabled.' . (new Modules\Core\Models\Setting)->getTable())->value('value'))->toBeTrue();
 });
 
 it('locked add command helper methods build migration path and stub contents', function (): void {

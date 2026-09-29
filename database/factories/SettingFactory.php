@@ -34,7 +34,7 @@ final class SettingFactory extends Factory
     #[Override]
     public function definition(): array
     {
-        $type = fake()->randomElement(SettingTypeEnum::cases())->value;
+        $type = fake()->randomElement(SettingTypeEnum::cases());
 
         return [
             // Microseconds, as an integer: the name column is unique and fake()->word()
@@ -53,7 +53,7 @@ final class SettingFactory extends Factory
             },
             'encrypted' => fake()->boolean(),
             'choices' => $type === SettingTypeEnum::Json ? fake()->words() : null,
-            'type' => $type,
+            'type' => $type->value,
             'group_name' => fake()->word(),
             'description' => fake()->text(),
         ];
