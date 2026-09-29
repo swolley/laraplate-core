@@ -41,6 +41,9 @@ return new class extends Migration
             $table->index(['model_type', 'model_id', 'locale'], "{$model_embeddings_table}_model_locale_IDX");
             $table->string('content_hash', 64)->nullable()
                 ->comment('SHA-256 of the embedded text; lets indexing skip re-embedding unchanged content');
+            // Lookup of an identical text already embedded by the same model, so a duplicated
+            // file or caption reuses its vectors instead of calling the embedding service again.
+            $table->index(['content_hash', 'model_key'], "{$model_embeddings_table}_content_model_IDX");
 
             MigrateUtils::timestamps(
                 $table,
