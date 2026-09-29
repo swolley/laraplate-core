@@ -114,6 +114,24 @@ final class Setting extends Model
         return $rules;
     }
 
+    /**
+     * Whether the saved value is a scalar missing from a non-empty choice list, i.e. a choice a
+     * refresh no longer offers. List values (checkbox settings) are never flagged.
+     */
+    public function isValueOutsideChoices(): bool
+    {
+        $choices = $this->choices;
+        $value = $this->value;
+
+        if (! is_array($choices) || $choices === [] || ! is_scalar($value)) {
+            return false;
+        }
+
+        $offered = array_map(static fn (mixed $choice): ?string => is_scalar($choice) ? (string) $choice : null, $choices);
+
+        return ! in_array((string) $value, $offered, true);
+    }
+
     protected static function newFactory(): SettingFactory
     {
         return SettingFactory::new();

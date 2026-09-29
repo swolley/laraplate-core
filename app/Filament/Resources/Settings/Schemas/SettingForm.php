@@ -131,7 +131,7 @@ final class SettingForm
                 ->required(),
             SettingTypeEnum::Json => self::jsonValueField($record, $choices),
             default => $choices !== []
-                ? Select::make('value')->required()->options($choices)
+                ? self::choiceSelect($record, $choices)
                 : TextInput::make('value')->required()->maxLength(65535),
         };
     }
@@ -158,6 +158,28 @@ final class SettingForm
         } catch (JsonException) {
             return $state;
         }
+    }
+
+    /**
+     * A value the choices no longer offer stays selectable, labelled as such, so the select is
+     * never blank and saving does not drop it.
+     *
+     * @param  array<string, string>  $choices
+     */
+    private static function choiceSelect(?Setting $record, array $choices): Select
+    {
+        $unavailable = $record?->isValueOutsideChoices() ?? false;
+
+        if ($unavailable) {
+            $value = (string) $record->value;
+            $choices[$value] = $value . ' (no longer available)';
+        }
+
+        return Select::make('value')
+            ->required()
+            ->searchable()
+            ->options($choices)
+            ->helperText($unavailable ? 'The saved value is no longer among the available choices.' : null);
     }
 
     /**

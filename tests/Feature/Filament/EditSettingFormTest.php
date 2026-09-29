@@ -292,3 +292,38 @@ it('hides the action fields when the setting has no action', function (): void {
         ->assertFormFieldHidden('action_command')
         ->assertFormFieldHidden('action_queued');
 });
+
+it('keeps a value no longer offered selectable and flags it', function (): void {
+    editSettingActor();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'string',
+        'value' => 'openai:gpt-3.5',
+        'choices' => ['openai:gpt-4o'],
+        'encrypted' => false,
+    ]);
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->assertFormFieldExists('value', static fn (Select $field): bool => $field->isSearchable()
+            && array_key_exists('openai:gpt-3.5', $field->getOptions())
+            && str_contains((string) $field->getOptions()['openai:gpt-3.5'], 'no longer available'))
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($setting->fresh()->value)->toBe('openai:gpt-3.5');
+});
+
+it('marks a value no longer offered in the settings grid', function (): void {
+    editSettingActor();
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'string',
+        'value' => 'openai:gpt-3.5',
+        'choices' => ['openai:gpt-4o'],
+        'encrypted' => false,
+    ]);
+
+    Livewire::test(ListSettings::class)
+        ->call('loadTable')
+        ->assertSee('The saved value is not among the available choices');
+});

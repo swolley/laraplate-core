@@ -59,6 +59,11 @@ final class SettingsTable
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('value')
                         ->alignCenter()
+                        ->color(static fn (Setting $record): ?string => $record->isValueOutsideChoices() ? 'warning' : null)
+                        ->icon(static fn (Setting $record): ?Heroicon => $record->isValueOutsideChoices() ? Heroicon::OutlinedExclamationTriangle : null)
+                        ->tooltip(static fn (Setting $record): ?string => $record->isValueOutsideChoices()
+                            ? 'The saved value is not among the available choices'
+                            : null)
                         ->html()
                         ->badge(static fn (Setting $record): bool => self::isFlatList($record->value))
                         ->state(static fn (Setting $record): mixed => match ($record->type) {
