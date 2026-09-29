@@ -58,6 +58,7 @@ use Modules\Core\Filament\Generators\LaraplateResourceFormSchemaClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceInfolistSchemaClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceListRecordsPageClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceTableClassGenerator;
+use Modules\Core\Filament\ResourceSchemaContributorRegistry;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\Contracts\GraphToolGatewayInterface;
 use Modules\Core\Graph\GraphProviderRegistry;
@@ -238,6 +239,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // at boot writes into the same registry the Searchable trait resolves from.
         $this->app->singleton(SearchableContributorRegistry::class);
         $this->app->singleton(OwnerAuthorizerRegistry::class);
+
+        // Singleton so every module registering a Filament resource-schema
+        // contributor at boot writes into the same registry a resource resolves from (M22).
+        $this->app->singleton(ResourceSchemaContributorRegistry::class);
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);
