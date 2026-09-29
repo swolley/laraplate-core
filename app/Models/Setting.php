@@ -52,8 +52,21 @@ final class Setting extends Model
         'is_public',
     ];
 
+    /**
+     * The command a setting runs is code-owned: it is neither mass assignable nor exposed in
+     * serialized output, since public settings are readable by guests.
+     *
+     * @var list<string>
+     */
+    #[Override]
+    protected $hidden = [
+        'action_command',
+        'action_queued',
+    ];
+
     #[Override]
     protected $attributes = [
+        'action_queued' => false,
         'encrypted' => false,
         'is_internal' => false,
         'is_public' => false,
@@ -118,6 +131,7 @@ final class Setting extends Model
             'encrypted' => 'boolean',
             'is_internal' => 'boolean',
             'is_public' => 'boolean',
+            'action_queued' => 'boolean',
             'choices' => 'array',
             'seeded_value' => 'json',
             'type' => SettingTypeEnum::class,
@@ -127,7 +141,8 @@ final class Setting extends Model
     }
 
     /**
-     * Presentation-only fields (description, group) are applied directly. Any other change follows
+     * Presentation-only fields (description, group) and the choices a refresh command writes
+     * are applied directly: users cannot edit choices from the panel. Any other change follows
      * the shared approval rule: a writer holding the approve permission, when one approval is
      * enough, saves directly; everybody else goes through approval.
      */
@@ -135,7 +150,7 @@ final class Setting extends Model
     {
         $guarded = array_intersect_key(
             $modifications,
-            array_flip(array_diff($this->getFillable(), ['description', 'group_name'])),
+            array_flip(array_diff($this->getFillable(), ['description', 'group_name', 'choices'])),
         );
 
         if ($guarded === []) {

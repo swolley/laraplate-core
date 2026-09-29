@@ -50,6 +50,13 @@ return new class() extends Migration
             $table->json('seeded_value')
                 ->nullable(true)
                 ->comment('Last value written by the seeder; drift is value !== seeded_value');
+            $table->string('action_command')
+                ->nullable(true)
+                ->comment('Artisan command line run from the settings grid, with {attribute} placeholders; seeded only');
+            $table->boolean('action_queued')
+                ->nullable(false)
+                ->default(false)
+                ->comment('Queue the action command instead of running it inside the request');
 
             MigrateUtils::timestamps(
                 $table,
