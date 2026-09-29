@@ -8,24 +8,9 @@ use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Setting;
-use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Support\HttpContext;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
-
-/**
- * The author reaches Modifications to withdraw their requests: grant it the list besides the setting actions.
- */
-function approvalOutcomeAuthor(): void
-{
-    $actor = HttpContext::panelActorWithoutApproval(new Setting);
-    $permission = PermissionName::forModel(new Modification, 'select');
-    Permission::findOrCreate($permission, 'web');
-    $actor->givePermissionTo($permission);
-    app(PermissionRegistrar::class)->forgetCachedPermissions();
-}
 
 beforeEach(function (): void {
     $this->setting = Setting::factory()->persistedWithoutApprovalCapture()->create(['type' => 'string', 'value' => 'x', 'choices' => null, 'is_public' => false]);
@@ -44,7 +29,7 @@ it('reports a save blocked by a pending deletion', function (): void {
 });
 
 it('offers the author a withdraw action in Modifications', function (): void {
-    approvalOutcomeAuthor();
+    HttpContext::panelActorWithoutApproval(new Setting);
     $this->setting->delete();
     $modification = $this->setting->pendingModification();
 
@@ -60,7 +45,7 @@ it('hides the withdraw action from anybody but the author', function (): void {
     $this->setting->delete();
     $modification = $this->setting->pendingModification();
 
-    approvalOutcomeAuthor();
+    HttpContext::panelActorWithoutApproval(new Setting);
 
     Livewire::test(ListModifications::class)->assertTableActionHidden('withdraw', $modification);
 });
