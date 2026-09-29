@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Events\ModificationPreProcessingCompleted;
@@ -46,6 +47,9 @@ final class EventServiceProvider extends ServiceProvider
         // module's, so these never ran while they relied on it.
         Attempting::class => [
             \Modules\Core\Listeners\LogoutOtherDevicesListener::class . '@handleAttempting',
+        ],
+        JobProcessing::class => [
+            \Modules\Core\Listeners\ApplySettingsOverlayBeforeJob::class,
         ],
         Login::class => [
             \Modules\Core\Listeners\AfterLoginListener::class,

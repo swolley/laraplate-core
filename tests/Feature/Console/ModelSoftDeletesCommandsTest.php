@@ -120,6 +120,8 @@ it('writes soft-delete settings through the Setting model connection', function 
         $table->string('type');
         $table->string('group_name');
         $table->string('description')->nullable();
+        $table->string('action_command')->nullable();
+        $table->boolean('action_queued')->default(false);
         $table->boolean('is_deleted')->default(false);
         $table->timestamps();
     });
