@@ -390,6 +390,14 @@ The literal-prefixed `pending`/`claim` routes are registered **before** the gene
 - **Lifecycle.** `MediaLifecycleObserver` reindexes the owner when a media is edited (the claim included), soft-deleted or restored; a force delete also drops the media's `ModelEmbedding` rows.
 - **Vector reuse.** `core_model_embeddings` is indexed on `(content_hash, model_key)` so the embedding pipeline can reuse the vectors of an identical text instead of embedding it again.
 
+### Media gallery and curation (Filament)
+
+The backoffice exposes claimed media through Filament, gated by the same seeded `core.media.*` permissions as any other resource (no bespoke media policy; policies here are reserved for domain actions):
+
+- **Gallery (`MediaResource`).** A read-only, filterable list (by `mime_type`, `collection_name`, owner `model_type`) of claimed media with a read-only View page; draft-staged media are excluded via `getEloquentQuery`. It offers no create and no edit — media are born from an owner's upload. This realizes the owner-agnostic view that the `media.search_visibility=open` mode anticipates.
+- **Owner curation (`MediaRelationManager`).** A reusable relation manager on the `media` relationship, attached to owner resources (CMS `Content`, SAO `Ticket`) via `getRelations()`. An owner's editor curates the display fields (`description`, `alt_text`, `keywords`) inside `custom_properties`; `applyDisplayEdit()` merges them back preserving technical metadata, `content_hash` and other fields' provenance, and marks each edited field `human` so the AI layer never overwrites it. Gated by the owner resource's own edit access.
+- **Resource-schema seam (`ResourceSchemaContributorRegistry`).** The UI twin of the searchable-contributor seam: a module contributes read-only infolist sections and record actions for a model without Core referencing it. The media View renders the contributed sections and its header shows the contributed actions (the AI module adds its analysis panel and a "Re-analyze" action this way).
+
 ```mermaid
 flowchart LR
   Req[Graph request]
