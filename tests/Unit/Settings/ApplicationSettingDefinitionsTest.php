@@ -26,8 +26,8 @@ it('defines core runtime settings with current defaults and choices', function (
 
     expect($definitions->get('auth.registration.enabled')['value'])->toBeFalse()
         ->and($definitions->get('auth.registration.enabled')['type'])->toBe(SettingTypeEnum::Boolean)
-        ->and($definitions->get('translations.provider')['value'])->toBe('deepl')
-        ->and($definitions->get('translations.provider')['choices'])->toBe(['deepl', 'ai'])
+        ->and($definitions->has('translations.provider'))->toBeFalse()
+        ->and($definitions->has('translations.fallback_to_ai'))->toBeFalse()
         ->and($definitions->get('search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
 });
 
