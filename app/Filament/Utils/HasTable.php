@@ -22,7 +22,7 @@ use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\BaseFilter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -125,7 +125,7 @@ trait HasTable
     /**
      * @param  ?callable(Collection<string,Column> $columns):void  $columns
      * @param  ?callable(Collection<string,Action> $actions, Collection<string,BulkAction> $bulk_actions):void  $actions
-     * @param  ?callable(Collection<string,Filter> $default_filters):void  $filters
+     * @param  ?callable(Collection<string,BaseFilter> $default_filters):void  $filters
      * @param  list<string>  $fixedActions  Action names kept out of the grouped menu,
      *                                      matched against Action::getName().
      *
