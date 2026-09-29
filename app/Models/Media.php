@@ -121,6 +121,28 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
      * intent) added through the contributor seam. Read by the `Searchable` trait
      * via the `$embed` list.
      */
+    /**
+     * The compact surrogate an owner's search document carries for this media (M9): the
+     * Core display fields (description, keywords) plus the compact fields contributors add
+     * to the media document (for AI: idea, intent, entities). Never the heavy tracks
+     * (transcript, OCR), which contributors only add to the media's own vector.
+     */
+    public function ownerSurrogateText(): string
+    {
+        $custom = $this->custom_properties;
+        $parts = [];
+
+        foreach ([$custom['description'] ?? null, $custom['keywords'] ?? [], ...array_values(app(SearchableContributorRegistry::class)->fieldsFor($this))] as $value) {
+            foreach (is_array($value) ? $value : [$value] as $item) {
+                if (is_string($item) && mb_trim($item) !== '') {
+                    $parts[] = mb_trim($item);
+                }
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
     public function getSearchableEmbedTextAttribute(): string
     {
         $custom = $this->custom_properties;

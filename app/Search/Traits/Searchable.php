@@ -22,6 +22,7 @@ use Modules\Core\Events\ModelsRequireIndexing;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasValidity;
+use Modules\Core\Models\Media;
 use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Overrides\LocaleScope;
 use Modules\Core\Search\AdaptiveBatchController;
@@ -36,6 +37,7 @@ use Modules\Core\Search\Schema\SchemaManager;
 use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\SearchEngineAvailability;
+use Spatie\MediaLibrary\HasMedia;
 use Throwable;
 
 /**
@@ -276,6 +278,16 @@ trait Searchable
         // for this model without Core knowing them. Base keys win; empty registry
         // is a no-op.
         $array += app(SearchableContributorRegistry::class)->fieldsFor($this);
+
+        // Parent enrichment (media M9): an owner carries the compact surrogate of its
+        // media, so it is findable by what only its media show.
+        if ($this instanceof HasMedia && ! $this instanceof Media) {
+            $surrogate = $this->mediaSurrogateText();
+
+            if ($surrogate !== '') {
+                $array['media_surrogate'] = $surrogate;
+            }
+        }
 
         return $array;
     }
@@ -631,6 +643,18 @@ trait Searchable
         return (bool) Config::get('core.search.vector.enabled');
     }
 
+    private function mediaSurrogateText(): string
+    {
+        /** @var Collection<int, Model> $media */
+        $media = $this->relationLoaded('media') ? $this->getRelation('media') : $this->media()->get();
+
+        return mb_trim(implode(' ', $media
+            ->filter(static fn (Model $item): bool => $item instanceof Media)
+            ->map(static fn (Media $item): string => $item->ownerSurrogateText())
+            ->filter(static fn (string $text): bool => $text !== '')
+            ->all()));
+    }
+
     private function getSchemaDefinition(): SchemaDefinition
     {
         $schema = new SchemaDefinition($this->getTable());
@@ -639,6 +663,10 @@ trait Searchable
         // fields to the model's index schema. Empty registry is a no-op.
         foreach (app(SearchableContributorRegistry::class)->mappingFor(static::class) as $field) {
             $schema->addField($field);
+        }
+
+        if (is_subclass_of(static::class, HasMedia::class) && ! is_a(static::class, Media::class, true)) {
+            $schema->addField(new FieldDefinition('media_surrogate', FieldType::Text, [IndexType::Searchable]));
         }
 
         return $schema;
