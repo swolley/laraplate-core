@@ -25,6 +25,12 @@ final readonly class ApplySettingsOverlayBeforeJob
 
     public function handle(JobProcessing $event): void
     {
+        // A sync job runs inside the request that dispatched it, whose middleware already
+        // applied the overlay: re-applying would only overwrite config set during that request.
+        if ($event->connectionName === 'sync') {
+            return;
+        }
+
         $this->overlay->applyFromDatabase($this->settings);
     }
 }

@@ -31,7 +31,26 @@ it('applies a setting changed by another process before the next job runs', func
     $job = Mockery::mock(Job::class);
     $job->shouldReceive('payload')->andReturn([]);
 
-    event(new JobProcessing('sync', $job));
+    event(new JobProcessing('database', $job));
 
     expect(config('core.overlay.probe'))->toBe('after');
+});
+
+it('leaves the request config alone for a job run on the sync queue', function (): void {
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'overlay.sync_probe',
+        'module' => 'Core',
+        'type' => 'string',
+        'value' => 'from database',
+        'choices' => null,
+        'encrypted' => false,
+    ]);
+    config()->set('core.overlay.sync_probe', 'set in this request');
+
+    $job = Mockery::mock(Job::class);
+    $job->shouldReceive('payload')->andReturn([]);
+
+    event(new JobProcessing('sync', $job));
+
+    expect(config('core.overlay.sync_probe'))->toBe('set in this request');
 });

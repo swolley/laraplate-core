@@ -22,7 +22,7 @@ A seeder row declares it next to the usual keys:
 [
     ...self::setting('features.chat.model', 'ollama:llama3.2:3b', SettingTypeEnum::String, 'ai', 'AI model used by chat', ['ollama:llama3.2:3b']),
     'action_command' => 'ai:models:refresh --setting={name}',
-    'action_queued' => false,
+    'action_queued' => true,
 ]
 ```
 
@@ -78,8 +78,8 @@ Filament reached queued jobs only after a worker restart. `ApplySettingsOverlayB
 job, so it reads a fresh `PerModelSettingResolver` backed by the persistent cache the saving process
 invalidated.
 
-Consequence for tests: with `QUEUE_CONNECTION=sync`, every dispatched job re-applies the settings rows
-that exist in the test database, overwriting a `config()->set()` on the same keys.
+Jobs on the `sync` connection are skipped: they run inside the request that dispatched them, whose
+middleware already applied the overlay, and re-applying would overwrite config set during that request.
 
 If `bootstrap/cache/events.php` exists (`php artisan event:cache`), it replaces every
 `EventServiceProvider::$listen`: after adding a listener, run `php artisan event:clear` or re-cache.
