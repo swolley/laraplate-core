@@ -6,6 +6,8 @@ namespace Modules\Core\Filament\Resources\Settings\Tables;
 
 use function Filament\Support\generate_icon_html;
 
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Support\Enums\IconSize;
 use Filament\Support\Icons\Heroicon;
 use Filament\Support\View\ComponentAttributeBag as FilamentComponentAttributeBag;
@@ -17,11 +19,17 @@ use Filament\Tables\Table;
 use Filament\Tables\View\Components\Columns\IconColumnComponent\IconComponent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Exceptions\InvalidSettingActionException;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\SettingActionResult;
+use Modules\Core\Services\SettingActionRunner;
+use Modules\Core\Support\PermissionName;
+use Throwable;
 
 final class SettingsTable
 {
@@ -125,6 +133,10 @@ final class SettingsTable
                         ]),
                 ]);
             },
+            actions: static function (Collection $default_actions): void {
+                $default_actions->push(self::runActionAction());
+            },
+            fixedActions: ['runSettingAction'],
         )
             // ->defaultGroup(
             //     Group::make('group_name')->label('Group Name'),
@@ -133,6 +145,67 @@ final class SettingsTable
                 ->orderBy('group_name')
                 ->orderBy('name'))
             ->defaultGroup('group_name');
+    }
+
+    /**
+     * Runs the setting's seeded command. Visible only when the setting carries one and the user
+     * may update settings; the command itself comes from the seeder, never from the user.
+     */
+    private static function runActionAction(): Action
+    {
+        return Action::make('runSettingAction')
+            ->hiddenLabel()
+            ->icon(Heroicon::OutlinedPlay)
+            ->tooltip(static fn (Setting $record): string => (string) $record->action_command)
+            ->visible(static fn (Setting $record): bool => $record->action_command !== null
+                && (Auth::user()?->can(PermissionName::forModel($record, 'update')) ?? false))
+            ->action(static function (Setting $record): void {
+                self::runAction($record);
+            });
+    }
+
+    private static function runAction(Setting $record): void
+    {
+        try {
+            $result = app(SettingActionRunner::class)->run($record);
+        } catch (InvalidSettingActionException $exception) {
+            Notification::make()->danger()->title('Action refused')->body($exception->getMessage())->send();
+
+            return;
+        } catch (Throwable $exception) {
+            report($exception);
+            Notification::make()->danger()->title('Action failed')->body($exception->getMessage())->send();
+
+            return;
+        }
+
+        self::notifyResult($result);
+    }
+
+    private static function notifyResult(SettingActionResult $result): void
+    {
+        if ($result->queued) {
+            Notification::make()->info()->title('Command queued')->body($result->commandLine)->send();
+
+            return;
+        }
+
+        $notification = Notification::make()->body(self::outputTail($result->output));
+
+        if ($result->succeeded()) {
+            $notification->success()->title('Command completed');
+        } else {
+            $notification->danger()->title('Command failed');
+        }
+
+        $notification->send();
+    }
+
+    private static function outputTail(string $output): string
+    {
+        $output = mb_trim($output);
+
+        return mb_strlen($output) > 1000 ? mb_substr($output, -1000) : $output;
     }
 
     /**

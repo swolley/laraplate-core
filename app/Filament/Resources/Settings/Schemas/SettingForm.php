@@ -23,7 +23,9 @@ use Modules\Core\Models\Setting;
 
 /**
  * Settings are seeded: only the group, the value and the description can be edited.
- * The value input follows the setting type, which is itself read-only.
+ * The value input follows the setting type, which is itself read-only. The action a setting
+ * runs is shown read-only; `$hidden` keeps it out of the fill data, so the fields read it
+ * from the record.
  */
 final class SettingForm
 {
@@ -82,6 +84,27 @@ final class SettingForm
                     ->columnSpanFull(),
                 TextInput::make('description')
                     ->maxLength(255)
+                    ->columnSpanFull(),
+                Grid::make(4)
+                    ->schema([
+                        TextInput::make('action_command')
+                            ->label('Action')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(static function (TextInput $component, ?Setting $record): void {
+                                $component->state($record?->action_command);
+                            })
+                            ->columnSpan(3),
+                        Toggle::make('action_queued')
+                            ->label('Queued')
+                            ->inline(false)
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(static function (Toggle $component, ?Setting $record): void {
+                                $component->state((bool) $record?->action_queued);
+                            }),
+                    ])
+                    ->visible(static fn (?Setting $record): bool => $record?->action_command !== null)
                     ->columnSpanFull(),
             ]);
     }

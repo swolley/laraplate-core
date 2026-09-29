@@ -256,3 +256,39 @@ it('sends an is_public change from the form to approval', function (): void {
     expect($setting->modifications()->activeOnly()->sole()->modifications['is_public']['modified'])->toBeTrue()
         ->and($setting->fresh()->is_public)->toBeFalse();
 });
+
+it('shows the action fields read-only when the setting has an action', function (): void {
+    editSettingActor();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'string',
+        'value' => 'a',
+        'choices' => null,
+        'encrypted' => false,
+        'action_command' => 'laraplate:setting-action-probe {name}',
+        'action_queued' => true,
+    ]);
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->assertFormFieldDisabled('action_command')
+        ->assertFormFieldDisabled('action_queued')
+        ->assertFormSet([
+            'action_command' => 'laraplate:setting-action-probe {name}',
+            'action_queued' => true,
+        ]);
+});
+
+it('hides the action fields when the setting has no action', function (): void {
+    editSettingActor();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'string',
+        'value' => 'a',
+        'choices' => null,
+        'encrypted' => false,
+    ]);
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->assertFormFieldHidden('action_command')
+        ->assertFormFieldHidden('action_queued');
+});
