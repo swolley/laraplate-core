@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Modules\Core\Contracts\IEmbeddableModel;
 use Modules\Core\Contracts\ISearchableModel;
@@ -13,11 +15,16 @@ use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Observers\MediaMetadataObserver;
+use Modules\Core\Search\Contracts\IAuthorizesSearchRehydration;
+use Modules\Core\Search\OwnerAuthorizerRegistry;
 use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\Search\Traits\Searchable;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\PermissionName;
 use Override;
 use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
+use Throwable;
 
 /**
  * The shared media model owned by Core (the app-wide `media_model`). Any module
@@ -31,7 +38,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
  * @phpstan-use Searchable<Media>
  */
 #[ObservedBy(MediaMetadataObserver::class)]
-final class Media extends BaseMedia implements IEmbeddableModel, ISearchableModel, ISoftDeletableModel
+final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEmbeddableModel, ISearchableModel, ISoftDeletableModel
 {
     /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<static>> */
     use HasFactory;
@@ -64,6 +71,45 @@ final class Media extends BaseMedia implements IEmbeddableModel, ISearchableMode
      * A media is indexed only once claimed onto a real owner (M14): while it is
      * staged, its owner is a {@see MediaDraft} and it must not enter search.
      */
+    /**
+     * Media hits inherit their owner's visibility (M16): the index holds no ACL, so at
+     * rehydration each hit is kept only when the user may see its owner, through the
+     * owner module's {@see \Modules\Core\Search\Contracts\IOwnerAuthorizer}. An owner type
+     * with no registered authorizer falls back to the owner's own `select` ACL; one whose
+     * visibility cannot be evaluated is dropped. The `core.media.search_visibility`
+     * setting `open` turns this off for an owner-agnostic gallery.
+     */
+    #[Override]
+    public function authorizeSearchRehydration(Builder $query): Builder
+    {
+        if (config('core.media.search_visibility', 'owner') === 'open') {
+            return $query;
+        }
+
+        $owner_types = (clone $query)->distinct()->pluck('model_type')->filter()->values()->all();
+        $visible = [];
+
+        foreach ($owner_types as $owner_type) {
+            $owners = self::visibleOwnersOf((string) $owner_type);
+
+            if ($owners instanceof Builder) {
+                $visible[(string) $owner_type] = $owners;
+            }
+        }
+
+        return $query->where(static function (Builder $query) use ($visible): void {
+            // No visible owner type at all: match nothing.
+            $query->whereRaw('1 = 0');
+
+            foreach ($visible as $owner_type => $owners) {
+                $query->orWhere(static function (Builder $query) use ($owner_type, $owners): void {
+                    $query->where('model_type', $owner_type)
+                        ->whereIn('model_id', $owners->select($owners->getModel()->getQualifiedKeyName()));
+                });
+            }
+        });
+    }
+
     public function shouldBeSearchable(): bool
     {
         return $this->model_type !== (new MediaDraft())->getMorphClass();
@@ -137,5 +183,31 @@ final class Media extends BaseMedia implements IEmbeddableModel, ISearchableMode
         $expirationDays = config('core.soft_deletes.expiration_days');
 
         return $this->trashed() && $expirationDays ? $this->{self::getDeletedAtColumn()}->addDays($expirationDays) : null;
+    }
+
+    /**
+     * @return Builder<Model>|null
+     */
+    private static function visibleOwnersOf(string $owner_type): ?Builder
+    {
+        $authorizer = app(OwnerAuthorizerRegistry::class)->for($owner_type);
+
+        if ($authorizer !== null) {
+            return $authorizer->visibleOwners();
+        }
+
+        if (! is_subclass_of($owner_type, Model::class)) {
+            return null;
+        }
+
+        try {
+            /** @var Builder<Model> $owners */
+            $owners = $owner_type::query();
+            app(AuthorizationService::class)->applyAclFiltersToQuery($owners, PermissionName::forClass($owner_type, 'select'));
+
+            return $owners;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

@@ -59,6 +59,7 @@ use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
+use Modules\Core\Search\Contracts\IAuthorizesSearchRehydration;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
@@ -2339,6 +2340,10 @@ class CrudService
 
         $query = $model->newQuery()->whereKey($ids->all());
 
+        if ($model instanceof IAuthorizesSearchRehydration) {
+            $query = $model->authorizeSearchRehydration($query);
+        }
+
         if ($requestData->relations !== []) {
             $query->with($requestData->relations);
         }
@@ -2417,6 +2422,10 @@ class CrudService
         }
 
         $query = $model->newQuery()->whereKey($ids);
+
+        if ($model instanceof IAuthorizesSearchRehydration) {
+            $query = $model->authorizeSearchRehydration($query);
+        }
 
         if ($requestData->relations !== []) {
             $query->with($requestData->relations);

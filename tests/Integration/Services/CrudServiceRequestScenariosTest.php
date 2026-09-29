@@ -1723,3 +1723,35 @@ it('activate does not issue a redundant select after restoring the record', func
     expect($result->data)->toBeInstanceOf(Model::class)
         ->and($select_count)->toBe(1);
 });
+
+it('search applies the model rehydration authorization to the hits', function (): void {
+    config()->set('scout.driver', 'elasticsearch');
+
+    $superadmin = crud_cov_login_superadmin();
+    $hidden = User::factory()->create([
+        'username' => 'rehydration_hidden_' . uniqid(),
+        'email' => 'rehydration_hidden_' . uniqid() . '@example.com',
+    ]);
+
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), crud_cov_advanced_search_returning($hidden->getKey()));
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+    Modules\Core\Tests\Stubs\Search\RehydrationGuardedUserStub::$engine = $engine;
+    Modules\Core\Tests\Stubs\Search\RehydrationGuardedUserStub::$hiddenKey = $hidden->getKey();
+
+    $request = crud_cov_validated_request(['qs' => 'needle']);
+    $request->setUserResolver(fn () => $superadmin);
+    $model = new Modules\Core\Tests\Stubs\Search\RehydrationGuardedUserStub();
+
+    $data = crud_cov_make_request_data(SearchRequestData::class, $model, $request, $model->getKeyName());
+    crud_cov_set($data, 'qs', 'needle');
+    crud_cov_set($data, 'mode', SearchMode::Orchestrated);
+    crud_cov_set($data, 'page', null);
+    crud_cov_set($data, 'limit', 5);
+    crud_cov_set($data, 'pagination', 5);
+    crud_cov_set($data, 'from', null);
+    crud_cov_set($data, 'to', null);
+    crud_cov_set($data, 'count', false);
+
+    expect($service->search($data)->data)->toHaveCount(0);
+});

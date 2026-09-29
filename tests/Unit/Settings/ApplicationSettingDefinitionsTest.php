@@ -28,6 +28,8 @@ it('defines core runtime settings with current defaults and choices', function (
         ->and($definitions->get('auth.registration.enabled')['type'])->toBe(SettingTypeEnum::Boolean)
         ->and($definitions->has('translations.provider'))->toBeFalse()
         ->and($definitions->has('translations.fallback_to_ai'))->toBeFalse()
+        ->and($definitions->get('media.search_visibility')['value'])->toBe('owner')
+        ->and($definitions->get('media.search_visibility')['choices'])->toBe(['owner', 'open'])
         ->and($definitions->get('search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
 });
 

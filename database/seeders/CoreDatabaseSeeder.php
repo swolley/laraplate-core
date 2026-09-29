@@ -100,6 +100,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('notifications.enabled', true, SettingTypeEnum::Boolean, 'notifications', 'Enable pending approval notifications'),
             self::setting('notifications.channels', ['database'], SettingTypeEnum::Json, 'notifications', 'Approval notification channels', ['mail', 'database']),
             self::setting('notifications.threshold.default', 8, SettingTypeEnum::Integer, 'notifications', 'Default hours before pending approval notification'),
+            self::setting('media.search_visibility', 'owner', SettingTypeEnum::String, 'search', 'Media search hits: owner = only when the user can see the media owner, open = owner-agnostic gallery', ['owner', 'open']),
             self::setting('search.reranker.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
             self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
             self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
