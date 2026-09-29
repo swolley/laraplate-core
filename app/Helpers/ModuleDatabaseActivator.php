@@ -178,6 +178,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     {
         return [
             'value' => $allModules,
+            'encrypted' => false,
             'choices' => $allModules,
             'name' => self::$RECORD_NAME,
             'module' => class_module(self::class),

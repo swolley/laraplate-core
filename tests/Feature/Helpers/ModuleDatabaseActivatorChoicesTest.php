@@ -51,3 +51,14 @@ it('refreshes stale choices when seeding the backend modules record', function (
 
     expect($setting->choices)->toEqualCanonicalizing($all_modules);
 });
+
+it('creates the missing backend modules record on first read with every required column', function (): void {
+    Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->forceDelete();
+
+    new ModuleDatabaseActivator(app())->hasStatus('Core', true);
+
+    $setting = Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->sole();
+
+    expect($setting->encrypted)->toBeFalse()
+        ->and($setting->value)->toEqualCanonicalizing(ModuleDatabaseActivator::getAllModulesNames());
+});
