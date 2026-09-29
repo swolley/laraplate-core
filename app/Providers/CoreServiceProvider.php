@@ -7,6 +7,7 @@ namespace Modules\Core\Providers;
 use Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider;
 use BladeUI\Icons\Factory as IconFactory;
 use Carbon\CarbonImmutable;
+use Closure;
 use Cron\CronExpression;
 use Elastic\Elasticsearch\Client as ElasticsearchClient;
 use Elastic\Elasticsearch\ClientBuilder;
@@ -22,6 +23,7 @@ use Filament\Forms\Components\Toggle;
 use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Console\Migrations\StatusCommand as LaravelStatusCommand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
@@ -86,6 +88,7 @@ use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Overrides\ListCommand as InternalListCommand;
 use Modules\Core\Overrides\Migrator;
 use Modules\Core\Overrides\ModuleServiceProvider;
+use Modules\Core\Overrides\PostgresConnection;
 use Modules\Core\Overrides\QueueMonitorCommand;
 use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
@@ -112,6 +115,7 @@ use Modules\Core\Versioning\VersionSetManager;
 use Modules\Core\Versioning\VersionWriter;
 use Nwidart\Modules\Module as NwidartModule;
 use Override;
+use PDO;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use ReflectionClass;
@@ -200,6 +204,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         parent::register();
 
         $this->registerCacheManager();
+
+        $this->registerPostgresConnection();
 
         $this->registerIconSet();
 
@@ -745,6 +751,28 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 'prefix' => 'laraplate',
             ]);
         });
+    }
+
+    /**
+     * Postgres connections are built by {@see PostgresConnection}, which binds
+     * booleans so emulated prepares work. The module activator opens the default
+     * connection before this provider registers, so with emulation on that
+     * connection is dropped once, and the next use reconnects through the resolver.
+     */
+    private function registerPostgresConnection(): void
+    {
+        Connection::resolverFor('pgsql', static fn (Closure|PDO $pdo, string $database, string $prefix, array $config): PostgresConnection => new PostgresConnection($pdo, $database, $prefix, $config));
+
+        $db = $this->app->make('db');
+
+        foreach ($db->getConnections() as $name => $connection) {
+            if ($connection->getDriverName() === 'pgsql'
+                && ! $connection instanceof PostgresConnection
+                && PostgresConnection::emulatesPreparesIn($connection->getConfig('options'))
+                && $connection->transactionLevel() === 0) {
+                $db->purge($name);
+            }
+        }
     }
 
     private function registerCacheManager(): void

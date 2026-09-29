@@ -78,6 +78,9 @@ LOCKIN_LOCK_UNTIL_COLUMN=locked_until			#column name for the lock deadline; null
 LOCKING_LEASE_TTL=900							#lifetime in seconds of the lease an edit form takes
 LOCKING_CAN_BE_UNLOCKED=						#comma separated list of classes exempt when the above is false
 
+#database
+DB_EMULATE_PREPARES=false						#pgsql: one round trip per query instead of prepare + execute (Overrides\PostgresConnection binds booleans for it)
+
 #https
 FORCE_HTTPS=false								#enables HTTPS
 
