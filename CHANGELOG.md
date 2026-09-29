@@ -2,6 +2,184 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.78.0] - 2026-09-29
+
+### 🚀 Features
+
+- *(core)* Declare isImpersonated on User with an explicit return type
+- *(models)* Add @mixin annotations for IDE helper support
+- *(core)* Add content_hash to model_embeddings
+- *(core)* Validate index mapping structure in scout:check-index
+- *(core)* Additive scout:sync-mapping for new locale fields
+- *(core)* List mapping incoherences and print ready-to-run fixes in scout:check-index
+- *(core)* Add queue:monitor --all for every Horizon queue
+- *(core)* Add the expiring validity scope the table filter was already calling
+- *(core)* Assert supported Elasticsearch major version at the edge
+- *(core)* Make the embeddings queue rate limit configurable
+- *(core)* Add driver-agnostic AdaptiveBatchController (AIMD)
+- *(core)* Let AdaptiveBatchController start at a configured batch size
+- *(core)* Route bulk scout imports through adaptive batches
+- *(search)* ProvidesDefaultSearchFilters hook on the generic Scout search
+- *(migration)* Add content_hash column to model_embeddings table
+- *(core)* Let locked users sign in and out
+- *(core)* Dashboard system health with lightweight ping checks
+- *(core)* Internal and public settings, edit-only settings and modifications resources
+- *(core)* Is_internal follows the declaring module's ownership
+- *(core)* Deletes, force deletes and restores go through approval
+- *(core)* Approving a deletion or restore runs it, in one transaction with the vote
+- *(core)* A pending deletion blocks the record, or hides it per model
+- *(core)* Reload and clear-filters buttons on every HasTable list
+- *(core)* Form pages say Close until something is unsaved
+- *(core)* Authors withdraw their requests; decisions fire approved, rejected and withdrawn events
+- *(core)* Imports index in deferred bulk flushes and stop cleanly on Ctrl+C
+- *(core)* The CRUD API answers 202 for writes sent to approval
+- *(core)* The panel reports captured writes and lets authors withdraw them
+- *(modules)* Verify every declared module dependency is enabled, not just Core
+- *(settings)* Add seeded-only action columns and exempt choices from approval
+- *(seeding)* Realign setting actions and add command-managed choices definition
+- *(settings)* Run a setting's action command with quoted placeholders
+- *(settings)* Run a setting's action from the settings grid
+- *(settings)* Flag and keep values no longer among the choices
+- *(search)* Index model embeddings by content hash and embedding model
+- *(search)* Media hits inherit their owner's visibility at rehydration (M16)
+- *(search)* Owners carry their media's compact surrogate (media M9)
+- *(readme)* Update logo size and add PHP version badge
+- *(media)* Keep owner index and media vectors in step with the media lifecycle (M19)
+- *(core)* Import search flushes go to the queue and report each chunk
+- *(module)* Add QueueImportCommand for chunked model indexing and update ModuleDatabaseActivatorChoicesTest
+- *(filament)* Resource-schema contributor seam (media analysis Task 13a, M22)
+- *(core)* Pgsql connection that works with emulated prepares
+- *(filament)* Read-only media gallery resource (media analysis Task 13c, M22)
+- *(filament)* Media view renders contributed record actions (media analysis Task 13d, M22)
+- *(filament)* Reusable media curation relation manager (media analysis Task 13b, M22)
+- *(core)* A setting's value is validated against its type and choices
+
+### 🐛 Bug Fixes
+
+- *(search)* Scan the query by character, not by byte
+- *(search)* Keep a domain write alive when the search engine is unreachable
+- *(search)* Import the Queueable trait FinalizeReindexJob was missing
+- *(filament)* Declare ISoftDeletableModel where SoftDeletes is used, not only inherited
+- *(search)* Sanitize ES mapping at index creation so object/nested fields are valid
+- *(core)* Drop obsolete lat_lon from geo_point mapping
+- *(factory)* Update SettingFactory to append random number to name generation
+- Repair what PHPStan found in the merged work, and tell the truth about testing
+- *(core)* Drop the Expiring option from the validity table filter
+- *(core)* ExpiredAt returns what had lapsed by that date
+- *(core)* Fall back to the default timestamp column names in table filters
+- *(core)* Four defects in the shared table and form utilities
+- *(core)* A version was never attributed to anyone
+- *(core)* Register SearchServiceProvider
+- *(core)* Run the login listeners and end other sessions for licensed users
+- *(core)* Seeders no longer realign a setting's group
+- *(core)* Filament tables accept the Core user class, and the approval mocks say they are not superadmins
+- *(core)* API votes honour the requests they name and never revote a decided one
+- *(settings)* Re-apply the settings overlay before every queued job
+- *(settings)* Skip the settings overlay for jobs on the sync queue
+
+### 💼 Other
+
+- *(core)* Settings follow the shared approval write rule; superadmin writes are never captured
+- Add deterministic media metadata extraction on create
+
+Task 2 of the media AI analysis plan (M2, M3a, M15). MetadataExtractor reads
+embedded metadata per mime (IPTC/EXIF for images, getid3 for audio/video,
+smalot/pdfparser for PDFs) into a MediaMetadata DTO, degrading to the content
+hash on any malformed file. MediaMetadataService merges it into Spatie
+custom_properties with a _provenance map so it never overwrites a human edit and
+always refreshes content_hash + technical data; wired via a MediaMetadataObserver
+on create. Adds getid3 and smalot/pdfparser (approved). Unit tests (6).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+- Add generic searchable-contributor seam (M4a)
+
+Task 4 of the media AI analysis plan. A Core-owned ISearchableContributor
+contract + SearchableContributorRegistry (singleton, keyed by target model
+class, subclass-aware) let another module add fields and mapping to a searchable
+model's document without Core referencing it. Wired generically into the
+Searchable trait (toSearchableArray merges contributor fields with base keys
+winning; getSchemaDefinition adds contributor mapping) as a no-op until a
+contributor registers. Unit tests + stubs; existing search behavior unchanged.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+- Make Media searchable and embeddable (M5)
+
+Task 5 of the media AI analysis plan. Media now uses the Core Searchable trait
+and implements IEmbeddableModel/ISearchableModel: a computed searchable_embed_text
+accessor composes the custom_properties surrogate (description + keywords) with
+AI-contributed text, and toSearchableArray ships facets (mime, track, collection,
+keywords, description) from day one. Indexing is gated on claim via
+shouldBeSearchable (draft-owned media stay out of the index). Extends the
+contributor seam with embeddableText so AI text can join the standalone vector
+without Core referencing AI. Feature tests (6).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
+### 🚜 Refactor
+
+- *(migrations)* Fold column/index/enum alters into their create migrations
+- *(migrations)* Fold is_first_login/preferences into integrate_users_table
+- *(models)* State locking, activation and validity as contracts
+- *(models)* State soft deletion and search indexing as contracts
+- Private methods for a final class, and instance calls where they are local
+- Narrow findOrFail to a single record with whereKey()->firstOrFail()
+- Give the domain action handlers and Filament pages their real types
+- *(core)* Type what PHPStan read as an undefined property
+- *(core)* Declare the type where it is lost, not the property where it exists
+- *(core)* Say "the class using this trait" as self, and fix two contracts
+- *(core)* Resolve the Builder scopes with contracts, not a rule
+- *(core)* Ask the contract, not the trait, in the shared form and table
+- *(core)* Type the approvals and validations concerns
+- *(core)* Correct the captured-delete shape and type what HasVersions returns
+- *(core)* Type what HasTranslations takes and returns
+- *(core)* Read toggles moved to runtime settings from their setting keys
+- *(core)* Module-prefixed setting keys, conservative defaults, AI moderation out of Core
+- *(core)* Setting names drop the module prefix, the overlay adds it back
+- *(core)* Domain-first setting names, gated licenses and modifications, Core group after Documentation
+- *(core)* Use Str::studly for consistent label formatting in ListModifications and ListSettings
+- *(core)* Update module group name and enhance module comparison logic
+- *(core)* Crud settings live in the core group
+- *(core)* The approval tables carry the Core prefix
+- *(core)* Approval models stand alone, attributed to laravel-approval
+- *(core)* HasApprovals carries the approval behaviour itself
+- *(core)* Modifications carry an operation instead of is_update
+- *(core)* Streamline backend module record creation and insertion
+
+### 📚 Documentation
+
+- *(rag)* Describe how the module is released from the application
+- The dev toolchain is the application's, not this module's
+- *(core)* Say what composer check does and does not answer
+- *(core)* Attribute the locking code derived from MIT libraries
+- *(core)* Attribute the approvals code derived from laravel-approval
+- Approvals cover deletes and restores
+- *(settings)* Setting actions and command-managed choices
+- *(media)* Media search, owner visibility, surrogate and lifecycle
+- Media gallery and curation Filament surface (media analysis Task 14)
+
+### ⚡ Performance
+
+- *(migrations)* Index all foreign-key and row-scoping columns
+- *(core)* Eager-load relations once on the bulk indexing path
+- *(core)* Honor toSearchableWith on the bulk indexing path
+
+### 🧪 Testing
+
+- Classify what UnitShell was holding, and say why five stay
+- *(core)* Authenticate permission mocks without firing Login
+- *(core)* Queue the version check in Elasticsearch tests and pin the embeddings default
+- *(core)* The settings tests share the HTTP-context helper
+- *(core)* The Core suite is green again
+- *(core)* The withdraw panel test needs no permission on modifications
+
+### ⚙️ Miscellaneous Tasks
+
+- Rimuove docblock ide-helper generati dai model
+- *(core)* Sort settings group tabs and hide the group column
+- *(core)* Nothing references the laravel-approval package any more
+- *(core)* Drop the laravel-approval requirement, the code is ours
+- *(settings)* Drop translation provider settings now owned by AI
+
 ## [1.77.0] - 2026-09-15
 
 ### 🚀 Features
