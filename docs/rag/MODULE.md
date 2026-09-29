@@ -379,6 +379,17 @@ The per-id endpoints resolve the owner record **through the caller's row-level A
 
 The literal-prefixed `pending`/`claim` routes are registered **before** the generic `{module}/{entity}/{id?}` routes so they win by registration order. Stale drafts (and their staged media) are pruned by the `core:prune-media-drafts` command, scheduled daily; the TTL is `config('core.media.draft_ttl_hours')` (env `CORE_MEDIA_DRAFT_TTL_HOURS`, default `24`).
 
+### Media search
+
+`Modules\Core\Models\Media` (Spatie media, table `core_media`) is `Searchable` and embeddable once claimed onto a real owner: a media still owned by a `MediaDraft` is never indexed. Its document carries facets (`mime`, `track`, `collection`, `keywords`, `description`) and its vector source is `searchable_embed_text`: the Core display fields in `custom_properties` (`description`, `keywords`) plus any text a module contributes.
+
+- **Deterministic metadata.** On create, `MediaMetadataService` fills `custom_properties` from the file (EXIF/IPTC, getID3, PDF details) and stores `content_hash` (sha256 of the file), with a `_provenance` map so it only overwrites values it wrote itself.
+- **Contributor seam.** `SearchableContributorRegistry` lets a module add fields, mapping and embeddable text to another module's searchable model without Core referencing it (the AI module contributes its media analysis this way).
+- **Owner surrogate.** Every searchable owner implementing Spatie's `HasMedia` gets a `media_surrogate` text field: each media's `Media::ownerSurrogateText()`, i.e. description, keywords and the compact fields contributors add to the media document. Heavy tracks (transcripts, OCR) stay in the media's own vector.
+- **Owner visibility.** A media hit is shown only to users who may see its owner. `CrudService` applies `IAuthorizesSearchRehydration` when it turns search hits back into models, and `Media` implements it by grouping hits by owner type and delegating to the `IOwnerAuthorizer` registered for that type in `OwnerAuthorizerRegistry` (CMS registers `Content`: valid and `select` ACL; SAO registers `Ticket`: `TicketQueryService::visible()`). An owner type without an authorizer falls back to the owner's own `select` ACL; one that cannot be evaluated is dropped. The Core setting `media.search_visibility` (`owner` default, `open` for an owner-agnostic gallery) turns this off. Engine totals are counted before rehydration, so a page can hold fewer media than its size when owners are hidden.
+- **Lifecycle.** `MediaLifecycleObserver` reindexes the owner when a media is edited (the claim included), soft-deleted or restored; a force delete also drops the media's `ModelEmbedding` rows.
+- **Vector reuse.** `core_model_embeddings` is indexed on `(content_hash, model_key)` so the embedding pipeline can reuse the vectors of an identical text instead of embedding it again.
+
 ```mermaid
 flowchart LR
   Req[Graph request]
