@@ -14,6 +14,7 @@ use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Observers\MediaLifecycleObserver;
 use Modules\Core\Observers\MediaMetadataObserver;
 use Modules\Core\Search\Contracts\IAuthorizesSearchRehydration;
 use Modules\Core\Search\OwnerAuthorizerRegistry;
@@ -37,7 +38,7 @@ use Throwable;
  *
  * @phpstan-use Searchable<Media>
  */
-#[ObservedBy(MediaMetadataObserver::class)]
+#[ObservedBy([MediaMetadataObserver::class, MediaLifecycleObserver::class])]
 final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEmbeddableModel, ISearchableModel, ISoftDeletableModel
 {
     /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<static>> */
@@ -127,6 +128,25 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
      * to the media document (for AI: idea, intent, entities). Never the heavy tracks
      * (transcript, OCR), which contributors only add to the media's own vector.
      */
+    /**
+     * Reindex the single owner (M9, M19): its document carries this media's surrogate.
+     * No-op for a draft owner, an owner that is not searchable, or an owner class that no
+     * longer exists.
+     */
+    public function reindexOwner(): void
+    {
+        // An owner whose module was disabled or removed cannot be resolved; nothing to reindex.
+        if (! is_string($this->model_type) || ! class_exists($this->model_type)) {
+            return;
+        }
+
+        $owner = $this->model;
+
+        if ($owner instanceof ISearchableModel && $owner instanceof Model && $owner->shouldBeSearchable()) {
+            $owner->searchable();
+        }
+    }
+
     public function ownerSurrogateText(): string
     {
         $custom = $this->custom_properties;
