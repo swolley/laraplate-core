@@ -57,21 +57,59 @@ class Seeder extends BaseSeeder
      * `is_internal = false`. The flag is structural, so a re-seed realigns rows
      * written before it existed and follows a module that changes ownership.
      * `group_name` is written on insert only: operators regroup settings freely and
-     * a re-seed keeps their choice.
+     * a re-seed keeps their choice. The action a setting runs is code-owned and
+     * realigned like its type.
      *
      * @param  list<array<string,mixed>>  $rows
      */
     protected static function internalSettingsDefinition(string $module, array $rows): SeedDefinition
     {
+        return self::settingsDefinition(
+            $module,
+            $rows,
+            ['type', 'description', 'choices', 'is_internal', 'action_command', 'action_queued'],
+        );
+    }
+
+    /**
+     * Same as {@see internalSettingsDefinition()} for settings whose choices a command
+     * refreshes: `choices` is written when the row is created and never realigned, so a
+     * re-seed cannot overwrite the list the command wrote.
+     *
+     * @param  list<array<string,mixed>>  $rows
+     */
+    protected static function commandManagedChoicesSettingsDefinition(string $module, array $rows): SeedDefinition
+    {
+        return self::settingsDefinition(
+            $module,
+            $rows,
+            ['type', 'description', 'is_internal', 'action_command', 'action_queued'],
+        );
+    }
+
+    /**
+     * Rows without an action get explicit defaults: an upsert needs every row to carry the
+     * same columns, and a row whose action was removed must realign it to none.
+     *
+     * @param  list<array<string,mixed>>  $rows
+     * @param  list<string>  $structural
+     */
+    private static function settingsDefinition(string $module, array $rows, array $structural): SeedDefinition
+    {
         $is_internal = is_laraplate_owned_module($module);
 
         return SeedDefinition::for(Setting::class)
             ->identity(['name'])
-            ->structural(['type', 'description', 'choices', 'is_internal'])
+            ->structural($structural)
             ->initial(['value'])
             ->ownedBy($module)
             ->rows(array_map(
-                static fn (array $row): array => [...$row, 'is_internal' => $is_internal],
+                static fn (array $row): array => [
+                    'action_command' => null,
+                    'action_queued' => false,
+                    ...$row,
+                    'is_internal' => $is_internal,
+                ],
                 $rows,
             ));
     }
