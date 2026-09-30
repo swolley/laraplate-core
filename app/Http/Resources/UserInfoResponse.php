@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
-use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Override;
 
@@ -20,7 +19,7 @@ final class UserInfoResponse extends JsonResource
         if ($this->resource) {
             $permissions = [];
 
-            foreach ($this->resource->isSuperAdmin() ? Permission::all() : $this->resource->getAllPermissions() as $permission) {
+            foreach ($this->resource->isSuperAdmin() ? $this->resource->getPermissionsViaRoles() : $this->resource->getAllPermissions() as $permission) {
                 $guard_key = $permission->guard_name;
 
                 if (! isset($permissions[$guard_key])) {

@@ -24,24 +24,29 @@ final class ListModifications extends ListRecords
     protected static string $resource = ModificationResource::class;
 
     /**
-     * Build tabs with badges from a single grouped query instead of N+1 count() queries.
+     * Build tabs with badges from a single grouped query instead of N+1 count() queries,
+     * cached for `core.filament.tabs_counts_ttl_seconds`.
      */
     public function getTabs(): array
     {
         /** @var class-string<Model> $model */
         $model = self::getResource()::getModel();
 
-        // $cache_key = 'filament_core_modifications_tabs_' . $model;
+        $cache_key = 'filament_core_modifications_tabs_' . $model;
 
-        // $counts = Cache::remember($cache_key, config('core.filament.tabs_counts_ttl_seconds'), function () use ($model) {
-        $counts_by_type = $model::query()
-            ->selectRaw('modifiable_type, count(*) as count')
-            ->groupBy('modifiable_type')
-            ->pluck('count', 'modifiable_type')
-            ->all();
+        /** @var array<string, int> $counts */
+        $counts = Cache::remember($cache_key, $this->tabsCountsTtl(), static function () use ($model): array {
+            $counts_by_type = [];
 
-        $counts = array_merge(['all' => (int) array_sum($counts_by_type)], $counts_by_type);
-        // });
+            foreach ($model::query()
+                ->selectRaw('modifiable_type, count(*) as aggregate_count')
+                ->groupBy('modifiable_type')
+                ->pluck('aggregate_count', 'modifiable_type') as $type => $count) {
+                $counts_by_type[(string) $type] = (int) $count;
+            }
+
+            return array_merge(['all' => array_sum($counts_by_type)], $counts_by_type);
+        });
 
         if (count($counts) < 2) {
             return [];
@@ -76,5 +81,12 @@ final class ListModifications extends ListRecords
             });
 
         return $tabs;
+    }
+
+    private function tabsCountsTtl(): int
+    {
+        $ttl = config('core.filament.tabs_counts_ttl_seconds', 60);
+
+        return is_numeric($ttl) ? (int) $ttl : 60;
     }
 }

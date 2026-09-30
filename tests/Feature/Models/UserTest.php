@@ -473,3 +473,35 @@ it('uses web as default guard name for permission checks', function (): void {
 
     expect($method->invoke(User::factory()->create()))->toBe('web');
 });
+
+it('serves superadmin permissions from the permission registrar cache sorted by name', function (): void {
+    Permission::factory()->create(['name' => 'default.zeta.select']);
+    Permission::factory()->create(['name' => 'default.alpha.select']);
+    $superadmin_role = Role::factory()->create(['name' => config('permission.roles.superadmin')]);
+    $this->user->roles()->attach($superadmin_role);
+    $this->user->load('roles');
+
+    $first = $this->user->getPermissionsViaRoles();
+
+    $connection = $this->user->getConnection();
+    $permissions_table = (new Permission)->getTable();
+    $connection->flushQueryLog();
+    $connection->enableQueryLog();
+
+    $second = $this->user->getPermissionsViaRoles();
+
+    $permission_queries = array_filter(
+        $connection->getQueryLog(),
+        static fn (array $query): bool => str_contains($query['query'], $permissions_table),
+    );
+    $connection->disableQueryLog();
+
+    $names = $second->pluck('name')->all();
+    $sorted = $names;
+    sort($sorted, SORT_STRING);
+
+    expect($permission_queries)->toBe([])
+        ->and($second->pluck('name')->all())->toBe($first->pluck('name')->all())
+        ->and($names)->toBe($sorted)
+        ->and($names)->toContain('default.alpha.select', 'default.zeta.select');
+});

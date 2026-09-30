@@ -323,3 +323,21 @@ it('returns welcome widget view data', function (): void {
         expect(true)->toBeTrue();
     }
 });
+
+it('reads horizon pending and recently failed counts from the job repository', function (): void {
+    $jobs = Mockery::mock(Laravel\Horizon\Contracts\JobRepository::class);
+    $jobs->shouldReceive('countPending')->andReturn(7);
+    $jobs->shouldReceive('countRecentlyFailed')->andReturn(3);
+    $metrics = Mockery::mock(Laravel\Horizon\Contracts\MetricsRepository::class);
+    $metrics->shouldReceive('throughput')->andReturn(42);
+    app()->instance(Laravel\Horizon\Contracts\JobRepository::class, $jobs);
+    app()->instance(Laravel\Horizon\Contracts\MetricsRepository::class, $metrics);
+
+    $method = new ReflectionMethod(HorizonStatsWidget::class, 'getStats');
+    $stats = $method->invoke(new HorizonStatsWidget);
+
+    expect($stats[0]->getLabel())->toBe('Pending Jobs')
+        ->and($stats[0]->getValue())->toBe(7)
+        ->and($stats[1]->getLabel())->toBe('Failed Jobs')
+        ->and($stats[1]->getValue())->toBe(3);
+});

@@ -46,6 +46,7 @@ use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
 use Override;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
@@ -354,10 +355,14 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         });
     }
 
+    /**
+     * A superadmin holds every permission. They come from the permission registrar's cache,
+     * which Spatie flushes on every permission and role write, instead of a query per call.
+     */
     public function getPermissionsViaRoles(): Collection
     {
         if ($this->isSuperAdmin()) {
-            return Permission::query()->get()->sort()->values();
+            return app(PermissionRegistrar::class)->getPermissions()->sortBy('name')->values();
         }
 
         return $this->getPermissionsViaRolesTrait();

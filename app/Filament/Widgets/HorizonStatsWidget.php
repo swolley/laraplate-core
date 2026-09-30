@@ -35,12 +35,8 @@ final class HorizonStatsWidget extends BaseWidget
         $metrics = resolve(MetricsRepository::class);
         $jobs = resolve(JobRepository::class);
 
-        // Pending jobs
-        $recent = $jobs->getRecent();
-        $pendingCount = isset($recent['pending']) && is_countable($recent['pending']) ? count($recent['pending']) : 0;
-
-        // Failed jobs
-        $failedCount = isset($recent['failed']) && is_countable($recent['failed']) ? count($recent['failed']) : 0;
+        $pendingCount = (int) $jobs->countPending();
+        $failedCount = (int) $jobs->countRecentlyFailed();
 
         // Throughput (jobs per minute)
         $throughput = method_exists($metrics, 'throughput') ? $metrics->throughput() : 0;

@@ -182,6 +182,8 @@ Mario sees records from BOTH countries.
 
 Users with the `superadmin` role bypass ALL ACL filters automatically.
 
+A superadmin's permission list (`User::getPermissionsViaRoles()`, the `permissions` of the user info response) is every permission, read from Spatie's `PermissionRegistrar` cache and sorted by name. Spatie flushes that cache on every permission or role write, so no query runs per call.
+
 ## ACL Filter Injection
 
 When ACL filters are injected into a request, they wrap the existing user filters:

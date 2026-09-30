@@ -157,3 +157,32 @@ it('shows modifications when an active model goes through approvals', function (
 
     Livewire::test(ListModifications::class)->assertOk();
 });
+
+it('caches the modification tab counts for the configured ttl', function (): void {
+    $author = modificationPanelUser();
+    pendingSettingModification($author);
+    $this->actingAs(modificationPanelUser());
+
+    $first_tabs = (new ListModifications)->getTabs();
+
+    $modification = new Modification;
+    $connection = $modification->getConnection();
+    $connection->flushQueryLog();
+    $connection->enableQueryLog();
+
+    pendingSettingModification($author);
+    $connection->flushQueryLog();
+
+    $second_tabs = (new ListModifications)->getTabs();
+
+    $count_queries = array_filter(
+        $connection->getQueryLog(),
+        static fn (array $query): bool => str_contains($query['query'], 'count(*)')
+            && str_contains($query['query'], $modification->getTable()),
+    );
+    $connection->disableQueryLog();
+
+    expect((int) $first_tabs['all']->getBadge())->toBe(1)
+        ->and((int) $second_tabs['all']->getBadge())->toBe(1)
+        ->and($count_queries)->toBe([]);
+});

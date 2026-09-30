@@ -64,7 +64,8 @@ it('transforms superadmin user with all permissions grouped by guard', function 
     $array = $resource->toArray(new Request);
 
     expect($array['permissions'])->toBeArray()
-        ->and($array['permissions'])->not->toBeEmpty();
+        ->and($array['permissions'])->not->toBeEmpty()
+        ->and($array['permissions']['web'])->toContain('posts.articles.edit');
 });
 
 it('groups multiple permissions under same guard', function (): void {
