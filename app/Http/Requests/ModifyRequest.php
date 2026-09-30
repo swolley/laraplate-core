@@ -101,6 +101,13 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
         }
 
         if ($is_vote) {
+            // A pending create has no record yet, so a vote naming its modifications needs no id.
+            foreach (is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey] as $key) {
+                if (isset($to_merge[$key])) {
+                    $to_merge[$key] = ['required_without:modification', ...array_values(array_diff($to_merge[$key], ['required']))];
+                }
+            }
+
             // One request id or a list of them; none votes on every active request of the record.
             if ($this->has('modification') && ! is_array($this->input('modification'))) {
                 $this->merge(['modification' => [$this->input('modification')]]);

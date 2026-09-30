@@ -653,6 +653,9 @@ Pending requests are listed by `GET /app/crud/pending-approvals` (every entity) 
   that permission, for restrictions such as `modifier_id = @user.id` or a department filter.
 
 Approve, reject and withdraw via `PATCH /app/crud/approve|disapprove|withdraw/{module}/{entity}`.
+A pending create has no record yet: vote on it with `modification` and no `id` (the vote then
+looks only at the entity's pending creates). Every model with approvals validates a write before
+capturing it, so an invalid insert or update answers 422 and never becomes a pending request.
 A vote acts on one record (`id`): without `modification` it votes on every active request of
 that record, oldest first; with `modification` (one id or a list of ids) only on those, which
 must all belong to the record (`404` otherwise) and still be pending (`409` otherwise). An
@@ -901,6 +904,48 @@ a bounded id subquery (never a join into the aggregated query, so parent scopes
 never collide with related columns), the MorphToMany morph constraint is applied,
 and related soft-deletes are honoured. Content facets `categories` and `tags` this
 way.
+
+## List Freshness
+
+`GET crud/freshness/{module}/{entity}` is a lightweight fingerprint of a list page,
+used by the UI to tell whether the rows on screen are stale without reloading them.
+It takes the same `ListRequest` vocabulary as `select` (`filters`, `sort`, `page`,
+`pagination`, `from`/`to`, `limit`) and runs through the same pipeline: `select`
+permission on the entity table, ACL filter injection, filters and sort. It is never
+cached.
+
+Only the primary key and, when the model uses timestamps, its `updated_at` column
+are selected, read through the base query builder (no Eloquent hydration, no eager
+loads), so model scopes that expect wider selects cannot interfere.
+
+Optional `check_ids[]` (max 100, scalar ids of the client's snapshot page) asks the
+server to classify each id against the **filtered set without the page window**:
+
+| `status` | Meaning |
+| --- | --- |
+| `on_page` | Still matches the filters and is in the current page window. |
+| `off_page` | Still matches the filters but moved to another page (sort or insert shift). |
+| `gone` | No longer in the filtered set: deleted, soft-deleted, or filtered out by ACL or a changed value. |
+
+Response `data`:
+
+```json
+{
+  "total": 42,
+  "items": [{ "id": 7, "updated_at": "2026-08-06T10:15:00+00:00" }],
+  "presence": [{ "id": 7, "status": "on_page", "updated_at": "2026-08-06T10:15:00+00:00" }]
+}
+```
+
+- `total` is the filtered count across all pages; `items` is the current page only,
+  in the same order as `select`.
+- `updated_at` is normalised to ISO-8601 UTC so clients can compare it with Eloquent
+  JSON timestamps. It is `null` for models without timestamps (only presence and
+  `total` can then signal drift) and for `gone` entries.
+- `presence` is empty when `check_ids` is omitted, and for composite primary keys.
+
+The response carries the usual list `meta` (`totalRecords`, `currentPage`, ...).
+Contract covered by `tests/Feature/Controllers/CrudFreshnessTest.php`.
 
 ## Related Documentation
 

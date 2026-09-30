@@ -16,6 +16,7 @@ use InvalidArgumentException;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Approvals\PendingDeletionLock;
 use Modules\Core\Approvals\PendingDeletionStrategy;
+use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
@@ -84,6 +85,12 @@ trait HasApprovals
             }
 
             if ($item->shouldCapture($item->exists ? Operation::Update : Operation::Create) && $item->requiresApprovalWhen($item->getDirtyForApproval()) === true) {
+                // Model validation runs on creating/updating, which a captured write never reaches:
+                // validate here so a pending request only ever carries data the model accepts.
+                if (method_exists($item, 'validateWithRules') && ! $item->shouldSkipValidation()) {
+                    $item->validateWithRules($item->exists ? CrudExecutor::UPDATE : CrudExecutor::INSERT);
+                }
+
                 return static::captureSave($item);
             }
 

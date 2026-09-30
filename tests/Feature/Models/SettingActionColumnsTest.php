@@ -46,7 +46,7 @@ it('writes a choices-only change directly for a writer who would otherwise be ca
 });
 
 it('still captures a value change from the same writer', function (): void {
-    $setting = settingActionColumnsFixture();
+    $setting = settingActionColumnsFixture(['choices' => ['a', 'b']]);
     HttpContext::panelActorWithoutApproval(new Setting, ['select', 'update']);
 
     $fresh = $setting->fresh();

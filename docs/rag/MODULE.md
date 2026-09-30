@@ -250,6 +250,8 @@ flowchart LR
 
 **While a deletion waits.** `pendingDeletionStrategy()` decides: `Block` (default) keeps the record visible and refuses every save with `PendingDeletionLock`, except the attributes listed by `attributesWritableWhilePendingDeletion()` and `updated_at`; `Hide` filters the record out for authenticated users who hold neither `approve` nor `disapprove` on its table (global scope `PendingDeletionStrategy::HIDE_SCOPE`; local scope `withoutPendingDeletion()`). With nobody authenticated (console, queues, indexing, exports) nothing is hidden.
 
+**Validation.** A write is validated with the model's rules before it is captured, since model validation otherwise runs on `creating`/`updating`, which a captured write never reaches: a pending request only ever holds data the model accepts.
+
 **Deciding.** Votes go through `ModificationVoteService`, the only place a decision is applied. `cast()` records the vote and, when it completes the quorum, applies the decision in the same transaction: an approved create or update writes its diff, an approved delete, force delete or restore runs it, and an approved deletion rejects the record's pending updates (`reason = record deleted`). If applying fails, the vote is rolled back and the request stays pending. A decided request is deactivated and kept, with its votes, as the trail. The author never votes on their own request.
 
 **Withdrawing.** `ModificationVoteService::withdraw()` lets the author, and only the author, drop a request before its decision: the request and its votes are deleted and the record stays as it was.

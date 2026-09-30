@@ -2331,9 +2331,11 @@ class CrudService
     }
 
     /**
-     * @return array<string, mixed>|string|int
+     * Null only on a vote that names its modifications instead of a record (a pending create).
+     *
+     * @return array<string, mixed>|string|int|null
      */
-    private function getModelKeyValue(ModifyRequestData $filters): array|string|int
+    private function getModelKeyValue(ModifyRequestData $filters): array|string|int|null
     {
         /** @var string|array<int,string> $key */
         $key = $this->getModelPrimaryKeyName($filters->model);
@@ -2595,25 +2597,37 @@ class CrudService
         $this->assertCrudWriteAllowed($model, $operation);
         $permission_name = $this->auth->ensurePermission($requestData->request, $model->getTable(), 'approve', $model->getConnectionName());
 
-        $key_value = $this->getModelKeyValue($requestData);
-        $found_record = $this->aclFiltered(
-            $this->newQueryWithTrashed($model)->where($this->keyValueToWhereCondition($model, $key_value)),
-            $permission_name,
-        )->firstOrFail();
-
-        $user = Auth::user();
-        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
-        $connection = $found_record->getConnection();
-        $modification_prototype = (new Modification())->setConnection($connection->getName());
-
         $requested = $requestData->changes['modification'] ?? null;
         $reason = $requestData->changes['reason'] ?? null;
         $vote_reason = is_string($reason) ? $reason : null;
 
-        $connection->transaction(function () use ($found_record, $user, $operation, $modification_prototype, $requested, $vote_reason): void {
+        // A pending create has no record yet: it is named by its modification alone.
+        $key_value = $this->getModelKeyValue($requestData);
+        $has_record_key = is_array($key_value)
+            ? array_filter($key_value, static fn (mixed $value): bool => $value !== null && $value !== '') !== []
+            : $key_value !== null && $key_value !== '';
+        throw_if(! $has_record_key && ! is_array($requested), InvalidArgumentException::class, 'A record id or the modifications to vote on are required.');
+
+        $found_record = $has_record_key
+            ? $this->aclFiltered(
+                $this->newQueryWithTrashed($model)->where($this->keyValueToWhereCondition($model, $key_value)),
+                $permission_name,
+            )->firstOrFail()
+            : null;
+
+        $user = Auth::user();
+        throw_unless($user instanceof User, LogicException::class, 'Authenticated user is required.');
+        $connection = ($found_record ?? $model)->getConnection();
+        $modification_prototype = (new Modification())->setConnection($connection->getName());
+
+        $connection->transaction(function () use ($model, $found_record, $user, $operation, $modification_prototype, $requested, $vote_reason): void {
             $modifications = $modification_prototype->newQuery()
-                ->where('modifiable_type', $found_record::class)
-                ->where('modifiable_id', $found_record->getKey());
+                ->where('modifiable_type', ($found_record ?? $model)::class)
+                ->when(
+                    $found_record instanceof Model,
+                    static fn (Builder $query): Builder => $query->where('modifiable_id', $found_record?->getKey()),
+                    static fn (Builder $query): Builder => $query->whereNull('modifiable_id'),
+                );
 
             if (is_array($requested)) {
                 // Only the named requests, and every one of them must belong to this record.
@@ -2631,6 +2645,12 @@ class CrudService
                 $this->castApprovalVote($user, $modification, $found_record, $operation, $vote_reason);
             }
         });
+
+        if (! $found_record instanceof Model) {
+            return new CrudResult(
+                data: ['modifications' => array_values($requested ?? [])],
+            );
+        }
 
         $found_record->refresh();
 
@@ -2670,7 +2690,7 @@ class CrudService
     /**
      * @param  "approve"|"disapprove"  $operation
      */
-    private function castApprovalVote(User $user, Modification $modification, Model $modifiable, string $operation, ?string $reason): void
+    private function castApprovalVote(User $user, Modification $modification, ?Model $modifiable, string $operation, ?string $reason): void
     {
         resolve(ModificationVoteService::class)->cast($user, $modification, $operation === 'approve', $reason, $modifiable);
     }
