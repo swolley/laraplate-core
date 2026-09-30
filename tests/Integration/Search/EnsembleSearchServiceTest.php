@@ -12,6 +12,7 @@ use Modules\Core\Search\Services\SearchQueryAnalyzer;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Tests\Integration\Search\EnsembleSearchPaginatorTestModel;
+use Modules\Core\Tests\Stubs\Search\FusionFixtureSearchModel;
 
 beforeEach(function (): void {
     $this->reranker = new HeuristicReranker();
@@ -249,4 +250,110 @@ it('propagates one resolved text match decision and exposes matching metadata', 
             'fuzzy_token_limit' => 1,
             'degraded' => ['capabilities'],
         ]);
+});
+
+/**
+ * @return array<string, mixed>
+ */
+function ensemble_fusion_fixture_plan(bool $useReranker, array $ranking = []): array
+{
+    return [
+        'retrieval' => ['use_fulltext' => true, 'use_vector' => true],
+        'ensemble' => [
+            'keyword_weight' => 0.30,
+            'vector_weight' => 0.40,
+            'hybrid_weight' => 0.30,
+            'agreement_boost' => 0.15,
+            'rrf_k' => 60,
+            'rrf_weight' => 0.25,
+        ],
+        'ranking' => ['use_reranker' => $useReranker, 'rerank_top_k' => 4, ...$ranking],
+    ];
+}
+
+function ensemble_fusion_fixture_reranker(): IReranker
+{
+    $scores = [
+        'invoice approval workflow' => 0.20,
+        'supplier invoice list' => 0.95,
+        'payment reminders' => 0.40,
+        'archived invoices' => 0.10,
+        'overdue supplier payments' => 0.85,
+        'vendor onboarding' => 0.05,
+    ];
+    $reranker = Mockery::mock(IReranker::class);
+    $reranker->shouldReceive('score')->andReturnUsing(
+        static fn (array $pairs): array => array_map(static fn (array $pair): float => $scores[$pair['text']], $pairs),
+    );
+
+    return $reranker;
+}
+
+/**
+ * @return list<array{0: string, 1: float}>
+ */
+function ensemble_fusion_fixture_ranking(EnsembleSearchService $service, array $plan): array
+{
+    $result = $service->search(
+        model: new FusionFixtureSearchModel(),
+        query: 'supplier invoices',
+        plan: $plan,
+        vector: [0.1, 0.2, 0.3],
+        page: 1,
+        perPage: 10,
+    );
+
+    return array_map(static fn (array $hit): array => [$hit['id'], $hit['score']], $result->hits);
+}
+
+it('fuses keyword, vector and hybrid rankings into a pinned order and pinned scores', function (): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(false)))->toBe([
+        ['3', 0.918035],
+        ['2', 0.896436],
+        ['1', 0.575374],
+        ['5', 0.477169],
+        ['4', 0.003906],
+        ['6', 0.003906],
+    ]);
+});
+
+it('blends reranker scores into the fused top-k with pinned results', function (): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true)))->toBe([
+        ['2', 0.881854],
+        ['5', 0.659066],
+        ['3', 0.587543],
+        ['1', 0.340314],
+        ['4', 0.003906],
+        ['6', 0.003906],
+    ]);
+});
+
+it('keeps the fused order when the plan sets a zero rerank blend', function (): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true, ['rerank_blend' => 0.0])))
+        ->toBe(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(false)));
+});
+
+it('reads the rerank blend from the reranker weight setting when the plan does not set it', function (): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+    config()->set('core.search.reranker.weight', 0.0);
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true)))
+        ->toBe(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(false)));
+
+    config()->set('core.search.reranker.weight', 0.6);
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true)))->toBe([
+        ['2', 0.881854],
+        ['5', 0.659066],
+        ['3', 0.587543],
+        ['1', 0.340314],
+        ['4', 0.003906],
+        ['6', 0.003906],
+    ]);
 });

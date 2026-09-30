@@ -67,6 +67,9 @@ It therefore does not change:
 - how their results are fused (weights, RRF constant, agreement bonus);
 - whether results are reranked, or how the reranked score is blended.
 
+The operator's retrieval tuning switch (`search.adaptive_tuning`) is the opposite: it can change
+fusion and reranking per kind of query, and never the `matching` preference.
+
 A query that returns nothing under `strict` and returns results under `tolerant` changed only the
 lexical recall. If you need semantic recall (different words, same meaning), that comes from vector
 retrieval being active, not from a looser preference.

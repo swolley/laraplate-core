@@ -229,6 +229,10 @@ Text matching is configured under `search.text_matching.defaults` and translated
 
 The database engine always provides case-insensitive prefix or substring matching. PostgreSQL can additionally use `strict_word_similarity()` after installing the trusted `pg_trgm` extension and setting `SEARCH_DATABASE_PG_TRGM_ENABLED=true`. Other database drivers report typo tolerance as degraded. Oracle intentionally uses the portable fallback: `UTL_MATCH` is not index-backed for generic retrieval over long text, while Oracle Text requires explicit `CONTEXT` indexes and a schema-aware adapter.
 
+### Retrieval tuning profile
+
+Orchestrated search fuses keyword, vector and hybrid rankings with parameters from the planner (L0). The `search.adaptive_tuning` setting (group `search`, seeded off) swaps in the committed, measured profile `config/search_tuning.php`, selected per query class (`identifier`, `short_keyword`, `multi_term`, `natural_language`). The profile shapes fusion and reranking only, never which strategies run; off, missing or invalid means the planner values are used unchanged. Every tuned response carries `meta['tuning']` with the profile version and the query class. Profile values are produced by `php artisan ai:tune-retrieval` (AI module) and committed by hand. Details: `docs/rag/SEARCH_RETRIEVAL_PIPELINE.md`.
+
 ### Elasticsearch configuration
 
 ```php
@@ -680,7 +684,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 ### Environment (principali variabili)
 
--   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.email_verification.enabled`, `auth.registration.enabled`, `auth.two_factor.enabled`, `auth.licenses.enabled`, `auth.social_login.enabled`, `crud.dynamic_entities`, `crud.expose_api`, `soft_deletes.expiration_days` (0 = never purge), `search.vector.enabled` (embeddings generation requires AI module). Settings are listed without the module prefix (the module is a column) and read from config as `core.<name>`.
+-   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.email_verification.enabled`, `auth.registration.enabled`, `auth.two_factor.enabled`, `auth.licenses.enabled`, `auth.social_login.enabled`, `crud.dynamic_entities`, `crud.expose_api`, `soft_deletes.expiration_days` (0 = never purge), `search.vector.enabled` (embeddings generation requires AI module). Search ranking is tuned from the `search` settings group too: `search.reranker.enabled`, `search.reranker.top_k`, `search.reranker.weight` (rerank blend, seeded `0.6`) and `search.adaptive_tuning` (seeded off: applies the committed `config/search_tuning.php` profile per query class; see `docs/rag/SEARCH_RETRIEVAL_PIPELINE.md`). Settings are listed without the module prefix (the module is a column) and read from config as `core.<name>`.
 -   Data retention: `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 

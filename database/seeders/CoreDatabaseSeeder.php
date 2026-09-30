@@ -103,9 +103,11 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('media.search_visibility', 'owner', SettingTypeEnum::String, 'search', 'Media search hits: owner = only when the user can see the media owner, open = owner-agnostic gallery', ['owner', 'open']),
             self::setting('search.reranker.enabled', true, SettingTypeEnum::Boolean, 'search', 'Enable search reranker'),
             self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
+            self::setting('search.reranker.weight', 0.6, SettingTypeEnum::Float, 'search', 'Reranker share of the final score for the top-K (0 = fused order, 1 = reranker only)'),
             self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
             self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
             self::setting('search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
+            self::setting('search.adaptive_tuning', false, SettingTypeEnum::Boolean, 'search', 'Apply the committed retrieval tuning profile (config/search_tuning.php) per query class; off keeps the fixed planner values'),
         ];
     }
 

@@ -12,6 +12,7 @@ use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Contracts\ITextEmbedder;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Enums\QueryClass;
 use Modules\Core\Search\Enums\TextMatchPreference;
 
 final readonly class AdvancedSearchService
@@ -21,6 +22,7 @@ final readonly class AdvancedSearchService
         private ISearchPlanner $planner,
         private EnsembleSearchService $ensemble_search,
         private Application $app,
+        private ?RetrievalTuningProfile $tuning = null,
     ) {}
 
     public function available(?Model $model = null): bool
@@ -59,8 +61,9 @@ final readonly class AdvancedSearchService
         $plan['intent'] = $intent;
         $plan['retrieval']['size'] = $perPage;
         $plan = $this->applyEngineCapabilities($engine, $plan);
-        $vector = $this->resolveVector($query, $plan);
         $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
+        $plan = $this->tuningProfile()->apply($plan, QueryClass::fromAnalysis($text_match->analysis));
+        $vector = $this->resolveVector($query, $plan);
 
         return $this->ensemble_search->search(
             model: $model,
@@ -73,6 +76,11 @@ final readonly class AdvancedSearchService
             sort: $sort,
             textMatch: $text_match,
         );
+    }
+
+    private function tuningProfile(): RetrievalTuningProfile
+    {
+        return $this->tuning ?? $this->app->make(RetrievalTuningProfile::class);
     }
 
     private function engineFor(Model $model): ?ISearchEngine

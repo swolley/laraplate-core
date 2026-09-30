@@ -17,7 +17,10 @@ use Throwable;
 
 /**
  * Ensemble search service that combines keyword, vector and hybrid retrieval
- * strategies with Reciprocal Rank Fusion (RRF) and optional reranking.
+ * strategies with Reciprocal Rank Fusion (RRF) and optional reranking. The
+ * fusion math lives in {@see RankFusion}.
+ *
+ * @phpstan-import-type FusedHit from RankFusion
  */
 class EnsembleSearchService
 {
@@ -79,21 +82,18 @@ class EnsembleSearchService
             return AdvancedSearchResult::empty($page, $perPage, ['strategies_executed' => 0]);
         }
 
-        $adjusted_weights = $this->renormalizeWeightsForExecutedStrategies(
-            $weights,
-            $use_fulltext,
-            $use_vector,
-        );
+        $adjusted_weights = RankFusion::renormalizeWeights($weights, $use_fulltext, $use_vector);
 
-        $fused = $this->fuseStrategies($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
+        $fused = RankFusion::fuse($per_strategy, $adjusted_weights, $agreement_boost, $rrf_k, $rrf_weight);
 
         $use_reranker = (bool) ($ranking['use_reranker'] ?? config('core.search.reranker.enabled', true));
         $default_rerank_top_k = $this->configInt('core.search.reranker.top_k', 30);
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
+        $rerank_blend = $this->planFloat($ranking, 'rerank_blend', $this->configFloat('core.search.reranker.weight', 0.6));
 
         if ($use_reranker && $fused !== []) {
             try {
-                $fused = $this->rerankTopK($fused, $query, $rerank_top_k);
+                $fused = $this->rerankTopK($fused, $query, $rerank_top_k, $rerank_blend);
             } catch (Throwable $exception) {
                 // A reranker failure (e.g. the cross-encoder service is down) must
                 // not break search: keep the fused results unreranked and record
@@ -112,20 +112,34 @@ class EnsembleSearchService
                 ->slice(max(0, ($page - 1) * $perPage), $perPage)
                 ->map(function (array $item): array {
                     $score = round($item['score'], 6);
-                    $score_details = $item['score_details'] ?? [];
+                    $score_details = $item['score_details'];
                     $score_details['normalized_score'] = $score;
 
                     return [
                         'id' => $item['id'],
                         'score' => $score,
-                        'raw_score' => $item['raw_score'] ?? null,
+                        'raw_score' => $item['raw_score'],
                         'score_details' => $score_details,
-                        'source' => $item['source'] ?? [],
+                        'source' => $item['source'],
                     ];
                 })
                 ->all(),
         );
         $total = max(array_map(static fn (AdvancedSearchResult $result): int => $result->total, $strategy_results) ?: [count($hits)]);
+        $meta = [
+            'driver' => $driver,
+            'strategies_executed' => count($per_strategy),
+            'strategies' => array_keys($per_strategy),
+            'reranked' => $use_reranker,
+            'total_results' => count($hits),
+            'matching' => $textMatch?->toMeta($this->textMatchDegradations($model, $textMatch)) ?? [],
+            'per_strategy' => $per_strategy,
+        ];
+        $tuning = $this->planSection($this->planSection($plan, 'meta'), 'tuning');
+
+        if ($tuning !== []) {
+            $meta['tuning'] = $tuning;
+        }
 
         return new AdvancedSearchResult(
             hits: $hits,
@@ -133,15 +147,7 @@ class EnsembleSearchService
             page: $page,
             perPage: $perPage,
             totalPages: (int) ceil($total / max(1, $perPage)),
-            meta: [
-                'driver' => $driver,
-                'strategies_executed' => count($per_strategy),
-                'strategies' => array_keys($per_strategy),
-                'reranked' => $use_reranker,
-                'total_results' => count($hits),
-                'matching' => $textMatch?->toMeta($this->textMatchDegradations($model, $textMatch)) ?? [],
-                'per_strategy' => $per_strategy,
-            ],
+            meta: $meta,
         );
     }
 
@@ -320,165 +326,15 @@ class EnsembleSearchService
     }
 
     /**
-     * Min-max normalize scores within a hit set to [0, 1].
-     *
-     * @param  array<string, array{id: string, score: float, source: array<string, mixed>, rank: int}>  $hits
-     * @return array<string, array{id: string, score: float, source: array<string, mixed>, rank: int}>
-     */
-    private function minMaxNormalizeScores(array $hits): array
-    {
-        if ($hits === []) {
-            return [];
-        }
-
-        $scores = array_column($hits, 'score');
-        $min_score = min($scores);
-        $max_score = max($scores);
-        $range = $max_score - $min_score;
-
-        foreach ($hits as &$hit) {
-            $hit['score'] = $range > 0.0
-                ? ($hit['score'] - $min_score) / $range
-                : 1.0;
-            $hit['score_details']['normalized_score'] = $hit['score'];
-        }
-
-        return $hits;
-    }
-
-    /**
-     * Fuse multiple retrieval strategies using weighted scoring and RRF.
-     *
-     * @param  array<string, array<string, array{id: string, score: float, source: array<string, mixed>, rank: int}>>  $per_strategy
-     * @param  array<string, float>  $weights
-     * @return list<array{id: string, score: float, source: array<string, mixed>}>
-     */
-    private function fuseStrategies(
-        array $per_strategy,
-        array $weights,
-        float $agreement_boost,
-        int $rrf_k,
-        float $rrf_weight,
-    ): array {
-        $normalized_strategies = [];
-
-        foreach ($per_strategy as $name => $hits) {
-            $normalized_strategies[$name] = $this->minMaxNormalizeScores($hits);
-        }
-
-        $all_ids = [];
-
-        foreach ($normalized_strategies as $hits) {
-            foreach (array_keys($hits) as $id) {
-                $all_ids[$id] = true;
-            }
-        }
-
-        $fused = [];
-
-        foreach (array_keys($all_ids) as $id) {
-            $weighted_score = 0.0;
-            $rrf_score = 0.0;
-            $appearances = 0;
-            $source = [];
-            $raw_score = null;
-            $score_details = [
-                'strategies' => [],
-            ];
-
-            foreach ($normalized_strategies as $strategy_name => $hits) {
-                if (! isset($hits[$id])) {
-                    continue;
-                }
-
-                $appearances++;
-                $weight = $weights[$strategy_name] ?? 0.0;
-                $weighted_score += $hits[$id]['score'] * $weight;
-                $rrf_score += 1.0 / ($rrf_k + $hits[$id]['rank']);
-
-                if ($source === []) {
-                    $source = $hits[$id]['source'];
-                }
-
-                if ($raw_score === null) {
-                    $raw_score = $hits[$id]['raw_score'] ?? null;
-                }
-
-                $score_details['strategies'][$strategy_name] = $hits[$id]['score_details'] ?? [];
-            }
-
-            $strategy_count = count($normalized_strategies);
-            $agreement = $strategy_count > 1 && $appearances > 1
-                ? $agreement_boost * ($appearances / $strategy_count)
-                : 0.0;
-
-            $final_score = $weighted_score + ($rrf_score * $rrf_weight) + $agreement;
-
-            $fused[] = [
-                'id' => (string) $id,
-                'score' => $final_score,
-                'raw_score' => $raw_score,
-                'score_details' => array_merge(
-                    $appearances === 1 && count($score_details['strategies']) === 1
-                        ? reset($score_details['strategies'])
-                        : [],
-                    [
-                        'normalized_score' => $final_score,
-                        'strategies' => $score_details['strategies'],
-                    ],
-                ),
-                'source' => $source,
-            ];
-        }
-
-        return $fused;
-    }
-
-    /**
-     * Renormalize strategy weights so they sum to 1.0 for executed strategies only.
-     *
-     * @param  array<string, float>  $weights
-     * @return array<string, float>
-     */
-    private function renormalizeWeightsForExecutedStrategies(
-        array $weights,
-        bool $use_fulltext,
-        bool $use_vector,
-    ): array {
-        $active = [];
-
-        if ($use_fulltext) {
-            $active['keyword'] = $weights['keyword'] ?? 0.0;
-        }
-
-        if ($use_vector) {
-            $active['vector'] = $weights['vector'] ?? 0.0;
-        }
-
-        if ($use_fulltext && $use_vector) {
-            $active['hybrid'] = $weights['hybrid'] ?? 0.0;
-        }
-
-        $total = array_sum($active);
-
-        if ($total <= 0.0) {
-            return $active;
-        }
-
-        foreach ($active as $key => $value) {
-            $active[$key] = $value / $total;
-        }
-
-        return $active;
-    }
-
-    /**
      * Rerank the top-K results using the injected reranker.
      *
-     * @param  list<array{id: string, score: float, source: array<string, mixed>}>  $results
-     * @return list<array{id: string, score: float, source: array<string, mixed>}>
+     * Each top-K score becomes `fused * (1 - blend) + rerank * max_fused * blend`; the default
+     * blend 0.6 is the historical 0.4 / 0.6 split.
+     *
+     * @param  list<FusedHit>  $results
+     * @return list<FusedHit>
      */
-    private function rerankTopK(array $results, string $query, int $top_k): array
+    private function rerankTopK(array $results, string $query, int $top_k, float $blend): array
     {
         usort($results, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
 
@@ -503,7 +359,7 @@ class EnsembleSearchService
 
         foreach ($to_rerank as $i => &$item) {
             $rerank_score = $rerank_scores[$i] ?? 0.0;
-            $item['score'] = ($item['score'] * 0.4) + ($rerank_score * $original_max * 0.6);
+            $item['score'] = ($item['score'] * (1 - $blend)) + ($rerank_score * $original_max * $blend);
         }
 
         return array_merge($to_rerank, $remaining);
@@ -564,6 +420,13 @@ class EnsembleSearchService
     private function planFloat(array $section, string $key, float $default): float
     {
         $value = $section[$key] ?? $default;
+
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
+    private function configFloat(string $key, float $default): float
+    {
+        $value = config($key, $default);
 
         return is_numeric($value) ? (float) $value : $default;
     }
