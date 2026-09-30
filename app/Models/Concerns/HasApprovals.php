@@ -117,7 +117,7 @@ trait HasApprovals
                 return;
             }
 
-            if ($user->isSuperAdmin() || $user->can(PermissionName::forModel($model, 'approve')) || $user->can(PermissionName::forModel($model, 'disapprove'))) {
+            if ($user->isSuperAdmin() || $user->can(PermissionName::forModel($model, 'approve'))) {
                 return;
             }
 

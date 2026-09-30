@@ -991,7 +991,7 @@ class CrudService
             ->distinct()
             ->pluck('modifiable_type')
             ->filter(static fn (mixed $type): bool => is_string($type) && class_exists($type) && is_subclass_of($type, Model::class)
-                && ($user->can(PermissionName::forModel(new $type(), 'approve')) || $user->can(PermissionName::forModel(new $type(), 'disapprove'))))
+                && ($user->can(PermissionName::forModel(new $type(), 'approve'))))
             ->values()
             ->all();
 

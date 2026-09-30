@@ -332,7 +332,7 @@ $this->app->make(ModerationContextBuilderRegistry::class)
 |-------|------|
 | AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
 | Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
-| System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
+| System actor | the user named by `permission.users.system` (`SYSTEM_USER`), seeded by Core |
 
 See also:
 

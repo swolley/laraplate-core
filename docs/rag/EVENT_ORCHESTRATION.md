@@ -98,7 +98,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 |-------|------|
 | AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
 | Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
-| System actor | `ai.features.moderation.system_user_id` (`AI_MODERATOR_USER_ID`) |
+| System actor | the user named by `permission.users.system` (`SYSTEM_USER`), seeded by Core |
 
 ### Post-decision
 
@@ -125,7 +125,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 |---------|--------|
 | Model never indexed | `Searchable`, Scout driver, `IndexModelFallbackListener` registered |
 | Embeddings missing | `ai.features.embeddings.enabled`, model `$embed`, `GenerateEmbeddingsJob` queue |
-| AI moderation never runs | `ai.features.moderation.enabled`, `system_user_id`, registry builder, `ai.features.moderation.entities.{table}` |
+| AI moderation never runs | `ai.features.moderation.enabled`, a user with the `permission.users.system` username, registry builder, `ai.features.moderation.entities.{table}` |
 | Comment pending, no AI | `CommentModerationContextBuilder` registered in `CMSServiceProvider` |
 | Humans only (expected) | AI skipped → fallback is no-op; Filament approval still works |
 

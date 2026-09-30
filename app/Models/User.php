@@ -543,13 +543,17 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         return $this->can($this->approvalPermissionFor($mod, 'approve'));
     }
 
+    /**
+     * Disapproving needs no permission of its own: `approve` governs both votes, and
+     * `ActionEnum` has never declared a `disapprove` ability.
+     */
     protected function authorizedToDisapprove(Modification $mod): bool
     {
         if ($this->isModificationAuthor($mod)) {
             return false;
         }
 
-        return $this->can($this->approvalPermissionFor($mod, 'disapprove'));
+        return $this->can($this->approvalPermissionFor($mod, 'approve'));
     }
 
     protected function getDefaultGuardName(): string
