@@ -364,7 +364,7 @@ Core Graph is a CRUD extension, not a CMS-only subsystem. Routes are mounted und
 
 Traversal is explicit. Requested `relations[]` are the only traversed paths; without explicit relations Core asks an optional provider for defaults, otherwise it returns only the center/search seed nodes. Authorization uses `AuthorizationService`: inaccessible centers fail like CRUD detail, while inaccessible neighbor nodes are omitted and reported through `graphMeta.filteredByAcl`. Cross-module nodes keep their own `{module}:{entity}:{id}` identity and their own CRUD permission checks.
 
-Providers are optional. `GraphProviderInterface` supplies default relations, summary fields, edge labels, and exclusions. `GraphProviderRulesInterface` can narrow allowed paths, max depth, and per-relation limits. Runtime traversal remains the source of truth for `expand`, `search`, and `stats`; materialized edges are deferred until real benchmarks and an invalidation/freshness strategy justify storage. Stable developer reference: [GRAPH_SYSTEM.md](../GRAPH_SYSTEM.md).
+Providers are optional. `GraphProviderInterface` supplies default relations, summary fields, edge labels, and exclusions. `GraphProviderRulesInterface` can narrow allowed paths, max depth, and per-relation limits. Runtime traversal remains the source of truth for `expand`, `search`, and `stats`; materialized edges were evaluated on 2026-09-30 and not built, since request cost tracks query count rather than graph size (see Performance Boundary in GRAPH_SYSTEM.md). Stable developer reference: [GRAPH_SYSTEM.md](../GRAPH_SYSTEM.md).
 
 ### Media API
 

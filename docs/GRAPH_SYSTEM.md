@@ -63,7 +63,9 @@ Node details are controlled by `node_detail`. Summary serialization uses provide
 
 ## Performance Boundary
 
-Runtime traversal is the correctness baseline for expand, search, and stats. Do not add materialized edge storage until a real workflow shows runtime traversal is too expensive and the affected module/entity/relation set has an accepted invalidation and freshness strategy. Any future materialized layer must preserve the public response contract and fall back to runtime traversal whenever freshness cannot be proven.
+Runtime traversal is the only implementation of expand, search, and stats: there is no materialized edge store. One was evaluated on 2026-09-30 and not built. The cost of a graph request tracks its query count, not the size of the graph: an expand costs 16 to 32 queries whether CMS holds 40 or 250 contents, and on a remote PostgreSQL each query adds roughly 12 to 14 ms on top of the request's own baseline. Materialized edges would cut those queries at the price of a table, invalidation hooks and staleness checks; batching the traversal's queries reaches the same saving without them, and is where performance work should start.
+
+Reopen the question only if a real workflow shows expand cost growing with graph size. Any materialized layer must then preserve the public response contract, have an accepted invalidation and freshness strategy for each module/entity/relation it covers, and fall back to runtime traversal whenever freshness cannot be proven. The CMS runtime benchmark (`Modules/CMS/tests/Benchmark/CmsGraphRuntimeBenchmarkTest.php`) produces that evidence.
 
 ## AI Tool Boundary
 
