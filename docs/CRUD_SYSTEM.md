@@ -242,6 +242,27 @@ for `activate`/`inactivate`). The check runs at registration, which happens at b
 contradiction stops the application on start rather than surfacing when one record is
 first touched.
 
+#### Restricting generic writes
+
+Some models must never be written through the generic verbs: posted accounting vouchers,
+stock movements and other rows derived by a service that enforces invariants CRUD cannot.
+Such a model implements `Modules\Core\Contracts\RestrictsCrudWrites` and lists the
+operations it denies in `deniedCrudWrites()`, a subset of `insert`, `update`, `delete`,
+`forceDelete`, `restore`, `approve`, `disapprove`, `lock` and `unlock`. The
+`DeniesGenericCrudWrites` trait denies all of them.
+
+```php
+final class StockMovement extends Model implements RestrictsCrudWrites
+{
+    use DeniesGenericCrudWrites;
+}
+```
+
+`CrudService` checks the contract before it touches the record, ahead of the permission
+check, and throws `CrudWriteNotAllowedException`, which `CrudController` answers with `403`.
+A model that does not implement the contract is unaffected, and services and domain actions
+that write the model directly are not subject to it.
+
 #### Responses
 
 A handler returning a `Symfony\Component\HttpFoundation\Response` is passed through
