@@ -49,18 +49,22 @@ final class ModificationsTable
                         ->label('Modified')
                         ->limit(50),
                     TextColumn::make('meta')
-                        ->label('Meta')
+                        ->label('AI moderation')
                         ->badge()
-                        ->getStateUsing(function (Modification $record): ?string {
+                        // The AI moderator's decision on a comment, from the latest automated vote:
+                        // auto_approved, auto_rejected or requires_human_review; empty when no AI voted.
+                        ->getStateUsing(static fn (Modification $record): ?string => ($status = $record->latestAutomatedVoteMeta()['status'] ?? null) === null ? null : (string) $status)
+                        ->tooltip(static function (Modification $record): ?string {
                             $meta = $record->latestAutomatedVoteMeta();
 
-                            $string = '';
-
-                            foreach ($meta as $key => $value) {
-                                $string .= $key . ': ' . $value . '<br>';
+                            if ($meta === null) {
+                                return null;
                             }
 
-                            return $string;
+                            return collect(['verdict', 'confidence', 'reason'])
+                                ->filter(static fn (string $key): bool => isset($meta[$key]) && is_scalar($meta[$key]))
+                                ->map(static fn (string $key): string => $key . ': ' . $meta[$key])
+                                ->implode(' · ');
                         })
                         ->color(fn (?string $state): string => match ($state) {
                             'requires_human_review' => 'warning',
@@ -69,8 +73,7 @@ final class ModificationsTable
                             'auto_rejected' => 'danger',
                             default => 'gray',
                         })
-                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class)
-                        ->html(),
+                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class),
                     TextColumn::make('disapprovers_required')
                         ->label('Disapprovals required')
                         ->numeric()

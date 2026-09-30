@@ -231,6 +231,40 @@ it('evaluates modifications table comment-only columns without a record', functi
         ->and($columns['disapprovers_required']->record($other_modification)->isVisible())->toBeFalse();
 });
 
+it('shows the AI moderation status of a comment modification, and nothing when no AI voted', function (): void {
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => Modification::query());
+    ModificationsTable::configure($table);
+    $meta = $table->getColumns()['meta'];
+
+    $author = User::factory()->create();
+    $attributes = [
+        'modifiable_type' => Comment::class,
+        'modifier_id' => $author->getKey(),
+        'modifier_type' => $author::class,
+        'active' => true,
+        'operation' => Modules\Core\Approvals\Operation::Create,
+        'approvers_required' => 2,
+        'disapprovers_required' => 1,
+        'modifications' => [],
+    ];
+    $reviewed = Modification::query()->create([...$attributes, 'md5' => md5('ai-reviewed')]);
+    $unreviewed = Modification::query()->create([...$attributes, 'md5' => md5('ai-unreviewed')]);
+    Modules\Core\Models\Approval::query()->create([
+        'modification_id' => $reviewed->getKey(),
+        'approver_id' => $author->getKey(),
+        'approver_type' => $author::class,
+        'meta' => ['source' => 'ai', 'status' => 'requires_human_review', 'verdict' => 'uncertain', 'confidence' => 0.4, 'reason' => 'Ambiguous tone'],
+    ]);
+
+    $reviewed_state = $meta->record($reviewed)->getState();
+
+    expect($reviewed_state)->toBe('requires_human_review')
+        ->and($meta->record($reviewed)->getColor($reviewed_state))->toBe('warning')
+        ->and($meta->record($unreviewed)->getState())->toBeNull();
+});
+
 it('executes users table reset password action closure', function (): void {
     $livewire = $this->createStub(HasTable::class);
     $table = Table::make($livewire);
