@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\CMS\Casts\EntityType;
 use Modules\CMS\Enums\CMSTables;
@@ -10,6 +12,7 @@ use Modules\CMS\Models\Entity;
 use Modules\CMS\Models\Pivot\Presettable;
 use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Field;
 use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\PresetVersioningService;
@@ -371,4 +374,43 @@ describe('Presettable::getFieldsFromSnapshot memoization', function (): void {
         expect($after)->not->toBe($before)
             ->and($after)->toHaveCount(1);
     });
+});
+
+it('writes the new version on the preset connection, not on the default one', function (): void {
+    ['preset' => $preset] = createPresetWithFields(1);
+    $default_versions = Presettable::query()->count();
+
+    config()->set('database.connections.affinity', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => false,
+    ]);
+    DB::purge('affinity');
+
+    try {
+        $migrations = array_map(
+            static fn (string $file): string => module_path('Core', 'database/migrations/' . $file),
+            ['2024_11_27_230300_create_entities_table.php', '2024_11_28_224314_create_presets_table.php', '2024_11_28_224400_create_presettables_table.php', '2024_11_28_225525_create_fields_table.php', '2024_11_28_225526_create_fieldables_table.php'],
+        );
+        Artisan::call('migrate', ['--database' => 'affinity', '--path' => $migrations, '--realpath' => true, '--force' => true]);
+
+        DB::connection('affinity')->table(CoreTables::Entities->value)->insert(['id' => $preset->entity_id, 'name' => 'affinity', 'slug' => 'affinity', 'type' => EntityType::Contents->value]);
+        DB::connection('affinity')->table(CoreTables::Presets->value)->insert(['id' => $preset->id, 'entity_id' => $preset->entity_id, 'name' => 'affinity']);
+        $preset->setConnection('affinity');
+
+        $version = resolve(PresetVersioningService::class)->createVersion($preset);
+
+        // Inserting the preset fires the migration's trigger, which writes the first version: the
+        // service must retire it and add the new one on the same connection.
+        $versions = DB::connection('affinity')->table(CoreTables::Presettables->value)->where('preset_id', $preset->id);
+
+        expect($version->getConnectionName())->toBe('affinity')
+            ->and((clone $versions)->whereNull('deleted_at')->pluck('id')->all())->toBe([$version->id])
+            ->and((clone $versions)->whereNotNull('deleted_at')->count())->toBe(1)
+            ->and(Presettable::query()->count())->toBe($default_versions);
+    } finally {
+        DB::disconnect('affinity');
+        DB::purge('affinity');
+    }
 });

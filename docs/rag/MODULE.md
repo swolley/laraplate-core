@@ -574,6 +574,12 @@ flowchart LR
   Cache -.-> Activator
 ```
 
+### Database connection affinity
+
+The native modules (`Core`, `CMS`, `AI`, `ERP`, `MES`, `SAO`) share one schema on one connection: cross-module foreign keys, `whereHas` and joins are allowed, and no module can be moved to a database of its own (decided 2026-09-04, rationale in `docs/database-connection-affinity-audit.md`). Several connections exist only at driver level, such as read replicas with `sticky`. `core.model_connections` and `erp.model_connections` are frozen with no entries, and new code must not use `ConnectionScoped*` or `ErpConnectionContext`.
+
+Code still derives every query and transaction from the model that owns the data, never from the implicit `DB::` default: `$model->getConnection()->transaction(...)`, `$model->newQuery()`, the parent model's connection for its pivot and translation tables. `Modules/Core/tests/Unit/Architecture/DatabaseConnectionAffinityTest.php` scans the application code (not the tests) and fails on implicit default-connection calls; its baseline is empty. Services that write through a model (closure tables, ACL resolution, CRUD, preset versioning) have tests proving they follow a model moved to a secondary connection. Tests may still use `DB::` directly: under a single connection they are default-connection tests on purpose.
+
 ## Built-in abstractions used by other modules
 
 Core exposes reusable primitives for module authors:
