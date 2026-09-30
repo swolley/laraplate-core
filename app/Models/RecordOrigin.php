@@ -11,8 +11,10 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Validator;
 use Modules\Core\Database\Factories\RecordOriginFactory;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Models\Concerns\HasValidations;
 use Override;
 
 /**
@@ -23,6 +25,16 @@ use Override;
 final class RecordOrigin extends Model
 {
     use HasFactory;
+    use HasValidations {
+        getRules as private validationRules;
+    }
+
+    /**
+     * Rules for the link to the record in its source, shared by manual writes and imports.
+     *
+     * @var list<string>
+     */
+    public const array URL_RULES = ['nullable', 'url', 'max:2048'];
 
     /**
      * @var list<string>
@@ -44,6 +56,30 @@ final class RecordOrigin extends Model
      */
     #[Override]
     protected $table = CoreTables::RecordOrigins->value;
+
+    /**
+     * Whether a value may be stored as the link to the source.
+     */
+    public static function isValidUrl(mixed $url): bool
+    {
+        return Validator::make(['url' => $url], ['url' => self::URL_RULES])->passes();
+    }
+
+    /**
+     * A manual attribution must carry a well-formed link. Imports write through
+     * RecordOriginRegistry, which drops a malformed link rather than failing the record.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function getRules(): array
+    {
+        $rules = $this->validationRules();
+        $rules[self::DEFAULT_RULE] = array_merge($rules[self::DEFAULT_RULE], [
+            'url' => self::URL_RULES,
+        ]);
+
+        return $rules;
+    }
 
     /**
      * The record this origin belongs to.

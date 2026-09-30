@@ -64,7 +64,8 @@ final class RecordOriginRegistry
         $values = [
             'referable_id' => $referable->getKey(),
             'source_label' => $source_label,
-            'url' => $url,
+            // A malformed link from the source is dropped: it must not cost the record its import.
+            'url' => RecordOrigin::isValidUrl($url) ? $url : null,
             'updated_at' => $now,
         ];
 

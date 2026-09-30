@@ -225,3 +225,12 @@ it('uses the referable model connection for registry reads and writes', function
         DB::purge('import_affinity');
     }
 });
+
+it('drops a malformed url from the source instead of failing the import', function (): void {
+    $user = User::factory()->perpetual()->create();
+    $registry = resolve(RecordOriginRegistry::class);
+
+    $registry->register($user, new ExternalRecordIdentity('legacy_symfony:nebula', 'payment:824'), 'Nebula', 'not-a-url');
+
+    expect(RecordOrigin::query()->sole()->url)->toBeNull();
+});
