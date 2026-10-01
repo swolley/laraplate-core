@@ -40,11 +40,12 @@ it('throws when model does not use Searchable', function (): void {
         ->toThrow(InvalidArgumentException::class, 'does not implement the Searchable trait');
 });
 
-it('returns middleware with RateLimited', function (): void {
+it('returns middleware with RateLimited, behind the one that makes an unreachable engine a failure', function (): void {
     $job = new IndexInSearchJob(new StubSearchableModel);
     $middleware = $job->middleware();
-    expect($middleware)->toHaveCount(1);
-    expect($middleware[0])->toBeInstanceOf(Illuminate\Queue\Middleware\RateLimited::class);
+    expect($middleware)->toHaveCount(2);
+    expect($middleware[0])->toBeInstanceOf(Modules\Core\Search\Jobs\Middleware\FailWhenSearchEngineUnreachable::class);
+    expect($middleware[1])->toBeInstanceOf(Illuminate\Queue\Middleware\RateLimited::class);
 });
 
 it('deletes document when model should not be searchable', function (): void {

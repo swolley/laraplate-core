@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
 
@@ -31,6 +32,15 @@ it('guards and hides soft delete columns on initialize', function (): void {
     expect($model->getHidden())->toContain('deleted_at')
         ->and($model->getHidden())->toContain('is_deleted')
         ->and($model->getGuarded())->toContain('is_deleted');
+});
+
+it('casts is_deleted to boolean, as it does for deleted_at', function (): void {
+    DB::table('soft_deletes_stub')->insert(['name' => 'live', 'created_at' => now(), 'updated_at' => now()]);
+
+    $model = SoftDeletesStubModel::withoutGlobalScopes()->firstOrFail();
+
+    expect($model->getCasts())->toHaveKey('is_deleted', 'boolean')
+        ->and($model->is_deleted)->toBeFalse();
 });
 
 it('uses model property to disable soft deletes persistence', function (): void {

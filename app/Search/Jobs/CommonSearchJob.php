@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
+use Modules\Core\Search\Jobs\Middleware\FailWhenSearchEngineUnreachable;
 
 abstract class CommonSearchJob implements ShouldQueue
 {
@@ -66,6 +67,7 @@ abstract class CommonSearchJob implements ShouldQueue
     public function middleware(): array
     {
         return [
+            new FailWhenSearchEngineUnreachable,
             new RateLimited('indexing'),
         ];
     }

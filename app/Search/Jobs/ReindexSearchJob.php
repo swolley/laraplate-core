@@ -91,9 +91,14 @@ final class ReindexSearchJob extends CommonSearchJob
         ]);
     }
 
+    /**
+     * Scans the models the way `scout:import` does, through `makeAllSearchableUsing`,
+     * so rows that a global scope such as `LocaleScope` hides from `query()` (e.g.
+     * content with no translation in the current locale) are still reindexed.
+     */
     private function bulkReindex(object $model_instance, string $index_name): void
     {
-        $model_instance::query()->searchable();
+        $model_instance::makeAllSearchableQuery()->searchable();
         Log::info('Bulk reindex job completed successfully', [
             'model' => $this->model_class,
             'index' => $index_name,
@@ -103,7 +108,7 @@ final class ReindexSearchJob extends CommonSearchJob
     private function individualReindex(object $model_instance): void
     {
         $count = 0;
-        $model_instance::chunk($this->batch_size, function (iterable $models) use (&$count): void {
+        $model_instance::makeAllSearchableQuery()->chunk($this->batch_size, function (iterable $models) use (&$count): void {
             foreach ($models as $model) {
                 $model->searchable();
                 $count++;

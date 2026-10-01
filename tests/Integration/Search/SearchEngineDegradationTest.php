@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
+use Modules\Core\Search\Jobs\IndexDeferredSearchChunkJob;
+use Modules\Core\Search\Jobs\Middleware\FailWhenSearchEngineUnreachable;
 use Modules\Core\Support\SearchEngineAvailability;
 use Modules\Core\Tests\Stubs\Search\DegradingSearchableStubModel;
 use Modules\Core\Tests\Stubs\Search\DegradingSearchEngineStub;
@@ -52,4 +54,43 @@ it('still reports an indexing failure that is not a transport error', function (
 
     expect(static fn () => $model->searchable())
         ->toThrow(RuntimeException::class, 'field mapping is invalid');
+});
+
+it('rethrows an unreachable engine inside a strict scope, so a queued job fails instead of skipping', function (): void {
+    config(['scout.queue' => false]);
+
+    $model = degrading_stub_model(new UnreachableNetworkException);
+
+    expect(static fn () => SearchEngineAvailability::strictly(static fn () => $model->searchable()))
+        ->toThrow(UnreachableNetworkException::class);
+});
+
+it('leaves the strict scope when it ends, even when it ends with an exception', function (): void {
+    expect(SearchEngineAvailability::isStrict())->toBeFalse();
+
+    try {
+        SearchEngineAvailability::strictly(static function (): void {
+            expect(SearchEngineAvailability::isStrict())->toBeTrue();
+
+            throw new RuntimeException('inside');
+        });
+    } catch (RuntimeException) {
+    }
+
+    expect(SearchEngineAvailability::isStrict())->toBeFalse();
+});
+
+it('makes the job middleware turn an unreachable engine into a failure', function (): void {
+    config(['scout.queue' => false]);
+
+    $model = degrading_stub_model(new UnreachableNetworkException);
+
+    expect(static fn () => (new FailWhenSearchEngineUnreachable)->handle(new stdClass, static fn (): mixed => $model->searchable()))
+        ->toThrow(UnreachableNetworkException::class);
+});
+
+it('runs every queued search job under that middleware, ahead of the rate limiter', function (): void {
+    $job = new IndexDeferredSearchChunkJob(DegradingSearchableStubModel::class, [1]);
+
+    expect($job->middleware()[0])->toBeInstanceOf(FailWhenSearchEngineUnreachable::class);
 });

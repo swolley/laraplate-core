@@ -30,6 +30,35 @@ final class SearchEngineAvailability
     ];
 
     /**
+     * How many strict scopes are open. While any is, an unreachable engine is not tolerated.
+     */
+    private static int $strict_depth = 0;
+
+    /**
+     * Runs the callback with an unreachable engine treated as a failure, not tolerated.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public static function strictly(callable $callback): mixed
+    {
+        self::$strict_depth++;
+
+        try {
+            return $callback();
+        } finally {
+            self::$strict_depth--;
+        }
+    }
+
+    public static function isStrict(): bool
+    {
+        return self::$strict_depth > 0;
+    }
+
+    /**
      * Whether the failure (or any failure it wraps) means the engine could not be reached.
      */
     public static function isUnreachable(Throwable $exception): bool

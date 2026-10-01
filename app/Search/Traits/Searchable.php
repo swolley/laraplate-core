@@ -588,7 +588,9 @@ trait Searchable
      * Indexing is a side effect of a domain write: when the engine cannot be
      * reached the write must still succeed, with the failure logged so the
      * documents can be reindexed later. Any other failure (schema, payload,
-     * authentication) still propagates.
+     * authentication) still propagates, and so does this one inside a strict
+     * scope, which is what a queued search job runs in
+     * ({@see \Modules\Core\Search\Jobs\Middleware\FailWhenSearchEngineUnreachable}).
      *
      * @param  callable(): mixed  $operation
      */
@@ -597,7 +599,7 @@ trait Searchable
         try {
             $operation();
         } catch (Throwable $exception) {
-            if (! SearchEngineAvailability::isUnreachable($exception)) {
+            if (SearchEngineAvailability::isStrict() || ! SearchEngineAvailability::isUnreachable($exception)) {
                 throw $exception;
             }
 

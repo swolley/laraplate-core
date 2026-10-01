@@ -32,6 +32,12 @@ trait SoftDeletes
     {
         $this->baseInitializeSoftDeletes();
 
+        // The base trait casts deleted_at; is_deleted needs the same, otherwise a
+        // database returns it as 0/1, which a boolean search mapping rejects.
+        if (! isset($this->casts[$this->getIsDeletedColumn()])) {
+            $this->casts[$this->getIsDeletedColumn()] = 'boolean';
+        }
+
         $guarded = $this->guarded;
 
         if (is_array($guarded) && ! in_array($this->getIsDeletedColumn(), $guarded, true)) {
