@@ -95,7 +95,8 @@ profile logs one warning per process). The shipped profile restates the L0 const
 (`rrf_k` 60, `rrf_weight` 0.25, `agreement_boost` 0.15, empty class sets), so switching it on
 changes only `meta['tuning']` until a measured profile is committed. Profile values come from
 `ai:tune-retrieval` (AI module), never from intuition: see
-`Modules/AI/docs/rag/MODULE.md`.
+`Modules/AI/docs/rag/MODULE.md`. The tuner holds out a share of its cases to validate the winner and
+withholds class overrides backed by too few cases, so a profile is not just the best fit to its dataset.
 
 ### Step 3 — the query vector is an AI-module capability
 
