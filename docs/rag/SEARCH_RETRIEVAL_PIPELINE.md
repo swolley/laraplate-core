@@ -93,10 +93,14 @@ whether vector search runs stays a capability question.
 With the switch off, or a missing or invalid profile, the plan is returned untouched (an invalid
 profile logs one warning per process). The shipped profile restates the L0 constants
 (`rrf_k` 60, `rrf_weight` 0.25, `agreement_boost` 0.15, empty class sets), so switching it on
-changes only `meta['tuning']` until a measured profile is committed. Profile values come from
+changes only `meta['tuning']` until a measured profile is committed. A profile with measured values
+must cite its source in a `report` key, a path relative to the Core module under
+`docs/evaluations/retrieval-tuning/`: a report of `ai:tune-retrieval` that passed the held-out
+validation and the noise check and holds the same `default` and class sets (checked by
+`CommittedRetrievalTuningProfileTest`; the runtime ignores the key). Profile values come from
 `ai:tune-retrieval` (AI module), never from intuition: see
 `Modules/AI/docs/rag/MODULE.md`. The tuner holds out a share of its cases to validate the winner and
-withholds class overrides backed by too few cases, so a profile is not just the best fit to its dataset.
+withholds class overrides backed by too few cases, and it declares no winner when the gain over the committed profile is no bigger than what one flipped case of its sample could produce (the noise margin), so a profile is not just the best fit to its dataset.
 
 ### Step 3 — the query vector is an AI-module capability
 
