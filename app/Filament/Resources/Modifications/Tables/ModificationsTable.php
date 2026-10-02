@@ -14,10 +14,10 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use LogicException;
-use Modules\CMS\Models\Comment;
 use Modules\Core\Filament\Utils\HasTable;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\ModificationVoteService;
 
 final class ModificationsTable
@@ -51,8 +51,8 @@ final class ModificationsTable
                     TextColumn::make('meta')
                         ->label('AI moderation')
                         ->badge()
-                        // The AI moderator's decision on a comment, from the latest automated vote:
-                        // auto_approved, auto_rejected or requires_human_review; empty when no AI voted.
+                        // The automated moderator's decision, from the latest automated vote:
+                        // auto_approved, auto_rejected or requires_human_review; empty when none voted.
                         ->getStateUsing(static fn (Modification $record): ?string => ($status = $record->latestAutomatedVoteMeta()['status'] ?? null) === null ? null : (string) $status)
                         ->tooltip(static function (Modification $record): ?string {
                             $meta = $record->latestAutomatedVoteMeta();
@@ -73,11 +73,11 @@ final class ModificationsTable
                             'auto_rejected' => 'danger',
                             default => 'gray',
                         })
-                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class),
+                        ->visible(fn (?Modification $record): bool => self::isAutomaticallyModerated($record)),
                     TextColumn::make('disapprovers_required')
                         ->label('Disapprovals required')
                         ->numeric()
-                        ->visible(fn (?Modification $record): bool => $record === null || $record->modifiable_type === Comment::class),
+                        ->visible(fn (?Modification $record): bool => self::isAutomaticallyModerated($record)),
                 ]);
             },
             actions: static function (Collection $default_actions): void {
@@ -168,5 +168,15 @@ final class ModificationsTable
                     ->success()
                     ->send();
             });
+    }
+
+    /**
+     * Whether the record's model has a registered moderation adapter, so automated moderation can
+     * have voted on it. A column evaluated without a record stays visible.
+     */
+    private static function isAutomaticallyModerated(?Modification $record): bool
+    {
+        return $record === null
+            || in_array($record->modifiable_type, app(ModerationAdapterRegistry::class)->modelClasses(), true);
     }
 }

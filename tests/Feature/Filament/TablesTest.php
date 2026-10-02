@@ -10,7 +10,6 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Modules\CMS\Models\Comment;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -29,6 +28,9 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Services\ModerationAdapterRegistry;
+use Modules\Core\Tests\Stubs\Approvals\StubModerationAdapter;
+use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 use Modules\Core\Tests\Stubs\ValidityStubModel;
 
 beforeEach(function (): void {
@@ -210,7 +212,8 @@ it('applies settings default sort callback', function (): void {
         ->and($order_columns)->toContain('name');
 });
 
-it('evaluates modifications table comment-only columns without a record', function (): void {
+it('shows the automated moderation columns only for models with a moderation adapter', function (): void {
+    app(ModerationAdapterRegistry::class)->register(new StubModerationAdapter());
     $livewire = $this->createStub(HasTable::class);
     $table = Table::make($livewire);
     $table->query(fn () => Modification::query());
@@ -222,16 +225,16 @@ it('evaluates modifications table comment-only columns without a record', functi
     expect($columns['meta']->isVisible())->toBeTrue()
         ->and($columns['disapprovers_required']->isVisible())->toBeTrue();
 
-    $comment_modification = new Modification(['modifiable_type' => Comment::class]);
+    $moderated_modification = new Modification(['modifiable_type' => HasApprovalsStubModel::class]);
     $other_modification = new Modification(['modifiable_type' => User::class]);
 
-    expect($columns['meta']->record($comment_modification)->isVisible())->toBeTrue()
+    expect($columns['meta']->record($moderated_modification)->isVisible())->toBeTrue()
         ->and($columns['meta']->record($other_modification)->isVisible())->toBeFalse()
-        ->and($columns['disapprovers_required']->record($comment_modification)->isVisible())->toBeTrue()
+        ->and($columns['disapprovers_required']->record($moderated_modification)->isVisible())->toBeTrue()
         ->and($columns['disapprovers_required']->record($other_modification)->isVisible())->toBeFalse();
 });
 
-it('shows the AI moderation status of a comment modification, and nothing when no AI voted', function (): void {
+it('shows the automated moderation status of a modification, and nothing when no automated vote exists', function (): void {
     $livewire = $this->createStub(HasTable::class);
     $table = Table::make($livewire);
     $table->query(fn () => Modification::query());
@@ -240,7 +243,7 @@ it('shows the AI moderation status of a comment modification, and nothing when n
 
     $author = User::factory()->create();
     $attributes = [
-        'modifiable_type' => Comment::class,
+        'modifiable_type' => HasApprovalsStubModel::class,
         'modifier_id' => $author->getKey(),
         'modifier_type' => $author::class,
         'active' => true,
