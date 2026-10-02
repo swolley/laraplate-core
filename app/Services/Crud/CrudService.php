@@ -2429,11 +2429,7 @@ class CrudService
             );
         }
 
-        $query = $model->newQuery()->whereKey($ids->all());
-
-        if ($model instanceof IAuthorizesSearchRehydration) {
-            $query = $model->authorizeSearchRehydration($query);
-        }
+        $query = $this->searchHitsQuery($model, $ids->all(), $permissionName);
 
         if ($requestData->relations !== []) {
             $query->with($requestData->relations);
@@ -2497,10 +2493,10 @@ class CrudService
             return $this->invalidSearchConstraintsResult($exception->getMessage());
         }
 
-        return $this->searchResultFromAdvancedResult($requestData, $result);
+        return $this->searchResultFromAdvancedResult($requestData, $result, $permissionName);
     }
 
-    private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result): CrudResult
+    private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result, string $permissionName): CrudResult
     {
         $model = $requestData->model;
         $ids = $result->ids();
@@ -2512,11 +2508,7 @@ class CrudService
             );
         }
 
-        $query = $model->newQuery()->whereKey($ids);
-
-        if ($model instanceof IAuthorizesSearchRehydration) {
-            $query = $model->authorizeSearchRehydration($query);
-        }
+        $query = $this->searchHitsQuery($model, $ids, $permissionName);
 
         if ($requestData->relations !== []) {
             $query->with($requestData->relations);
@@ -2538,6 +2530,32 @@ class CrudService
             data: $data,
             meta: $this->buildAdvancedSearchMeta($requestData, $result, $data->count()),
         );
+    }
+
+    /**
+     * The records behind the hits of a search, reloaded by key and authorized again.
+     *
+     * The ACL row filters of the user reach the engine as filters, but they are not the only barrier: a
+     * strategy that dropped them (the text half of a hybrid search once did), or an index that is out of
+     * date, would otherwise let a hit through that the user may not see, since only a model that implements
+     * {@see IAuthorizesSearchRehydration} checked it again. The same filters are applied to this database
+     * query, which is the semantics they have everywhere else in the CRUD service, and the model's own
+     * rehydration guard comes on top.
+     *
+     * @param  array<int, mixed>  $ids
+     * @return Builder<Model>
+     */
+    private function searchHitsQuery(Model $model, array $ids, string $permissionName): Builder
+    {
+        $query = $model->newQuery()->whereKey($ids);
+
+        $this->auth->applyAclFiltersToQuery($query, $permissionName);
+
+        if ($model instanceof IAuthorizesSearchRehydration) {
+            $query = $model->authorizeSearchRehydration($query);
+        }
+
+        return $query;
     }
 
     private function searchConstraintApplier(): ScoutSearchConstraintApplier

@@ -192,9 +192,19 @@ it would read `locales` as a model attribute and return nothing.
 
 The text half of a hybrid search is added to the nearest-vector hits, so it carries the **same filters as the
 vectors**: the language and every filter the caller passed, the ones the keyword and vector strategies already
-applied. It used to carry none, so a document that matched the text but not those filters could still come
-back through the hybrid strategy; if the caller's filters include a permission restriction, that restriction
-did not hold for those hits. When there is no filter at all the query is unchanged.
+applied. It used to carry none, so a document that matched the text but not those filters could still come back
+through the hybrid strategy. The generic CRUD search passes the user's ACL row filters this way
+(`injectAclFilters()`) and used to reload the hits without them, since only `Media` re-authorized on rehydration,
+so for those hits the row-level restriction did not hold, on every model but `Media` and whenever vector search
+was on (it is off by default). When there is no filter at all the query is unchanged.
+
+The filters in the engine query are no longer the only barrier. `CrudService` reloads the records behind the hits
+of both search paths (orchestrated and Scout) through one query that applies the user's ACL row filters to the
+database (`AuthorizationService::applyAclFiltersToQuery()`, the same semantics as everywhere else in the CRUD
+service) and then the model's own `IAuthorizesSearchRehydration` guard, so a hit the engine should not have
+returned (a strategy that dropped the filters, an index out of date) is dropped there. The cost is that such a
+hit takes a place in the page. The CMS and SAO application-content providers have always reloaded through an
+authorized query.
 
 The text is matched on the fields of the requested language only (`title.it`, `subtitle.it`, `content.it`, with
 the title boosted), analysed with that language's analyser; fields with no language (`entity`, `preset`, ...)
