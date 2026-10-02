@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Entity;
@@ -111,10 +110,7 @@ final class DynamicContentsService
             return $this->entities_cache[$type_cache_key];
         }
 
-        $type_module = class_module($type);
-        $entity_module = class_module(Entity::class);
-        $entity_class = Str::replace("\\{$entity_module}\\", "\\{$type_module}\\", Entity::class);
-
+        $entity_class = $this->getModuleModelClass($type::class, Entity::class);
         $entity_model = new $entity_class();
         $cache_key = $this->typedMemoKey($entity_model->getCacheKey(), $type_cache_key);
         $this->registerEntityMemoKey($cache_key);
