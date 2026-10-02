@@ -26,7 +26,7 @@ function mediaPanelUser(): User
     return $user;
 }
 
-function makeClaimedMedia(array $custom = [], string $mime = 'image/jpeg', string $name = 'photo', ?string $ownerType = 'Modules\\CMS\\Models\\Content'): Media
+function makeClaimedMedia(array $custom = [], string $mime = 'image/jpeg', string $name = 'photo', ?string $ownerType = User::class): Media
 {
     $media = new Media();
     $media->forceFill([

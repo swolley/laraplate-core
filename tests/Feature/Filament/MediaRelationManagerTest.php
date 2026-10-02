@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Filament\RelationManagers\MediaRelationManager;
 use Modules\Core\Models\Media;
+use Modules\Core\Models\User;
 
 function relationManagerMedia(array $custom): Media
 {
@@ -15,7 +16,7 @@ function relationManagerMedia(array $custom): Media
         'mime_type' => 'image/jpeg',
         'disk' => 'public',
         'size' => 1024,
-        'model_type' => 'Modules\\CMS\\Models\\Content',
+        'model_type' => User::class,
         'model_id' => 1,
         'custom_properties' => $custom,
         'manipulations' => [],

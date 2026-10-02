@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Models\Comment;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
 it('returns latest automated vote meta from approval or disapproval', function (): void {
     $user = User::factory()->create();
 
     $modification = Modification::query()->create([
-        'modifiable_type' => Comment::class,
+        'modifiable_type' => HasApprovalsStubModel::class,
         'modifiable_id' => null,
         'modifier_id' => $user->id,
         'modifier_type' => User::class,
@@ -53,7 +53,7 @@ it('returns null when no vote has meta', function (): void {
     $user = User::factory()->create();
 
     $modification = Modification::query()->create([
-        'modifiable_type' => Comment::class,
+        'modifiable_type' => HasApprovalsStubModel::class,
         'modifiable_id' => null,
         'modifier_id' => $user->id,
         'modifier_type' => User::class,

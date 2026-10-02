@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Models\Comment;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Tests\Stubs\HasApprovalsStubModel;
 
 it('exposes active and modifier identity but keeps quorum columns hidden', function (): void {
     $user = User::factory()->create();
 
     $modification = Modification::query()->create([
-        'modifiable_type' => Comment::class,
+        'modifiable_type' => HasApprovalsStubModel::class,
         'modifiable_id' => null,
         'modifier_id' => $user->id,
         'modifier_type' => User::class,

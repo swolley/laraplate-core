@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use Modules\Core\Models\Media;
 use Modules\Core\Models\MediaDraft;
+use Modules\Core\Models\User;
 use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\Tests\Stubs\Search\StubMediaContributor;
 
-function makeMedia(array $custom = [], ?string $ownerType = 'Modules\\CMS\\Models\\Content'): Media
+function makeMedia(array $custom = [], ?string $ownerType = User::class): Media
 {
     $media = new Media();
     $media->forceFill([

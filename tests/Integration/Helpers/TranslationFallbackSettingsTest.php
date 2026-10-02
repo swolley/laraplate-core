@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Models\Tag;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
+use Modules\Core\Tests\Fixtures\FallbackDeclaringTranslatableModel;
 
 beforeEach(function (): void {
     app(PerModelSettingResolver::class)->flush();
 });
 
 it('uses model property when translation_fallback_enabled is declared', function (): void {
-    $tag = new Tag();
+    $model = new FallbackDeclaringTranslatableModel();
 
-    expect($tag->translationFallbackEnabledBySettings())->toBeTrue();
+    expect($model->translationFallbackEnabledBySettings())->toBeFalse();
 });
 
 it('reads translation fallback from settings when property is not declared', function (): void {
