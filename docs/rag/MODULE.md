@@ -635,6 +635,10 @@ When building new module features, reuse these primitives instead of re-implemen
 - `make:translation`
 - `lang:check-translations`
 
+### Dynamic entities
+
+- `model:create-entity {entity?} {--module=} {--content-model}`: creates an entity and its default `standard` preset, with the chosen fields, in a module that defines its own `Entity` model (CMS, ERP). The module comes from `--module`, or is the only one installed, or is chosen at the prompt; Core names no module, and the preset model is the module's own, resolved by `Entity::presets()`.
+
 ### Inspector and dynamic schema cache
 
 - `inspector:warm`

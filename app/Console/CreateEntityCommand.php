@@ -11,19 +11,25 @@ use function Laravel\Prompts\text;
 
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Str;
-use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Console\Concerns\HasCommandUtils;
 use Modules\Core\Contracts\IDynamicEntityTypable;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Models\Entity;
 use Modules\Core\Models\Field;
+use Modules\Core\Models\Preset;
 use Modules\Core\Overrides\Command;
 use Override;
 use ReflectionClass;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
+/**
+ * Creates an entity and its default `standard` preset in a module that defines its own
+ * `Entity` model (extending Core's), such as CMS or ERP. Core knows no module: the target
+ * module is the one passed with `--module`, the only one installed, or the one chosen at
+ * the prompt, and its preset model comes from {@see Entity::presets()}.
+ */
 final class CreateEntityCommand extends Command
 {
     use HasCommandUtils;
@@ -37,13 +43,13 @@ final class CreateEntityCommand extends Command
      * The name and signature of the console command.
      */
     #[Override]
-    protected $signature = 'model:create-entity {entity?} {--content-model}';
+    protected $signature = 'model:create-entity {entity?} {--module= : Module whose Entity model to use} {--content-model}';
 
     /**
      * The console command description.
      */
     #[Override]
-    protected $description = 'Create new CMS entity <fg=cyan>(📰 Modules/CMS)</fg=cyan>';
+    protected $description = 'Create a new entity and its default preset in a module that defines entities <fg=green>(⚡ Modules\Core)</fg=green>';
 
     /**
      * Execute the console command.
@@ -99,10 +105,8 @@ final class CreateEntityCommand extends Command
 
             $this->output->info(sprintf("A default preset 'standard' will be created for the entity '%s'", $entity->name));
 
-            $preset = new Preset();
-            $preset->name = 'standard';
-            $preset->entity_id = $entity->id;
-            $preset->save();
+            /** @var Preset $preset */
+            $preset = $entity->presets()->create(['name' => 'standard']);
 
             $preset_fields = multiselect('Choose fields for the preset', $all_fields->pluck('name', 'id'), required: true);
 
@@ -134,14 +138,26 @@ final class CreateEntityCommand extends Command
     protected function getOptions(): array
     {
         return [
+            ['module', '', InputOption::VALUE_REQUIRED, 'Module whose Entity model to use.'],
             ['content-model', '', InputOption::VALUE_NONE, 'Create a content model file for this entity.', false],
         ];
     }
 
+    /**
+     * @throws ConfigurationException when the requested module, or every installed one, defines no Entity model
+     */
     private function resolveModule(): string
     {
-        if (class_exists(\Modules\CMS\Models\Entity::class)) {
-            return 'CMS';
+        $requested = $this->option('module');
+
+        if (is_string($requested) && $requested !== '') {
+            throw_unless(
+                is_subclass_of("Modules\\{$requested}\\Models\\Entity", Entity::class),
+                ConfigurationException::class,
+                "Module {$requested} defines no Entity model.",
+            );
+
+            return $requested;
         }
 
         $valid_modules = array_values(array_filter(
