@@ -12,7 +12,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Approvals\Operation;
+use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Models\Concerns\DeniesGenericCrudWrites;
 use Override;
 
 /**
@@ -23,9 +25,14 @@ use Override;
  * package's; the unused parts of its model (`forceApprovalUpdate()`, the
  * `approvalsRemaining`/`disapprovalsRemaining` aliases, the `changes`/`creations`
  * scopes) were not brought over.
+ *
+ * Only the approval flow writes it: votes and withdrawals go through ModificationVoteService,
+ * which keeps the decision coherent with the quorum. The generic CRUD layer may read it but
+ * never write it, since a plain save of the quorum would leave a reached decision unapplied.
  */
-final class Modification extends Model
+final class Modification extends Model implements RestrictsCrudWrites
 {
+    use DeniesGenericCrudWrites;
     use HasFactory;
 
     /**
