@@ -243,6 +243,18 @@ describe('Dynamic content uses presettable snapshot', function (): void {
         expect($dynamic_fields)->toContain($fields[0]->name);
         expect($dynamic_fields)->toContain($new_field->name);
     });
+
+    it('takes the entity from the new presettable, not from the one already loaded', function (): void {
+        ['presettable' => $first] = createPresetWithFields(1);
+        ['entity' => $other_entity, 'presettable' => $second] = createPresetWithFields(1);
+
+        $page = new Page();
+        $page->setRelation('presettable', $first);
+        $page->presettable_id = $second->id;
+
+        expect($page->entity_id)->toBe($other_entity->id)
+            ->and($page->presettable->id)->toBe($second->id);
+    });
 });
 
 describe('DynamicContentsService with versioning', function (): void {

@@ -146,10 +146,17 @@ trait HasDynamicContents
 
         $result = parent::setAttribute($key, $value);
 
-        // Sync entity_id when presettable_id changes
+        // Sync entity_id when presettable_id changes. The relation is read without the magic
+        // getter: lazy loading it calls setRelation(), which sets presettable_id again and would
+        // re-enter this method while PHP is still inside __get('presettable').
         if ($key === 'presettable_id' && $value) {
             $entity_id = null;
-            $presettable = $this->presettable;
+            $presettable = $this->relationLoaded('presettable') ? $this->getRelation('presettable') : null;
+
+            if ($presettable === null || ($presettable instanceof Model && (string) $presettable->getKey() !== (string) $value)) {
+                $presettable = $this->presettable()->getResults();
+                $this->setRelation('presettable', $presettable);
+            }
 
             if ($presettable instanceof Model) {
                 $entity_id = $presettable->getAttribute('entity_id');
