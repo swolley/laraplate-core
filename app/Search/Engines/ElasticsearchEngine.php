@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
+use Modules\Core\Search\Contracts\ILocaleFilterableEngine;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
@@ -32,7 +33,7 @@ use stdClass;
 /**
  * Implementation of the search engine for Elasticsearch.
  */
-final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISearchEngine
+final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILocaleFilterableEngine, ISearchEngine
 {
     use CommonEngineFunctions;
 
@@ -909,6 +910,143 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
     }
 
     /**
+     * The request of a vector (or hybrid) search, or null when the builder is not a usable one.
+     *
+     * The vectors carry no language and are all searched. The language the results are requested in is a
+     * document-level restriction (`locales`) that has to be part of this request: applied after the top
+     * results are fetched it leaves the documents of another language to fill the first places, and the
+     * list comes back short. The text half of a hybrid search is added to the nearest vectors, so it is
+     * restricted the same way: by the same filters, and by the fields of the requested language.
+     *
+     * @param  Builder<covariant Model>  $builder
+     * @return array<string, mixed>|null
+     */
+    public function buildVectorSearchParams(Builder $builder): ?array
+    {
+        $vector = $this->extractVectorFromBuilder($builder);
+
+        if ($vector === []) {
+            return null;
+        }
+
+        $model = $builder->model;
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        $index = $this->resolveSearchableCollectionName($model);
+
+        if ($index === null) {
+            return null;
+        }
+
+        // Build the vector search query using knn (more efficient than script_score)
+        $knn = [
+            'field' => $this->resolveVectorField($model),
+            'query_vector' => $vector,
+            'k' => $builder->limit ?: 10,
+            'num_candidates' => min(($builder->limit ?: 10) * 10, 100),
+        ];
+
+        $requested_locales = $this->extractLocaleFilter($builder);
+        $filters = $this->filtersWithLocale($this->filtersFromBuilder($builder, $model), $requested_locales);
+
+        if ($filters !== []) {
+            // `locales` lives on the root document, not inside the `embeddings` nested path, so this
+            // restricts which documents are considered without touching per-vector scoring: a document
+            // with a matching vector in any language still scores, it is just excluded when none of its
+            // available languages is the requested one.
+            $knn['filter'] = ['bool' => ['must' => $filters]];
+        }
+
+        $body = ['knn' => $knn];
+
+        if ($builder->query && $builder->query !== '*') {
+            $text = $this->buildTextMatchQuery($builder->query, $this->textOptionsFor($builder, $model, $index, $requested_locales));
+            $body['query'] = $filters === []
+                ? ['bool' => ['should' => [$text]]]
+                : ['bool' => ['must' => [$text], 'filter' => $filters]];
+        }
+
+        return [
+            'index' => $index,
+            'body' => $body,
+            'size' => $builder->limit ?: 10,
+        ];
+    }
+
+    /**
+     * The request of a keyword search, or null when the model has no index.
+     *
+     * When a language is requested the documents are restricted to the ones available in it and the text is
+     * matched on that language's fields only, so an Italian request never matches words in the English fields.
+     *
+     * @param  Builder<covariant Model>  $builder
+     * @return array<string, mixed>|null
+     */
+    public function buildKeywordSearchParams(Builder $builder, int $perPage, int $page): ?array
+    {
+        $model = $builder->model;
+        $index = $this->resolveSearchableCollectionName($model);
+
+        if ($index === null) {
+            return null;
+        }
+
+        $requested_locales = $this->extractLocaleFilter($builder);
+        $filters = $this->filtersWithLocale($this->filtersFromBuilder($builder, $model), $requested_locales);
+        $bool = [
+            'must' => [],
+        ];
+
+        if ($builder->query && $builder->query !== '*') {
+            $bool['must'][] = $this->buildTextMatchQuery(
+                $builder->query,
+                $this->textOptionsFor($builder, $model, $index, $requested_locales),
+            );
+        } else {
+            $bool['must'][] = ['match_all' => new stdClass()];
+        }
+
+        if ($filters !== []) {
+            $bool['filter'] = $filters;
+        }
+
+        $params = [
+            'index' => $index,
+            'body' => [
+                'query' => [
+                    'bool' => $bool,
+                ],
+            ],
+            'from' => max(0, ($page - 1) * $perPage),
+            'size' => $perPage,
+        ];
+
+        if ($builder->orders !== []) {
+            $params['body']['sort'] = array_map(
+                static fn (array $order): array => [$order['column'] => $order['direction']],
+                $builder->orders,
+            );
+        }
+
+        return $params;
+    }
+
+    /**
+     * Whether the model's index records the languages each document is available in, which is what lets a
+     * search be restricted to the language the results are requested in.
+     */
+    #[Override]
+    public function filtersByLocale(Model $model): bool
+    {
+        $mapping = method_exists($model, 'getSearchMapping') ? $model->getSearchMapping() : [];
+
+        return is_array($mapping) && is_array($mapping['mappings']['properties']['locales'] ?? null);
+    }
+
+    /**
      * Make a translated field definition valid for Elasticsearch before the
      * mapping reaches the cluster. Applied recursively to a property and its
      * `properties`/`fields` subtrees.
@@ -1047,79 +1185,13 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     private function performVectorSearch(Builder $builder): SearchResult
     {
-        $vector = $this->extractVectorFromBuilder($builder);
+        $params = $this->buildVectorSearchParams($builder);
 
-        if ($vector === []) {
+        if ($params === null) {
             return parent::search($builder);
         }
 
-        $model = $builder->model;
-
-        if (! $model instanceof Model) {
-            return parent::search($builder);
-        }
-
-        $index = $this->resolveSearchableCollectionName($model);
-
-        if ($index === null) {
-            return parent::search($builder);
-        }
-
-        // Build the vector search query using knn (more efficient than script_score)
-        $query = [
-            'knn' => [
-                'field' => $this->resolveVectorField($model),
-                'query_vector' => $vector,
-                'k' => $builder->limit ?: 10,
-                'num_candidates' => min(($builder->limit ?: 10) * 10, 100),
-            ],
-        ];
-
-        $filters = $this->filtersFromBuilder($builder, $model);
-        $requestedLocales = $this->extractLocaleFilter($builder);
-
-        if ($requestedLocales !== []) {
-            // Document-level filter: `locales` lives on the root document, not
-            // inside the `embeddings` nested path, so this restricts which
-            // documents are considered without touching per-vector scoring —
-            // a document with a matching vector in any language still scores,
-            // it is just excluded if none of its available locales match.
-            $filters[] = ['terms' => ['locales' => $requestedLocales]];
-        }
-
-        if ($filters !== []) {
-            $query['knn']['filter'] = [
-                'bool' => [
-                    'must' => $filters,
-                ],
-            ];
-        }
-
-        // Combine with text search if query is provided
-        $body = [
-            'knn' => $query['knn'],
-        ];
-
-        if ($builder->query && $builder->query !== '*') {
-            $body['query'] = [
-                'bool' => [
-                    'should' => [
-                        $this->buildTextMatchQuery($builder->query, app(TextMatchOptionsResolver::class)->forBuilder($builder)),
-                    ],
-                ],
-            ];
-        }
-
-        // Execute the search query using ElasticsearchService
-        $client = ElasticsearchService::getInstance()->client;
-
-        $params = [
-            'index' => $index,
-            'body' => $body,
-            'size' => $builder->limit ?: 10,
-        ];
-
-        $response = $client->search($params);
+        $response = ElasticsearchService::getInstance()->client->search($params);
 
         return new SearchResult($this->elasticsearchResponseToArray($response));
     }
@@ -1129,52 +1201,49 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ISear
      */
     private function performKeywordSearch(Builder $builder, int $perPage, int $page): SearchResult
     {
-        $model = $builder->model;
-        $index = $this->resolveSearchableCollectionName($model);
+        $params = $this->buildKeywordSearchParams($builder, $perPage, $page);
 
-        if ($index === null) {
+        if ($params === null) {
             return parent::search($builder);
-        }
-
-        $filters = $this->filtersFromBuilder($builder, $model);
-        $bool = [
-            'must' => [],
-        ];
-
-        if ($builder->query && $builder->query !== '*') {
-            $bool['must'][] = $this->buildTextMatchQuery(
-                $builder->query,
-                app(TextMatchOptionsResolver::class)->forBuilder($builder),
-            );
-        } else {
-            $bool['must'][] = ['match_all' => new stdClass()];
-        }
-
-        if ($filters !== []) {
-            $bool['filter'] = $filters;
-        }
-
-        $params = [
-            'index' => $index,
-            'body' => [
-                'query' => [
-                    'bool' => $bool,
-                ],
-            ],
-            'from' => max(0, ($page - 1) * $perPage),
-            'size' => $perPage,
-        ];
-
-        if ($builder->orders !== []) {
-            $params['body']['sort'] = array_map(
-                static fn (array $order): array => [$order['column'] => $order['direction']],
-                $builder->orders,
-            );
         }
 
         $response = ElasticsearchService::getInstance()->client->search($params);
 
         return new SearchResult($this->elasticsearchResponseToArray($response));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $filters
+     * @param  list<string>  $locales
+     * @return list<array<string, mixed>>
+     */
+    private function filtersWithLocale(array $filters, array $locales): array
+    {
+        if ($locales !== []) {
+            $filters[] = ['terms' => ['locales' => $locales]];
+        }
+
+        return $filters;
+    }
+
+    /**
+     * The text options of a builder, searching the fields of the requested language when there is one and
+     * the caller did not name fields of its own. With no mapping known the default fields stay.
+     *
+     * @param  Builder<covariant Model>  $builder
+     * @param  list<string>  $locales
+     */
+    private function textOptionsFor(Builder $builder, Model $model, string $index, array $locales): TextMatchOptions
+    {
+        $options = app(TextMatchOptionsResolver::class)->forBuilder($builder);
+
+        if ($locales === [] || $options->fields !== []) {
+            return $options;
+        }
+
+        $fields = app(ElasticsearchLocaleTextFields::class)->forModel($model, $index, $locales);
+
+        return $fields === [] ? $options : $options->withFields($fields);
     }
 
     /**

@@ -171,6 +171,40 @@ fused order is returned with `meta['reranked'] = false`. Search never fails beca
 A caller can disable it for one search through the plan (`ranking.use_reranker`); otherwise
 `config('core.search.reranker.enabled')` decides.
 
+## The language of the results
+
+The query can be in any language and the vectors carry none, so every vector of every document is searched.
+What is language-bound is the **result**: it comes back only in the language requested, whether by a
+preference or explicitly, which is the language of the `LocaleContext`. A document that has no translation in
+that language is not returned, however strongly it matches: an English query that matches an English
+translation strongly still brings out the document in Italian when Italian is requested, as long as the
+document exists in Italian. This is strict; the `translations.locale_fallback.*` settings govern how a
+translated model is shown elsewhere and do not apply to search.
+
+The restriction is part of the engine request, not a clean-up after it. `EnsembleSearchService` adds a
+`locales` where clause to every strategy when the model's engine implements `ILocaleFilterableEngine` and its
+index records `locales` (`filtersByLocale()`; Elasticsearch does, and a mono-language model such as a ticket
+does not). The Elasticsearch engine turns it into a document-level `terms` filter on the nearest-vector search,
+on the keyword search and on the text half of a hybrid search, whose hits are added to the vector ones. Applied
+only after the top results are fetched, the documents of another language took the first places and were then
+dropped, and a request for five results returned one to four. An engine without the capability is left alone:
+it would read `locales` as a model attribute and return nothing.
+
+The text half of a hybrid search is added to the nearest-vector hits, so it carries the **same filters as the
+vectors**: the language and every filter the caller passed, the ones the keyword and vector strategies already
+applied. It used to carry none, so a document that matched the text but not those filters could still come
+back through the hybrid strategy; if the caller's filters include a permission restriction, that restriction
+did not hold for those hits. When there is no filter at all the query is unchanged.
+
+The text is matched on the fields of the requested language only (`title.it`, `subtitle.it`, `content.it`, with
+the title boosted), analysed with that language's analyser; fields with no language (`entity`, `preset`, ...)
+stay, and nested fields, which a plain `multi_match` cannot reach, dates, numbers and `locales` are left out.
+The field list comes from the live mapping of the index (cached for five minutes), because the component fields
+are mapped dynamically, as an object with a sub-field per language, and from the model's declared mapping when
+the cluster cannot be asked. A caller that names its own fields in the text-match options keeps them. The
+consequence for ranking is deliberate: a word that only matches the text of another language no longer counts,
+so a request in Italian ranks on Italian text and on the vectors.
+
 ## Response metadata
 
 `AdvancedSearchResult->meta` carries:

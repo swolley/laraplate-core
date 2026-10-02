@@ -64,6 +64,16 @@ final readonly class TextMatchOptions
     }
 
     /**
+     * The same options searching these fields instead.
+     *
+     * @param  list<string>  $fields
+     */
+    public function withFields(array $fields): self
+    {
+        return self::fromArray([...$this->toEngineArray(), 'fields' => $fields]);
+    }
+
+    /**
      * @return array<string, bool|float|int|string>
      */
     public function toArray(): array
