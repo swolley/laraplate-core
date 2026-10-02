@@ -148,7 +148,10 @@ trait HasApprovals
 
     /**
      * Turn a delete, force delete or restore into a request waiting for approval. The request
-     * carries no diff, only the operation; repeating it updates the pending one.
+     * carries no diff, only the operation. A record has at most one pending request per
+     * operation: repeating it, by anybody, joins the pending one, whose author and quorum stay
+     * as they are (two pending deletions would leave the second one acting on a record the
+     * first already removed).
      *
      * @param  Model&self  $item
      */
@@ -160,17 +163,18 @@ trait HasApprovals
         $modification->active = true;
         $modification->operation = $operation;
         $modification->modifications = [];
-        $modification->approvers_required = $item->approversRequired;
-        $modification->disapprovers_required = $item->disapproversRequired;
         $modification->md5 = md5($operation->value . '|' . $item::class . '|' . $item->getKey());
 
-        $modifier = $item->modifier();
-
-        if ($modifier !== null) {
-            $modification->modifier()->associate($modifier);
-        }
-
         if ($existing === null) {
+            $modification->approvers_required = $item->approversRequired;
+            $modification->disapprovers_required = $item->disapproversRequired;
+
+            $modifier = $item->modifier();
+
+            if ($modifier !== null) {
+                $modification->modifier()->associate($modifier);
+            }
+
             $item->modifications()->save($modification);
         } else {
             $modification->save();
@@ -185,6 +189,11 @@ trait HasApprovals
     /**
      * Capture a pending modification, then apply the writer's approve-permission credit when N > 1.
      *
+     * Saving the same diff again reuses the author's own pending request and leaves its quorum
+     * as it is: the quorum may have been set after capture (AI moderation does), and resetting
+     * it would leave a decision the votes already reach unapplied. Another author saving the
+     * same diff gets a request of their own, so nobody takes over a request others voted on.
+     *
      * @param  Model&self  $item
      */
     public static function captureSave($item): bool
@@ -196,34 +205,37 @@ trait HasApprovals
                     'modified' => $item->{$key},
                 ];
             })->all();
-
-        $has_modification_pending = $item->modifications()
-            ->activeOnly()
-            ->where('md5', md5(json_encode($diff, JSON_THROW_ON_ERROR)))
-            ->first();
-
+        $md5 = md5(json_encode($diff, JSON_THROW_ON_ERROR));
         $modifier = $item->modifier();
+
+        $pending_request = $item->modifications()->activeOnly()->where('md5', $md5);
+
+        if ($modifier !== null) {
+            $pending_request->where('modifier_type', $modifier::class)->where('modifier_id', $modifier->getKey());
+        } else {
+            $pending_request->whereNull('modifier_id');
+        }
+
+        $has_modification_pending = $pending_request->first();
 
         $modification = $has_modification_pending ?? new Modification();
         $modification->active = true;
         $modification->modifications = $diff;
-        $modification->approvers_required = $item->approversRequired;
-        $modification->disapprovers_required = $item->disapproversRequired;
-        $modification->md5 = md5(json_encode($diff, JSON_THROW_ON_ERROR));
-
-        if ($modifier && ($modifier_class = $modifier::class)) {
-            $modifier_instance = new $modifier_class();
-
-            $modification->modifier_id = $modifier->{$modifier_instance->getKeyName()};
-            $modification->modifier_type = $modifier_class;
-        }
-
+        $modification->md5 = $md5;
         $modification->operation = $item->{$item->getKeyName()} === null ? Operation::Create : Operation::Update;
 
-        if ($has_modification_pending) {
-            $modification->save();
-        } else {
+        if ($has_modification_pending === null) {
+            $modification->approvers_required = $item->approversRequired;
+            $modification->disapprovers_required = $item->disapproversRequired;
+
+            if ($modifier !== null) {
+                $modification->modifier_id = $modifier->getKey();
+                $modification->modifier_type = $modifier::class;
+            }
+
             $item->modifications()->save($modification);
+        } else {
+            $modification->save();
         }
 
         $item->applyAuthorApproveCredit($modification);
