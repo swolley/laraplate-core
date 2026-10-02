@@ -179,9 +179,13 @@ abstract class Preset extends Model implements IActivatableModel
         ]);
     }
 
+    /**
+     * The module's concrete counterpart of a Core model class, resolved from the concrete
+     * preset's module (`static`), not from this abstract class, which always lives in Core.
+     */
     private function getModuleModelClass(string $class): string
     {
-        $module = class_module(self::class);
+        $module = class_module(static::class);
 
         if ($module !== 'App') {
             return str_replace('Core', $module, $class);
