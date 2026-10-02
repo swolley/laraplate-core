@@ -7,6 +7,7 @@ namespace Modules\Core\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Approvals\PendingDeletionStrategy;
@@ -47,6 +48,45 @@ final class ModificationVoteService
     public function cast(User $user, Modification $modification, bool $approval, ?string $reason = null, ?Model $modifiable = null): bool
     {
         return $modification->getConnection()->transaction(fn (): bool => $this->castInTransaction($user, $modification, $approval, $reason, $modifiable));
+    }
+
+    /**
+     * Set the quorum a request needs and cast a vote on it, in one transaction.
+     *
+     * The new quorum counts the votes already on the request: lowering it can complete
+     * either side, and that side is applied, so the decision always matches the totals.
+     * Changing the quorum with a plain save would leave a reached quorum unapplied.
+     *
+     * @param  array<string, mixed>  $meta  stored on the vote
+     * @return bool false when the user is not authorized to vote or the request is already decided
+     *
+     * @throws InvalidArgumentException when a quorum is lower than one vote
+     */
+    public function castWithQuorum(
+        User $user,
+        Modification $modification,
+        bool $approval,
+        int $approvers_required,
+        int $disapprovers_required,
+        ?string $reason = null,
+        array $meta = [],
+        ?Model $modifiable = null,
+    ): bool {
+        throw_if(
+            $approvers_required < 1 || $disapprovers_required < 1,
+            InvalidArgumentException::class,
+            'A quorum needs at least one vote.',
+        );
+
+        return $modification->getConnection()->transaction(fn (): bool => $this->castInTransaction(
+            $user,
+            $modification,
+            $approval,
+            $reason,
+            $modifiable,
+            ['approvers' => $approvers_required, 'disapprovers' => $disapprovers_required],
+            $meta,
+        ));
     }
 
     /**
@@ -96,8 +136,19 @@ final class ModificationVoteService
         $connection->afterCommit(static fn () => event(new ModificationWithdrawn($modification, $modifiable)));
     }
 
-    private function castInTransaction(User $user, Modification $modification, bool $approval, ?string $reason, ?Model $modifiable): bool
-    {
+    /**
+     * @param  array{approvers: int, disapprovers: int}|null  $quorum  null keeps the request's quorum
+     * @param  array<string, mixed>  $meta
+     */
+    private function castInTransaction(
+        User $user,
+        Modification $modification,
+        bool $approval,
+        ?string $reason,
+        ?Model $modifiable,
+        ?array $quorum = null,
+        array $meta = [],
+    ): bool {
         $connection = $modification->getConnectionName();
 
         if ($modifiable instanceof Model) {
@@ -120,6 +171,12 @@ final class ModificationVoteService
         $opposite_id_column = $approval ? 'disapprover_id' : 'approver_id';
         $opposite_type_column = $approval ? 'disapprover_type' : 'approver_type';
 
+        if ($quorum !== null) {
+            $modification->approvers_required = $quorum['approvers'];
+            $modification->disapprovers_required = $quorum['disapprovers'];
+            $modification->save();
+        }
+
         $opposite_vote->newQuery()->where([
             $opposite_id_column => $user->getKey(),
             $opposite_type_column => $user::class,
@@ -130,16 +187,12 @@ final class ModificationVoteService
             $actor_id_column => $user->getKey(),
             $actor_type_column => $user::class,
             'modification_id' => $modification->getKey(),
-        ], [
-            'reason' => $reason,
-        ]);
+        ], array_merge(['reason' => $reason], $meta === [] ? [] : ['meta' => $meta]));
 
         $modification->refresh();
-        $remaining = $approval
-            ? $modification->approversRemaining
-            : $modification->disapproversRemaining;
+        $decision = $this->reachedDecision($modification, $approval);
 
-        if ($remaining !== 0) {
+        if ($decision === null) {
             return true;
         }
 
@@ -155,17 +208,40 @@ final class ModificationVoteService
             $target = (new $modifiable_type)->setConnection($connection);
         }
 
-        $target->applyModificationChanges($modification, $approval);
+        $target->applyModificationChanges($modification, $decision);
 
-        if ($approval && $modification->operation->isDeletion()) {
+        if ($decision && $modification->operation->isDeletion()) {
             $this->rejectPendingUpdatesOf($modification, $user);
         }
 
-        $modification->getConnection()->afterCommit(static fn () => event($approval
+        $modification->getConnection()->afterCommit(static fn () => event($decision
             ? new ModificationApproved($modification, $target)
             : new ModificationRejected($modification, $record)));
 
         return true;
+    }
+
+    /**
+     * The side whose quorum the votes now reach, or null while neither is reached. A side is
+     * reached when its votes meet or exceed its quorum: a quorum lowered below the votes
+     * already cast counts as reached. The side just voted for wins when both are reached.
+     */
+    private function reachedDecision(Modification $modification, bool $cast_approval): ?bool
+    {
+        $approval_reached = (int) $modification->approversRemaining <= 0;
+        $disapproval_reached = (int) $modification->disapproversRemaining <= 0;
+        $cast_side_reached = $cast_approval ? $approval_reached : $disapproval_reached;
+        $other_side_reached = $cast_approval ? $disapproval_reached : $approval_reached;
+
+        if ($cast_side_reached) {
+            return $cast_approval;
+        }
+
+        if ($other_side_reached) {
+            return ! $cast_approval;
+        }
+
+        return null;
     }
 
     /**

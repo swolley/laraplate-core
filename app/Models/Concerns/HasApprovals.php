@@ -546,7 +546,7 @@ trait HasApprovals
 
         $modification->refresh();
 
-        if ((int) $modification->approversRemaining === 0) {
+        if ((int) $modification->approversRemaining <= 0) {
             resolve(ModificationVoteService::class)->applyAuthorCredit($modification, $this);
         }
     }
