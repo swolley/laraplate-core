@@ -167,6 +167,10 @@ The seeded `0.6` reproduces the historical `0.4 / 0.6` split exactly. `0` keeps 
 `1` ranks the top-K by the reranker alone. `$original_max` rescales the reranker's `[0,1]` output onto the fused score range. A reranker
 failure (for example the cross-encoder service being down) is caught, logged as a warning, and the
 fused order is returned with `meta['reranked'] = false`. Search never fails because of reranking.
+An `IReranker` that cannot score must therefore throw, not answer: `CrossEncoderService` throws on an
+error status, an unreachable service and an answer that is not one numeric score per pair, because a
+list of invented zeros would pass for a rerank that changed nothing and `meta['reranked']` would say
+`true`.
 
 A caller can disable it for one search through the plan (`ranking.use_reranker`); otherwise
 `config('core.search.reranker.enabled')` decides.
