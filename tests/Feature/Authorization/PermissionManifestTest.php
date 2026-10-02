@@ -2,34 +2,68 @@
 
 declare(strict_types=1);
 
+use Modules\Core\Authorization\Contracts\DeclaresPermissions;
 use Modules\Core\Authorization\CorePermissions;
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Models\Approval;
 use Modules\Core\Support\PermissionName;
-use Modules\ERP\Authorization\ERPPermissions;
-use Modules\ERP\Models\Invoice;
+
+/**
+ * The permission declarations of the enabled modules, found by the same convention the
+ * manifest uses, so these tests hold for whichever modules are installed.
+ *
+ * @return array<string, class-string<DeclaresPermissions>>
+ */
+function installedPermissionDeclarations(): array
+{
+    $declarations = [];
+
+    foreach (modules(prioritySort: false) as $module) {
+        $class = sprintf('Modules\\%s\\Authorization\\%sPermissions', $module, $module);
+
+        if (class_exists($class)) {
+            $declarations[$module] = $class;
+        }
+    }
+
+    return $declarations;
+}
+
+/**
+ * @param  class-string<DeclaresPermissions>  $declaration
+ * @return list<string>
+ */
+function declaredPermissionNames(string $declaration): array
+{
+    $names = [];
+
+    foreach ($declaration::operations() as $model_class => $operations) {
+        foreach ($operations as $operation) {
+            $names[] = PermissionName::forClass($model_class, $operation);
+        }
+    }
+
+    return array_values(array_unique($names));
+}
 
 it('collects the domain permissions declared by the enabled modules', function (): void {
     $names = app(PermissionManifest::class)->names();
 
-    expect($names)->toContain(PermissionName::forClass(Invoice::class, 'post'))
-        ->and($names)->toContain(PermissionName::forClass(Invoice::class, 'force_post'));
+    foreach (installedPermissionDeclarations() as $declaration) {
+        foreach (declaredPermissionNames($declaration) as $declared_name) {
+            expect($names)->toContain($declared_name);
+        }
+    }
 });
 
 it('returns one module slice so a seeder can materialize only its own names', function (): void {
     $manifest = app(PermissionManifest::class);
 
-    $expected = [];
-
-    foreach (ERPPermissions::operations() as $model_class => $operations) {
-        foreach ($operations as $operation) {
-            $expected[] = PermissionName::forClass($model_class, $operation);
-        }
+    foreach (installedPermissionDeclarations() as $module => $declaration) {
+        expect($manifest->namesFor($module))->toBe(declaredPermissionNames($declaration));
     }
 
-    expect($manifest->namesFor('ERP'))->toBe($expected)
-        ->and($manifest->namesFor('Core'))->toBe([])
-        ->and($manifest->namesFor('NotAModule'))->toBe([]);
+    expect($manifest->namesFor('NotAModule'))->toBe([]);
 });
 
 it('never repeats a name, whichever module declared it', function (): void {

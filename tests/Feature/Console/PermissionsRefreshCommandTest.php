@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
-use Modules\AI\Models\ActionRequest;
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\SettingTypeEnum;
@@ -22,7 +21,6 @@ use Modules\Core\Tests\Fixtures\PermissionsRefreshForcedUnlockableModel;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshLockableModel;
 use Modules\Core\Tests\Fixtures\PermissionsRefreshPlainModel;
 use Modules\Core\Tests\Stubs\Console\ConstructorConfiguredPermissionsModel;
-use Modules\ERP\Models\ReturnOrder;
 use Symfony\Component\Console\Application as SymfonyConsoleApplication;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -58,6 +56,20 @@ function permissionNameForModel(string $model_class, ActionEnum $action): string
     $model = new $model_class();
 
     return PermissionName::forModel($model, $action->value);
+}
+
+/**
+ * Stands in for the modules' permission declarations, so these tests do not depend on which
+ * modules are installed or on what they declare.
+ *
+ * @param  list<string>  $declared_names
+ */
+function fakeDeclaredPermissions(array $declared_names): void
+{
+    $manifest = Mockery::mock(PermissionManifest::class);
+    $manifest->shouldReceive('names')->andReturn($declared_names);
+    $manifest->shouldReceive('excludedModels')->andReturn([]);
+    app()->instance(PermissionManifest::class, $manifest);
 }
 
 it('command exists and has correct signature', function (): void {
@@ -200,14 +212,14 @@ it('command handles permission deletion', function (): void {
 });
 
 it('does not duplicate permissions when they already exist for the model table', function (): void {
-    $permission_name = permissionNameForModel(ActionRequest::class, ActionEnum::Select);
+    $permission_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Select);
 
     Permission::query()->firstOrCreate(
         ['name' => $permission_name],
         ['guard_name' => 'web'],
     );
 
-    HelpersCache::setModels('active', [ActionRequest::class]);
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
 
     $output = runPermissionsRefreshForCoverage([]);
 
@@ -216,9 +228,9 @@ it('does not duplicate permissions when they already exist for the model table',
 });
 
 it('skips cached model classes whose files were moved or deleted', function (): void {
-    // Simulate a stale HelpersCache entry after Media moved from CMS to Core.
+    // Simulate a stale HelpersCache entry for a model class that no longer exists.
     HelpersCache::setModels('active', [
-        'Modules\\CMS\\Models\\Media',
+        'Modules\\Removed\\Models\\Media',
         PermissionsRefreshPlainModel::class,
     ]);
 
@@ -239,7 +251,7 @@ it('skips cached model classes whose files were moved or deleted', function (): 
     })->not->toThrow(Throwable::class);
 
     expect($exit_code)->toBe(0)
-        ->and($output)->not->toContain('Modules\\CMS\\Models\\Media');
+        ->and($output)->not->toContain('Modules\\Removed\\Models\\Media');
 });
 
 it('uses connection and table configured by the model constructor', function (): void {
@@ -520,8 +532,8 @@ it('creates impersonate permission for the configured user model when missing', 
 });
 
 it('creates the domain permissions a module declares', function (): void {
-    $declared = app(PermissionManifest::class)->namesFor('ERP');
-    $permission_name = $declared[0];
+    $permission_name = PermissionName::forClass(PermissionsRefreshPlainModel::class, 'post');
+    fakeDeclaredPermissions([$permission_name]);
 
     Permission::query()->where('name', $permission_name)->delete();
 
@@ -535,14 +547,13 @@ it('creates the domain permissions a module declares', function (): void {
 
 it('keeps a declared permission whose verb collides with a generic one it would otherwise drop', function (): void {
     // `approve` is a generic verb the command drops for a model without the
-    // approval trait, and at the same time a domain step ERP declares on returns.
-    $permission_name = PermissionName::forClass(ReturnOrder::class, 'approve');
-
-    expect(app(PermissionManifest::class)->names())->toContain($permission_name);
+    // approval trait, and at the same time a domain step a module may declare.
+    $permission_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Approve);
+    fakeDeclaredPermissions([$permission_name]);
 
     Permission::query()->firstOrCreate(['name' => $permission_name], ['guard_name' => 'web']);
 
-    HelpersCache::setModels('active', [ReturnOrder::class]);
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
 
     $output = runPermissionsRefreshForCoverage([]);
 

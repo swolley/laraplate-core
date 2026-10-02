@@ -2,24 +2,8 @@
 
 declare(strict_types=1);
 
-use Modules\AI\Database\Seeders\AIDatabaseSeeder;
-use Modules\CMS\Database\Seeders\CMSDatabaseSeeder;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
-use Modules\ERP\Services\Company\ErpCompanySettings;
-use Modules\MES\Database\Seeders\MESDatabaseSeeder;
-
-it('keeps runtime setting names within the Setting model name limit', function (): void {
-    $all_names = collect([
-        ...CoreDatabaseSeeder::runtimeSettingDefinitions(),
-        ...AIDatabaseSeeder::runtimeSettingDefinitions(),
-        ...CMSDatabaseSeeder::runtimeSettingDefinitions(),
-        ...MESDatabaseSeeder::runtimeSettingDefinitions(),
-        ...ErpCompanySettings::globalSettingDefinitions(),
-    ])->pluck('name');
-
-    expect($all_names->every(fn (string $name): bool => mb_strlen($name) <= 255))->toBeTrue();
-});
 
 it('defines core runtime settings with current defaults and choices', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
@@ -31,32 +15,4 @@ it('defines core runtime settings with current defaults and choices', function (
         ->and($definitions->get('media.search_visibility')['value'])->toBe('owner')
         ->and($definitions->get('media.search_visibility')['choices'])->toBe(['owner', 'open'])
         ->and($definitions->get('search.vector.similarity')['choices'])->toBe(['cosine', 'dot_product', 'euclidean']);
-});
-
-it('defines ai runtime settings with current defaults and choices', function (): void {
-    $definitions = collect(AIDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
-
-    expect($definitions->get('features.embeddings.enabled')['value'])->toBeFalse()
-        ->and($definitions->get('features.faq.splitter.driver')['value'])->toBe('markdown_aware')
-        ->and($definitions->get('features.faq.splitter.driver')['choices'])
-        ->toBe(['markdown_aware', 'sentence', 'delimiter'])
-        ->and($definitions->get('features.moderation.approval_mode')['choices'])->toBe(['threshold', 'dual']);
-});
-
-it('defines cms and mes runtime settings with current defaults and choices', function (): void {
-    $cmsDefinitions = collect(CMSDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
-    $mesDefinitions = collect(MESDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
-
-    expect($cmsDefinitions->get('geocoding.cache_ttl')['value'])->toBe(604800)
-        ->and($mesDefinitions->get('lots.number_format')['value'])->toBe('{YEAR}{MONTH}{DAY}-{SEQ}');
-});
-
-it('keeps erp company-backed settings selectable where appropriate', function (): void {
-    $definitions = collect(ErpCompanySettings::globalSettingDefinitions())->keyBy('name');
-
-    expect($definitions->get(ErpCompanySettings::settingName(ErpCompanySettings::INVOICE_GENERATION_MODE))['choices'])
-        ->toBe([
-            ErpCompanySettings::INVOICE_GENERATION_MODE_EXPANDED,
-            ErpCompanySettings::INVOICE_GENERATION_MODE_COMPACT,
-        ]);
 });

@@ -3,15 +3,16 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Log;
-use Modules\CMS\Models\Content;
-use Modules\CMS\Models\Tag;
 use Modules\Core\Helpers\HelpersCache;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\License;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
+use Modules\Core\Seeding\ModelCapabilities;
 use Modules\Core\Seeding\ModelCapabilityScanner;
+use Modules\Core\Tests\Fixtures\FakeTranslatableModel;
+use Modules\Core\Tests\Stubs\Locking\OptimisticLockModel;
 use Modules\Core\Tests\Stubs\Seeding\UnresolvableCapabilityModel;
 
 it('reports HasApprovals without a second filesystem walk', function (): void {
@@ -60,36 +61,45 @@ it('reports hasSoftDeletes and hasLocks for User, not hasOptimisticLocking, hasT
         ->and($user->hasApprovals)->toBeFalse();
 });
 
-it('distinguishes hasLocks from hasOptimisticLocking', function (): void {
-    $scanned = app(ModelCapabilityScanner::class)->scan();
-    $byClass = array_column($scanned, null, 'modelClass');
+/**
+ * Scans only the given models, restoring the discovered list afterwards.
+ *
+ * @param  list<class-string>  $model_classes
+ * @return array<class-string, ModelCapabilities>
+ */
+function scanCapabilitiesOf(array $model_classes): array
+{
+    $original_active_models = HelpersCache::getModels('active');
+    HelpersCache::setModels('active', $model_classes);
 
-    expect($byClass)->toHaveKey(CronJob::class)
-        ->and($byClass)->toHaveKey(Content::class);
+    try {
+        return array_column(app(ModelCapabilityScanner::class)->scan(), null, 'modelClass');
+    } finally {
+        if ($original_active_models === null) {
+            HelpersCache::clearModels();
+        } else {
+            HelpersCache::setModels('active', $original_active_models);
+        }
+    }
+}
+
+it('distinguishes hasLocks from hasOptimisticLocking', function (): void {
+    $byClass = scanCapabilitiesOf([CronJob::class, OptimisticLockModel::class]);
 
     // CronJob carries HasLocks but not HasOptimisticLocking: catches a swap
     // between the two constants in either direction.
     expect($byClass[CronJob::class]->hasLocks)->toBeTrue()
-        ->and($byClass[CronJob::class]->hasOptimisticLocking)->toBeFalse();
-
-    // Content is the only model in the codebase carrying HasOptimisticLocking,
-    // confirming the constant matches a real trait.
-    expect($byClass[Content::class]->hasOptimisticLocking)->toBeTrue();
+        ->and($byClass[CronJob::class]->hasOptimisticLocking)->toBeFalse()
+        ->and($byClass[OptimisticLockModel::class]->hasOptimisticLocking)->toBeTrue();
 });
 
-it('reports hasTranslations for Tag, not hasLocks, hasOptimisticLocking or hasApprovals', function (): void {
-    $scanned = app(ModelCapabilityScanner::class)->scan();
-    $byClass = array_column($scanned, null, 'modelClass');
+it('reports hasTranslations for a translatable model, not hasLocks, hasOptimisticLocking or hasApprovals', function (): void {
+    $translatable = scanCapabilitiesOf([FakeTranslatableModel::class])[FakeTranslatableModel::class];
 
-    expect($byClass)->toHaveKey(Tag::class);
-
-    $tag = $byClass[Tag::class];
-
-    expect($tag->hasTranslations)->toBeTrue()
-        ->and($tag->hasSoftDeletes)->toBeTrue()
-        ->and($tag->hasLocks)->toBeFalse()
-        ->and($tag->hasOptimisticLocking)->toBeFalse()
-        ->and($tag->hasApprovals)->toBeFalse();
+    expect($translatable->hasTranslations)->toBeTrue()
+        ->and($translatable->hasLocks)->toBeFalse()
+        ->and($translatable->hasOptimisticLocking)->toBeFalse()
+        ->and($translatable->hasApprovals)->toBeFalse();
 });
 
 it('does not confuse hasOptimisticLocking with hasApprovals', function (): void {

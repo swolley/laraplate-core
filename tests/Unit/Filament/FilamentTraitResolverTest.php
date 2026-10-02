@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Filament\Utils\HasRecords as CmsHasRecords;
-use Modules\CMS\Filament\Utils\HasTable as CmsHasTable;
-use Modules\CMS\Models\Content;
 use Modules\Core\Filament\FilamentTraitResolver;
 use Modules\Core\Filament\Utils\HasForm as CoreHasForm;
 use Modules\Core\Filament\Utils\HasRecords as CoreHasRecords;
 use Modules\Core\Filament\Utils\HasTable as CoreHasTable;
 use Modules\Core\Models\Setting;
+use Modules\Core\Tests\Stubs\DynamicEntities\DynamicContentStubModel;
 
 it('resolves Core traits for App namespaces', function (): void {
     expect(FilamentTraitResolver::resolve('App\\Filament\\Resources\\Users\\Tables\\UsersTable', 'HasTable'))
@@ -20,24 +18,17 @@ it('resolves Core traits for App namespaces', function (): void {
         ->toBe(CoreHasRecords::class);
 });
 
-it('resolves CMS traits when present', function (): void {
-    expect(FilamentTraitResolver::resolve('Modules\\CMS\\Filament\\Resources\\Tags\\Tables\\TagsTable', 'HasTable'))
-        ->toBe(CmsHasTable::class)
-        ->and(FilamentTraitResolver::resolve('Modules\\CMS\\Filament\\Resources\\Tags\\Pages\\ListTags', 'HasRecords'))
-        ->toBe(CmsHasRecords::class)
-        ->and(FilamentTraitResolver::resolve('Modules\\CMS\\Filament\\Resources\\Tags\\Schemas\\TagForm', 'HasForm'))
+it('falls back to Core traits for a module that defines none of its own', function (): void {
+    expect(FilamentTraitResolver::resolve('Modules\\WithoutTraits\\Filament\\Resources\\Things\\Tables\\ThingsTable', 'HasTable'))
+        ->toBe(CoreHasTable::class)
+        ->and(FilamentTraitResolver::resolve('Modules\\WithoutTraits\\Filament\\Resources\\Things\\Pages\\ListThings', 'HasRecords'))
+        ->toBe(CoreHasRecords::class)
+        ->and(FilamentTraitResolver::resolve('Modules\\WithoutTraits\\Filament\\Resources\\Things\\Schemas\\ThingForm', 'HasForm'))
         ->toBe(CoreHasForm::class);
 });
 
-it('falls back to Core traits for ERP', function (): void {
-    expect(FilamentTraitResolver::resolve('Modules\\ERP\\Filament\\Resources\\Companies\\Tables\\CompaniesTable', 'HasTable'))
-        ->toBe(CoreHasTable::class)
-        ->and(FilamentTraitResolver::resolve('Modules\\ERP\\Filament\\Resources\\Companies\\Pages\\ListCompanies', 'HasRecords'))
-        ->toBe(CoreHasRecords::class);
-});
-
 it('lists HasForm-owned columns only for HasDynamicContents models', function (): void {
-    expect(FilamentTraitResolver::formColumnsOwnedByHasForm(Content::class))
+    expect(FilamentTraitResolver::formColumnsOwnedByHasForm(DynamicContentStubModel::class))
         ->toBe(['entity_id', 'presettable_id'])
         ->and(FilamentTraitResolver::formColumnsOwnedByHasForm(Setting::class))
         ->toBe([]);
@@ -49,6 +40,6 @@ it('lists HasTable strip columns including timestamp and validity grezzi', funct
 });
 
 it('lists computed attributes that must never reach filament form state', function (): void {
-    expect(FilamentTraitResolver::computedAttributesNeverInForms(Content::class))
+    expect(FilamentTraitResolver::computedAttributesNeverInForms(DynamicContentStubModel::class))
         ->toContain('statistics', 'is_locked', 'is_deleted');
 });

@@ -2,30 +2,17 @@
 
 declare(strict_types=1);
 
-use Modules\AI\Database\Seeders\AIDatabaseSeeder;
-use Modules\CMS\Database\Seeders\CMSDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Database\Seeders\PermissionRefreshSeeder;
 use Modules\Core\Seeding\SeedGraphBuilder;
 use Modules\Core\Seeding\SeedNode;
-use Modules\ERP\Database\Seeders\ERPDatabaseSeeder;
-use Modules\ERP\Database\Seeders\ItalianTaxCodesSeeder;
-use Modules\MES\Database\Seeders\MESDatabaseSeeder;
+use Nwidart\Modules\Facades\Module;
 
 /**
- * @return array<class-string, int>
- */
-function seederPositions(): array
-{
-    $sorted = app(SeedGraphBuilder::class)->build();
-
-    return array_flip(array_map(
-        static fn (SeedNode $node): string => $node->seederClass,
-        $sorted,
-    ));
-}
-
-/**
+ * The production seed graph. The rules below hold for whichever modules are installed: each
+ * module's seeders follow, and depend on, the seeders of the modules its module.json requires.
+ * Edges a module declares for its own seeders are tested in that module.
+ *
  * @return list<SeedNode>
  */
 function seedNodes(): array
@@ -33,51 +20,59 @@ function seedNodes(): array
     return app(SeedGraphBuilder::class)->build();
 }
 
-function seedNodeFor(string $seederClass): SeedNode
+/**
+ * @return array<class-string, int>
+ */
+function seederPositions(): array
 {
-    $nodes = collect(seedNodes());
-
-    /** @var SeedNode $node */
-    return $nodes->firstOrFail(fn (SeedNode $n): bool => $n->seederClass === $seederClass);
+    return array_flip(array_map(
+        static fn (SeedNode $node): string => $node->seederClass,
+        seedNodes(),
+    ));
 }
 
-it('orders MES after ERP, which module priority alone got wrong', function (): void {
+function seedNodeFor(string $seederClass): SeedNode
+{
+    /** @var SeedNode $node */
+    return collect(seedNodes())->firstOrFail(fn (SeedNode $n): bool => $n->seederClass === $seederClass);
+}
+
+/**
+ * @return list<string>
+ */
+function requiredModulesOf(string $module): array
+{
+    $required = Module::find($module)?->get('requires') ?? [];
+
+    return is_array($required) ? array_values(array_filter($required, is_string(...))) : [];
+}
+
+it('orders and wires every module seeder after every seeder of the modules it requires', function (): void {
+    $nodes = seedNodes();
     $positions = seederPositions();
 
-    expect($positions[MESDatabaseSeeder::class])
-        ->toBeGreaterThan($positions[ERPDatabaseSeeder::class]);
+    foreach ($nodes as $node) {
+        foreach (requiredModulesOf($node->module) as $required_module) {
+            foreach ($nodes as $required) {
+                if ($required->module !== $required_module) {
+                    continue;
+                }
+
+                expect($node->dependsOn)->toContain($required->seederClass)
+                    ->and($positions[$node->seederClass])->toBeGreaterThan($positions[$required->seederClass]);
+            }
+        }
+    }
 });
 
 it('orders Core before every other module seeder', function (): void {
     $positions = seederPositions();
     $core = $positions[CoreDatabaseSeeder::class];
 
-    expect($positions[ERPDatabaseSeeder::class])->toBeGreaterThan($core)
-        ->and($positions[MESDatabaseSeeder::class])->toBeGreaterThan($core);
-});
-
-it('wires MES to depend on every ERP seeder via module.json requires', function (): void {
-    $mes = seedNodeFor(MESDatabaseSeeder::class);
-
-    expect($mes->dependsOn)
-        ->toContain(ERPDatabaseSeeder::class)
-        ->toContain(ItalianTaxCodesSeeder::class);
-});
-
-it('wires ItalianTaxCodesSeeder to depend on ERPDatabaseSeeder, not on alphabetical tie-break', function (): void {
-    // This previously worked only because 'E' sorts before 'I' in the graph's
-    // deterministic tie-break — ItalianTaxCodesSeeder::run() looks up the
-    // default company created by ERPDatabaseSeeder::ensureDefaultCompany(),
-    // and warns-and-returns (no throw) when it is missing, so a dropped edge
-    // would silently no-seed instead of failing this graph, hence the direct
-    // assertion mirroring the PermissionRefreshSeeder edge below.
-    expect(seedNodeFor(ItalianTaxCodesSeeder::class)->dependsOn)
-        ->toContain(ERPDatabaseSeeder::class);
-});
-
-it('wires every module that requires Core to depend on CoreDatabaseSeeder', function (): void {
-    foreach ([AIDatabaseSeeder::class, CMSDatabaseSeeder::class, ERPDatabaseSeeder::class] as $seederClass) {
-        expect(seedNodeFor($seederClass)->dependsOn)->toContain(CoreDatabaseSeeder::class);
+    foreach (seedNodes() as $node) {
+        if ($node->module !== 'Core') {
+            expect($positions[$node->seederClass])->toBeGreaterThan($core);
+        }
     }
 });
 
@@ -87,18 +82,20 @@ it('makes permission:refresh a declared graph node that CoreDatabaseSeeder depen
     expect(seedNodeFor(CoreDatabaseSeeder::class)->dependsOn)->toBe([PermissionRefreshSeeder::class]);
 });
 
-it('propagates the permission:refresh node to every module that requires Core, so ERP can rely on it', function (): void {
-    // ERPDatabaseSeeder::ensureDomainPermissions() is the obvious consumer, but it gets this
-    // edge for free via module.json "requires": ["Core"] — no explicit dependsOn() needed there.
-    foreach ([AIDatabaseSeeder::class, CMSDatabaseSeeder::class, ERPDatabaseSeeder::class] as $seederClass) {
-        expect(seedNodeFor($seederClass)->dependsOn)->toContain(PermissionRefreshSeeder::class);
+it('propagates CoreDatabaseSeeder and the permission:refresh node to every module that requires Core', function (): void {
+    // A module seeder that needs its permissions (ERP's ensureDomainPermissions(), for one)
+    // gets this edge from module.json "requires": ["Core"], with no dependsOn() of its own.
+    foreach (seedNodes() as $node) {
+        if (in_array('Core', requiredModulesOf($node->module), true)) {
+            expect($node->dependsOn)
+                ->toContain(CoreDatabaseSeeder::class)
+                ->toContain(PermissionRefreshSeeder::class);
+        }
     }
 });
 
 it('excludes Dev seeders from the production graph', function (): void {
-    $classes = array_keys(seederPositions());
-
-    foreach ($classes as $class) {
+    foreach (array_keys(seederPositions()) as $class) {
         expect(class_basename($class))->not->toStartWith('Dev');
     }
 });
