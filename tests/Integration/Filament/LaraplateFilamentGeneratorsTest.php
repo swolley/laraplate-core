@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Page;
 use Filament\Commands\FileGenerators\Resources\Pages\ResourceCreateRecordPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Pages\ResourceEditRecordPageClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Pages\ResourceListRecordsPageClassGenerator;
@@ -113,14 +114,20 @@ it('emits HasForm and configureForm in generated form source', function (): void
 });
 
 it('excludes HasForm-owned columns from generated HasDynamicContents forms', function (): void {
+    Page::createTable();
+
     $generator = app(ResourceFormSchemaClassGenerator::class, [
-        'fqn' => 'Modules\\CMS\\Filament\\Resources\\Contents\\Schemas\\ContentForm',
-        'modelFqn' => Modules\CMS\Models\Content::class,
+        'fqn' => 'App\\Filament\\Resources\\Pages\\Schemas\\PageForm',
+        'modelFqn' => Page::class,
         'parentResourceFqn' => null,
         'isGenerated' => true,
     ]);
 
-    $source = $generator->generate();
+    try {
+        $source = $generator->generate();
+    } finally {
+        Page::dropTable();
+    }
 
     expect($source)->toContain(HasForm::class)
         ->and($source)->not->toContain("make('entity_id')")

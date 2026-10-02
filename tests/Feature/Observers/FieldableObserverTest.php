@@ -2,19 +2,25 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Models\Pivot\Presettable;
-use Modules\CMS\Models\Preset;
+use App\Models\Pivot\Presettable;
+use App\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Observers\FieldableObserver;
+use Modules\Core\Tests\Support\AppDynamicEntities;
 
 beforeEach(function (): void {
-    setupCMSEntities();
+    // The observer finds the preset of a pivot through models(), which does not scan Core's stubs.
+    AppDynamicEntities::discoverPreset();
+});
+
+afterEach(function (): void {
+    AppDynamicEntities::forgetDiscoveredPreset();
 });
 
 it('creates preset version when fieldable pivot is saved', function (): void {
-    $preset = Preset::query()->firstOrFail();
+    $preset = AppDynamicEntities::preset();
     $rows_before = Presettable::query()->withTrashed()->where('preset_id', $preset->id)->count();
 
     $field = Field::query()->create([
@@ -35,7 +41,7 @@ it('creates preset version when fieldable pivot is saved', function (): void {
 });
 
 it('creates preset version when fieldable pivot is deleted', function (): void {
-    $preset = Preset::query()->firstOrFail();
+    $preset = AppDynamicEntities::preset();
     $field = Field::query()->create([
         'name' => 'obs_field_del_' . uniqid(),
         'type' => FieldType::Text,
@@ -71,7 +77,7 @@ it('skips versioning when preset id does not resolve', function (): void {
 });
 
 it('orders fieldables by order column ascending', function (): void {
-    $preset = Preset::query()->firstOrFail();
+    $preset = AppDynamicEntities::preset();
     $field_a = Field::query()->create([
         'name' => 'ordered_field_a_' . uniqid(),
         'type' => FieldType::Text,
@@ -115,7 +121,7 @@ it('orders fieldables by order column ascending', function (): void {
 });
 
 it('invokes deleted hook when fieldable pivot is removed', function (): void {
-    $preset = Preset::query()->firstOrFail();
+    $preset = AppDynamicEntities::preset();
     $field = Field::query()->create([
         'name' => 'obs_field_deleted_hook_' . uniqid(),
         'type' => FieldType::Text,

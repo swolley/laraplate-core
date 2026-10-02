@@ -2,18 +2,14 @@
 
 declare(strict_types=1);
 
-use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Overrides\Model;
-
-beforeEach(function (): void {
-    setupCMSEntities();
-});
+use Modules\Core\Tests\Support\AppDynamicEntities;
 
 it('reads and writes pivot attributes through field accessors', function (): void {
-    $preset = Preset::query()->firstOrFail();
+    $preset = AppDynamicEntities::preset();
     $field = Field::query()->create([
         'name' => 'pivot_field_' . uniqid(),
         'type' => FieldType::Text,

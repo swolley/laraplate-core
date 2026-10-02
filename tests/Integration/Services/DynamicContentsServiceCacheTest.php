@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Casts\EntityType;
+use App\Models\Entity;
 use Illuminate\Support\Facades\Cache;
-use Modules\CMS\Casts\EntityType;
-use Modules\CMS\Models\Entity;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Services\DynamicContentsService;
 
@@ -36,20 +36,38 @@ it('keeps entity in-memory cache buckets isolated by dynamic content type', func
     Entity::query()->create([
         'name' => 'Article',
         'slug' => 'article',
-        'type' => EntityType::Contents,
+        'type' => EntityType::Pages,
     ]);
 
     $service = DynamicContentsService::getInstance();
-    $contents = $service->fetchAvailableEntities(EntityType::Contents);
+    $pages = $service->fetchAvailableEntities(EntityType::Pages);
 
-    $category = Entity::query()->create([
-        'name' => 'Topic',
-        'slug' => 'topic',
-        'type' => EntityType::Categories,
+    $author = Entity::query()->create([
+        'name' => 'Writer',
+        'slug' => 'writer',
+        'type' => EntityType::Authors,
     ]);
 
-    $categories = $service->fetchAvailableEntities(EntityType::Categories);
+    $authors = $service->fetchAvailableEntities(EntityType::Authors);
 
-    expect($contents)->toHaveCount(1)
-        ->and($categories->pluck('id')->all())->toBe([$category->id]);
+    expect($pages)->toHaveCount(1)
+        ->and($authors->pluck('id')->all())->toBe([$author->id]);
+});
+
+/**
+ * The entity class is resolved from the type's module like presets and presettables are:
+ * an App type maps to App\Models\Entity, not to a `Modules\App\Models\Entity` that cannot exist.
+ */
+it('fetches App entity types as App entity models', function (): void {
+    $entity = Entity::query()->create([
+        'name' => 'Landing',
+        'slug' => 'landing',
+        'type' => EntityType::Pages,
+    ]);
+
+    $entities = DynamicContentsService::getInstance()->fetchAvailableEntities(EntityType::Pages);
+
+    expect($entities)->toHaveCount(1)
+        ->and($entities->first())->toBeInstanceOf(Entity::class)
+        ->and($entities->first()->id)->toBe($entity->id);
 });

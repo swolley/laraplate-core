@@ -2,15 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Casts\EntityType;
+use App\Models\Entity;
+use App\Models\Page;
+use App\Models\Pivot\Presettable;
+use App\Models\Preset;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Modules\CMS\Casts\EntityType;
-use Modules\CMS\Enums\CMSTables;
-use Modules\CMS\Models\Content;
-use Modules\CMS\Models\Entity;
-use Modules\CMS\Models\Pivot\Presettable;
-use Modules\CMS\Models\Preset;
 use Modules\Core\Casts\FieldType;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Field;
@@ -18,10 +16,11 @@ use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\PresetVersioningService;
 
 beforeEach(function (): void {
-    // Base tables store shared_components; translated `components` live on *_translations.
-    if (! Schema::hasColumn(CMSTables::Contents->value, 'shared_components')) {
-        $this->markTestSkipped('Preset versioning integration requires full Core runtime.');
-    }
+    Page::createTable();
+});
+
+afterEach(function (): void {
+    Page::dropTable();
 });
 
 /**
@@ -36,7 +35,7 @@ function createPresetWithFields(int $field_count = 2): array
     $entity = Entity::query()->create([
         'name' => 'test_entity_' . uniqid(),
         'slug' => 'test-entity-' . uniqid(),
-        'type' => EntityType::Contents,
+        'type' => EntityType::Pages,
     ]);
 
     $preset = Preset::query()->create([
@@ -70,6 +69,20 @@ function createPresetWithFields(int $field_count = 2): array
     $presettable = $preset->createFieldsVersion();
 
     return ['entity' => $entity, 'preset' => $preset, 'fields' => $fields, 'presettable' => $presettable];
+}
+
+/**
+ * Create a page bound to the given presettable version.
+ *
+ * @param  array<string, mixed>  $components
+ */
+function createPageOnPresettable(Entity $entity, Presettable $presettable, array $components): Page
+{
+    return Page::query()->create([
+        'entity_id' => $entity->id,
+        'presettable_id' => $presettable->id,
+        'components' => $components,
+    ]);
 }
 
 describe('PresetVersioningService', function (): void {
@@ -171,14 +184,11 @@ describe('PresetVersioningService', function (): void {
     });
 });
 
-describe('Content uses presettable snapshot', function (): void {
+describe('Dynamic content uses presettable snapshot', function (): void {
     it('reads dynamic fields from presettable snapshot', function (): void {
         ['entity' => $entity, 'presettable' => $presettable, 'fields' => $fields] = createPresetWithFields(1);
 
-        $content = Content::withoutSyncingToSearch(fn () => Content::factory()->create([
-            'entity_id' => $entity->id,
-            'presettable_id' => $presettable->id,
-        ]));
+        $content = createPageOnPresettable($entity, $presettable, [$fields[0]->name => 'value']);
 
         $dynamic_fields = $content->getDynamicFields();
         expect($dynamic_fields)->toContain($fields[0]->name);
@@ -187,10 +197,7 @@ describe('Content uses presettable snapshot', function (): void {
     it('content preserves old field structure after preset changes', function (): void {
         ['entity' => $entity, 'preset' => $preset, 'presettable' => $v1, 'fields' => $fields] = createPresetWithFields(1);
 
-        $content = Content::withoutSyncingToSearch(fn () => Content::factory()->create([
-            'entity_id' => $entity->id,
-            'presettable_id' => $v1->id,
-        ]));
+        $content = createPageOnPresettable($entity, $v1, [$fields[0]->name => 'value']);
 
         $new_field = Field::query()->create([
             'name' => 'extra_field_' . uniqid(),
@@ -230,10 +237,7 @@ describe('Content uses presettable snapshot', function (): void {
 
         DynamicContentsService::reset();
 
-        $content = Content::withoutSyncingToSearch(fn () => Content::factory()->create([
-            'entity_id' => $entity->id,
-            'presettable_id' => $v2->id,
-        ]));
+        $content = createPageOnPresettable($entity, $v2, [$fields[0]->name => 'value']);
 
         $dynamic_fields = $content->getDynamicFields();
         expect($dynamic_fields)->toContain($fields[0]->name);
@@ -248,7 +252,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityType::Contents);
+            ->fetchAvailablePresettables(EntityType::Pages);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -265,7 +269,7 @@ describe('DynamicContentsService with versioning', function (): void {
         DynamicContentsService::reset();
 
         $presettables = DynamicContentsService::getInstance()
-            ->fetchAvailablePresettables(EntityType::Contents);
+            ->fetchAvailablePresettables(EntityType::Pages);
 
         $preset_presettables = $presettables->where('preset_id', $preset->id);
 
@@ -278,7 +282,7 @@ describe('Presettable model', function (): void {
         $entity = Entity::query()->create([
             'name' => 'auto_entity_' . uniqid(),
             'slug' => 'auto-entity-' . uniqid(),
-            'type' => EntityType::Contents,
+            'type' => EntityType::Pages,
         ]);
 
         $preset = Preset::query()->create([
@@ -314,7 +318,7 @@ describe('Presettable model', function (): void {
         $entity = Entity::query()->create([
             'name' => 'empty_entity_' . uniqid(),
             'slug' => 'empty-entity-' . uniqid(),
-            'type' => EntityType::Contents,
+            'type' => EntityType::Pages,
         ]);
 
         $preset = Preset::query()->create([
@@ -395,7 +399,7 @@ it('writes the new version on the preset connection, not on the default one', fu
         );
         Artisan::call('migrate', ['--database' => 'affinity', '--path' => $migrations, '--realpath' => true, '--force' => true]);
 
-        DB::connection('affinity')->table(CoreTables::Entities->value)->insert(['id' => $preset->entity_id, 'name' => 'affinity', 'slug' => 'affinity', 'type' => EntityType::Contents->value]);
+        DB::connection('affinity')->table(CoreTables::Entities->value)->insert(['id' => $preset->entity_id, 'name' => 'affinity', 'slug' => 'affinity', 'type' => EntityType::Pages->value]);
         DB::connection('affinity')->table(CoreTables::Presets->value)->insert(['id' => $preset->id, 'entity_id' => $preset->entity_id, 'name' => 'affinity']);
         $preset->setConnection('affinity');
 

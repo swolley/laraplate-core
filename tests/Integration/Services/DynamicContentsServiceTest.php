@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Page;
+use App\Models\Pivot\Presettable as AppPresettable;
+use App\Models\Preset as AppPreset;
 use App\Models\User;
-use Modules\CMS\Models\Category;
 use Modules\Core\Models\Pivot\Presettable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
@@ -40,16 +42,16 @@ it('throws when target namespace cannot be mapped', function (): void {
     dynamic_contents_invoke_get_module_model_class(User::class, 'Acme\\Models\\Foo');
 })->throws(UnexpectedValueException::class);
 
-it('maps core target model to the local module namespace for presets', function (): void {
-    $resolved = dynamic_contents_invoke_get_module_model_class(Category::class, Preset::class);
+it('maps core target model to the app namespace for app presets', function (): void {
+    $resolved = dynamic_contents_invoke_get_module_model_class(Page::class, Preset::class);
 
-    expect($resolved)->toBe(Modules\CMS\Models\Preset::class);
+    expect($resolved)->toBe(AppPreset::class);
 });
 
-it('maps core target pivot to the local module namespace for presettables', function (): void {
-    $resolved = dynamic_contents_invoke_get_module_model_class(Category::class, Presettable::class);
+it('maps core target pivot to the app namespace for app presettables', function (): void {
+    $resolved = dynamic_contents_invoke_get_module_model_class(Page::class, Presettable::class);
 
-    expect($resolved)->toBe(Modules\CMS\Models\Pivot\Presettable::class);
+    expect($resolved)->toBe(AppPresettable::class);
 });
 
 it('returns the target class unchanged when local and target share the same module', function (): void {
@@ -62,16 +64,16 @@ it('throws when the resolved class is not autoloadable', function (): void {
     dynamic_contents_invoke_get_module_model_class(User::class, 'Modules\Core\Models\NonExistentPresetStub');
 })->throws(UnexpectedValueException::class, 'Target class not found');
 
-it('uses distinct memo cache keys for different module Presettable classes', function (): void {
+it('uses distinct memo cache keys for different Presettable classes', function (): void {
     $ref = new ReflectionClass(DynamicContentsService::class);
     $method = $ref->getMethod('presettableMemoKey');
     $method->setAccessible(true);
 
     $service = DynamicContentsService::getInstance();
-    $cms_key = $method->invoke($service, Modules\CMS\Models\Pivot\Presettable::class);
-    $erp_key = $method->invoke($service, Modules\ERP\Models\Pivot\Presettable::class);
+    $core_key = $method->invoke($service, Presettable::class);
+    $app_key = $method->invoke($service, AppPresettable::class);
 
-    expect($cms_key)->not->toBe($erp_key)
-        ->and($cms_key)->toStartWith('core.dynamic_contents.presettables:')
-        ->and($erp_key)->toStartWith('core.dynamic_contents.presettables:');
+    expect($core_key)->not->toBe($app_key)
+        ->and($core_key)->toStartWith('core.dynamic_contents.presettables:')
+        ->and($app_key)->toStartWith('core.dynamic_contents.presettables:');
 });

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Casts\EntityType;
+use App\Models\Entity;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
@@ -9,8 +11,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
 use Illuminate\Validation\Rule;
-use Modules\CMS\Casts\EntityType;
-use Modules\CMS\Models\Entity;
 use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Models\Concerns\HasValidations;
@@ -78,7 +78,7 @@ it('encodes dynamic json components before validating json rules', function (): 
 
         public static function getEntityType(): Modules\Core\Contracts\IDynamicEntityTypable
         {
-            return EntityType::Contents;
+            return EntityType::Pages;
         }
 
         public static function getEntityModelClass(): string
