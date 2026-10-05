@@ -43,6 +43,10 @@ return new class() extends Migration
                 ->nullable(false)
                 ->default(false)
                 ->comment('Written by a first-party module seeder');
+            $table->boolean('managed')
+                ->nullable(false)
+                ->default(false)
+                ->comment('Value written by a command, read-only in the panel');
             $table->boolean('is_public')
                 ->nullable(false)
                 ->default(false)

@@ -56,7 +56,8 @@ class Seeder extends BaseSeeder
      * third-party module shipping its own settings through this definition gets
      * `is_internal = false`. The flag is structural, so a re-seed realigns rows
      * written before it existed and follows a module that changes ownership.
-     * `group_name` is written on insert only: operators regroup settings freely and
+     * `managed` (default false) marks a value a command writes: it is realigned like the type,
+     * while the value itself is written on insert only. `group_name` is written on insert only: operators regroup settings freely and
      * a re-seed keeps their choice. The action a setting runs is code-owned and
      * realigned like its type.
      *
@@ -67,7 +68,7 @@ class Seeder extends BaseSeeder
         return self::settingsDefinition(
             $module,
             $rows,
-            ['type', 'description', 'choices', 'is_internal', 'action_command', 'action_queued'],
+            ['type', 'description', 'choices', 'is_internal', 'managed', 'action_command', 'action_queued'],
         );
     }
 
@@ -83,7 +84,7 @@ class Seeder extends BaseSeeder
         return self::settingsDefinition(
             $module,
             $rows,
-            ['type', 'description', 'is_internal', 'action_command', 'action_queued'],
+            ['type', 'description', 'is_internal', 'managed', 'action_command', 'action_queued'],
         );
     }
 
@@ -107,6 +108,7 @@ class Seeder extends BaseSeeder
                 static fn (array $row): array => [
                     'action_command' => null,
                     'action_queued' => false,
+                    'managed' => false,
                     ...$row,
                     'is_internal' => $is_internal,
                 ],

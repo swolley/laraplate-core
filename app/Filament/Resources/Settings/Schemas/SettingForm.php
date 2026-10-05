@@ -74,7 +74,7 @@ final class SettingForm
                             ->dehydrateStateUsing(static fn (?string $state): ?string => $state === null ? null : mb_trim($state))
                             ->helperText('Pick an existing group or type a new one'),
                         Group::make()
-                            ->schema(static fn (?Setting $record): array => [self::valueField($record)])
+                            ->schema(static fn (?Setting $record): array => [self::managedAware(self::valueField($record), $record)])
                             ->columnSpan(2),
                         Toggle::make('is_public')
                             ->label('Public')
@@ -158,6 +158,21 @@ final class SettingForm
         } catch (JsonException) {
             return $state;
         }
+    }
+
+    /**
+     * A managed value is written by a command: the field stays visible but cannot be edited.
+     */
+    private static function managedAware(Field $field, ?Setting $record): Field
+    {
+        if ($record?->managed !== true) {
+            return $field;
+        }
+
+        return $field
+            ->disabled()
+            ->dehydrated(false)
+            ->helperText('Written by a command, not editable here');
     }
 
     /**

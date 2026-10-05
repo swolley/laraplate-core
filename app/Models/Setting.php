@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use InvalidArgumentException;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Factories\SettingFactory;
@@ -70,10 +71,45 @@ final class Setting extends Model
         'action_queued' => false,
         'encrypted' => false,
         'is_internal' => false,
+        'managed' => false,
         'is_public' => false,
         'type' => 'string',
         'group_name' => 'base',
     ];
+
+    /**
+     * True while writeManaged() saves: the value is then command-owned and skips approval.
+     */
+    private bool $writingManaged = false;
+
+    /**
+     * Write the value of a setting a command owns (the panel shows it read-only). The write
+     * never becomes a pending approval, and the observer refreshes the settings overlay.
+     *
+     * @throws InvalidArgumentException If the setting does not exist or is not managed.
+     */
+    public static function writeManaged(string $name, mixed $value): void
+    {
+        $setting = self::query()->where('name', $name)->first();
+
+        if (! $setting instanceof self) {
+            throw new InvalidArgumentException("Setting {$name} does not exist.");
+        }
+
+        if (! $setting->managed) {
+            throw new InvalidArgumentException("Setting {$name} is not managed by a command.");
+        }
+
+        $setting->writingManaged = true;
+
+        try {
+            $setting->setSkipValidation(true);
+            $setting->value = $value;
+            $setting->save();
+        } finally {
+            $setting->writingManaged = false;
+        }
+    }
 
     public function getRules(): array
     {
@@ -167,6 +203,7 @@ final class Setting extends Model
             'value' => 'json',
             'encrypted' => 'boolean',
             'is_internal' => 'boolean',
+            'managed' => 'boolean',
             'is_public' => 'boolean',
             'action_queued' => 'boolean',
             'choices' => 'array',
@@ -185,6 +222,10 @@ final class Setting extends Model
      */
     protected function requiresApprovalWhen(array $modifications): bool
     {
+        if ($this->writingManaged) {
+            return false;
+        }
+
         $guarded = array_intersect_key(
             $modifications,
             array_flip(array_diff($this->getFillable(), ['description', 'group_name', 'choices'])),

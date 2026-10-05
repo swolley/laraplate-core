@@ -80,7 +80,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     }
 
     /**
-     * @return array<int, array{name: string, value: mixed, type: SettingTypeEnum, group_name: string, description: string, choices?: array<int, mixed>}>
+     * @return array<int, array{name: string, value: mixed, type: SettingTypeEnum, group_name: string, description: string, choices?: array<int, mixed>, managed?: bool}>
      */
     public static function runtimeSettingDefinitions(): array
     {
@@ -105,8 +105,10 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('search.reranker.top_k', 30, SettingTypeEnum::Integer, 'search', 'Reranker candidate count'),
             self::setting('search.reranker.weight', 0.6, SettingTypeEnum::Float, 'search', 'Reranker share of the final score for the top-K (0 = fused order, 1 = reranker only)'),
             self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
-            self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions'),
-            self::setting('search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric', ['cosine', 'dot_product', 'euclidean']),
+            self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions (set by the embedding model switch)', managed: true),
+            self::setting('search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric (set by the embedding model switch)', ['cosine', 'dot_product', 'euclidean'], managed: true),
+            self::setting('search.vector.model', 'sentence_transformers:intfloat/multilingual-e5-small', SettingTypeEnum::String, 'search', 'Active embedding model, as provider:model (set by the embedding model switch)', managed: true),
+            self::setting('search.vector.suspended_reason', null, SettingTypeEnum::String, 'search', 'Why vector search is suspended, null when it is not (set by the embedding model switch)', managed: true),
             self::setting('search.adaptive_tuning', false, SettingTypeEnum::Boolean, 'search', 'Apply the committed retrieval tuning profile (config/search_tuning.php) per query class; off keeps the fixed planner values'),
         ];
     }
@@ -127,7 +129,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         app(SettingsCacheCoordinator::class)->flushAll();
     }
 
-    private static function setting(string $name, mixed $value, SettingTypeEnum $type, string $group, string $description, ?array $choices = null): array
+    private static function setting(string $name, mixed $value, SettingTypeEnum $type, string $group, string $description, ?array $choices = null, bool $managed = false): array
     {
         return [
             'name' => $name,
@@ -137,6 +139,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             'type' => $type,
             'group_name' => $group,
             'description' => $description,
+            'managed' => $managed,
         ];
     }
 

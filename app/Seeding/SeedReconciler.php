@@ -143,7 +143,19 @@ final class SeedReconciler
             }
         }
 
-        return $this->encodeJsonCasts($model, $payload);
+        $payload = $this->encodeJsonCasts($model, $payload);
+
+        // A JSON null is a value: the initial column of a seeded row may be NOT NULL while
+        // the value to seed is null (a command-managed setting that starts unset).
+        $casts = $model->getCasts();
+
+        foreach ($definition->initial as $field) {
+            if (($row[$field] ?? null) === null && in_array($casts[$field] ?? null, ['array', 'json', 'object', 'collection'], true)) {
+                $payload[$field] = 'null';
+            }
+        }
+
+        return $payload;
     }
 
     /**
