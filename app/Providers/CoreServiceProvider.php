@@ -105,6 +105,7 @@ use Modules\Core\Services\DynamicContentsService;
 use Modules\Core\Services\DynamicEntityService;
 use Modules\Core\Services\ModerationAdapterRegistry;
 use Modules\Core\Services\PerModelSettingResolver;
+use Modules\Core\Services\SettingChangeConfirmations;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -245,6 +246,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // at boot writes into the same registry the Searchable trait resolves from.
         $this->app->singleton(SearchableContributorRegistry::class);
         $this->app->singleton(OwnerAuthorizerRegistry::class);
+
+        // Singleton so every module registering a setting-change confirmation at boot
+        // writes into the registry the settings edit page reads.
+        $this->app->singleton(SettingChangeConfirmations::class);
 
         // Singleton so every module registering a Filament resource-schema
         // contributor at boot writes into the same registry a resource resolves from (M22).

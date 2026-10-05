@@ -20,6 +20,7 @@ use JsonException;
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Filament\Utils\HasForm;
 use Modules\Core\Models\Setting;
+use Modules\Core\Services\SettingChangeConfirmations;
 
 /**
  * Settings are seeded: only the group, the value and the description can be edited.
@@ -161,10 +162,20 @@ final class SettingForm
     }
 
     /**
-     * A managed value is written by a command: the field stays visible but cannot be edited.
+     * A managed value is written by a command, and a value a module locks is held by it: the field stays
+     * visible but cannot be edited.
      */
     private static function managedAware(Field $field, ?Setting $record): Field
     {
+        $lockedReason = $record === null ? null : app(SettingChangeConfirmations::class)->for($record->name)?->lockedReason($record);
+
+        if ($lockedReason !== null) {
+            return $field
+                ->disabled()
+                ->dehydrated(false)
+                ->helperText($lockedReason);
+        }
+
         if ($record?->managed !== true) {
             return $field;
         }
