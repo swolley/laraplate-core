@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Modules\Core\DTOs\SettingChangeWarning;
+use Modules\Core\Data\SettingChangeWarning;
 use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Role;
@@ -150,5 +150,31 @@ it('does not call confirmed when the change is sent for approval', function (): 
 
     expect($setting->fresh()->value)->toBe('old')
         ->and(Modification::query()->exists())->toBeTrue()
+        ->and($stub->confirmedCalls)->toBe(0);
+});
+
+it('never calls confirmed for a crafted confirm call on an unchanged value', function (): void {
+    confirmationActor();
+    $stub = registerConfirmation(new SettingChangeWarning('Switch?', ['x']));
+    $setting = confirmableSetting();
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->mountAction('confirmSettingChange')
+        ->callMountedAction();
+
+    expect($stub->confirmedCalls)->toBe(0);
+});
+
+it('never calls confirmed for a crafted confirm call when warn returns null', function (): void {
+    confirmationActor();
+    $stub = registerConfirmation(null);
+    $setting = confirmableSetting();
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->fillForm(['value' => 'new'])
+        ->mountAction('confirmSettingChange')
+        ->callMountedAction();
+
+    expect($setting->fresh()->value)->toBe('new')
         ->and($stub->confirmedCalls)->toBe(0);
 });

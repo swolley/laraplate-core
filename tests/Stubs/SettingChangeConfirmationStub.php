@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs;
 
 use Modules\Core\Contracts\ISettingChangeConfirmation;
-use Modules\Core\DTOs\SettingChangeWarning;
+use Modules\Core\Data\SettingChangeWarning;
 use Modules\Core\Models\Setting;
 
 final class SettingChangeConfirmationStub implements ISettingChangeConfirmation

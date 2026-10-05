@@ -39,6 +39,8 @@ final class EditSetting extends EditRecord
 
     private bool $changeConfirmed = false;
 
+    private ?Setting $recordBeforeSave = null;
+
     public function confirmSettingChangeAction(): Action
     {
         return Action::make('confirmSettingChange')
@@ -57,12 +59,14 @@ final class EditSetting extends EditRecord
 
     protected function beforeSave(): void
     {
+        /** @var Setting $record */
+        $record = $this->getRecord();
+        $this->recordBeforeSave = clone $record;
+
         if ($this->changeConfirmed) {
             return;
         }
 
-        /** @var Setting $record */
-        $record = $this->getRecord();
         $confirmation = app(SettingChangeConfirmations::class)->for($record->name);
         $data = $this->form->getState();
 
@@ -93,10 +97,18 @@ final class EditSetting extends EditRecord
         /** @var Setting $record */
         $record = $this->getRecord();
 
-        if ($this->sentForApproval) {
+        if ($this->sentForApproval || ! $record->wasChanged('value') || $this->recordBeforeSave === null) {
             return;
         }
 
-        app(SettingChangeConfirmations::class)->for($record->name)?->confirmed($record, $record->value);
+        $confirmation = app(SettingChangeConfirmations::class)->for($record->name);
+
+        // The flag is set by a client-callable action: confirmed() only runs when the saved change
+        // really is one the confirmation would have warned about.
+        if ($confirmation?->warn($this->recordBeforeSave, $record->value) === null) {
+            return;
+        }
+
+        $confirmation->confirmed($record, $record->value);
     }
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\DTOs;
+namespace Modules\Core\Data;
 
 /**
  * What the confirmation modal shows before a setting change is saved.

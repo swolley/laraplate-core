@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Contracts;
 
-use Modules\Core\DTOs\SettingChangeWarning;
+use Modules\Core\Data\SettingChangeWarning;
 use Modules\Core\Models\Setting;
 
 /**
@@ -27,6 +27,10 @@ interface ISettingChangeConfirmation
 
     /**
      * A non-null reason disables the value field and is shown as its helper text.
+     *
+     * This is a UI-level lock of the settings form, not a domain invariant: the API,
+     * `Setting::save()` and approved pending modifications are not blocked by it. A module that
+     * needs a real guard enforces it in its own service.
      */
     public function lockedReason(Setting $setting): ?string;
 }
