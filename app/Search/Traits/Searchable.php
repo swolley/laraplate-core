@@ -35,6 +35,7 @@ use Modules\Core\Search\Schema\IndexType;
 use Modules\Core\Search\Schema\SchemaDefinition;
 use Modules\Core\Search\Schema\SchemaManager;
 use Modules\Core\Search\SearchableContributorRegistry;
+use Modules\Core\Search\Support\VectorModelContext;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\SearchEngineAvailability;
 use Spatie\MediaLibrary\HasMedia;
@@ -264,8 +265,12 @@ trait Searchable
             // Reuse the eager-loaded relation on the bulk path (adaptiveBulkIndex
             // pre-loads it) and query only when it is not loaded, so serializing a
             // chunk does not fire one embeddings query per model.
-            $embeddings = $this->relationLoaded('embeddings') ? $this->getRelation('embeddings') : $this->embeddings()->get();
+            $model_key = VectorModelContext::get();
+            $embeddings = $this->relationLoaded('embeddings')
+                ? $this->getRelation('embeddings')
+                : ($model_key !== null ? $this->embeddings()->where('model_key', $model_key)->get() : $this->embeddings()->get());
             $vectors = $embeddings
+                ->when($model_key !== null, static fn ($rows) => $rows->filter(static fn (Model $e): bool => $model_key === $e->getAttribute('model_key')))
                 ->map(static fn (Model $e): array => ['vector' => $e->getAttribute('embedding')])
                 ->values()->all();
 
