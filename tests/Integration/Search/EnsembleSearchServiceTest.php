@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Builder as ScoutBuilder;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\Contracts\ISearchable;
 use Modules\Core\Search\Services\EnsembleSearchService;
@@ -13,6 +14,7 @@ use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Tests\Integration\Search\EnsembleSearchPaginatorTestModel;
 use Modules\Core\Tests\Stubs\Search\FusionFixtureSearchModel;
+use Modules\Core\Tests\Stubs\Search\FusionFixtureTranslatedSearchModel;
 
 beforeEach(function (): void {
     $this->reranker = new HeuristicReranker();
@@ -292,10 +294,10 @@ function ensemble_fusion_fixture_reranker(): IReranker
 /**
  * @return list<array{0: string, 1: float}>
  */
-function ensemble_fusion_fixture_ranking(EnsembleSearchService $service, array $plan): array
+function ensemble_fusion_fixture_ranking(EnsembleSearchService $service, array $plan, ?Model $model = null): array
 {
     $result = $service->search(
-        model: new FusionFixtureSearchModel(),
+        model: $model ?? new FusionFixtureSearchModel(),
         query: 'supplier invoices',
         plan: $plan,
         vector: [0.1, 0.2, 0.3],
@@ -356,4 +358,53 @@ it('reads the rerank blend from the reranker weight setting when the plan does n
         ['4', 0.003906],
         ['6', 0.003906],
     ]);
+});
+
+/**
+ * The hits of a model with translated text carry none of it, so the reranker used to be handed an empty
+ * text for every hit and returned the fused order whatever model scored the pairs.
+ */
+afterEach(function (): void {
+    FusionFixtureTranslatedSearchModel::reset();
+});
+
+it('reranks on the text the model provides when its hits carry none', function (): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    expect(ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true), new FusionFixtureTranslatedSearchModel()))->toBe([
+        ['2', 0.881854],
+        ['5', 0.659066],
+        ['3', 0.587543],
+        ['1', 0.340314],
+        ['4', 0.003906],
+        ['6', 0.003906],
+    ]);
+});
+
+it('asks the model for the text in the language the search is requested in', function (): void {
+    LocaleContext::set('it');
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    ensemble_fusion_fixture_ranking($service, ensemble_fusion_fixture_plan(true), new FusionFixtureTranslatedSearchModel());
+
+    expect(FusionFixtureTranslatedSearchModel::$requestedLocales)->toBe(['it']);
+});
+
+it('does not rerank when no hit has any text, and says so instead of scoring empty pairs', function (): void {
+    FusionFixtureTranslatedSearchModel::$hasText = false;
+    $reranker = Mockery::mock(IReranker::class);
+    $reranker->shouldNotReceive('score');
+    $service = new EnsembleSearchService($reranker);
+
+    $result = $service->search(
+        model: new FusionFixtureTranslatedSearchModel(),
+        query: 'supplier invoices',
+        plan: ensemble_fusion_fixture_plan(true),
+        vector: [0.1, 0.2, 0.3],
+        page: 1,
+        perPage: 10,
+    );
+
+    expect($result->meta['reranked'])->toBeFalse()
+        ->and(array_column($result->hits, 'id'))->toBe(['3', '2', '1', '5', '4', '6']);
 });

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Search;
 
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Laravel\Scout\Builder as ScoutBuilder;
 
 /**
  * Returns a fixed ranking per strategy: no vector means keyword, a vector with the `*` query
- * means vector, a vector with a text query means hybrid.
+ * means vector, a vector with a text query means hybrid. For a {@see FusionFixtureTranslatedSearchModel}
+ * the hits carry no title.
  */
 final class FusionFixtureSearchBuilder extends ScoutBuilder
 {
@@ -40,7 +42,9 @@ final class FusionFixtureSearchBuilder extends ScoutBuilder
     public function paginate($perPage = null, $pageName = 'page', $page = null): LengthAwarePaginator
     {
         $items = collect(self::RANKINGS[$this->strategy()])
-            ->map(static fn (array $attributes): FusionFixtureSearchModel => FusionFixtureSearchModel::hit($attributes));
+            ->map(fn (array $attributes): FusionFixtureSearchModel => FusionFixtureSearchModel::hit(
+                $this->model instanceof FusionFixtureTranslatedSearchModel ? Arr::except($attributes, 'title') : $attributes,
+            ));
 
         return new LengthAwarePaginator($items, $items->count(), (int) $perPage, (int) ($page ?? 1));
     }

@@ -12,9 +12,11 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Search\Contracts\ILocaleFilterableEngine;
+use Modules\Core\Search\Contracts\IProvidesRerankerText;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -95,7 +97,7 @@ class EnsembleSearchService
 
         if ($use_reranker && $fused !== []) {
             try {
-                $fused = $this->rerankTopK($fused, $query, $rerank_top_k, $rerank_blend);
+                $fused = $this->rerankTopK($model, $fused, $query, $rerank_top_k, $rerank_blend);
             } catch (Throwable $exception) {
                 // A reranker failure (e.g. the cross-encoder service is down) must
                 // not break search: keep the fused results unreranked and record
@@ -357,7 +359,7 @@ class EnsembleSearchService
      * @param  list<FusedHit>  $results
      * @return list<FusedHit>
      */
-    private function rerankTopK(array $results, string $query, int $top_k, float $blend): array
+    private function rerankTopK(Model $model, array $results, string $query, int $top_k, float $blend): array
     {
         usort($results, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
 
@@ -368,13 +370,25 @@ class EnsembleSearchService
             return $results;
         }
 
+        $provided = $this->providedRerankerTexts($model, $to_rerank);
+
         $pairs = array_map(
-            fn (array $item): array => [
-                'query' => $query,
-                'text' => $this->buildRerankerText($item['source']),
-            ],
+            function (array $item) use ($query, $provided): array {
+                $text = $provided[(string) $item['id']] ?? '';
+
+                return [
+                    'query' => $query,
+                    'text' => $text !== '' ? $text : $this->buildRerankerText($item['source']),
+                ];
+            },
             $to_rerank,
         );
+
+        // A reranker handed only empty texts can do nothing but echo the order it got: fail, so the search
+        // reports `reranked = false` instead of a rerank that never saw a document.
+        if (array_all($pairs, static fn (array $pair): bool => $pair['text'] === '')) {
+            throw new RuntimeException('No text to rerank: the hits carry none and the model provides none.');
+        }
 
         $rerank_scores = $this->reranker->score($pairs);
 
@@ -386,6 +400,28 @@ class EnsembleSearchService
         }
 
         return array_merge($to_rerank, $remaining);
+    }
+
+    /**
+     * The text the model provides for the hits to rerank, in the language of the search, keyed by hit id.
+     * Empty for a model that provides none: its hits are read for text as they are.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return array<string, string>
+     */
+    private function providedRerankerTexts(Model $model, array $items): array
+    {
+        if (! $model instanceof IProvidesRerankerText) {
+            return [];
+        }
+
+        $texts = [];
+
+        foreach ($model::rerankerTexts(array_column($items, 'id'), LocaleContext::get()) as $key => $text) {
+            $texts[(string) $key] = mb_trim($text);
+        }
+
+        return $texts;
     }
 
     /**

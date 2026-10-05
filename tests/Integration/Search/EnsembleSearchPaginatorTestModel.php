@@ -19,7 +19,7 @@ class EnsembleSearchPaginatorTestModel extends Model
     {
         $items = collect(range(1, 15))->map(static function (int $id): self {
             $model = new self();
-            $model->forceFill(['id' => $id, '_score' => 1.0]);
+            $model->forceFill(['id' => $id, '_score' => 1.0, 'title' => "needle {$id}"]);
             $model->exists = true;
 
             return $model;

@@ -152,8 +152,14 @@ strategy found.
 ### Step 5 — reranking
 
 Reranking runs on the **fused** list, not on the individual strategy lists, and only on the first
-`rerank_top_k` entries (default 30). The reranker receives `{query, text}` pairs built from the
-document source (`buildRerankerText()`: title/name plus body area), never the raw engine scores.
+`rerank_top_k` entries (default 30). The reranker receives `{query, text}` pairs, never the raw engine
+scores. The text is the one the model provides through `IProvidesRerankerText::rerankerTexts()`, called once
+per search with every key to rerank and the language of the search; a model that provides none is read from
+the hit source (`buildRerankerText()`: title/name plus body area). This matters when the text is not an
+attribute of the model: a search hit carries the model's own columns, and translated text lives elsewhere, so
+without the contract a model like the CMS `Content` sent the reranker an empty text for every hit and the
+rerank returned the fused order whatever model scored it. When no pair has any text at all the rerank fails
+(`meta['reranked'] = false`, a warning in the log) instead of scoring empty pairs.
 
 The blend comes from the plan (`ranking.rerank_blend`, set by the tuning profile when it defines
 one), falling back to the `search.reranker.weight` runtime setting (`core.search.reranker.weight`,
