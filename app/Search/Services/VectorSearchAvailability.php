@@ -80,8 +80,9 @@ final class VectorSearchAvailability implements IVectorSearchAvailability
 
         if (! in_array($key, $keys, true)) {
             $keys[] = $key;
-            Cache::put(self::KEYS_KEY, $keys, self::TTL_SECONDS * 60);
         }
+
+        Cache::put(self::KEYS_KEY, $keys, self::TTL_SECONDS * 60);
 
         return $dimensions;
     }

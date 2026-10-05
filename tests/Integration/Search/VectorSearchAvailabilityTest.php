@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Cache;
 use Modules\Core\Search\Services\VectorSearchAvailability;
 use Modules\Core\Tests\Stubs\Search\VectorGuardEngineStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardPlainEngineStub;
+use Modules\Core\Tests\Stubs\Search\VectorGuardSecondStubModel;
 use Modules\Core\Tests\Stubs\Search\VectorGuardStubModel;
 
 beforeEach(function (): void {
@@ -99,4 +100,35 @@ it('asks the engine again after forget()', function (): void {
     $result = $this->guard->check(new VectorGuardStubModel());
 
     expect($engine->calls)->toBe(2)->and($result->reason)->toBe('dimension_mismatch');
+});
+
+it('asks the engine again for every model class after forget()', function (): void {
+    $engine = new VectorGuardEngineStub(384);
+    VectorGuardStubModel::$engine = $engine;
+
+    $this->guard->check(new VectorGuardStubModel());
+    $this->guard->check(new VectorGuardSecondStubModel());
+    expect($engine->calls)->toBe(2);
+
+    $this->guard->forget();
+    $this->guard->check(new VectorGuardStubModel());
+    $this->guard->check(new VectorGuardSecondStubModel());
+
+    expect($engine->calls)->toBe(4);
+});
+
+it('keeps the key registry alive as long as a dimension key is cached', function (): void {
+    $engine = new VectorGuardEngineStub(384);
+    VectorGuardStubModel::$engine = $engine;
+
+    $this->guard->check(new VectorGuardStubModel());
+    $this->travel(3590)->seconds();
+    $this->guard->check(new VectorGuardStubModel());
+    $this->travel(40)->seconds();
+    expect($engine->calls)->toBe(2);
+
+    $this->guard->forget();
+    $this->guard->check(new VectorGuardStubModel());
+
+    expect($engine->calls)->toBe(3);
 });
