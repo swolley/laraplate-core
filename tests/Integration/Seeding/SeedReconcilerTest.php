@@ -7,6 +7,7 @@ use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Models\Setting;
 use Modules\Core\Seeding\SeedDefinition;
 use Modules\Core\Seeding\SeedReconciler;
+use Modules\Core\Seeding\ValueComparator;
 
 /**
  * @param  list<array<string,mixed>>  $rows
@@ -248,4 +249,48 @@ it('issues a fixed number of queries regardless of row count', function (): void
     DB::disableQueryLog();
 
     expect($large_count)->toBe($small_count);
+});
+
+it('seeds a null initial value as a JSON null and reads it back as null', function (): void {
+    app(SeedReconciler::class)->reconcile(
+        settingsDefinition([settingRow('recon_null_value', null)]),
+    );
+
+    $setting = Setting::query()->withoutGlobalScopes()->where('name', 'recon_null_value')->sole();
+
+    expect($setting->value)->toBeNull()
+        ->and(DB::table($setting->getTable())->where('name', 'recon_null_value')->value('value'))->toBe('null')
+        ->and($setting->seeded_value)->toBeNull();
+});
+
+it('reports no drift and writes nothing on a second run of a null seeded value', function (): void {
+    $definition = fn (): SeedDefinition => settingsDefinition([settingRow('recon_null_stable', null)]);
+
+    app(SeedReconciler::class)->reconcile($definition());
+    $before = DB::table((new Setting)->getTable())->where('name', 'recon_null_stable')->first();
+
+    $outcome = app(SeedReconciler::class)->reconcile($definition());
+    $after = DB::table((new Setting)->getTable())->where('name', 'recon_null_stable')->first();
+
+    expect($outcome->created)->toBe([])
+        ->and($outcome->realigned)->toBe([])
+        ->and($outcome->unchanged)->toBe(1)
+        ->and(ValueComparator::equal(
+            Setting::query()->withoutGlobalScopes()->where('name', 'recon_null_stable')->sole()->value,
+            Setting::query()->withoutGlobalScopes()->where('name', 'recon_null_stable')->sole()->seeded_value,
+        ))->toBeTrue()
+        ->and((array) $after)->toEqual((array) $before);
+});
+
+it('keeps SQL NULL for a nullable JSON column that is not the settings value', function (): void {
+    $definition = SeedDefinition::for(Setting::class)
+        ->identity(['name'])
+        ->structural(['type'])
+        ->initial(['value', 'choices'])
+        ->ownedBy('Core')
+        ->rows([settingRow('recon_null_choices', 5) + ['choices' => null]]);
+
+    app(SeedReconciler::class)->reconcile($definition);
+
+    expect(DB::table((new Setting)->getTable())->where('name', 'recon_null_choices')->value('choices'))->toBeNull();
 });

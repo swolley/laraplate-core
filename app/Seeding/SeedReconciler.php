@@ -7,6 +7,7 @@ namespace Modules\Core\Seeding;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Contracts\ISoftDeletableModel;
+use Modules\Core\Models\Setting;
 
 final class SeedReconciler
 {
@@ -145,12 +146,12 @@ final class SeedReconciler
 
         $payload = $this->encodeJsonCasts($model, $payload);
 
-        // A JSON null is a value: the initial column of a seeded row may be NOT NULL while
-        // the value to seed is null (a command-managed setting that starts unset).
+        // A JSON null is a value: core_settings.value is NOT NULL while a command-managed
+        // setting may start unset. Other nullable JSON columns keep SQL NULL.
         $casts = $model->getCasts();
 
         foreach ($definition->initial as $field) {
-            if (($row[$field] ?? null) === null && in_array($casts[$field] ?? null, ['array', 'json', 'object', 'collection'], true)) {
+            if ($field === 'value' && $model instanceof Setting && ($row[$field] ?? null) === null && in_array($casts[$field] ?? null, ['array', 'json', 'object', 'collection'], true)) {
                 $payload[$field] = 'null';
             }
         }

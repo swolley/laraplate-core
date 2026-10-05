@@ -44,3 +44,41 @@ it('shows the value of a managed setting read-only and keeps unmanaged ones edit
     'managed' => [true],
     'unmanaged' => [false],
 ]);
+
+it('never stores a value submitted for a managed setting', function (): void {
+    managedFormActor();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'integer',
+        'value' => 384,
+        'choices' => null,
+        'group_name' => 'search',
+    ]);
+    $setting->forceFill(['managed' => true])->saveQuietly();
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->fillForm(['value' => 9999, 'description' => 'Edited description'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($setting->fresh()->value)->toBe(384)
+        ->and($setting->fresh()->description)->toBe('Edited description');
+});
+
+it('ignores a value injected into the Livewire state of a managed setting', function (): void {
+    managedFormActor();
+
+    $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'type' => 'integer',
+        'value' => 384,
+        'choices' => null,
+        'group_name' => 'search',
+    ]);
+    $setting->forceFill(['managed' => true])->saveQuietly();
+
+    Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+        ->set('data.value', 9999)
+        ->call('save');
+
+    expect($setting->fresh()->value)->toBe(384);
+});
