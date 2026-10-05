@@ -58,3 +58,16 @@ it('drops the index it creates for the same key', function (): void {
 it('maps the similarity to the distance operator the index uses', function (string $similarity, string $operator): void {
     expect(PgvectorProfileIndex::distanceOperator($similarity))->toBe($operator);
 })->with([['cosine', '<=>'], ['l2', '<->'], ['ip', '<#>']]);
+
+it('runs ensureOnce once per key and ensure again after a drop', function (): void {
+    $connection = Mockery::mock(Illuminate\Database\Connection::class);
+    $connection->shouldReceive('getTablePrefix')->andReturn('');
+    $connection->shouldReceive('statement')->times(4);
+
+    $index = new PgvectorProfileIndex;
+    $index->ensureOnce($connection, PGV_KEY, 8, 'cosine');
+    $index->ensureOnce($connection, PGV_KEY, 8, 'cosine');
+    $index->ensureOnce($connection, 'other', 8, 'cosine');
+    $index->drop($connection, PGV_KEY);
+    $index->ensureOnce($connection, PGV_KEY, 8, 'cosine');
+});
