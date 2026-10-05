@@ -179,7 +179,7 @@ list of invented zeros would pass for a rerank that changed nothing and `meta['r
 `true`.
 
 A caller can disable it for one search through the plan (`ranking.use_reranker`); otherwise
-`config('core.search.reranker.enabled')` decides.
+`config('core.search.reranker.enabled')` decides, and it is off by default.
 
 ## The language of the results
 

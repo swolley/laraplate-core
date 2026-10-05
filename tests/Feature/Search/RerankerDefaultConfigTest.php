@@ -5,10 +5,10 @@ declare(strict_types=1);
 use Modules\Core\Casts\SettingTypeEnum;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 
-it('seeds the search reranker enabled by default', function (): void {
+it('seeds the search reranker off: its measured gain does not pay for what it costs a search', function (): void {
     $definitions = collect(CoreDatabaseSeeder::runtimeSettingDefinitions())->keyBy('name');
 
-    expect($definitions->get('search.reranker.enabled')['value'])->toBeTrue()
+    expect($definitions->get('search.reranker.enabled')['value'])->toBeFalse()
         ->and($definitions->get('search.reranker.top_k')['value'])->toBe(30);
 });
 

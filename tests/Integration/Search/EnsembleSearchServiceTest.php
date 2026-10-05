@@ -132,8 +132,31 @@ it('degrades to fused results when the reranker throws', function (): void {
         ->and($result->meta['reranked'])->toBeFalse();
 });
 
-it('reranks by default when the plan does not specify the flag', function (): void {
+it('does not rerank by default when the plan does not specify the flag', function (): void {
     EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+
+    $result = $this->service->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => [
+                'use_fulltext' => true,
+                'use_vector' => false,
+            ],
+            'ensemble' => [],
+            'ranking' => [],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    expect($result->meta['reranked'])->toBeFalse();
+});
+
+it('reranks when the reranker setting is on and the plan does not specify the flag', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+    config()->set('core.search.reranker.enabled', true);
 
     $result = $this->service->search(
         model: new EnsembleSearchPaginatorTestModel(),

@@ -87,11 +87,11 @@ it('reads reranker config from search config', function (): void {
     expect($plan['ranking']['rerank_top_k'])->toBe(50);
 });
 
-it('enables the reranker by default under the shipped config', function (): void {
+it('leaves the reranker off by default under the shipped config', function (): void {
     $planner = new FallbackSearchPlanner;
     $plan = $planner->fallbackPlan('test');
 
-    expect($plan['ranking']['use_reranker'])->toBeTrue();
+    expect($plan['ranking']['use_reranker'])->toBeFalse();
 });
 
 it('honours the reranker being explicitly disabled', function (): void {
