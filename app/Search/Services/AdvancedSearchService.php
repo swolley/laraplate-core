@@ -11,7 +11,9 @@ use Modules\Core\Search\Contracts\IQueryIntentParser;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\ISearchPlanner;
 use Modules\Core\Search\Contracts\ITextEmbedder;
+use Modules\Core\Search\Contracts\IVectorSearchAvailability;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\DTOs\VectorAvailability;
 use Modules\Core\Search\Enums\QueryClass;
 use Modules\Core\Search\Enums\TextMatchPreference;
 
@@ -23,6 +25,7 @@ final readonly class AdvancedSearchService
         private EnsembleSearchService $ensemble_search,
         private Application $app,
         private ?RetrievalTuningProfile $tuning = null,
+        private ?IVectorSearchAvailability $vector_availability = null,
     ) {}
 
     public function available(?Model $model = null): bool
@@ -63,9 +66,10 @@ final readonly class AdvancedSearchService
         $plan = $this->applyEngineCapabilities($engine, $plan);
         $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
         $plan = $this->tuningProfile()->apply($plan, QueryClass::fromAnalysis($text_match->analysis));
-        $vector = $this->resolveVector($query, $plan);
+        $availability = $this->vectorAvailability($model, $plan);
+        $vector = $availability->available ? $this->resolveVector($query, $plan) : null;
 
-        return $this->ensemble_search->search(
+        $result = $this->ensemble_search->search(
             model: $model,
             query: $search_query,
             plan: $plan,
@@ -76,6 +80,37 @@ final readonly class AdvancedSearchService
             sort: $sort,
             textMatch: $text_match,
         );
+
+        if ($availability->available) {
+            return $result;
+        }
+
+        return new AdvancedSearchResult(
+            hits: $result->hits,
+            total: $result->total,
+            page: $result->page,
+            perPage: $result->perPage,
+            totalPages: $result->totalPages,
+            meta: [...$result->meta, 'vector_disabled' => $availability->reason],
+        );
+    }
+
+    /**
+     * Asks the guard only when the plan wants vectors, so a keyword-only search never reports a reason.
+     *
+     * @param  array<string, mixed>  $plan
+     */
+    private function vectorAvailability(Model $model, array $plan): VectorAvailability
+    {
+        $retrieval = $this->planSection($plan, 'retrieval');
+
+        if (($retrieval['use_vector'] ?? false) !== true || ! $this->app->bound(ITextEmbedder::class)) {
+            return VectorAvailability::yes();
+        }
+
+        $guard = $this->vector_availability ?? $this->app->make(IVectorSearchAvailability::class);
+
+        return $guard->check($model);
     }
 
     private function tuningProfile(): RetrievalTuningProfile

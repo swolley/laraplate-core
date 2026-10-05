@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Modules\Core\Search\Contracts\ILocaleFilterableEngine;
+use Modules\Core\Search\Contracts\IReportsVectorDimensions;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\DTOs\TextMatchOptions;
 use Modules\Core\Search\Exceptions\MissingSearchSchemaException;
@@ -33,7 +34,7 @@ use stdClass;
 /**
  * Implementation of the search engine for Elasticsearch.
  */
-final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILocaleFilterableEngine, ISearchEngine
+final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILocaleFilterableEngine, IReportsVectorDimensions, ISearchEngine
 {
     use CommonEngineFunctions;
 
@@ -682,6 +683,28 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
     public function checkIndexStructure(string|Model $model): bool
     {
         return $this->structureMismatches($model) === [];
+    }
+
+    /**
+     * The dimension of the `embeddings.vector` field in the model's live index mapping, or null when the
+     * index, the field or the mapping is absent or unreadable.
+     */
+    #[Override]
+    public function indexedVectorDimensions(Model $model): ?int
+    {
+        try {
+            $collection = $this->resolveSearchableCollectionName($model);
+
+            if ($collection === null || ! $this->indexManager->exists($collection)) {
+                return null;
+            }
+
+            $dimensions = ElasticsearchService::getInstance()->getMapping($collection)['embeddings']['properties']['vector']['dims'] ?? null;
+
+            return is_numeric($dimensions) ? (int) $dimensions : null;
+        } catch (Exception) {
+            return null;
+        }
     }
 
     /**
