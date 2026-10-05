@@ -11,8 +11,6 @@ use Modules\Core\Models\ModelEmbedding;
 
 return new class extends Migration
 {
-    private const int DEFAULT_VECTOR_DIMENSIONS = 384;
-
     /**
      * Run the migrations.
      */
@@ -20,15 +18,14 @@ return new class extends Migration
     {
         $connection = (new ModelEmbedding)->getConnection();
         $supports_vector = $this->supportsPostgreSQLVector($connection);
-        $vector_dimensions = $this->vectorDimensions();
 
         $model_embeddings_table = CoreTables::ModelEmbeddings->value;
-        $connection->getSchemaBuilder()->create($model_embeddings_table, function (Blueprint $table) use ($connection, $supports_vector, $model_embeddings_table, $vector_dimensions): void {
+        $connection->getSchemaBuilder()->create($model_embeddings_table, function (Blueprint $table) use ($connection, $supports_vector, $model_embeddings_table): void {
             $table->id();
             $table->morphs('model', "{$model_embeddings_table}_embedding_model_IDX");
 
             if ($supports_vector) {
-                $table->vector('embedding', $vector_dimensions)->nullable(false)->comment('The generated embedding of the model');
+                $table->vector('embedding')->nullable(false)->comment('The generated embedding of the model; no dimension, so models of different lengths coexist (an index per profile is created on demand)');
             } else {
                 $table->json('embedding')->nullable(false)->comment('The generated embedding of the model');
             }
@@ -51,14 +48,6 @@ return new class extends Migration
                 connection: $connection,
             );
         });
-
-        if ($supports_vector) {
-            $grammar = $connection->getQueryGrammar();
-            $wrapped_index = $grammar->wrap("{$model_embeddings_table}_embedding_IDX");
-            $wrapped_table = $grammar->wrapTable($model_embeddings_table);
-            $wrapped_embedding = $grammar->wrap('embedding');
-            $connection->statement("CREATE INDEX {$wrapped_index} ON {$wrapped_table} USING ivfflat ({$wrapped_embedding} vector_cosine_ops);");
-        }
     }
 
     /**
@@ -82,16 +71,5 @@ return new class extends Migration
         $connection->statement('CREATE EXTENSION IF NOT EXISTS vector');
 
         return $connection->table('pg_extension')->where('extname', 'vector')->exists();
-    }
-
-    private function vectorDimensions(): int
-    {
-        $dimensions = config('core.search.vector.dimensions', self::DEFAULT_VECTOR_DIMENSIONS);
-
-        if (! is_numeric($dimensions) || (int) $dimensions < 1) {
-            return self::DEFAULT_VECTOR_DIMENSIONS;
-        }
-
-        return (int) $dimensions;
     }
 };

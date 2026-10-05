@@ -93,11 +93,13 @@ use Modules\Core\Overrides\QueueMonitorCommand;
 use Modules\Core\Overrides\RouteListCommand;
 use Modules\Core\Overrides\StatusCommand;
 use Modules\Core\Performance\SubprocessBootSampler;
+use Modules\Core\Search\Contracts\IProfileVectorIndex;
 use Modules\Core\Search\DeferredSearchIndexing;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Search\OwnerAuthorizerRegistry;
 use Modules\Core\Search\SearchableContributorRegistry;
+use Modules\Core\Search\Support\PgvectorProfileIndex;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
@@ -540,6 +542,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 'maxTotalResults' => config('scout.typesense.max_total_results', 1000),
             ]);
         });
+
+        $this->app->singleton(IProfileVectorIndex::class, PgvectorProfileIndex::class);
 
         $this->app->singleton(Locked::class, static fn (): Locked => new Locked());
         $this->app->alias(Locked::class, 'locked');

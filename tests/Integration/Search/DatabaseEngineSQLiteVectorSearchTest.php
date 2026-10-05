@@ -63,11 +63,15 @@ it('builds the postgresql vector query with pgvector distance bindings without e
     $method = new ReflectionMethod(DatabaseEngine::class, 'postgreSQLVectorSearchQuery');
     $method->setAccessible(true);
 
+    config()->set('core.search.vector.dimensions', 3);
+    config()->set('core.search.vector.similarity', 'cosine');
+    config()->set('core.search.vector.model', '');
+
     $query = $method->invoke(new DatabaseEngine(), [1.0, 0.5, 0.0], new DatabaseEngineSQLiteVectorSearchUser(), [101, 202]);
 
-    expect($query->toSql())->toContain('embedding <=> ?::vector AS distance')
+    expect($query->toSql())->toContain('"embedding"::vector(3) <=> ?::vector AS distance')
         ->and($query->toSql())->toContain('"model_id" in (?, ?)')
-        ->and($query->toSql())->toContain('order by embedding <=> ?::vector')
+        ->and($query->toSql())->toContain('order by "embedding"::vector(3) <=> ?::vector')
         ->and($query->getBindings())->toBe([
             '[1,0.5,0]',
             DatabaseEngineSQLiteVectorSearchUser::class,

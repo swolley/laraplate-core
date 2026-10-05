@@ -16,6 +16,7 @@ use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Services\DatabaseTextMatchCompiler;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
+use Modules\Core\Search\Support\PgvectorProfileIndex;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 
 final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
@@ -505,10 +506,22 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
     {
         $vector_string = '[' . implode(',', $queryVector) . ']';
 
+        // The cast, the model filter and the operator mirror the partial index of the profile
+        // (PgvectorProfileIndex): any difference and the planner scans the table instead.
+        $dimensions = (int) config('core.search.vector.dimensions');
+        $operator = PgvectorProfileIndex::distanceOperator((string) config('core.search.vector.similarity', 'cosine'));
+        $distance = "\"embedding\"::vector({$dimensions}) {$operator} ?::vector";
+
         $query = ModelEmbedding::query()
             ->where('model_type', $model::class)
-            ->selectRaw('*, embedding <=> ?::vector AS distance', [$vector_string])
-            ->orderByRaw('embedding <=> ?::vector', [$vector_string]);
+            ->selectRaw("*, {$distance} AS distance", [$vector_string])
+            ->orderByRaw($distance, [$vector_string]);
+
+        $model_key = config('core.search.vector.model');
+
+        if (is_string($model_key) && $model_key !== '') {
+            $query->where('model_key', $model_key);
+        }
 
         if ($candidateIds !== null) {
             $query->whereIn('model_id', $candidateIds);
