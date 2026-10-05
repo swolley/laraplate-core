@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Search\Contracts\ITextEmbedder;
+use Modules\Core\Search\Contracts\IVectorSearchAvailability;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
+use Modules\Core\Search\Services\VectorSearchAvailability;
 use Modules\Core\Tests\Stubs\Search\VectorGuardOrchestratedEngineStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardPlannerStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardStubModel;
 
 beforeEach(function (): void {
     Cache::flush();
+    // This file exercises Core's guard, whichever module bound the interface.
+    app()->instance(IVectorSearchAvailability::class, new VectorSearchAvailability);
     config()->set('core.search.vector.enabled', true);
     config()->set('core.search.vector.suspended_reason', null);
     config()->set('core.search.vector.dimensions', 384);

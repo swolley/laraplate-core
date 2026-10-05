@@ -508,7 +508,13 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
 
         // The cast, the model filter and the operator mirror the partial index of the profile
         // (PgvectorProfileIndex): any difference and the planner scans the table instead.
-        $dimensions = (int) config('core.search.vector.dimensions');
+        $configured_dimensions = config('core.search.vector.dimensions');
+
+        if (! is_numeric($configured_dimensions) || (int) $configured_dimensions < 1) {
+            throw new InvalidArgumentException('core.search.vector.dimensions must be a positive number to search vectors on PostgreSQL.');
+        }
+
+        $dimensions = (int) $configured_dimensions;
         $operator = PgvectorProfileIndex::distanceOperator((string) config('core.search.vector.similarity', 'cosine'));
         $distance = "\"embedding\"::vector({$dimensions}) {$operator} ?::vector";
 
@@ -520,7 +526,12 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         $model_key = config('core.search.vector.model');
 
         if (is_string($model_key) && $model_key !== '') {
-            $query->where('model_key', $model_key);
+            // A literal, not a binding: the partial index predicate is one, and a generic plan
+            // cannot prove that a parameter implies it.
+            $query->whereRaw('"model_key" = ' . PgvectorProfileIndex::quoteLiteral($model_key));
+        } else {
+            // Without a model filter, rows of other lengths would make the cast fail.
+            $query->whereRaw("vector_dims(\"embedding\") = {$dimensions}");
         }
 
         if ($candidateIds !== null) {

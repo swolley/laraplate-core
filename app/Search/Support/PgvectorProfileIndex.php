@@ -85,6 +85,14 @@ final class PgvectorProfileIndex implements IProfileVectorIndex
         return 'DROP INDEX IF EXISTS ' . self::quoteIdentifier(self::indexName($modelKey));
     }
 
+    /**
+     * Quotes a string as a SQL literal, the way the index predicate and the search query both write it.
+     */
+    public static function quoteLiteral(string $value): string
+    {
+        return "'" . str_replace("'", "''", $value) . "'";
+    }
+
     #[Override]
     public function supports(Connection $connection): bool
     {
@@ -95,6 +103,16 @@ final class PgvectorProfileIndex implements IProfileVectorIndex
     #[Override]
     public function ensure(Connection $connection, string $modelKey, int $dimensions, string $similarity): void
     {
+        // A catalog read first: CREATE INDEX IF NOT EXISTS takes its ShareLock on the table before
+        // it looks at the name, which would queue behind (and block) concurrent writers.
+        // The build itself is deliberately not CONCURRENTLY: it is a maintenance operation and
+        // vector search is suspended while a switch runs.
+        if ($this->exists($connection, $modelKey)) {
+            $this->ensured[$modelKey] = true;
+
+            return;
+        }
+
         $table = $connection->getTablePrefix() . CoreTables::ModelEmbeddings->value;
 
         foreach (self::statements($table, $modelKey, $dimensions, $similarity) as $statement) {
@@ -132,8 +150,11 @@ final class PgvectorProfileIndex implements IProfileVectorIndex
         return '"' . str_replace('"', '""', $identifier) . '"';
     }
 
-    private static function quoteLiteral(string $value): string
+    private function exists(Connection $connection, string $modelKey): bool
     {
-        return "'" . str_replace("'", "''", $value) . "'";
+        return $connection->selectOne(
+            'SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = ?',
+            [self::indexName($modelKey)],
+        ) !== null;
     }
 }

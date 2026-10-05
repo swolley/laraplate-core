@@ -63,13 +63,15 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     if (isset($this->connection)) {
+        $this->connection->statement('RESET enable_seqscan');
+        $this->connection->statement('RESET search_path');
         $this->connection->statement('DROP SCHEMA IF EXISTS ' . PGV_SCHEMA . ' CASCADE');
     }
 });
 
 function pgvector_insert(Connection $connection, string $key, string $vector, int $id): void
 {
-    $connection->statement('INSERT INTO core_model_embeddings (model_type, model_id, embedding, model_key) VALUES (?, ?, ?::vector, ?)', ['T', $id, $vector, $key]);
+    $connection->statement('INSERT INTO core_model_embeddings (model_type, model_id, embedding, model_key) VALUES (?, ?, ?::vector, ?)', [ModelEmbedding::class, $id, $vector, $key]);
 }
 
 it('stores vectors of two lengths in the dimensionless column', function (): void {

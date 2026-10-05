@@ -21,8 +21,9 @@ it('casts the column and filters on the active model like the partial index', fu
 
     expect($query->toSql())
         ->toContain('"embedding"::vector(384) <=> ?::vector')
-        ->toContain('"model_key" = ?')
-        ->and($query->getBindings())->toContain('prov:model-a');
+        ->toContain('"model_key" = \'prov:model-a\'')
+        ->not->toContain('"model_key" = ?')
+        ->and($query->getBindings())->not->toContain('prov:model-a');
 });
 
 it('uses the operator of the configured similarity', function (string $similarity, string $operator): void {
@@ -37,5 +38,19 @@ it('does not filter on a model when none is configured', function (): void {
     config()->set('core.search.vector.dimensions', 8);
     config()->set('core.search.vector.model', '');
 
-    expect(pgvector_engine_query()->toSql())->not->toContain('"model_key"');
+    expect(pgvector_engine_query()->toSql())->not->toContain('"model_key"')
+        ->toContain('vector_dims("embedding") = 8');
 });
+
+it('escapes the model key literal', function (): void {
+    config()->set('core.search.vector.dimensions', 8);
+    config()->set('core.search.vector.model', "a'b");
+
+    expect(pgvector_engine_query()->toSql())->toContain("\"model_key\" = 'a''b'");
+});
+
+it('rejects non-positive or non-numeric dimensions before building SQL', function (mixed $dimensions): void {
+    config()->set('core.search.vector.dimensions', $dimensions);
+
+    expect(fn () => pgvector_engine_query())->toThrow(InvalidArgumentException::class);
+})->with([0, -3, 'abc', null]);

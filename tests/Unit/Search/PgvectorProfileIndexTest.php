@@ -62,6 +62,7 @@ it('maps the similarity to the distance operator the index uses', function (stri
 it('runs ensureOnce once per key and ensure again after a drop', function (): void {
     $connection = Mockery::mock(Illuminate\Database\Connection::class);
     $connection->shouldReceive('getTablePrefix')->andReturn('');
+    $connection->shouldReceive('selectOne')->andReturn(null);
     $connection->shouldReceive('statement')->times(4);
 
     $index = new PgvectorProfileIndex;
@@ -70,4 +71,18 @@ it('runs ensureOnce once per key and ensure again after a drop', function (): vo
     $index->ensureOnce($connection, 'other', 8, 'cosine');
     $index->drop($connection, PGV_KEY);
     $index->ensureOnce($connection, PGV_KEY, 8, 'cosine');
+});
+
+it('issues no CREATE INDEX when the index already exists', function (): void {
+    $connection = Mockery::mock(Illuminate\Database\Connection::class);
+    $connection->shouldReceive('selectOne')->once()->andReturn((object) ['?column?' => 1]);
+    $connection->shouldNotReceive('statement');
+
+    $index = new PgvectorProfileIndex;
+    $index->ensure($connection, PGV_KEY, 8, 'cosine');
+    $index->ensureOnce($connection, PGV_KEY, 8, 'cosine');
+});
+
+it('quotes a literal by doubling single quotes', function (): void {
+    expect(PgvectorProfileIndex::quoteLiteral("a'b"))->toBe("'a''b'");
 });
