@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Search\Contracts\IReranker;
+use Modules\Core\Search\Contracts\IRerankerWithModel;
 use Modules\Core\Search\Contracts\ISearchable;
+use Modules\Core\Search\DTOs\RerankResult;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Services\SearchQueryAnalyzer;
@@ -431,3 +433,42 @@ it('does not rerank when no hit has any text, and says so instead of scoring emp
     expect($result->meta['reranked'])->toBeFalse()
         ->and(array_column($result->hits, 'id'))->toBe(['3', '2', '1', '5', '4', '6']);
 });
+
+it('reports the model that scored the hits when the reranker names it', function (): void {
+    $reranker = Mockery::mock(IRerankerWithModel::class);
+    $reranker->shouldNotReceive('score');
+    $reranker->shouldReceive('scoreWithModel')->andReturnUsing(
+        static fn (array $pairs): RerankResult => new RerankResult(array_fill(0, count($pairs), 0.5), 'org/reranker'),
+    );
+    $service = new EnsembleSearchService($reranker);
+
+    $result = $service->search(
+        model: new FusionFixtureSearchModel(),
+        query: 'supplier invoices',
+        plan: ensemble_fusion_fixture_plan(true),
+        vector: [0.1, 0.2, 0.3],
+        page: 1,
+        perPage: 10,
+    );
+
+    expect($result->meta['reranked'])->toBeTrue()
+        ->and($result->meta['reranker_model'])->toBe('org/reranker');
+});
+
+it('names no model for a reranker that does not name one, or when nothing was reranked', function (bool $useReranker): void {
+    $service = new EnsembleSearchService(ensemble_fusion_fixture_reranker());
+
+    $result = $service->search(
+        model: new FusionFixtureSearchModel(),
+        query: 'supplier invoices',
+        plan: ensemble_fusion_fixture_plan($useReranker),
+        vector: [0.1, 0.2, 0.3],
+        page: 1,
+        perPage: 10,
+    );
+
+    expect($result->meta)->not->toHaveKey('reranker_model');
+})->with([
+    'reranked by a reranker with no model' => [true],
+    'not reranked' => [false],
+]);

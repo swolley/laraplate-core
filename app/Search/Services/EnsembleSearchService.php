@@ -14,7 +14,9 @@ use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Search\Contracts\ILocaleFilterableEngine;
 use Modules\Core\Search\Contracts\IProvidesRerankerText;
 use Modules\Core\Search\Contracts\IReranker;
+use Modules\Core\Search\Contracts\IRerankerWithModel;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\DTOs\RerankResult;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
 use RuntimeException;
 use Throwable;
@@ -95,9 +97,11 @@ class EnsembleSearchService
         $rerank_top_k = $this->planInt($ranking, 'rerank_top_k', $default_rerank_top_k);
         $rerank_blend = $this->planFloat($ranking, 'rerank_blend', $this->configFloat('core.search.reranker.weight', 0.6));
 
+        $reranker_model = null;
+
         if ($use_reranker && $fused !== []) {
             try {
-                $fused = $this->rerankTopK($model, $fused, $query, $rerank_top_k, $rerank_blend);
+                [$fused, $reranker_model] = $this->rerankTopK($model, $fused, $query, $rerank_top_k, $rerank_blend);
             } catch (Throwable $exception) {
                 // A reranker failure (e.g. the cross-encoder service is down) must
                 // not break search: keep the fused results unreranked and record
@@ -135,6 +139,7 @@ class EnsembleSearchService
             'strategies_executed' => count($per_strategy),
             'strategies' => array_keys($per_strategy),
             'reranked' => $use_reranker,
+            ...($use_reranker && $reranker_model !== null ? ['reranker_model' => $reranker_model] : []),
             'total_results' => count($hits),
             'matching' => $textMatch?->toMeta($this->textMatchDegradations($model, $textMatch)) ?? [],
             'per_strategy' => $per_strategy,
@@ -357,7 +362,7 @@ class EnsembleSearchService
      * blend 0.6 is the historical 0.4 / 0.6 split.
      *
      * @param  list<FusedHit>  $results
-     * @return list<FusedHit>
+     * @return array{0: list<FusedHit>, 1: string|null} the hits, and the model that scored them when the reranker names it
      */
     private function rerankTopK(Model $model, array $results, string $query, int $top_k, float $blend): array
     {
@@ -367,7 +372,7 @@ class EnsembleSearchService
         $remaining = array_slice($results, $top_k);
 
         if ($to_rerank === []) {
-            return $results;
+            return [$results, null];
         }
 
         $provided = $this->providedRerankerTexts($model, $to_rerank);
@@ -390,7 +395,10 @@ class EnsembleSearchService
             throw new RuntimeException('No text to rerank: the hits carry none and the model provides none.');
         }
 
-        $rerank_scores = $this->reranker->score($pairs);
+        $reranked = $this->reranker instanceof IRerankerWithModel
+            ? $this->reranker->scoreWithModel($pairs)
+            : new RerankResult($this->reranker->score($pairs));
+        $rerank_scores = $reranked->scores;
 
         $original_max = max(array_column($to_rerank, 'score')) ?: 1.0;
 
@@ -399,7 +407,7 @@ class EnsembleSearchService
             $item['score'] = ($item['score'] * (1 - $blend)) + ($rerank_score * $original_max * $blend);
         }
 
-        return array_merge($to_rerank, $remaining);
+        return [array_merge($to_rerank, $remaining), $reranked->model];
     }
 
     /**

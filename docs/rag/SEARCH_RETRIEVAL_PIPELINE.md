@@ -234,6 +234,7 @@ so a request in Italian ranks on Italian text and on the vectors.
 | `driver` | active Scout driver |
 | `strategies_executed` / `strategies` | how many and which strategies ran |
 | `reranked` | whether reranking actually ran (false after a reranker failure) |
+| `reranker_model` | the model that scored the hits, present only when the reranker names it (`IRerankerWithModel`, which `CrossEncoderService` implements from the `model` its service answers with) |
 | `matching` | resolved text-match decision plus engine degradations |
 | `per_strategy` | per-strategy ordered hits (`id`, `score`, `rank`), consumed by `ai:evaluate-retrieval-strategies` and `ai:tune-retrieval` |
 | `tuning` | present only when the tuning profile was applied: `{applied, profile_version, query_class}` |
