@@ -69,6 +69,50 @@ command writing it runs synchronously from the grid, where it would otherwise be
 values (checkbox settings) are never flagged. The grid marks such a value, and the form keeps it
 selectable as "(no longer available)" instead of blanking the select.
 
+## Managed settings
+
+`core_settings.managed` (boolean, default `false`, in the create migration) marks a setting whose value
+is owned by code, not by people. The column is cast to bool and is not mass-assignable; the seed
+reconciler persists it from the seed definition (`managed: true` on `setting()`, or a `'managed' => true`
+key in a module's row).
+
+- The settings form shows a managed value read-only (disabled, not dehydrated). The other columns
+  (type, name, choices, `is_public`) stay editable.
+- `Setting::writeManaged(string $name, mixed $value): void` writes the value without creating a pending
+  approval and without value validation, and the observer refreshes the settings overlay. It throws
+  `InvalidArgumentException` for a missing or unmanaged setting.
+- `core_settings.value` is NOT NULL and `SettingObserver` turns `''` into `null`, so a managed setting is
+  cleared by writing the JSON string `null` directly and flushing the setting through
+  `SettingsCacheCoordinator`, as the seeder stores an unset value (see the AI `EmbeddingSwitchStore`).
+
+Core seeds four managed settings in group `search`, written by the AI embedding model switch:
+`search.vector.dimensions` (384), `search.vector.similarity` (`cosine`), `search.vector.model`
+(`sentence_transformers:intfloat/multilingual-e5-small`) and `search.vector.suspended_reason` (null).
+
+## Change confirmations and locks
+
+A module can ask for a confirmation before a setting's new value is saved, or lock the field, by
+implementing `Modules\Core\Contracts\ISettingChangeConfirmation` and registering it at boot:
+`app(SettingChangeConfirmations::class)->register($confirmation)` (a singleton; `for($name)` returns the
+first implementation whose `supports($name)` is true).
+
+| Method | Called | Contract |
+|--------|--------|----------|
+| `supports(string $settingName): bool` | to find the implementation | |
+| `warn(Setting $setting, mixed $newValue): ?SettingChangeWarning` | before the save, and again after it | null means no confirmation. Called twice per confirmed change, so it must be cheap and pure: no writes, no slow calls |
+| `confirmed(Setting $setting, mixed $newValue): void` | once, after the confirmed value was saved | not called when the save went to approval, when the value did not change, or when `warn()` on the saved value now returns null |
+| `lockedReason(Setting $setting): ?string` | when the form is built | non-null disables the value field and shows the reason as helper text |
+
+`SettingChangeWarning` (`Modules\Core\Data`) is readonly: `string $title`, `list<string> $lines`.
+`EditSetting::beforeSave()` holds the save back when the value changed and `warn()` returns a warning,
+and opens a modal with the title and lines; confirming runs the normal save, cancelling saves nothing.
+
+The lock is a UI-level lock of the settings form, not a domain invariant: the CRUD API, `Setting::save()`
+and approved pending modifications are not blocked by it. A module that needs a real guard enforces it in
+its own service (the AI model switch refuses to start while a switch runs). The AI module registers one
+confirmation, for `features.embeddings.model` (`Modules/AI/docs/rag/MODULE.md`, *Embedding model and
+model switch*).
+
 ## Settings in queue workers
 
 Web requests apply the database settings to config through the `ApplyDatabaseSettingsOverlay` middleware.

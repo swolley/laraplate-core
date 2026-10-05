@@ -115,7 +115,7 @@ OLLAMA_MODEL="llama3.2:3b"						#ollama model (deprecated - use AI module config
 
 #search
 SCOUT_DRIVER=typesense                          #actually supperted drivers with full functionalities (typesense, elasticsearch)
-#embeddings are produced by the AI module: AI_EMBEDDINGS_PROVIDER (default sentence_transformers) and AI_EMBEDDINGS_MODEL select provider and model profile. Core only declares dimension/similarity below.
+#embeddings are produced by the AI module: the model is the setting features.embeddings.model (provider:model), not an env var. Core's search.vector.dimensions|similarity|model are managed settings the AI model switch writes (ai:embeddings:switch).
 SEARCH_ENGINE=elasticsearch						#default search engine
 SEARCH_DATABASE_PG_TRGM_ENABLED=false             #enable PostgreSQL pg_trgm matching for the database Scout driver
 SEARCH_ANALYZER_IT=italian                        #Elasticsearch analyzer for the it locale sub-field
