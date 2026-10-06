@@ -22,19 +22,30 @@ final readonly class TranslationCatalogService
         $languages = $this->getLanguages($defaultLocale);
         $translations = [];
 
+        // Every module ships its own lang/{locale} directory: merge them all per locale
+        // (app.php from Core, mes.php from MES, …) instead of letting the last one win.
         foreach ($languages as $language) {
             $shortName = explode(DIRECTORY_SEPARATOR, $language);
             $shortName = array_pop($shortName);
 
-            if ($lang && $shortName !== $lang) {
+            if ($lang && $shortName !== $lang && $shortName !== $defaultLocale) {
                 continue;
             }
 
-            $translations[$shortName] = $this->mergeLanguageFiles($language);
+            $translations[$shortName] = array_merge($translations[$shortName] ?? [], $this->mergeLanguageFiles($language));
+        }
 
-            if ($shortName !== $defaultLocale && array_key_exists($defaultLocale, $translations)) {
-                $translations[$shortName] = array_merge($translations[$defaultLocale], $translations[$shortName]);
+        // Non-default locales fall back to the default locale leaf by leaf.
+        if (array_key_exists($defaultLocale, $translations)) {
+            foreach (array_keys($translations) as $shortName) {
+                if ($shortName !== $defaultLocale) {
+                    $translations[$shortName] = array_merge($translations[$defaultLocale], $translations[$shortName]);
+                }
             }
+        }
+
+        if ($lang) {
+            $translations = array_intersect_key($translations, [$lang => true]);
         }
 
         if (! in_array($lang, [null, '', '0'], true)) {

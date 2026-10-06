@@ -131,3 +131,37 @@ it('buildTranslations skips language when lang filter does not match', function 
         (new Filesystem())->deleteDirectory($tmpDir);
     }
 });
+
+it('buildTranslations merges every module lang directory of the same locale', function (): void {
+    $tmpDir = sys_get_temp_dir() . '/langs-' . bin2hex(random_bytes(5));
+    mkdir($tmpDir . '/Core/en', 0777, true);
+    mkdir($tmpDir . '/Core/it', 0777, true);
+    mkdir($tmpDir . '/MES/en', 0777, true);
+    mkdir($tmpDir . '/MES/it', 0777, true);
+    file_put_contents($tmpDir . '/Core/en/app.php', "<?php return ['save' => 'Save', 'only_en' => 'en'];");
+    file_put_contents($tmpDir . '/Core/it/app.php', "<?php return ['save' => 'Salva'];");
+    file_put_contents($tmpDir . '/MES/en/mes.php', "<?php return ['orders' => 'Orders', 'only_en' => 'en'];");
+    file_put_contents($tmpDir . '/MES/it/mes.php', "<?php return ['orders' => 'Ordini'];");
+
+    try {
+        $service = new TranslationCatalogService(
+            languagesProvider: fn () => [$tmpDir . '/Core/en', $tmpDir . '/Core/it', $tmpDir . '/MES/en', $tmpDir . '/MES/it'],
+        );
+
+        $all = $service->buildTranslations(null, 'en');
+
+        expect($all['en'])->toMatchArray(['app.save' => 'Save', 'mes.orders' => 'Orders']);
+        expect($all['it'])->toMatchArray([
+            'app.save' => 'Salva',
+            'app.only_en' => 'en',
+            'mes.orders' => 'Ordini',
+            'mes.only_en' => 'en',
+        ]);
+
+        $it = $service->buildTranslations('it', 'en');
+
+        expect($it)->toMatchArray(['app.save' => 'Salva', 'mes.orders' => 'Ordini', 'mes.only_en' => 'en']);
+    } finally {
+        (new Filesystem())->deleteDirectory($tmpDir);
+    }
+});
