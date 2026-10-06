@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Actions\Users\GetUserInfoAction;
 use Modules\Core\Actions\Users\HandleSocialLoginAction;
 use Modules\Core\Actions\Users\ImpersonateUserAction;
@@ -19,6 +20,7 @@ use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Http\Requests\ImpersonationRequest;
 use Modules\Core\Http\Requests\UpdatePreferencesRequest;
 use Modules\Core\Http\Resources\UserInfoResponse;
+use Modules\Core\Rules\PreferencesBag;
 
 final class UserController extends Controller
 {
@@ -105,20 +107,57 @@ final class UserController extends Controller
     }
 
     /**
-     * Persist the caller's own UI preferences and echo back the refreshed profile.
+     * Persist the caller's own UI preferences and echo back the refreshed profile. Each namespace
+     * received replaces the stored one and a null removes it; the others are left as they are, so
+     * two clients or two devices cannot erase each other.
      */
     public function updatePreferences(UpdatePreferencesRequest $request): \Illuminate\Http\JsonResponse
     {
         /** @var User $user */
         $user = Auth::user();
 
-        // Self-service write on the caller's own row: bypass the CRUD `update`
-        // authorization + versioning events, which gate admins editing other users.
-        $user->forceFill(['preferences' => $request->validated()['preferences']])->saveQuietly();
+        $bag = $user->preferences ?? [];
 
-        return new ResponseBuilder($request)
-            ->setData(($this->getUserInfoAction)($user))
-            ->json();
+        foreach ($request->validated()['preferences'] as $namespace => $value) {
+            if ($value === null) {
+                unset($bag[$namespace]);
+            } else {
+                $bag[$namespace] = $value;
+            }
+        }
+
+        if (! PreferencesBag::fits($bag)) {
+            throw ValidationException::withMessages([
+                'preferences' => 'The preferences may not exceed ' . PreferencesBag::MAX_BYTES . ' bytes once merged.',
+            ]);
+        }
+
+        return $this->storePreferences($request, $user, $bag);
+    }
+
+    /**
+     * Clear the caller's whole preferences bag.
+     */
+    public function deletePreferences(Request $request): \Illuminate\Http\JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        return $this->storePreferences($request, $user, []);
+    }
+
+    /**
+     * Clear one namespace of the caller's preferences bag.
+     */
+    public function deletePreferencesNamespace(Request $request, string $namespace): \Illuminate\Http\JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $bag = $user->preferences ?? [];
+        unset($bag[$namespace]);
+
+        return $this->storePreferences($request, $user, $bag);
     }
 
     /**
@@ -130,6 +169,21 @@ final class UserController extends Controller
         $user = Auth::user();
 
         $user->forceFill(['is_first_login' => false])->saveQuietly();
+
+        return new ResponseBuilder($request)
+            ->setData(($this->getUserInfoAction)($user))
+            ->json();
+    }
+
+    /**
+     * Self-service write on the caller's own row: bypass the CRUD `update` authorization and
+     * versioning events, which gate admins editing other users.
+     *
+     * @param  array<string, mixed>  $bag
+     */
+    private function storePreferences(Request $request, User $user, array $bag): \Illuminate\Http\JsonResponse
+    {
+        $user->forceFill(['preferences' => $bag])->saveQuietly();
 
         return new ResponseBuilder($request)
             ->setData(($this->getUserInfoAction)($user))

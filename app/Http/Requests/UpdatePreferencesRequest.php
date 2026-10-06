@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Rules\PreferencesBag;
 
 /**
  * Self-service update of the authenticated user's own UI preferences. No target
  * id is accepted — the endpoint always writes the current session user's row.
+ * Each top-level key is a namespace: the write replaces it, or removes it when null.
  *
  * @property array<string, mixed> $preferences
  */
@@ -25,7 +27,7 @@ final class UpdatePreferencesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'preferences' => ['required', 'array'],
+            'preferences' => ['required', 'array', new PreferencesBag],
         ];
     }
 }

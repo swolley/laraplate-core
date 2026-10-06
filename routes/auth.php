@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\UserController;
+use Modules\Core\Rules\PreferencesBag;
 
 Route::controller(UserController::class)->name('auth.')->group(function (): void {
     // Keep the `auth` group session stack (StartSession, cookies, …) but allow
@@ -15,6 +16,10 @@ Route::controller(UserController::class)->name('auth.')->group(function (): void
         ->name('userInfo');
     // Self-service profile writes on the caller's own row (auth-gated by the group).
     Route::patch('/user/preferences', 'updatePreferences')->name('updatePreferences');
+    Route::delete('/user/preferences', 'deletePreferences')->name('deletePreferences');
+    Route::delete('/user/preferences/{namespace}', 'deletePreferencesNamespace')
+        ->where('namespace', PreferencesBag::NAMESPACE_REGEX)
+        ->name('deletePreferencesNamespace');
     Route::patch('/user/first-login-complete', 'completeFirstLogin')->name('completeFirstLogin');
     Route::post('/impersonate', 'impersonate')->can('impersonate')->name('impersonate');
     Route::post('/leave-impersonate', 'leaveImpersonate')->can('impersonate')->name('leaveImpersonate');
