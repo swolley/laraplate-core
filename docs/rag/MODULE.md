@@ -465,6 +465,12 @@ flowchart LR
   Q --> Fallback
 ```
 
+### Interface labels (lang files)
+
+Interface labels live in PHP lang files registered on Laravel's default namespace, so the file name is the group. Generic, module-agnostic labels (actions, form, table columns, login, import, states) are in `Modules/Core/lang/{locale}/app.php` (`app.*`). Domain labels of a module (entities, fields, statuses, domain actions and messages) are in that module's own file, `Modules/{Module}/lang/{locale}/{module}.php` (`cms.*`, `mes.*`, `sao.*`, `erp.*`). Every locale file (en, it, de, es, sl) is standalone, with the same keys as the others: none merges another locale at load time. Missing keys fall back through Laravel's `fallback_locale`.
+
+`GET /app/translations/{lang?}` (`TranslationCatalogService`) returns every group of every active module as dotted keys (`app.form.save`, `mes.entities.workCenters`). It merges all module lang directories of the same locale, then fills a non-default locale's missing keys from the default locale. The Vue UI loads this payload over its own Vue-only `ui.*` catalogs. A label goes in the backend when the backend could use it too (Filament, notifications, exports); Vue-only interaction copy stays in the UI catalogs.
+
 ### Search abstractions and engines
 
 `Searchable` extends Elastic Scout Plus and adds: a `SchemaDefinition` driven by `FieldDefinition` + `IndexType` enums, a `SchemaManager` that synchronises engine schemas, and event-based indexing (`ModelRequiresIndexing` → `ReindexSearchJob` / `IndexInSearchJob` / `BulkIndexSearchJob` / `FinalizeReindexJob`) so listeners can pre-process embeddings or translations before the document is sent to the engine. `ISearchEngine` is bound to the active Scout engine (Typesense or Elasticsearch); database fallback is also provided. Optional AI overrides bind `IReranker`, `ISearchPlanner`, and `IQueryIntentParser` (Core ships heuristic fallbacks via `HeuristicReranker`, `FallbackSearchPlanner`, `SimpleQueryIntentParser`).
