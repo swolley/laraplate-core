@@ -10,13 +10,16 @@ use Symfony\Component\Finder\Finder;
  * contents: `Content::withExtended()->where('extended_type', $alias)->searchable()`), which
  * rewrites its own documents and leaves every other module's documents in the shared index alone.
  *
- * The only exception is AI's RAG index, which is AI's own index rather than a model's.
+ * The exceptions are AI's RAG index, which is AI's own index rather than a model's, and the embedding
+ * model switch, which recreates a model's index through that model's own Core search engine when the
+ * vector dimensions change.
  */
-it('leaves index creation and deletion to Core search and the AI RAG index', function (): void {
+it('leaves index creation and deletion to Core search, the AI RAG index and the embedding switch', function (): void {
     $project_root = dirname(__DIR__, 5);
     $allowed = [
         'Core/app/Search/',
         'AI/app/Console/CreateRagElasticsearchIndexCommand.php',
+        'AI/app/Ai/Embeddings/Switching/EmbeddingSwitchIndexes.php',
     ];
     $offenders = [];
 

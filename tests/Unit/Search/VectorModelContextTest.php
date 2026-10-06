@@ -2,25 +2,24 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Config;
 use Modules\Core\Search\Support\VectorModelContext;
 
 it('returns the configured model outside using()', function (): void {
-    Config::set('core.search.vector.model', 'a:one');
+    config()->set('core.search.vector.model', 'a:one');
 
     expect(VectorModelContext::get())->toBe('a:one');
 });
 
 it('returns null when nothing is configured', function (): void {
-    Config::set('core.search.vector.model', '');
+    config()->set('core.search.vector.model', '');
     expect(VectorModelContext::get())->toBeNull();
 
-    Config::set('core.search.vector.model', null);
+    config()->set('core.search.vector.model', null);
     expect(VectorModelContext::get())->toBeNull();
 });
 
 it('returns the override inside using() and the callback result', function (): void {
-    Config::set('core.search.vector.model', 'a:one');
+    config()->set('core.search.vector.model', 'a:one');
 
     $result = VectorModelContext::using('b:two', static fn (): ?string => VectorModelContext::get());
 
@@ -29,7 +28,7 @@ it('returns the override inside using() and the callback result', function (): v
 });
 
 it('supports nested overrides', function (): void {
-    Config::set('core.search.vector.model', 'a:one');
+    config()->set('core.search.vector.model', 'a:one');
 
     $seen = VectorModelContext::using('b:two', static function (): array {
         $outer = VectorModelContext::get();
@@ -42,7 +41,7 @@ it('supports nested overrides', function (): void {
 });
 
 it('restores the previous override when the callback throws', function (): void {
-    Config::set('core.search.vector.model', 'a:one');
+    config()->set('core.search.vector.model', 'a:one');
 
     try {
         VectorModelContext::using('b:two', static function (): never {
