@@ -334,7 +334,9 @@ class CrudService
             $this->query_builder->applyFilters($filtered, $this->excludeFacetField($base->filters, $key));
         }
 
-        $filtered_base = $filtered->toBase();
+        // The model's default ordering scope (e.g. `order_column`) is meaningless on an
+        // aggregate and breaks `GROUP BY` under MySQL's only_full_group_by.
+        $filtered_base = $filtered->toBase()->reorder();
 
         // A relation label (single-hop BelongsTo keyed by the group key) lets the
         // facet search and sort by the label instead of the raw key — resolved
@@ -1178,6 +1180,7 @@ class CrudService
 
         return $query
             ->toBase()
+            ->reorder()
             ->select($field)
             ->selectRaw('count(*) as aggregate')
             ->groupBy($field)
@@ -1686,13 +1689,19 @@ class CrudService
      */
     private function orderRelationFacet(BaseQueryBuilder $query, string $key, FacetSort $sort, ?string $label): void
     {
+        // The label column is joined but not grouped: order by its per-group MIN so the
+        // query stays valid under MySQL's only_full_group_by (one label per key anyway).
+        $label_expression = $label !== null && $label !== $key
+            ? 'min(' . $query->getGrammar()->wrap($label) . ')'
+            : null;
+
         match ($sort) {
             FacetSort::CountDesc => $query->orderByRaw('aggregate desc')->orderBy($key),
             FacetSort::CountAsc => $query->orderByRaw('aggregate asc')->orderBy($key),
             FacetSort::KeyAsc => $query->orderBy($key),
             FacetSort::KeyDesc => $query->orderByDesc($key),
-            FacetSort::LabelAsc => $label !== null ? $query->orderBy($label) : $query->orderBy($key),
-            FacetSort::LabelDesc => $label !== null ? $query->orderByDesc($label) : $query->orderByDesc($key),
+            FacetSort::LabelAsc => $label_expression !== null ? $query->orderByRaw($label_expression . ' asc')->orderBy($key) : $query->orderBy($label ?? $key),
+            FacetSort::LabelDesc => $label_expression !== null ? $query->orderByRaw($label_expression . ' desc')->orderByDesc($key) : $query->orderByDesc($label ?? $key),
         };
     }
 
@@ -1967,6 +1976,7 @@ class CrudService
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
 
         $rows = $query->toBase()
+            ->reorder()
             ->select($key)
             ->selectRaw('count(*) as aggregate')
             ->whereIn($key, $page_keys)
