@@ -8,7 +8,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
 
@@ -223,8 +222,6 @@ trait HasBenchmark
                 $command->newLine();
             }
         }
-
-        Log::debug(preg_replace("/\<bg=[\w-]+;fg=[\w-]+\>|\<\/\>/", '', $output) ?? $output);
     }
 
     /**

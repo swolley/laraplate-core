@@ -8,20 +8,22 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Console\Concerns\HasBenchmark;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkHarness;
 use Modules\Core\Tests\Stubs\Benchmark\BenchmarkSeederHarness;
 use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
-function prepare_benchmark_command(BenchmarkHarness $command): void
+function prepare_benchmark_command(BenchmarkHarness $command): BufferedOutput
 {
     $input = new ArrayInput([]);
     $input->bind($command->getDefinition());
     $command->setInput($input);
-    $command->setOutput(new OutputStyle($input, new NullOutput));
+    $buffer = new BufferedOutput;
+    $command->setOutput(new OutputStyle($input, $buffer));
+
+    return $buffer;
 }
 
 beforeEach(function (): void {
@@ -31,30 +33,26 @@ beforeEach(function (): void {
 it('cancels benchmark and clears start time', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testCancelBenchmark();
 });
 
-it('runs benchmark without table and logs output', function (): void {
-    Log::spy();
-
+it('runs benchmark without table and prints output to the console', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStartEndWithoutTable();
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('counts rows when benchmark table is set', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStartEndWithTable();
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('keeps benchmark row counts and query logging on the supplied connection', function (): void {
@@ -72,17 +70,14 @@ it('keeps benchmark row counts and query logging on the supplied connection', fu
     });
     $connection->table('bench_affinity_rows')->insert(['id' => 1]);
 
-    Log::spy();
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
 
     try {
         $cmd->testStartEndWithConnection($connection);
 
-        Log::shouldHaveReceived('debug')
-            ->once()
-            ->withArgs(fn (string $message): bool => str_contains($message, 'ROWS 1'));
+        expect($output->fetch())->toContain('ROWS 1');
     } finally {
         DB::disconnect('benchmark_affinity');
         DB::purge('benchmark_affinity');
@@ -107,7 +102,7 @@ it('uses the database manager runtime default when no connection is supplied', f
 
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $start = new ReflectionMethod($cmd, 'startBenchmark');
     $start->setAccessible(true);
     $connection = new ReflectionProperty($cmd, 'benchmarkConnection');
@@ -128,25 +123,23 @@ it('uses the database manager runtime default when no connection is supplied', f
 it('stepBenchmark returns early when not started', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStepBenchmarkWithoutStartIsNoOp();
 });
 
 it('stepBenchmarkAndRestart keeps timing running', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStepBenchmarkAndRestart();
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('exposes sqlite query count and time formatting', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testGetQueryCountUsesSqliteBranch();
     $cmd->testFormatTimeBranches();
 });
@@ -156,51 +149,43 @@ it('does not expose the query-count test helper in production', function (): voi
 });
 
 it('treats missing startQueries as zero in stepBenchmark', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStepBenchmarkUsesZeroQueriesWhenStartQueriesUnset();
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('stepBenchmark tolerates missing benchmark table when counting rows', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStepBenchmarkSurvivesInvalidBenchmarkTable();
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('skips starting when the database binding cannot be checked', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testStartBenchmarkReturnsWhenDatabaseBindingThrows(Container::getInstance());
 });
 
 it('formats zero memory usage in benchmark output', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testComposeOutputHandlesZeroMemoryUsage();
 
-    Log::shouldHaveReceived('debug')
-        ->once()
-        ->withArgs(fn (string $message): bool => str_contains($message, 'MEM 0b'));
+    expect($output->fetch())->toContain('MEM 0b');
 });
 
 it('skips writing to console when command output is not set', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
 
     $output_prop = new ReflectionProperty(BenchmarkHarness::class, 'output');
     $output_prop->setAccessible(true);
@@ -220,44 +205,38 @@ it('skips writing to console when command output is not set', function (): void 
 it('returns zero from getQueryCount for unsupported drivers', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testGetQueryCountReturnsZeroForUnsupportedDriver();
 });
 
 it('uses pgsql and oracle branches in getQueryCount', function (): void {
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
     $cmd->testGetQueryCountUsesPgsqlBranch();
     $cmd->testGetQueryCountUsesOracleBranch();
 });
 
 it('reports the exact sql query count in the benchmark output', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
 
     $cmd->testQueryCountAccuracy(3);
 
-    Log::shouldHaveReceived('debug')
-        ->once()
-        ->withArgs(fn (string $message): bool => str_contains($message, 'SQL 3'));
+    expect($output->fetch())->toContain('SQL 3');
 });
 
 it('writes benchmark output when used from a seeder with command set', function (): void {
-    Log::spy();
-
     $cmd = new BenchmarkHarness;
     $cmd->setLaravel($this->app);
-    prepare_benchmark_command($cmd);
+    $output = prepare_benchmark_command($cmd);
 
     $seeder = new BenchmarkSeederHarness;
     $seeder->setContainer($this->app);
     $seeder->runBenchmark($cmd);
 
-    Log::shouldHaveReceived('debug');
+    expect($output->fetch())->toContain('BOOT')->not->toBeEmpty();
 });
 
 it('does not throw when a seeder has no command instance', function (): void {
