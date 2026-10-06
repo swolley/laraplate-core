@@ -124,7 +124,22 @@ final class ModifyRequest extends CrudRequest implements IParsableRequest
 
             $pk_keys = is_array($this->primaryKey) ? $this->primaryKey : [$this->primaryKey];
 
-            foreach ($this->model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
+            // `$this->model` is a blank instance, resolved from the route only to read its rules. A model's
+            // update rules exclude the record from its own unique checks through its key
+            // (`unique:table,name,{$this->id}`): without a key that exclusion is empty and saving a record
+            // with its current unique value is rejected as already used. Give a copy the key being updated.
+            $rules_model = $this->model;
+
+            if ($is_update && ! is_array($this->primaryKey)) {
+                $key_value = $this->input($this->primaryKey);
+
+                if ($key_value !== null && $key_value !== '') {
+                    $rules_model = clone $this->model;
+                    $rules_model->setAttribute($this->primaryKey, $key_value);
+                }
+            }
+
+            foreach ($rules_model->getOperationRules($is_insert ? 'create' : ($is_update ? 'update' : null)) as $attribute => $rule) {
                 $rule_key = $attribute;
 
                 // For update/delete skip merging model rules for primary key so we don't validate "exists" (service returns 404 when not found)
