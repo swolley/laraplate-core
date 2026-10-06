@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-$default_locale = (string) (config('app.locale'));
-
-$translations = [
+return [
     'accepted' => ':attribute muss akzeptiert werden.',
     'accepted_if' => 'Die :attribute muss akzeptiert werden, wenn :other :value ist.',
     'active_url' => ':attribute ist keine gültige Internet-Adresse.',
@@ -13,9 +11,11 @@ $translations = [
     'alpha' => ':attribute darf nur aus Buchstaben bestehen.',
     'alpha_dash' => ':attribute darf nur aus Buchstaben, Zahlen, Binde- und Unterstrichen bestehen.',
     'alpha_num' => ':attribute darf nur aus Buchstaben und Zahlen bestehen.',
+    'any_of' => 'Das Feld :attribute ist ungültig.',
     'array' => ':attribute muss ein Array sein.',
     'ascii' => 'Die :attribute darf nur alphanumerische Single-Byte-Zeichen und -Symbole enthalten.',
     'attached' => ':attribute ist bereits angehängt.',
+    'attributes' => [],
     'before' => ':attribute muss ein Datum vor dem :date sein.',
     'before_or_equal' => ':attribute muss ein Datum vor dem :date oder gleich dem :date sein.',
     'between' => [
@@ -27,6 +27,7 @@ $translations = [
     'boolean' => ":attribute muss entweder 'true' oder 'false' sein.",
     'can' => 'Das Feld :attribute enthält einen nicht autorisierten Wert.',
     'confirmed' => ':attribute stimmt nicht mit der Bestätigung überein.',
+    'contains' => 'Dem Feld :attribute fehlt ein erforderlicher Wert.',
     'current_password' => 'Das Passwort ist inkorrekt.',
     'custom' => [
         'attribute-name' => [
@@ -44,9 +45,11 @@ $translations = [
     'digits_between' => ':attribute muss zwischen :min und :max Stellen haben.',
     'dimensions' => ':attribute hat ungültige Bildabmessungen.',
     'distinct' => ':attribute beinhaltet einen bereits vorhandenen Wert.',
+    'doesnt_contain' => 'Das Feld :attribute darf keinen der folgenden Werte enthalten: :values.',
     'doesnt_end_with' => 'Die :attribute darf nicht mit einer der folgenden Zahlen enden: :values.',
     'doesnt_start_with' => 'Die :attribute darf nicht mit einem der folgenden Werte beginnen: :values.',
     'email' => ':attribute muss eine gültige E-Mail-Adresse sein.',
+    'encoding' => 'Das Feld :attribute muss in :encoding kodiert sein.',
     'ends_with' => ':attribute muss eine der folgenden Endungen aufweisen: :values',
     'enum' => 'Die ausgewählte :attribute ist ungültig.',
     'exists' => 'Der gewählte Wert für :attribute ist ungültig.',
@@ -69,11 +72,13 @@ $translations = [
     'image' => ':attribute muss ein Bild sein.',
     'in' => 'Der gewählte Wert für :attribute ist ungültig.',
     'in_array' => 'Der gewählte Wert für :attribute kommt nicht in :other vor.',
+    'in_array_keys' => 'Das Feld :attribute muss mindestens einen der folgenden Schlüssel enthalten: :values.',
     'integer' => ':attribute muss eine ganze Zahl sein.',
     'ip' => ':attribute muss eine gültige IP-Adresse sein.',
     'ipv4' => ':attribute muss eine gültige IPv4-Adresse sein.',
     'ipv6' => ':attribute muss eine gültige IPv6-Adresse sein.',
     'json' => ':attribute muss ein gültiger JSON-String sein.',
+    'list' => 'Das Feld :attribute muss eine Liste sein.',
     'lowercase' => 'Die :attribute muss klein geschrieben werden.',
     'lt' => [
         'array' => ':attribute muss kleiner :value Elemente haben.',
@@ -129,6 +134,8 @@ $translations = [
     'previous' => '&laquo; Zurück',
     'prohibited' => ':attribute ist gesperrt.',
     'prohibited_if' => ':attribute ist gesperrt, wenn :other :value ist.',
+    'prohibited_if_accepted' => 'Das Feld :attribute ist gesperrt, wenn :other akzeptiert wird.',
+    'prohibited_if_declined' => 'Das Feld :attribute ist gesperrt, wenn :other abgelehnt wird.',
     'prohibited_unless' => ':attribute ist gesperrt, wenn :other nicht :values ist.',
     'prohibits' => 'Das :attribute-Feld verhindert, dass :other vorhanden sind.',
     'regex' => ':attribute Format ist ungültig.',
@@ -137,6 +144,7 @@ $translations = [
     'required_array_keys' => 'Das Feld :attribute muss Einträge enthalten für: :values.',
     'required_if' => ':attribute muss ausgefüllt sein, wenn :other :value ist.',
     'required_if_accepted' => 'Das Feld :attribute ist erforderlich, wenn :other akzeptiert wird.',
+    'required_if_declined' => 'Das Feld :attribute ist erforderlich, wenn :other abgelehnt wird.',
     'required_unless' => ':attribute muss ausgefüllt sein, wenn :other nicht :values ist.',
     'required_with' => ':attribute muss angegeben werden, wenn :values ausgefüllt wurde.',
     'required_with_all' => ':attribute muss angegeben werden, wenn :values ausgefüllt wurde.',
@@ -159,9 +167,3 @@ $translations = [
     'url' => ':attribute muss eine URL sein.',
     'uuid' => ':attribute muss ein UUID sein.',
 ];
-
-if ($default_locale !== 'de') {
-    $translations = array_merge($translations, (array) require (__DIR__ . "/../{$default_locale}/validation.php"));
-}
-
-return $translations;
