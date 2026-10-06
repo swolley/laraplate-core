@@ -76,3 +76,19 @@ it('still refuses an ordinary model to a user without the permission', function 
 
     expect($check)->toBeFalse();
 });
+
+it('resolves the acting user from the session without recursing into its own select check', function (): void {
+    // Loading the session user hydrates a User, which fires the per-row select check, which asks
+    // for the acting user, which is not resolved yet: the lookup re-entered itself until the stack
+    // ran out. Only happens once `users.select` is a registered permission.
+    registerSelectPermission(new User());
+
+    $user = User::factory()->create();
+
+    Auth::forgetGuards();
+    Auth::guard('web')->onceUsingId($user->getKey());
+    Auth::forgetGuards();
+    session()->put(Auth::guard('web')->getName(), $user->getKey());
+
+    expect(Auth::user()?->getKey())->toBe($user->getKey());
+});

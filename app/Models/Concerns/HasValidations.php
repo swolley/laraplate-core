@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -258,9 +259,17 @@ trait HasValidations
             return true;
         }
 
-        $user = Auth::user();
+        // Resolving the acting user hydrates a User, which fires this same check: the lookup must
+        // sit inside the window too, or it re-enters itself until the stack is exhausted.
+        $user = ResolvingAuthorization::resolve(static fn (): ?Authenticatable => Auth::user());
 
         if ($user) {
+            // Hydrating the acting user from the session is how authentication itself works, so a
+            // user always reads their own row, whatever they were granted.
+            if ($user->is($model)) {
+                return true;
+            }
+
             return ResolvingAuthorization::resolve(static function () use ($user, $permission): bool {
                 if ($user->isSuperAdmin()) {
                     return true;
