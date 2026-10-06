@@ -7,13 +7,12 @@ namespace Modules\Core\Listeners;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Events\ModificationPreProcessingCompleted;
 use Modules\Core\Events\ModificationRequiresModeration;
-use Modules\Core\Models\Modification;
 
 final class FinalizeModificationModerationListener
 {
     public function handle(ModificationPreProcessingCompleted $event): void
     {
-        $cache_key = $this->cacheKey($event->modification);
+        $cache_key = ModificationRequiresModeration::cacheKey($event->modification);
 
         $moderation_event = Cache::get($cache_key);
 
@@ -29,11 +28,6 @@ final class FinalizeModificationModerationListener
             return;
         }
 
-        Cache::put($cache_key, $moderation_event, now()->addMinutes(10));
-    }
-
-    private function cacheKey(Modification $modification): string
-    {
-        return 'modification_moderation:' . $modification->getKey();
+        Cache::put($cache_key, $moderation_event, now()->addMinutes(ModificationRequiresModeration::CACHE_TTL_MINUTES));
     }
 }

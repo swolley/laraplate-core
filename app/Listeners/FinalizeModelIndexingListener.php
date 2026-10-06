@@ -15,7 +15,7 @@ final class FinalizeModelIndexingListener
 {
     public function handle(ModelPreProcessingCompleted $event): void
     {
-        $cache_key = $this->getCacheKey($event->model);
+        $cache_key = ModelRequiresIndexing::cacheKey($event->model);
 
         // Retrieve the original event from cache
         $indexing_event = Cache::get($cache_key);
@@ -46,7 +46,7 @@ final class FinalizeModelIndexingListener
             Cache::forget($cache_key);
         } else {
             // Not all completed, save updated event in cache
-            Cache::put($cache_key, $indexing_event, now()->addMinutes(10));
+            Cache::put($cache_key, $indexing_event, now()->addMinutes(ModelRequiresIndexing::CACHE_TTL_MINUTES));
         }
     }
 
@@ -60,10 +60,5 @@ final class FinalizeModelIndexingListener
         }
 
         dispatch(new IndexInSearchJob($model));
-    }
-
-    private function getCacheKey(Model $model): string
-    {
-        return "model_indexing:{$model->getTable()}:{$model->getKey()}";
     }
 }

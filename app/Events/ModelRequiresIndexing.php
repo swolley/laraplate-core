@@ -13,6 +13,12 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ModelRequiresIndexing
 {
+    /**
+     * Minutes the event stays in the cache between the listeners that pre-process the model and the
+     * listener that finalizes it.
+     */
+    public const int CACHE_TTL_MINUTES = 10;
+
     public bool $handled = false;
 
     /**
@@ -32,6 +38,15 @@ class ModelRequiresIndexing
         public readonly Model $model,
         public readonly bool $sync = false,
     ) {}
+
+    /**
+     * The cache key under which the event of a model waits for its pre-processing to complete: the
+     * listeners of every module write and read the same key.
+     */
+    public static function cacheKey(Model $model): string
+    {
+        return "model_indexing:{$model->getTable()}:{$model->getKey()}";
+    }
 
     public function markAsHandled(): void
     {

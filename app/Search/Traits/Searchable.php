@@ -127,8 +127,7 @@ trait Searchable
 
                     // Save event in cache for the finalize listener
                     if (! $sync) {
-                        $cache_key = "model_indexing:{$model->getTable()}:{$model->getKey()}";
-                        Cache::put($cache_key, $event, now()->addMinutes(10));
+                        Cache::put(ModelRequiresIndexing::cacheKey($model), $event, now()->addMinutes(ModelRequiresIndexing::CACHE_TTL_MINUTES));
                     }
                 },
             );

@@ -11,6 +11,12 @@ use Modules\Core\Models\Modification;
  */
 final class ModificationRequiresModeration
 {
+    /**
+     * Minutes the event stays in the cache between the listeners that pre-process the modification and
+     * the listener that finalizes it.
+     */
+    public const int CACHE_TTL_MINUTES = 10;
+
     public bool $handled = false;
 
     /**
@@ -27,6 +33,14 @@ final class ModificationRequiresModeration
         public readonly Modification $modification,
         public readonly bool $sync = false,
     ) {}
+
+    /**
+     * The cache key under which the event of a modification waits for its pre-processing to complete.
+     */
+    public static function cacheKey(Modification $modification): string
+    {
+        return 'modification_moderation:' . $modification->getKey();
+    }
 
     public function markAsHandled(): void
     {
