@@ -2,6 +2,116 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.79.0] - 2026-10-07
+
+### 🚀 Features
+
+- *(core)* One pending-approvals list for every entity, narrowed by permissions and ACL
+- *(core)* A record origin's link must be a well-formed url
+- *(core)* Approvals validate before capturing; votes reach pending creates without a record id
+- *(search)* Measured retrieval tuning L1, query classes, tuning profile and extracted rank fusion
+- *(search)* Restrict a search to the requested language inside the engine request
+- *(search)* The reranker is off by default, and its default lives only in the seed
+- *(search)* A reranker can name the model that scored, and the result records it
+- *(settings)* A setting can be managed by a command and read-only in the form
+- *(search)* Vector search is guarded: suspended, mismatching or disabled searches fall back to keywords with a reason
+- *(search)* An index document carries the vectors of one embedding model
+- *(settings)* A module can ask for a confirmation, or lock a setting, when its value changes
+- *(search)* PostgreSQL stores vectors of any length, with one partial index per embedding profile
+- *(core)* Generic interface labels for the Vue UI in app.php
+- *(core)* Preferences are namespaced, merged per namespace, bounded and deletable
+- *(search)* SearchQualityEvaluator, the retry judgement salvaged from IntelligentSearchAction
+
+### 🐛 Bug Fixes
+
+- *(core)* Approve governs disapprove
+- *(core)* The modifications AI column shows the moderator's status
+- *(command)* Update LockedAddCommand signature to use 'model:locked-add' instead of 'module:locked-add'
+- *(search)* Make indexing fail loudly and reach every row
+- *(approvals)* Apply a decision whenever votes reach the quorum
+- *(approvals)* Deny generic CRUD writes on modifications
+- *(approvals)* Keep quorum and author when a write is captured again
+- *(core)* Make model:create-entity independent of the CMS module
+- *(core)* Show automated moderation columns for any moderated model, not CMS comments
+- *(core)* Resolve a preset's presettable from its own module
+- *(core)* Sync entity_id from the presettable being set, without re-entering __get
+- *(crud)* Reload the hits of a search under the user's ACL row filters
+- *(search)* Rerank on the text a model provides, and fail when there is none
+- *(settings)* Cover the managed form write path and narrow the reconciler JSON null to settings.value
+- *(search)* Vector guard forget() is proven for several model classes and the key registry TTL is renewed
+- *(settings)* Confirmed() only runs for a saved change that warn() still flags; move SettingChangeWarning to Data
+- *(search)* Pgvector query uses a literal model filter, checks the index in the catalog first and guards dimensions
+- *(core)* Stop the select guard from recursing while resolving the acting user
+- *(core)* Merge every module lang directory per locale in the translations payload
+- *(core)* Standalone validation and passwords locale files
+- *(crud)* Facet aggregates valid under only_full_group_by
+- *(crud)* Update validation excludes the record from its own unique checks
+- *(core)* CrudService resolves the key of a form request that was never validated
+
+### 💼 Other
+
+- Make module-enumerating Core tests module-agnostic
+
+Permission manifest, permission refresh, seed graph, capability scanner,
+Filament plugin/trait resolution and runtime setting tests no longer name
+CMS, AI, ERP, MES or SAO classes. They loop installed modules or use Core
+stubs. Module-specific assertions moved into each module. The domain action
+permission coverage check moved to the application integration suite.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016bQ9UWLJjnRQA6sGEYNGPL
+- Resolve App-namespace entities in fetchAvailableEntities
+
+The entity class was built by swapping the module segment, so an App type
+resolved a nonexistent Modules\App\Models\Entity. It now uses the same
+resolution as presets and presettables.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016bQ9UWLJjnRQA6sGEYNGPL
+- Test dynamic entities with Core-owned App fixtures
+
+Core tests no longer use CMS or ERP entities, presets and contents.
+Fixtures live in stubs/App (App\\Casts\\EntityType, App\\Models\\Entity,
+Preset, Pivot\\Presettable, Page, Author): Core resolves concrete dynamic
+entity classes by module convention, and the App namespace is the one a
+fixture outside a module resolves to. Adds a regression test for App
+entity resolution in fetchAvailableEntities. The CMS presettable case
+moved to CMS.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016bQ9UWLJjnRQA6sGEYNGPL
+
+### 🚜 Refactor
+
+- *(search)* Delete the orphaned SentenceTransformers embedding generator
+- *(core)* Benchmark output goes to the console only, not to the log
+- *(core)* The pre-processing events own their cache key and its lifetime
+
+### 📚 Documentation
+
+- *(core)* Describe the RestrictsCrudWrites guard on generic CRUD
+- *(core)* RAG covers the write guard, the single approve permission and HasForm's gate
+- *(core)* Graph materialized edges were measured and not built
+- *(core)* Retrieval pipeline notes the tuner's overfitting safeguards
+- *(search)* An IReranker that cannot score must throw, not answer
+- Vector availability guard, pgvector partial indexes, managed settings and change confirmations
+- *(core)* User preferences, user and developer guides
+- *(core)* AI moderation is configured by settings, not AI_MODERATION_* env
+
+### ⚡ Performance
+
+- *(core)* Superadmin permissions from the registrar cache, cached modification tab counts; fix Horizon widget counts
+
+### 🧪 Testing
+
+- *(core)* Preset versioning follows the preset's connection
+- *(core)* Required modules boot before their dependents
+- *(core)* Only Core search creates and drops search indexes
+- *(search)* A committed tuning profile must cite a validated report
+- *(core)* Use Core fixtures instead of CMS models as sample models
+- *(search)* Cover the once-per-key memo of the profile index
+- *(core)* The vector model context test reads config through the same repository as the code, and the index ownership rule allows the embedding switch
+
 ## [1.78.0] - 2026-09-29
 
 ### 🚀 Features
