@@ -96,7 +96,7 @@ When an **active** `Modification` is **created** (`wasRecentlyCreated`), Core em
 
 | Layer | Keys |
 |-------|------|
-| AI global | `ai.features.moderation.*` (`AI_MODERATION_*` env) |
+| AI global | `ai.features.moderation.*`, AI module settings `features.moderation.*` in Filament (group `ai`); no env variable |
 | Per entity | AI module setting `ai.features.moderation.entities.{table}` (group `moderation`), offered only for models with a registered `ModerationAdapter` |
 | System actor | the user named by `permission.users.system` (`SYSTEM_USER`), seeded by Core |
 
