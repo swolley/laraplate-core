@@ -3220,7 +3220,7 @@ class CrudService
 
     private function resolveKeyFromRequest(Request $request, string $key): mixed
     {
-        if ($request instanceof FormRequest) {
+        if ($request instanceof FormRequest && $this->hasBeenValidated($request)) {
             $validated = $request->validated($key);
 
             if ($validated !== null && $validated !== '') {
@@ -3229,6 +3229,15 @@ class CrudService
         }
 
         return $request->input($key) ?? $request->route($key);
+    }
+
+    /**
+     * Whether the form request went through validation. A caller that builds one by hand, as the AI
+     * assistant's tools do, never runs it, and `validated()` on such a request fails on a null validator.
+     */
+    private function hasBeenValidated(FormRequest $request): bool
+    {
+        return (fn (): bool => $this->validator !== null)->call($request);
     }
 
     /**
