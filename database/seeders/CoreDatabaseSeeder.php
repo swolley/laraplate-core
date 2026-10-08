@@ -95,7 +95,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('locking.prevent_modifications', true, SettingTypeEnum::Boolean, 'locking', 'Whether saves, deletes, and replicates on locked models should be blocked'),
             self::setting('locking.prevent_notifications', false, SettingTypeEnum::Boolean, 'locking', 'Prevents notifications to locked records'),
             self::setting('crud.dynamic_entities', false, SettingTypeEnum::Boolean, 'core', 'Enable dynamic entities'),
-            self::setting('crud.expose_api', false, SettingTypeEnum::Boolean, 'core', 'Expose CRUD API endpoints'),
+            self::setting('expose_api', false, SettingTypeEnum::Boolean, 'core', 'Expose the API: gates every /api route, Core and modules'),
             self::setting('soft_deletes.expiration_days', 0, SettingTypeEnum::Integer, 'soft_deletes', 'Days before soft-deleted records are purged (0 = never)'),
             self::setting('translations.cache.enabled', true, SettingTypeEnum::Boolean, 'translations', 'Cache translation results'),
             self::setting('notifications.enabled', true, SettingTypeEnum::Boolean, 'notifications', 'Enable pending approval notifications'),

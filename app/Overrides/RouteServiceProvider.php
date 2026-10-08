@@ -51,7 +51,7 @@ abstract class RouteServiceProvider extends ServiceProvider
         $name_prefix = $this->getPrefix();
         $route_prefix = 'api';
         Route::prefix($route_prefix . '/v1')
-            ->middleware($route_prefix)
+            ->middleware([$route_prefix, 'api_access'])
             ->name(sprintf('%s.%s.', $name_prefix, $route_prefix))
             ->group([
                 module_path($this->name, '/routes/api.php'),

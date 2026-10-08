@@ -20,6 +20,7 @@ use Filament\Commands\FileGenerators\Resources\Schemas\ResourceFormSchemaClassGe
 use Filament\Commands\FileGenerators\Resources\Schemas\ResourceInfolistSchemaClassGenerator;
 use Filament\Commands\FileGenerators\Resources\Schemas\ResourceTableClassGenerator;
 use Filament\Forms\Components\Toggle;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Container\BindingResolutionException;
@@ -30,7 +31,9 @@ use Illuminate\Database\Eloquent\SoftDeletes as BaseSoftDeletes;
 use Illuminate\Database\Migrations\Migrator as LaravelMigrator;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Console\RouteListCommand as LaravelRouteListCommand;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Console\MonitorCommand as LaravelQueueMonitorCommand;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -38,11 +41,13 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
+use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Scout\EngineManager;
 use Modules\Core\ApplicationContent\ApplicationContentRetrievalProviderRegistry;
 use Modules\Core\ApplicationContent\Contracts\ApplicationContentRetrievalProviderRegistryInterface;
@@ -68,7 +73,7 @@ use Modules\Core\Graph\GraphToolGateway;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ApplyDatabaseSettingsOverlay;
-use Modules\Core\Http\Middleware\EnsureCrudApiAreEnabled;
+use Modules\Core\Http\Middleware\AuthenticateApiRequest;
 use Modules\Core\Http\Middleware\LocalizationMiddleware;
 use Modules\Core\Http\Middleware\PreviewMiddleware;
 use Modules\Core\Import\Events\ImportSessionCompleted;
@@ -654,15 +659,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
             ]);
         }
 
+        if (config('core.auth.passkeys.enabled')) {
+            $features[] = Features::passkeys();
+        }
+
         config()->set('fortify.features', $features);
     }
 
     private function registerMigrationOverrides(): void
     {
-        if (config('core.auth.passkeys.enabled')) {
-            $features[] = Features::passkeys();
-        }
-
         $this->app->booted(function (): void {
             $this->app->loadDeferredProvider('migrator');
 
@@ -840,6 +845,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
             // RouteRegistrar which is built, never bound to a route, and discarded —
             // which is why these middleware had never run outside the panel.
             $router->pushMiddlewareToGroup($group, ApplyDatabaseSettingsOverlay::class);
+
+            if ($group === 'api') {
+                // Right after the overlay, which supplies the switch it reads, and ahead of route model
+                // binding (moved to the end below): a refused request must not learn whether a record exists.
+                $router->pushMiddlewareToGroup($group, AuthenticateApiRequest::class);
+            }
+
             $router->pushMiddlewareToGroup($group, LocalizationMiddleware::class);
             // Request-scoped: ?preview=true arms HasApprovals for this call only.
             // The SPA re-sends the param when it wants the overlay; the session is
@@ -848,9 +860,23 @@ final class CoreServiceProvider extends ModuleServiceProvider
             $router->pushMiddlewareToGroup($group, AddContext::class . ':' . $scope);
         }
 
+        $router->middlewareGroup('api', [
+            ...array_filter($router->getMiddlewareGroups()['api'] ?? [], static fn (string $middleware): bool => $middleware !== SubstituteBindings::class),
+            SubstituteBindings::class,
+        ]);
+
         $router->aliasMiddleware('role', RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
         $router->aliasMiddleware('role_or_permission', RoleOrPermissionMiddleware::class);
-        $router->aliasMiddleware('crud_api', EnsureCrudApiAreEnabled::class);
+        $router->aliasMiddleware('api_access', AuthenticateApiRequest::class);
+
+        // One limiter for the whole /api surface: per token once a token authenticated, else per client address.
+        RateLimiter::for('api', static function (Request $request): Limit {
+            $user = $request->user();
+            $token = $user instanceof CoreUser ? $user->currentAccessToken() : null;
+            $key = $token instanceof PersonalAccessToken ? 'token:' . $token->id : 'ip:' . $request->ip();
+
+            return Limit::perMinute(config()->integer('core.api.rate_limit_per_minute', 600))->by($key);
+        });
     }
 }

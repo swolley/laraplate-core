@@ -18,5 +18,3 @@ use Illuminate\Support\Facades\Route;
 Route::name('crud.')->prefix('/crud')->group(function (): void {
     require __DIR__ . '/graph.php';
 });
-
-require __DIR__ . '/crud.php';

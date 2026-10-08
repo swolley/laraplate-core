@@ -71,7 +71,7 @@ it('outputs json when asked', function (): void {
         'parameters' => ['module' => 'cms', 'entity' => 'contents'],
     ])
         ->and($payload['methods'])->toContain('GET')
-        ->and($payload['middleware'])->toBe(['api', 'crud_api']);
+        ->and($payload['middleware'])->toBe(['api', 'api_access']);
 });
 
 it('prompts for the url when the argument is missing', function (): void {

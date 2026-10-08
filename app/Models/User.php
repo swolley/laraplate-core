@@ -32,6 +32,7 @@ use Lab404\Impersonate\Services\ImpersonateManager;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Passkeys\PasskeyAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\ILockableModel;
@@ -57,6 +58,8 @@ use UnexpectedValueException;
 #[ObservedBy([UserObserver::class])]
 class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail, PasskeyUser
 {
+    use HasApiTokens;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory;
     use HasLocks;

@@ -126,7 +126,7 @@ final class RouteServiceProvider extends ServiceProvider
         $route_prefix = 'api';
 
         Route::prefix($route_prefix . '/v1')
-            ->middleware([$route_prefix, 'crud_api'])
+            ->middleware([$route_prefix, 'api_access'])
             ->name(sprintf('%s.%s.', $name_prefix, $route_prefix))
             ->namespace($this->namespace)
             ->group([

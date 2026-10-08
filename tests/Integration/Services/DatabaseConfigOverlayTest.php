@@ -38,14 +38,14 @@ it('overlays settings under the namespace of the module that declares them', fun
 it('applies a single setting model onto runtime config', function (): void {
     $config = new Repository([
         'core' => [
-            'crud.expose_api' => true,
+            'expose_api' => true,
         ],
     ]);
 
     $overlay = new DatabaseConfigOverlay($config);
 
     $setting = new Setting([
-        'name' => 'crud.expose_api',
+        'name' => 'expose_api',
         'module' => 'Core',
         'value' => false,
         'type' => SettingTypeEnum::Boolean,
@@ -54,7 +54,7 @@ it('applies a single setting model onto runtime config', function (): void {
 
     $overlay->applySetting($setting);
 
-    expect($config->get('core.crud.expose_api'))->toBeFalse();
+    expect($config->get('core.expose_api'))->toBeFalse();
 });
 
 it('does not apply settings that no module declares', function (): void {

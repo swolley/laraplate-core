@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Sanctum\Contracts\HasAbilities;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
@@ -303,6 +305,47 @@ final class AuthorizationService
     }
 
     /**
+     * Resolve the user from request, falling back to anonymous user if needed.
+     *
+     * Public for the API middleware, which resolves the anonymous user before the controller runs.
+     */
+    public function resolveUser(Request $request): ?User
+    {
+        $user = $request->user();
+
+        if ($user instanceof User) {
+            return $user;
+        }
+
+        $guest_name = config('permission.users.guest');
+
+        if (! is_string($guest_name) || $guest_name === '') {
+            return null;
+        }
+
+        // Keyed by the configured name: a stale user must not survive a rename of the guest account.
+        $anonymous = Cache::rememberForever(
+            'anonymous_user.' . $guest_name,
+            static fn (): ?User => User::query()->where('name', $guest_name)->first(),
+        );
+
+        if ($anonymous === null) {
+            return null;
+        }
+
+        // The `api` guard is stateless and has no session to log into: the user is set on it directly.
+        if (Auth::getDefaultDriver() === 'api') {
+            Auth::guard('api')->setUser($anonymous);
+        } else {
+            Auth::login($anonymous);
+        }
+
+        $request->setUserResolver(fn (): User => $anonymous);
+
+        return $anonymous;
+    }
+
+    /**
      * Superadmin-aware check that a request's user holds a fully-qualified
      * permission name. Shared by the entity- and model-based gates.
      */
@@ -322,7 +365,25 @@ final class AuthorizationService
         // ancestor role, so the gate denied what the role model itself reports as granted.
         // The guard is the request's: `web` for the session routes, `api` once the API
         // middleware has switched the default guard.
-        return $user->hasPermission($permission_name, Auth::getDefaultDriver());
+        return $user->hasPermission($permission_name, Auth::getDefaultDriver())
+            && $this->tokenAllows($user, $permission_name);
+    }
+
+    /**
+     * A personal access token narrows what the role grants: the permission has to be among its
+     * abilities, and the wildcard ability is never accepted. A request with no token (anonymous or
+     * a session) is not narrowed.
+     */
+    private function tokenAllows(User $user, string $permission_name): bool
+    {
+        /** @var HasAbilities|null $token A session carries a transient token, a bearer request a personal one */
+        $token = $user->currentAccessToken();
+
+        if (! $token instanceof PersonalAccessToken) {
+            return true;
+        }
+
+        return in_array($permission_name, $token->abilities ?? [], true);
     }
 
     /**
@@ -456,44 +517,5 @@ final class AuthorizationService
         return once(fn (): Permission => Permission::query()
             ->where(['name' => $permission_name, 'guard_name' => $guard_name])
             ->firstOrFail());
-    }
-
-    /**
-     * Resolve the user from request, falling back to anonymous user if needed.
-     */
-    private function resolveUser(Request $request): ?User
-    {
-        $user = $request->user();
-
-        if ($user instanceof User) {
-            return $user;
-        }
-
-        $guest_name = config('permission.users.guest');
-
-        if (! is_string($guest_name) || $guest_name === '') {
-            return null;
-        }
-
-        // Keyed by the configured name: a stale user must not survive a rename of the guest account.
-        $anonymous = Cache::rememberForever(
-            'anonymous_user.' . $guest_name,
-            static fn (): ?User => User::query()->where('name', $guest_name)->first(),
-        );
-
-        if ($anonymous === null) {
-            return null;
-        }
-
-        // The `api` guard is stateless and has no session to log into: the user is set on it directly.
-        if (Auth::getDefaultDriver() === 'api') {
-            Auth::guard('api')->setUser($anonymous);
-        } else {
-            Auth::login($anonymous);
-        }
-
-        $request->setUserResolver(fn (): User => $anonymous);
-
-        return $anonymous;
     }
 }

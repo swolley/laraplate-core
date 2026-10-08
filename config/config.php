@@ -56,6 +56,26 @@ return [
     // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
     'force_https' => env('FORCE_HTTPS', false),
 
+    /**
+     * Master switch of every /api route, Core and modules. A runtime setting (`expose_api`)
+     * overrides this default; off, no API route answers.
+     */
+    'expose_api' => false,
+
+    'api' => [
+        /**
+         * Requests a minute per token, or per client address when there is no token.
+         */
+        'rate_limit_per_minute' => 600,
+    ],
+
+    'api_tokens' => [
+        /**
+         * Longest life of a personal access token, in days.
+         */
+        'max_lifetime_days' => 365,
+    ],
+
     /*
      * How near an expiry has to be for HasValidity's `expiring` scope to report a
      * record, when the caller names no window of its own. Hours, because the right

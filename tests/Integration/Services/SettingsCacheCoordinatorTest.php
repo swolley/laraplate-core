@@ -69,10 +69,10 @@ it('invalidates settings on model save via observer', function (): void {
 });
 
 it('syncs runtime config on model save via observer after cache flush', function (): void {
-    config(['core.crud.expose_api' => true]);
+    config(['core.expose_api' => true]);
 
     $setting = Setting::factory()->persistedWithoutApprovalCapture()->create([
-        'name' => 'crud.expose_api',
+        'name' => 'expose_api',
         'module' => 'Core',
         'value' => true,
         'type' => SettingTypeEnum::Boolean,
@@ -80,13 +80,13 @@ it('syncs runtime config on model save via observer after cache flush', function
         'description' => 'Expose CRUD API endpoints',
     ]);
 
-    expect(config('core.crud.expose_api'))->toBeTrue();
+    expect(config('core.expose_api'))->toBeTrue();
 
     $setting->setForcedApprovalUpdate(true);
     $setting->value = false;
     $setting->save();
 
-    expect(config('core.crud.expose_api'))->toBeFalse();
+    expect(config('core.expose_api'))->toBeFalse();
 });
 
 it('does not sync non-overlay settings onto runtime config when saved', function (): void {
