@@ -82,19 +82,27 @@ class ModuleServiceProvider extends ServiceProvider
         $viewPath = $this->getResourcePath('views');
         $sourcePath = module_path($this->name, 'resources/views');
 
-        $this->publishes([$sourcePath => $viewPath], ['views', $this->nameLower . '-module-views']);
+        // A module without views (no resources/views folder) registers no view path: `view:cache`
+        // walks every registered path and aborts on one that does not exist.
+        $hasViews = is_dir($sourcePath);
 
-        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
+        if ($hasViews) {
+            $this->publishes([$sourcePath => $viewPath], ['views', $this->nameLower . '-module-views']);
+        }
+
+        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), $hasViews ? [$sourcePath] : []), $this->nameLower);
 
         $componentNamespace = $this->module_namespace($this->name, $this->app_path(config('modules.paths.generator.component-class.path')));
         Blade::componentNamespace($componentNamespace, $this->nameLower);
 
-        // Anonymous components: <x-mes::layouts.master> resolves to the module's own
+        // Anonymous components: <x-cms::layouts.master> resolves to the module's own
         // resources/views/layouts/master.blade.php. componentNamespace() above only covers
         // class-based components, and the default anonymous lookup expects a components/
-        // subfolder, so without this the module scaffold views cannot be compiled and
-        // `php artisan view:cache` fails on them.
-        Blade::anonymousComponentPath($sourcePath, $this->nameLower);
+        // subfolder, so without this a module's anonymous component views cannot be compiled
+        // and `php artisan view:cache` fails on them.
+        if ($hasViews) {
+            Blade::anonymousComponentPath($sourcePath, $this->nameLower);
+        }
     }
 
     /**
