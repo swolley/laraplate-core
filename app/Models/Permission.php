@@ -6,6 +6,8 @@ namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Database\Factories\PermissionFactory;
@@ -87,10 +89,10 @@ final class Permission extends ModelsPermission
             'description' => ['string', 'max:255', 'nullable'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
-            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:' . CoreTables::Permissions->value . ',name'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', $this->uniqueNameOnGuard()],
         ]);
         $rules['update'] = array_merge($rules['update'], [
-            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', 'unique:' . CoreTables::Permissions->value . ',name,' . $this->id],
+            'name' => ['sometimes', 'string', 'max:255', 'regex:/^\\w+\\.\\w+\\.\\w+$/', $this->uniqueNameOnGuard()->ignore($this->id)],
         ]);
 
         return $rules;
@@ -118,5 +120,14 @@ final class Permission extends ModelsPermission
         $splitted = explode('.', $this->name);
 
         return ActionEnum::tryFrom(array_pop($splitted));
+    }
+
+    /**
+     * A permission name is unique per guard: every permission exists once for each guard it serves.
+     */
+    private function uniqueNameOnGuard(): Unique
+    {
+        return Rule::unique(CoreTables::Permissions->value, 'name')
+            ->where('guard_name', $this->guard_name ?? 'web');
     }
 }

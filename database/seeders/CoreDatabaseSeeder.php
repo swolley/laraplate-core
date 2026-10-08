@@ -161,7 +161,9 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
 
         $roles = self::getDefaultUserRoles();
 
-        $all_permissions = $permission_class::query()->get();
+        // The default roles live on the default guard and can only hold that guard's permissions;
+        // the `api` twins are granted to the roles of the `api` guard.
+        $all_permissions = $permission_class::query()->where('guard_name', $this->defaultGuard())->get();
 
         $roles_data = [
             [
@@ -246,7 +248,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $setting = new Setting;
         $permission_name = PermissionName::forModel($setting, ActionEnum::Select->value);
 
-        $permission = $permission_class::query()->where('name', $permission_name)->first(['id']);
+        $permission = $permission_class::query()->where(['name' => $permission_name, 'guard_name' => $this->defaultGuard()])->first(['id']);
 
         if ($permission === null) {
             $this->command?->line("    - permission {$permission_name} missing, skipping settings ACL");

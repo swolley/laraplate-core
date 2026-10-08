@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Services\Authorization;
 
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Auth\SessionGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -319,12 +318,11 @@ final class AuthorizationService
             return true;
         }
 
-        /** @var SessionGuard $guard */
-        $guard = Auth::guard();
-
         // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
         // ancestor role, so the gate denied what the role model itself reports as granted.
-        return $user->hasPermission($permission_name, $guard->name);
+        // The guard is the request's: `web` for the session routes, `api` once the API
+        // middleware has switched the default guard.
+        return $user->hasPermission($permission_name, Auth::getDefaultDriver());
     }
 
     /**
@@ -447,14 +445,16 @@ final class AuthorizationService
     }
 
     /**
-     * Resolve a Permission model instance by name, memoized for the current request.
+     * Resolve a Permission model instance by name on the active guard, memoized for the current request.
      *
      * @param  string  $permission_name  The full permission name (e.g., 'default.orders.select')
      */
     private function resolvePermission(string $permission_name): Permission
     {
+        $guard_name = Auth::getDefaultDriver();
+
         return once(fn (): Permission => Permission::query()
-            ->where('name', $permission_name)
+            ->where(['name' => $permission_name, 'guard_name' => $guard_name])
             ->firstOrFail());
     }
 
@@ -469,17 +469,29 @@ final class AuthorizationService
             return $user;
         }
 
-        // Try to get anonymous user
+        $guest_name = config('permission.users.guest');
+
+        if (! is_string($guest_name) || $guest_name === '') {
+            return null;
+        }
+
+        // Keyed by the configured name: a stale user must not survive a rename of the guest account.
         $anonymous = Cache::rememberForever(
-            'anonymous_user',
-            static fn (): ?User => User::query()->where('name', 'anonymous')->first(),
+            'anonymous_user.' . $guest_name,
+            static fn (): ?User => User::query()->where('name', $guest_name)->first(),
         );
 
         if ($anonymous === null) {
             return null;
         }
 
-        Auth::login($anonymous);
+        // The `api` guard is stateless and has no session to log into: the user is set on it directly.
+        if (Auth::getDefaultDriver() === 'api') {
+            Auth::guard('api')->setUser($anonymous);
+        } else {
+            Auth::login($anonymous);
+        }
+
         $request->setUserResolver(fn (): User => $anonymous);
 
         return $anonymous;

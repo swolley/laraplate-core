@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -48,6 +49,7 @@ use Modules\Core\Support\PermissionName;
 use Override;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
@@ -289,7 +291,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
 
         try {
             return $this->hasPermissionViaRole(Permission::findByName(PermissionName::forModel($this, ActionEnum::Impersonate->value)));
-        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+        } catch (PermissionDoesNotExist) {
             return false;
         }
     }
@@ -342,16 +344,25 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
      */
     public function hasPermission(string $permission, ?string $guard_name = null): bool
     {
+     *
+     * Every route is evaluated on one guard: `null` is the guard of the current request
+     * ({@see Auth::getDefaultDriver()}), and a permission that does not exist on it is not held.
         if ($this->isSuperAdmin()) {
             return true;
         }
 
         return $this->resolvingAuthorization(function () use ($permission, $guard_name): bool {
-            if ($this->hasPermissionTo($permission, $guard_name)) {
-                return true;
+            try {
+                if ($this->hasPermissionTo($permission, $guard_name)) {
+                    return true;
+                }
+            } catch (PermissionDoesNotExist) {
+                return false;
+        $guard_name ??= Auth::getDefaultDriver();
+
             }
 
-            return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission));
+            return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission, $guard_name));
         });
     }
 

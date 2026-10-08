@@ -223,7 +223,7 @@ it('does not duplicate permissions when they already exist for the model table',
 
     $output = runPermissionsRefreshForCoverage([]);
 
-    expect(Permission::query()->where('name', $permission_name)->count())->toBe(1)
+    expect(Permission::query()->where(['name' => $permission_name, 'guard_name' => 'web'])->count())->toBe(1)
         ->and($output)->not->toContain("Created '{$permission_name}' permission");
 });
 
@@ -440,8 +440,8 @@ it('creates both verbs for a model that carries the locking trait', function ():
 
     runPermissionsRefreshForCoverage([]);
 
-    expect(Permission::query()->where('name', $lock_name)->count())->toBe(1)
-        ->and(Permission::query()->where('name', $unlock_name)->count())->toBe(1);
+    expect(Permission::query()->where(['name' => $lock_name, 'guard_name' => 'web'])->count())->toBe(1)
+        ->and(Permission::query()->where(['name' => $unlock_name, 'guard_name' => 'web'])->count())->toBe(1);
 });
 
 it('leaves both verbs out for a model that disables locking in its own code', function (): void {
@@ -488,8 +488,8 @@ it('keeps the verbs when locking is only switched off in settings', function ():
 
     runPermissionsRefreshForCoverage([]);
 
-    expect(Permission::query()->where('name', $lock_name)->count())->toBe(1)
-        ->and(Permission::query()->where('name', $unlock_name)->count())->toBe(1);
+    expect(Permission::query()->where(['name' => $lock_name, 'guard_name' => 'web'])->count())->toBe(1)
+        ->and(Permission::query()->where(['name' => $unlock_name, 'guard_name' => 'web'])->count())->toBe(1);
 });
 
 it('drops permissions that no longer match any inspected model', function (): void {
@@ -592,4 +592,36 @@ it('generates no permission for a model a module excludes', function (): void {
     runPermissionsRefreshForCoverage([]);
 
     expect(Permission::query()->where('table_name', $table)->count())->toBe(0);
+});
+
+it('creates every permission for the web and the api guard with the same name', function (): void {
+    $select_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Select);
+    $declared_name = 'default.zz_' . bin2hex(random_bytes(4)) . '.declared';
+    fakeDeclaredPermissions([$declared_name]);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    foreach ([$select_name, $declared_name] as $name) {
+        expect(Permission::query()->where('name', $name)->orderBy('guard_name')->pluck('guard_name')->all())
+            ->toBe(['api', 'web']);
+    }
+});
+
+it('creates the api twin of a permission that exists on web only and is idempotent on a second run', function (): void {
+    $permission_name = permissionNameForModel(PermissionsRefreshPlainModel::class, ActionEnum::Select);
+    Permission::query()->where('name', $permission_name)->delete();
+    Permission::query()->create(['name' => $permission_name, 'guard_name' => 'web']);
+
+    HelpersCache::setModels('active', [PermissionsRefreshPlainModel::class]);
+
+    runPermissionsRefreshForCoverage([]);
+    $count_after_first_run = Permission::query()->count();
+    $second_output = runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('name', $permission_name)->count())->toBe(2)
+        ->and(Permission::query()->where(['name' => $permission_name, 'guard_name' => 'api'])->exists())->toBeTrue()
+        ->and(Permission::query()->count())->toBe($count_after_first_run)
+        ->and($second_output)->not->toContain('Created');
 });

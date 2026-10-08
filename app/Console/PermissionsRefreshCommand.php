@@ -12,6 +12,7 @@ use function user_class;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Modules\Core\Authorization\PermissionManifest;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Helpers\HelpersCache;
@@ -33,6 +34,14 @@ use Throwable;
 
 final class PermissionsRefreshCommand extends Command
 {
+    /**
+     * The guards every permission is created for, same names on each. The first one is the
+     * stack's default guard and the only one whose creation messages carry no guard label.
+     *
+     * @var list<string>
+     */
+    private const array GUARDS = ['web', 'api'];
+
     /**
      * The name and signature of the console command.
      *
@@ -161,8 +170,13 @@ final class PermissionsRefreshCommand extends Command
             $table = $instance->getTable();
             $permission_class::flushEventListeners();
 
+            $found_rows = $permission_class::query()->where(['connection_name' => $connection_name, 'table_name' => $table])->get(['name', 'guard_name']);
+
             /** @var array<int,string> $found_permissions */
-            $found_permissions = $permission_class::query()->where(['connection_name' => $connection_name, 'table_name' => $table])->pluck('name')->toArray();
+            $found_permissions = $found_rows->pluck('name')->unique()->values()->all();
+
+            /** @var array<string,array<int,string>> $found_by_guard */
+            $found_by_guard = $found_rows->groupBy('guard_name')->map(static fn (Collection $rows): array => $rows->pluck('name')->all())->all();
             $new_model_suffix = $found_permissions !== [] ? ' for new model ' . $model : '';
 
             foreach ($common_permissions as $permission) {
@@ -221,19 +235,8 @@ final class PermissionsRefreshCommand extends Command
                     continue;
                 }
 
-                if (! in_array($permission_name, $found_permissions, true)) {
-                    $permission = $permission_class::query()->firstOrCreate(
-                        ['name' => $permission_name],
-                        ['guard_name' => config('auth.defaults.guard', 'web')],
-                    );
-
-                    if ($permission->wasRecentlyCreated) {
-                        if (! $quiet_mode) {
-                            $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
-                        }
-
-                        $changes = true;
-                    }
+                if ($this->ensureForEveryGuard($permission_class, $permission_name, $found_by_guard, 'permission', $new_model_suffix, $quiet_mode)) {
+                    $changes = true;
                 }
             }
 
@@ -242,19 +245,8 @@ final class PermissionsRefreshCommand extends Command
                 $permission_name = PermissionName::build($connection_name, $table, ActionEnum::Impersonate->value);
                 $all_permissions[] = $permission_name;
 
-                if (! in_array($permission_name, $found_permissions, true)) {
-                    $permission = $permission_class::query()->firstOrCreate(
-                        ['name' => $permission_name],
-                        ['guard_name' => config('auth.defaults.guard', 'web')],
-                    );
-
-                    if ($permission->wasRecentlyCreated) {
-                        if (! $quiet_mode) {
-                            $this->line(sprintf("<fg=green>Created</> '%s' permission %s", $permission_name, $new_model_suffix));
-                        }
-
-                        $changes = true;
-                    }
+                if ($this->ensureForEveryGuard($permission_class, $permission_name, $found_by_guard, 'permission', $new_model_suffix, $quiet_mode)) {
+                    $changes = true;
                 }
             }
 
@@ -268,16 +260,7 @@ final class PermissionsRefreshCommand extends Command
         foreach ($manifest->names() as $permission_name) {
             $all_permissions[] = $permission_name;
 
-            $permission = $permission_class::query()->firstOrCreate(
-                ['name' => $permission_name],
-                ['guard_name' => config('auth.defaults.guard', 'web')],
-            );
-
-            if ($permission->wasRecentlyCreated) {
-                if (! $quiet_mode) {
-                    $this->line(sprintf("<fg=green>Created</> '%s' declared permission", $permission_name));
-                }
-
+            if ($this->ensureForEveryGuard($permission_class, $permission_name, null, 'declared permission', '', $quiet_mode)) {
                 $changes = true;
             }
         }
@@ -330,6 +313,50 @@ final class PermissionsRefreshCommand extends Command
         } else {
             $connection->rollBack();
         }
+    }
+
+    /**
+     * Make a permission exist once for every guard in {@see self::GUARDS}, same name on each.
+     *
+     * Existing does not mean granted: the twin on another guard starts with no role attached.
+     * Only the default guard keeps the historical message, the others name their guard.
+     *
+     * @param  class-string<Permission>  $permission_class
+     * @param  array<string,array<int,string>>|null  $found_by_guard  Names already known per guard; null looks each one up.
+     * @return bool Whether a permission was created.
+     */
+    private function ensureForEveryGuard(
+        string $permission_class,
+        string $permission_name,
+        ?array $found_by_guard,
+        string $kind,
+        string $suffix,
+        bool $quiet_mode,
+    ): bool {
+        $created = false;
+
+        foreach (self::GUARDS as $guard) {
+            if ($found_by_guard !== null && in_array($permission_name, $found_by_guard[$guard] ?? [], true)) {
+                continue;
+            }
+
+            $permission = $permission_class::query()->firstOrCreate(
+                ['name' => $permission_name, 'guard_name' => $guard],
+            );
+
+            if (! $permission->wasRecentlyCreated) {
+                continue;
+            }
+
+            if (! $quiet_mode) {
+                $guard_label = $guard === self::GUARDS[0] ? '' : $guard . ' ';
+                $this->line(mb_rtrim(sprintf("<fg=green>Created</> '%s' %s%s %s", $permission_name, $guard_label, $kind, $suffix)));
+            }
+
+            $created = true;
+        }
+
+        return $created;
     }
 
     /**

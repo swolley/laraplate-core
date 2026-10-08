@@ -155,7 +155,7 @@ it('seeds a guest ACL that limits settings reads to public ones', function (): v
 
     $setting = new Setting;
     $permission = Permission::query()
-        ->where('name', PermissionName::forModel($setting, ActionEnum::Select->value))
+        ->where(['name' => PermissionName::forModel($setting, ActionEnum::Select->value), 'guard_name' => 'web'])
         ->sole();
     $guest = Role::query()->where('name', config('permission.roles.guest'))->sole();
 

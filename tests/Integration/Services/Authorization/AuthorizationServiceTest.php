@@ -474,7 +474,7 @@ it('checkPermission returns false when the request user is not a Core User model
 });
 
 it('checkPermission returns false when there is no request user and anonymous user does not exist', function (): void {
-    Cache::forget('anonymous_user');
+    Cache::forget('anonymous_user.anonymous');
 
     $entity = 'authz_no_anon_' . uniqid();
     $permission_name = 'default.' . $entity . '.select';

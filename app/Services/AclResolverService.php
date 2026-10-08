@@ -412,7 +412,7 @@ final class AclResolverService
 
         foreach ($roles as $role) {
             // Skip roles that don't have this permission (direct or via ancestors)
-            if (! $role->hasPermission($permission->name)) {
+            if (! $role->hasPermission($permission->name, $permission->guard_name)) {
                 continue;
             }
 

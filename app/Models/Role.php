@@ -8,6 +8,7 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
@@ -21,7 +22,6 @@ use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
-use Spatie\Permission\Exceptions\GuardDoesNotMatch;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Models\Role as BaseRole;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
@@ -97,15 +97,28 @@ final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
     }
 
     /**
-     * @throws PermissionDoesNotExist
-     * @throws GuardDoesNotMatch
+     * Whether the role, or one of its ancestors, holds a permission on a guard.
+     *
+     * A role belongs to one guard and only speaks for it: asked about another guard it holds
+     * nothing, and so does an ancestor of another guard. A permission missing for the guard
+     * is not held, it is not an error.
+     *
+     * @param  string|null  $guard_name  `null` is the guard of the current request, {@see Auth::getDefaultDriver()}.
      */
-    public function hasPermission(string $permission): bool
+    public function hasPermission(string $permission, ?string $guard_name = null): bool
     {
-        $has_permission = parent::hasPermissionTo($permission);
+        $guard_name ??= Auth::getDefaultDriver();
 
-        if ($has_permission) {
-            return true;
+        if ($this->guard_name !== $guard_name) {
+            return false;
+        }
+
+        try {
+            if (parent::hasPermissionTo($permission, $guard_name)) {
+                return true;
+            }
+        } catch (PermissionDoesNotExist) {
+            return false;
         }
 
         /**
@@ -114,7 +127,7 @@ final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
          * @var Role $parent
          */
         foreach ($this->ancestors as $parent) {
-            if ($parent->hasPermission($permission)) {
+            if ($parent->hasPermission($permission, $guard_name)) {
                 return true;
             }
         }
