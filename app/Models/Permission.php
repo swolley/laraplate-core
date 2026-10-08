@@ -127,7 +127,9 @@ final class Permission extends ModelsPermission
      */
     private function uniqueNameOnGuard(): Unique
     {
-        return Rule::unique(CoreTables::Permissions->value, 'name')
-            ->where('guard_name', $this->guard_name ?? config('auth.defaults.guard', 'web'));
+        $default_guard = config('auth.defaults.guard', 'web');
+        $guard_name = $this->guard_name ?? (is_string($default_guard) ? $default_guard : 'web');
+
+        return Rule::unique(CoreTables::Permissions->value, 'name')->where('guard_name', $guard_name);
     }
 }
