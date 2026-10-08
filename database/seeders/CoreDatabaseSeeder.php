@@ -88,6 +88,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('auth.email_verification.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Require email verification for new users'),
             self::setting('auth.registration.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable public user registration'),
             self::setting('auth.two_factor.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable two-factor authentication'),
+            self::setting('auth.passkeys.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable passkey login (an addition to the password, never a replacement)'),
             self::setting('auth.licenses.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable user license checks'),
             self::setting('auth.social_login.enabled', false, SettingTypeEnum::Boolean, 'auth', 'Enable social login providers'),
             self::setting('locking.unlock_allowed', true, SettingTypeEnum::Boolean, 'locking', 'Allow unlocking locked records'),

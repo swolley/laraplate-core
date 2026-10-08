@@ -58,3 +58,18 @@ it('getAvailableProviders returns names of enabled providers only', function ():
 
     expect(array_values($providers))->toBe(['first', 'third']);
 });
+
+it('reports the second factor flag of the enabled provider that handles the request', function (): void {
+    $request = new Request();
+    $request->attributes->set('provider', 'social');
+
+    $password = new FakeEnabledProvider('password');
+    $social = new FakeEnabledProvider('social');
+    $social->secondFactor = true;
+    $disabled = new FakeDisabledProvider('social');
+    $disabled->secondFactor = true;
+
+    expect((new AuthenticationService([$password, $social]))->satisfiesSecondFactor($request))->toBeTrue()
+        ->and((new AuthenticationService([$password]))->satisfiesSecondFactor($request))->toBeFalse()
+        ->and((new AuthenticationService([$disabled]))->satisfiesSecondFactor($request))->toBeFalse();
+});

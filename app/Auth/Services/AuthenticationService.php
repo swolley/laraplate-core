@@ -36,6 +36,20 @@ final readonly class AuthenticationService
         ];
     }
 
+    /**
+     * Whether the enabled provider that handles the request already carries a second factor.
+     */
+    public function satisfiesSecondFactor(Request $request): bool
+    {
+        foreach ($this->providers as $provider) {
+            if ($provider->isEnabled() && $provider->canHandle($request)) {
+                return $provider->satisfiesSecondFactor();
+            }
+        }
+
+        return false;
+    }
+
     public function getAvailableProviders(): array
     {
         return array_map(

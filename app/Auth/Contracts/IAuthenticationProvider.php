@@ -33,6 +33,12 @@ interface IAuthenticationProvider
     public function isEnabled(): bool;
 
     /**
+     * Verifica se questo metodo di login porta già un secondo fattore (provider esterno, passkey),
+     * nel qual caso la sfida TOTP locale non viene richiesta.
+     */
+    public function satisfiesSecondFactor(): bool;
+
+    /**
      * Ritorna il nome del provider.
      */
     public function getProviderName(): string;

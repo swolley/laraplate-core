@@ -11,6 +11,8 @@ class FakeEnabledProvider implements IAuthenticationProvider
 {
     public bool $handleCalled = false;
 
+    public bool $secondFactor = false;
+
     public function __construct(private readonly string $name) {}
 
     public function canHandle(Request $request): bool
@@ -30,6 +32,11 @@ class FakeEnabledProvider implements IAuthenticationProvider
             'error' => null,
             'license' => null,
         ];
+    }
+
+    public function satisfiesSecondFactor(): bool
+    {
+        return $this->secondFactor;
     }
 
     public function isEnabled(): bool

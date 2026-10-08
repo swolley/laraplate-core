@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,9 @@ final readonly class HandleSocialLoginAction
     use ReadsSocialiteTokens;
 
     /**
+     * A custom `$userUpserter` owns user creation, so the registration switch is its concern. The
+     * default path creates a user only when `auth.registration.enabled` is on or the `social_id` is known.
+     *
      * @param  callable(SocialUser,string):Authenticatable  $userUpserter
      */
     public function __construct(
@@ -29,6 +33,12 @@ final readonly class HandleSocialLoginAction
     {
         /** @var SocialUser $socialUser */
         $socialUser = $this->socialite->driver($service)->user();
+
+        $refusal = $this->userUpserter ? null : $this->refusalFor($socialUser);
+
+        if ($refusal !== null) {
+            return redirect('/admin')->withErrors(['social' => $refusal]);
+        }
 
         $tokens = $this->socialiteTokens($socialUser);
 
@@ -56,5 +66,28 @@ final readonly class HandleSocialLoginAction
     public function redirect(string $service): RedirectResponse
     {
         return $this->socialite->driver($service)->redirect();
+    }
+
+    /**
+     * A social identity never attaches to an existing account by email, and a new one is created only
+     * while registration is open.
+     */
+    private function refusalFor(SocialUser $socialUser): ?string
+    {
+        $users = user_class()::query();
+
+        if (
+            $users->where('email', $socialUser->getEmail())
+                ->where(fn (Builder $query) => $query->whereNull('social_id')->orWhere('social_id', '!=', $socialUser->getId()))
+                ->exists()
+        ) {
+            return 'User already registered with another account type';
+        }
+
+        if (! config('core.auth.registration.enabled') && ! user_class()::query()->where('social_id', $socialUser->getId())->exists()) {
+            return 'Registration is disabled';
+        }
+
+        return null;
     }
 }

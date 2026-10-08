@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Auth\Providers;
 
 use App\Models\User;
-use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Modules\Core\Auth\Concerns\ValidatesUserAccount;
@@ -100,14 +99,14 @@ final class FortifyCredentialsProvider implements IAuthenticationProvider
     }
 
     #[Override]
+    public function satisfiesSecondFactor(): bool
+    {
+        return false;
+    }
+
+    #[Override]
     public function getProviderName(): string
     {
         return 'credentials';
-    }
-
-    private function shouldVerifyEmail(User $user): bool
-    {
-        return class_uses_trait($user, MustVerifyEmail::class)
-            && ! $user->hasVerifiedEmail();
     }
 }

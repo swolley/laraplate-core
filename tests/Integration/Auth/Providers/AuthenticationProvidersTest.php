@@ -251,7 +251,7 @@ it('authenticates social user successfully when data is valid', function (): voi
     Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
 
     expect((new AppUser)->getConnection()->getSchemaBuilder()->hasColumn((new AppUser)->getTable(), 'social_id'))->toBeTrue();
-    config(['core.auth.licenses.enabled' => false]);
+    config(['core.auth.licenses.enabled' => false, 'core.auth.registration.enabled' => true]);
     $success = $provider->authenticate(request()->duplicate(['provider' => 'github']));
     expect($success['error'])->toBeNull()
         ->and($success['success'])->toBeTrue()
@@ -276,7 +276,7 @@ it('covers socialite license error and enabled-license success branches', functi
     Socialite::shouldReceive('driver')->twice()->with('github')->andReturn($driver_mock);
 
     License::query()->delete();
-    config(['core.auth.licenses.enabled' => true]);
+    config(['core.auth.licenses.enabled' => true, 'core.auth.registration.enabled' => true]);
     $license_error = $provider->authenticate(request()->duplicate(['provider' => 'github']));
     expect($license_error['success'])->toBeFalse()
         ->and($license_error['error'])->toBe('No free licenses available');
@@ -309,4 +309,57 @@ it('covers socialite private checkLicense helper', function (): void {
     License::query()->delete();
 
     expect($method->invoke($provider, $user))->toBe('No free licenses available');
+});
+
+it('refuses a new social user while registration is disabled', function (): void {
+    $provider = new SocialiteProvider();
+    $social_user = (new SocialiteUser)
+        ->map([
+            'id' => 'social-closed',
+            'name' => 'Closed Social',
+            'nickname' => 'closed_social',
+            'email' => 'closed-social@example.test',
+        ])
+        ->setToken('token-closed')
+        ->setRefreshToken('refresh-closed');
+    $driver_mock = Mockery::mock();
+    $driver_mock->shouldReceive('user')->once()->andReturn($social_user);
+    Socialite::shouldReceive('driver')->once()->with('github')->andReturn($driver_mock);
+
+    config(['core.auth.licenses.enabled' => false, 'core.auth.registration.enabled' => false]);
+    $result = $provider->authenticate(request()->duplicate(['provider' => 'github']));
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['error'])->toBe('Registration is disabled')
+        ->and(AppUser::query()->where('social_id', 'social-closed')->exists())->toBeFalse();
+});
+
+it('keeps logging in a known social user while registration is disabled', function (): void {
+    $provider = new SocialiteProvider();
+    $social_user = (new SocialiteUser)
+        ->map([
+            'id' => 'social-known',
+            'name' => 'Known Social',
+            'nickname' => 'known_social',
+            'email' => 'known-social@example.test',
+        ])
+        ->setToken('token-known')
+        ->setRefreshToken('refresh-known');
+    $driver_mock = Mockery::mock();
+    $driver_mock->shouldReceive('user')->twice()->andReturn($social_user);
+    Socialite::shouldReceive('driver')->twice()->with('github')->andReturn($driver_mock);
+
+    config(['core.auth.licenses.enabled' => false, 'core.auth.registration.enabled' => true]);
+    expect($provider->authenticate(request()->duplicate(['provider' => 'github']))['success'])->toBeTrue();
+
+    config(['core.auth.registration.enabled' => false]);
+    $again = $provider->authenticate(request()->duplicate(['provider' => 'github']));
+
+    expect($again['success'])->toBeTrue()
+        ->and($again['error'])->toBeNull();
+});
+
+it('declares which login methods already carry a second factor', function (): void {
+    expect((new FortifyCredentialsProvider())->satisfiesSecondFactor())->toBeFalse()
+        ->and((new SocialiteProvider())->satisfiesSecondFactor())->toBeTrue();
 });

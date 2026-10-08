@@ -43,6 +43,8 @@ enum CoreTables: string
     case Versions = 'vend_versions';
     case Media = 'vend_media';
 
+    case Passkeys = 'core_passkeys';
+
     // do not modify because they are used in the Laravel core environment
     case Users = 'users';
     case PasswordResetTokens = 'password_reset_tokens';

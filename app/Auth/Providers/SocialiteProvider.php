@@ -47,6 +47,17 @@ final class SocialiteProvider implements IAuthenticationProvider
                 ];
             }
 
+            $isKnownSocialUser = User::query()->where('social_id', $socialUser->getId())->exists();
+
+            if (! $isKnownSocialUser && ! config('core.auth.registration.enabled')) {
+                return [
+                    'success' => false,
+                    'user' => null,
+                    'error' => 'Registration is disabled',
+                    'license' => null,
+                ];
+            }
+
             $tokens = $this->socialiteTokens($socialUser);
 
             $defaults = [
@@ -59,7 +70,7 @@ final class SocialiteProvider implements IAuthenticationProvider
                 'social_token_secret' => $tokens['token_secret'],
             ];
 
-            if (! User::query()->where('social_id', $socialUser->getId())->exists()) {
+            if (! $isKnownSocialUser) {
                 $defaults['password'] = Str::random(40);
             }
 
@@ -111,6 +122,12 @@ final class SocialiteProvider implements IAuthenticationProvider
     public function isEnabled(): bool
     {
         return config('core.auth.social_login.enabled', false);
+    }
+
+    #[Override]
+    public function satisfiesSecondFactor(): bool
+    {
+        return true;
     }
 
     #[Override]

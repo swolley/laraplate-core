@@ -14,15 +14,21 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
+use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Passkey as BasePasskey;
+use Laravel\Passkeys\Passkeys;
 use Modules\Core\Actions\Fortify\CreateNewUser;
 use Modules\Core\Actions\Fortify\ResetUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserPassword;
 use Modules\Core\Actions\Fortify\UpdateUserProfileInformation;
+use Modules\Core\Auth\PasskeyLoginAuthorizer;
 use Modules\Core\Auth\Providers\FortifyCredentialsProvider;
 use Modules\Core\Auth\Providers\SocialiteProvider;
+use Modules\Core\Auth\RedirectIfSecondFactorRequired;
 use Modules\Core\Auth\Services\AuthenticationService;
+use Modules\Core\Models\Passkey;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Override;
@@ -97,6 +103,7 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+        Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfSecondFactorRequired::class);
 
         RateLimiter::for('login', static function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())) . '|' . $request->ip());
@@ -109,6 +116,7 @@ final class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('im-still-here', static fn (Request $request) => Limit::perMinute(6)->by($request->session()->get('login.id')));
 
         $this->registerAuthenticateCallback();
+        $this->registerPasskeyLoginGuard();
     }
 
     /**
@@ -145,18 +153,46 @@ final class FortifyServiceProvider extends ServiceProvider
             if ($result['success']) {
                 $this->ensureModuleScope($request, $result['user']);
 
-                if (config('core.auth.licenses.enabled') && $result['license']) {
-                    session()->put('license_id', $result['license']->id);
-
-                    if (isset($result['license']->uuid)) {
-                        session()->put('license_uuid', $result['license']->uuid);
-                    }
-                }
+                $this->rememberLicense($result['license']);
 
                 return $result['user'];
             }
 
             return null;
         });
+    }
+
+    /**
+     * A verified passkey proves who the person is, not that the account may log in: the account checks of
+     * the password flow run before the session starts. The passkey itself is the second factor, so Fortify's
+     * TOTP redirect is not in this path.
+     */
+    private function registerPasskeyLoginGuard(): void
+    {
+        Passkeys::usePasskeyModel(Passkey::class);
+
+        Passkeys::authorizeLoginUsing(function (Request $request, PasskeyUser $user, BasePasskey $passkey): bool {
+            if (! $user instanceof \App\Models\User || $this->app->make(PasskeyLoginAuthorizer::class)->error($user) !== null) {
+                return false;
+            }
+
+            $this->ensureModuleScope($request, $user);
+            $this->rememberLicense($user->license);
+
+            return true;
+        });
+    }
+
+    private function rememberLicense(?object $license): void
+    {
+        if (! config('core.auth.licenses.enabled') || ! $license) {
+            return;
+        }
+
+        session()->put('license_id', $license->id);
+
+        if (isset($license->uuid)) {
+            session()->put('license_uuid', $license->uuid);
+        }
     }
 }

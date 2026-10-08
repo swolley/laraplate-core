@@ -29,7 +29,9 @@ use Lab404\Impersonate\Exceptions\InvalidUserProvider;
 use Lab404\Impersonate\Exceptions\MissingUserProvider;
 use Lab404\Impersonate\Models\Impersonate;
 use Lab404\Impersonate\Services\ImpersonateManager;
+use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\ILockableModel;
@@ -53,7 +55,7 @@ use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail
+class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
@@ -71,6 +73,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         isImpersonated as private isImpersonatedTrait;
     }
     use Notifiable;
+    use PasskeyAuthenticatable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
 

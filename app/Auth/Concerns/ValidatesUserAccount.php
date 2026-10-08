@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Auth\Concerns;
 
 use App\Models\User;
+use Illuminate\Auth\MustVerifyEmail;
 use Modules\Core\Models\License;
 
 trait ValidatesUserAccount
@@ -35,5 +36,11 @@ trait ValidatesUserAccount
         }
 
         return null;
+    }
+
+    private function shouldVerifyEmail(User $user): bool
+    {
+        return class_uses_trait($user, MustVerifyEmail::class)
+            && ! $user->hasVerifiedEmail();
     }
 }

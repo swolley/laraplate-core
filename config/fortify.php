@@ -167,6 +167,10 @@ return [
             ]);
         }
 
+        if (config('core.auth.passkeys.enabled')) {
+            $features[] = Features::passkeys();
+        }
+
         return $features;
     })(),
 ];

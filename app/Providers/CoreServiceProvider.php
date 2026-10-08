@@ -659,6 +659,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     private function registerMigrationOverrides(): void
     {
+        if (config('core.auth.passkeys.enabled')) {
+            $features[] = Features::passkeys();
+        }
+
         $this->app->booted(function (): void {
             $this->app->loadDeferredProvider('migrator');
 

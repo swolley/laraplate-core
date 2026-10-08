@@ -43,6 +43,11 @@ function scopeAuthService(User $user): AuthenticationService
                 return true;
             }
 
+            public function satisfiesSecondFactor(): bool
+            {
+                return false;
+            }
+
             public function getProviderName(): string
             {
                 return 'test';
@@ -203,6 +208,11 @@ it('authenticates via authentication service and stores license id when enabled'
                 return true;
             }
 
+            public function satisfiesSecondFactor(): bool
+            {
+                return false;
+            }
+
             public function getProviderName(): string
             {
                 return 'test';
@@ -247,6 +257,11 @@ it('returns null when authentication service reports failure', function (): void
             public function isEnabled(): bool
             {
                 return true;
+            }
+
+            public function satisfiesSecondFactor(): bool
+            {
+                return false;
             }
 
             public function getProviderName(): string

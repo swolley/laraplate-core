@@ -74,8 +74,14 @@ it('uses updateOrCreate and logs in when userUpserter is null', function (): voi
         )
         ->andReturn($userFromDb);
 
+    $queryBuilder->shouldReceive('where')->andReturnSelf();
+    $queryBuilder->shouldReceive('exists')->andReturn(false);
+
     HandleSocialLoginActionTestUserDouble::$queryBuilder = $queryBuilder;
-    config(['auth.providers.users.model' => HandleSocialLoginActionTestUserDouble::class]);
+    config([
+        'auth.providers.users.model' => HandleSocialLoginActionTestUserDouble::class,
+        'core.auth.registration.enabled' => true,
+    ]);
 
     Auth::shouldReceive('hasResolvedGuards')->andReturn(true);
     Auth::shouldReceive('guard')->andReturnSelf();
@@ -197,4 +203,131 @@ it('redirect returns redirect response from socialite driver', function (): void
     $response = $action->redirect('google');
 
     expect($response)->toBe($redirectResponse);
+});
+
+it('refuses a new social user and does not log in while registration is disabled', function (): void {
+    $socialUser = new class implements SocialUser
+    {
+        public string $token = 'token';
+
+        public ?string $refreshToken = null;
+
+        public ?string $tokenSecret = null;
+
+        public function getId()
+        {
+            return 'social-closed';
+        }
+
+        public function getNickname()
+        {
+            return 'nick';
+        }
+
+        public function getName()
+        {
+            return 'Closed';
+        }
+
+        public function getEmail()
+        {
+            return 'closed@example.com';
+        }
+
+        public function getAvatar()
+        {
+            return '';
+        }
+    };
+
+    $driver = Mockery::mock();
+    $driver->shouldReceive('user')->once()->andReturn($socialUser);
+    $socialite = Mockery::mock(SocialiteFactory::class);
+    $socialite->shouldReceive('driver')->with('github')->andReturn($driver);
+
+    $queryBuilder = Mockery::mock();
+    $queryBuilder->shouldReceive('where')->andReturnSelf();
+    $queryBuilder->shouldReceive('exists')->andReturn(false);
+    $queryBuilder->shouldNotReceive('updateOrCreate');
+
+    HandleSocialLoginActionTestUserDouble::$queryBuilder = $queryBuilder;
+    config([
+        'auth.providers.users.model' => HandleSocialLoginActionTestUserDouble::class,
+        'core.auth.registration.enabled' => false,
+    ]);
+
+    Auth::shouldReceive('hasResolvedGuards')->andReturn(true);
+    Auth::shouldReceive('guard')->andReturnSelf();
+    Auth::shouldReceive('setDispatcher')->andReturnNull();
+    Auth::shouldReceive('login')->never();
+    Event::fake();
+
+    $response = (new HandleSocialLoginAction(socialite: $socialite))('github');
+
+    expect($response->getStatusCode())->toBe(Response::HTTP_FOUND);
+    Event::assertNotDispatched(SocialLoginCompleted::class);
+});
+
+it('refuses a social user whose email belongs to another account and does not log in', function (): void {
+    $socialUser = new class implements SocialUser
+    {
+        public string $token = 'token';
+
+        public ?string $refreshToken = null;
+
+        public ?string $tokenSecret = null;
+
+        public function getId()
+        {
+            return 'social-conflict';
+        }
+
+        public function getNickname()
+        {
+            return 'nick';
+        }
+
+        public function getName()
+        {
+            return 'Conflict';
+        }
+
+        public function getEmail()
+        {
+            return 'taken@example.com';
+        }
+
+        public function getAvatar()
+        {
+            return '';
+        }
+    };
+
+    $driver = Mockery::mock();
+    $driver->shouldReceive('user')->once()->andReturn($socialUser);
+    $socialite = Mockery::mock(SocialiteFactory::class);
+    $socialite->shouldReceive('driver')->with('github')->andReturn($driver);
+
+    $queryBuilder = Mockery::mock();
+    $queryBuilder->shouldReceive('where')->andReturnSelf();
+    $queryBuilder->shouldReceive('exists')->once()->andReturn(true);
+    $queryBuilder->shouldNotReceive('updateOrCreate');
+
+    HandleSocialLoginActionTestUserDouble::$queryBuilder = $queryBuilder;
+    config([
+        'auth.providers.users.model' => HandleSocialLoginActionTestUserDouble::class,
+        'core.auth.registration.enabled' => true,
+    ]);
+
+    Auth::shouldReceive('hasResolvedGuards')->andReturn(true);
+    Auth::shouldReceive('guard')->andReturnSelf();
+    Auth::shouldReceive('setDispatcher')->andReturnNull();
+    Auth::shouldReceive('login')->never();
+    Event::fake();
+
+    $response = (new HandleSocialLoginAction(socialite: $socialite))('github');
+
+    expect($response->getStatusCode())->toBe(Response::HTTP_FOUND)
+        ->and(session('errors')->first('social'))->toBe('User already registered with another account type');
+    Event::assertNotDispatched(SocialLoginCompleted::class);
 });
