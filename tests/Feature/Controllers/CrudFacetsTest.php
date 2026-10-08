@@ -75,7 +75,7 @@ it('denies facets without the select permission on the entity', function (): voi
             . '?' . http_build_query(['columns' => ['group_name']]),
     );
 
-    $response->assertStatus(Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Response::HTTP_FORBIDDEN);
 });
 
 it('maps a facet failure onto a client error instead of letting it escape', function (): void {

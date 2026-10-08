@@ -221,7 +221,7 @@ final class MediaController extends Controller
 
             return $callback($permission_name);
         } catch (AuthorizationException $exception) {
-            return $this->errorResponse($request, $exception, Response::HTTP_UNAUTHORIZED);
+            return $this->errorResponse($request, $exception, $this->authorizationFailureStatus($request));
         } catch (ModelNotFoundException|NotFoundHttpException $exception) {
             return $this->errorResponse($request, $exception, Response::HTTP_NOT_FOUND);
         }

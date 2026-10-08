@@ -172,6 +172,6 @@ it('denies freshness without select permission', function (): void {
         route('core.crud.freshness', freshnessRouteParams()),
     );
 
-    // AuthorizationException is mapped to 401 by CrudController (sibling CRUD endpoints).
-    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_UNAUTHORIZED);
+    // AuthorizationException is mapped to 403 for an authenticated user by CrudController (sibling CRUD endpoints).
+    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_FORBIDDEN);
 });

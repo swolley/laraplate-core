@@ -90,5 +90,5 @@ it('denies pending approvals listing without approve permission', function (): v
         route('core.crud.pending-approvals', pendingApprovalsRouteParams()),
     );
 
-    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_FORBIDDEN);
 });

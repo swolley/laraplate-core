@@ -317,6 +317,15 @@ final class AuthorizationService
             return $user;
         }
 
+        return $this->resolveAnonymousUser($request);
+    }
+
+    /**
+     * The anonymous user (`permission.users.guest`) as the request user, whatever session or token the
+     * request carries. Null when the installation has no such account.
+     */
+    public function resolveAnonymousUser(Request $request): ?User
+    {
         $guest_name = config('permission.users.guest');
 
         if (! is_string($guest_name) || $guest_name === '') {

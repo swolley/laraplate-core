@@ -74,10 +74,10 @@ it('refuses a withdrawal through the API from anybody but the author', function 
     $this->setting->save();
     $modification = $this->setting->pendingModification();
 
-    // CrudController answers 401 to every AuthorizationException, not only to a missing login.
+    // CrudController answers 403 to an authenticated user an AuthorizationException refuses, 401 to the anonymous user.
     $this->actingAs($this->other_writer)
         ->patchJson(route('core.crud.withdraw', crudApprovalRouteParams()), ['id' => $this->setting->id, 'modification' => $modification->id])
-        ->assertStatus(401);
+        ->assertStatus(403);
 
     expect(Modification::query()->find($modification->id))->not->toBeNull();
 });

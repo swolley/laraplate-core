@@ -14,7 +14,7 @@ it('registers the api graph expand route under crud', function (): void {
 
     $this->actingAs($user)
         ->getJson('/api/v1/crud/graph/expand/Core/users/' . $user->getKey())
-        ->assertStatus(401);
+        ->assertStatus(403);
 });
 
 it('registers the api graph search route under crud', function (): void {
@@ -32,7 +32,7 @@ it('registers the api graph stats route under crud', function (): void {
 
     $this->actingAs($user)
         ->getJson('/api/v1/crud/graph/stats/Core/users/' . $user->getKey())
-        ->assertStatus(401);
+        ->assertStatus(403);
 });
 
 it('registers the web graph expand route under app crud', function (): void {
@@ -40,7 +40,7 @@ it('registers the web graph expand route under app crud', function (): void {
 
     $this->actingAs($user)
         ->get('/app/crud/graph/expand/Core/users/' . $user->getKey())
-        ->assertStatus(401);
+        ->assertStatus(403);
 });
 
 it('registers the web graph search route under app crud', function (): void {
@@ -56,5 +56,5 @@ it('registers the web graph stats route under app crud', function (): void {
 
     $this->actingAs($user)
         ->get('/app/crud/graph/stats/Core/users/' . $user->getKey())
-        ->assertStatus(401);
+        ->assertStatus(403);
 });

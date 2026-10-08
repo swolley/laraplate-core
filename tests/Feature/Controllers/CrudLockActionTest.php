@@ -147,7 +147,7 @@ it('needs the lock permission to freeze a record', function (): void {
         ['id' => $target->id, 'freeze' => true],
     );
 
-    $response->assertStatus(Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Response::HTTP_FORBIDDEN);
 
     expect($target->fresh()?->isLocked())->toBeFalse();
 });
@@ -178,7 +178,7 @@ it('needs the lock permission for an owned lock with no deadline', function (): 
         ['id' => $target->id, 'locked_until' => null],
     );
 
-    $response->assertStatus(Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Response::HTTP_FORBIDDEN);
 });
 
 it('lets a user release its own lock without the unlock permission', function (): void {
@@ -210,7 +210,7 @@ it('needs the unlock permission to release somebody else’s lock', function ():
         ['id' => $target->id],
     );
 
-    $response->assertStatus(Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Response::HTTP_FORBIDDEN);
 
     expect($target->fresh()?->isLocked())->toBeTrue();
 });

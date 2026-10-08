@@ -110,7 +110,7 @@ it('denies latest disapproval without select permission', function (): void {
             . '?' . http_build_query(['id' => $setting->getKey()]),
     );
 
-    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_UNAUTHORIZED);
+    $response->assertStatus(Symfony\Component\HttpFoundation\Response::HTTP_FORBIDDEN);
 });
 
 it('allows latest disapproval with select permission on the entity table', function (): void {

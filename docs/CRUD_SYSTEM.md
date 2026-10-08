@@ -638,7 +638,7 @@ What the API answers:
 | Insert, update, delete, activate or inactivate captured for approval | `202 Accepted` | `{modification, operation}` for one record; `{modifications: [...], applied}` when a multi-record write captured some of them |
 | Save of a record whose deletion waits for approval (`Block` models) | `409 Conflict` | error message |
 | Withdraw by the request's author | `200` | `{withdrawn: id}` |
-| Withdraw by anybody else | `401` | error message (every `AuthorizationException` answers 401) |
+| Withdraw by anybody else | `403` | error message (an `AuthorizationException` answers 403 to an authenticated user and 401 to the anonymous user) |
 | Withdraw of a request already decided | `409 Conflict` | error message |
 
 Pending requests are listed by `GET /app/crud/pending-approvals` (every entity) and

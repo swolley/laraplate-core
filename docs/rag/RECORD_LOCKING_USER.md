@@ -90,8 +90,8 @@ Answers:
 | 200, `data` empty | nothing was written: the lock is already exactly what you asked for |
 | 200, `data` with the record | the lock changed, and the record carries its current `lock_version` |
 | 423 | somebody else holds it, or it is frozen. The body names the holder and the deadline |
-| 403 | this class of record is configured so that nobody may unlock it |
-| 401 | you do not hold the permission the act requires |
+| 403 | this class of record is configured so that nobody may unlock it, or you are signed in and do not hold the permission the act requires |
+| 401 | you are not signed in (the anonymous user) and the act requires a permission |
 
 There is no heartbeat call. Call `lock` again periodically and read the answer: an empty `data`
 means your lock is still yours and still valid, and in that case not a single column is written.

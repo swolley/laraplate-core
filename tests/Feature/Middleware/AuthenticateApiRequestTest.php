@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Middleware\AuthenticateApiRequest;
+use Modules\Core\Http\Middleware\SelfAuthenticatedApiRoute;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
@@ -85,14 +86,13 @@ function apiAccessBearer(string $token): array
 }
 
 /**
- * What CrudController answers to every AuthorizationException (documented in CRUD_SYSTEM.md): the
- * status of a refused permission is its own, not the 403 of the middleware.
+ * What CrudController answers to a permission an authenticated principal lacks.
  *
  * @return array<string, mixed>
  */
-function apiAccessDenied(): array
+function apiAccessDenied(int $status = 403): array
 {
-    return ['meta' => ['status' => 401], 'error' => 'User not allowed to access this resource'];
+    return ['meta' => ['status' => $status], 'error' => 'User not allowed to access this resource'];
 }
 
 function apiAccessUrl(): string
@@ -155,7 +155,7 @@ describe('the anonymous fallback', function (): void {
         apiAccessEnsurePermission(API_ACCESS_ENTITY_PERMISSION);
         apiAccessAnonymous();
 
-        $this->getJson(apiAccessUrl())->assertUnauthorized()->assertJson(apiAccessDenied());
+        $this->getJson(apiAccessUrl())->assertUnauthorized()->assertJson(apiAccessDenied(401));
     });
 
     it('refuses an unsigned anonymous webhook delivery at the route', function (): void {
@@ -238,7 +238,7 @@ describe('token abilities and role permissions', function (): void {
         $user = apiAccessUserWithGrant();
         $token = $user->createToken('t', ['default.roles.select']);
 
-        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertUnauthorized()->assertJson(apiAccessDenied());
+        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertForbidden()->assertJson(apiAccessDenied());
     });
 
     it('refuses a token ability without the role permission', function (): void {
@@ -247,7 +247,7 @@ describe('token abilities and role permissions', function (): void {
         $user = apiAccessTokenable(User::factory()->create());
         $token = $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
 
-        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertUnauthorized()->assertJson(apiAccessDenied());
+        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertForbidden()->assertJson(apiAccessDenied());
     });
 
     it('never accepts the wildcard ability in place of a permission', function (): void {
@@ -255,7 +255,28 @@ describe('token abilities and role permissions', function (): void {
         $user = apiAccessUserWithGrant();
         $token = $user->createToken('t', ['*']);
 
-        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertUnauthorized()->assertJson(apiAccessDenied());
+        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertForbidden()->assertJson(apiAccessDenied());
+    });
+
+    it('refuses an authenticated user for a permission that does not exist on the api guard', function (): void {
+        CrudApiExposure::enable();
+        Permission::query()->where(['name' => API_ACCESS_ENTITY_PERMISSION, 'guard_name' => 'api'])->delete();
+        Permission::query()->firstOrCreate(['name' => API_ACCESS_ENTITY_PERMISSION, 'guard_name' => 'web']);
+        $user = apiAccessTokenable(User::factory()->create());
+        $token = $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
+
+        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertForbidden()->assertJson(apiAccessDenied());
+    });
+
+    it('refuses a session user who holds the permission only on the web guard', function (): void {
+        CrudApiExposure::enable();
+        apiAccessEnsurePermission(API_ACCESS_ENTITY_PERMISSION);
+        $role = Role::factory()->create(['name' => 'web_only_' . uniqid(), 'guard_name' => 'web']);
+        $role->givePermissionTo(Permission::query()->where(['name' => API_ACCESS_ENTITY_PERMISSION, 'guard_name' => 'web'])->firstOrFail());
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        $this->actingAs($user->fresh())->getJson(apiAccessUrl())->assertForbidden()->assertJson(apiAccessDenied());
     });
 
     it('serves a request that holds both the role permission and the token ability', function (): void {
@@ -276,7 +297,7 @@ describe('token abilities and role permissions', function (): void {
         Role::query()->where(['name' => 'api_revocable', 'guard_name' => 'api'])->firstOrFail()
             ->revokePermissionTo(Permission::query()->where(['name' => API_ACCESS_ENTITY_PERMISSION, 'guard_name' => 'api'])->firstOrFail());
 
-        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertUnauthorized()->assertJson(apiAccessDenied());
+        $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertForbidden()->assertJson(apiAccessDenied());
     });
 });
 
@@ -312,7 +333,26 @@ describe('rate limit', function (): void {
         $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertStatus(429);
 
         $other = $user->createToken('other', [API_ACCESS_ENTITY_PERMISSION]);
-        $this->getJson(apiAccessUrl(), apiAccessBearer($other->plainTextToken))->assertOk();
+        $this->withServerVariables(['REMOTE_ADDR' => '10.1.1.1'])
+            ->getJson(apiAccessUrl(), apiAccessBearer($other->plainTextToken))
+            ->assertOk();
+    });
+
+    it('limits the requests that carry a bearer per client address before the token is looked up', function (): void {
+        CrudApiExposure::enable();
+        config()->set('core.api.rate_limit_per_minute', 3);
+
+        $statuses = [];
+
+        foreach (range(1, 4) as $attempt) {
+            $statuses[] = $this->getJson(apiAccessUrl(), apiAccessBearer('1|invalid' . $attempt))->getStatusCode();
+        }
+
+        expect($statuses)->toBe([401, 401, 401, 429]);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.2.2.2'])
+            ->getJson(apiAccessUrl(), apiAccessBearer('1|invalid'))
+            ->assertUnauthorized();
     });
 });
 
@@ -341,5 +381,98 @@ describe('route registration', function (): void {
         expect($names)->not->toBeEmpty()
             ->and(array_unique($names))->toHaveCount(count($names))
             ->and(file_get_contents(base_path('Modules/Core/routes/api.php')))->not->toContain('crud.php');
+    });
+});
+
+describe('bearer and session', function (): void {
+    it('answers 401 for a session user who sends an invalid bearer instead of falling back to the session', function (): void {
+        CrudApiExposure::enable();
+        $user = apiAccessUserWithGrant();
+
+        $this->actingAs($user)->getJson(apiAccessUrl())->assertOk();
+
+        $this->actingAs($user)->getJson(apiAccessUrl(), apiAccessBearer('1|invalid'))->assertUnauthorized();
+    });
+
+    it('takes the principal from the token alone when both a session and a token are present', function (): void {
+        CrudApiExposure::enable();
+        $session_user = apiAccessUserWithGrant();
+        apiAccessEnsurePermission(API_ACCESS_ENTITY_PERMISSION);
+        $token_user = apiAccessTokenable(User::factory()->create());
+        $token = $token_user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
+
+        $this->actingAs($session_user)
+            ->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))
+            ->assertForbidden();
+    });
+});
+
+describe('self-authenticated routes', function (): void {
+    beforeEach(function (): void {
+        Route::middleware('api')->post('api/v1/_probe/self', static fn (Request $request) => response()->json([
+            'user' => $request->user()?->name,
+            'bearer' => $request->bearerToken(),
+        ]))->middleware(SelfAuthenticatedApiRoute::class);
+        Route::middleware('api')->post('api/v1/_probe/plain', static fn (Request $request) => response()->json([
+            'user' => $request->user()?->name,
+        ]));
+    });
+
+    it('still answers 403 while the switch is off', function (): void {
+        $this->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))->assertForbidden();
+    });
+
+    it('hands an arbitrary bearer to the route and runs it as the anonymous user', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous();
+
+        $this->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))
+            ->assertOk()
+            ->assertJson(['user' => 'anonymous', 'bearer' => 'own-secret']);
+    });
+
+    it('does not let a session user through as anybody but the anonymous user', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous();
+        $user = apiAccessUserWithGrant();
+
+        $this->actingAs($user)->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))
+            ->assertOk()
+            ->assertJson(['user' => 'anonymous']);
+    });
+
+    it('gives the same bearer a 401 on a route that is not marked', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous();
+
+        $this->postJson('/api/v1/_probe/plain', [], apiAccessBearer('own-secret'))->assertUnauthorized();
+    });
+
+    it('still rate limits a marked route per client address', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous();
+        config()->set('core.api.rate_limit_per_minute', 2);
+
+        foreach (range(1, 2) as $_) {
+            $this->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))->assertOk();
+        }
+
+        $this->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))->assertStatus(429);
+    });
+
+    it('is declared on the provider callbacks of ERP and on the MES machine ingest', function (): void {
+        $marked = collect(Route::getRoutes()->getRoutes())
+            ->filter(static fn (Illuminate\Routing\Route $route): bool => in_array(SelfAuthenticatedApiRoute::class, Route::gatherRouteMiddleware($route), true))
+            ->map(static fn (Illuminate\Routing\Route $route): string => $route->uri())
+            ->filter(static fn (string $uri): bool => ! str_contains($uri, '_probe'))
+            ->sort()
+            ->values()
+            ->all();
+
+        expect($marked)->toBe([
+            'api/v1/erp/einvoice/{provider}/callbacks',
+            'api/v1/erp/payment-requests/{provider}/callbacks',
+            'api/v1/mes/machine-data',
+        ]);
     });
 });

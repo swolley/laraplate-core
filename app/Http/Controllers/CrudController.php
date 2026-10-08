@@ -627,7 +627,7 @@ class CrudController extends Controller
                 new CrudResult(
                     data: null,
                     error: $ex->getMessage(),
-                    statusCode: Response::HTTP_UNAUTHORIZED,
+                    statusCode: $this->authorizationFailureStatus($request),
                 ),
                 $request,
             );

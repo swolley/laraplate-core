@@ -30,7 +30,7 @@ final class GraphController extends Controller
         } catch (ModelNotFoundException $exception) {
             return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_NOT_FOUND), $request);
         } catch (AuthorizationException $exception) {
-            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_UNAUTHORIZED), $request);
+            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: $this->authorizationFailureStatus($request)), $request);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -45,7 +45,7 @@ final class GraphController extends Controller
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (AuthorizationException $exception) {
-            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_UNAUTHORIZED), $request);
+            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: $this->authorizationFailureStatus($request)), $request);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -62,7 +62,7 @@ final class GraphController extends Controller
         } catch (ModelNotFoundException $exception) {
             return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_NOT_FOUND), $request);
         } catch (AuthorizationException $exception) {
-            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: Response::HTTP_UNAUTHORIZED), $request);
+            return $this->buildResponse(new CrudResult(null, error: $exception->getMessage(), statusCode: $this->authorizationFailureStatus($request)), $request);
         } catch (Throwable $exception) {
             report($exception);
 
