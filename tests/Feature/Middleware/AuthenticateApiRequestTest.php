@@ -333,14 +333,14 @@ describe('rate limit', function (): void {
         $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertStatus(429);
 
         $other = $user->createToken('other', [API_ACCESS_ENTITY_PERMISSION]);
-        $this->withServerVariables(['REMOTE_ADDR' => '10.1.1.1'])
-            ->getJson(apiAccessUrl(), apiAccessBearer($other->plainTextToken))
-            ->assertOk();
+        $this->getJson(apiAccessUrl(), apiAccessBearer($other->plainTextToken))->assertOk();
     });
 
-    it('limits the requests that carry a bearer per client address before the token is looked up', function (): void {
+    it('counts the failed bearer authentications per client address and refuses further bearers before the token lookup', function (): void {
         CrudApiExposure::enable();
         config()->set('core.api.rate_limit_per_minute', 3);
+        $user = apiAccessUserWithGrant();
+        $valid = $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
 
         $statuses = [];
 
@@ -350,9 +350,51 @@ describe('rate limit', function (): void {
 
         expect($statuses)->toBe([401, 401, 401, 429]);
 
+        $this->getJson(apiAccessUrl(), apiAccessBearer($valid->plainTextToken))->assertStatus(429);
+
         $this->withServerVariables(['REMOTE_ADDR' => '10.2.2.2'])
-            ->getJson(apiAccessUrl(), apiAccessBearer('1|invalid'))
-            ->assertUnauthorized();
+            ->getJson(apiAccessUrl(), apiAccessBearer($valid->plainTextToken))
+            ->assertOk();
+    });
+
+    it('counts every kind of failed bearer authentication against the address', function (string $case): void {
+        CrudApiExposure::enable();
+        config()->set('core.api.rate_limit_per_minute', 1);
+        $user = apiAccessUserWithGrant();
+
+        $header = match ($case) {
+            'expired' => $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION], now()->subMinute())->plainTextToken,
+            'superadmin' => (function (): string {
+                $admin = apiAccessTokenable(User::factory()->create());
+                $admin->assignRole(Role::findOrCreate('superadmin', 'web'));
+
+                return $admin->createToken('t', ['*'])->plainTextToken;
+            })(),
+            'cidr' => (function () use ($user): string {
+                $token = $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
+                $token->accessToken->forceFill(['allowed_cidrs' => json_encode(['10.0.0.0/8'])])->save();
+
+                return $token->plainTextToken;
+            })(),
+        };
+
+        $this->getJson(apiAccessUrl(), apiAccessBearer($header))->assertStatus($case === 'cidr' ? 403 : 401);
+        $this->getJson(apiAccessUrl(), apiAccessBearer($header))->assertStatus(429);
+    })->with(['expired', 'superadmin', 'cidr']);
+
+    it('does not let valid-token requests consume the per-address budget', function (): void {
+        CrudApiExposure::enable();
+        config()->set('core.api.rate_limit_per_minute', 3);
+        $user = apiAccessUserWithGrant();
+
+        foreach (range(1, 6) as $index) {
+            $token = $user->createToken('t' . $index, [API_ACCESS_ENTITY_PERMISSION]);
+
+            $this->getJson(apiAccessUrl(), apiAccessBearer($token->plainTextToken))->assertOk();
+        }
+
+        $failure = $this->getJson(apiAccessUrl(), apiAccessBearer('1|invalid'));
+        $failure->assertUnauthorized();
     });
 });
 

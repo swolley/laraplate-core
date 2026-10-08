@@ -24,8 +24,10 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * anonymous user, the network restriction of the token and the rate limit. A bearer
  * token that does not resolve is refused: it never falls back to the anonymous user, and
  * it never falls back to a web session either (the principal of a bearer request comes
- * from the token alone). Requests that carry a bearer are counted per client address
- * before the token is looked up, so repeated invalid tokens end in 429.
+ * from the token alone). Failed bearer authentications (unknown, malformed, expired, revoked,
+ * superadmin, address outside the allowed networks) are counted per client address, and an
+ * address over the limit gets 429 before the token is looked up; successful requests do not
+ * consume that budget.
  *
  * A route that authenticates its caller itself declares
  * `->middleware(SelfAuthenticatedApiRoute::class)`: the switch, the `api` guard and the
@@ -53,7 +55,7 @@ final readonly class AuthenticateApiRequest
         if ($this->isSelfAuthenticated($request)) {
             $user = $this->authorization->resolveAnonymousUser($request);
         } elseif ($this->hasBearerToken($request)) {
-            $this->throttleByAddress($request);
+            $this->refuseWhenTooManyFailures($request);
             $user = $this->authenticateToken($request);
         } else {
             $user = $this->authorization->resolveUser($request);
@@ -74,19 +76,34 @@ final readonly class AuthenticateApiRequest
             && in_array(SelfAuthenticatedApiRoute::class, resolve(Router::class)->gatherRouteMiddleware($route), true);
     }
 
-    /**
-     * Counts every request that carries a bearer against the client address, ahead of the token lookup.
-     */
-    private function throttleByAddress(Request $request): void
+    private function failureKey(Request $request): string
     {
-        $key = 'api-bearer:' . $request->ip();
-        $max = config()->integer('core.api.rate_limit_per_minute', 600);
+        return 'api-bearer-failures:' . $request->ip();
+    }
 
-        if (RateLimiter::tooManyAttempts($key, $max)) {
+    /**
+     * Refuses a bearer request, ahead of the token lookup, from an address that failed to authenticate
+     * more than the limit allows in the current window.
+     */
+    private function refuseWhenTooManyFailures(Request $request): void
+    {
+        $key = $this->failureKey($request);
+
+        if (RateLimiter::tooManyAttempts($key, config()->integer('core.api.rate_limit_per_minute', 600))) {
             abort(429, 'Too Many Attempts.', ['Retry-After' => (string) RateLimiter::availableIn($key)]);
         }
+    }
 
-        RateLimiter::hit($key, 60);
+    /**
+     * Counts a failed bearer authentication against the client address, then refuses the request.
+     *
+     * @param  array<string, string>  $headers
+     */
+    private function failAuthentication(Request $request, int $status, string $message, array $headers = []): never
+    {
+        RateLimiter::hit($this->failureKey($request), 60);
+
+        abort($status, $message, $headers);
     }
 
     /**
@@ -105,12 +122,8 @@ final readonly class AuthenticateApiRequest
         $user = $this->resolveTokenUser();
         $token = $user instanceof User ? $user->currentAccessToken() : null;
 
-        if (! $user instanceof User || ! $token instanceof PersonalAccessToken) {
-            abort(401, 'Unauthenticated.', ['WWW-Authenticate' => 'Bearer']);
-        }
-
-        if ($user->isSuperAdmin()) {
-            abort(401, 'Unauthenticated.', ['WWW-Authenticate' => 'Bearer']);
+        if (! $user instanceof User || ! $token instanceof PersonalAccessToken || $user->isSuperAdmin()) {
+            $this->failAuthentication($request, 401, 'Unauthenticated.', ['WWW-Authenticate' => 'Bearer']);
         }
 
         if (! $this->isAddressAllowed($token, $request->ip())) {
@@ -121,7 +134,7 @@ final readonly class AuthenticateApiRequest
                 'ip' => $request->ip(),
             ]);
 
-            abort(403, 'Forbidden');
+            $this->failAuthentication($request, 403, 'Forbidden');
         }
 
         return $user;
