@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Search\Services;
 
+use Closure;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Search\Contracts\IQueryIntentParser;
 use Modules\Core\Search\Contracts\ISearchEngine;
@@ -16,6 +18,8 @@ use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\DTOs\VectorAvailability;
 use Modules\Core\Search\Enums\QueryClass;
 use Modules\Core\Search\Enums\TextMatchPreference;
+use Modules\Core\Search\Support\SearchStageTimings;
+use Throwable;
 
 final readonly class AdvancedSearchService
 {
@@ -40,6 +44,9 @@ final readonly class AdvancedSearchService
     }
 
     /**
+     * With the `search.debug_timings` setting on, `meta['timings']` reports the milliseconds spent in the
+     * intent parser, the planner, the query embedding and the ensemble (rerank included), plus the total.
+     *
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
     public function search(
@@ -52,24 +59,31 @@ final readonly class AdvancedSearchService
         TextMatchPreference|string|null $matching = null,
         array $matchingOptions = [],
     ): AdvancedSearchResult {
+        $timings = (bool) config('core.search.debug_timings', false) ? new SearchStageTimings() : null;
         $engine = $this->engineFor($model);
 
         if (! $engine instanceof ISearchEngine || ! $engine->supportsOrchestratedSearch()) {
-            return AdvancedSearchResult::empty($page, $perPage, ['unsupported_driver' => true]);
+            $meta = ['unsupported_driver' => true];
+
+            if ($timings instanceof SearchStageTimings) {
+                $meta['timings'] = $timings->toMeta();
+            }
+
+            return AdvancedSearchResult::empty($page, $perPage, $meta);
         }
 
-        $intent = $this->intent_parser->parse($query);
+        $intent = $this->stage($timings, SearchStageTimings::INTENT, fn (): array => $this->intent_parser->parse($query));
         $search_query = $this->expandedQuery($intent, $query);
-        $plan = $this->planner->safePlan($query);
+        $plan = $this->stage($timings, SearchStageTimings::PLAN, fn (): array => $this->planner->safePlan($query));
         $plan['intent'] = $intent;
         $plan['retrieval']['size'] = $perPage;
         $plan = $this->applyEngineCapabilities($engine, $plan);
         $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
         $plan = $this->tuningProfile()->apply($plan, QueryClass::fromAnalysis($text_match->analysis));
         $availability = $this->vectorAvailability($model, $plan);
-        $vector = $availability->available ? $this->resolveVector($query, $plan) : null;
+        $vector = $availability->available ? $this->resolveVector($query, $plan, $timings) : null;
 
-        $result = $this->ensemble_search->search(
+        $result = $this->stage($timings, SearchStageTimings::ENSEMBLE, fn (): AdvancedSearchResult => $this->ensemble_search->search(
             model: $model,
             query: $search_query,
             plan: $plan,
@@ -79,10 +93,16 @@ final readonly class AdvancedSearchService
             filters: $filters,
             sort: $sort,
             textMatch: $text_match,
-        );
+        ));
 
-        if ($availability->available) {
+        if ($availability->available && ! $timings instanceof SearchStageTimings) {
             return $result;
+        }
+
+        $meta = $availability->available ? $result->meta : [...$result->meta, 'vector_disabled' => $availability->reason];
+
+        if ($timings instanceof SearchStageTimings) {
+            $meta['timings'] = $timings->toMeta();
         }
 
         return new AdvancedSearchResult(
@@ -91,8 +111,37 @@ final readonly class AdvancedSearchService
             page: $result->page,
             perPage: $result->perPage,
             totalPages: $result->totalPages,
-            meta: [...$result->meta, 'vector_disabled' => $availability->reason],
+            meta: $meta,
         );
+    }
+
+    /**
+     * Runs one stage of the search, timed only when timings were asked for. A stage that throws is rethrown
+     * unchanged; the durations measured up to that point are logged, since no result will carry them.
+     *
+     * @template TResult
+     *
+     * @param  SearchStageTimings::INTENT|SearchStageTimings::PLAN|SearchStageTimings::VECTOR|SearchStageTimings::ENSEMBLE  $stage
+     * @param  Closure(): TResult  $callback
+     * @return TResult
+     */
+    private function stage(?SearchStageTimings $timings, string $stage, Closure $callback): mixed
+    {
+        if (! $timings instanceof SearchStageTimings) {
+            return $callback();
+        }
+
+        try {
+            return $timings->measure($stage, $callback);
+        } catch (Throwable $exception) {
+            Log::info('Search stage failed; timings measured so far', [
+                'failed_stage' => $stage,
+                'timings' => $timings->toMeta(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -175,7 +224,7 @@ final readonly class AdvancedSearchService
      * @param  array<string, mixed>  $plan
      * @return list<float>|null
      */
-    private function resolveVector(string $query, array $plan): ?array
+    private function resolveVector(string $query, array $plan, ?SearchStageTimings $timings): ?array
     {
         $retrieval = is_array($plan['retrieval'] ?? null) ? $plan['retrieval'] : [];
 
@@ -183,10 +232,12 @@ final readonly class AdvancedSearchService
             return null;
         }
 
-        /** @var ITextEmbedder $embedder */
-        $embedder = $this->app->make(ITextEmbedder::class);
+        return $this->stage($timings, SearchStageTimings::VECTOR, function () use ($query): array {
+            /** @var ITextEmbedder $embedder */
+            $embedder = $this->app->make(ITextEmbedder::class);
 
-        return $embedder->embed($query);
+            return $embedder->embed($query);
+        });
     }
 
     /**

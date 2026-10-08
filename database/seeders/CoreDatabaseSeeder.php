@@ -111,6 +111,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('search.vector.model', 'sentence_transformers:intfloat/multilingual-e5-small', SettingTypeEnum::String, 'search', 'Active embedding model, as provider:model (set by the embedding model switch)', managed: true),
             self::setting('search.vector.suspended_reason', null, SettingTypeEnum::String, 'search', 'Why vector search is suspended, null when it is not (set by the embedding model switch)', managed: true),
             self::setting('search.adaptive_tuning', false, SettingTypeEnum::Boolean, 'search', 'Apply the committed retrieval tuning profile (config/search_tuning.php) per query class; off keeps the fixed planner values'),
+            self::setting('search.debug_timings', false, SettingTypeEnum::Boolean, 'search', 'Developer diagnostics: add per-stage search timings (intent, plan, vector, ensemble, total, in ms) to the search response meta'),
         ];
     }
 

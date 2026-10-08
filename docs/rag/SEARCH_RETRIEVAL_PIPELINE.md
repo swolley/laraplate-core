@@ -306,6 +306,74 @@ so a request in Italian ranks on Italian text and on the vectors.
 | `tuning` | present only when the tuning profile was applied: `{applied, profile_version, query_class}` |
 | `unsupported_driver` | present when the engine cannot orchestrate |
 | `vector_disabled` | present when the plan wanted vectors and the guard refused them: `disabled`, `suspended`, `dimension_mismatch` or `no_vectors` |
+| `timings` | present only when the `search.debug_timings` setting is on: `{intent_ms, plan_ms, vector_ms, ensemble_ms, total_ms}`, see [Measuring the stages](#measuring-the-stages) |
+
+`AdvancedSearchResult->meta` is what `CrudService` hands to `CrudMeta->search`. The CRUD HTTP response
+(`CrudController::buildResponse()`) does not serialize `CrudMeta->search` today, so these keys are read
+in PHP (tests, tinker, the AI evaluation commands), not in the JSON a client receives.
+
+### Measuring the stages
+
+The `search.debug_timings` runtime setting (config `core.search.debug_timings`, seeded off, group
+`search`) makes `AdvancedSearchService::search()` time its four costly stages with `hrtime()` and add
+`meta['timings']`, in milliseconds rounded to 3 decimals:
+
+| Key | Stage |
+|-----|-------|
+| `intent_ms` | `IQueryIntentParser::parse()` (an LLM call with the AI overlay, a stopword split without it) |
+| `plan_ms` | `ISearchPlanner::safePlan()` only (the AI planner caches a plan per query for 10 minutes) |
+| `vector_ms` | resolving `ITextEmbedder` and embedding the query; `null` when no embedding ran (no embedder bound, plan without vectors, or guard refusal) |
+| `ensemble_ms` | `EnsembleSearchService::search()`: the 1 or 3 engine calls, fusion and reranking |
+| `total_ms` | the whole `search()` call; the gap to the sum of the four is plan shaping, text-match resolution, tuning and the vector guard |
+
+A stage that did not run is `null`, never `0`. With the setting off nothing is built and the meta is
+unchanged. A stage that throws is rethrown unchanged; with the setting on, an `info` log line
+`Search stage failed; timings measured so far` carries `failed_stage` and the partial `timings`.
+
+How to take the numbers (a machine that runs the app against its real engine, never the test suite;
+`bootstrap/cache/config.php` must not exist where tests run, so do not `config:cache` to switch the
+overlay):
+
+1. Pick a searchable model and a representative query. The snippet sets the flag for its own process,
+   so the setting row does not need to change; to see timings from a worker instead, set
+   `search.debug_timings` to true in Filament > Settings (run `db:seed --class=CoreDatabaseSeeder`
+   first if the row is missing).
+2. Run, from the laraplate root:
+
+   ```bash
+   php artisan tinker --execute '
+   config(["core.search.debug_timings" => true]);
+   $service = app(Modules\Core\Search\Services\AdvancedSearchService::class);
+   $model = new Modules\CMS\Models\Content();
+   $query = "replace with a representative query";
+   $metas = [];
+   foreach (range(1, 11) as $run) { $metas[] = $service->search($model, $query, 1, 25)->meta; }
+   $warm = collect(array_slice($metas, 1))->pluck("timings");
+   foreach (["intent_ms", "plan_ms", "vector_ms", "ensemble_ms", "total_ms"] as $stage) {
+       $values = $warm->pluck($stage)->reject(fn ($value) => $value === null);
+       printf("%-12s cold %10s   warm median %10s\n", $stage, $metas[0]["timings"][$stage] ?? "null", $values->isEmpty() ? "null" : $values->median());
+   }
+   printf("reranked: %s, vector_disabled: %s\n", var_export($metas[0]["reranked"] ?? null, true), $metas[0]["vector_disabled"] ?? "-");
+   '
+   ```
+
+   The first run is the cold one (planner cache empty for that query, if it was not searched in the
+   last 10 minutes); the median of the other ten is the warm figure. Use a query not searched recently
+   to get a true cold run.
+3. Repeat with the AI overlay off. `ai.features.search_orchestration.enabled` is the env variable
+   `AI_SEARCH_ORCHESTRATION_ENABLED`, read once at boot by `AIServiceProvider::registerSearchBindings()`:
+   set `AI_SEARCH_ORCHESTRATION_ENABLED=false` in `.env` (tinker boots a fresh process, so no restart is
+   needed for it; restart PHP-FPM, Octane or queue workers only when measuring through them), run step 2
+   again with the same query, then set it back. With the overlay off no `ITextEmbedder` is bound, so
+   `vector_ms` is `null` by design.
+4. Reranking runs only when the plan or the `search.reranker.enabled` setting asks for it: the
+   `reranked` line says whether the `ensemble_ms` figure includes it.
+
+`perf:crud` does not exercise this path: it benchmarks `/api/v1/select/{module}/{entity}`, the list
+endpoint, without a search query. `perf:bench` and `perf:profile` can target
+`GET:/api/v1/search/{module}/{entity}?qs=...&mode=orchestrated` for end-to-end latency or a flame
+profile (the public API must be exposed, as `perf:crud` does with the `expose_api` setting), but none
+of the perf commands prints the response body, so the per-stage split comes from step 2.
 
 ## What the `matching` preference does and does not affect
 
@@ -334,6 +402,7 @@ Consumed at runtime:
 | `core.search.reranker.top_k` | runtime setting | `EnsembleSearchService` |
 | `core.search.reranker.weight` | runtime setting | `EnsembleSearchService` (rerank blend when the plan sets none) |
 | `core.search.adaptive_tuning` | runtime setting | `RetrievalTuningProfile` (switch) |
+| `core.search.debug_timings` | runtime setting | `AdvancedSearchService` (adds `meta['timings']`) |
 | `search_tuning.*` | — (committed file) | `RetrievalTuningProfile`, `ai:tune-retrieval` |
 | `search.text_matching.*` | — | `TextMatchOptionsResolver` |
 
