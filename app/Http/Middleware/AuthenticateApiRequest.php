@@ -29,6 +29,12 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * address over the limit gets 429 before the token is looked up; successful requests do not
  * consume that budget.
  *
+ * A request that claims no bearer (no `Authorization` header, or none that mentions one) runs as
+ * the anonymous user, set directly on the guard; the Sanctum guard is only ever asked for a user
+ * through {@see self::authenticateToken()}, so no token can be resolved outside its checks. A
+ * header counts as a bearer claim when Laravel reads a token from it, wherever `Bearer ` sits, or
+ * when it mentions a bearer at all.
+ *
  * A route that authenticates its caller itself declares
  * `->middleware(SelfAuthenticatedApiRoute::class)`: the switch, the `api` guard and the
  * rate limit still apply, the bearer is not read as a Laraplate token, and the request runs
@@ -54,11 +60,13 @@ final readonly class AuthenticateApiRequest
 
         if ($this->isSelfAuthenticated($request)) {
             $user = $this->authorization->resolveAnonymousUser($request);
-        } elseif ($this->hasBearerToken($request)) {
+        } elseif ($this->claimsBearer($request)) {
             $this->refuseWhenTooManyFailures($request);
             $user = $this->authenticateToken($request);
         } else {
-            $user = $this->authorization->resolveUser($request);
+            // Never through $request->user(): the Sanctum guard behind it would resolve any token it
+            // can read, outside the checks of authenticateToken().
+            $user = $this->authorization->resolveAnonymousUser($request);
         }
 
         if ($user instanceof User) {
@@ -107,11 +115,19 @@ final readonly class AuthenticateApiRequest
     }
 
     /**
-     * Whether the request names a bearer credential, valid or not.
+     * Whether the request claims a bearer credential, valid or not: either Laravel (and so Sanctum)
+     * reads a token from the header, wherever `Bearer ` sits in it, or the header mentions a bearer at
+     * all. A malformed claim is therefore refused as unauthenticated and never served as anonymous.
      */
-    private function hasBearerToken(Request $request): bool
+    private function claimsBearer(Request $request): bool
     {
-        return preg_match('/^Bearer(\s|$)/i', mb_trim($request->header('Authorization', ''))) === 1;
+        if ($request->bearerToken() !== null) {
+            return true;
+        }
+
+        $header = $request->headers->get('Authorization');
+
+        return is_string($header) && mb_stripos($header, 'bearer') !== false;
     }
 
     /**

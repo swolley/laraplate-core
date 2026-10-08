@@ -426,6 +426,64 @@ describe('route registration', function (): void {
     });
 });
 
+describe('bearer claims in unusual Authorization headers', function (): void {
+    /**
+     * @return array<string, array{0: string}>
+     */
+    $prefixes = [
+        'prefixed with a word' => ['X Bearer %s'],
+        'after another scheme' => ['Basic Zm9v, Bearer %s'],
+        'lowercase' => ['bearer %s'],
+    ];
+
+    it('answers 401 for an invalid token and counts it as a failure', function (string $template): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous(withGrant: true);
+        config()->set('core.api.rate_limit_per_minute', 1);
+        $header = ['Authorization' => sprintf($template, '1|invalid')];
+
+        $this->getJson(apiAccessUrl(), $header)->assertUnauthorized();
+        $this->getJson(apiAccessUrl(), $header)->assertStatus(429);
+    })->with($prefixes);
+
+    it('answers 401 for the token of a superadmin', function (string $template): void {
+        CrudApiExposure::enable();
+        $admin = apiAccessTokenable(User::factory()->create());
+        $admin->assignRole(Role::findOrCreate('superadmin', 'web'));
+        $token = $admin->createToken('t', ['*']);
+
+        $this->getJson(apiAccessUrl(), ['Authorization' => sprintf($template, $token->plainTextToken)])->assertUnauthorized();
+    })->with($prefixes);
+
+    it('answers 403 for a token used from outside its allowed networks', function (string $template): void {
+        CrudApiExposure::enable();
+        $user = apiAccessUserWithGrant();
+        $token = $user->createToken('t', [API_ACCESS_ENTITY_PERMISSION]);
+        $token->accessToken->forceFill(['allowed_cidrs' => json_encode(['10.0.0.0/8'])])->save();
+
+        $this->withServerVariables(['REMOTE_ADDR' => '192.168.1.5'])
+            ->getJson(apiAccessUrl(), ['Authorization' => sprintf($template, $token->plainTextToken)])
+            ->assertForbidden();
+    })->with($prefixes);
+
+    it('serves a valid token with its abilities and refuses what it lacks', function (string $template): void {
+        CrudApiExposure::enable();
+        $user = apiAccessUserWithGrant();
+        $allowed = $user->createToken('allowed', [API_ACCESS_ENTITY_PERMISSION]);
+        $narrow = $user->createToken('narrow', ['default.roles.select']);
+
+        $this->getJson(apiAccessUrl(), ['Authorization' => sprintf($template, $allowed->plainTextToken)])->assertOk();
+        $this->getJson(apiAccessUrl(), ['Authorization' => sprintf($template, $narrow->plainTextToken)])->assertForbidden();
+    })->with($prefixes);
+
+    it('answers 401 for an Authorization header that mentions a bearer but carries no token', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous(withGrant: true);
+
+        $this->getJson(apiAccessUrl(), ['Authorization' => 'Basic Zm9v, Bearer'])->assertUnauthorized();
+    });
+});
+
 describe('bearer and session', function (): void {
     it('answers 401 for a session user who sends an invalid bearer instead of falling back to the session', function (): void {
         CrudApiExposure::enable();
@@ -434,6 +492,14 @@ describe('bearer and session', function (): void {
         $this->actingAs($user)->getJson(apiAccessUrl())->assertOk();
 
         $this->actingAs($user)->getJson(apiAccessUrl(), apiAccessBearer('1|invalid'))->assertUnauthorized();
+    });
+
+    it('runs a request without Authorization header as the anonymous user even when a session user exists', function (): void {
+        CrudApiExposure::enable();
+        apiAccessAnonymous();
+        Route::middleware('api')->get('api/v1/_probe/who', static fn (Request $request) => response()->json(['user' => $request->user()?->name]));
+
+        $this->actingAs(apiAccessUserWithGrant())->getJson('/api/v1/_probe/who')->assertOk()->assertJson(['user' => 'anonymous']);
     });
 
     it('takes the principal from the token alone when both a session and a token are present', function (): void {
