@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Schema\FieldDefinition;
@@ -27,6 +28,8 @@ final readonly class ScoutSearchConstraintApplier
      */
     public function apply(mixed $builder, Model $model, ?FiltersGroup $filters = null, array $sort = []): void
     {
+        $filters = $filters instanceof FiltersGroup ? self::withoutRelationFilters($filters) : null;
+
         if ($filters instanceof FiltersGroup) {
             $this->applyFilters($builder, $filters, $model);
         }
@@ -40,6 +43,39 @@ final readonly class ScoutSearchConstraintApplier
 
             $builder->orderBy($field, $item->direction->value);
         }
+    }
+
+    /**
+     * The filters the engine can take: a relation filter (an ACL condition on a related record) is never
+     * pushed to it, the records behind the hits are checked against it when they are reloaded.
+     *
+     * A condition left out means "no engine condition", which only ever widens the hits, so it is dropped
+     * from an AND group. Dropping it from an OR group would narrow the branch the relation filter belongs
+     * to, so the whole group is left out instead. Null when nothing is left to push.
+     */
+    private static function withoutRelationFilters(FiltersGroup $filters): ?FiltersGroup
+    {
+        $kept = [];
+
+        foreach ($filters->filters as $node) {
+            $pushable = match (true) {
+                $node instanceof RelationFilter => null,
+                $node instanceof FiltersGroup => self::withoutRelationFilters($node),
+                default => $node,
+            };
+
+            if ($pushable === null) {
+                if ($filters->operator === WhereClause::Or) {
+                    return null;
+                }
+
+                continue;
+            }
+
+            $kept[] = $pushable;
+        }
+
+        return $kept === [] ? null : new FiltersGroup($kept, $filters->operator);
     }
 
     /**
@@ -169,6 +205,11 @@ final readonly class ScoutSearchConstraintApplier
                 continue;
             }
 
+            // Left out beforehand by withoutRelationFilters(): the engine takes no relation filter.
+            if ($filter instanceof RelationFilter) {
+                continue;
+            }
+
             $this->applyFilter($builder, $filter, $model);
         }
     }
@@ -210,6 +251,11 @@ final readonly class ScoutSearchConstraintApplier
         $out = [];
 
         foreach ($filters->filters as $filter) {
+            // Never reached: an OR group that holds a relation filter is left out by withoutRelationFilters().
+            if ($filter instanceof RelationFilter) {
+                throw new InvalidArgumentException(self::FILTER_ERROR);
+            }
+
             $out[] = $filter instanceof FiltersGroup
                 ? $this->normalizeFiltersGroup($filter, $model)
                 : $this->normalizeFilter($filter, $model);

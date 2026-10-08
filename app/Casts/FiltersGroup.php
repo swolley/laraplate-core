@@ -8,7 +8,7 @@ final readonly class FiltersGroup
 {
     public function __construct(
         /**
-         * @var array<Filter|FiltersGroup>
+         * @var array<Filter|FiltersGroup|RelationFilter>
          */
         public array $filters = [],
         public WhereClause $operator = WhereClause::And,
@@ -22,9 +22,7 @@ final readonly class FiltersGroup
         $filters = [];
 
         foreach ($this->filters as $node) {
-            if ($node instanceof self || $node instanceof Filter) {
-                $filters[] = $node->toArray();
-            }
+            $filters[] = $node->toArray();
         }
 
         return [

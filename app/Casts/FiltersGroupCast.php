@@ -71,6 +71,10 @@ final class FiltersGroupCast implements CastsAttributes
      */
     private function hydrateGroup(array $data): FiltersGroup
     {
+        if (array_key_exists('relation', $data)) {
+            return new FiltersGroup(filters: [$this->hydrateRelationFilter($data)]);
+        }
+
         if (array_key_exists('filters', $data)) {
             $nested = [];
 
@@ -109,8 +113,12 @@ final class FiltersGroupCast implements CastsAttributes
     /**
      * @param  array<string, mixed>  $item
      */
-    private function hydrateNode(array $item): Filter|FiltersGroup
+    private function hydrateNode(array $item): Filter|FiltersGroup|RelationFilter
     {
+        if (array_key_exists('relation', $item)) {
+            return $this->hydrateRelationFilter($item);
+        }
+
         if (array_key_exists('filters', $item)) {
             return $this->hydrateGroup($item);
         }
@@ -127,6 +135,52 @@ final class FiltersGroupCast implements CastsAttributes
         }
 
         throw new InvalidArgumentException('Invalid filter node in filters JSON.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function hydrateRelationFilter(array $data): RelationFilter
+    {
+        $relation = $data['relation'] ?? null;
+        $nested = $data['filters'] ?? null;
+        $morph_types = $data['morph_types'] ?? null;
+
+        if (! is_string($relation) || $relation === '') {
+            throw new InvalidArgumentException('A relation filter needs the name of the relation.');
+        }
+
+        if (! is_array($nested)) {
+            throw new InvalidArgumentException('A relation filter needs nested filters.');
+        }
+
+        if ($morph_types !== null && ! is_array($morph_types)) {
+            throw new InvalidArgumentException('The morph types of a relation filter must be a list.');
+        }
+
+        $group = [];
+
+        foreach ($nested as $key => $value) {
+            if (is_string($key)) {
+                $group[$key] = $value;
+            }
+        }
+
+        $types = null;
+
+        foreach ($morph_types ?? [] as $type) {
+            if (! is_string($type) || $type === '') {
+                throw new InvalidArgumentException('The morph types of a relation filter must be class names.');
+            }
+
+            $types[] = $type;
+        }
+
+        return new RelationFilter(
+            relation: $relation,
+            filters: $this->hydrateGroup($group),
+            morph_types: $types,
+        );
     }
 
     /**

@@ -9,6 +9,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Filament\Utils\HasTable;
 
 final class ACLsTable
@@ -58,6 +59,8 @@ final class ACLsTable
         foreach ($group->filters as $node) {
             if ($node instanceof FiltersGroup) {
                 $parts[] = self::describeGroup($node);
+            } elseif ($node instanceof RelationFilter) {
+                $parts[] = self::describeRelationFilter($node);
             } elseif ($node instanceof Filter) {
                 $parts[] = self::describeFilter($node);
             }
@@ -70,6 +73,11 @@ final class ACLsTable
         $expression = implode(sprintf(' %s ', $group->operator->value), $parts);
 
         return ($isRoot || count($parts) === 1) ? $expression : sprintf('(%s)', $expression);
+    }
+
+    private static function describeRelationFilter(RelationFilter $filter): string
+    {
+        return sprintf('%s has (%s)', $filter->relation, self::describeGroup($filter->filters, isRoot: true));
     }
 
     private static function describeFilter(Filter $filter): string

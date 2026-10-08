@@ -9,6 +9,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Arr;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\RelationFilter;
 use Override;
 
 final class QueryBuilder implements ValidationRule
@@ -25,7 +26,7 @@ final class QueryBuilder implements ValidationRule
     #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if ($value instanceof FiltersGroup || $value instanceof Filter) {
+        if ($value instanceof FiltersGroup || $value instanceof Filter || $value instanceof RelationFilter) {
             return;
         }
 
@@ -64,6 +65,12 @@ final class QueryBuilder implements ValidationRule
             return;
         }
 
+        if (array_key_exists('relation', $value)) {
+            $this->validateRelation($attribute, $value, $fail);
+
+            return;
+        }
+
         if (array_key_exists('property', $value)) {
             if (! array_key_exists('operator', $value)) {
                 $fail($attribute . ' "operator" is required');
@@ -83,5 +90,34 @@ final class QueryBuilder implements ValidationRule
 
             $this->validate($attribute . '.filters', $value['filters'], $fail);
         }
+    }
+
+    /**
+     * A relation filter names the relation and nests a filters group (not a bare list) evaluated on the
+     * related record; the morph types, when given, are a non-empty list of class names.
+     *
+     * @param  array<string, mixed>  $value
+     */
+    private function validateRelation(string $attribute, array $value, Closure $fail): void
+    {
+        if (! is_string($value['relation']) || $value['relation'] === '') {
+            $fail($attribute . ' "relation" must be a relation name');
+        }
+
+        if (array_key_exists('morph_types', $value)) {
+            $types = $value['morph_types'];
+
+            if (! is_array($types) || $types === [] || ! Arr::isList($types) || array_filter($types, static fn (mixed $type): bool => ! is_string($type) || $type === '') !== []) {
+                $fail($attribute . ' "morph_types" must be a non-empty list of class names');
+            }
+        }
+
+        if (! is_array($value['filters'] ?? null) || Arr::isList($value['filters'])) {
+            $fail($attribute . ' "filters" must be a filters group');
+
+            return;
+        }
+
+        $this->validate($attribute . '.filters', $value['filters'], $fail);
     }
 }

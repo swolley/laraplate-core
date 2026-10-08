@@ -288,6 +288,34 @@ Filters can be nested with AND/OR operators:
 
 Result: `status = 'active' AND (department_id = 1 OR region = 'north')`
 
+### Relation Filters
+
+An ACL can restrict a record by a condition on a **related record** (a `BelongsTo`, or a `MorphTo` with the types it accepts). A relation node carries the relation name, an optional `morph_types` list and a nested filters group evaluated on the related record, with the same operators and dynamic values (`@now`, `@today`, `@user.<attribute>`):
+
+```json
+{
+  "filters": [
+    {
+      "relation": "model",
+      "morph_types": ["Modules\\CMS\\Models\\Content"],
+      "filters": {
+        "filters": [
+          { "property": "valid_from", "operator": "<=", "value": "@now" }
+        ],
+        "operator": "and"
+      }
+    }
+  ],
+  "operator": "and"
+}
+```
+
+Result on `vend_media`: only media whose owner is a content valid at the time of the request. A relation node is a `whereHas`, or a `whereHasMorph` when `morph_types` is set (a media owned by any other type never matches).
+
+- Only ACLs build relation nodes: filters sent in a request are parsed as column filters and cannot contain one.
+- In search the engine receives column conditions only. A relation node is not pushed to the engine (inside an OR group the whole group is left out, so the engine never drops what the relation allows); the records behind the hits are reloaded with the ACL applied, which is where the relation condition takes effect.
+- The ACL form edits the JSON; the validation rule accepts a relation node whose `filters` is a group.
+
 ## Usage
 
 ### Automatic Integration (CrudService)

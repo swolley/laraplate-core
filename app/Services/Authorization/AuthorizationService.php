@@ -17,6 +17,7 @@ use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
@@ -192,7 +193,9 @@ final class AuthorizationService
             return;
         }
 
-        $request_data->mergeFilters($acl_filters);
+        // The list path hands the filters to the CRUD query builder, which knows nothing of the ACL
+        // placeholders: they are resolved here, as applyAclFiltersToQuery() does for the same filters.
+        $request_data->mergeFilters($this->resolvePlaceholders($acl_filters));
     }
 
     /**
@@ -411,11 +414,59 @@ final class AuthorizationService
                 $query->{$method}(function (Builder $q) use ($filter): void {
                     $this->applyFiltersRecursively($q, $filter);
                 });
+            } elseif ($filter instanceof RelationFilter) {
+                $this->applyRelationFilter($query, $filter, $method);
             } else {
-                // It's a Filter
                 $this->applySingleFilter($query, $filter, $method);
             }
         }
+    }
+
+    /**
+     * A condition on the related record: `whereHas`, or `whereHasMorph` for a morph relation, with the
+     * nested filters applied to the related query.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function applyRelationFilter(Builder $query, RelationFilter $filter, string $method): void
+    {
+        $or = $method === 'orWhere';
+        $constraint = function (Builder $related) use ($filter): void {
+            $this->applyFiltersRecursively($related, $filter->filters);
+        };
+
+        if ($filter->morph_types !== null) {
+            $query->{$or ? 'orWhereHasMorph' : 'whereHasMorph'}($filter->relation, $filter->morph_types, $constraint);
+
+            return;
+        }
+
+        $query->{$or ? 'orWhereHas' : 'whereHas'}($filter->relation, $constraint);
+    }
+
+    /**
+     * A copy of the filters with every dynamic value (`@now`, `@today`, `@user.<attribute>`) replaced by its
+     * live value, nested relation filters included.
+     */
+    private function resolvePlaceholders(FiltersGroup $filters): FiltersGroup
+    {
+        $resolved = [];
+
+        foreach ($filters->filters as $node) {
+            $resolved[] = match (true) {
+                $node instanceof FiltersGroup => $this->resolvePlaceholders($node),
+                $node instanceof RelationFilter => new RelationFilter(
+                    relation: $node->relation,
+                    filters: $this->resolvePlaceholders($node->filters),
+                    morph_types: $node->morph_types,
+                ),
+                default => new Filter($node->property, $this->resolveFilterValue($node->value), $node->operator),
+            };
+        }
+
+        return new FiltersGroup($resolved, $filters->operator);
     }
 
     /**

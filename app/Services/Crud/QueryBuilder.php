@@ -18,6 +18,7 @@ use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
@@ -226,6 +227,11 @@ final class QueryBuilder
                     continue;
                 }
 
+                // A relation filter (ACL only) constrains the rows, never an eager load.
+                if (! $subfilter instanceof Filter) {
+                    continue;
+                }
+
                 $path_length = mb_substr_count($subfilter->property, '.');
 
                 if ($path_length < 1) {
@@ -280,6 +286,10 @@ final class QueryBuilder
                     $kept[] = $nested;
                 }
 
+                continue;
+            }
+
+            if (! $subfilter instanceof Filter) {
                 continue;
             }
 
@@ -452,11 +462,7 @@ final class QueryBuilder
                 $return_type = $reflected_method->getReturnType();
 
                 if ($return_type !== null && is_a($return_type->__toString(), Relation::class, true)) {
-                    $returned_relation_entity = $query_model->{$field}()->getModel();
                     $splitted['relation'] = $field;
-                    $splitted['table'] = $returned_relation_entity->getTable();
-                    $splitted['field'] = $returned_relation_entity->getKeyName();
-                    $splitted['connection'] = $returned_relation_entity->getConnection()->getName();
 
                     $has_count = is_int($filter->value)
                         ? $filter->value
@@ -540,8 +546,32 @@ final class QueryBuilder
     }
 
     /**
+     * A relation filter from an ACL: the rows whose related record matches the nested filters, through
+     * `whereHas` or, for a morph relation, `whereHasMorph`. Applied by relation, never by property path, so
+     * the nested filters keep their plain column names.
+     *
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
-     * @param  FiltersGroup|array<int, Filter|FiltersGroup>  $filters
+     * @param  array<string,array<int,Column>>  $relation_columns
+     */
+    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns): void
+    {
+        $has_method = $method . ($filter->morph_types !== null ? 'HasMorph' : 'Has');
+        $constraint = function (Builder $q) use ($filter, &$relation_columns): void {
+            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns);
+        };
+
+        if ($filter->morph_types !== null) {
+            $query->{$has_method}($filter->relation, $filter->morph_types, $constraint);
+
+            return;
+        }
+
+        $query->{$has_method}($filter->relation, $constraint);
+    }
+
+    /**
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
@@ -564,6 +594,8 @@ final class QueryBuilder
                 if (is_callable([$query, $method])) {
                     $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
                 }
+            } elseif ($subfilter instanceof RelationFilter) {
+                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns);
             } elseif ($subfilter instanceof Filter) {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns);
             }
