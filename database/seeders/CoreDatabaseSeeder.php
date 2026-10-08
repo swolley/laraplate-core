@@ -283,6 +283,13 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $this->command?->line('    - settings guest ACL <fg=green>created</>');
     }
 
+    private function defaultGuard(): string
+    {
+        $guard = config('auth.defaults.guard', 'web');
+
+        return is_string($guard) ? $guard : 'web';
+    }
+
     private function defaultUsers(): void
     {
         $user_class = user_class();

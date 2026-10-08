@@ -47,9 +47,9 @@ use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
 use Override;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
-use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
@@ -341,15 +341,19 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
      * permission, so a permission sitting on a parent role is invisible to it even though
      * {@see Role::hasPermission()} and {@see Role::getAllPermissions()} both report it. Role
      * inheritance stopped one step short of the user, and this closes that step.
-     */
-    public function hasPermission(string $permission, ?string $guard_name = null): bool
-    {
      *
      * Every route is evaluated on one guard: `null` is the guard of the current request
      * ({@see Auth::getDefaultDriver()}), and a permission that does not exist on it is not held.
+     * A missing permission on the direct path means no role can hold it on that guard either,
+     * so the role route is skipped.
+     */
+    public function hasPermission(string $permission, ?string $guard_name = null): bool
+    {
         if ($this->isSuperAdmin()) {
             return true;
         }
+
+        $guard_name ??= Auth::getDefaultDriver();
 
         return $this->resolvingAuthorization(function () use ($permission, $guard_name): bool {
             try {
@@ -358,8 +362,6 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
                 }
             } catch (PermissionDoesNotExist) {
                 return false;
-        $guard_name ??= Auth::getDefaultDriver();
-
             }
 
             return $this->roles->contains(static fn (Role $role): bool => $role->hasPermission($permission, $guard_name));
