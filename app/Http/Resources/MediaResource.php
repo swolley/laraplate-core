@@ -6,10 +6,10 @@ namespace Modules\Core\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Media\MediaUrls;
 use Modules\Core\Models\Media;
 use Modules\Core\Models\MediaDraft;
 use Override;
-use Throwable;
 
 /**
  * Serializes a single {@see Media} row for the generic media API.
@@ -63,17 +63,11 @@ final class MediaResource extends JsonResource
      */
     private function resolveUrl(Media $media, string $conversion = ''): ?string
     {
-        try {
-            return $media->getUrl($conversion);
-        } catch (Throwable) {
-            return null;
-        }
+        return resolve(MediaUrls::class)->url($media, $conversion);
     }
 
     /**
-     * Map of generated conversion name to its URL. Derived from the media's own
-     * generated conversions so it stays correct for any collection (image
-     * `thumb-*`, video `video_thumb-*`, …) without hardcoding conversion names.
+     * Map of generated conversion name to its URL, from the media's own generated conversions.
      *
      * @return array<string, string>
      */
@@ -81,17 +75,11 @@ final class MediaResource extends JsonResource
     {
         $conversions = [];
 
-        foreach ($media->getGeneratedConversions() as $name => $generated) {
-            $conversion_name = (string) $name;
-
-            if ($generated !== true || ! $media->hasGeneratedConversion($conversion_name)) {
-                continue;
-            }
-
-            $url = $this->resolveUrl($media, $conversion_name);
+        foreach (resolve(MediaUrls::class)->generatedConversions($media) as $name) {
+            $url = $this->resolveUrl($media, $name);
 
             if ($url !== null) {
-                $conversions[$conversion_name] = $url;
+                $conversions[$name] = $url;
             }
         }
 

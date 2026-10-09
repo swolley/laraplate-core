@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\IEmbeddableModel;
 use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Media\MediaProjection;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Observers\MediaLifecycleObserver;
 use Modules\Core\Observers\MediaMetadataObserver;
@@ -220,6 +224,24 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
         return $document;
     }
 
+    /**
+     * The record as a client receives it. On the `api` guard a caller who may not update media gets the safe
+     * projection (spec 7.2, R8): serializing is where it is applied, so a media loaded as a relation or read as the
+     * `cover` of its owner is covered too. The `web` guard and a request with no user (console, queue, search
+     * indexing) serialize the full record.
+     *
+     * @return array<string, mixed>
+     */
+    #[Override]
+    public function toArray(): array
+    {
+        if ($this->isProjectedForCurrentCaller()) {
+            return resolve(MediaProjection::class)->project($this);
+        }
+
+        return parent::toArray();
+    }
+
     protected function getExpiresAtAttribute(): ?Carbon
     {
         $expirationDays = config('core.soft_deletes.expiration_days');
@@ -251,5 +273,28 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Whether the caller of an `api` request lacks the `update` permission of media on that guard and within the
+     * abilities of its token. With no authenticated user on the guard the projection applies as well: a request
+     * the API middleware did not authenticate must not receive the full record.
+     */
+    private function isProjectedForCurrentCaller(): bool
+    {
+        if (Auth::getDefaultDriver() !== 'api') {
+            return false;
+        }
+
+        $user = Auth::user();
+
+        if (! $user instanceof Authenticatable) {
+            return true;
+        }
+
+        $request = request()->duplicate();
+        $request->setUserResolver(static fn (): Authenticatable => $user);
+
+        return ! resolve(AuthorizationService::class)->checkPermission($request, $this->getTable(), ActionEnum::Update->value, $this->getConnectionName());
     }
 }

@@ -103,6 +103,11 @@ return [
          */
         // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
         'draft_ttl_hours' => (int) env('CORE_MEDIA_DRAFT_TTL_HOURS', 24),
+
+        /**
+         * Minutes a temporary URL of the API media projection stays valid, on a disk whose driver can sign URLs.
+         */
+        'signed_url_ttl_minutes' => 60,
     ],
 
     'acl' => [
