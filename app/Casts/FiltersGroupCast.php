@@ -150,12 +150,12 @@ final class FiltersGroupCast implements CastsAttributes
             throw new InvalidArgumentException('A relation filter needs the name of the relation.');
         }
 
-        if (! is_array($nested)) {
-            throw new InvalidArgumentException('A relation filter needs nested filters.');
+        if (! is_array($nested) || $nested === [] || array_is_list($nested)) {
+            throw new InvalidArgumentException('The nested filters of a relation filter must be a filters group, not a list of conditions.');
         }
 
-        if ($morph_types !== null && ! is_array($morph_types)) {
-            throw new InvalidArgumentException('The morph types of a relation filter must be a list.');
+        if ($morph_types !== null && (! is_array($morph_types) || $morph_types === [] || ! array_is_list($morph_types))) {
+            throw new InvalidArgumentException('The morph types of a relation filter must be a non-empty list.');
         }
 
         $group = [];

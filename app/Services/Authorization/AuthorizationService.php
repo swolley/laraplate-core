@@ -23,6 +23,7 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AclResolverService;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\RelationGuard;
 
 /**
  * Authorization Service - handles permission checks and ACL filter injection.
@@ -432,6 +433,8 @@ final class AuthorizationService
      */
     private function applyRelationFilter(Builder $query, RelationFilter $filter, string $method): void
     {
+        RelationGuard::assertFilterable($query->getModel(), $filter);
+
         $or = $method === 'orWhere';
         $constraint = function (Builder $related) use ($filter): void {
             $this->applyFiltersRecursively($related, $filter->filters);

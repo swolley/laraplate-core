@@ -18,10 +18,9 @@ use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\RelationGuard;
 use Override;
 use ReflectionClass;
-use ReflectionMethod;
-use ReflectionNamedType;
 use Throwable;
 
 /**
@@ -151,7 +150,7 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
 
     private function validateRelation(string $attribute, RelationFilter $filter, Model $model, Closure $fail): void
     {
-        $relation = $this->relationOf($model, $filter->relation);
+        $relation = RelationGuard::relationOf($model, $filter->relation);
 
         if (! $relation instanceof Relation) {
             $fail(sprintf('%s relation "%s" is not a relation of %s', $attribute, $filter->relation, $model::class));
@@ -178,9 +177,9 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         }
 
         foreach ($filter->morph_types as $type) {
-            $class = Relation::getMorphedModel($type) ?? $type;
+            $class = RelationGuard::morphModelClass($type);
 
-            if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+            if ($class === null) {
                 $fail(sprintf('%s morph type "%s" is not a model', $attribute, $type));
 
                 continue;
@@ -188,37 +187,5 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
 
             $this->validateGroup($attribute, $filter->filters, $this->instance($class), $fail);
         }
-    }
-
-    /**
-     * The relation behind a public method of the model whose declared return type is a relation. The
-     * method is called only after that check, so a filter cannot invoke an arbitrary method by name.
-     *
-     * @return Relation<Model, Model, mixed>|null
-     */
-    private function relationOf(Model $model, string $name): ?Relation
-    {
-        if (! method_exists($model, $name)) {
-            return null;
-        }
-
-        $method = new ReflectionMethod($model, $name);
-        $type = $method->getReturnType();
-
-        if (! $method->isPublic() || $method->isStatic() || $method->getNumberOfRequiredParameters() > 0) {
-            return null;
-        }
-
-        if (! $type instanceof ReflectionNamedType || ! is_a($type->getName(), Relation::class, true)) {
-            return null;
-        }
-
-        try {
-            $relation = $model->{$name}();
-        } catch (Throwable) {
-            return null;
-        }
-
-        return $relation instanceof Relation ? $relation : null;
     }
 }

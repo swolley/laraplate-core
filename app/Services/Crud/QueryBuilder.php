@@ -26,6 +26,7 @@ use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\RelationGuard;
 use ReflectionMethod;
 
 /**
@@ -555,6 +556,8 @@ final class QueryBuilder
      */
     private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns): void
     {
+        RelationGuard::assertFilterable($query->getModel(), $filter);
+
         $has_method = $method . ($filter->morph_types !== null ? 'HasMorph' : 'Has');
         $constraint = function (Builder $q) use ($filter, &$relation_columns): void {
             $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns);

@@ -263,6 +263,75 @@ it('rejects at save a nested relation filter that is wrong for the related entit
     expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
 });
 
+it('fails closed on a relation filter whose nested conditions are a bare list, on read and on write', function (): void {
+    $cast = new FiltersGroupCast;
+    $list_form = [
+        'operator' => 'and',
+        'filters' => [[
+            'relation' => 'model',
+            'morph_types' => [User::class],
+            'filters' => [['property' => 'name', 'operator' => '=', 'value' => 'kept-owner']],
+        ]],
+    ];
+
+    expect(fn () => $cast->get(new ACL, 'filters', json_encode($list_form), []))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $cast->set(new ACL, 'filters', $list_form, []))->toThrow(InvalidArgumentException::class);
+});
+
+it('fails closed on a relation filter with an empty nested group or an empty morph type list', function (): void {
+    $cast = new FiltersGroupCast;
+    $group = ['operator' => 'and', 'filters' => [['property' => 'name', 'operator' => '=', 'value' => 'x']]];
+
+    $empty_nested = ['relation' => 'model', 'morph_types' => [User::class], 'filters' => []];
+    $empty_types = ['relation' => 'model', 'morph_types' => [], 'filters' => $group];
+
+    expect(fn () => $cast->get(new ACL, 'filters', json_encode(['operator' => 'and', 'filters' => [$empty_nested]]), []))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $cast->get(new ACL, 'filters', json_encode(['operator' => 'and', 'filters' => [$empty_types]]), []))->toThrow(InvalidArgumentException::class);
+});
+
+it('never calls a method that is not a relation when a relation filter is applied, even if the ACL skipped validation', function (): void {
+    CrudApiExposure::enable();
+    $owner = User::factory()->create(['name' => 'kept-owner']);
+    aclrel_media($owner->getMorphClass(), $owner->getKey());
+    $filters = new FiltersGroup([
+        new RelationFilter('truncate', new FiltersGroup([new Filter('id', 1, FilterOperator::GreatEquals)])),
+    ]);
+    [$reader, $permission_name] = aclrel_media_reader($filters);
+
+    $response = $this->actingAs($reader)->getJson('/api/v1/select/core/media');
+
+    expect($response->status())->toBeGreaterThanOrEqual(400)
+        ->and(Media::query()->withoutGlobalScopes()->count())->toBe(1);
+
+    Auth::shouldUse('api');
+    Auth::guard('api')->setUser($reader);
+
+    expect(fn () => app(AuthorizationService::class)->applyAclFiltersToQuery(Media::query(), $permission_name))->toThrow(InvalidArgumentException::class);
+    expect(Media::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+it('refuses at query time a morph wildcard, an unknown morph type and a plain relation given morph types', function (array $relation_filter): void {
+    CrudApiExposure::enable();
+    $owner = User::factory()->create(['name' => 'kept-owner']);
+    aclrel_media($owner->getMorphClass(), $owner->getKey());
+    [$reader, $permission_name] = aclrel_media_reader(new FiltersGroup([
+        new RelationFilter(...$relation_filter),
+    ]));
+
+    $response = $this->actingAs($reader)->getJson('/api/v1/select/core/media');
+
+    expect($response->status())->toBeGreaterThanOrEqual(400);
+
+    Auth::shouldUse('api');
+    Auth::guard('api')->setUser($reader);
+
+    expect(fn () => app(AuthorizationService::class)->applyAclFiltersToQuery(Media::query(), $permission_name))->toThrow(InvalidArgumentException::class);
+})->with([
+    'wildcard' => [fn () => ['relation' => 'model', 'filters' => new FiltersGroup([new Filter('id', 1, FilterOperator::GreatEquals)]), 'morph_types' => ['*']]],
+    'unknown class' => [fn () => ['relation' => 'model', 'filters' => new FiltersGroup([new Filter('id', 1, FilterOperator::GreatEquals)]), 'morph_types' => ['Modules\\Nowhere\\Models\\Ghost']]],
+    'morph relation without types' => [fn () => ['relation' => 'model', 'filters' => new FiltersGroup([new Filter('id', 1, FilterOperator::GreatEquals)])]],
+]);
+
 it('refuses a relation filter that names no morph type when it is given an empty list', function (): void {
     expect(fn () => new RelationFilter('model', new FiltersGroup, []))->toThrow(InvalidArgumentException::class);
 });
