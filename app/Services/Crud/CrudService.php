@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Fluent;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Approvals\PendingDeletionStrategy;
@@ -1291,7 +1292,7 @@ class CrudService
             foreach ($request_data->group_by as $group) {
                 // The grouping reads the relation from each row: one the CRUD never loads cannot be grouped on.
                 throw_if(
-                    QueryBuilder::isBlackListedPath($group),
+                    Str::contains($group, '.') && QueryBuilder::isBlackListedPath(Str::beforeLast($group, '.')),
                     InvalidArgumentException::class,
                     sprintf('"%s" cannot be grouped on: the CRUD does not load that relation.', $group),
                 );

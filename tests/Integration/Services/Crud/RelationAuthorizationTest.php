@@ -475,3 +475,76 @@ describe('tree and history', function (): void {
             ->and($response->json('data.history'))->toBeNull();
     });
 });
+
+describe('pending changes', function (): void {
+    beforeEach(function (): void {
+        Illuminate\Support\Facades\Schema::create('has_approvals_stub', function (Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+            $table->timestamps();
+        });
+    });
+
+    afterEach(function (): void {
+        Illuminate\Support\Facades\Schema::dropIfExists('has_approvals_stub');
+    });
+
+    it('show in a preview only to a caller who may update or approve the record', function (array $operations, string $expected): void {
+        $model = Modules\Core\Tests\Stubs\HasApprovalsStubModel::query()->create(['name' => 'stored']);
+        Modules\Core\Models\Modification::query()->create([
+            'modifiable_type' => Modules\Core\Tests\Stubs\HasApprovalsStubModel::class,
+            'modifiable_id' => $model->id,
+            'md5' => md5('relauth'),
+            'modifications' => ['name' => ['modified' => 'proposed']],
+        ]);
+
+        $role = Role::factory()->create(['name' => 'relauth_preview_' . uniqid(), 'guard_name' => 'api']);
+
+        foreach (['select', ...$operations] as $operation) {
+            $name = PermissionName::forClass(Modules\Core\Tests\Stubs\HasApprovalsStubModel::class, $operation);
+            Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+            $role->givePermissionTo(Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'api']));
+        }
+
+        $reader = User::query()->findOrFail(CoreUser::factory()->create()->getKey());
+        $reader->assignRole($role);
+        Auth::shouldUse('api');
+        Auth::guard('api')->setUser($reader->fresh());
+        session(['preview' => true]);
+
+        expect($model->fresh()->toArray()['name'] ?? null)->toBe($expected);
+    })->with([
+        'select only' => [[], 'stored'],
+        'update' => [['update'], 'proposed'],
+        'approve' => [['approve'], 'proposed'],
+    ]);
+});
+
+it('groups on a plain column named like a black-listed relation', function (): void {
+    Illuminate\Support\Facades\Schema::create('relauth_group_stub', function (Illuminate\Database\Schema\Blueprint $table): void {
+        $table->id();
+        $table->string('children');
+    });
+    Modules\Core\Tests\Stubs\Crud\GroupByColumnStub::query()->insert([['children' => 'a'], ['children' => 'a'], ['children' => 'b']]);
+
+    $superadmin = User::query()->findOrFail(CoreUser::factory()->create()->getKey());
+    $superadmin->assignRole(Role::factory()->create(['name' => config('permission.roles.superadmin'), 'guard_name' => 'web']));
+    auth()->login($superadmin);
+
+    $model = new Modules\Core\Tests\Stubs\Crud\GroupByColumnStub;
+    $request = Request::create('/api/v1/select/core/relauth_group_stub');
+    $request->setUserResolver(static fn (): User => $superadmin);
+    $data = (new ReflectionClass(Modules\Core\Casts\ListRequestData::class))->newInstanceWithoutConstructor();
+
+    foreach ([
+        'request' => $request, 'mainEntity' => 'relauth_group_stub', 'primaryKey' => 'id', 'model' => $model,
+        'connection' => null, 'columns' => [], 'relations' => [], 'sort' => [], 'filters' => null,
+        'group_by' => ['children'], 'page' => null, 'from' => null, 'to' => null, 'limit' => 25, 'pagination' => 25, 'count' => false,
+    ] as $property => $value) {
+        (new ReflectionProperty($data, $property))->setValue($data, $value);
+    }
+
+    $result = (new CrudService(app(AuthorizationService::class), app(QueryBuilder::class)))->list($data);
+
+    expect($result->data->keys()->sort()->values()->all())->toBe(['a', 'b']);
+});

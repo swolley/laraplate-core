@@ -22,6 +22,7 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Console\PermissionsRefreshCommand;
 use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Models\Concerns\HasTranslations;
+use Modules\Core\Models\Modification;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
@@ -142,10 +143,22 @@ final class RelationAuthorizer
             return false;
         }
 
+        // The pending modifications of a record are the values somebody proposed and nobody approved yet: only a
+        // caller who may change or approve the record reads them.
+        if ($related instanceof Modification) {
+            return $this->maySeePendingChanges($request, $parent);
+        }
+
         $source = $this->visibilitySource($parent, $related);
 
         if ($source === null) {
             return true;
+        }
+
+        // A part of a modification (its approvals) reached from anywhere but its modification: the record the
+        // modification belongs to is unknown here, so the read fails closed.
+        if ($source['model'] instanceof Modification) {
+            return $this->allows($request, $source['model'], ActionEnum::Select->value);
         }
 
         // An entity deliberately kept out of permission generation (modifications, versions, licenses) has no
@@ -156,6 +169,34 @@ final class RelationAuthorizer
         }
 
         return $this->allows($request, $source['model'], ActionEnum::Select->value);
+    }
+
+    /**
+     * Whether the caller may see the pending (unapproved) changes of a record: it holds the record's `update` or
+     * `approve` permission, on the request's guard and within the abilities of its token.
+     */
+    public function maySeePendingChanges(Request $request, Model $record): bool
+    {
+        return $this->allows($request, $record, ActionEnum::Update->value)
+            || $this->allows($request, $record, ActionEnum::Approve->value);
+    }
+
+    /**
+     * {@see maySeePendingChanges()} for a model serializing itself (the approvals preview), which has no request of
+     * its own. With no acting user (console, queue) there is no caller to hide them from.
+     */
+    public function actingUserMaySeePendingChanges(Model $record): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null) {
+            return true;
+        }
+
+        $request = request()->duplicate();
+        $request->setUserResolver(static fn (): Authenticatable => $user);
+
+        return $this->maySeePendingChanges($request, $record);
     }
 
     /**

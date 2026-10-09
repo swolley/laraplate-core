@@ -20,6 +20,7 @@ use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Services\Crud\RelationAuthorizer;
 use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\PermissionName;
@@ -421,6 +422,12 @@ trait HasApprovals
         // preview(), not session('preview'): on app/api the flag is request-scoped and
         // the session is deliberately unread.
         if (! preview()) {
+            return null;
+        }
+
+        // The preview shows the values somebody proposed and nobody approved yet: only to a caller who may change
+        // or approve the record.
+        if (! resolve(RelationAuthorizer::class)->actingUserMaySeePendingChanges($this)) {
             return null;
         }
 
