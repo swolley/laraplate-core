@@ -250,6 +250,18 @@ final class QueryBuilder
     }
 
     /**
+     * {@see guardDefaultEagerLoads()} for a query the CRUD engine builds itself, after the request relations were
+     * applied (the nodes of a tree, the versions of a record): the relations that query loads on its own, and the
+     * ones its model's appended attributes read, follow the same rule instead of loading unchecked or row by row.
+     *
+     * @param  Builder<Model>  $builder
+     */
+    public function guardEngineQuery(Builder $builder, RelationAuthorizer $authorizer, Request $request): void
+    {
+        $this->guardDefaultEagerLoads($builder, $authorizer, $request, []);
+    }
+
+    /**
      * @param  Builder<Model>  $query
      * @param  (callable(string, Builder<Model>): void)|null  $countConstraint
      *

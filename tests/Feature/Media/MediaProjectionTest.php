@@ -8,10 +8,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Modules\Core\Models\Media;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User as CoreUser;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\CrudApiExposure;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\Media\MediaProjectionOwnerStub;
@@ -190,6 +192,22 @@ describe('on the api guard', function (): void {
         $row = collect($response->json('data'))->firstWhere('id', $media->id);
 
         expect($row)->toHaveKeys(['custom_properties', 'disk', 'file_name']);
+    });
+});
+
+describe('the decision of the projection', function (): void {
+    it('is taken once per request and user, however many media are serialized', function (): void {
+        $first = mediaprojection_media();
+        $second = mediaprojection_media();
+        mediaprojection_act_on('api', mediaprojection_user('api'));
+
+        $this->partialMock(AuthorizationService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('checkPermission')->once()->andReturn(false);
+        });
+
+        $first->toArray();
+        $second->toArray();
+        $first->toArray();
     });
 });
 

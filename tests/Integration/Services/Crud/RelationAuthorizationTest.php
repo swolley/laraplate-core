@@ -465,11 +465,23 @@ describe('tree and history', function (): void {
             ->and($visible->id)->not->toBe($hidden->id);
     });
 
-    it('give no history of a record the ACL hides', function (): void {
+    it('refuse the history to a reader who may only select, whether the record is hidden by the ACL or missing', function (): void {
         $hidden = CoreUser::factory()->create(['name' => 'relauth_hidden_user']);
         $reader = relauth_reader([CoreUser::class => new FiltersGroup([new Filter('name', ['nobody'], FilterOperator::In)], WhereClause::And)]);
 
-        $response = $this->actingAs($reader)->getJson('/api/v1/history/core/users?' . http_build_query(['id' => $hidden->id]));
+        $hiddenResponse = $this->actingAs($reader)->getJson('/api/v1/history/core/users?' . http_build_query(['id' => $hidden->id]));
+        $missingResponse = $this->actingAs($reader)->getJson('/api/v1/history/core/users?' . http_build_query(['id' => 987654]));
+
+        expect($hiddenResponse->status())->toBe(403)
+            ->and($missingResponse->status())->toBe(403);
+    });
+
+    it('give no history of a record the ACL hides to an editor', function (): void {
+        $hidden = CoreUser::factory()->create(['name' => 'relauth_hidden_user']);
+        $reader = relauth_reader([CoreUser::class => new FiltersGroup([new Filter('name', ['nobody'], FilterOperator::In)], WhereClause::And)]);
+        $reader->roles->firstOrFail()->givePermissionTo(Permission::query()->firstOrCreate(['name' => PermissionName::forClass(CoreUser::class, 'update'), 'guard_name' => 'api']));
+
+        $response = $this->actingAs($reader->fresh())->getJson('/api/v1/history/core/users?' . http_build_query(['id' => $hidden->id]));
 
         expect($response->status())->toBe(404)
             ->and($response->json('data.history'))->toBeNull();

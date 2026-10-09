@@ -17,6 +17,11 @@ interface IHidesAttributesFromAnonymous
     /**
      * The attributes, and the relations, never returned to the anonymous user.
      *
+     * Only what the model's own serialization produces is removed. Fields that the translations and dynamic-content
+     * traits merge into the array afterwards (the translatable fields, the dynamic ones a preset defines) are added
+     * back by those traits' `toArray()` and are not covered: do not declare them here. Declare a column or a
+     * relation of the model itself.
+     *
      * @return list<string>
      */
     public function anonymousHiddenAttributes(): array;

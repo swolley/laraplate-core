@@ -292,9 +292,21 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
             return true;
         }
 
-        $request = request()->duplicate();
-        $request->setUserResolver(static fn (): Authenticatable => $user);
+        // The answer is the same for every media of a request and its user, and a serialization asks it once per
+        // media (more than once for a model that serializes through several traits): it is kept on the request.
+        $request = request();
+        $key = 'core.media_projected.' . spl_object_id($user);
 
-        return ! resolve(AuthorizationService::class)->checkPermission($request, $this->getTable(), ActionEnum::Update->value, $this->getConnectionName());
+        if ($request->attributes->has($key)) {
+            return (bool) $request->attributes->get($key);
+        }
+
+        $duplicate = $request->duplicate();
+        $duplicate->setUserResolver(static fn (): Authenticatable => $user);
+
+        $projected = ! resolve(AuthorizationService::class)->checkPermission($duplicate, $this->getTable(), ActionEnum::Update->value, $this->getConnectionName());
+        $request->attributes->set($key, $projected);
+
+        return $projected;
     }
 }

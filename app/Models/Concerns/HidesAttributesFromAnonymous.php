@@ -7,6 +7,7 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Contracts\IHidesAttributesFromAnonymous;
 use Modules\Core\Models\User;
+use Override;
 
 /**
  * Removes the attributes a model declares through {@see IHidesAttributesFromAnonymous} from what it serializes
@@ -31,6 +32,7 @@ trait HidesAttributesFromAnonymous
      * @param  array<string, mixed>  $values
      * @return array<string, mixed>
      */
+    #[Override]
     protected function getArrayableItems(array $values): array
     {
         $items = parent::getArrayableItems($values);

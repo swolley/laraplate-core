@@ -640,6 +640,15 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        // The versions hold the values as they were before they were published, and the raw attributes of the
+        // record: they are editorial data, for who may change or approve the entity, as the pending changes are.
+        // The answer is the same whether the record is hidden by its ACL or does not exist, because it comes first.
+        throw_unless(
+            $this->relationAuthorizer()->maySeePendingChanges($requestData->request, $model),
+            AuthorizationException::class,
+            'User not allowed to access this resource',
+        );
+
         // 2. Build query and apply ACL filters
         $this->authorizeRequestedRelations($requestData);
         $query = $model->newQuery();
@@ -647,6 +656,11 @@ class CrudService
         $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
 
         $query->with('history', function (Relation $q) use ($requestData): void {
+            // A version loads on its own the record it belongs to, which is the `record` of this answer and would
+            // load its own default relations unchecked: it is left out. The other relations a version loads on its
+            // own obey the rule.
+            $q->getQuery()->without('versionable');
+            $this->query_builder->guardEngineQuery($q->getQuery(), $this->relationAuthorizer(), $requestData->request);
             $q->latest();
 
             if (isset($requestData->limit)) {
@@ -675,7 +689,9 @@ class CrudService
             cachedAt: Date::now(),
         );
 
-        $record_array = $data->getAttributes();
+        // The model serializes its own record, so the attributes it hides from the anonymous user and the media
+        // projection of the api guard apply; the history and the modifications are given beside it.
+        $record_array = (clone $data)->unsetRelation('history')->unsetRelation('modifications')->toArray();
 
         $payload = [
             'record' => $record_array,
@@ -725,7 +741,12 @@ class CrudService
             // matched on the key column of that expression.
             $visible = $this->visibleRelatedKeys($requestData->request, $model, $model->newInstance(), $model->getKeyName());
 
-            $query->with([$tree_relation_type => static function (Relation $nodes) use ($visible, $model): void {
+            $query->with([$tree_relation_type => function (Relation $nodes) use ($visible, $model, $requestData): void {
+                // Added after the request relations, so the guard has not seen this query: the relations the nodes
+                // load on their own, and the ones their appended attributes read (a cover), follow the rule here,
+                // once for all the nodes.
+                $this->query_builder->guardEngineQuery($nodes->getQuery(), $this->relationAuthorizer(), $requestData->request);
+
                 if ($visible !== null) {
                     $nodes->getQuery()->whereIn($nodes->getQuery()->getModel()->qualifyColumn($model->getKeyName()), $visible);
                 }
