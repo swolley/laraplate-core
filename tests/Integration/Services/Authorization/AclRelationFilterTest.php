@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -16,12 +17,14 @@ use Modules\Core\Models\Media;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Rules\QueryBuilder as QueryBuilderRule;
 use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Support\CrudApiExposure;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Tests\Stubs\Search\RecordingEngineBuilderStub;
 
 beforeEach(function (): void {
     Cache::flush();
@@ -175,6 +178,91 @@ it('accepts a relation filter in the ACL validation rule and refuses a malformed
     expect($failures)->not->toBe([]);
 });
 
+/**
+ * An ACL on the `select` permission of a model (Media by default), not yet saved, ready to be validated as a save would.
+ *
+ * @param  array<string, mixed>|FiltersGroup  $filters
+ * @param  class-string<Illuminate\Database\Eloquent\Model>  $model_class
+ */
+function aclrel_unsaved_media_acl(array|FiltersGroup $filters, string $model_class = Media::class): ACL
+{
+    $permission = Permission::query()->firstOrCreate([
+        'name' => PermissionName::forClass($model_class, 'select'),
+        'guard_name' => 'api',
+    ]);
+
+    $acl = new ACL;
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => $filters,
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+
+    return $acl;
+}
+
+it('accepts at save a relation filter that names a real relation and a real morph type', function (): void {
+    $acl = aclrel_unsaved_media_acl(aclrel_owner_filters('owner'));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->not->toThrow(ContextualValidationException::class);
+});
+
+it('rejects at save a relation filter whose relation does not exist on the entity', function (): void {
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup([
+        new RelationFilter('nowhere', new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)])),
+    ]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
+it('rejects at save a relation filter that names a method which is not a relation', function (): void {
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup([
+        new RelationFilter('delete', new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)])),
+    ]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
+it('rejects at save a morph relation without morph types and a plain relation with morph types', function (): void {
+    $nested = new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)]);
+
+    $morph_without_types = aclrel_unsaved_media_acl(new FiltersGroup([new RelationFilter('model', $nested)]));
+    $plain_with_types = aclrel_unsaved_media_acl(new FiltersGroup([
+        new RelationFilter('roles', $nested, [Role::class]),
+    ]), User::class);
+
+    expect(fn () => $morph_without_types->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+    expect(fn () => $plain_with_types->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
+it('rejects at save a morph type that is not a model class, from the JSON array form too', function (): void {
+    $nested = ['filters' => [['property' => 'id', 'operator' => '=', 'value' => 1]], 'operator' => 'and'];
+
+    $unknown_class = aclrel_unsaved_media_acl(new FiltersGroup([
+        new RelationFilter('model', new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)]), ['Modules\\Nowhere\\Models\\Ghost']),
+    ]));
+    $not_a_model = aclrel_unsaved_media_acl(['operator' => 'and', 'filters' => [
+        ['relation' => 'model', 'morph_types' => [stdClass::class], 'filters' => $nested],
+    ]]);
+
+    expect(fn () => $unknown_class->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+    expect(fn () => $not_a_model->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
+it('rejects at save a nested relation filter that is wrong for the related entity', function (): void {
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup([
+        new RelationFilter(
+            'model',
+            new FiltersGroup([new RelationFilter('nowhere', new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)]))]),
+            [User::class],
+        ),
+    ]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
 it('refuses a relation filter that names no morph type when it is given an empty list', function (): void {
     expect(fn () => new RelationFilter('model', new FiltersGroup, []))->toThrow(InvalidArgumentException::class);
 });
@@ -197,6 +285,22 @@ it('keeps on a list only the media whose morph owner matches the nested filters,
 
     $response->assertOk();
     expect(collect($response->json('data'))->pluck('id')->all())->toBe([$kept->id]);
+});
+
+it('applies the relation filter on a detail too: the record behind a matching owner is returned, any other is not found', function (): void {
+    CrudApiExposure::enable();
+    $kept_owner = User::factory()->create(['name' => 'kept-owner']);
+    $other_owner = User::factory()->create(['name' => 'other-owner']);
+    $kept = aclrel_media($kept_owner->getMorphClass(), $kept_owner->getKey());
+    $hidden = aclrel_media($other_owner->getMorphClass(), $other_owner->getKey());
+
+    [$reader] = aclrel_media_reader(aclrel_owner_filters('kept-owner'));
+
+    $this->actingAs($reader)->getJson('/api/v1/detail/core/media?id=' . $kept->id)
+        ->assertOk()
+        ->assertJsonPath('data.id', $kept->id);
+    $this->actingAs($reader)->getJson('/api/v1/detail/core/media?id=' . $hidden->id)
+        ->assertNotFound();
 });
 
 it('applies the same relation filter when the ACL is applied straight to a query', function (): void {
@@ -241,41 +345,8 @@ it('combines a relation filter with a column filter in an OR group', function ()
         ->and($query->pluck('id')->all())->not->toContain($neither->id);
 });
 
-/**
- * A Scout-like builder that records the engine constraints.
- */
-function aclrel_engine_builder(): object
-{
-    return new class
-    {
-        /**
-         * @var list<array{method: string, field: string, value: mixed}>
-         */
-        public array $calls = [];
-
-        /**
-         * @var array<string, mixed>
-         */
-        public array $options = [];
-
-        public function where(string $field, mixed $value): self
-        {
-            $this->calls[] = ['method' => 'where', 'field' => $field, 'value' => $value];
-
-            return $this;
-        }
-
-        public function whereIn(string $field, array $value): self
-        {
-            $this->calls[] = ['method' => 'whereIn', 'field' => $field, 'value' => $value];
-
-            return $this;
-        }
-    };
-}
-
 it('does not push a relation filter to the search engine and keeps the column conditions beside it', function (): void {
-    $builder = aclrel_engine_builder();
+    $builder = new RecordingEngineBuilderStub;
     $filters = new FiltersGroup(
         filters: [
             new Filter('collection_name', 'covers', FilterOperator::Equals),
@@ -291,7 +362,7 @@ it('does not push a relation filter to the search engine and keeps the column co
 });
 
 it('pushes nothing for an OR group that holds a relation filter, so the engine never drops what the relation allows', function (): void {
-    $builder = aclrel_engine_builder();
+    $builder = new RecordingEngineBuilderStub;
     $filters = new FiltersGroup(
         filters: [
             new Filter('collection_name', 'covers', FilterOperator::Equals),

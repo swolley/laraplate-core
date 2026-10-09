@@ -315,6 +315,7 @@ Result on `vend_media`: only media whose owner is a content valid at the time of
 - Only ACLs build relation nodes: filters sent in a request are parsed as column filters and cannot contain one.
 - In search the engine receives column conditions only. A relation node is not pushed to the engine (inside an OR group the whole group is left out, so the engine never drops what the relation allows); the records behind the hits are reloaded with the ACL applied, which is where the relation condition takes effect.
 - The ACL form edits the JSON; the validation rule accepts a relation node whose `filters` is a group.
+- At save, `Rules\AclRelationFilters` checks what the node names: the relation must be a relation method of the entity the ACL's permission is about (nested relation nodes are checked against the related entity), a `MorphTo` needs `morph_types` and any other relation must not carry them, and every morph type must be a model class or morph alias. A failing check rejects the ACL.
 
 ## Usage
 
