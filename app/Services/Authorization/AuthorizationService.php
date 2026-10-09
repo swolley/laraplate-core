@@ -337,12 +337,15 @@ final class AuthorizationService
         }
 
         // Keyed by the configured name: a stale user must not survive a rename of the guest account.
-        $anonymous = Cache::rememberForever(
-            'anonymous_user.' . $guest_name,
-            static fn (): ?User => User::query()->where('name', $guest_name)->first(),
-        );
+        // Loaded as the configured user class: the roles of the account are stored under the morph type of
+        // that class, so a parent class would load the account with no role at all.
+        $anonymous = Cache::rememberForever('anonymous_user.' . $guest_name, static function () use ($guest_name): ?Model {
+            $id = User::query()->where('name', $guest_name)->value('id');
 
-        if ($anonymous === null) {
+            return $id === null ? null : user_class()::query()->whereKey($id)->first();
+        });
+
+        if (! $anonymous instanceof User) {
             return null;
         }
 

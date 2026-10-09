@@ -153,7 +153,7 @@ it('finds the anonymous user by the configured guest name', function (): void {
     $api_role = Role::factory()->create(['name' => 'guard_anon_api_' . uniqid(), 'guard_name' => 'api']);
     $api_role->givePermissionTo($permissions['api']);
 
-    $visitor = User::factory()->create(['name' => 'visitor', 'username' => 'visitor']);
+    $visitor = App\Models\User::query()->findOrFail(User::factory()->create(['name' => 'visitor', 'username' => 'visitor'])->getKey());
     $visitor->assignRole($api_role);
 
     Auth::shouldUse('api');

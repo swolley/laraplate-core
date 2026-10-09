@@ -429,7 +429,7 @@ describe('entities outside the permission scheme', function (): void {
 
     it('answers 401 to the anonymous caller asking for a relation it may not read', function (): void {
         config()->set('permission.users.guest', 'anonymous');
-        $anonymous = CoreUser::query()->where('name', 'anonymous')->first() ?? CoreUser::factory()->create(['name' => 'anonymous', 'username' => 'anonymous']);
+        $anonymous = User::query()->where('name', 'anonymous')->first() ?? User::query()->findOrFail(CoreUser::factory()->create(['name' => 'anonymous', 'username' => 'anonymous'])->getKey());
         $role = Role::factory()->create(['name' => 'relauth_guest_' . uniqid(), 'guard_name' => 'api']);
         $role->givePermissionTo(Permission::query()->where(['name' => PermissionName::forClass(CoreUser::class, 'select'), 'guard_name' => 'api'])->firstOrFail());
         $anonymous->assignRole($role);

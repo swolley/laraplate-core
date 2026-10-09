@@ -64,8 +64,10 @@ function apiAccessUserWithGrant(?string $name = null): App\Models\User
  */
 function apiAccessAnonymous(bool $withGrant = false): User
 {
-    $anonymous = User::query()->where('name', 'anonymous')->first()
-        ?? User::factory()->create(['name' => 'anonymous', 'username' => 'anonymous']);
+    // Created as the configured user class: the roles of the account are stored under its morph type, and the
+    // API resolves the anonymous account as that class.
+    $anonymous = App\Models\User::query()->where('name', 'anonymous')->first()
+        ?? App\Models\User::query()->findOrFail(User::factory()->create(['name' => 'anonymous', 'username' => 'anonymous'])->getKey());
 
     if ($withGrant) {
         apiAccessEnsurePermission(API_ACCESS_ENTITY_PERMISSION);

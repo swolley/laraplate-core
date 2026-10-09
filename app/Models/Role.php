@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Contracts\ILockableModel;
@@ -183,10 +184,7 @@ final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
                 'required',
                 'string',
                 'max:255',
-                /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique(CoreTables::Roles->value)->where(function ($query): void { // @pest-ignore-type
-                    $query->where('deleted_at', null);
-                }),
+                $this->uniqueNameOnGuard(),
             ],
         ]);
         $rules['update'] = array_merge($rules['update'], [
@@ -194,10 +192,7 @@ final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
                 'sometimes',
                 'string',
                 'max:255',
-                /** @var \Illuminate\Database\Query\Builder $query */
-                Rule::unique(CoreTables::Roles->value)->where(function ($query): void { // @pest-ignore-type
-                    $query->where('deleted_at', null);
-                })->ignore($this->id, 'id'),
+                $this->uniqueNameOnGuard()->ignore($this->id, 'id'),
             ],
         ]);
 
@@ -215,6 +210,19 @@ final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * A role name is unique per guard: the `guest` of `/app` and the `guest` of `/api` are two roles.
+     */
+    private function uniqueNameOnGuard(): Unique
+    {
+        $default_guard = config('auth.defaults.guard', 'web');
+        $guard_name = $this->guard_name ?? (is_string($default_guard) ? $default_guard : 'web');
+
+        return Rule::unique(CoreTables::Roles->value, 'name')
+            ->where('guard_name', $guard_name)
+            ->whereNull('deleted_at');
     }
 
     /**

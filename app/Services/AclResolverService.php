@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
+use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Cache\CacheManager;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
@@ -64,7 +65,10 @@ final class AclResolverService
         $connection_name = $this->assertSharedConnection($user, $permission);
         $cache_key = $this->buildCacheKey($connection_name, $user->id, $permission->id);
 
-        return Cache::remember($cache_key, self::CACHE_TTL, fn (): Collection => $this->resolveAcls($user, $permission));
+        // Reading the ACL rows is part of working out what the user may read: the per-row select check of the
+        // ACL model must not ask the very question being answered, or a role that holds a permission narrowed by
+        // an ACL (the guest of the api, the publisher) could not resolve its own narrowing.
+        return Cache::remember($cache_key, self::CACHE_TTL, fn (): Collection => ResolvingAuthorization::resolve(fn (): Collection => $this->resolveAcls($user, $permission)));
     }
 
     /**

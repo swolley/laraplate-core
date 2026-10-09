@@ -48,6 +48,13 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     public const APPROVAL_THRESHOLD_NAME_PREFIX = 'notifications.threshold';
 
     /**
+     * The guard of `/api`. Roles are keyed by (name, guard): the `guest` of `/app` and the `guest` of `/api` are two roles.
+     */
+    public const string API_GUARD = 'api';
+
+    /**
+     * The seeded default roles, keyed by {@see self::roleKey()}.
+     *
      * @var Collection<string, BaseRole>
      */
     private Collection $groups;
@@ -116,6 +123,24 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
     }
 
     /**
+     * The key of a default role: a role is identified by its name and its guard.
+     */
+    public static function roleKey(string $name, ?string $guard): string
+    {
+        return "{$name}|{$guard}";
+    }
+
+    /**
+     * The guard of `/app`, the one the staff roles live on.
+     */
+    public static function defaultGuard(): string
+    {
+        $guard = config('auth.defaults.guard', 'web');
+
+        return is_string($guard) ? $guard : 'web';
+    }
+
+    /**
      * Seed the application's database.
      */
     public function run(): void
@@ -125,6 +150,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             $this->defaultRoles();
             $this->defaultSettingAcls();
             $this->defaultUsers();
+            $this->ensureAnonymousGuestRoles();
             $this->defaultCrons();
         });
 
@@ -162,19 +188,23 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $this->logOperation($role_class);
 
         $roles = self::getDefaultUserRoles();
+        $web = $this->defaultGuard();
 
-        // The default roles live on the default guard and can only hold that guard's permissions;
-        // the `api` twins are granted to the roles of the `api` guard.
-        $all_permissions = $permission_class::query()->where('guard_name', $this->defaultGuard())->get();
+        // Every permission exists once per guard. The staff roles live on the default guard and hold only
+        // its permissions; the `api` guard has its own roles, granted its own permissions.
+        $all_permissions = $permission_class::query()->where('guard_name', $web)->get();
+        $public_api_permission_names = [PermissionName::forClass(Setting::class, ActionEnum::Select->value)];
 
         $roles_data = [
             [
                 'name' => $roles['superadmin'],
+                'guard_name' => $web,
                 'description' => 'superadmin is the only one who can bypass all the system guards and permissions',
                 'locked_at' => now(),
             ],
             [
                 'name' => $roles['admin'],
+                'guard_name' => $web,
                 'locked_at' => now(),
                 'permissions' => fn () => $all_permissions
                     ->filter(function ($permission) use ($user_table, $role_table) {
@@ -185,20 +215,28 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                         return ($isUserOrRoleTable || $isSelectAction) && ! $isLockAction;
                     }),
             ],
+            // `/app` is for authenticated users only: the guest of the web guard holds no permission.
             [
                 'name' => $roles['guest'],
+                'guard_name' => $web,
                 'locked_at' => now(),
-                'permissions' => fn () => $all_permissions
-                    ->filter(function ($permission) {
-                        $isSelectAction = str_ends_with($permission->name, '.' . ActionEnum::Select->value);
-                        $excludedTables = ['versions', 'modifications', 'cron_jobs'];
-
-                        return $isSelectAction && ! in_array($permission->table_name, $excludedTables, true);
-                    }),
+            ],
+            // The guest of the api guard is the anonymous reader of `/api`: it holds the public list, each entity
+            // narrowed by its ACL. Core grants its own entity, the modules grant theirs.
+            [
+                'name' => $roles['guest'],
+                'guard_name' => self::API_GUARD,
+                'description' => 'The anonymous reader of the api: the public list, narrowed by ACLs.',
+                'locked_at' => now(),
+                'permissions' => fn () => $permission_class::query()
+                    ->where('guard_name', self::API_GUARD)
+                    ->whereIn('name', $public_api_permission_names)
+                    ->get(),
             ],
             // system is not superadmin so develper can decide what to do with it and limit permissions for security reasons
             [
                 'name' => $roles['system'],
+                'guard_name' => $web,
                 'locked_at' => now(),
                 'permissions' => fn () => $all_permissions,
                 // ->filter(function ($permission) {
@@ -207,9 +245,9 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             ],
         ];
 
-        $this->groups = $role_class::query()->withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
-        $existing_roles = $this->groups->keys()->all();
-        $new_roles = array_filter($roles_data, fn ($role) => ! in_array($role['name'], $existing_roles, true));
+        $names = array_values(array_unique(array_column($roles_data, 'name')));
+        $this->groups = $this->loadGroups($role_class, $names);
+        $new_roles = array_filter($roles_data, fn (array $role): bool => ! $this->groups->has(self::roleKey($role['name'], $role['guard_name'])));
 
         if ($new_roles === []) {
             $this->command?->line('    - nothing to update');
@@ -220,16 +258,27 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $role_instance->getConnection()->transaction(function () use ($role_class, $new_roles): void {
             foreach ($new_roles as &$role) {
                 $this->create($role_class, $role);
-                $this->command?->line("    - {$role['name']} <fg=green>created</>");
+                $this->command?->line("    - {$role['name']} ({$role['guard_name']}) <fg=green>created</>");
             }
         });
 
         // Reload keyed roles so defaultUsers() sees IDs created in this transaction.
-        $this->groups = $role_class::query()->withoutGlobalScopes()->whereIn('name', array_column($roles_data, 'name'))->get(['id', 'name', 'guard_name'])->keyBy('name');
+        $this->groups = $this->loadGroups($role_class, $names);
     }
 
     /**
-     * Seed the row-level ACL that limits the `guest` role to public settings on
+     * @param  class-string<BaseRole>  $role_class
+     * @param  list<string>  $names
+     * @return Collection<string, BaseRole>
+     */
+    private function loadGroups(string $role_class, array $names): Collection
+    {
+        return $role_class::query()->withoutGlobalScopes()->whereIn('name', $names)->get(['id', 'name', 'guard_name'])
+            ->keyBy(fn (BaseRole $role): string => self::roleKey($role->name, $role->guard_name));
+    }
+
+    /**
+     * Seed the row-level ACL that limits the `guest` role of the api guard to public settings on
      * `settings.select`. Staff roles have no ACL on that permission and read every setting.
      */
     private function defaultSettingAcls(): void
@@ -239,10 +288,10 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         /** @var class-string<Permission> $permission_class */
         $permission_class = config('permission.models.permission');
 
-        $guest = $this->groups->get(config('permission.roles.guest'));
+        $guest = $this->groups->get(self::roleKey(self::getDefaultUserRoles()['guest'], self::API_GUARD));
 
         if ($guest === null) {
-            $this->command?->line('    - guest role missing, skipping settings ACL');
+            $this->command?->line('    - api guest role missing, skipping settings ACL');
 
             return;
         }
@@ -250,7 +299,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $setting = new Setting;
         $permission_name = PermissionName::forModel($setting, ActionEnum::Select->value);
 
-        $permission = $permission_class::query()->where(['name' => $permission_name, 'guard_name' => $this->defaultGuard()])->first(['id']);
+        $permission = $permission_class::query()->where(['name' => $permission_name, 'guard_name' => self::API_GUARD])->first(['id']);
 
         if ($permission === null) {
             $this->command?->line("    - permission {$permission_name} missing, skipping settings ACL");
@@ -275,7 +324,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 ],
                 operator: WhereClause::And,
             ),
-            'description' => 'Guests (anonymous/public) read only public settings.',
+            'description' => 'Anonymous readers of the api read only public settings.',
             'unrestricted' => false,
             'priority' => 100,
             'is_active' => true,
@@ -285,19 +334,15 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $this->command?->line('    - settings guest ACL <fg=green>created</>');
     }
 
-    private function defaultGuard(): string
-    {
-        $guard = config('auth.defaults.guard', 'web');
-
-        return is_string($guard) ? $guard : 'web';
-    }
-
     private function defaultUsers(): void
     {
         $user_class = user_class();
         $user_instance = new ReflectionClass($user_class)->newInstanceWithoutConstructor();
 
         $this->logOperation($user_class);
+
+        $roles = self::getDefaultUserRoles();
+        $web = $this->defaultGuard();
 
         $anonymous = config('permission.users.guest');
         $superadmin = config('permission.users.superadmin');
@@ -311,7 +356,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'email' => "{$superadmin}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'roles' => [$this->groups->get('superadmin')],
+                'roles' => [$this->groups->get(self::roleKey($roles['superadmin'], $web))],
                 'locked_at' => now(),
                 'valid_from' => now(),
                 'valid_to' => null,
@@ -322,7 +367,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'email' => "{$admin}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'roles' => [$this->groups->get('admin')],
+                'roles' => [$this->groups->get(self::roleKey($roles['admin'], $web))],
                 'locked_at' => now(),
                 'valid_from' => now(),
                 'valid_to' => null,
@@ -333,7 +378,10 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'email' => "{$anonymous}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'roles' => [$this->groups->get('guest')],
+                'roles' => [
+                    $this->groups->get(self::roleKey($roles['guest'], $web)),
+                    $this->groups->get(self::roleKey($roles['guest'], self::API_GUARD)),
+                ],
                 'locked_at' => now(),
                 'valid_from' => now(),
                 'valid_to' => null,
@@ -344,7 +392,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'email' => "{$system}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
                 'password' => Str::random(16),
                 'email_verified_at' => now(),
-                'roles' => [$this->groups->get('system')],
+                'roles' => [$this->groups->get(self::roleKey($roles['system'], $web))],
                 'locked_at' => now(),
                 'valid_from' => now(),
                 'valid_to' => null,
@@ -371,6 +419,25 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 }
             }
         });
+    }
+
+    /**
+     * The anonymous user holds the `guest` role of both guards, also when it was seeded before the api role existed.
+     */
+    private function ensureAnonymousGuestRoles(): void
+    {
+        $user_class = user_class();
+        $anonymous_id = $user_class::query()->withoutGlobalScopes()->where('username', config('permission.users.guest'))->value('id');
+
+        if ($anonymous_id === null) {
+            return;
+        }
+
+        $guest = self::getDefaultUserRoles()['guest'];
+
+        foreach ([$this->defaultGuard(), self::API_GUARD] as $guard) {
+            $this->groups->get(self::roleKey($guest, $guard))?->users()->syncWithoutDetaching([$anonymous_id]);
+        }
     }
 
     private function defaultSettings(): void

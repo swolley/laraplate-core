@@ -148,16 +148,16 @@ it('defaults is_internal to false for settings not written by a seeder', functio
     expect($setting->fresh()->is_internal)->toBeFalse();
 });
 
-it('seeds a guest ACL that limits settings reads to public ones', function (): void {
+it('seeds a guest ACL on the api guard that limits settings reads to public ones', function (): void {
     $this->artisan('db:seed', ['--class' => PermissionRefreshSeeder::class])->assertSuccessful();
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
     $this->artisan('db:seed', ['--class' => CoreDatabaseSeeder::class])->assertSuccessful();
 
     $setting = new Setting;
     $permission = Permission::query()
-        ->where(['name' => PermissionName::forModel($setting, ActionEnum::Select->value), 'guard_name' => 'web'])
+        ->where(['name' => PermissionName::forModel($setting, ActionEnum::Select->value), 'guard_name' => 'api'])
         ->sole();
-    $guest = Role::query()->where('name', config('permission.roles.guest'))->sole();
+    $guest = Role::query()->where(['name' => config('permission.roles.guest'), 'guard_name' => 'api'])->sole();
 
     $acl = ACL::query()->where('permission_id', $permission->id)->where('role_id', $guest->id)->sole();
 
