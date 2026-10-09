@@ -42,7 +42,13 @@ final class FiltersGroupCast implements CastsAttributes
             throw new InvalidArgumentException(sprintf('The stored filters of [%s] must be a JSON object or list.', $key));
         }
 
-        return $this->hydrateGroup($value);
+        $group = $this->hydrateGroup($value);
+
+        if (! filter_var($attributes['unrestricted'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $this->holdsCondition($group)) {
+            throw new InvalidArgumentException(sprintf('The stored filters of [%s] constrain nothing.', $key));
+        }
+
+        return $group;
     }
 
     /**
@@ -71,39 +77,12 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
+     * A group, or a single node (a filter or a relation node) or a list of nodes standing for a group.
+     *
      * @param  array<mixed>  $data
      */
     private function hydrateGroup(array $data): FiltersGroup
     {
-        if (array_key_exists('relation', $data)) {
-            return new FiltersGroup(filters: [$this->hydrateRelationFilter($data)]);
-        }
-
-        if (array_key_exists('filters', $data)) {
-            if (! is_array($data['filters'])) {
-                throw new InvalidArgumentException('The filters of a group must be a list of conditions.');
-            }
-
-            $nested = [];
-
-            foreach ($data['filters'] as $item) {
-                $nested[] = $this->hydrateNode($item);
-            }
-
-            $group_operator = $data['operator'] ?? 'and';
-            $operator = is_string($group_operator) ? WhereClause::tryFrom(mb_strtolower($group_operator)) : null;
-
-            if (! $operator instanceof WhereClause) {
-                throw new InvalidArgumentException('Unknown operator of a filters group.');
-            }
-
-            return new FiltersGroup(filters: $nested, operator: $operator);
-        }
-
-        if (array_key_exists('property', $data)) {
-            return new FiltersGroup(filters: [$this->hydrateFilter($data)]);
-        }
-
         if (array_is_list($data)) {
             $items = [];
 
@@ -114,32 +93,90 @@ final class FiltersGroupCast implements CastsAttributes
             return new FiltersGroup(filters: $items);
         }
 
-        throw new InvalidArgumentException('Invalid filters JSON structure for FiltersGroup.');
+        $node = $this->hydrateAssociative($data);
+
+        return $node instanceof FiltersGroup ? $node : new FiltersGroup(filters: [$node]);
     }
 
     /**
-     * A node is a relation node (`relation` key), a group (`filters` key) or a filter (`property` key). Anything
-     * else is refused: a condition skipped or guessed at inside an AND group would widen access.
+     * An item of a filters list: an object that is a filter, a group or a relation node.
      */
     private function hydrateNode(mixed $item): Filter|FiltersGroup|RelationFilter
     {
-        if (! is_array($item)) {
+        if (! is_array($item) || array_is_list($item)) {
             throw new InvalidArgumentException('Every item of a filters list must be a filter, a group or a relation filter.');
         }
 
-        if (array_key_exists('relation', $item)) {
-            return $this->hydrateRelationFilter($item);
+        return $this->hydrateAssociative($item);
+    }
+
+    /**
+     * A node is exactly one kind, with exactly the keys of that kind: a relation node (`relation`, `filters`,
+     * `morph_types`), a filter (`property`, `operator`, `value`) or a group (`operator`, `filters`). A key
+     * outside the kind, or keys of two kinds at once, are refused: whatever a loose reading drops from an AND
+     * group widens access.
+     *
+     * @param  array<mixed>  $data
+     */
+    private function hydrateAssociative(array $data): Filter|FiltersGroup|RelationFilter
+    {
+        if (array_key_exists('relation', $data)) {
+            $this->assertKeys($data, ['relation', 'filters', 'morph_types']);
+
+            return $this->hydrateRelationFilter($data);
         }
 
-        if (array_key_exists('filters', $item)) {
-            return $this->hydrateGroup($item);
+        if (array_key_exists('property', $data)) {
+            $this->assertKeys($data, ['property', 'operator', 'value']);
+
+            return $this->hydrateFilter($data);
         }
 
-        if (array_key_exists('property', $item)) {
-            return $this->hydrateFilter($item);
+        if (array_key_exists('filters', $data)) {
+            $this->assertKeys($data, ['operator', 'filters']);
+
+            return $this->hydrateFiltersGroup($data);
         }
 
         throw new InvalidArgumentException('Invalid filter node in filters JSON.');
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     * @param  list<string>  $allowed
+     */
+    private function assertKeys(array $data, array $allowed): void
+    {
+        foreach (array_keys($data) as $key) {
+            if (! in_array($key, $allowed, true)) {
+                throw new InvalidArgumentException(sprintf('Unexpected key [%s] in a filters node.', $key));
+            }
+        }
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     */
+    private function hydrateFiltersGroup(array $data): FiltersGroup
+    {
+        if (! is_array($data['filters'])) {
+            throw new InvalidArgumentException('The filters of a group must be a list of conditions.');
+        }
+
+        $nested = [];
+
+        foreach ($data['filters'] as $item) {
+            $nested[] = $this->hydrateNode($item);
+        }
+
+        $group_operator = $data['operator'] ?? 'and';
+        $operator = is_string($group_operator) ? WhereClause::tryFrom(mb_strtolower($group_operator)) : null;
+
+        if (! $operator instanceof WhereClause) {
+            throw new InvalidArgumentException('Unknown operator of a filters group.');
+        }
+
+        return new FiltersGroup(filters: $nested, operator: $operator);
     }
 
     /**

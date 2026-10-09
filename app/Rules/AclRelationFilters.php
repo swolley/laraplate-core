@@ -57,7 +57,7 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         try {
-            $filters = $value instanceof FiltersGroup ? $value : new FiltersGroupCast()->get(new ACL, 'filters', $value, []);
+            $filters = $value instanceof FiltersGroup ? $value : new FiltersGroupCast()->get(new ACL, 'filters', $value, $this->data);
         } catch (InvalidArgumentException $exception) {
             $fail($attribute . ' cannot be read as filters: ' . $exception->getMessage());
 

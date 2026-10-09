@@ -370,6 +370,68 @@ it('throws an InvalidArgumentException, not a conversion error, for an array whe
     'filter operator' => [['operator' => 'and', 'filters' => [['property' => 'id', 'operator' => ['='], 'value' => 1]]]],
 ]);
 
+/**
+ * Stored filters that drop a condition when read loosely: an extra key, keys of two node kinds at once, or a
+ * group that constrains nothing.
+ *
+ * @return array<string, array{0: array<string, mixed>}>
+ */
+function aclrel_ambiguous_filters(): array
+{
+    $a = ['property' => 'name', 'operator' => '=', 'value' => 'a'];
+    $b = ['property' => 'name', 'operator' => '=', 'value' => 'b'];
+
+    return [
+        'relation nested group with a numeric extra key' => [['operator' => 'and', 'filters' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['operator' => 'and', 'filters' => [$a], '0' => $b]]]]],
+        'relation nested filter with a numeric extra key' => [['operator' => 'and', 'filters' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => $a + ['1' => $b]]]]],
+        'a node with property and filters' => [['operator' => 'and', 'filters' => [$a + ['filters' => [$b]]]]],
+        'a group with an unknown key' => [['operator' => 'and', 'filters' => [$a], 'note' => 'x']],
+        'a filter with an unknown key' => [['operator' => 'and', 'filters' => [$a + ['note' => 'x']]]],
+        'a relation node with an unknown key' => [['operator' => 'and', 'filters' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['operator' => 'and', 'filters' => [$a]], 'note' => 'x']]]],
+        'a relation node with a property' => [['operator' => 'and', 'filters' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['operator' => 'and', 'filters' => [$a]], 'property' => 'id']]]],
+        'a top-level group with a hidden extra condition' => [['filters' => [], '0' => $b]],
+        'a top-level group of empty groups' => [['filters' => [['filters' => []]]]],
+        'an empty top-level group' => [['operator' => 'and', 'filters' => []]],
+    ];
+}
+
+it('refuses to read a stored node with a key outside its kind or with keys of two kinds, and a group that constrains nothing', function (array $stored): void {
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', json_encode($stored), []))->toThrow(InvalidArgumentException::class);
+})->with(aclrel_ambiguous_filters());
+
+it('rejects at save a stored node with a key outside its kind or with keys of two kinds, and a group that constrains nothing', function (array $stored): void {
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup);
+    $acl->setRawAttributes(array_merge($acl->getAttributes(), ['filters' => json_encode($stored)]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+})->with(aclrel_ambiguous_filters());
+
+it('refuses to store a node with a key outside its kind', function (array $stored): void {
+    expect(fn () => (new FiltersGroupCast)->set(new ACL, 'filters', $stored, []))->toThrow(InvalidArgumentException::class);
+})->with(array_slice(aclrel_ambiguous_filters(), 0, 7, true));
+
+it('does not grant access, and answers with a client error, when a stored top-level group is ambiguous or constrains nothing', function (array $stored): void {
+    CrudApiExposure::enable();
+    $owner = User::factory()->create(['name' => 'kept-owner']);
+    aclrel_media($owner->getMorphClass(), $owner->getKey());
+    aclrel_media($owner->getMorphClass(), $owner->getKey());
+    [$reader] = aclrel_media_reader(aclrel_owner_filters('kept-owner'));
+    ACL::query()->update(['filters' => json_encode($stored)]);
+    Cache::flush();
+
+    $response = $this->actingAs($reader)->getJson('/api/v1/select/core/media');
+
+    expect($response->status())->toBe(400)
+        ->and($response->json('data'))->toBe([]);
+})->with(array_slice(aclrel_ambiguous_filters(), 7, null, true));
+
+it('keeps reading an unrestricted ACL whose stored group is empty', function (): void {
+    $acl = new ACL;
+
+    expect((new FiltersGroupCast)->get($acl, 'filters', json_encode(['operator' => 'and', 'filters' => []]), ['unrestricted' => true]))
+        ->toBeInstanceOf(FiltersGroup::class);
+});
+
 it('never calls a method that is not a relation when a relation filter is applied, even if the ACL skipped validation', function (): void {
     CrudApiExposure::enable();
     $owner = User::factory()->create(['name' => 'kept-owner']);
