@@ -407,3 +407,71 @@ describe('parts of a parent', function (): void {
             ->toThrow(LogicException::class);
     });
 });
+
+describe('entities outside the permission scheme', function (): void {
+    it('never loads the access tokens of a user', function (): void {
+        // The token belongs to the class the users endpoint hydrates, so a loaded relation would find it.
+        CoreUser::factory()->create()->createToken('relauth-secret', ['default.users.select']);
+        $reader = relauth_reader([CoreUser::class => null]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', ['relations' => ['tokens']]));
+
+        expect($response->getContent())->not->toContain('relauth-secret')
+            ->and(collect($response->json('data') ?? [])->pluck('tokens')->filter()->all())->toBe([])
+            ->and(app(RelationAuthorizer::class)->isReadable(Request::create('/'), new CoreUser, new Laravel\Sanctum\PersonalAccessToken))->toBeFalse();
+    });
+
+    it('refuses a related entity with no select permission that is not deliberately left out of the scheme', function (): void {
+        $reader = relauth_reader([CoreUser::class => null]);
+
+        $this->actingAs($reader)->getJson(relauth_url('select', ['relations' => ['notifications']]))->assertForbidden();
+    });
+
+    it('answers 401 to the anonymous caller asking for a relation it may not read', function (): void {
+        config()->set('permission.users.guest', 'anonymous');
+        $anonymous = CoreUser::query()->where('name', 'anonymous')->first() ?? CoreUser::factory()->create(['name' => 'anonymous', 'username' => 'anonymous']);
+        $role = Role::factory()->create(['name' => 'relauth_guest_' . uniqid(), 'guard_name' => 'api']);
+        $role->givePermissionTo(Permission::query()->where(['name' => PermissionName::forClass(CoreUser::class, 'select'), 'guard_name' => 'api'])->firstOrFail());
+        $anonymous->assignRole($role);
+
+        $this->getJson(relauth_url('select', []))->assertOk();
+        $this->getJson(relauth_url('select', ['relations' => ['roles']]))->assertUnauthorized();
+    });
+});
+
+describe('tree and history', function (): void {
+    it('leave out of a tree the nodes the ACL hides', function (): void {
+        $root = Role::factory()->create(['name' => 'relauth_root', 'guard_name' => 'web']);
+        $visible = Role::factory()->create(['name' => 'relauth_visible', 'guard_name' => 'web', 'parent_id' => $root->id]);
+        $hidden = Role::factory()->create(['name' => 'relauth_hidden', 'guard_name' => 'web', 'parent_id' => $root->id]);
+        $reader = relauth_reader([Role::class => new FiltersGroup([new Filter('name', ['relauth_root', 'relauth_visible'], FilterOperator::In)], WhereClause::And)]);
+
+        // A JSON body keeps `children` a boolean (TreeRequestData types it).
+        $response = $this->actingAs($reader)->json('GET', '/api/v1/tree/core/roles', [
+            'children' => true,
+            'filters' => [['property' => 'id', 'operator' => 'eq', 'value' => $root->id]],
+        ]);
+
+        $response->assertOk();
+        $names = [];
+        $data = (array) $response->json('data');
+        array_walk_recursive($data, static function (mixed $value, string|int $key) use (&$names): void {
+            if ($key === 'name') {
+                $names[] = $value;
+            }
+        });
+
+        expect($names)->toContain('relauth_visible')->not->toContain('relauth_hidden')
+            ->and($visible->id)->not->toBe($hidden->id);
+    });
+
+    it('give no history of a record the ACL hides', function (): void {
+        $hidden = CoreUser::factory()->create(['name' => 'relauth_hidden_user']);
+        $reader = relauth_reader([CoreUser::class => new FiltersGroup([new Filter('name', ['nobody'], FilterOperator::In)], WhereClause::And)]);
+
+        $response = $this->actingAs($reader)->getJson('/api/v1/history/core/users?' . http_build_query(['id' => $hidden->id]));
+
+        expect($response->status())->toBe(404)
+            ->and($response->json('data.history'))->toBeNull();
+    });
+});

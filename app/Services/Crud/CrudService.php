@@ -258,6 +258,10 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        // The relations the request names (its filters included) obey their own permission, as in a list.
+        // The columns of a facet request are facet fields of the main table, not relation paths.
+        $this->authorizeRequestedRelations($base, include_columns: false);
+
         $result = [];
 
         foreach ($base->columns as $column) {
@@ -286,7 +290,8 @@ class CrudService
             $this->auth->applyAclFiltersToQuery($count_query, $permission_name);
 
             if ($base->filters instanceof FiltersGroup) {
-                $this->query_builder->applyFilters($count_query, $this->excludeFacetField($base->filters, $field));
+                $relation_columns = [];
+                $this->query_builder->applyFilters($count_query, $this->excludeFacetField($base->filters, $field), $relation_columns, $this->relationAuthorizer(), $base->request);
             }
 
             $counts = $this->columnValueCounts($count_query, $field, $is_real_column);
@@ -328,6 +333,9 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        // The columns of a facet request are facet fields of the main table, not relation paths.
+        $this->authorizeRequestedRelations($base, include_columns: false);
+
         $to_one = $facet->relation === null ? $this->resolveToOneColumn($model, $facet->groupBy) : null;
         $this->assertFacetResolvable($model, $facet, $to_one);
 
@@ -345,7 +353,8 @@ class CrudService
         $this->auth->applyAclFiltersToQuery($filtered, $permission_name);
 
         if ($base->filters instanceof FiltersGroup) {
-            $this->query_builder->applyFilters($filtered, $this->excludeFacetField($base->filters, $key));
+            $relation_columns = [];
+            $this->query_builder->applyFilters($filtered, $this->excludeFacetField($base->filters, $key), $relation_columns, $this->relationAuthorizer(), $base->request);
         }
 
         // The model's default ordering scope (e.g. `order_column`) is meaningless on an
@@ -359,6 +368,11 @@ class CrudService
             ? null
             : $this->resolveLabelRelation($model, $key, $facet->labelField);
 
+        // The label is read on the related entity: its permission and ACL apply.
+        $label_visible = $label_relation === null
+            ? null
+            : $this->visibleRelatedKeys($base->request, $model, $label_relation['related'], $label_relation['ownerKey']);
+
         if ($facet->search !== null) {
             if ($label_relation === null) {
                 $filtered_base->where($key, 'like', '%' . $facet->search . '%');
@@ -368,6 +382,7 @@ class CrudService
                 $matching_keys = $translation['model']->newQuery()
                     ->where($translation['column'], 'like', '%' . $facet->search . '%')
                     ->where('locale', $translation['locale'])
+                    ->when($label_visible !== null, fn (Builder $query): Builder => $query->whereIn($translation['foreign'], $label_visible))
                     ->pluck($translation['foreign'])
                     ->all();
 
@@ -375,6 +390,7 @@ class CrudService
             } else {
                 $matching_keys = $label_relation['related']->newQuery()
                     ->where($label_relation['column'], 'like', '%' . $facet->search . '%')
+                    ->when($label_visible !== null, fn (Builder $query): Builder => $query->whereIn($label_relation['ownerKey'], $label_visible))
                     ->pluck($label_relation['ownerKey'])
                     ->all();
 
@@ -402,7 +418,7 @@ class CrudService
         }
 
         $totals = $this->facetTotals($model, $permission_name, $key, $page_keys);
-        $attributes = $this->resolveFacetLabels($model, $key, $page_keys, $facet->fields);
+        $attributes = $this->resolveFacetLabels($model, $key, $page_keys, $facet->fields, $base->request);
 
         $values = array_map(static fn (mixed $value): array => [
             'key' => $value,
@@ -701,7 +717,19 @@ class CrudService
         $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
         $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
-        $query->with($tree_relation_type);
+
+        if (is_string($tree_relation_type)) {
+            // The nodes are records of the same entity: the root's ACL leaves out the ones it hides. The tree query
+            // reads a recursive expression named after neither the table nor the model, so the visible keys are
+            // matched on the key column of that expression.
+            $visible = $this->visibleRelatedKeys($requestData->request, $model, $model->newInstance(), $model->getKeyName());
+
+            $query->with([$tree_relation_type => static function (Relation $nodes) use ($visible, $model): void {
+                if ($visible !== null) {
+                    $nodes->getQuery()->whereIn($nodes->getQuery()->getModel()->qualifyColumn($model->getKeyName()), $visible);
+                }
+            }]);
+        }
 
         $data = $requestData->request->has(is_array($requestData->primaryKey) ? $requestData->primaryKey[0] : $requestData->primaryKey)
             ? $query->sole()
@@ -1220,14 +1248,14 @@ class CrudService
      * @throws AuthorizationException when the caller may not select an entity the request names
      * @throws InvalidArgumentException when a name of the request is not a relation
      */
-    private function authorizeRequestedRelations(SelectRequestData $request_data, bool $lenient_filters = false): void
+    private function authorizeRequestedRelations(SelectRequestData $request_data, bool $lenient_filters = false, bool $include_columns = true): void
     {
         $this->assertComputedColumns($request_data);
 
         $this->relationAuthorizer()->authorizePaths(
             $request_data->request,
             $request_data->model,
-            $this->query_builder->requestedRelationPaths($request_data->model, $request_data, $lenient_filters),
+            $this->query_builder->requestedRelationPaths($request_data->model, $request_data, $lenient_filters, $include_columns),
         );
     }
 
@@ -1261,6 +1289,13 @@ class CrudService
 
         if ($request_data instanceof ListRequestData) {
             foreach ($request_data->group_by as $group) {
+                // The grouping reads the relation from each row: one the CRUD never loads cannot be grouped on.
+                throw_if(
+                    QueryBuilder::isBlackListedPath($group),
+                    InvalidArgumentException::class,
+                    sprintf('"%s" cannot be grouped on: the CRUD does not load that relation.', $group),
+                );
+
                 ComputedColumnGuard::assertReadablePath($model, $group);
             }
         }
@@ -1296,6 +1331,17 @@ class CrudService
     }
 
     /**
+     * The keys (`$key_column` values) of the related rows the caller may see, for a facet query that reads a
+     * related table directly; null when nothing narrows them.
+     *
+     * @throws AuthorizationException when the caller may not select the related entity
+     */
+    private function visibleRelatedKeys(Request $request, Model $parent, Model $related, string $key_column): ?BaseQueryBuilder
+    {
+        return $this->relationAuthorizer()->visibleKeysQuery($request, $parent, $related, $key_column)?->toBase();
+    }
+
+    /**
      * Facet over a BelongsToMany/MorphToMany relation's pivot: keys are related model
      * ids and the double counter counts distinct parent rows per related key. Parent
      * ACL and filters are enforced through a bounded id subquery, never a join into
@@ -1319,6 +1365,9 @@ class CrudService
         $related_key_name = $relation->getRelatedKeyName();
         $related_key = $related->getTable() . '.' . $related_key_name;
 
+        // The related rows obey their own permission and ACL, as a loaded relation does.
+        $related_visible = $this->visibleRelatedKeys($base->request, $model, $related, $related_key_name);
+
         // A `relation.column` label field is a locale-scoped translation join keyed
         // by the pivot's related key; a bare one is a column on the related table.
         $label_translation = $facet->labelField !== null
@@ -1331,8 +1380,8 @@ class CrudService
             ? $label_translation['table'] . '.' . $label_translation['column']
             : $label_bare;
 
-        $filtered_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, $base->filters, $facet->relation);
-        $acl_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, null, null);
+        $filtered_ids = fn (): BaseQueryBuilder => $this->relationParentIds($base->request, $model, $permission_name, $base->filters, $facet->relation);
+        $acl_ids = fn (): BaseQueryBuilder => $this->relationParentIds($base->request, $model, $permission_name, null, null);
 
         // Aggregate over the pivot on the query builder (never Eloquent) so heavy
         // related models are not hydrated from a partial select. Related global
@@ -1341,6 +1390,7 @@ class CrudService
         $pivot_query = fn (): BaseQueryBuilder => $related->getConnection()->query()
             ->from($pivot_table)
             ->whereIn($qualified_related, $related->newQuery()->toBase()->select($related_key_name))
+            ->when($related_visible !== null, fn (BaseQueryBuilder $query): BaseQueryBuilder => $query->whereIn($qualified_related, $related_visible))
             ->when(
                 $relation instanceof MorphToMany,
                 fn (BaseQueryBuilder $query): BaseQueryBuilder => $query->where($pivot_table . '.' . $relation->getMorphType(), $relation->getMorphClass()),
@@ -1406,7 +1456,7 @@ class CrudService
      * enforced through a bounded id subquery, and the facet's own selection
      * (`<relation>.<column>`) is excluded to keep cross-filtering live.
      *
-     * @param  array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}  $to_one
+     * @param  array{related: Model, relatedTable: string, foreignKey: string, ownerKey: string, column: string}  $to_one
      */
     private function facetRelatedColumnValues(ListRequestData $base, FacetQuery $facet, string $permission_name, array $to_one): FacetPage
     {
@@ -1415,12 +1465,16 @@ class CrudService
         $qualified_pk = $table . '.' . $model->getKeyName();
         $qualified_group = $to_one['relatedTable'] . '.' . $to_one['column'];
 
-        $filtered_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, $base->filters, $facet->groupBy);
-        $acl_ids = fn (): BaseQueryBuilder => $this->relationParentIds($model, $permission_name, null, null);
+        $filtered_ids = fn (): BaseQueryBuilder => $this->relationParentIds($base->request, $model, $permission_name, $base->filters, $facet->groupBy);
+
+        // The related rows obey their own permission and ACL, as a loaded relation does.
+        $related_visible = $this->visibleRelatedKeys($base->request, $model, $to_one['related'], $to_one['ownerKey']);
+        $acl_ids = fn (): BaseQueryBuilder => $this->relationParentIds($base->request, $model, $permission_name, null, null);
 
         $joined = fn (): BaseQueryBuilder => $model->getConnection()->query()
             ->from($table)
-            ->join($to_one['relatedTable'], $table . '.' . $to_one['foreignKey'], '=', $to_one['relatedTable'] . '.' . $to_one['ownerKey']);
+            ->join($to_one['relatedTable'], $table . '.' . $to_one['foreignKey'], '=', $to_one['relatedTable'] . '.' . $to_one['ownerKey'])
+            ->when($related_visible !== null, fn (BaseQueryBuilder $query): BaseQueryBuilder => $query->whereIn($to_one['relatedTable'] . '.' . $to_one['ownerKey'], $related_visible));
 
         $searched = fn (BaseQueryBuilder $query): BaseQueryBuilder => $query->when(
             $facet->search !== null,
@@ -1479,7 +1533,7 @@ class CrudService
      * column/relation, so a magic-accessor or typo yields a clear message instead of
      * a cryptic SQL error deep in the aggregate query.
      *
-     * @param  array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null  $to_one
+     * @param  array{related: Model, relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null  $to_one
      */
     private function assertFacetResolvable(Model $model, FacetQuery $facet, ?array $to_one): void
     {
@@ -1530,7 +1584,7 @@ class CrudService
      * Resolve a `relation.column` group key to its single-hop to-one relation join,
      * or null when it is not a dotted path over a {@see BelongsTo}.
      *
-     * @return array{relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null
+     * @return array{related: Model, relatedTable: string, foreignKey: string, ownerKey: string, column: string}|null
      */
     private function resolveToOneColumn(Model $model, string $group_by): ?array
     {
@@ -1547,6 +1601,7 @@ class CrudService
         }
 
         return [
+            'related' => $relation_object->getRelated(),
             'relatedTable' => $relation_object->getRelated()->getTable(),
             'foreignKey' => $relation_object->getForeignKeyName(),
             'ownerKey' => $relation_object->getOwnerKeyName(),
@@ -1559,15 +1614,19 @@ class CrudService
      * own relation selection, when given), selecting only the parent key so it can
      * feed a `whereIn` without joining into the aggregated query.
      */
-    private function relationParentIds(Model $model, string $permission_name, ?FiltersGroup $filters, ?string $relation): BaseQueryBuilder
+    private function relationParentIds(Request $request, Model $model, string $permission_name, ?FiltersGroup $filters, ?string $relation): BaseQueryBuilder
     {
         $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
 
         if ($filters instanceof FiltersGroup) {
+            $relation_columns = [];
             $this->query_builder->applyFilters(
                 $query,
                 $relation !== null ? $this->excludeFacetField($filters, $relation) : $filters,
+                $relation_columns,
+                $this->relationAuthorizer(),
+                $request,
             );
         }
 
@@ -2064,7 +2123,7 @@ class CrudService
      * @param  list<string>  $fields
      * @return array<mixed, array<string, mixed>>
      */
-    private function resolveFacetLabels(Model $model, string $key, array $page_keys, array $fields): array
+    private function resolveFacetLabels(Model $model, string $key, array $page_keys, array $fields, Request $request): array
     {
         if ($fields === [] || $page_keys === []) {
             return [];
@@ -2096,7 +2155,7 @@ class CrudService
         $this->resolveBaseColumnLabels($model, $key, $page_keys, array_values(array_unique($columns)), $resolved);
 
         foreach ($relation_fields as $relation => $specs) {
-            $this->resolveRelationLabels($model, $key, $page_keys, $relation, $specs, $resolved);
+            $this->resolveRelationLabels($request, $model, $key, $page_keys, $relation, $specs, $resolved);
         }
 
         return $resolved;
@@ -2132,7 +2191,7 @@ class CrudService
      * @param  list<array{field: string, column: string}>  $specs
      * @param  array<mixed, array<string, mixed>>  $resolved
      */
-    private function resolveRelationLabels(Model $model, string $key, array $page_keys, string $relation, array $specs, array &$resolved): void
+    private function resolveRelationLabels(Request $request, Model $model, string $key, array $page_keys, string $relation, array $specs, array &$resolved): void
     {
         // Only a single-hop label target whose key is the facet key can be resolved
         // from the page's keys without a join (a BelongsTo or a declared source).
@@ -2142,8 +2201,11 @@ class CrudService
             return;
         }
 
+        // The label is read on the related entity: its permission and ACL apply, and a hidden record gives no label.
+        $visible = $this->visibleRelatedKeys($request, $model, $target['related'], $target['ownerKey']);
+
         if (isset($target['translation'])) {
-            $this->resolveTranslatedFacetLabels($target['translation'], $page_keys, $specs, $resolved);
+            $this->resolveTranslatedFacetLabels($target['translation'], $page_keys, $specs, $resolved, $visible);
 
             return;
         }
@@ -2153,6 +2215,7 @@ class CrudService
 
         $related = $target['related']->newQuery()
             ->whereIn($owner_key, $page_keys)
+            ->when($visible !== null, fn (Builder $query): Builder => $query->whereIn($owner_key, $visible))
             ->get(array_values(array_unique([$owner_key, ...$columns])))
             ->keyBy($owner_key);
 
@@ -2175,11 +2238,13 @@ class CrudService
      * @param  list<mixed>  $page_keys
      * @param  list<array{field: string, column: string}>  $specs
      * @param  array<mixed, array<string, mixed>>  $resolved
+     * @param  BaseQueryBuilder|null  $visible  the related keys the caller may see; null when nothing narrows them
      */
-    private function resolveTranslatedFacetLabels(array $translation, array $page_keys, array $specs, array &$resolved): void
+    private function resolveTranslatedFacetLabels(array $translation, array $page_keys, array $specs, array &$resolved, ?BaseQueryBuilder $visible = null): void
     {
         $rows = $translation['model']->newQuery()
             ->whereIn($translation['foreign'], $page_keys)
+            ->when($visible !== null, fn (Builder $query): Builder => $query->whereIn($translation['foreign'], $visible))
             ->where('locale', $translation['locale'])
             ->get([$translation['foreign'], $translation['column']])
             ->keyBy($translation['foreign']);

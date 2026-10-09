@@ -14,10 +14,12 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Laravel\Sanctum\PersonalAccessToken;
 use LogicException;
 use Modules\Core\Authorization\PermissionExistenceMemo;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Console\PermissionsRefreshCommand;
 use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Services\Authorization\AuthorizationService;
@@ -135,20 +137,61 @@ final class RelationAuthorizer
      */
     public function isReadable(Request $request, Model $parent, Model $related): bool
     {
+        // Credentials are never read through the CRUD, whoever asks.
+        if ($related instanceof PersonalAccessToken) {
+            return false;
+        }
+
         $source = $this->visibilitySource($parent, $related);
 
         if ($source === null) {
             return true;
         }
 
-        // An entity kept out of permission generation (modifications, versions, licenses) has no select
-        // permission on any guard: it is not governed by one, as the model events treat it, and nobody but a
-        // superadmin could otherwise read the modifications of a content.
-        if (! $this->isGovernedByPermission($source['model'])) {
+        // An entity deliberately kept out of permission generation (modifications, versions, licenses) has no
+        // select permission on any guard by design: it is not governed by one, as the model events treat it.
+        // Any other entity without a permission fails closed: it was simply never granted.
+        if (! $this->isGovernedByPermission($source['model']) && PermissionsRefreshCommand::isOutsidePermissionScheme($source['model']::class)) {
             return true;
         }
 
         return $this->allows($request, $source['model'], ActionEnum::Select->value);
+    }
+
+    /**
+     * The keys of the related rows the caller may see, for a query that reads a related table directly instead of
+     * loading a relation (facets): refuses an entity the caller may not select, and answers null when no ACL
+     * narrows it.
+     *
+     *
+     * @throws AuthorizationException when the caller may not select the related entity
+     *
+     * @return Builder<Model>|null
+     */
+    public function visibleKeysQuery(Request $request, Model $parent, Model $related, ?string $key_column = null): ?Builder
+    {
+        throw_unless(
+            $this->isReadable($request, $parent, $related),
+            AuthorizationException::class,
+            sprintf('User not allowed to read %s through %s', $related->getTable(), $parent->getTable()),
+        );
+
+        $source = $this->visibilitySource($parent, $related);
+
+        if ($source === null) {
+            return null;
+        }
+
+        $permission = PermissionName::forModel($source['model'], ActionEnum::Select->value);
+
+        if (! $this->aclFilters($permission) instanceof FiltersGroup) {
+            return null;
+        }
+
+        $keys = $related->newQueryWithoutScopes()->select($related->qualifyColumn($key_column ?? $related->getKeyName()));
+        $this->applyAclThroughPath($keys, $source['path'], $permission);
+
+        return $keys;
     }
 
     /**

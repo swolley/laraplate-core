@@ -53,6 +53,42 @@ use ReflectionMethod;
 final class QueryBuilder
 {
     /**
+     * Relations a CRUD read never loads, at any depth of a path: tree walks (their own endpoint), version
+     * history (its own endpoint, and every past value of every field), and access tokens (credentials).
+     *
+     * @var list<string>
+     */
+    public const array RELATION_BLACK_LIST = [
+        'history',
+        'versions',
+        'lastVersion',
+        'latestVersion',
+        'firstVersion',
+        'latestVersions',
+        'oldestVersions',
+        'tokens',
+        'ancestors',
+        'ancestorsAndSelf',
+        'bloodline',
+        'children',
+        'childrenAndSelf',
+        'descendants',
+        'descendantsAndSelf',
+        'parentAndSelf',
+        'rootAncestor',
+        'siblings',
+        'siblingsAndSelf',
+    ];
+
+    /**
+     * Whether a relation path names a black-listed relation at any depth.
+     */
+    public static function isBlackListedPath(string $path): bool
+    {
+        return array_intersect(explode('.', $path), self::RELATION_BLACK_LIST) !== [];
+    }
+
+    /**
      * Prepare the query based on request data.
      *
      * This applies columns, filters, sorts, and relations from the request.
@@ -140,21 +176,24 @@ final class QueryBuilder
      * property contributes only the part of it that resolves to relations.
      *
      * Call it before the ACL filters are merged into the request: they name relations on their own authority.
+     * Without `$include_columns` (facets, whose columns are bare facet fields of the main table) the columns are
+     * not read as relation paths.
      *
      *
      * @throws InvalidArgumentException when a relation name of the request is not a relation
      *
      * @return list<string>
      */
-    public function requestedRelationPaths(Model $model, SelectRequestData $request_data, bool $lenient_filters = false): array
+    public function requestedRelationPaths(Model $model, SelectRequestData $request_data, bool $lenient_filters = false, bool $include_columns = true): array
     {
         $main_entity = $model->getTable();
-        $columns = $this->groupColumns($main_entity, $request_data->columns);
+        $columns = $this->groupColumns($main_entity, $include_columns ? $request_data->columns : []);
         $loaded = array_merge(
             $this->normalizeRelations($request_data->relations),
             array_keys($columns['relations']),
             array_keys($columns['aggregates']),
-            array_keys($this->extractComputedColumns($main_entity, $request_data->columns)['relations']),
+            array_keys($this->extractComputedColumns($main_entity, $include_columns ? $request_data->columns : [])['relations']),
+            $this->groupByRelations($request_data),
         );
         $this->cleanRelations($loaded);
 
@@ -198,12 +237,15 @@ final class QueryBuilder
      *
      * Useful when you need to apply filters outside of the normal request flow.
      *
+     * Given a relation authorizer, the existence checks of the relation filters receive the related ACL, as in
+     * {@see prepareAuthorizedQuery()}; their related permission is checked by the caller beforehand.
+     *
      * @param  Builder<Model>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = []): void
+    public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = [], ?RelationAuthorizer $relation_authorizer = null, ?Request $request = null): void
     {
-        $this->recursivelyApplyFilters($query, $filters, $relation_columns);
+        $this->recursivelyApplyFilters($query, $filters, $relation_columns, $relation_authorizer, $request);
     }
 
     /**
@@ -332,6 +374,16 @@ final class QueryBuilder
 
                 $cloned_column = new Sort($splitted[1], $column->direction);
                 $relations_sorts[$splitted[0]][] = $cloned_column;
+            }
+        }
+
+        // A group_by key through a relation is read from each row: the relation is loaded here, asked for, so that
+        // it obeys the related permission and ACL instead of loading lazily and unchecked while grouping.
+        foreach ($this->groupByRelations($request_data) as $group_relation) {
+            $requested_relations[] = $group_relation;
+
+            if (! in_array($group_relation, $normalized_relations, true)) {
+                $normalized_relations[] = $group_relation;
             }
         }
 
@@ -545,29 +597,37 @@ final class QueryBuilder
     }
 
     /**
+     * The relation part of each group_by key (`relation.column` gives `relation`).
+     *
+     * @return list<string>
+     */
+    private function groupByRelations(SelectRequestData $request_data): array
+    {
+        if (! $request_data instanceof ListRequestData) {
+            return [];
+        }
+
+        $relations = [];
+
+        foreach ($request_data->group_by as $group) {
+            if (Str::contains($group, '.')) {
+                $relations[] = Str::beforeLast($group, '.');
+            }
+        }
+
+        return array_values(array_unique($relations));
+    }
+
+    /**
      * Drops the paths that load a black-listed relation (history, tree walks) at any depth.
      *
      * @param  array<int,string>  $relations
      */
     private function cleanRelations(array &$relations): void
     {
-        $black_list = [
-            'history',
-            'ancestors',
-            'ancestorsAndSelf',
-            'bloodline',
-            'children',
-            'childrenAndSelf',
-            'descendants',
-            'descendantsAndSelf',
-            'parentAndSelf',
-            'rootAncestor',
-            'siblings',
-            'siblingsAndSelf',
-        ];
         $relations = array_values(array_filter(
             $relations,
-            static fn (string $relation): bool => array_intersect(explode('.', $relation), $black_list) === [],
+            static fn (string $relation): bool => ! self::isBlackListedPath($relation),
         ));
     }
 

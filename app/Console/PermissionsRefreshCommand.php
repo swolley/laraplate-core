@@ -79,6 +79,21 @@ final class PermissionsRefreshCommand extends Command
     ];
 
     /**
+     * Whether a model is deliberately kept out of permission generation by the core list or the
+     * `permission.models_blacklist` setting: an entity with no permission by design (modifications,
+     * versions, licenses, pivots, translations). The models a module manifest excludes are not counted:
+     * they have no permission because their reads go through a dedicated route, not by design of the
+     * permission scheme.
+     */
+    public static function isOutsidePermissionScheme(string $model): bool
+    {
+        /** @var list<class-string> $config_blacklist */
+        $config_blacklist = config('permission.models_blacklist', []);
+
+        return self::matchesBlacklist($model, array_merge(self::$MODELS_BLACKLIST, $config_blacklist));
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle(): void
@@ -316,6 +331,14 @@ final class PermissionsRefreshCommand extends Command
     }
 
     /**
+     * @param  list<string>  $blacklist
+     */
+    private static function matchesBlacklist(string $model, array $blacklist): bool
+    {
+        return array_any($blacklist, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
+    }
+
+    /**
      * Make a permission exist once for every guard in {@see self::GUARDS}, same name on each.
      *
      * Existing does not mean granted: the twin on another guard starts with no role attached.
@@ -424,12 +447,7 @@ final class PermissionsRefreshCommand extends Command
 
     private function checkIfBlacklisted(string $model): bool
     {
-        /** @var list<class-string> $config_blacklist */
-        $config_blacklist = config('permission.models_blacklist', []);
-
-        $blacklist = array_merge(self::$MODELS_BLACKLIST, $config_blacklist, $this->excluded_models);
-
-        return array_any($blacklist, fn (string $blacklisted): bool => $model === $blacklisted || is_subclass_of($model, $blacklisted));
+        return self::isOutsidePermissionScheme($model) || self::matchesBlacklist($model, $this->excluded_models);
     }
 
     /**
