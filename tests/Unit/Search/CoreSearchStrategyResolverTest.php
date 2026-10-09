@@ -34,3 +34,11 @@ it('reads an unknown mode as fast at the boundary', function (): void {
     expect(SearchMode::tryFrom('turbo') ?? SearchMode::Fast)->toBe(SearchMode::Fast)
         ->and(SearchMode::tryFrom('deep'))->toBe(SearchMode::Deep);
 });
+
+it('serves a balanced request as fast because Core has no embedder', function (): void {
+    $strategy = app(CoreSearchStrategyResolver::class)->resolve(SearchMode::Balanced);
+
+    expect($strategy->applied_mode)->toBe(SearchMode::Fast)
+        ->and($strategy->embedder)->toBeNull()
+        ->and($strategy->degraded_reason)->toBe('mode_unavailable');
+});

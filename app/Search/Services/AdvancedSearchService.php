@@ -236,7 +236,14 @@ final readonly class AdvancedSearchService
             return null;
         }
 
-        return $this->stage($timings, SearchStageTimings::VECTOR, static fn (): array => $embedder->embed($query));
+        try {
+            return $this->stage($timings, SearchStageTimings::VECTOR, static fn (): array => $embedder->embed($query));
+        } catch (Throwable $exception) {
+            // A search never errors because a model was unavailable: keep the keyword results.
+            Log::warning('Query embedding failed; searching without the vector', ['error' => $exception->getMessage()]);
+
+            return null;
+        }
     }
 
     /**

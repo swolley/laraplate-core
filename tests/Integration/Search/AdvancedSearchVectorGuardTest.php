@@ -85,3 +85,14 @@ it('embeds the query and adds no meta when the guard says yes', function (): voi
 
     expect($seen)->toBe([0.1, 0.2])->and($result->meta)->not->toHaveKey('vector_disabled');
 });
+
+it('keeps the keyword results when the embedder throws', function (): void {
+    $embedder = Mockery::mock(ITextEmbedder::class);
+    $embedder->shouldReceive('embed')->once()->andThrow(new RuntimeException('embedding service down'));
+    app()->instance(ITextEmbedder::class, $embedder);
+
+    $seen = ['sentinel'];
+    $result = guarded_search($seen);
+
+    expect($seen)->toBeNull()->and($result->meta['strategies_executed'])->toBe(1);
+});

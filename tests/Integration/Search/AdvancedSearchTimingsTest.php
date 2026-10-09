@@ -174,23 +174,16 @@ it('reports every stage as null on the unsupported driver path when the flag is 
         ->and($meta['timings']['total_ms'])->toBeFloat();
 });
 
-it('rethrows a failing stage unchanged and logs the timings measured so far', function (): void {
+it('logs the timings measured so far when the embedding fails, and still answers with the keyword results', function (): void {
     config()->set('core.search.debug_timings', true);
-    $failure = new RuntimeException('embedding service down');
     $embedder = Mockery::mock(ITextEmbedder::class);
-    $embedder->shouldReceive('embed')->andThrow($failure);
+    $embedder->shouldReceive('embed')->andThrow(new RuntimeException('embedding service down'));
     app()->instance(ITextEmbedder::class, $embedder);
     Log::spy();
 
-    $thrown = null;
+    $result = timed_search();
 
-    try {
-        timed_search();
-    } catch (RuntimeException $exception) {
-        $thrown = $exception;
-    }
-
-    expect($thrown)->toBe($failure);
+    expect($result->total)->toBe(1);
 
     Log::shouldHaveReceived('info')->once()->withArgs(function (string $message, array $context): bool {
         return $context['failed_stage'] === 'vector'

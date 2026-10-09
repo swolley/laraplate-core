@@ -27,8 +27,9 @@ it('registers advanced search coordinator', function (): void {
     expect(app()->bound(AdvancedSearchService::class))->toBeTrue();
 });
 
-it('binds the strategy resolver contract to the cheap Core resolver by default', function (): void {
-    expect(app(ISearchStrategyResolver::class))->toBeInstanceOf(CoreSearchStrategyResolver::class);
+it('binds the strategy resolver contract, to Core\'s cheap resolver unless a module replaces it', function (): void {
+    expect(app(ISearchStrategyResolver::class))->toBeInstanceOf(ISearchStrategyResolver::class)
+        ->and(app(CoreSearchStrategyResolver::class))->toBeInstanceOf(CoreSearchStrategyResolver::class);
 });
 
 it('binds Scout engine implementations', function (): void {
