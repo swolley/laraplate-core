@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasModerationMeta;
 use Override;
@@ -16,7 +17,7 @@ use Override;
  *
  * Derived from cloudcake/laravel-approval (MIT), see LICENSES/laravel-approval.md.
  */
-final class Approval extends Model
+final class Approval extends Model implements IsPartOfParent
 {
     use HasModerationMeta;
 
@@ -38,6 +39,15 @@ final class Approval extends Model
     public function approver(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * The relation to the record this one only exists inside, whose visibility it inherits.
+     */
+    #[Override]
+    public function parentRelation(): string
+    {
+        return 'modification';
     }
 
     /**

@@ -55,6 +55,11 @@ class ResponseBuilder
 
     private ?Carbon $cachedAt = null;
 
+    /**
+     * @var array<string, array{hidden: int}>
+     */
+    private array $relationsMeta = [];
+
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
     public function __construct(private ?Request $request, private readonly ?Carbon $startedAt = new Carbon())
@@ -388,6 +393,19 @@ class ResponseBuilder
         return $this;
     }
 
+    /**
+     * Declares the relations of the returned record that the related ACL left partial, as
+     * `meta.relations.{name}.hidden`, so that a client can warn before editing them.
+     *
+     * @param  array<string, array{hidden: int}>  $relations
+     */
+    public function setRelationsMeta(array $relations): self
+    {
+        $this->relationsMeta = $relations;
+
+        return $this;
+    }
+
     public function getPreview(): bool
     {
         return $this->preview;
@@ -535,6 +553,10 @@ class ResponseBuilder
 
         if ($this->cachedAt instanceof Carbon) {
             $payload['meta']['cachedAt'] = $this->cachedAt;
+        }
+
+        if ($this->relationsMeta !== []) {
+            $payload['meta']['relations'] = $this->relationsMeta;
         }
 
         if (config('app.debug')) {

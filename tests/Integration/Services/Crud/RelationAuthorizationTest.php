@@ -1,0 +1,409 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Modules\Core\Casts\Filter;
+use Modules\Core\Casts\FilterOperator;
+use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\SearchMode;
+use Modules\Core\Casts\SearchRequestData;
+use Modules\Core\Casts\WhereClause;
+use Modules\Core\Models\ACL;
+use Modules\Core\Models\Permission;
+use Modules\Core\Models\Role;
+use Modules\Core\Models\User as CoreUser;
+use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Services\AdvancedSearchService;
+use Modules\Core\Search\Services\EnsembleSearchService;
+use Modules\Core\Search\Services\FallbackSearchPlanner;
+use Modules\Core\Search\Services\SimpleQueryIntentParser;
+use Modules\Core\Services\Authorization\AuthorizationService;
+use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Services\Crud\QueryBuilder;
+use Modules\Core\Services\Crud\RelationAuthorizer;
+use Modules\Core\Support\CrudApiExposure;
+use Modules\Core\Support\PermissionName;
+use Modules\Core\Tests\Stubs\Crud\RelationElsewhereStub;
+use Modules\Core\Tests\Stubs\Crud\RelationMisdeclaredPartStub;
+use Modules\Core\Tests\Stubs\Crud\RelationOwnerStub;
+use Modules\Core\Tests\Stubs\Crud\RelationPartStub;
+use Modules\Core\Tests\Stubs\Search\AclRehydrationUserStub;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
+
+/*
+ * Related records obey their own permission and ACL (spec 8.1): a relation the caller asks for is loaded only
+ * when the caller may select the related entity, on the request's guard, and its query receives that entity's
+ * ACL, exactly as a root query does. Every relation name taken from a request is checked before anything calls it.
+ */
+
+beforeEach(function (): void {
+    Cache::flush();
+    CrudApiExposure::enable();
+
+    // As `permission:refresh` does: the select permissions exist on both guards, granted to nobody. An entity
+    // with no permission registered at all is outside the permission scheme and is not checked.
+    foreach ([CoreUser::class, Role::class] as $model_class) {
+        foreach (['web', 'api'] as $guard) {
+            Permission::query()->firstOrCreate(['name' => PermissionName::forClass($model_class, 'select'), 'guard_name' => $guard]);
+        }
+    }
+});
+
+/**
+ * A user whose `api` role holds the select permission of each given model, narrowed by its ACL when one is given.
+ *
+ * @param  array<class-string<Model>, FiltersGroup|null>  $grants
+ */
+function relauth_reader(array $grants): User
+{
+    $role = Role::factory()->create(['name' => 'relauth_reader_' . uniqid(), 'guard_name' => 'api']);
+
+    foreach ($grants as $model_class => $filters) {
+        $name = PermissionName::forClass($model_class, 'select');
+        Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+        $permission = Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'api']);
+        $role->givePermissionTo($permission);
+
+        if ($filters instanceof FiltersGroup) {
+            $acl = new ACL;
+            $acl->setSkipValidation(true);
+            $acl->forceFill([
+                'permission_id' => $permission->id,
+                'role_id' => $role->id,
+                'filters' => $filters,
+                'unrestricted' => false,
+                'priority' => 10,
+                'is_active' => true,
+            ]);
+            $acl->save();
+        }
+    }
+
+    $user = User::query()->findOrFail(CoreUser::factory()->create()->getKey());
+    $user->assignRole($role);
+
+    return $user->fresh();
+}
+
+/**
+ * The roles ACL that lets a reader see only the role named `relauth_visible`.
+ */
+function relauth_visible_roles(): FiltersGroup
+{
+    return new FiltersGroup([new Filter('name', ['relauth_visible'], FilterOperator::In)], WhereClause::And);
+}
+
+/**
+ * A user holding one role the reader may see and one it may not. The roles pivot is keyed by the morph class,
+ * so the user is assigned through the class the reading endpoint hydrates: the Core user for the CRUD routes,
+ * the application user for the search stub.
+ *
+ * @param  class-string<CoreUser>  $class
+ */
+function relauth_user_with_two_roles(string $class = CoreUser::class): CoreUser
+{
+    $visible = Role::factory()->create(['name' => 'relauth_visible', 'guard_name' => 'web']);
+    $hidden = Role::factory()->create(['name' => 'relauth_hidden', 'guard_name' => 'web']);
+
+    $user = $class::query()->findOrFail(CoreUser::factory()->create()->getKey());
+    $user->assignRole($visible, $hidden);
+
+    return $user;
+}
+
+/**
+ * @param  array<string, mixed>  $query
+ */
+function relauth_url(string $action, array $query): string
+{
+    return sprintf('/api/v1/%s/core/users?%s', $action, http_build_query($query));
+}
+
+/**
+ * The role names loaded on the response row of the given user.
+ *
+ * @param  array<int, array<string, mixed>>|array<string, mixed>  $data
+ * @return list<string>
+ */
+function relauth_role_names(array $data, int|string $user_id): array
+{
+    $rows = array_is_list($data) ? $data : [$data];
+    $row = collect($rows)->firstWhere('id', $user_id);
+
+    return collect($row['roles'] ?? [])->pluck('name')->sort()->values()->all();
+}
+
+describe('request relation names', function (): void {
+    it('answers a client error and leaves the table intact for a name that is not a relation', function (string $name, string $place): void {
+        $reader = relauth_reader([CoreUser::class => null]);
+        relauth_user_with_two_roles();
+        $before = CoreUser::query()->count();
+        $roles_before = Role::query()->count();
+
+        $query = match ($place) {
+            'filter' => ['filters' => [['property' => $name . '.id', 'operator' => 'eq', 'value' => 1]]],
+            'column' => ['columns' => [$name . '.id']],
+            'relation' => ['relations' => [$name]],
+            'sort' => ['sort' => [['property' => $name . '.id', 'direction' => 'asc']]],
+            'nested relation' => ['relations' => ['roles.' . $name]],
+        };
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', $query));
+
+        expect(CoreUser::query()->count())->toBe($before)
+            ->and(Role::query()->count())->toBe($roles_before)
+            ->and($response->status())->toBeGreaterThanOrEqual(400)->toBeLessThan(500);
+    })->with(['truncate', 'delete'])->with(['filter', 'column', 'relation', 'sort', 'nested relation']);
+});
+
+describe('a relation whose entity the caller may not select', function (): void {
+    it('is refused with 403', function (array $query, bool $detail_reads_it): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null]);
+
+        $this->actingAs($reader)->getJson(relauth_url('select', $query))->assertForbidden();
+
+        if ($detail_reads_it) {
+            $this->actingAs($reader)->getJson(relauth_url('detail', ['id' => $target->getKey()] + $query))->assertForbidden();
+        }
+    })->with([
+        'by relations' => [['relations' => ['roles']], true],
+        'by a dotted column' => [['columns' => ['roles.name']], true],
+        'by an aggregate' => [['columns' => [['name' => 'roles', 'type' => 'count']]], true],
+        // A detail reads neither filters nor sorts.
+        'by a relation filter' => [['filters' => [['property' => 'roles.name', 'operator' => 'eq', 'value' => 'relauth_visible']]], false],
+        'by a relation-count filter' => [['filters' => [['property' => 'users.roles', 'operator' => 'ge', 'value' => 1]]], false],
+        'by a sort' => [['sort' => [['property' => 'roles.name', 'direction' => 'asc']]], false],
+    ]);
+
+    it('is loaded once the caller holds the related select permission', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null, Role::class => null]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', ['relations' => ['roles']]));
+
+        $response->assertOk();
+        expect(relauth_role_names($response->json('data'), $target->getKey()))->toBe(['relauth_hidden', 'relauth_visible']);
+    });
+});
+
+describe('the related ACL', function (): void {
+    it('keeps only the related rows it allows in a list, without a partial relations meta', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null, Role::class => relauth_visible_roles()]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', ['relations' => ['roles']]));
+
+        $response->assertOk();
+        expect(relauth_role_names($response->json('data'), $target->getKey()))->toBe(['relauth_visible'])
+            ->and($response->json('meta.relations'))->toBeNull();
+    });
+
+    it('keeps only the related rows it allows in a detail and declares how many it left out', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null, Role::class => relauth_visible_roles()]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('detail', ['id' => $target->getKey(), 'relations' => ['roles']]));
+
+        $response->assertOk();
+        expect(relauth_role_names($response->json('data'), $target->getKey()))->toBe(['relauth_visible'])
+            ->and($response->json('meta.relations.roles.hidden'))->toBe(1);
+    });
+
+    it('counts only the related rows it allows in an aggregate', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null, Role::class => relauth_visible_roles()]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', ['columns' => [['name' => 'roles', 'type' => 'count']]]));
+
+        $response->assertOk();
+        expect(collect($response->json('data'))->firstWhere('id', $target->getKey())['roles_count'])->toBe(1);
+    });
+
+    it('narrows the existence check of a relation filter', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null, Role::class => relauth_visible_roles()]);
+
+        $response = $this->actingAs($reader)->getJson(relauth_url('select', [
+            'filters' => [['property' => 'roles.name', 'operator' => 'eq', 'value' => 'relauth_hidden']],
+        ]));
+
+        $response->assertOk();
+        expect(collect($response->json('data'))->pluck('id')->all())->not->toContain($target->getKey());
+    });
+});
+
+/**
+ * @param  list<int|string>  $ids
+ */
+function relauth_search_returning(array $ids): AdvancedSearchService
+{
+    $ensemble = Mockery::mock(EnsembleSearchService::class);
+    $ensemble->shouldReceive('search')->andReturnUsing(static fn (Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage): AdvancedSearchResult => new AdvancedSearchResult(
+        hits: array_map(static fn (int|string $id): array => ['id' => (string) $id, 'score' => 1.0, 'source' => []], $ids),
+        total: count($ids),
+        page: $page,
+        perPage: $perPage,
+        totalPages: 1,
+        meta: [],
+    ));
+
+    return new AdvancedSearchService(
+        new FixedSearchStrategyResolver(planner: new FallbackSearchPlanner, intent_parser: new SimpleQueryIntentParser),
+        $ensemble,
+        app(),
+    );
+}
+
+/**
+ * @param  list<string>  $relations
+ */
+function relauth_search_data(User $user, array $relations): SearchRequestData
+{
+    $model = new AclRehydrationUserStub;
+    $request = new class(['qs' => 'needle']) extends Request
+    {
+        public function validated(?string $key = null, mixed $default = null): mixed
+        {
+            return $key === null ? $this->all() : ($this->all()[$key] ?? $default);
+        }
+    };
+    $request->setUserResolver(static fn (): User => $user);
+
+    $data = (new ReflectionClass(SearchRequestData::class))->newInstanceWithoutConstructor();
+
+    foreach ([
+        'request' => $request,
+        'mainEntity' => $model->getTable(),
+        'primaryKey' => $model->getKeyName(),
+        'model' => $model,
+        'connection' => $model->getConnectionName(),
+        'columns' => [],
+        'relations' => $relations,
+        'sort' => [],
+        'filters' => null,
+        'group_by' => [],
+        'qs' => 'needle',
+        'mode' => SearchMode::Orchestrated,
+        'page' => null,
+        'limit' => 5,
+        'pagination' => 5,
+        'from' => null,
+        'to' => null,
+        'count' => false,
+    ] as $property => $value) {
+        (new ReflectionProperty($data, $property))->setValue($data, $value);
+    }
+
+    return $data;
+}
+
+/**
+ * @param  list<int|string>  $hit_ids
+ * @param  list<string>  $relations
+ */
+function relauth_search(array $hit_ids, User $user, array $relations): Modules\Core\Services\Crud\DTOs\CrudResult
+{
+    config()->set('scout.driver', 'elasticsearch');
+
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+    AclRehydrationUserStub::$engine = $engine;
+
+    Auth::shouldUse('api');
+    Auth::guard('api')->setUser($user);
+
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), relauth_search_returning($hit_ids));
+
+    return $service->search(relauth_search_data($user, $relations));
+}
+
+describe('search', function (): void {
+    it('refuses a relation whose entity the caller may not select', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null]);
+
+        expect(fn (): mixed => relauth_search([$target->getKey()], $reader, ['roles']))
+            ->toThrow(Illuminate\Auth\Access\AuthorizationException::class);
+    });
+
+    it('applies the related ACL to the relations of the hits', function (): void {
+        $target = relauth_user_with_two_roles(User::class);
+        $reader = relauth_reader([CoreUser::class => null, Role::class => relauth_visible_roles()]);
+
+        $result = relauth_search([$target->getKey()], $reader, ['roles']);
+        $row = $result->data->firstWhere('id', $target->getKey());
+
+        expect($row->roles->pluck('name')->all())->toBe(['relauth_visible']);
+    });
+
+    it('drops a relation of the black list', function (): void {
+        $target = relauth_user_with_two_roles();
+        $reader = relauth_reader([CoreUser::class => null]);
+
+        $result = relauth_search([$target->getKey()], $reader, ['history']);
+        $row = $result->data->firstWhere('id', $target->getKey());
+
+        expect($row->relationLoaded('history'))->toBeFalse();
+    });
+});
+
+describe('parts of a parent', function (): void {
+    beforeEach(function (): void {
+        foreach (['web', 'api'] as $guard) {
+            Permission::query()->firstOrCreate(['name' => PermissionName::forClass(RelationOwnerStub::class, 'select'), 'guard_name' => $guard]);
+        }
+
+        // The readers hold `api` roles: the checks run on the guard of an API request.
+        Auth::shouldUse('api');
+    });
+
+    it('inherit the visibility of the parent they are loaded from', function (): void {
+        $reader = relauth_reader([CoreUser::class => null]);
+        $request = Request::create('/api/v1/select/core/users');
+        $request->setUserResolver(static fn (): User => $reader);
+
+        expect(app(RelationAuthorizer::class)->isReadable($request, new RelationOwnerStub, new RelationPartStub))->toBeTrue();
+    });
+
+    it('are checked against their parent when another model reaches them', function (): void {
+        $authorizer = app(RelationAuthorizer::class);
+        $request = Request::create('/api/v1/select/core/users');
+
+        $without = relauth_reader([CoreUser::class => null]);
+        $request->setUserResolver(static fn (): User => $without);
+        expect($authorizer->isReadable($request, new RelationElsewhereStub, new RelationPartStub))->toBeFalse();
+
+        $with = relauth_reader([RelationOwnerStub::class => null]);
+        $request->setUserResolver(static fn (): User => $with);
+        expect($authorizer->isReadable($request, new RelationElsewhereStub, new RelationPartStub))->toBeTrue();
+    });
+
+    it('receive the ACL of their parent through the parent relation when another model reaches them', function (): void {
+        $reader = relauth_reader([RelationOwnerStub::class => new FiltersGroup([new Filter('name', 'visible', FilterOperator::Equals)], WhereClause::And)]);
+        Auth::guard('api')->setUser($reader);
+
+        $query = RelationPartStub::query();
+        app(RelationAuthorizer::class)->constrain($query, new RelationElsewhereStub);
+
+        expect(mb_strtolower($query->toSql()))->toContain('relauth_owners')->toContain('"name" = ?');
+
+        $own = RelationPartStub::query();
+        app(RelationAuthorizer::class)->constrain($own, new RelationOwnerStub);
+
+        expect(mb_strtolower($own->toSql()))->not->toContain('relauth_owners');
+    });
+
+    it('refuse a declared parent relation that is not a relation', function (): void {
+        $request = Request::create('/api/v1/select/core/users');
+
+        expect(fn (): bool => app(RelationAuthorizer::class)->isReadable($request, new RelationElsewhereStub, new RelationMisdeclaredPartStub))
+            ->toThrow(LogicException::class);
+    });
+});

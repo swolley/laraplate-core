@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Crud;
 
+use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -25,7 +30,6 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
-use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
 use ReflectionMethod;
 
@@ -55,26 +59,170 @@ final class QueryBuilder
      * ACL filters should already be injected into $request_data->filters.
      *
      * @param  Builder<Model>  $query
-     *
-     * @throws InvalidArgumentException
-     */
-    /**
-     * @param  Builder<Model>  $query
      * @param  (callable(string, Builder<Model>): void)|null  $countConstraint  Optional
-     *                                                                          hook to constrain each main-model relation-count subquery — the caller
-     *                                                                          (CrudService) uses it to apply the related entity's ACL so a `*_count`
-     *                                                                          never leaks rows the viewer cannot see. QueryBuilder stays auth-agnostic.
+     *                                                                          hook to constrain each main-model relation-count subquery.
      *
-     * @throws InvalidArgumentException
+     * @throws InvalidArgumentException when a relation name of the request is not a relation
      */
     public function prepareQuery(Builder $query, SelectRequestData $request_data, ?callable $countConstraint = null): void
     {
+        $this->buildQuery($query, $request_data, $countConstraint, null);
+    }
+
+    /**
+     * {@see prepareQuery()} for a caller's request: every relation the query loads, counts or filters on obeys
+     * the related entity's permission and ACL (spec 8.1). A relation the request asked for (by `relations`, a
+     * dotted column, a sort or an aggregate) is refused when the caller may not select the related entity, one
+     * the query loads on its own (a model's default eager loads, a computed column's dependency, an ACL filter's
+     * relation) is left out instead, and each receives the related ACL. The relations of the request filters
+     * are checked before the ACL is merged into them, by {@see requestedRelationPaths()} and
+     * {@see RelationAuthorizer::authorizePaths()}; here their existence checks only receive the related ACL.
+     *
+     * @param  Builder<Model>  $query
+     *
+     * @throws InvalidArgumentException when a relation name of the request is not a relation
+     * @throws AuthorizationException when the caller may not select an entity the request asked for
+     */
+    public function prepareAuthorizedQuery(Builder $query, SelectRequestData $request_data, RelationAuthorizer $relation_authorizer): void
+    {
+        $this->buildQuery($query, $request_data, null, $relation_authorizer);
+    }
+
+    /**
+     * Loads the relations a request names (`relations` and the relation part of its dotted columns) on a query
+     * built elsewhere, the record reload of a search, under the same rules as {@see prepareQuery()}: the
+     * black list, the related columns, the related permission and the related ACL.
+     *
+     * @param  Builder<Model>  $query
+     *
+     * @throws InvalidArgumentException when a relation name of the request is not a relation
+     * @throws AuthorizationException when the caller may not select an entity the request asked for
+     */
+    public function applyRequestedRelations(Builder $query, SelectRequestData $request_data, ?RelationAuthorizer $relation_authorizer = null): void
+    {
+        $request = $relation_authorizer instanceof RelationAuthorizer ? $request_data->request : null;
+        $main_entity = $query->getModel()->getTable();
+        $relations = $this->normalizeRelations($request_data->relations);
+        $relations_columns = [];
+        $relations_sorts = [];
+        $relations_aggregates = [];
+        $relations_filters = [];
+        $computed_relations = $this->extractComputedColumns($main_entity, $request_data->columns)['relations'];
+
+        foreach ($this->groupColumns($main_entity, $request_data->columns)['relations'] as $relation => $relation_cols) {
+            $relations_columns[$relation] = array_values(array_filter($relation_cols, static fn (Column $column): bool => $column->type === ColumnType::Column));
+
+            if (! in_array($relation, $relations, true)) {
+                $relations[] = $relation;
+            }
+        }
+
+        foreach (array_keys($computed_relations) as $computed_relation) {
+            if (! in_array($computed_relation, $relations, true)) {
+                $relations[] = $computed_relation;
+            }
+        }
+
+        if ($relation_authorizer instanceof RelationAuthorizer && $request instanceof Request) {
+            $this->guardDefaultEagerLoads($query, $relation_authorizer, $request, []);
+        }
+
+        if ($relations !== []) {
+            $this->applyRelations($query, $relations, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations, $relation_authorizer, $request, $relations);
+        }
+    }
+
+    /**
+     * Every relation path a request names, each name checked by {@see RelationGuard} before anything calls it:
+     * `relations`, the relation part of dotted, aggregate and computed columns, of sorts and of filters. The
+     * black-listed relations are dropped from the paths that would load them, as {@see prepareQuery()} drops
+     * them. With `$lenient_filters` (search, whose filters and sorts name index fields), a filter or sort
+     * property contributes only the part of it that resolves to relations.
+     *
+     * Call it before the ACL filters are merged into the request: they name relations on their own authority.
+     *
+     *
+     * @throws InvalidArgumentException when a relation name of the request is not a relation
+     *
+     * @return list<string>
+     */
+    public function requestedRelationPaths(Model $model, SelectRequestData $request_data, bool $lenient_filters = false): array
+    {
+        $main_entity = $model->getTable();
+        $columns = $this->groupColumns($main_entity, $request_data->columns);
+        $loaded = array_merge(
+            $this->normalizeRelations($request_data->relations),
+            array_keys($columns['relations']),
+            array_keys($columns['aggregates']),
+            array_keys($this->extractComputedColumns($main_entity, $request_data->columns)['relations']),
+        );
+        $this->cleanRelations($loaded);
+
+        $named = [];
+
+        if ($request_data instanceof ListRequestData) {
+            foreach ($request_data->sort ?? [] as $sort) {
+                $property = (string) $sort->property;
+
+                if (! Str::contains($property, '.') || Str::startsWith($property, $main_entity . '.')) {
+                    continue;
+                }
+
+                $named[] = $this->splitColumnNameOnLastDot($property)[0];
+            }
+
+            if ($request_data->filters instanceof FiltersGroup) {
+                array_push($named, ...$this->filterRelationPaths($model, $request_data->filters));
+            }
+        }
+
+        $paths = [];
+
+        foreach ($loaded as $path) {
+            $paths[] = $this->assertRelationPath($model, $path);
+        }
+
+        foreach ($named as $path) {
+            $path = $lenient_filters ? $this->resolvableRelationPrefix($model, $path) : $this->assertRelationPath($model, $path);
+
+            if ($path !== '') {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
+     * Apply a FiltersGroup directly to a query.
+     *
+     * Useful when you need to apply filters outside of the normal request flow.
+     *
+     * @param  Builder<Model>  $query
+     * @param  array<string,array<int,Column>>  $relation_columns
+     */
+    public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = []): void
+    {
+        $this->recursivelyApplyFilters($query, $filters, $relation_columns);
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  (callable(string, Builder<Model>): void)|null  $countConstraint
+     *
+     * @throws InvalidArgumentException when a relation name of the request is not a relation
+     * @throws AuthorizationException when the caller may not select an entity the request asked for
+     */
+    private function buildQuery(Builder $query, SelectRequestData $request_data, ?callable $countConstraint, ?RelationAuthorizer $relation_authorizer): void
+    {
+        $request = $relation_authorizer instanceof RelationAuthorizer ? $request_data->request : null;
         $main_model = $query->getModel();
         $main_entity = $main_model->getTable();
         $relations_sorts = [];
         $relations_columns = [];
         $relations_filters = [];
         $normalized_relations = $this->normalizeRelations($request_data->relations);
+        $requested_relations = $normalized_relations;
         $computed_columns = $this->extractComputedColumns($main_entity, $request_data->columns);
         $computed_main = $computed_columns['main'];
         $computed_relations = $computed_columns['relations'];
@@ -87,6 +235,16 @@ final class QueryBuilder
 
         if ($computed_main_dependencies['relations'] !== []) {
             $normalized_relations = array_values(array_unique(array_merge($normalized_relations, $computed_main_dependencies['relations'])));
+        }
+
+        // A computed column on a relation is read from the loaded relation, so the relation is loaded here,
+        // under the same rule as any other, rather than lazily and unchecked while the column is computed.
+        foreach (array_keys($computed_relations) as $computed_relation) {
+            $requested_relations[] = $computed_relation;
+
+            if (! in_array($computed_relation, $normalized_relations, true)) {
+                $normalized_relations[] = $computed_relation;
+            }
         }
 
         $columns = $this->groupColumns($main_entity, $request_data->columns);
@@ -131,6 +289,7 @@ final class QueryBuilder
                     }
 
                     $relations_columns[$relation] = $only_relation_columns;
+                    $requested_relations[] = $relation;
 
                     if (! in_array($relation, $normalized_relations, true)) {
                         $normalized_relations[] = $relation;
@@ -177,7 +336,7 @@ final class QueryBuilder
         }
 
         if ($request_data instanceof ListRequestData && isset($request_data->filters)) {
-            $this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations']);
+            $this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations'], $relation_authorizer, $request);
 
             $relations_filters = $this->extractRelationFilters($main_model, $request_data->filters);
 
@@ -188,24 +347,16 @@ final class QueryBuilder
 
         // Main-model relation aggregates (dotless keys) apply whether or not other
         // relations are eager-loaded; the relation pass then handles the dotted ones.
-        $this->applyMainAggregates($query, $columns['aggregates'], $countConstraint);
+        $this->applyMainAggregates($query, $columns['aggregates'], $countConstraint, $relation_authorizer, $request);
+
+        if ($relation_authorizer instanceof RelationAuthorizer && $request instanceof Request) {
+            // The relations the model loads on its own were not asked for: they follow the rule, but quietly.
+            $this->guardDefaultEagerLoads($query, $relation_authorizer, $request, []);
+        }
 
         if ($normalized_relations !== []) {
-            $this->applyRelations($query, $normalized_relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters, $computed_relations);
+            $this->applyRelations($query, $normalized_relations, $relations_columns, $relations_sorts, $columns['aggregates'], $relations_filters, $computed_relations, $relation_authorizer, $request, $requested_relations);
         }
-    }
-
-    /**
-     * Apply a FiltersGroup directly to a query.
-     *
-     * Useful when you need to apply filters outside of the normal request flow.
-     *
-     * @param  Builder<Model>  $query
-     * @param  array<string,array<int,Column>>  $relation_columns
-     */
-    public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = []): void
-    {
-        $this->recursivelyApplyFilters($query, $filters, $relation_columns);
     }
 
     /**
@@ -394,6 +545,8 @@ final class QueryBuilder
     }
 
     /**
+     * Drops the paths that load a black-listed relation (history, tree walks) at any depth.
+     *
      * @param  array<int,string>  $relations
      */
     private function cleanRelations(array &$relations): void
@@ -412,12 +565,277 @@ final class QueryBuilder
             'siblings',
             'siblingsAndSelf',
         ];
-        $relations = array_filter($relations, fn (string $relation): bool => ! in_array($relation, $black_list, true));
+        $relations = array_values(array_filter(
+            $relations,
+            static fn (string $relation): bool => array_intersect(explode('.', $relation), $black_list) === [],
+        ));
+    }
+
+    /**
+     * The relation paths named by the filter properties of a request, including a property that is itself a
+     * relation (a relation-count filter).
+     *
+     * @return list<string>
+     */
+    private function filterRelationPaths(Model $model, FiltersGroup $filters): array
+    {
+        $paths = [];
+
+        foreach ($filters->filters as $filter) {
+            if ($filter instanceof FiltersGroup) {
+                array_push($paths, ...$this->filterRelationPaths($model, $filter));
+
+                continue;
+            }
+
+            if (! $filter instanceof Filter || ! Str::contains($filter->property, '.')) {
+                continue;
+            }
+
+            $exploded = explode('.', $filter->property);
+
+            if ($exploded[0] === $model->getTable()) {
+                array_shift($exploded);
+            }
+
+            $field = (string) array_pop($exploded);
+
+            if ($exploded !== []) {
+                $paths[] = implode('.', $exploded);
+            }
+
+            $owner = $exploded === [] ? $model : $this->relatedModelAt($model, $exploded);
+
+            if ($owner instanceof Model && $field !== '' && RelationGuard::relationOf($owner, $field) instanceof Relation) {
+                $paths[] = $exploded === [] ? $field : implode('.', $exploded) . '.' . $field;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Checks every name of a relation path from the model: each must be a relation, and a morph relation can only
+     * end a path, since what follows it depends on each row's type and cannot be checked.
+     *
+     * @throws InvalidArgumentException when a name is not a relation or follows a morph relation
+     */
+    private function assertRelationPath(Model $model, string $path): string
+    {
+        $this->relationChain($model, $path);
+
+        return $path;
+    }
+
+    /**
+     * The longest leading part of a dotted property that resolves to relations from the model, '' when none does.
+     */
+    private function resolvableRelationPrefix(Model $model, string $path): string
+    {
+        $resolved = [];
+        $current = $model;
+
+        foreach (explode('.', $path) as $name) {
+            $relation = RelationGuard::relationOf($current, $name);
+
+            if (! $relation instanceof Relation) {
+                break;
+            }
+
+            $resolved[] = $name;
+
+            if ($relation instanceof MorphTo) {
+                break;
+            }
+
+            $current = $relation->getRelated();
+        }
+
+        return implode('.', $resolved);
+    }
+
+    /**
+     * The model at the end of a relation path, or null when a name on it is not a relation or a morph relation
+     * stands in the way.
+     *
+     * @param  list<string>  $names
+     */
+    private function relatedModelAt(Model $model, array $names): ?Model
+    {
+        $current = $model;
+
+        foreach ($names as $name) {
+            $relation = RelationGuard::relationOf($current, $name);
+
+            if (! $relation instanceof Relation || $relation instanceof MorphTo) {
+                return null;
+            }
+
+            $current = $relation->getRelated();
+        }
+
+        return $current;
+    }
+
+    /**
+     * Each relation of a dotted path from the model, every name checked by {@see RelationGuard} before it is
+     * called.
+     *
+     *
+     * @throws InvalidArgumentException when a name is not a relation or follows a morph relation
+     *
+     * @return list<array{name: string, relation: Relation<Model, Model, mixed>}>
+     */
+    private function relationChain(Model $model, string $path): array
+    {
+        $chain = [];
+        $current = $model;
+        $names = explode('.', $path);
+
+        foreach ($names as $index => $name) {
+            $relation = RelationGuard::relationOf($current, $name);
+
+            throw_unless($relation instanceof Relation, InvalidArgumentException::class, sprintf('"%s" is not a relation of %s.', $name, $current::class));
+            throw_if(
+                $relation instanceof MorphTo && $index < count($names) - 1,
+                InvalidArgumentException::class,
+                sprintf('"%s" follows the morph relation "%s"; a morph relation can only end a relation path.', $names[$index + 1] ?? '', $name),
+            );
+
+            $chain[] = ['name' => $name, 'relation' => $relation];
+            $current = $relation->getRelated();
+        }
+
+        return $chain;
+    }
+
+    /**
+     * Whether the caller may select every entity along a relation chain; a morph relation is checked per type
+     * when it loads.
+     *
+     * @param  list<array{name: string, relation: Relation<Model, Model, mixed>}>  $chain
+     */
+    private function chainIsReadable(array $chain, RelationAuthorizer $authorizer, Request $request): bool
+    {
+        foreach ($chain as $link) {
+            $relation = $link['relation'];
+
+            if ($relation instanceof MorphTo) {
+                continue;
+            }
+
+            if (! $authorizer->isReadable($request, $relation->getParent(), $relation->getRelated())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Applies the rule to the relations a query loads on its own (a model's `$with`, a dependency added on the
+     * way): each is dropped when the caller may not select its entity, and narrowed by the related ACL otherwise.
+     * The relations in `$known` were added by the request and carry their own check. A name that does not
+     * resolve to a relation is left alone: it comes from code, not from the request.
+     *
+     * @param  Builder<Model>  $builder
+     * @param  list<string>  $known
+     */
+    private function guardDefaultEagerLoads(Builder $builder, RelationAuthorizer $authorizer, Request $request, array $known): void
+    {
+        $model = $builder->getModel();
+        $drop = [];
+        $wrapped = [];
+
+        foreach ($builder->getEagerLoads() as $name => $constraint) {
+            if ($this->isKnownRelationPath($name, $known)) {
+                continue;
+            }
+
+            try {
+                $chain = $this->relationChain($model, $name);
+            } catch (InvalidArgumentException) {
+                continue;
+            }
+
+            if (! $this->chainIsReadable($chain, $authorizer, $request)) {
+                $drop[] = $name;
+
+                continue;
+            }
+
+            $wrapped[$name] = function (Relation $relation) use ($constraint, $authorizer, $request): mixed {
+                $result = $constraint($relation);
+                $this->guardRelationQuery($relation, $authorizer, $request, [], false);
+
+                return $result;
+            };
+        }
+
+        if ($drop !== []) {
+            $builder->without($drop);
+            $wrapped = array_filter(
+                $wrapped,
+                static fn (string $name): bool => array_all($drop, static fn (string $dropped): bool => ! Str::startsWith($name, $dropped . '.')),
+                ARRAY_FILTER_USE_KEY,
+            );
+        }
+
+        if ($wrapped !== []) {
+            $builder->with($wrapped);
+        }
+    }
+
+    /**
+     * Whether a relation path is one of the given paths, or leads to one of them.
+     *
+     * @param  list<string>  $paths
+     */
+    private function isKnownRelationPath(string $name, array $paths): bool
+    {
+        foreach ($paths as $path) {
+            if ($path === $name || Str::startsWith($path, $name . '.') || Str::startsWith($name, $path . '.')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The rule on one loading relation: its query receives the related ACL (a morph relation is checked per type,
+     * refused when asked for), and the relations its model loads on its own are guarded in turn.
+     *
+     * @param  Relation<Model, Model, mixed>  $relation
+     * @param  list<string>  $known  the nested paths the request added under this relation
+     */
+    private function guardRelationQuery(Relation $relation, ?RelationAuthorizer $authorizer, ?Request $request, array $known, bool $requested): void
+    {
+        if (! $authorizer instanceof RelationAuthorizer || ! $request instanceof Request) {
+            return;
+        }
+
+        if ($relation instanceof MorphTo) {
+            if ($requested) {
+                $authorizer->authorize($request, $relation);
+            } else {
+                $authorizer->constrainIfReadable($request, $relation);
+            }
+
+            return;
+        }
+
+        $authorizer->constrain($relation->getQuery(), $relation->getParent());
+        $this->guardDefaultEagerLoads($relation->getQuery(), $authorizer, $request, $known);
     }
 
     /**
      * @param  Builder<Model>|Model  $model
-     * @return array{relation:string,connection:string,table:string,field:string|null}
+     *
+     * @throws InvalidArgumentException when a name of the property path is not a relation of the model it is
+     *                                  read on, before that name is ever called
+     *
+     * @return array{relation:string,connection:string|null,table:string,field:string|null}
      */
     private function splitProperty(Builder|Model $model, string $property): array
     {
@@ -434,7 +852,15 @@ final class QueryBuilder
         $relation = implode('.', $exploded);
 
         foreach ($exploded as $relation_name) {
-            $relation_model = $relation_model->{$relation_name}()->getModel();
+            $relation_instance = RelationGuard::relationOf($relation_model, $relation_name);
+
+            throw_unless(
+                $relation_instance instanceof Relation,
+                InvalidArgumentException::class,
+                sprintf('"%s" is not a relation of %s.', $relation_name, $relation_model::class),
+            );
+
+            $relation_model = $relation_instance->getModel();
         }
 
         return [
@@ -449,7 +875,7 @@ final class QueryBuilder
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function applyFilter(Builder|Relation $query, Filter $filter, string $method, array &$relation_columns): void
+    private function applyFilter(Builder|Relation $query, Filter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         $path_length = mb_substr_count($filter->property, '.');
 
@@ -458,54 +884,43 @@ final class QueryBuilder
             $query_model = $query->getModel();
             $field = $splitted['field'];
 
-            if ($field !== null && method_exists($query_model, $field)) {
-                $reflected_method = new ReflectionMethod($query_model, $field);
-                $return_type = $reflected_method->getReturnType();
+            if ($field !== null && $splitted['relation'] === '' && RelationGuard::relationOf($query_model, $field) instanceof Relation) {
+                $this->applyRelationCount($query, $field, $filter, Str::startsWith($method, 'or') ? 'or' : 'and', $authorizer);
 
-                if ($return_type !== null && is_a($return_type->__toString(), Relation::class, true)) {
-                    $splitted['relation'] = $field;
-
-                    $has_count = is_int($filter->value)
-                        ? $filter->value
-                        : (is_numeric($filter->value) ? (int) $filter->value : 1);
-
-                    $query->has(
-                        $splitted['relation'],
-                        $filter->operator->value,
-                        $has_count,
-                        Str::startsWith($method, 'or') ? 'or' : 'and',
-                        static fn (Builder $q) => $q->withoutGlobalScope('global_ordered'),
-                    );
-
-                    return;
-                }
+                return;
             }
 
             if ($splitted['relation'] !== '') {
                 $has_method = $method . 'Has';
 
                 if (is_callable([$query, $has_method])) {
-                    $query->{$has_method}($splitted['relation'], function (Builder $q) use ($filter, $splitted, &$relation_columns): void {
-                        $q->withoutGlobalScope('global_ordered');
+                    $this->whereHasPath(
+                        $query,
+                        $has_method,
+                        explode('.', $splitted['relation']),
+                        function (Builder $q) use ($filter, $splitted, &$relation_columns, $authorizer, $request): void {
+                            $q->withoutGlobalScope('global_ordered');
 
-                        if ($splitted['field'] === 'deleted_at') {
-                            // Built from the related model, not from `$splitted['connection']`:
-                            // that key carries the *resolved* connection (e.g. `mysql`), while
-                            // permissions name the default connection `default`.
-                            $permission = PermissionName::forModel($q->getModel(), ActionEnum::Delete->value);
-                            $user = Auth::user();
-
-                            if ($user && $user->can($permission) && in_array(SoftDeletes::class, class_uses_recursive($q->getModel()), true)) {
+                            if ($splitted['field'] === 'deleted_at' && $this->mayReadTrashed($q->getModel(), $authorizer, $request)) {
                                 $q->withoutGlobalScope(CustomSoftDeletingScope::class);
                             }
-                        }
 
-                        $filter_field = $splitted['field'] ?? $filter->property;
-                        $cloned_filter = new Filter($filter_field, $filter->value, $filter->operator);
-                        // Inside relation subquery we must not propagate `orWhere`,
-                        // otherwise the relation constraints can be bypassed.
-                        $this->applyFilter($q, $cloned_filter, 'where', $relation_columns);
-                    });
+                            $filter_field = $splitted['field'] ?? $filter->property;
+
+                            // A relation at the end of the path is a count condition on it, as on the main model.
+                            if (RelationGuard::relationOf($q->getModel(), $filter_field) instanceof Relation) {
+                                $this->applyRelationCount($q, $filter_field, $filter, 'and', $authorizer);
+
+                                return;
+                            }
+
+                            $cloned_filter = new Filter($filter_field, $filter->value, $filter->operator);
+                            // Inside relation subquery we must not propagate `orWhere`,
+                            // otherwise the relation constraints can be bypassed.
+                            $this->applyFilter($q, $cloned_filter, 'where', $relation_columns, $authorizer, $request);
+                        },
+                        $authorizer,
+                    );
                 }
 
                 return;
@@ -547,6 +962,85 @@ final class QueryBuilder
     }
 
     /**
+     * A filter on a relation itself: the rows with as many related records as the value says (1 when it is not
+     * a number), counting only the related records the caller may see.
+     *
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     */
+    private function applyRelationCount(Builder|Relation $query, string $relation, Filter $filter, string $boolean, ?RelationAuthorizer $authorizer): void
+    {
+        $owner = $query->getModel();
+        $has_count = is_int($filter->value)
+            ? $filter->value
+            : (is_numeric($filter->value) ? (int) $filter->value : 1);
+
+        $query->has(
+            $relation,
+            $filter->operator->value,
+            $has_count,
+            $boolean,
+            static function (Builder $q) use ($authorizer, $owner): void {
+                $q->withoutGlobalScope('global_ordered');
+                $authorizer?->constrain($q, $owner);
+            },
+        );
+    }
+
+    /**
+     * An existence condition along a relation path, one `whereHas` per relation so that each related query
+     * receives its own ACL; the leaf callback constrains the last one.
+     *
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  list<string>  $segments
+     * @param  Closure(Builder<Model>): void  $leaf
+     */
+    private function whereHasPath(Builder|Relation $query, string $has_method, array $segments, Closure $leaf, ?RelationAuthorizer $authorizer): void
+    {
+        $segment = array_shift($segments);
+
+        if ($segment === null) {
+            return;
+        }
+
+        $owner = $query->getModel();
+
+        $query->{$has_method}($segment, function (Builder $related) use ($segments, $leaf, $authorizer, $owner): void {
+            $authorizer?->constrain($related, $owner);
+
+            if ($segments === []) {
+                $leaf($related);
+
+                return;
+            }
+
+            $this->whereHasPath($related, 'whereHas', $segments, $leaf, $authorizer);
+        });
+    }
+
+    /**
+     * Whether a filter on the related `deleted_at` may reach the trashed related records: only for a caller who
+     * holds the related delete permission on the request's guard, within the abilities of the token. Without an
+     * acting user nobody is asking, and the soft-delete scope stays.
+     */
+    private function mayReadTrashed(Model $related, ?RelationAuthorizer $authorizer, ?Request $request): bool
+    {
+        if (! in_array(SoftDeletes::class, class_uses_recursive($related), true) || Auth::user() === null) {
+            return false;
+        }
+
+        $authorizer ??= resolve(RelationAuthorizer::class);
+
+        if (! $request instanceof Request) {
+            // A caller without a request of its own (a direct use of the query builder): the acting user is
+            // the authenticated one, whatever the current request object resolves.
+            $request = request()->duplicate();
+            $request->setUserResolver(static fn (): ?Authenticatable => Auth::user());
+        }
+
+        return $authorizer->allows($request, $related, ActionEnum::Delete->value);
+    }
+
+    /**
      * A relation filter from an ACL: the rows whose related record matches the nested filters, through
      * `whereHas` or, for a morph relation, `whereHasMorph`. Applied by relation, never by property path, so
      * the nested filters keep their plain column names.
@@ -554,13 +1048,13 @@ final class QueryBuilder
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns): void
+    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         RelationGuard::assertFilterable($query->getModel(), $filter);
 
         $has_method = $method . ($filter->morph_types !== null ? 'HasMorph' : 'Has');
-        $constraint = function (Builder $q) use ($filter, &$relation_columns): void {
-            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns);
+        $constraint = function (Builder $q) use ($filter, &$relation_columns, $authorizer, $request): void {
+            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns, $authorizer, $request);
         };
 
         if ($filter->morph_types !== null) {
@@ -577,7 +1071,7 @@ final class QueryBuilder
      * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns): void
+    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         if ($filters instanceof FiltersGroup) {
             $iterable = $filters->filters;
@@ -595,12 +1089,12 @@ final class QueryBuilder
 
             if ($subfilter instanceof FiltersGroup) {
                 if (is_callable([$query, $method])) {
-                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns));
+                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns, $authorizer, $request));
                 }
             } elseif ($subfilter instanceof RelationFilter) {
-                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns);
+                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             } elseif ($subfilter instanceof Filter) {
-                $this->applyFilter($query, $subfilter, $method, $relation_columns);
+                $this->applyFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             }
 
             $first = false;
@@ -661,13 +1155,17 @@ final class QueryBuilder
      * and are consumed by {@see applyAggregatesToQuery()}). Consumed keys are removed
      * so the relation pass does not see them again.
      *
+     * Given a relation authorizer, an aggregate is refused when the caller may not select the related entity,
+     * and counts only the related rows its ACL allows.
+     *
      * @param  Builder<Model>  $query
      * @param  array<string,array<int,Column>>  $aggregates
      * @param  (callable(string, Builder<Model>): void)|null  $countConstraint
      *
      * @throws InvalidArgumentException when a dotless key is not an Eloquent relation
+     * @throws AuthorizationException when the caller may not select the related entity
      */
-    private function applyMainAggregates(Builder $query, array &$aggregates, ?callable $countConstraint = null): void
+    private function applyMainAggregates(Builder $query, array &$aggregates, ?callable $countConstraint = null, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         $model = $query->getModel();
 
@@ -676,12 +1174,17 @@ final class QueryBuilder
                 continue;
             }
 
-            $this->assertAggregateRelation($model, $relation);
+            $instance = $this->assertAggregateRelation($model, $relation);
+            $this->authorizeAggregate($instance, $authorizer, $request);
 
-            $constraint = $countConstraint === null
+            $constraint = $countConstraint === null && ! $authorizer instanceof RelationAuthorizer
                 ? null
-                : static function (Builder $subquery) use ($countConstraint, $relation): void {
-                    $countConstraint($relation, $subquery);
+                : static function (Builder $subquery) use ($countConstraint, $relation, $authorizer, $model): void {
+                    $authorizer?->constrain($subquery, $model);
+
+                    if ($countConstraint !== null) {
+                        $countConstraint($relation, $subquery);
+                    }
                 };
 
             foreach ($aggregates_cols as $col) {
@@ -702,29 +1205,54 @@ final class QueryBuilder
 
     /**
      * Fail fast when an aggregate targets something that is not a real relation on
-     * the model, turning an opaque "undefined method" into a clear message.
+     * the model, turning an opaque "undefined method" into a clear message. The name
+     * is checked by {@see RelationGuard} before it is ever called.
+     *
+     * @return Relation<Model, Model, mixed>
      */
-    private function assertAggregateRelation(Model $model, string $relation): void
+    private function assertAggregateRelation(Model $model, string $relation): Relation
     {
-        $is_relation = method_exists($model, $relation)
-            && ($return = new ReflectionMethod($model, $relation)->getReturnType()) !== null
-            && is_a((string) $return, Relation::class, true);
+        $instance = RelationGuard::relationOf($model, $relation);
 
-        if (! $is_relation) {
+        if (! $instance instanceof Relation) {
             throw new InvalidArgumentException(sprintf(
                 "Aggregate '%s' is not an Eloquent relation on %s, so it cannot be counted or summed.",
                 $relation,
                 $model::class,
             ));
         }
+
+        return $instance;
+    }
+
+    /**
+     * An aggregate is always asked for by the request: refused when the caller may not select the related entity.
+     *
+     * @param  Relation<Model, Model, mixed>  $relation
+     *
+     * @throws AuthorizationException when the caller may not select the related entity
+     */
+    private function authorizeAggregate(Relation $relation, ?RelationAuthorizer $authorizer, ?Request $request): void
+    {
+        if (! $authorizer instanceof RelationAuthorizer || ! $request instanceof Request || $relation instanceof MorphTo) {
+            return;
+        }
+
+        throw_unless(
+            $authorizer->isReadable($request, $relation->getParent(), $relation->getRelated()),
+            AuthorizationException::class,
+            sprintf('User not allowed to read %s through %s', $relation->getRelated()->getTable(), $relation->getParent()->getTable()),
+        );
     }
 
     /**
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relations_aggregates
      */
-    private function applyAggregatesToQuery(Builder|Relation $query, array &$relations_aggregates, string $relation): void
+    private function applyAggregatesToQuery(Builder|Relation $query, array &$relations_aggregates, string $relation, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
+        $owner = $query->getModel();
+
         foreach ($relations_aggregates as $aggregate_relation => $aggregates_cols) {
             $escaped = preg_quote($relation);
 
@@ -732,18 +1260,24 @@ final class QueryBuilder
                 continue;
             }
 
-            $subrelation = preg_replace('/^' . $escaped . '\./', '', $aggregate_relation);
+            $subrelation = (string) preg_replace('/^' . $escaped . '\./', '', $aggregate_relation);
+            $this->authorizeAggregate($this->assertAggregateRelation($owner, $subrelation), $authorizer, $request);
+            $constraint = $authorizer instanceof RelationAuthorizer
+                ? static function (Builder $subquery) use ($authorizer, $owner): void {
+                    $authorizer->constrain($subquery, $owner);
+                }
+            : null;
 
             foreach ($aggregates_cols as $col) {
                 $method = $this->resolveAggregateMethod($col->type);
 
                 if ($col->type === ColumnType::Count) {
-                    $query->{$method}([$subrelation]);
+                    $query->{$method}($constraint === null ? [$subrelation] : [$subrelation => $constraint]);
 
                     continue;
                 }
 
-                $query->{$method}($subrelation, $col->name);
+                $query->{$method}($constraint === null ? $subrelation : [$subrelation => $constraint], $col->name);
             }
 
             unset($relations_aggregates[$aggregate_relation]);
@@ -813,7 +1347,7 @@ final class QueryBuilder
      * @param  array<string,FiltersGroup>  $relations_filters
      * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
      */
-    private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
+    private function createRelationCallback(Relation $query, string $relation, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         $computed = $computed_relations[$relation] ?? ['append' => [], 'method' => []];
         $computed_dependencies = $this->resolveComputedDependencies($query->getModel(), $computed);
@@ -838,14 +1372,14 @@ final class QueryBuilder
             $this->applyColumnsToSelect($query, $relations_columns[$relation]);
         }
 
-        $this->applyAggregatesToQuery($query, $relations_aggregates, $relation);
+        $this->applyAggregatesToQuery($query, $relations_aggregates, $relation, $authorizer, $request);
 
         if (isset($relations_filters[$relation])) {
             if (! array_key_exists($relation, $relations_columns)) {
                 $relations_columns[$relation] = [];
             }
 
-            $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns);
+            $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns, $authorizer, $request);
         }
 
         if (array_key_exists($relation, $relations_sorts) && $relations_sorts[$relation] !== []) {
@@ -856,6 +1390,11 @@ final class QueryBuilder
     }
 
     /**
+     * Eager-loads the relation paths. Every name is checked by {@see RelationGuard} before Eloquent calls it.
+     * Given a relation authorizer, a path the request asked for is refused when the caller may not select an
+     * entity on it and a path the query added on its own is dropped instead; each relation of each path, the
+     * intermediate ones included, receives the related ACL.
+     *
      * @param  Builder<Model>  $query
      * @param  array<int,string>  $relations
      * @param  array<string,array<int,Column>>  $relations_columns
@@ -863,24 +1402,91 @@ final class QueryBuilder
      * @param  array<string,array<int,Column>>  $relations_aggregates
      * @param  array<string,FiltersGroup>  $relations_filters
      * @param  array<string,array{append:array<int,string>,method:array<int,string>}>  $computed_relations
+     * @param  array<int,string>  $requested  the paths the request asked for
+     *
+     * @throws InvalidArgumentException when a name is not a relation
+     * @throws AuthorizationException when the caller may not select an entity on a requested path
      */
-    private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations): void
+    private function applyRelations(Builder $query, array $relations, array &$relations_columns, array &$relations_sorts, array &$relations_aggregates, array &$relations_filters, array $computed_relations, ?RelationAuthorizer $authorizer = null, ?Request $request = null, array $requested = []): void
     {
         $relations = $this->normalizeRelations($relations);
-        $this->cleanRelations($relations);
-        $merged_relations = array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns)));
+        $merged_relations = array_values(array_unique(array_merge($relations, array_keys($relations_sorts), array_keys($relations_columns))));
+        $this->cleanRelations($merged_relations);
+        $requested = array_merge($requested, array_keys($relations_sorts), array_keys($relations_columns));
+        $root = $query->getModel();
+        $loaded = [];
+
+        foreach ($merged_relations as $relation) {
+            $chain = $this->relationChain($root, $relation);
+
+            if ($authorizer instanceof RelationAuthorizer && $request instanceof Request && ! $this->chainIsReadable($chain, $authorizer, $request)) {
+                throw_if(
+                    in_array($relation, $requested, true),
+                    AuthorizationException::class,
+                    sprintf('User not allowed to read the relation %s of %s', $relation, $root->getTable()),
+                );
+
+                continue;
+            }
+
+            $loaded[] = $relation;
+        }
 
         $withs = [];
 
-        foreach ($merged_relations as $relation) {
-            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations): mixed {
-                $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations);
+        foreach ($loaded as $relation) {
+            $is_requested = $this->isKnownRelationPath($relation, $requested);
+            $nested = $this->nestedRelationPaths($relation, $loaded);
+
+            // Each intermediate relation of the path gets its own callback, so that it receives its ACL too:
+            // Eloquent would otherwise load it without constraints.
+            $prefix = '';
+
+            foreach (explode('.', $relation) as $segment) {
+                $prefix = $prefix === '' ? $segment : $prefix . '.' . $segment;
+
+                if ($prefix === $relation || isset($withs[$prefix]) || in_array($prefix, $loaded, true)) {
+                    continue;
+                }
+
+                $prefix_nested = $this->nestedRelationPaths($prefix, $loaded);
+                $withs[$prefix] = function (Relation $q) use ($authorizer, $request, $prefix_nested, $is_requested): mixed {
+                    $this->guardRelationQuery($q, $authorizer, $request, $prefix_nested, $is_requested);
+
+                    return null;
+                };
+            }
+
+            $withs[$relation] = function (Relation $q) use ($relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations, $authorizer, $request, $nested, $is_requested): mixed {
+                $this->createRelationCallback($q, $relation, $relations_columns, $relations_sorts, $relations_aggregates, $relations_filters, $computed_relations, $authorizer, $request);
+                $this->guardRelationQuery($q, $authorizer, $request, $nested, $is_requested);
 
                 return null;
             };
         }
 
-        $query->with($withs);
+        if ($withs !== []) {
+            $query->with($withs);
+        }
+    }
+
+    /**
+     * The paths among `$paths` that continue `$relation`, relative to it.
+     *
+     * @param  array<int,string>  $paths
+     * @return list<string>
+     */
+    private function nestedRelationPaths(string $relation, array $paths): array
+    {
+        $nested = [];
+
+        foreach ($paths as $path) {
+            if (Str::startsWith($path, $relation . '.')) {
+                $nested[] = Str::after($path, $relation . '.');
+            }
+        }
+
+        return $nested;
     }
 
     private function resolveAggregateMethod(ColumnType $column_type): string

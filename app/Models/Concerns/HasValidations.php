@@ -275,7 +275,16 @@ trait HasValidations
                     return true;
                 }
 
-                return $user->can($permission);
+                if ($user->can($permission)) {
+                    return true;
+                }
+
+                // The Gate answers for the session guard and does not see a permission an `api` role grants,
+                // so on an API request every related record hydrated read as a refusal: off the session
+                // guard the permission is asked on the request's guard, as the CRUD read engine asks it.
+                $guard = Auth::getDefaultDriver();
+
+                return config("auth.guards.{$guard}.driver") !== 'session' && $user->hasPermission($permission, $guard);
             });
         }
 

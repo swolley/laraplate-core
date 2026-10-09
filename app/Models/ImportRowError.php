@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Database\Factories\ImportRowErrorFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
@@ -16,7 +17,7 @@ use Override;
  * that explain why, and the raw mapped row. Together these back the downloadable
  * per-row failure report and let a user fix the source and re-import.
  */
-final class ImportRowError extends Model
+final class ImportRowError extends Model implements IsPartOfParent
 {
     use HasFactory;
 
@@ -36,6 +37,15 @@ final class ImportRowError extends Model
      */
     #[Override]
     protected $table = CoreTables::ImportRowErrors->value;
+
+    /**
+     * The relation to the record this one only exists inside, whose visibility it inherits.
+     */
+    #[Override]
+    public function parentRelation(): string
+    {
+        return 'session';
+    }
 
     /**
      * @return BelongsTo<ImportSession, $this>

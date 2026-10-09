@@ -478,6 +478,10 @@ class CrudController extends Controller
             if ($result->meta->cachedAt instanceof \Illuminate\Support\Carbon) {
                 $builder->setCachedAt($result->meta->cachedAt);
             }
+
+            if ($result->meta->relations !== []) {
+                $builder->setRelationsMeta($result->meta->relations);
+            }
         }
 
         if ($result->error) {

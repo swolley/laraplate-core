@@ -8,6 +8,7 @@ use BadMethodCallException;
 use Carbon\Carbon;
 use DateTimeInterface;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -119,6 +120,7 @@ class CrudService
         private readonly QueryBuilder $query_builder,
         private readonly ?AdvancedSearchService $advanced_search = null,
         private readonly ?ScoutSearchConstraintApplier $search_constraint_applier = null,
+        private readonly ?RelationAuthorizer $relation_authorizer = null,
     ) {}
 
     public function list(ListRequestData $requestData): CrudResult
@@ -133,14 +135,18 @@ class CrudService
             $model->getConnectionName(),
         );
 
-        // 2. Inject ACL filters into request (filters become: ACL AND user_filters)
+        // 2. The relations the request names obey their own permission, checked before the ACL
+        //    filters join the request filters (an ACL names relations on its own authority).
+        $this->authorizeRequestedRelations($requestData);
+
+        // 3. Inject ACL filters into request (filters become: ACL AND user_filters)
         $this->auth->injectAclFilters($requestData, $permission_name);
 
-        // 3. Build query (now includes ACL filters). Relation-count aggregates get the
-        //    related entity's ACL applied to their subquery, so a `*_count` never
-        //    counts rows the viewer is not permitted to see.
+        // 4. Build query (now includes ACL filters). Loaded relations and relation-count
+        //    aggregates get the related entity's ACL, so neither a related row nor a
+        //    `*_count` shows what the viewer is not permitted to see.
         $query = $model->newQuery();
-        $this->query_builder->prepareQuery($query, $requestData, $this->relationCountAclConstraint(...));
+        $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
 
         // When the full result set is materialized (no page, no from/to range, no
         // limit cap and not a count-only request), the total equals the number of
@@ -424,10 +430,11 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        $this->authorizeRequestedRelations($requestData);
         $this->auth->injectAclFilters($requestData, $permission_name);
 
         $query = $model->newQuery();
-        $this->query_builder->prepareQuery($query, $requestData);
+        $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
 
         // Drop eager loads / wide selects from the list pipeline; fingerprint only.
         $query->withoutEagerLoads();
@@ -538,8 +545,9 @@ class CrudService
         }
 
         // 3. Build query and apply ACL filters
+        $this->authorizeRequestedRelations($requestData);
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
+        $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
 
         $data = $query->sole();
 
@@ -549,6 +557,7 @@ class CrudService
             class: $model::class,
             table: $model->getTable(),
             cachedAt: Date::now(),
+            relations: $this->partialRelations($requestData->request, $data),
         );
 
         return new CrudResult(
@@ -579,6 +588,10 @@ class CrudService
             $model->getConnectionName(),
         );
 
+        // The relations and dotted columns load from the database and are checked in full; the filters and
+        // sorts name index fields, so only the part of them that resolves to relations is checked.
+        $this->authorizeRequestedRelations($requestData, lenient_filters: true);
+
         return match ($requestData->mode) {
             SearchMode::Orchestrated => $this->searchWithAdvanced($requestData, $permission_name),
             SearchMode::Auto => ($this->advanced_search ?? app(AdvancedSearchService::class))->available($model)
@@ -603,9 +616,10 @@ class CrudService
         );
 
         // 2. Build query and apply ACL filters
+        $this->authorizeRequestedRelations($requestData);
         $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
+        $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
 
         $query->with('history', function (Relation $q) use ($requestData): void {
             $q->latest();
@@ -673,10 +687,13 @@ class CrudService
             $tree_relation_type = 'descendantsAndSelf';
         }
 
-        // 2. Build query and apply ACL filters
-        $query = $model->newQuery()->with($tree_relation_type);
+        // 2. Build query and apply ACL filters. The tree relation is the engine's own, added after the
+        //    request relations so that it is not taken for a relation the model loads on its own.
+        $this->authorizeRequestedRelations($requestData);
+        $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
-        $this->query_builder->prepareQuery($query, $requestData);
+        $this->query_builder->prepareAuthorizedQuery($query, $requestData, $this->relationAuthorizer());
+        $query->with($tree_relation_type);
 
         $data = $requestData->request->has(is_array($requestData->primaryKey) ? $requestData->primaryKey[0] : $requestData->primaryKey)
             ? $query->sole()
@@ -1189,23 +1206,48 @@ class CrudService
     }
 
     /**
-     * Constrain a relation-count subquery with the related entity's read ACL, so a
-     * `<relation>_count` on a list row only counts rows the viewer may see. For an
-     * unrestricted viewer the ACL resolves to no filters and the count is unchanged.
+     * Refuses a request that names a relation whose entity the caller may not select (spec 8.1, R6), and one
+     * that names something that is not a relation, before any of those names is called.
      *
-     * @param  Builder<Model>  $subquery
+     * @throws AuthorizationException when the caller may not select an entity the request names
+     * @throws InvalidArgumentException when a name of the request is not a relation
      */
-    private function relationCountAclConstraint(string $relation, Builder $subquery): void
+    private function authorizeRequestedRelations(SelectRequestData $request_data, bool $lenient_filters = false): void
     {
-        $related = $subquery->getModel();
-
-        $permission = $this->auth->buildPermissionName(
-            $related->getTable(),
-            'select',
-            $related->getConnectionName(),
+        $this->relationAuthorizer()->authorizePaths(
+            $request_data->request,
+            $request_data->model,
+            $this->query_builder->requestedRelationPaths($request_data->model, $request_data, $lenient_filters),
         );
+    }
 
-        $this->auth->applyAclFiltersToQuery($subquery, $permission);
+    /**
+     * The relations of a detail record the related ACL left partial, with how many records each lost (R7).
+     *
+     * @return array<string, array{hidden: int}>
+     */
+    private function partialRelations(Request $request, Model $record): array
+    {
+        $partial = [];
+
+        foreach (array_keys($record->getRelations()) as $relation) {
+            if (! is_string($relation)) {
+                continue;
+            }
+
+            $hidden = $this->relationAuthorizer()->hiddenCount($request, $record, $relation);
+
+            if ($hidden > 0) {
+                $partial[$relation] = ['hidden' => $hidden];
+            }
+        }
+
+        return $partial;
+    }
+
+    private function relationAuthorizer(): RelationAuthorizer
+    {
+        return $this->relation_authorizer ?? resolve(RelationAuthorizer::class);
     }
 
     /**
@@ -2440,10 +2482,7 @@ class CrudService
         }
 
         $query = $this->searchHitsQuery($model, $ids->all(), $permissionName);
-
-        if ($requestData->relations !== []) {
-            $query->with($requestData->relations);
-        }
+        $this->query_builder->applyRequestedRelations($query, $requestData, $this->relationAuthorizer());
 
         $records = $query->get();
 
@@ -2519,10 +2558,7 @@ class CrudService
         }
 
         $query = $this->searchHitsQuery($model, $ids, $permissionName);
-
-        if ($requestData->relations !== []) {
-            $query->with($requestData->relations);
-        }
+        $this->query_builder->applyRequestedRelations($query, $requestData, $this->relationAuthorizer());
 
         $records = $query->get();
         $records_by_key = $records->keyBy(static fn (Model $record): string => (string) $record->getKey());

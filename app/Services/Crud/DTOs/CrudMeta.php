@@ -38,5 +38,12 @@ readonly class CrudMeta
          * @var array<string, mixed>
          */
         public array $search = [],
+        /**
+         * The relations of a detail record its related ACL left partial, keyed by relation name, with
+         * the number of related records left out.
+         *
+         * @var array<string, array{hidden: int}>
+         */
+        public array $relations = [],
     ) {}
 }
