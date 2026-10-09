@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Graphs;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 final class GraphTraversalActivity extends Model
 {
@@ -12,7 +13,10 @@ final class GraphTraversalActivity extends Model
 
     protected $guarded = [];
 
-    public function subject()
+    /**
+     * @return MorphTo<Model, $this>
+     */
+    public function subject(): MorphTo
     {
         return $this->morphTo();
     }

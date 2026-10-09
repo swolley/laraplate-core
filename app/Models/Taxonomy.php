@@ -21,13 +21,13 @@ use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasPath;
 use Modules\Core\Models\Concerns\HasTranslatedDynamicContents;
+use Modules\Core\Models\Concerns\HasTypedRecursiveRelationships;
 use Modules\Core\Models\Concerns\HasValidity;
 use Modules\Core\Models\Concerns\SortableTrait;
 use Modules\Core\Models\Translations\TaxonomyTranslation;
 use Modules\Core\Overrides\Model;
 use Override;
 use Spatie\EloquentSortable\Sortable;
-use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 abstract class Taxonomy extends Model implements IActivatableModel, ILockableModel, IValidatableModel, Sortable
 {
@@ -41,13 +41,13 @@ abstract class Taxonomy extends Model implements IActivatableModel, ILockableMod
     }
     use HasLocks;
     use HasPath;
-    use HasRecursiveRelationships;
     use HasTranslatedDynamicContents {
         HasTranslatedDynamicContents::getRules as private getRulesDynamicContents;
         HasTranslatedDynamicContents::toArray as private translatedDynamicContentsToArray;
         HasTranslatedDynamicContents::casts as private translatedDynamicContentsCasts;
         HasTranslatedDynamicContents::getTranslationModelClass as private getTranslationModelClassDynamicContents;
     }
+    use HasTypedRecursiveRelationships;
     use HasValidity;
     use SortableTrait {
         SortableTrait::scopeOrdered as private scopePriorityOrdered;

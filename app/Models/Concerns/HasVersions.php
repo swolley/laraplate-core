@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
 use Modules\Core\Contracts\IOptimisticLockableModel;
@@ -38,7 +39,11 @@ use Overtrue\LaravelVersionable\VersionStrategy;
  */
 trait HasVersions
 {
-    use Versionable;
+    use Versionable {
+        history as private untypedHistory;
+        latestVersions as private untypedLatestVersions;
+        oldestVersions as private untypedOldestVersions;
+    }
 
     protected ?User $_creator;
 
@@ -101,6 +106,33 @@ trait HasVersions
     public static function bootVersionable(): void
     {
         // Lifecycle persistence is owned by bootHasVersions().
+    }
+
+    /**
+     * The versions, latest first. Declared with its relation type, which the package leaves to PHPDoc: a
+     * relation a request names is called only when its declaration says it returns a relation.
+     *
+     * @return MorphMany<Version, $this>
+     */
+    public function history(): MorphMany
+    {
+        return $this->untypedHistory();
+    }
+
+    /**
+     * @return MorphMany<Version, $this>
+     */
+    public function latestVersions(): MorphMany
+    {
+        return $this->untypedLatestVersions();
+    }
+
+    /**
+     * @return MorphMany<Version, $this>
+     */
+    public function oldestVersions(): MorphMany
+    {
+        return $this->untypedOldestVersions();
     }
 
     /**

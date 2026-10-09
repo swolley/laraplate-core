@@ -17,6 +17,7 @@ use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Database\Factories\RoleFactory;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Locking\Traits\HasLocks;
+use Modules\Core\Models\Concerns\HasTypedRecursiveRelationships;
 use Modules\Core\Models\Concerns\HasValidations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Pivot\ModelHasRole;
@@ -24,14 +25,13 @@ use Modules\Core\SoftDeletes\SoftDeletes;
 use Override;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Models\Role as BaseRole;
-use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 final class Role extends BaseRole implements ILockableModel, ISoftDeletableModel
 {
     use HasCache;
     use HasFactory;
     use HasLocks;
-    use HasRecursiveRelationships;
+    use HasTypedRecursiveRelationships;
     use HasValidations {
         getRules as private getRulesTrait;
     }

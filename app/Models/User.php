@@ -33,6 +33,8 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Passkeys\PasskeyAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\ILockableModel;
@@ -328,6 +330,33 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
     public function license(): BelongsTo
     {
         return $this->belongsTo(License::class);
+    }
+
+    /**
+     * The personal access tokens. Declared with its relation type, which Sanctum leaves to PHPDoc: a relation a
+     * request names is called only when its declaration says it returns a relation.
+     *
+     * @return MorphMany<PersonalAccessToken, $this>
+     */
+    public function tokens(): MorphMany
+    {
+        return $this->morphMany(Sanctum::$personalAccessTokenModel, 'tokenable');
+    }
+
+    /**
+     * @return MorphMany<Notification, $this>
+     */
+    public function readNotifications(): MorphMany
+    {
+        return $this->notifications()->read();
+    }
+
+    /**
+     * @return MorphMany<Notification, $this>
+     */
+    public function unreadNotifications(): MorphMany
+    {
+        return $this->notifications()->unread();
     }
 
     /**
