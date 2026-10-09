@@ -790,14 +790,15 @@ class CrudService
         )->lazy(100);
         $changes = $requestData->changes;
         $discarded_values = $this->removeNonFillableProperties($model, $changes);
-        $relations = $this->resolveSyncableRelations($model, $requestData->relations);
+        $relations = $this->resolveSyncableRelations($model, $requestData->relations, $requestData->request);
 
         $updated_records = new Collection();
         $captured = [];
         $found_count = 0;
         $lock_version = $this->requestedLockVersion($requestData);
+        $request = $requestData->request;
 
-        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, $lock_version, &$found_count, &$captured): void {
+        $model->getConnection()->transaction(function () use ($found_records, $updated_records, $changes, $relations, $lock_version, $request, &$found_count, &$captured): void {
             foreach ($found_records as $found_record) {
                 $found_count++;
 
@@ -816,7 +817,7 @@ class CrudService
                 }
 
                 if ($relations !== []) {
-                    $this->syncModelRelations($found_record, $relations);
+                    $this->syncModelRelations($request, $found_record, $relations);
                     $mutated = true;
                 }
 
@@ -1830,15 +1831,17 @@ class CrudService
 
     /**
      * Validate the relation-sync payload against the model's whitelist and shape,
-     * before any write, and normalize the id lists.
+     * before any write, and normalize the id lists. A relation whose related entity
+     * the writer may not read cannot be synced at all (spec 8.2).
      *
      * @param  array<string, mixed>  $relations
      *
      * @throws UnexpectedValueException when a relation is not whitelisted or is not many-to-many
+     * @throws AuthorizationException when the writer may not read the related entity of a relation
      *
      * @return array<string, list<int>>
      */
-    private function resolveSyncableRelations(Model $model, array $relations): array
+    private function resolveSyncableRelations(Model $model, array $relations, Request $request): array
     {
         if ($relations === []) {
             return [];
@@ -1854,10 +1857,18 @@ class CrudService
                 UnexpectedValueException::class,
                 sprintf("Relation '%s' is not syncable on %s.", (string) $name, $model->getTable()),
             );
+
+            $relation = $model->{$name}();
+
             throw_unless(
-                $model->{$name}() instanceof BelongsToMany,
+                $relation instanceof BelongsToMany,
                 UnexpectedValueException::class,
                 sprintf("Relation '%s' on %s is not a many-to-many relation.", $name, $model->getTable()),
+            );
+            throw_unless(
+                $this->relationAuthorizer()->isReadable($request, $model, $relation->getRelated()),
+                AuthorizationException::class,
+                sprintf('User not allowed to read %s through %s', $relation->getRelated()->getTable(), $model->getTable()),
             );
 
             $resolved[$name] = $this->normalizeRelationIds(is_array($ids) ? $ids : []);
@@ -1870,16 +1881,69 @@ class CrudService
      * Sync each already-validated relation on a record from its list of ids.
      *
      * @param  array<string, list<int>>  $relations
+     *
+     * @throws AuthorizationException when a submitted id is outside the related records the writer can read
      */
-    private function syncModelRelations(Model $record, array $relations): void
+    private function syncModelRelations(Request $request, Model $record, array $relations): void
     {
         foreach ($relations as $name => $ids) {
             $relation = $record->{$name}();
 
             if ($relation instanceof BelongsToMany) {
-                $relation->sync($ids);
+                $relation->sync($this->syncTarget($request, $record, $relation, $ids));
             }
         }
+    }
+
+    /**
+     * The ids a relation is synced to: the submitted ids plus the attached records the writer cannot read, so a
+     * hidden record is never detached and its pivot row is never touched. Additions and removals are thus
+     * computed on the visible subset (spec 8.2). With no ACL narrowing the related entity, the submitted ids
+     * are the target as they are.
+     *
+     * @param  BelongsToMany<Model, Model>  $relation
+     * @param  list<int>  $submitted
+     *
+     * @throws AuthorizationException when a submitted id is outside the readable set, whether it is hidden or does not exist
+     *
+     * @return list<int>
+     */
+    private function syncTarget(Request $request, Model $record, BelongsToMany $relation, array $submitted): array
+    {
+        $related = $relation->getRelated();
+        $key = $relation->getRelatedKeyName();
+        $visible = $this->relationAuthorizer()->visibleKeysQuery($request, $record, $related, $key);
+
+        if (! $visible instanceof Builder) {
+            return $submitted;
+        }
+
+        $readable = static fn (array $ids): Builder => $related->newQueryWithoutScopes()
+            ->whereIn($related->qualifyColumn($key), $ids)
+            ->whereIn($related->qualifyColumn($key), $visible->toBase());
+
+        $unreadable = $submitted !== [] && $readable($submitted)->count() !== count($submitted);
+
+        throw_if(
+            $unreadable,
+            AuthorizationException::class,
+            sprintf('User not allowed to attach records of %s they cannot read', $related->getTable()),
+        );
+
+        /** @var list<int|string> $attached */
+        $attached = $relation->newPivotQuery()->pluck($relation->getRelatedPivotKeyName())->all();
+
+        if ($attached === []) {
+            return $submitted;
+        }
+
+        $readable_attached = $readable($attached)->pluck($key)->map(static fn (mixed $id): string => (string) $id)->all();
+        $hidden = array_values(array_filter(
+            $attached,
+            static fn (int|string $id): bool => ! in_array((string) $id, $readable_attached, true),
+        ));
+
+        return array_values(array_unique([...$submitted, ...array_map(static fn (int|string $id): int => (int) $id, $hidden)]));
     }
 
     /**
