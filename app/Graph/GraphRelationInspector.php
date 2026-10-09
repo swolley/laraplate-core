@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Graph\DTOs\GraphRelation;
+use Modules\Core\Support\RelationGuard;
 use ReflectionMethod;
 
 final class GraphRelationInspector
@@ -33,7 +33,9 @@ final class GraphRelationInspector
             ]);
         }
 
-        $relation = $model->{$relationName}();
+        // The relation name comes from the request and the model is a loaded record: only a method declared as
+        // returning a relation is called, never one such as `delete` that would act on the record.
+        $relation = RelationGuard::relationOf($model, $relationName);
 
         if (! $relation instanceof Relation) {
             throw ValidationException::withMessages([
@@ -47,10 +49,10 @@ final class GraphRelationInspector
             name: $relationName,
             relation: $relation,
             relatedClass: $related::class,
+            // A MorphToMany is a BelongsToMany.
             isMultiple: $relation instanceof HasMany
                 || $relation instanceof BelongsToMany
-                || $relation instanceof MorphMany
-                || $relation instanceof MorphToMany,
+                || $relation instanceof MorphMany,
             isMorphTo: $relation instanceof MorphTo,
         );
     }

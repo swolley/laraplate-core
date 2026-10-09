@@ -39,10 +39,10 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Stubs\ActivationStubModel;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
-use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 
 function crud_cov_set(object $obj, string $prop, mixed $value): void
 {
@@ -815,6 +815,16 @@ it('detail resolves single primary key and applies main-entity method columns', 
         public function rowCode(): string
         {
             return 'X';
+        }
+
+        /**
+         * A request may only invoke a method the model declares as computable for the CRUD.
+         *
+         * @return array<string, array<string, list<string>>>
+         */
+        public function crudComputedDependencies(): array
+        {
+            return ['rowCode' => ['columns' => []]];
         }
     };
 

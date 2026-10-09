@@ -78,7 +78,9 @@ use Modules\Core\Services\Crud\DTOs\FacetSort;
 use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
+use Modules\Core\Support\ComputedColumnGuard;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\RelationGuard;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
@@ -267,6 +269,12 @@ class CrudService
             // hydrated into PHP); computed accessors have no column to group on, so
             // they fall back to plucking the values and counting them in memory.
             $is_real_column = $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), $field);
+
+            // A field that is not a column is read from each row as an attribute: it must not name a method,
+            // which Eloquent would call on the row as if it were a relation.
+            if (! $is_real_column) {
+                ComputedColumnGuard::assertReadableAttribute($model, $field);
+            }
 
             // Both universes stay within the ACL-visible rows: `total` ignores the
             // request filters but not the row-level ACL, `count` applies both.
@@ -1214,11 +1222,48 @@ class CrudService
      */
     private function authorizeRequestedRelations(SelectRequestData $request_data, bool $lenient_filters = false): void
     {
+        $this->assertComputedColumns($request_data);
+
         $this->relationAuthorizer()->authorizePaths(
             $request_data->request,
             $request_data->model,
             $this->query_builder->requestedRelationPaths($request_data->model, $request_data, $lenient_filters),
         );
+    }
+
+    /**
+     * Refuses, before anything is queried or called, a request that would make a model run code it did not
+     * declare for the CRUD read: a `method` column the model does not declare as computable, an appended
+     * attribute without an accessor, a group_by key naming a method.
+     *
+     * @throws InvalidArgumentException when a name of the request is not computable or not readable
+     */
+    private function assertComputedColumns(SelectRequestData $request_data): void
+    {
+        $model = $request_data->model;
+        $table = $model->getTable();
+
+        foreach ($request_data->columns as $column) {
+            if ($column->type !== ColumnType::Method && $column->type !== ColumnType::Append) {
+                continue;
+            }
+
+            $segments = explode('.', str_replace($table . '.', '', $column->name));
+            $name = (string) array_pop($segments);
+            $target = ComputedColumnGuard::modelAt($model, $segments);
+
+            if ($column->type === ColumnType::Method) {
+                ComputedColumnGuard::assertMethod($target, $name);
+            } else {
+                ComputedColumnGuard::assertAppend($target, $name);
+            }
+        }
+
+        if ($request_data instanceof ListRequestData) {
+            foreach ($request_data->group_by as $group) {
+                ComputedColumnGuard::assertReadablePath($model, $group);
+            }
+        }
     }
 
     /**
@@ -1495,17 +1540,7 @@ class CrudService
             return null;
         }
 
-        $relation = mb_substr($group_by, 0, $dot);
-
-        if (! method_exists($model, $relation)) {
-            return null;
-        }
-
-        try {
-            $relation_object = $model->newInstance()->{$relation}();
-        } catch (Throwable) {
-            return null;
-        }
+        $relation_object = RelationGuard::relationOf($model->newInstance(), mb_substr($group_by, 0, $dot));
 
         if (! $relation_object instanceof BelongsTo) {
             return null;
@@ -1678,17 +1713,7 @@ class CrudService
             return null;
         }
 
-        $relation = mb_substr($spec, 0, $dot);
-
-        if (! method_exists($related, $relation)) {
-            return null;
-        }
-
-        try {
-            $relation_object = $related->newInstance()->{$relation}();
-        } catch (Throwable) {
-            return null;
-        }
+        $relation_object = RelationGuard::relationOf($related->newInstance(), mb_substr($spec, 0, $dot));
 
         if (! $relation_object instanceof HasMany) {
             return null;
@@ -1711,15 +1736,11 @@ class CrudService
      */
     private function resolveManyRelation(Model $model, string $relation): ?BelongsToMany
     {
-        if ($relation === '' || ! method_exists($model, $relation)) {
+        if ($relation === '') {
             return null;
         }
 
-        try {
-            $object = $model->newInstance()->{$relation}();
-        } catch (Throwable) {
-            return null;
-        }
+        $object = RelationGuard::relationOf($model->newInstance(), $relation);
 
         return $object instanceof BelongsToMany ? $object : null;
     }
@@ -1907,11 +1928,7 @@ class CrudService
         }
 
         if (method_exists($model, $relation)) {
-            try {
-                $relation_object = $model->newInstance()->{$relation}();
-            } catch (Throwable) {
-                $relation_object = null;
-            }
+            $relation_object = RelationGuard::relationOf($model->newInstance(), $relation);
 
             if ($relation_object instanceof BelongsTo && $key === $this->facetKey($relation_object->getForeignKeyName())) {
                 $related = $relation_object->getRelated();
@@ -3197,11 +3214,13 @@ class CrudService
             $next_targets = [];
 
             foreach ($targets as $target) {
-                if (! method_exists($target, $segment)) {
+                // Only a relation the query loaded: reading an unloaded one by name would make Eloquent call
+                // the same-named method, whatever it is.
+                if (! $target->relationLoaded($segment)) {
                     continue;
                 }
 
-                $related = $target->{$segment};
+                $related = $target->getRelation($segment);
 
                 if ($related instanceof Model) {
                     $next_targets[] = $related;
@@ -3235,6 +3254,8 @@ class CrudService
         throw_unless(method_exists($model, $method), UnexpectedValueException::class, sprintf('Method %s not found on %s', $method, $model::class));
 
         throw_if($this->methodRequiresParameters($model, $method), UnexpectedValueException::class, sprintf('Method %s requires parameters on %s', $method, $model::class));
+
+        throw_unless(ComputedColumnGuard::isSafeMethod($model, $method), UnexpectedValueException::class, sprintf('Method %s cannot be computed on %s', $method, $model::class));
 
         return $model->{$method}();
     }
