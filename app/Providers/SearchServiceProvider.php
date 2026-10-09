@@ -14,11 +14,13 @@ use Modules\Core\Search\Contracts\IQueryIntentParser;
 use Modules\Core\Search\Contracts\IReranker;
 use Modules\Core\Search\Contracts\ISearchEngine;
 use Modules\Core\Search\Contracts\ISearchPlanner;
+use Modules\Core\Search\Contracts\ISearchStrategyResolver;
 use Modules\Core\Search\Contracts\IVectorSearchAvailability;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Engines\ElasticsearchEngine;
 use Modules\Core\Search\Engines\TypesenseEngine;
 use Modules\Core\Search\Services\AdvancedSearchService;
+use Modules\Core\Search\Services\CoreSearchStrategyResolver;
 use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Services\RetrievalTuningProfile;
@@ -55,6 +57,7 @@ final class SearchServiceProvider extends ServiceProvider
         $this->app->singletonIf(IVectorSearchAvailability::class, VectorSearchAvailability::class);
         $this->app->singletonIf(ISearchPlanner::class, FallbackSearchPlanner::class);
         $this->app->singletonIf(IQueryIntentParser::class, SimpleQueryIntentParser::class);
+        $this->app->singletonIf(ISearchStrategyResolver::class, CoreSearchStrategyResolver::class);
         $this->app->singleton(RetrievalTuningProfile::class);
         $this->app->singleton(AdvancedSearchService::class);
     }

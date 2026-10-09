@@ -5,8 +5,10 @@ declare(strict_types=1);
 use Laravel\Scout\EngineManager;
 use Modules\Core\Providers\SearchServiceProvider;
 use Modules\Core\Search\Contracts\ISearchEngine;
+use Modules\Core\Search\Contracts\ISearchStrategyResolver;
 use Modules\Core\Search\Engines\DatabaseEngine;
 use Modules\Core\Search\Services\AdvancedSearchService;
+use Modules\Core\Search\Services\CoreSearchStrategyResolver;
 
 beforeEach(function (): void {
     $this->provider = new SearchServiceProvider(app());
@@ -23,6 +25,10 @@ it('registers advanced search coordinator', function (): void {
     $this->provider->register();
 
     expect(app()->bound(AdvancedSearchService::class))->toBeTrue();
+});
+
+it('binds the strategy resolver contract to the cheap Core resolver by default', function (): void {
+    expect(app(ISearchStrategyResolver::class))->toBeInstanceOf(CoreSearchStrategyResolver::class);
 });
 
 it('binds Scout engine implementations', function (): void {
