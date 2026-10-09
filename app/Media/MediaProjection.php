@@ -17,6 +17,13 @@ use Modules\Core\Models\Media;
  */
 final readonly class MediaProjection
 {
+    /**
+     * The columns the projection returns unchanged, the only ones a projected caller may name in a query.
+     *
+     * @var list<string>
+     */
+    public const array QUERYABLE_COLUMNS = ['id', 'collection_name', 'mime_type', 'size'];
+
     public function __construct(private MediaUrls $urls) {}
 
     /**

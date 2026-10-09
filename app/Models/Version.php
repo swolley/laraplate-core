@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Auth;
+use Modules\Core\Contracts\IHidesAttributesFromAnonymous;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
@@ -20,6 +23,11 @@ use Overtrue\LaravelVersionable\VersionStrategy;
 final class Version extends OvertrueVersion
 {
     use HasFactory;
+
+    /**
+     * A password hash of the algorithms PHP's password_hash() produces (bcrypt, argon2i, argon2id).
+     */
+    private const string PASSWORD_HASH_PATTERN = '/^\$(2[aby]|argon2id?)\$/';
 
     /**
      * @var string
@@ -177,22 +185,33 @@ final class Version extends OvertrueVersion
             ->first();
     }
 
+    /**
+     * The version as a client receives it. Its contents are the raw attributes of the versioned record, so every
+     * attribute the versioned model's own serialization withholds is masked in them: what the model hides from
+     * everybody (passwords, remember tokens, two-factor secrets) and, for the anonymous user, what it hides from
+     * the anonymous user. Any password hash left in a value is masked as well.
+     */
     #[Override]
     public function toArray(): mixed
     {
         $serialized = parent::toArray();
+        $masked = $this->maskedVersionableAttributes();
 
-        // mask hashed values from json_encode (guard against null/non-iterable)
-        $data = $serialized['versionable_data'] ?? null;
+        foreach (['contents', 'original_contents', 'versionable_data'] as $key) {
+            $data = $serialized[$key] ?? null;
 
-        if (is_array($data)) {
-            foreach ($data as &$value) {
-                if (gettype($value) === 'string' && mb_strlen($value) === 60 && preg_match('/^\$2y\$/', $value)) {
+            if (! is_array($data)) {
+                continue;
+            }
+
+            foreach ($data as $attribute => &$value) {
+                if (in_array($attribute, $masked, true) || (is_string($value) && preg_match(self::PASSWORD_HASH_PATTERN, $value) === 1)) {
                     $value = '[hidden]';
                 }
             }
 
-            $serialized['versionable_data'] = $data;
+            unset($value);
+            $serialized[$key] = $data;
         }
 
         return $serialized;
@@ -214,6 +233,39 @@ final class Version extends OvertrueVersion
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The attributes of the versioned model that its serialization withholds from the current caller.
+     *
+     * @return list<string>
+     */
+    private function maskedVersionableAttributes(): array
+    {
+        $type = $this->getAttributes()['versionable_type'] ?? null;
+
+        if (! is_string($type) || $type === '') {
+            return [];
+        }
+
+        $class = Relation::getMorphedModel($type) ?? $type;
+
+        if (! is_subclass_of($class, Model::class)) {
+            return [];
+        }
+
+        $model = new $class();
+        $masked = $model->getHidden();
+
+        if ($model instanceof IHidesAttributesFromAnonymous) {
+            $user = Auth::user();
+
+            if ($user instanceof User && $user->isGuest()) {
+                array_push($masked, ...$model->anonymousHiddenAttributes());
+            }
+        }
+
+        return array_values(array_filter($masked, is_string(...)));
     }
 
     private function getCompleteVersionable(): ?Model

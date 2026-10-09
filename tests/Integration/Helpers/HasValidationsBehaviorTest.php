@@ -404,7 +404,7 @@ it('checks user permissions when a permission row exists', function (): void {
 
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
-    $user->shouldReceive('can')->with($permission_name)->andReturn(true);
+    $user->shouldReceive('hasPermission')->with($permission_name, 'web')->andReturn(true);
     // setUser, not login: login() fires Login and AfterLoginListener would persist this unsaved mock.
     Auth::setUser($user);
 

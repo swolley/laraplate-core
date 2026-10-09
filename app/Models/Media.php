@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Casts\ActionEnum;
 use Modules\Core\Contracts\IEmbeddableModel;
+use Modules\Core\Contracts\IRestrictsReadableColumns;
 use Modules\Core\Contracts\ISearchableModel;
 use Modules\Core\Contracts\ISoftDeletableModel;
 use Modules\Core\Enums\CoreTables;
@@ -43,7 +44,7 @@ use Throwable;
  * @phpstan-use Searchable<Media>
  */
 #[ObservedBy([MediaMetadataObserver::class, MediaLifecycleObserver::class])]
-final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEmbeddableModel, ISearchableModel, ISoftDeletableModel
+final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEmbeddableModel, IRestrictsReadableColumns, ISearchableModel, ISoftDeletableModel
 {
     /** @use HasFactory<\Illuminate\Database\Eloquent\Factories\Factory<static>> */
     use HasFactory;
@@ -240,6 +241,18 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
         }
 
         return parent::toArray();
+    }
+
+    /**
+     * A caller who receives the projection may name, in a facet, a group_by key, a sort, a filter or an aggregate,
+     * only the columns the projection returns as they are: any other would answer through the query what the
+     * projection withholds (the original file name, the disks, the custom properties).
+     *
+     * @return list<string>|null
+     */
+    public function readableColumnsForCurrentCaller(): ?array
+    {
+        return $this->isProjectedForCurrentCaller() ? MediaProjection::QUERYABLE_COLUMNS : null;
     }
 
     protected function getExpiresAtAttribute(): ?Carbon

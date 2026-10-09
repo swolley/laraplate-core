@@ -24,3 +24,32 @@ it('builds stable graph node ids from module entity and model key', function ():
     expect($node->attributes)->toHaveKey('name', 'Graph User');
     expect($node->attributes)->not->toHaveKey('password');
 });
+
+it('builds the label and the summary of a media from its projection for an anonymous api caller', function (): void {
+    Illuminate\Support\Facades\Cache::flush();
+    $anonymous = User::factory()->create(['name' => config('permission.users.guest'), 'username' => config('permission.users.guest')]);
+    Illuminate\Support\Facades\Auth::shouldUse('api');
+    Illuminate\Support\Facades\Auth::guard('api')->setUser($anonymous);
+
+    $media = new Modules\Core\Models\Media();
+    $media->forceFill(['id' => 11, 'name' => 'graphnode-original-basename', 'file_name' => 'graphnode-original-basename.jpg', 'collection_name' => 'images', 'mime_type' => 'image/jpeg', 'size' => 10, 'custom_properties' => []]);
+    $media->exists = true;
+
+    $node = (new GraphNodeSerializer(new GraphEntityResolver(), new GraphProviderRegistry()))->serialize($media, 'summary');
+
+    expect($node->label)->toBe('11')
+        ->and($node->attributes)->not->toHaveKeys(['name', 'file_name'])
+        ->and(json_encode($node->attributes, JSON_THROW_ON_ERROR))->not->toContain('graphnode-original-basename');
+});
+
+it('never builds the label or the summary from an attribute the model hides', function (): void {
+    $user = new User();
+    $user->forceFill(['id' => 8, 'name' => 'graphnode-hidden-name', 'email' => 'graph-hidden@example.test']);
+    $user->exists = true;
+    $user->setHidden(['name', 'password']);
+
+    $node = (new GraphNodeSerializer(new GraphEntityResolver(), new GraphProviderRegistry()))->serialize($user, 'summary');
+
+    expect($node->label)->toBe('8')
+        ->and($node->attributes)->not->toHaveKey('name');
+});

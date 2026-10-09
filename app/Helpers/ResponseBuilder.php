@@ -493,7 +493,11 @@ class ResponseBuilder
             ],
         ];
 
-        if ($this->error !== null) {
+        if ($this->error !== null && $this->status >= Response::HTTP_INTERNAL_SERVER_ERROR && config('app.debug') !== true) {
+            // A server error carries what went wrong inside: the SQL and bindings of a failed query, a path, a
+            // class. It is reported where it was caught; the client receives the status text only.
+            $payload['error'] = Response::$statusTexts[$this->status] ?? 'Server Error';
+        } elseif ($this->error !== null) {
             if ($this->error instanceof Exception) {
                 $payload['error'] = $this->error->getMessage();
 

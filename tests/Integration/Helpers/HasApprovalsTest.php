@@ -72,10 +72,11 @@ it('requires approval when not in console and user cannot bypass approval', func
     $permission = PermissionName::forModel($model, 'approve');
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->with($permission)->andReturn(false);
+    $user->shouldReceive('hasPermission')->with($permission, 'web')->andReturn(false);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);
@@ -102,10 +103,11 @@ it('does not require approval when user has approve credit and N is 1', function
     $permission = PermissionName::forModel($model, 'approve');
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('hasPermission')->with($permission, 'web')->andReturn(true);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);
@@ -121,10 +123,11 @@ it('requires approval when user has approve credit but N is greater than 1', fun
     $permission = PermissionName::forModel($model, 'approve');
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('hasPermission')->with($permission, 'web')->andReturn(true);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
 
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $method = new ReflectionMethod($model, 'requiresApprovalWhen');
     $method->setAccessible(true);

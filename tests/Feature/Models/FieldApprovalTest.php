@@ -30,9 +30,10 @@ it('requires approval for field changes by a user without approve credit', funct
     $permission = PermissionName::forModel($field, 'approve');
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->with($permission)->andReturn(false);
+    $user->shouldReceive('hasPermission')->with($permission, 'web')->andReturn(false);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
     $method->setAccessible(true);
@@ -47,9 +48,10 @@ it('does not require approval for field changes when user has approve credit and
     $permission = PermissionName::forModel($field, 'approve');
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->with($permission)->andReturn(true);
+    $user->shouldReceive('hasPermission')->with($permission, 'web')->andReturn(true);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $method = new ReflectionMethod($field, 'requiresApprovalWhen');
     $method->setAccessible(true);

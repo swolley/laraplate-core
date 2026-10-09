@@ -233,8 +233,8 @@ it('uses and caches the permission model connection independently of the authori
 
         $user = Mockery::mock(Modules\Core\Models\User::class)->makePartial();
         $user->shouldReceive('isSuperAdmin')->andReturn(false);
-        $user->shouldReceive('can')->with($permission_name)->andReturn(false);
-        $user->shouldReceive('can')->with($affinity_permission_name)->andReturn(false);
+        $user->shouldReceive('hasPermission')->with($permission_name, 'web')->andReturn(false);
+        $user->shouldReceive('hasPermission')->with($affinity_permission_name, 'web')->andReturn(false);
         // setUser, not login: login() fires Login and AfterLoginListener would persist this unsaved mock.
         Illuminate\Support\Facades\Auth::setUser($user);
 

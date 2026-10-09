@@ -280,3 +280,26 @@ it('ping succeeds on a working store and fails when the store throws', function 
     expect((new Repository(new ArrayStore()))->ping())->toBeTrue()
         ->and((new Repository($failing_store))->ping())->toBeFalse();
 });
+
+it('tryByRequest keys a response by the token as well as by the user, so two tokens never share one', function (): void {
+    $repository = new Repository(new ArrayStore());
+    $user = User::factory()->create();
+    $first = $user->createToken('cachekey-first', [])->accessToken;
+    $second = $user->createToken('cachekey-second', [])->accessToken;
+
+    $request_with = static function (Laravel\Sanctum\PersonalAccessToken $token) use ($user): Request {
+        $token_user = User::query()->findOrFail($user->getKey())->withAccessToken($token);
+        $request = Request::create('/api/v1/select/core/settings', 'GET');
+        $request->setUserResolver(static fn (): User => $token_user);
+
+        return $request;
+    };
+
+    $from_first = $repository->tryByRequest(new Modules\Core\Models\Setting, $request_with($first), fn (): array => ['token' => 'first']);
+    $from_second = $repository->tryByRequest(new Modules\Core\Models\Setting, $request_with($second), fn (): array => ['token' => 'second']);
+    $first_again = $repository->tryByRequest(new Modules\Core\Models\Setting, $request_with($first), fn (): array => ['token' => 'recomputed']);
+
+    expect($from_first)->toBe(['token' => 'first'])
+        ->and($from_second)->toBe(['token' => 'second'])
+        ->and($first_again)->toBe(['token' => 'first']);
+});

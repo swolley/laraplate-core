@@ -23,6 +23,22 @@ function errorMappingActor(): User
     return $actor;
 }
 
+/**
+ * The CRUD service fails the list with a database error carrying its SQL and bindings, as a query naming a missing
+ * column does.
+ */
+function errorMappingFailingQuery(): void
+{
+    $service = Mockery::mock(CrudService::class);
+    $service->shouldReceive('list')->once()->andThrow(new Illuminate\Database\QueryException(
+        'sqlite',
+        'select * from "core_settings" where "errmap_no_such_column" = ?',
+        ['errmap-binding'],
+        new PDOException('no such column: errmap_no_such_column'),
+    ));
+    app()->instance(CrudService::class, $service);
+}
+
 it('answers 400 with the reason when the criteria name something that is not a relation', function (): void {
     errorMappingActor();
     Setting::factory()->persistedWithoutApprovalCapture()->create();
@@ -76,4 +92,45 @@ it('answers 500 and reports a broken invariant instead of calling it "not modifi
     $response = $this->getJson(route('core.crud.list', ['module' => 'core', 'entity' => 'settings']));
 
     $response->assertStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
+});
+
+it('answers a server error without the database message when debug is off, and reports it', function (): void {
+    config()->set('app.debug', false);
+    errorMappingActor();
+    Setting::factory()->persistedWithoutApprovalCapture()->create();
+    errorMappingFailingQuery();
+
+    $response = $this->getJson(route('core.crud.list', ['module' => 'core', 'entity' => 'settings']));
+
+    $response->assertStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
+    expect($response->getContent())->not->toContain('errmap_no_such_column')
+        ->and($response->getContent())->not->toContain('errmap-binding')
+        ->and($response->json('error'))->toBe('Internal Server Error');
+});
+
+it('keeps the server error message for a developer when debug is on', function (): void {
+    config()->set('app.debug', true);
+    errorMappingActor();
+    Setting::factory()->persistedWithoutApprovalCapture()->create();
+    errorMappingFailingQuery();
+
+    $response = $this->getJson(route('core.crud.list', ['module' => 'core', 'entity' => 'settings']));
+
+    $response->assertStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
+    expect((string) $response->json('error'))->toContain('errmap_no_such_column');
+});
+
+it('answers a server error of any controller built on the response builder without its message when debug is off', function (): void {
+    config()->set('app.debug', false);
+    errorMappingActor();
+    Setting::factory()->persistedWithoutApprovalCapture()->create();
+
+    $service = Mockery::mock(CrudService::class);
+    $service->shouldReceive('list')->once()->andThrow(new LogicException('errmap internal detail'));
+    app()->instance(CrudService::class, $service);
+
+    $response = $this->getJson(route('core.crud.list', ['module' => 'core', 'entity' => 'settings']));
+
+    $response->assertStatus(Response::HTTP_INTERNAL_SERVER_ERROR);
+    expect($response->getContent())->not->toContain('errmap internal detail');
 });

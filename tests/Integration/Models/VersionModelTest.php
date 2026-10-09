@@ -292,3 +292,57 @@ it('toArray masks bcrypt like strings inside versionable_data', function (): voi
 
     expect($serialized['versionable_data']['hash'])->toBe('[hidden]');
 });
+
+it('toArray masks in the contents every attribute the versioned model hides, whatever its hash algorithm', function (): void {
+    $user = new User();
+    $version = new Version();
+    $version->setRawAttributes([
+        'id' => 1,
+        'versionable_type' => $user->getMorphClass(),
+        'versionable_id' => 1,
+        'contents' => json_encode([
+            'name' => 'versioned-name',
+            'password' => '$argon2id$v=19$m=65536,t=4,p=1$versioned-salt$versioned-hash',
+            'remember_token' => 'versioned-remember-token',
+            'two_factor_secret' => 'versioned-2fa-secret',
+            'two_factor_recovery_codes' => 'versioned-recovery-codes',
+        ]),
+        'original_contents' => json_encode([
+            'password' => '$argon2id$v=19$m=65536,t=4,p=1$original-salt$original-hash',
+            'remember_token' => 'original-remember-token',
+        ]),
+    ]);
+
+    $serialized = $version->toArray();
+    $json = json_encode($serialized, JSON_THROW_ON_ERROR);
+
+    expect($serialized['contents']['name'])->toBe('versioned-name')
+        ->and($serialized['contents']['password'])->toBe('[hidden]')
+        ->and($serialized['original_contents']['remember_token'])->toBe('[hidden]')
+        ->and($json)->not->toContain('versioned-hash')
+        ->and($json)->not->toContain('original-hash')
+        ->and($json)->not->toContain('versioned-remember-token')
+        ->and($json)->not->toContain('versioned-2fa-secret')
+        ->and($json)->not->toContain('versioned-recovery-codes');
+});
+
+it('toArray masks in the contents the attributes the versioned model hides from the anonymous user, for the anonymous user only', function (): void {
+    $stub = new Modules\Core\Tests\Stubs\Models\HidesAttributesStub();
+    $version = new Version();
+    $version->setRawAttributes([
+        'id' => 1,
+        'versionable_type' => $stub->getMorphClass(),
+        'versionable_id' => 1,
+        'contents' => json_encode(['title' => 'versioned-title', 'user_id' => 4242]),
+    ]);
+
+    Illuminate\Support\Facades\Cache::flush();
+    $anonymous = User::factory()->create(['name' => config('permission.users.guest'), 'username' => config('permission.users.guest')]);
+    Illuminate\Support\Facades\Auth::setUser($anonymous);
+
+    expect($version->toArray()['contents'])->toBe(['title' => 'versioned-title', 'user_id' => '[hidden]']);
+
+    Illuminate\Support\Facades\Auth::setUser(User::factory()->create());
+
+    expect($version->toArray()['contents'])->toBe(['title' => 'versioned-title', 'user_id' => 4242]);
+});

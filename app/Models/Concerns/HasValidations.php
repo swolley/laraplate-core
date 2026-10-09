@@ -16,8 +16,10 @@ use Modules\Core\Authorization\PermissionExistenceMemo;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
+use Modules\Core\Models\User;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\PermissionName;
 use ReflectionException;
 use ReflectionProperty;
@@ -270,22 +272,12 @@ trait HasValidations
                 return true;
             }
 
-            return ResolvingAuthorization::resolve(static function () use ($user, $permission): bool {
-                if ($user->isSuperAdmin()) {
-                    return true;
-                }
-
-                if ($user->can($permission)) {
-                    return true;
-                }
-
-                // The Gate answers for the session guard and does not see a permission an `api` role grants,
-                // so on an API request every related record hydrated read as a refusal: off the session
-                // guard the permission is asked on the request's guard, as the CRUD read engine asks it.
-                $guard = Auth::getDefaultDriver();
-
-                return config("auth.guards.{$guard}.driver") !== 'session' && $user->hasPermission($permission, $guard);
-            });
+            // Asked as the CRUD asks it, on the request's guard and within the abilities of the token that
+            // authenticated the request: the Gate reads neither, so an `api` role went unseen and a token's
+            // abilities did not narrow what its owner's roles grant.
+            return ResolvingAuthorization::resolve(static fn (): bool => $user instanceof User
+                ? resolve(AuthorizationService::class)->userHolds($user, $permission)
+                : $user->can($permission));
         }
 
         return true;

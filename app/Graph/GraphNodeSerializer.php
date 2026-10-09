@@ -7,6 +7,7 @@ namespace Modules\Core\Graph;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\DTOs\GraphNode;
+use Modules\Core\Support\ReadableColumnGuard;
 
 final class GraphNodeSerializer
 {
@@ -71,6 +72,10 @@ final class GraphNodeSerializer
         $attributes = $model->getAttributes();
 
         foreach (['title', 'name', 'label', 'slug', 'code'] as $field) {
+            if (! $this->isReturnedToCaller($model, $field)) {
+                continue;
+            }
+
             $value = $attributes[$field] ?? null;
 
             if (is_scalar($value) && $value !== '') {
@@ -93,6 +98,10 @@ final class GraphNodeSerializer
         $attributes = $model->getAttributes();
 
         foreach ($fields as $field) {
+            if (! $this->isReturnedToCaller($model, $field)) {
+                continue;
+            }
+
             $value = $attributes[$field] ?? null;
 
             if ($value !== null) {
@@ -101,6 +110,26 @@ final class GraphNodeSerializer
         }
 
         return $this->safeAttributes($values);
+    }
+
+    /**
+     * Whether the model's serialization returns the attribute to the current caller: not hidden by the model, not
+     * hidden from the anonymous user, within the media projection. The label and the summary read raw attributes,
+     * so they obey the same rule as the serialization they stand beside.
+     */
+    private function isReturnedToCaller(Model $model, string $field): bool
+    {
+        if (in_array($field, $model->getHidden(), true)) {
+            return false;
+        }
+
+        $visible = $model->getVisible();
+
+        if ($visible !== [] && ! in_array($field, $visible, true)) {
+            return false;
+        }
+
+        return ReadableColumnGuard::isReadable($model, $field);
     }
 
     /**

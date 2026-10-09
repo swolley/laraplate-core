@@ -45,8 +45,8 @@ it('exposes the current effective locale in the meta', function (): void {
     expect($payload['meta']['locale'])->toBe('it');
 });
 
-it('sets status based on exception error and includes error message', function (): void {
-    config(['app.debug' => false]);
+it('sets status based on exception error and includes error message when debug is on', function (): void {
+    config(['app.debug' => true]);
 
     $request = Request::create('/test', 'GET');
     $builder = new ResponseBuilder($request, Carbon::now());
@@ -64,6 +64,34 @@ it('sets status based on exception error and includes error message', function (
 
     expect($payload['error'])->toBe('Failure')
         ->and($payload['meta']['status'])->toBe(SymfonyResponse::HTTP_INTERNAL_SERVER_ERROR);
+});
+
+it('replaces the message of a server error with the status text when debug is off', function (string|Exception $error): void {
+    config(['app.debug' => false]);
+
+    $builder = new ResponseBuilder(Request::create('/test', 'GET'), Carbon::now());
+    $builder->setData(null);
+    $builder->setError($error);
+    $builder->setStatus(SymfonyResponse::HTTP_INTERNAL_SERVER_ERROR);
+
+    $payload = json_decode($builder->getResponse()->getContent(), true);
+
+    expect($payload['error'])->toBe('Internal Server Error')
+        ->and($payload)->not->toHaveKey('exception');
+})->with([
+    'a message' => 'SQLSTATE[HY000]: no such column: secret (select * from users)',
+    'an exception' => fn (): Exception => new Exception('SQLSTATE[HY000]: no such column: secret'),
+]);
+
+it('keeps the message of a client error when debug is off', function (): void {
+    config(['app.debug' => false]);
+
+    $builder = new ResponseBuilder(Request::create('/test', 'GET'), Carbon::now());
+    $builder->setData(null);
+    $builder->setError('"user_id" cannot be read');
+    $builder->setStatus(SymfonyResponse::HTTP_BAD_REQUEST);
+
+    expect(json_decode($builder->getResponse()->getContent(), true)['error'])->toBe('"user_id" cannot be read');
 });
 
 it('throws when setting an invalid HTTP status code', function (): void {

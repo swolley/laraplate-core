@@ -81,6 +81,7 @@ use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
 use Modules\Core\Support\ComputedColumnGuard;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\ReadableColumnGuard;
 use Modules\Core\Support\RelationGuard;
 use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
@@ -263,6 +264,10 @@ class CrudService
         // The columns of a facet request are facet fields of the main table, not relation paths.
         $this->authorizeRequestedRelations($base, include_columns: false);
 
+        foreach ($base->columns as $column) {
+            ReadableColumnGuard::assertReadablePath($model, $this->facetKey($column->name));
+        }
+
         $result = [];
 
         foreach ($base->columns as $column) {
@@ -336,6 +341,7 @@ class CrudService
 
         // The columns of a facet request are facet fields of the main table, not relation paths.
         $this->authorizeRequestedRelations($base, include_columns: false);
+        $this->assertReadableFacet($model, $facet);
 
         $to_one = $facet->relation === null ? $this->resolveToOneColumn($model, $facet->groupBy) : null;
         $this->assertFacetResolvable($model, $facet, $to_one);
@@ -1274,12 +1280,98 @@ class CrudService
     private function authorizeRequestedRelations(SelectRequestData $request_data, bool $lenient_filters = false, bool $include_columns = true): void
     {
         $this->assertComputedColumns($request_data);
+        $this->assertReadableColumns($request_data, $include_columns);
 
         $this->relationAuthorizer()->authorizePaths(
             $request_data->request,
             $request_data->model,
             $this->query_builder->requestedRelationPaths($request_data->model, $request_data, $lenient_filters, $include_columns),
         );
+    }
+
+    /**
+     * Refuses, before anything is queried, a request that would read through the query a column the caller does
+     * not receive in the serialization (a column hidden from the anonymous user, a media column outside the
+     * projection): the sorts, the filter properties, the group_by keys and the aggregated columns. The filters
+     * are the caller's own: the ACL filters, which name columns on their own authority, are merged afterwards.
+     *
+     * @throws InvalidArgumentException when a name of the request is not readable by the caller
+     */
+    private function assertReadableColumns(SelectRequestData $request_data, bool $include_columns): void
+    {
+        $model = $request_data->model;
+
+        if ($include_columns) {
+            foreach ($request_data->columns as $column) {
+                if ($column->type->isAggregateColumn() && ! Str::endsWith($column->name, '.*')) {
+                    ReadableColumnGuard::assertReadablePath($model, $column->name);
+                }
+            }
+        }
+
+        if (! $request_data instanceof ListRequestData) {
+            return;
+        }
+
+        foreach ($request_data->sort ?? [] as $sort) {
+            ReadableColumnGuard::assertReadablePath($model, (string) $sort->property);
+        }
+
+        foreach ($request_data->group_by as $group) {
+            ReadableColumnGuard::assertReadablePath($model, $group);
+        }
+
+        if ($request_data->filters instanceof FiltersGroup) {
+            $this->assertReadableFilters($model, $request_data->filters);
+        }
+    }
+
+    /**
+     * @throws InvalidArgumentException when a filter property is not readable by the caller
+     */
+    private function assertReadableFilters(Model $model, FiltersGroup $filters): void
+    {
+        foreach ($filters->filters as $filter) {
+            if ($filter instanceof FiltersGroup) {
+                $this->assertReadableFilters($model, $filter);
+            } elseif ($filter instanceof Filter) {
+                ReadableColumnGuard::assertReadablePath($model, $filter->property);
+            }
+        }
+    }
+
+    /**
+     * The facet fields of a request obey the readable-column rule of its sorts and filters: a facet counts the
+     * values of its field, which is reading them.
+     *
+     * @throws InvalidArgumentException when a facet field is not readable by the caller
+     */
+    private function assertReadableFacet(Model $model, FacetQuery $facet): void
+    {
+        if ($facet->relation === null) {
+            ReadableColumnGuard::assertReadablePath($model, $facet->groupBy);
+
+            foreach ($facet->fields as $field) {
+                ReadableColumnGuard::assertReadablePath($model, $field);
+            }
+
+            if ($facet->labelField !== null) {
+                ReadableColumnGuard::assertReadablePath($model, $facet->labelField);
+            }
+
+            return;
+        }
+
+        ReadableColumnGuard::assertReadablePath($model, $facet->relation);
+        $related = $this->resolveManyRelation($model, $facet->relation)?->getRelated();
+
+        if (! $related instanceof Model) {
+            return;
+        }
+
+        foreach ([...$facet->fields, ...($facet->labelField === null ? [] : [$facet->labelField])] as $field) {
+            ReadableColumnGuard::assertReadablePath($related, $field);
+        }
     }
 
     /**

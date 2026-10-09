@@ -68,6 +68,7 @@ final class QueryBuilder
         'latestVersions',
         'oldestVersions',
         'tokens',
+        'embeddings',
         'ancestors',
         'ancestorsAndSelf',
         'bloodline',
@@ -809,7 +810,8 @@ final class QueryBuilder
      * Applies the rule to the relations a query loads on its own (a model's `$with`, a dependency added on the
      * way): each is dropped when the caller may not select its entity, and narrowed by the related ACL otherwise.
      * The relations in `$known` were added by the request and carry their own check. A name that does not
-     * resolve to a relation is left alone: it comes from code, not from the request.
+     * resolve to a relation is dropped: it cannot be checked, and a relation method needs a declared return type
+     * to be recognised (see {@see RelationGuard}).
      *
      * @param  Builder<Model>  $builder
      * @param  list<string>  $known
@@ -835,9 +837,13 @@ final class QueryBuilder
                 continue;
             }
 
+            // A name that does not resolve to a relation (an untyped relation method, a path through a morph
+            // relation) cannot be checked, so it is not loaded: unchecked, it would load unguarded.
             try {
                 $chain = $this->relationChain($model, $name);
             } catch (InvalidArgumentException) {
+                $drop[] = $name;
+
                 continue;
             }
 

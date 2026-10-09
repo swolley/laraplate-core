@@ -408,6 +408,22 @@ describe('parts of a parent', function (): void {
     });
 });
 
+describe('relations a query loads on its own', function (): void {
+    it('drops a default eager load whose name does not resolve to a relation, instead of loading it unguarded', function (string $name): void {
+        $reader = relauth_reader([CoreUser::class => null]);
+        $request = Request::create('/api/v1/select/core/users');
+        $request->setUserResolver(static fn (): User => $reader);
+        $builder = CoreUser::query()->with($name);
+
+        app(QueryBuilder::class)->guardEngineQuery($builder, app(RelationAuthorizer::class), $request);
+
+        expect(array_keys($builder->getEagerLoads()))->not->toContain($name);
+    })->with([
+        'a name that is not a relation' => 'relauth_not_a_relation',
+        'a name following a relation that is not one' => 'roles.relauth_not_a_relation',
+    ]);
+});
+
 describe('entities outside the permission scheme', function (): void {
     it('never loads the access tokens of a user', function (): void {
         // The token belongs to the class the users endpoint hydrates, so a loaded relation would find it.
@@ -419,6 +435,37 @@ describe('entities outside the permission scheme', function (): void {
         expect($response->getContent())->not->toContain('relauth-secret')
             ->and(collect($response->json('data') ?? [])->pluck('tokens')->filter()->all())->toBe([])
             ->and(app(RelationAuthorizer::class)->isReadable(Request::create('/'), new CoreUser, new Laravel\Sanctum\PersonalAccessToken))->toBeFalse();
+    });
+
+    it('refuses to a non-superadmin the entities left out of the scheme that are neither parts nor public', function (Model $related): void {
+        $request = Request::create('/');
+
+        expect(app(RelationAuthorizer::class)->isReadable($request, new CoreUser, $related))->toBeFalse();
+    })->with([
+        'model embeddings (vectors, model keys, content hashes)' => fn (): Model => new Modules\Core\Models\ModelEmbedding,
+        'versions' => fn (): Model => new Modules\Core\Models\Version,
+        'licenses' => fn (): Model => new Modules\Core\Models\License,
+        'dynamic entities' => fn (): Model => new Modules\Core\Models\DynamicEntity,
+    ]);
+
+    it('reads them as a relation for a superadmin only, never the embeddings', function (): void {
+        $superadmin = CoreUser::factory()->create();
+        $superadmin->assignRole(Role::findOrCreate(config('permission.roles.superadmin'), 'web'));
+        $request = Request::create('/');
+        $request->setUserResolver(static fn (): CoreUser => $superadmin);
+        $authorizer = app(RelationAuthorizer::class);
+
+        expect($authorizer->isReadable($request, new CoreUser, new Modules\Core\Models\License))->toBeTrue()
+            ->and($authorizer->isReadable($request, new CoreUser, new Modules\Core\Models\Version))->toBeTrue()
+            ->and($authorizer->isReadable($request, new CoreUser, new Modules\Core\Models\ModelEmbedding))->toBeFalse();
+    });
+
+    it('drops the embeddings relation from what a read loads', function (): void {
+        expect(QueryBuilder::isBlackListedPath('embeddings'))->toBeTrue();
+    });
+
+    it('still loads a pivot record reached through a plain relation, which is a part of its parent', function (): void {
+        expect(app(RelationAuthorizer::class)->isReadable(Request::create('/'), new CoreUser, new Modules\Core\Models\Pivot\Fieldable))->toBeTrue();
     });
 
     it('refuses a related entity with no select permission that is not deliberately left out of the scheme', function (): void {

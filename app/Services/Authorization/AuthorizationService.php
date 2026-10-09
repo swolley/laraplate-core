@@ -349,16 +349,34 @@ final class AuthorizationService
             return null;
         }
 
-        // The `api` guard is stateless and has no session to log into: the user is set on it directly.
-        if (Auth::getDefaultDriver() === 'api') {
-            Auth::guard('api')->setUser($anonymous);
-        } else {
-            Auth::login($anonymous);
-        }
+        // Set on the request's guard for this request only, never signed in to a session: a session sign-in would
+        // let the next request of the same browser through the `auth` group as the shared anonymous account.
+        Auth::guard(Auth::getDefaultDriver())->setUser($anonymous);
 
         $request->setUserResolver(fn (): User => $anonymous);
 
         return $anonymous;
+    }
+
+    /**
+     * Whether a user holds a fully-qualified permission name the way every CRUD check asks it: a superadmin always
+     * does; anybody else through a direct grant, a role or an ancestor role of the request's guard, and within the
+     * abilities of the token that authenticated the request. For the code that asks about the acting user outside
+     * a request object (model events and scopes), so that it answers as the CRUD does instead of through the Gate,
+     * which reads neither the request's guard nor the token.
+     */
+    public function userHolds(User $user, string $permission_name): bool
+    {
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
+        // ancestor role, so the gate denied what the role model itself reports as granted.
+        // The guard is the request's: `web` for the session routes, `api` once the API
+        // middleware has switched the default guard.
+        return $user->hasPermission($permission_name, Auth::getDefaultDriver())
+            && $this->tokenAllows($user, $permission_name);
     }
 
     /**
@@ -386,16 +404,7 @@ final class AuthorizationService
             return false;
         }
 
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        // Not Spatie's `hasPermissionTo`: that one does not see a permission inherited from an
-        // ancestor role, so the gate denied what the role model itself reports as granted.
-        // The guard is the request's: `web` for the session routes, `api` once the API
-        // middleware has switched the default guard.
-        return $user->hasPermission($permission_name, Auth::getDefaultDriver())
-            && $this->tokenAllows($user, $permission_name);
+        return $this->userHolds($user, $permission_name);
     }
 
     /**

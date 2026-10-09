@@ -20,6 +20,7 @@ use Modules\Core\Casts\CrudExecutor;
 use Modules\Core\Models\Approval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\User;
+use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\RelationAuthorizer;
 use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -125,7 +126,7 @@ trait HasApprovals
                 return;
             }
 
-            if ($user->isSuperAdmin() || $user->can(PermissionName::forModel($model, 'approve'))) {
+            if (resolve(AuthorizationService::class)->userHolds($user, PermissionName::forModel($model, 'approve'))) {
                 return;
             }
 
@@ -528,11 +529,12 @@ trait HasApprovals
     }
 
     /**
-     * One write-time approve credit from `approve.{connection}.{table}`.
+     * One write-time approve credit from `approve.{connection}.{table}`, held on the request's guard and within
+     * the abilities of the writer's token.
      */
     protected function writerHasApproveCredit(User $user): bool
     {
-        return $user->can(PermissionName::forModel($this, 'approve'));
+        return resolve(AuthorizationService::class)->userHolds($user, PermissionName::forModel($this, 'approve'));
     }
 
     /**

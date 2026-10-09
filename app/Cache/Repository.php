@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Helpers\ResponseBuilder;
 use Modules\Core\Models\User;
 use Override;
@@ -113,7 +114,7 @@ final class Repository extends BaseRepository
             array_push($tags, ...$user_tags);
         }
 
-        $key = $this->getKeyFromRequest($request, $user_tags);
+        $key = $this->getKeyFromRequest($request, [...$user_tags, ...$this->getKeyPartsFromToken($user)]);
         $ttl = $duration ?? $this->resolveDefaultCacheSeconds();
 
         return $this->remember($key, $ttl, fn () => $this->unwrapCallbackResult($callback()));
@@ -150,7 +151,7 @@ final class Repository extends BaseRepository
     {
         $request_user = $request->user();
         $user = $request_user instanceof User ? $request_user : null;
-        $key = $this->getKeyFromRequest($request, $this->getKeyPartsFromUser($user));
+        $key = $this->getKeyFromRequest($request, [...$this->getKeyPartsFromUser($user), ...$this->getKeyPartsFromToken($user)]);
 
         if ($entity) {
             $models = Arr::wrap($entity);
@@ -357,6 +358,26 @@ final class Repository extends BaseRepository
     private function getTableName(string|Model $entity): string
     {
         return is_string($entity) ? $entity : $entity->getTable();
+    }
+
+    /**
+     * The key part of the personal access token that authenticated the request, if one did: two tokens of one user
+     * carry different abilities, so their responses differ (relations left out, the media projection) and must
+     * never be served for each other. A session carries no personal token and adds nothing.
+     *
+     * @return list<string>
+     */
+    private function getKeyPartsFromToken(?User $user): array
+    {
+        $token = $user?->currentAccessToken();
+
+        if (! $token instanceof PersonalAccessToken) {
+            return [];
+        }
+
+        $key = $token->getKey();
+
+        return ['T' . (is_scalar($key) ? (string) $key : '0')];
     }
 
     /**

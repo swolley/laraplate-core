@@ -121,9 +121,10 @@ it('still requires approval when writer lacks approve credit even if admin role 
     App::swap($mock);
 
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('can')->andReturn(false);
+    $user->shouldReceive('hasPermission')->andReturn(false);
     $user->shouldReceive('isSuperAdmin')->andReturn(false);
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('getDefaultDriver')->andReturn('web');
 
     $model = new HasApprovalsStubModel;
     $model->setApproversRequired(1);

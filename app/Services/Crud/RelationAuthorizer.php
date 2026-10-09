@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +23,9 @@ use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Console\PermissionsRefreshCommand;
 use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Models\Concerns\HasTranslations;
+use Modules\Core\Models\ModelEmbedding;
 use Modules\Core\Models\Modification;
+use Modules\Core\Models\User;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
@@ -138,8 +141,9 @@ final class RelationAuthorizer
      */
     public function isReadable(Request $request, Model $parent, Model $related): bool
     {
-        // Credentials are never read through the CRUD, whoever asks.
-        if ($related instanceof PersonalAccessToken) {
+        // Credentials and model embeddings (vectors, model keys, content hashes) are never read through the CRUD,
+        // whoever asks.
+        if ($related instanceof PersonalAccessToken || $related instanceof ModelEmbedding) {
             return false;
         }
 
@@ -161,11 +165,14 @@ final class RelationAuthorizer
             return $this->allows($request, $source['model'], ActionEnum::Select->value);
         }
 
-        // An entity deliberately kept out of permission generation (modifications, versions, licenses) has no
-        // select permission on any guard by design: it is not governed by one, as the model events treat it.
-        // Any other entity without a permission fails closed: it was simply never granted.
+        // An entity deliberately kept out of permission generation has no select permission on any guard by
+        // design. Of those, only a pivot record reached through a plain relation (the preset link a model loads
+        // for its dynamic fields) is a part of its parent and readable with it. The others (versions, licenses,
+        // dynamic entities, a translation reached from anything but the model it translates, which is recognised
+        // above) are neither parts nor public: having no permission to grant, they are read as a relation by a
+        // superadmin only. Any other entity without a permission fails closed: it was simply never granted.
         if (! $this->isGovernedByPermission($source['model']) && PermissionsRefreshCommand::isOutsidePermissionScheme($source['model']::class)) {
-            return true;
+            return $source['model'] instanceof Pivot || $this->isSuperAdmin($request);
         }
 
         return $this->allows($request, $source['model'], ActionEnum::Select->value);
@@ -343,6 +350,16 @@ final class RelationAuthorizer
         }
 
         return true;
+    }
+
+    /**
+     * Whether the caller of the request is a superadmin.
+     */
+    private function isSuperAdmin(Request $request): bool
+    {
+        $user = $this->auth->resolveUser($request);
+
+        return $user instanceof User && $user->isSuperAdmin();
     }
 
     /**
