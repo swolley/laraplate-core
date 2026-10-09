@@ -19,6 +19,46 @@ default `auto`):
 An engine that does not support orchestration returns `AdvancedSearchResult::empty()` with
 `meta['unsupported_driver'] = true` when `orchestrated` was forced.
 
+## Search modes: how much a request spends
+
+`AdvancedSearchService::search()` takes a `SearchMode` (`$mode`, default `fast`) and asks one contract,
+`ISearchStrategyResolver`, for the components of this request. The resolver returns a `SearchStrategy`: planner,
+reranker, intent parser, an optional embedder and a retry cap. The service holds no planner, reranker or
+embedder of its own, so the cost of a search is decided per call, never at boot.
+
+| Mode | What it runs | Cost |
+|------|--------------|------|
+| `fast` (default) | Core's `FallbackSearchPlanner`, `HeuristicReranker`, `SimpleQueryIntentParser`; no query vector | milliseconds, no external call |
+| `balanced` | the same, plus the query embedding (the AI module's `SearchEmbedder`), so lexical and vector retrieval are fused | one embedding call, about 80 ms once the model is warm |
+| `deep` | LLM intent parsing and planning, cross-encoder reranking when the plan asks for it, the embedding, and up to two retries | seconds per LLM call, real money on a paid provider |
+
+Core binds `CoreSearchStrategyResolver`, which ignores the mode and always returns the `fast` set: Core has
+no embedder and no LLM. A module that can do more rebinds `ISearchStrategyResolver` (the AI module binds
+`AiSearchStrategyResolver`); Core never names it. `Balanced` and `Deep` are therefore served as `fast` when no
+module offers them.
+
+**Degradation is part of the contract.** A search never fails because a model is unavailable. Whatever prevents
+the requested mode produces the cheaper result and says why, in `meta['search']['degraded_reason']`:
+
+| `degraded_reason` | Cause |
+|-------------------|-------|
+| `mode_unavailable` | no installed module offers the requested mode (Core's resolver) |
+| `search_orchestration_disabled` | the AI overlay is switched off (`AI_SEARCH_ORCHESTRATION_ENABLED=false`) |
+| `embedder_unavailable` | the embedding service could not be built |
+| `deep_unavailable` | the LLM components could not be built |
+
+A failure during the search is handled where it happens: a failing reranker leaves `reranked=false`, a failing
+embedder is logged and the search runs on keywords, and an LLM planner or intent parser that times out falls back to
+its own rules. This last case does not set `degraded_reason`. A client should read `mode_applied` rather than assume it
+got the mode it asked for.
+
+**Retries.** `$retries` is how many times the caller lets a poor result be searched again, capped by the strategy
+(`max_retries`: 0 for `fast` and `balanced`, 2 for `deep`). `SearchQualityEvaluator` judges the result (fewer than five
+hits, fewer than three distinct ones, or an average score under the plan's `retry_policy` threshold). A retry
+is not the same query again: the candidate window doubles up to 200, the user's own words replace the intent
+expansion, and vector retrieval is switched on when the strategy has an embedder. The retry replaces the first
+result only if it has at least as many hits. `meta['search']['retries_used']` reports how many ran.
+
 ## The five steps
 
 ```text
@@ -50,7 +90,7 @@ $use_vector  = config('core.search.vector.enabled', false) && ! $has_numbers;
 | `core.search.vector.enabled` = false | `keyword` only |
 | query contains any digit | `keyword` only |
 | engine without `supportsOrchestratedVectorSearch()` | `keyword` only (plan downgraded by `applyEngineCapabilities()`) |
-| `ITextEmbedder` not bound (AI module absent or search orchestration disabled) | `keyword` only (`$vector === null`) |
+| the strategy has no embedder (`fast`, or the AI module absent or its overlay disabled) | `keyword` only (`$vector === null`) |
 | otherwise | `keyword` + `vector` + `hybrid` |
 
 **One or three, never two**: `hybrid` runs only when both `use_fulltext` and `use_vector` are true.
@@ -105,21 +145,22 @@ withholds class overrides backed by too few cases, and it declares no winner whe
 ### Step 3 — the query vector is an AI-module capability
 
 ```php
-if (($retrieval['use_vector'] ?? false) !== true || ! $this->app->bound(ITextEmbedder::class)) {
+if (($retrieval['use_vector'] ?? false) !== true || ! $embedder instanceof ITextEmbedder) {
     return null;
 }
 ```
 
-`ITextEmbedder` is bound **only** by `AIServiceProvider`, and only when
-`ai.features.search_orchestration.enabled` is true. Without the AI module the interface is unbound,
-the query vector is `null`, and the pipeline stays keyword-only. This is independent of
-`core.search.vector.enabled`: both must hold.
+The embedder comes from the `SearchStrategy`, not from the container. Core's strategy has none, so a `fast`
+search is keyword-only; the AI module's resolver supplies `SearchEmbedder` for `balanced` and `deep`. Without the AI
+module the query vector is `null` and the pipeline stays keyword-only. This is independent of
+`core.search.vector.enabled`: both must hold. An embedder that throws is logged (`Query embedding failed`) and
+the search continues on keywords.
 
 What is lost without the AI module, per contract:
 
 | Contract | Core fallback | Effect when AI is absent |
 |----------|---------------|--------------------------|
-| `ITextEmbedder` | none | vector and hybrid retrieval unavailable |
+| `ITextEmbedder` | none | vector and hybrid retrieval unavailable (`fast` only) |
 | `IReranker` | `HeuristicReranker` (pure PHP lexical scoring) | reranking still runs, coarser |
 | `ISearchPlanner` | `FallbackSearchPlanner` (rules above) | plans by rules instead of LLM |
 | `IQueryIntentParser` | `SimpleQueryIntentParser` | basic intent, no LLM expansion |
@@ -304,6 +345,7 @@ so a request in Italian ranks on Italian text and on the vectors.
 | `matching` | resolved text-match decision plus engine degradations |
 | `per_strategy` | per-strategy ordered hits (`id`, `score`, `rank`), consumed by `ai:evaluate-retrieval-strategies` and `ai:tune-retrieval` |
 | `tuning` | present only when the tuning profile was applied: `{applied, profile_version, query_class}` |
+| `search` | always present: `{mode_requested, mode_applied, degraded_reason, retries_used}`, see [Search modes](#search-modes-how-much-a-request-spends) |
 | `unsupported_driver` | present when the engine cannot orchestrate |
 | `vector_disabled` | present when the plan wanted vectors and the guard refused them: `disabled`, `suspended`, `dimension_mismatch` or `no_vectors` |
 | `timings` | present only when the `search.debug_timings` setting is on: `{intent_ms, plan_ms, vector_ms, ensemble_ms, total_ms}`, see [Measuring the stages](#measuring-the-stages) |
@@ -360,12 +402,14 @@ overlay):
    The first run is the cold one (planner cache empty for that query, if it was not searched in the
    last 10 minutes); the median of the other ten is the warm figure. Use a query not searched recently
    to get a true cold run.
-3. Repeat with the AI overlay off. `ai.features.search_orchestration.enabled` is the env variable
-   `AI_SEARCH_ORCHESTRATION_ENABLED`, read once at boot by `AIServiceProvider::registerSearchBindings()`:
-   set `AI_SEARCH_ORCHESTRATION_ENABLED=false` in `.env` (tinker boots a fresh process, so no restart is
-   needed for it; restart PHP-FPM, Octane or queue workers only when measuring through them), run step 2
-   again with the same query, then set it back. With the overlay off no `ITextEmbedder` is bound, so
-   `vector_ms` is `null` by design.
+3. The loop above measures the path of the `fast` mode, which no longer calls any model. To time the LLM and
+   embedding stages, call the AI classes directly with a reachable provider (`OLLAMA_API_URL` for Ollama), for
+   example `app(Modules\AI\Services\LlmQueryIntentParser::class)->parse($query)`,
+   `app(Modules\AI\Services\SearchOrchestratorAgent::class)->safePlan($query)` and
+   `app(Modules\Core\Search\Contracts\ITextEmbedder::class)->embed($query)`, each wrapped in `hrtime()`. Measured
+   on 2026-10-09 on a 1 vCPU test server: 23 to 60 s per LLM call, about 80 ms per warm embedding; see the
+   *Measurements* section of `2026-09-16-search-modes-and-strategy-resolution-design.md`. The timeout of an LLM
+   call in a search is `AI_SEARCH_LLM_TIMEOUT` (10 s).
 4. Reranking runs only when the plan or the `search.reranker.enabled` setting asks for it: the
    `reranked` line says whether the `ensemble_ms` figure includes it.
 
