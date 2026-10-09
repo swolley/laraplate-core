@@ -69,25 +69,22 @@ it('throws for invalid node/group structures and handles null set', function ():
     expect($cast->get($model, 'filters', '', []))->toBeNull();
     expect($cast->get($model, 'filters', ['property' => 'id', 'value' => 1, 'operator' => Modules\Core\Casts\FilterOperator::Equals], []))
         ->toBeInstanceOf(FiltersGroup::class);
-    expect($cast->get($model, 'filters', ['filters' => [[['property' => 'id', 'value' => 1, 'operator' => '=']]]], []))
-        ->toBeInstanceOf(FiltersGroup::class);
+    expect(fn () => $cast->get($model, 'filters', ['filters' => [[['property' => 'id', 'value' => 1, 'operator' => '=']]]], []))
+        ->toThrow(InvalidArgumentException::class);
     expect(fn () => $cast->get($model, 'filters', ['foo' => 'bar'], []))
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('skips invalid nested filter items and throws for invalid nested nodes', function (): void {
+it('throws for a nested filter item that is not an array and for invalid nested nodes, never skipping a condition', function (): void {
     $cast = new FiltersGroupCast();
     $model = new ACL();
 
-    $group = $cast->get($model, 'filters', [
+    expect(fn () => $cast->get($model, 'filters', [
         'filters' => [
             'not-an-array',
             ['property' => 'name', 'value' => 'john', 'operator' => '='],
         ],
-    ], []);
-
-    expect($group)->toBeInstanceOf(FiltersGroup::class)
-        ->and($group->filters)->toHaveCount(1);
+    ], []))->toThrow(InvalidArgumentException::class);
 
     expect(fn () => $cast->get($model, 'filters', [
         'filters' => [

@@ -289,6 +289,35 @@ it('fails closed on a relation filter with an empty nested group or an empty mor
     expect(fn () => $cast->get(new ACL, 'filters', json_encode(['operator' => 'and', 'filters' => [$empty_types]]), []))->toThrow(InvalidArgumentException::class);
 });
 
+it('throws on hydration, and rejects at save, a filters list that holds an item which is not a filter, a group or a relation node', function (array $filters): void {
+    $json = json_encode(['operator' => 'and', 'filters' => $filters]);
+
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', $json, []))->toThrow(InvalidArgumentException::class);
+    expect(fn () => (new FiltersGroupCast)->set(new ACL, 'filters', json_decode($json, true), []))->toThrow(InvalidArgumentException::class);
+
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup);
+    $acl->setRawAttributes(array_merge($acl->getAttributes(), ['filters' => $json]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+})->with([
+    'a string' => [[['property' => 'collection_name', 'operator' => '=', 'value' => 'cover'], 'oops']],
+    'a null' => [[['property' => 'collection_name', 'operator' => '=', 'value' => 'cover'], null]],
+    'an unknown node' => [[['property' => 'collection_name', 'operator' => '=', 'value' => 'cover'], ['foo' => 'bar']]],
+    'a bare list' => [[['property' => 'collection_name', 'operator' => '=', 'value' => 'cover'], [['property' => 'id', 'operator' => '=', 'value' => 1]]]],
+    'a nested group with a bad item' => [[['filters' => [['property' => 'id', 'operator' => '=', 'value' => 1], 5], 'operator' => 'or']]],
+]);
+
+it('throws on hydration of a filter whose operator is unknown instead of falling back to equality', function (): void {
+    $json = json_encode(['operator' => 'and', 'filters' => [['property' => 'id', 'operator' => 'nonsense', 'value' => 1]]]);
+
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', $json, []))->toThrow(InvalidArgumentException::class);
+
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup);
+    $acl->setRawAttributes(array_merge($acl->getAttributes(), ['filters' => $json]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+});
+
 it('never calls a method that is not a relation when a relation filter is applied, even if the ACL skipped validation', function (): void {
     CrudApiExposure::enable();
     $owner = User::factory()->create(['name' => 'kept-owner']);

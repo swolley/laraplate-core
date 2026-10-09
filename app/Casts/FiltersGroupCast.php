@@ -76,17 +76,18 @@ final class FiltersGroupCast implements CastsAttributes
         }
 
         if (array_key_exists('filters', $data)) {
+            if (! is_array($data['filters'])) {
+                throw new InvalidArgumentException('The filters of a group must be a list of conditions.');
+            }
+
             $nested = [];
 
             foreach ($data['filters'] as $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-
                 $nested[] = $this->hydrateNode($item);
             }
 
-            $operator = WhereClause::tryFrom(mb_strtolower((string) ($data['operator'] ?? 'and'))) ?? WhereClause::And;
+            $operator = WhereClause::tryFrom(mb_strtolower((string) ($data['operator'] ?? 'and')))
+                ?? throw new InvalidArgumentException('Unknown operator of a filters group.');
 
             return new FiltersGroup(filters: $nested, operator: $operator);
         }
@@ -99,9 +100,7 @@ final class FiltersGroupCast implements CastsAttributes
             $items = [];
 
             foreach ($data as $item) {
-                if (is_array($item)) {
-                    $items[] = $this->hydrateNode($item);
-                }
+                $items[] = $this->hydrateNode($item);
             }
 
             return new FiltersGroup(filters: $items);
@@ -111,10 +110,15 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * A node is a relation node (`relation` key), a group (`filters` key) or a filter (`property` key). Anything
+     * else is refused: a condition skipped or guessed at inside an AND group would widen access.
      */
-    private function hydrateNode(array $item): Filter|FiltersGroup|RelationFilter
+    private function hydrateNode(mixed $item): Filter|FiltersGroup|RelationFilter
     {
+        if (! is_array($item)) {
+            throw new InvalidArgumentException('Every item of a filters list must be a filter, a group or a relation filter.');
+        }
+
         if (array_key_exists('relation', $item)) {
             return $this->hydrateRelationFilter($item);
         }
@@ -125,13 +129,6 @@ final class FiltersGroupCast implements CastsAttributes
 
         if (array_key_exists('property', $item)) {
             return $this->hydrateFilter($item);
-        }
-
-        if (array_is_list($item)) {
-            return $this->hydrateGroup([
-                'filters' => $item,
-                'operator' => WhereClause::And->value,
-            ]);
         }
 
         throw new InvalidArgumentException('Invalid filter node in filters JSON.');
@@ -192,7 +189,8 @@ final class FiltersGroupCast implements CastsAttributes
 
         $operator = $operator_raw instanceof FilterOperator
             ? $operator_raw
-            : FilterOperator::tryFrom((string) $operator_raw) ?? FilterOperator::Equals;
+            : FilterOperator::tryFrom((string) $operator_raw)
+                ?? throw new InvalidArgumentException('Unknown operator of a filter.');
 
         return new Filter(
             property: (string) $data['property'],

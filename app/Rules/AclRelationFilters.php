@@ -12,6 +12,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use InvalidArgumentException;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Casts\RelationFilter;
@@ -21,7 +22,6 @@ use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
 use Override;
 use ReflectionClass;
-use Throwable;
 
 /**
  * Checks, when an ACL is saved, that every relation filter points at something that exists: the relation
@@ -56,7 +56,13 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
     #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $filters = $this->toGroup($value);
+        try {
+            $filters = $value instanceof FiltersGroup ? $value : new FiltersGroupCast()->get(new ACL, 'filters', $value, []);
+        } catch (InvalidArgumentException $exception) {
+            $fail($attribute . ' cannot be read as filters: ' . $exception->getMessage());
+
+            return;
+        }
 
         if (! $filters instanceof FiltersGroup || ! $this->holdsRelationFilter($filters)) {
             return;
@@ -71,19 +77,6 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         }
 
         $this->validateGroup($attribute, $filters, $model, $fail);
-    }
-
-    private function toGroup(mixed $value): ?FiltersGroup
-    {
-        if ($value instanceof FiltersGroup) {
-            return $value;
-        }
-
-        try {
-            return new FiltersGroupCast()->get(new ACL, 'filters', $value, []);
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     private function holdsRelationFilter(FiltersGroup $filters): bool
