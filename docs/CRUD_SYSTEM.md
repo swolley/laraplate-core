@@ -299,7 +299,8 @@ the guard is a denial, never an error.
 
 ### `AuthenticateApiRequest`
 
-The middleware (alias `api_access`) runs first in the `api` group of Core and of every module, in this
+The middleware (alias `api_access`) runs in the `api` group of Core and of every module, right after
+`ApplyDatabaseSettingsOverlay` (which supplies the switch it reads) and before route model binding, in this
 order:
 
 1. `core.expose_api` (the `expose_api` setting, default off) false: `403`.
@@ -324,12 +325,23 @@ own check authenticates it.
 the anonymous user (a login or a token may change the answer) and `403` for any authenticated principal, a
 session user or a token user.
 
+### Errors
+
+A server error (`5xx`) answers the status text (`Internal Server Error`) instead of the exception message
+when `app.debug` is off, for every controller built on `ResponseBuilder` (CRUD, graph, media, settings,
+users): the message of a failed query carries its SQL and bindings. The exception is still reported. Client
+errors (`4xx`) keep their message.
+
 ### Tokens
 
 Users create personal tokens (`/app/auth/user/tokens`, always expiring within
 `core.api_tokens.max_lifetime_days`, default 365); administrators create service accounts and their tokens
 in the Filament user resource. A token's abilities are `api` permission names (`*` is refused), and a
-request needs the role permission and the ability, evaluated per request. Superadmins cannot hold tokens.
+request needs the role permission and the ability, evaluated per request. The model events and scopes that
+ask about the acting user (the per-row select check, the write checks, the approval credit of a writer, the
+hiding of records pending deletion) ask through `AuthorizationService::userHolds()`, on the request's guard and
+within the token's abilities, never through the Gate. A cached response is keyed by the token as well as by the
+user and roles, so two tokens of one user never share one. Superadmins cannot hold tokens.
 Details in [rag/API_ACCESS_CONTROL.md](./rag/API_ACCESS_CONTROL.md#tokens).
 
 ### Related records
@@ -344,18 +356,24 @@ hits through the same relation handling.
   anonymous user). A relation the model loads on its own (default eager loads, a computed column's
   dependency, an appended attribute such as a content's `cover`) is left out, or the attribute is `null`.
 - A model that is a **part of its parent** implements `Contracts\IsPartOfParent::parentRelation()`
-  (translations, document lines, BOM lines, approvals). Loaded from its own parent it inherits the parent's
-  visibility and needs no permission of its own; reached from any other model it is checked against its
-  parent's permission and ACL (`RelationAuthorizer`).
-- An entity with no registered `select` permission is readable only if its class is in
-  `PermissionsRefreshCommand`'s deliberate blacklist (versions, modifications, licenses, pivots,
-  translations); any other fails closed. Sanctum tokens are never readable.
+  (translations, document lines, BOM lines, approvals, CMS references and ratings). Loaded from its own parent
+  it inherits the parent's visibility and is not checked, even when a permission exists for its table: an
+  installation's own ACL on a part applies only when the part is read directly (its own endpoint, or reached
+  from another model, where it is checked against its parent's permission and ACL by `RelationAuthorizer`).
+- An entity with no registered `select` permission and outside `PermissionsRefreshCommand`'s deliberate
+  blacklist fails closed. Of the blacklisted classes, only a pivot record reached through a plain relation
+  (the `presettable` link a model loads for its dynamic fields) and a translation loaded from the model it
+  translates are read as relations. Versions, licenses and dynamic entities are read as a relation by a
+  superadmin only; model embeddings and Sanctum tokens never, whoever asks; modifications follow the
+  pending-changes rule below.
 - Every relation name from a request, from a dotted column, filter or sort, or from an ACL goes through
   `RelationGuard`: it must be a public, non-static method with no required parameter and a declared
   `Relation` return type, otherwise the request answers `400` before anything is called. A relation method
   without a return type is therefore not usable by clients until it is typed.
-- The relation black list (`history`, the version relations, `tokens`, the tree-walk relations) is dropped
-  from every path a read loads, in select, detail and search.
+- The relation black list (`history`, the version relations, `tokens`, `embeddings`, the tree-walk relations)
+  is dropped from every path a read loads, in select, detail and search.
+- A relation a query loads on its own whose name does not resolve to a relation (an untyped relation method, a
+  path through a morph relation) cannot be checked and is not loaded.
 - **Pending modifications.** The `modifications` relation holds proposed, unapproved values. It is returned
   only to a caller holding the parent entity's `update` or `approve` permission on the request's guard,
   token abilities included: others get it omitted when appended or default, `403`/`401` when requested.
@@ -388,6 +406,19 @@ group-by key may not name a method.
   `conversions_disk` or `file_name`, unless the caller holds `vend_media.update` on the `api` guard. URLs
   are plain for public disks, temporary (valid `core.media.signed_url_ttl_minutes`, default 60) on disks
   that can sign, and `null` otherwise. `/app` is unchanged.
+- **Readable columns.** A column the serialization withholds from the caller (hidden from the anonymous user,
+  a media column outside the projection) cannot be read through the query either. A facet field (flat or
+  open, its `fields` and `labelField` included), a group-by key, a sort, a filter property or an aggregated
+  column naming one answers `400` before anything is queried, on the main model and, for a dotted path, on
+  each related model along it (`Support\ReadableColumnGuard`). A projected media caller may name only
+  `id`, `collection_name`, `mime_type` and `size`. The ACL filters are exempt: they name columns on their own
+  authority.
+- **Graph nodes.** The label and summary fields of a graph node are read only from attributes the model's
+  serialization returns to the caller: not in `$hidden`, not hidden from the anonymous user, within the media
+  projection.
+- **Version contents.** A version's `contents` and `original_contents` mask (`[hidden]`) every attribute in
+  the versioned model's `$hidden` (passwords, remember tokens, two-factor secrets), the attributes it hides from
+  the anonymous user when the anonymous user reads them, and any password hash (bcrypt or argon2).
 - **Cover preload.** Models that implement `Contracts\IPreloadsAppendedRelations` have the relations their
   appended attributes read added to the query once per result set, narrowed by the related ACL, instead of
   one query per row.
