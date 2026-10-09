@@ -360,6 +360,10 @@ hits through the same relation handling.
   it inherits the parent's visibility and is not checked, even when a permission exists for its table: an
   installation's own ACL on a part applies only when the part is read directly (its own endpoint, or reached
   from another model, where it is checked against its parent's permission and ACL by `RelationAuthorizer`).
+  The per-record check run when a model is hydrated (`HasValidations`) agrees: for `select` a part asks the
+  select permission (and token ability) of the first owner up its parent chain that is not a part, never its
+  own, so a token carrying only the content ability reads the content's references and a role without the
+  references permission still reads them through the content. Writes to a part keep the part's own permission.
 - An entity with no registered `select` permission and outside `PermissionsRefreshCommand`'s deliberate
   blacklist fails closed. Of the blacklisted classes, only a pivot record reached through a plain relation
   (the `presettable` link a model loads for its dynamic fields) and a translation loaded from the model it

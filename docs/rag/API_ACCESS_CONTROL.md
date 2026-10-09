@@ -137,7 +137,10 @@ keys and aggregates.
   inside their parent (translations, document lines, BOM lines, quality plan characteristics, approvals, CMS references
   and ratings). Loaded from their own parent they inherit its visibility and are not checked separately, although a
   permission exists for their table: an installation's own ACL on a part applies only when the part is read directly
-  (its own endpoint), or reached from any other model, where it is checked against its parent's permission and ACL. A model qualifies
+  (its own endpoint), or reached from any other model, where it is checked against its parent's permission and ACL.
+  The per-record check run when a model is hydrated agrees: for reading, a part asks the `select` permission (and
+  token ability) of the first owner up its parent chain that is not a part, never its own; a caller who may not read
+  that owner does not hydrate the part. Writes to a part keep the part's own permission. A model qualifies
   when it has a non-nullable foreign key to its parent with cascade delete and no Filament resource of its own.
 - **Names are checked before anything is called.** `Support\RelationGuard::relationOf()` accepts a name only when it is a
   public, non-static method with no required parameter and a declared `Relation` return type: a relation method without

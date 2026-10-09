@@ -346,3 +346,27 @@ it('toArray masks in the contents the attributes the versioned model hides from 
 
     expect($version->toArray()['contents'])->toBe(['title' => 'versioned-title', 'user_id' => 4242]);
 });
+
+it('toArray keeps in the contents the storage columns of dynamic contents, which the model hides only to flatten them', function (): void {
+    $stub = new Modules\Core\Tests\Stubs\DynamicEntities\DynamicContentStubModel();
+    $version = new Version();
+    $version->setRawAttributes([
+        'id' => 1,
+        'versionable_type' => $stub->getMorphClass(),
+        'versionable_id' => 1,
+        'contents' => json_encode([
+            'components' => ['subtitle' => 'versioned-subtitle'],
+            'shared_components' => ['phone' => 'versioned-phone'],
+            'entity_id' => 3,
+            'presettable_id' => 4,
+        ]),
+    ]);
+    Illuminate\Support\Facades\Auth::setUser(User::factory()->create());
+
+    expect($version->toArray()['contents'])->toBe([
+        'components' => ['subtitle' => 'versioned-subtitle'],
+        'shared_components' => ['phone' => 'versioned-phone'],
+        'entity_id' => 3,
+        'presettable_id' => 4,
+    ]);
+});

@@ -7,6 +7,8 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Exists;
@@ -16,11 +18,13 @@ use Modules\Core\Authorization\PermissionExistenceMemo;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Authorization\RetrievedSelectGuard;
 use Modules\Core\Casts\CrudExecutor;
+use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Support\RelationGuard;
 use ReflectionException;
 use ReflectionProperty;
 use Spatie\Permission\Contracts\Permission as SpatiePermission;
@@ -42,6 +46,11 @@ use Spatie\Permission\Contracts\Role as SpatieRole;
 trait HasValidations
 {
     public const DEFAULT_RULE = 'always';
+
+    /**
+     * How far a chain of parts is climbed to find the owner whose select permission governs it.
+     */
+    private const int PART_CHAIN_MAX_DEPTH = 8;
 
     /**
      * Validation rules per operation: 'create', 'update' and the DEFAULT_RULE
@@ -250,7 +259,9 @@ trait HasValidations
             return true;
         }
 
-        $permission = PermissionName::forModel($model, $operation);
+        // A part of its parent inherits the parent's visibility (spec 8.1): it is read when its parent may be read,
+        // whatever the part's own select permission says. Writes keep the part's own permission.
+        $permission = PermissionName::forModel($operation === 'select' ? self::selectPermissionSubject($model) : $model, $operation);
 
         /** @var class-string<Model> $permission_class */
         $permission_class = config('permission.models.permission');
@@ -281,6 +292,29 @@ trait HasValidations
         }
 
         return true;
+    }
+
+    /**
+     * The model whose select permission decides whether a record may be read: the record itself, or for a part of
+     * its parent ({@see IsPartOfParent}) the first owner along its chain of parent relations that is not itself a
+     * part, as {@see \Modules\Core\Services\Crud\RelationAuthorizer} decides the visibility of a part. A chain
+     * that does not resolve to a relation to one parent model leaves the record's own permission in charge.
+     */
+    protected static function selectPermissionSubject(Model $model): Model
+    {
+        $subject = $model;
+
+        for ($depth = 0; $subject instanceof IsPartOfParent && $depth < self::PART_CHAIN_MAX_DEPTH; $depth++) {
+            $relation = RelationGuard::relationOf($subject, $subject->parentRelation());
+
+            if (! $relation instanceof Relation || $relation instanceof MorphTo) {
+                return $model;
+            }
+
+            $subject = $relation->getRelated();
+        }
+
+        return $subject instanceof IsPartOfParent ? $model : $subject;
     }
 
     /**

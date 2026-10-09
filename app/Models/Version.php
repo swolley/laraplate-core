@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Core\Contracts\IHidesAttributesFromAnonymous;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Override;
@@ -28,6 +29,13 @@ final class Version extends OvertrueVersion
      * A password hash of the algorithms PHP's password_hash() produces (bcrypt, argon2i, argon2id).
      */
     private const string PASSWORD_HASH_PATTERN = '/^\$(2[aby]|argon2id?)\$/';
+
+    /**
+     * The columns in which {@see HasDynamicContents} stores the dynamic fields and their schema.
+     *
+     * @var list<string>
+     */
+    private const array DYNAMIC_CONTENTS_COLUMNS = ['components', 'shared_components', 'entity_id', 'presettable_id'];
 
     /**
      * @var string
@@ -256,6 +264,12 @@ final class Version extends OvertrueVersion
 
         $model = new $class();
         $masked = $model->getHidden();
+
+        // Dynamic contents hide their storage columns only because their own serialization flattens them into
+        // fields: they hold the record's editorial values, which its history is for, not secrets.
+        if (in_array(HasDynamicContents::class, class_uses_recursive($model), true)) {
+            $masked = array_diff($masked, self::DYNAMIC_CONTENTS_COLUMNS);
+        }
 
         if ($model instanceof IHidesAttributesFromAnonymous) {
             $user = Auth::user();
