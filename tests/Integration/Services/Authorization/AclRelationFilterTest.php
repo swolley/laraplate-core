@@ -318,6 +318,58 @@ it('throws on hydration of a filter whose operator is unknown instead of falling
     expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
 });
 
+it('fails closed on a relation filter whose nested group would constrain nothing, at hydration and at save', function (array $relation_node): void {
+    $json = json_encode(['operator' => 'and', 'filters' => [$relation_node]]);
+
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', $json, []))->toThrow(InvalidArgumentException::class);
+    expect(fn () => (new FiltersGroupCast)->set(new ACL, 'filters', json_decode($json, true), []))->toThrow(InvalidArgumentException::class);
+
+    $acl = aclrel_unsaved_media_acl(new FiltersGroup);
+    $acl->setRawAttributes(array_merge($acl->getAttributes(), ['filters' => $json]));
+
+    expect(fn () => $acl->validateWithRules(CrudExecutor::INSERT))->toThrow(ContextualValidationException::class);
+})->with([
+    'numeric keys not starting at zero' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['1' => ['property' => 'name', 'operator' => '=', 'value' => 'x']]]],
+    'an explicit empty group' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['operator' => 'and', 'filters' => []]]],
+    'a group holding only an empty group' => [['relation' => 'model', 'morph_types' => [User::class], 'filters' => ['operator' => 'and', 'filters' => [['operator' => 'and', 'filters' => []]]]]],
+]);
+
+it('throws on a stored filters column that cannot be read, and keeps null and empty meaning no filters', function (mixed $stored): void {
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', $stored, []))->toThrow(InvalidArgumentException::class);
+})->with([
+    'broken json' => ['{invalid'],
+    'a json string' => ['"everything"'],
+    'a json number' => ['5'],
+    'a json boolean' => ['true'],
+    'a non-json scalar' => [123],
+]);
+
+it('reads a null or empty filters column as no filters', function (): void {
+    expect((new FiltersGroupCast)->get(new ACL, 'filters', null, []))->toBeNull()
+        ->and((new FiltersGroupCast)->get(new ACL, 'filters', '', []))->toBeNull();
+});
+
+it('does not grant unrestricted access when the stored filters of an ACL are corrupted', function (): void {
+    CrudApiExposure::enable();
+    $owner = User::factory()->create(['name' => 'kept-owner']);
+    aclrel_media($owner->getMorphClass(), $owner->getKey());
+    [$reader] = aclrel_media_reader(aclrel_owner_filters('kept-owner'));
+    ACL::query()->update(['filters' => '{corrupted']);
+    Cache::flush();
+
+    $response = $this->actingAs($reader)->getJson('/api/v1/select/core/media');
+
+    expect($response->status())->toBeGreaterThanOrEqual(400);
+});
+
+it('throws an InvalidArgumentException, not a conversion error, for an array where a name or operator is expected', function (array $payload): void {
+    expect(fn () => (new FiltersGroupCast)->get(new ACL, 'filters', json_encode($payload), []))->toThrow(InvalidArgumentException::class);
+})->with([
+    'group operator' => [['operator' => ['and'], 'filters' => [['property' => 'id', 'operator' => '=', 'value' => 1]]]],
+    'filter property' => [['operator' => 'and', 'filters' => [['property' => ['id'], 'operator' => '=', 'value' => 1]]]],
+    'filter operator' => [['operator' => 'and', 'filters' => [['property' => 'id', 'operator' => ['='], 'value' => 1]]]],
+]);
+
 it('never calls a method that is not a relation when a relation filter is applied, even if the ACL skipped validation', function (): void {
     CrudApiExposure::enable();
     $owner = User::factory()->create(['name' => 'kept-owner']);

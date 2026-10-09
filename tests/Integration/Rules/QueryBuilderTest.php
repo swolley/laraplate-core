@@ -99,3 +99,16 @@ it('fails when filters key is not a list', function (): void {
 
     expect($message)->toBe('filter filters doesn\'t have a correct format');
 });
+
+it('keeps accepting a request filter list that nests a bare list of conditions', function (): void {
+    $failures = [];
+
+    (new QueryBuilder)->validate('filters', [
+        'filters' => [[['property' => 'id', 'operator' => '=', 'value' => 1]]],
+        'operator' => 'and',
+    ], function (string $message) use (&$failures): void {
+        $failures[] = $message;
+    });
+
+    expect($failures)->toBe([]);
+});

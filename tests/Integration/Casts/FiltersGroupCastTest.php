@@ -29,19 +29,17 @@ it('hydrates group from json string and dehydrates back to json', function (): v
         ->and($encoded)->toBeString();
 });
 
-it('returns null on invalid get payloads and supports list payload hydration', function (): void {
+it('throws on unreadable get payloads and supports list payload hydration', function (): void {
     $cast = new FiltersGroupCast();
     $model = new ACL();
 
-    $from_invalid_json = $cast->get($model, 'filters', '{invalid', []);
-    $from_invalid_type = $cast->get($model, 'filters', 123, []);
     $from_list = $cast->get($model, 'filters', [
         ['property' => 'name', 'value' => 'john', 'operator' => '='],
     ], []);
 
-    expect($from_invalid_json)->toBeNull()
-        ->and($from_invalid_type)->toBeNull()
-        ->and($from_list)->toBeInstanceOf(FiltersGroup::class);
+    expect(fn () => $cast->get($model, 'filters', '{invalid', []))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $cast->get($model, 'filters', 123, []))->toThrow(InvalidArgumentException::class);
+    expect($from_list)->toBeInstanceOf(FiltersGroup::class);
 });
 
 it('accepts array payload in set and rejects invalid set values', function (): void {

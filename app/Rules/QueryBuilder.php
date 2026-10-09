@@ -88,15 +88,7 @@ final class QueryBuilder implements ValidationRule
                 return;
             }
 
-            foreach ($value['filters'] as $idx => $item) {
-                if (! is_array($item) || Arr::isList($item)) {
-                    $fail(sprintf('%s.filters.%s must be a filter, a group or a relation filter', $attribute, $idx));
-
-                    continue;
-                }
-
-                $this->validate(sprintf('%s.filters.%s', $attribute, $idx), $item, $fail);
-            }
+            $this->validate($attribute . '.filters', $value['filters'], $fail);
         }
     }
 

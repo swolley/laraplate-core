@@ -27,7 +27,11 @@ final class FiltersGroupCast implements CastsAttributes
         if (is_string($value)) {
             $decoded = json_decode($value, true);
 
-            if (! is_array($decoded)) {
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new InvalidArgumentException(sprintf('The stored filters of [%s] are not valid JSON.', $key));
+            }
+
+            if ($decoded === null) {
                 return null;
             }
 
@@ -35,7 +39,7 @@ final class FiltersGroupCast implements CastsAttributes
         }
 
         if (! is_array($value)) {
-            return null;
+            throw new InvalidArgumentException(sprintf('The stored filters of [%s] must be a JSON object or list.', $key));
         }
 
         return $this->hydrateGroup($value);
@@ -67,7 +71,7 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<mixed>  $data
      */
     private function hydrateGroup(array $data): FiltersGroup
     {
@@ -86,8 +90,12 @@ final class FiltersGroupCast implements CastsAttributes
                 $nested[] = $this->hydrateNode($item);
             }
 
-            $operator = WhereClause::tryFrom(mb_strtolower((string) ($data['operator'] ?? 'and')))
-                ?? throw new InvalidArgumentException('Unknown operator of a filters group.');
+            $group_operator = $data['operator'] ?? 'and';
+            $operator = is_string($group_operator) ? WhereClause::tryFrom(mb_strtolower($group_operator)) : null;
+
+            if (! $operator instanceof WhereClause) {
+                throw new InvalidArgumentException('Unknown operator of a filters group.');
+            }
 
             return new FiltersGroup(filters: $nested, operator: $operator);
         }
@@ -155,14 +163,6 @@ final class FiltersGroupCast implements CastsAttributes
             throw new InvalidArgumentException('The morph types of a relation filter must be a non-empty list.');
         }
 
-        $group = [];
-
-        foreach ($nested as $key => $value) {
-            if (is_string($key)) {
-                $group[$key] = $value;
-            }
-        }
-
         $types = null;
 
         foreach ($morph_types ?? [] as $type) {
@@ -173,11 +173,31 @@ final class FiltersGroupCast implements CastsAttributes
             $types[] = $type;
         }
 
+        $group = $this->hydrateGroup($nested);
+
+        if (! $this->holdsCondition($group)) {
+            throw new InvalidArgumentException('The nested filters of a relation filter must hold at least one condition.');
+        }
+
         return new RelationFilter(
             relation: $relation,
-            filters: $this->hydrateGroup($group),
+            filters: $group,
             morph_types: $types,
         );
+    }
+
+    /**
+     * Whether the group constrains anything: an empty group, or one made of empty groups, matches every row.
+     */
+    private function holdsCondition(FiltersGroup $group): bool
+    {
+        foreach ($group->filters as $node) {
+            if (! $node instanceof FiltersGroup || $this->holdsCondition($node)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -186,14 +206,24 @@ final class FiltersGroupCast implements CastsAttributes
     private function hydrateFilter(array $data): Filter
     {
         $operator_raw = $data['operator'] ?? '=';
+        $property = $data['property'];
 
-        $operator = $operator_raw instanceof FilterOperator
-            ? $operator_raw
-            : FilterOperator::tryFrom((string) $operator_raw)
-                ?? throw new InvalidArgumentException('Unknown operator of a filter.');
+        if (! is_string($property) || $property === '') {
+            throw new InvalidArgumentException('The property of a filter must be a column name.');
+        }
+
+        if ($operator_raw instanceof FilterOperator) {
+            $operator = $operator_raw;
+        } else {
+            $operator = is_string($operator_raw) ? FilterOperator::tryFrom($operator_raw) : null;
+        }
+
+        if (! $operator instanceof FilterOperator) {
+            throw new InvalidArgumentException('Unknown operator of a filter.');
+        }
 
         return new Filter(
-            property: (string) $data['property'],
+            property: $property,
             value: $data['value'] ?? null,
             operator: $operator,
         );
