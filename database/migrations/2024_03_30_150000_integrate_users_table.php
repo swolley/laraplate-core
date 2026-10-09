@@ -31,6 +31,7 @@ return new class() extends Migration
 
             $table->boolean('is_first_login')->default(true)->comment('Whether the account still needs the first-login onboarding flow');
             $table->json('preferences')->nullable()->comment('Server-persisted UI preferences (theme, density, layout) synced from the SPA');
+            $table->boolean('is_service_account')->default(false)->comment('Whether the account is non-interactive: it has no usable password, never signs in and authenticates with API tokens only');
 
             MigrateUtils::timestamps(
                 $table,

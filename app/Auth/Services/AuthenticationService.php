@@ -6,6 +6,7 @@ namespace Modules\Core\Auth\Services;
 
 use Illuminate\Http\Request;
 use Modules\Core\Auth\Contracts\IAuthenticationProvider;
+use Modules\Core\Models\User;
 
 final readonly class AuthenticationService
 {
@@ -24,7 +25,7 @@ final readonly class AuthenticationService
             }
 
             if ($provider->canHandle($request)) {
-                return $provider->authenticate($request);
+                return $this->refusingServiceAccounts($provider->authenticate($request));
             }
         }
 
@@ -56,5 +57,28 @@ final readonly class AuthenticationService
             static fn (IAuthenticationProvider $provider): string => $provider->getProviderName(),
             array_filter($this->providers, static fn (IAuthenticationProvider $p): bool => $p->isEnabled()),
         );
+    }
+
+    /**
+     * A service account authenticates with API tokens only. The providers refuse it themselves; this is the
+     * single point every sign-in goes through, so a provider that forgets still cannot let one in.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function refusingServiceAccounts(array $result): array
+    {
+        $user = $result['user'] ?? null;
+
+        if (($result['success'] ?? false) === true && $user instanceof User && $user->isServiceAccount()) {
+            return [
+                'success' => false,
+                'user' => null,
+                'error' => 'Service accounts cannot sign in',
+                'license' => null,
+            ];
+        }
+
+        return $result;
     }
 }

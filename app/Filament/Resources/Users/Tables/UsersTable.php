@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Notifications\Notification;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -39,6 +40,10 @@ final class UsersTable
                     TextColumn::make('roles.name')
                         ->badge()
                         ->toggleable(),
+                    IconColumn::make('is_service_account')
+                        ->label('Service account')
+                        ->boolean()
+                        ->toggleable(),
                 ]);
 
                 return $default_columns;
@@ -48,7 +53,7 @@ final class UsersTable
                     Action::make('resend_verification_email')
                         ->label('Resend Verification Email')
                         ->icon('heroicon-o-envelope')
-                        ->authorize(static fn (User $record): bool => ! $record->hasVerifiedEmail())
+                        ->authorize(static fn (User $record): bool => ! $record->isServiceAccount() && ! $record->hasVerifiedEmail())
                         ->action(static function (User $record): void {
                             $notification = new VerifyEmail();
                             $notification->url = filament()->getVerifyEmailUrl($record);
@@ -64,7 +69,7 @@ final class UsersTable
                     Action::make('reset_password')
                         ->label('Reset Password')
                         ->icon('heroicon-o-key')
-                        ->authorize(fn (User $record): bool => true)
+                        ->authorize(static fn (User $record): bool => ! $record->isServiceAccount())
                         ->action(function (User $record): void {
                             $record->sendPasswordResetNotification($record->email);
                         })
@@ -77,6 +82,8 @@ final class UsersTable
                         ->relationship('roles', 'name')
                         ->multiple()
                         ->preload(),
+                    TernaryFilter::make('is_service_account')
+                        ->label('Service account'),
                     TernaryFilter::make('verified')
                         ->label('Verified email')
                         ->attribute('email_verified_at')

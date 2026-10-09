@@ -93,6 +93,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
      */
     protected $attributes = [
         'is_first_login' => true,
+        'is_service_account' => false,
         'preferences' => null,
     ];
 
@@ -118,6 +119,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         'social_refresh_token',
         'social_token_secret',
         'preferences',
+        'is_service_account',
     ];
 
     /**
@@ -211,6 +213,10 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
 
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($this->isServiceAccount()) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -218,8 +224,29 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         return $this->hasPermissionTo('*', $panel->getAuthGuard());
     }
 
+    /**
+     * Whether the account is non-interactive: no usable password, no sign-in, no panel, tokens only.
+     */
+    public function isServiceAccount(): bool
+    {
+        return (bool) ($this->attributes['is_service_account'] ?? false);
+    }
+
+    /**
+     * Whether the user is the anonymous visitor.
+     *
+     * A user without an email counts as anonymous, but a service account never does: it is a named
+     * principal that acts with its own roles and tokens, and treating it as a visitor would hide
+     * attributes from it and skip the checks that apply to authenticated users. The `users.email`
+     * column is not nullable, so this only matters for a service account built in memory; the
+     * backoffice requires an email for it all the same.
+     */
     public function isGuest(): bool
     {
+        if ($this->isServiceAccount()) {
+            return false;
+        }
+
         $guest = config('permission.users.guest');
 
         if ($this->getAttribute('email') === null) {
@@ -583,6 +610,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
             'created_at' => 'immutable_datetime',
             'updated_at' => 'datetime',
             'is_first_login' => 'boolean',
+            'is_service_account' => 'boolean',
             'preferences' => 'array',
         ];
     }

@@ -13,6 +13,7 @@ use Modules\Core\Filament\Resources\Modifications\ModificationResource;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
+use Modules\Core\Filament\Resources\Users\RelationManagers\ApiTokensRelationManager;
 use Modules\Core\Filament\Resources\Users\UserResource;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
@@ -33,9 +34,9 @@ beforeEach(function (): void {
     $this->admin->roles()->attach($adminRole);
 });
 
-it('exposes expected slugs and empty relation groups for core resources', function (): void {
+it('exposes expected slugs and relation groups for core resources', function (): void {
     expect(UserResource::getSlug())->toBe('core/users')
-        ->and(UserResource::getRelations())->toBe([]);
+        ->and(UserResource::getRelations())->toBe([ApiTokensRelationManager::class]);
 
     expect(RoleResource::getSlug())->toBe('core/roles')
         ->and(RoleResource::getRelations())->toBe([]);

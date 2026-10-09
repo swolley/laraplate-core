@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Support\Facades\Route;
+use Modules\Core\Http\Controllers\ApiTokenController;
 use Modules\Core\Http\Controllers\UserController;
 use Modules\Core\Rules\PreferencesBag;
+
+// The caller's own API tokens (session only): list, create, revoke.
+Route::controller(ApiTokenController::class)->prefix('/user/tokens')->name('auth.tokens.')->group(function (): void {
+    Route::get('/', 'list')->name('list');
+    Route::post('/', 'create')->name('create');
+    Route::delete('/{token}', 'revoke')->whereNumber('token')->name('revoke');
+});
 
 Route::controller(UserController::class)->name('auth.')->group(function (): void {
     // Keep the `auth` group session stack (StartSession, cookies, …) but allow

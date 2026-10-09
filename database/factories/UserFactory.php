@@ -62,6 +62,17 @@ final class UserFactory extends Factory
     }
 
     /**
+     * Non-interactive account: it authenticates with API tokens only.
+     */
+    public function serviceAccount(): static
+    {
+        return $this->state(fn (): array => [
+            'is_service_account' => true,
+            'email_verified_at' => now(),
+        ]);
+    }
+
+    /**
      * Active user with an open-ended validity window.
      */
     public function perpetual(): static

@@ -12,6 +12,10 @@ trait ValidatesUserAccount
 {
     private function accountValidityError(User $user): ?string
     {
+        if ($user->isServiceAccount()) {
+            return 'Service accounts cannot sign in';
+        }
+
         if (! $user->canAuthenticate()) {
             return 'Account is not active';
         }

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Filament\Resources\Users\Pages\CreateUser;
 use Modules\Core\Filament\Resources\Users\Pages\EditUser;
 use Modules\Core\Filament\Resources\Users\Pages\ListUsers;
+use Modules\Core\Filament\Resources\Users\RelationManagers\ApiTokensRelationManager;
 use Modules\Core\Filament\Resources\Users\Schemas\UserForm;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
 use Override;
@@ -54,7 +55,7 @@ final class UserResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ApiTokensRelationManager::class,
         ];
     }
 
