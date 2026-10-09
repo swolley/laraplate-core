@@ -25,6 +25,7 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Stubs\Search\AclRehydrationUserStub;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 
 /**
  * The ACL row filters of a user reach the search engine as filters. They are not the only barrier: the
@@ -52,7 +53,9 @@ function crud_acl_search_returning(array $ids): AdvancedSearchService
         meta: [],
     ));
 
-    return new AdvancedSearchService(new SimpleQueryIntentParser, new FallbackSearchPlanner, $ensemble, app());
+    return new AdvancedSearchService(
+        new FixedSearchStrategyResolver(planner: new FallbackSearchPlanner, intent_parser: new SimpleQueryIntentParser),
+        $ensemble, app());
 }
 
 function crud_acl_search_data(Model $model, User $user): SearchRequestData

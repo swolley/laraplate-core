@@ -10,6 +10,7 @@ use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
 use Modules\Core\Search\Services\VectorSearchAvailability;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 use Modules\Core\Tests\Stubs\Search\VectorGuardOrchestratedEngineStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardPlannerStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardStubModel;
@@ -40,8 +41,7 @@ function guarded_search(?array &$seen_vector): AdvancedSearchResult
     );
 
     $service = new AdvancedSearchService(
-        new SimpleQueryIntentParser(),
-        new VectorGuardPlannerStub(),
+        new FixedSearchStrategyResolver(planner: new VectorGuardPlannerStub(), intent_parser: new SimpleQueryIntentParser(), embedder: app()->bound(ITextEmbedder::class) ? app(ITextEmbedder::class) : null),
         $ensemble,
         app(),
     );

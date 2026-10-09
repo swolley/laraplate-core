@@ -16,6 +16,7 @@ use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
 use Modules\Core\Search\Services\VectorSearchAvailability;
 use Modules\Core\Tests\Stubs\Search\EngineBoundStubModel;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 use Modules\Core\Tests\Stubs\Search\VectorGuardOrchestratedEngineStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardPlannerStub;
 use Modules\Core\Tests\Stubs\Search\VectorGuardStubModel;
@@ -42,6 +43,14 @@ function timed_search_ensemble_meta(): array
     return ['driver' => 'typesense', 'strategies_executed' => 3, 'reranked' => false];
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function timed_search_mode_meta(): array
+{
+    return ['mode_requested' => 'fast', 'mode_applied' => 'fast', 'degraded_reason' => null, 'retries_used' => 0];
+}
+
 function timed_search(?IQueryIntentParser $intent_parser = null): AdvancedSearchResult
 {
     $ensemble = Mockery::mock(EnsembleSearchService::class);
@@ -55,8 +64,7 @@ function timed_search(?IQueryIntentParser $intent_parser = null): AdvancedSearch
     ));
 
     $service = new AdvancedSearchService(
-        $intent_parser ?? new SimpleQueryIntentParser(),
-        new VectorGuardPlannerStub(),
+        new FixedSearchStrategyResolver(planner: new VectorGuardPlannerStub(), intent_parser: $intent_parser ?? new SimpleQueryIntentParser(), embedder: app()->bound(ITextEmbedder::class) ? app(ITextEmbedder::class) : null),
         $ensemble,
         app(),
     );
@@ -83,14 +91,14 @@ it('seeds the debug timings switch off in the search group', function (): void {
 it('leaves the meta exactly as the ensemble returned it when the flag is off', function (): void {
     bind_embedder();
 
-    expect(timed_search()->meta)->toBe(timed_search_ensemble_meta());
+    expect(timed_search()->meta)->toBe([...timed_search_ensemble_meta(), 'search' => timed_search_mode_meta()]);
 });
 
 it('leaves the vector_disabled meta unchanged when the flag is off', function (): void {
     config()->set('core.search.vector.suspended_reason', 'switching');
     bind_embedder();
 
-    expect(timed_search()->meta)->toBe([...timed_search_ensemble_meta(), 'vector_disabled' => 'suspended']);
+    expect(timed_search()->meta)->toBe([...timed_search_ensemble_meta(), 'vector_disabled' => 'suspended', 'search' => timed_search_mode_meta()]);
 });
 
 it('adds the four stage timings and the total in milliseconds when the flag is on', function (): void {
@@ -153,7 +161,9 @@ it('reports every stage as null on the unsupported driver path when the flag is 
     $engine = Mockery::mock(ISearchEngine::class);
     $engine->shouldReceive('supportsOrchestratedSearch')->andReturnFalse();
 
-    $service = new AdvancedSearchService(new SimpleQueryIntentParser(), new VectorGuardPlannerStub(), Mockery::mock(EnsembleSearchService::class), app());
+    $service = new AdvancedSearchService(
+        new FixedSearchStrategyResolver(planner: new VectorGuardPlannerStub(), intent_parser: new SimpleQueryIntentParser(), embedder: app()->bound(ITextEmbedder::class) ? app(ITextEmbedder::class) : null),
+        Mockery::mock(EnsembleSearchService::class), app());
     $meta = $service->search(new EngineBoundStubModel($engine), 'query', 1, 10)->meta;
 
     expect($meta['unsupported_driver'])->toBeTrue()

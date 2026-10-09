@@ -42,7 +42,7 @@ class EnsembleSearchService
      * @param  list<float>|null  $vector
      * @param  array<int, Sort>  $sort
      */
-    public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = [], ?ResolvedTextMatch $textMatch = null): AdvancedSearchResult
+    public function search(Model $model, string $query, array $plan, ?array $vector, int $page, int $perPage, ?FiltersGroup $filters = null, array $sort = [], ?ResolvedTextMatch $textMatch = null, ?IReranker $reranker = null): AdvancedSearchResult
     {
         $retrieval = $this->planSection($plan, 'retrieval');
         $ensemble_config = $this->planSection($plan, 'ensemble');
@@ -101,7 +101,7 @@ class EnsembleSearchService
 
         if ($use_reranker && $fused !== []) {
             try {
-                [$fused, $reranker_model] = $this->rerankTopK($model, $fused, $query, $rerank_top_k, $rerank_blend);
+                [$fused, $reranker_model] = $this->rerankTopK($model, $fused, $query, $rerank_top_k, $rerank_blend, $reranker ?? $this->reranker);
             } catch (Throwable $exception) {
                 // A reranker failure (e.g. the cross-encoder service is down) must
                 // not break search: keep the fused results unreranked and record
@@ -356,7 +356,7 @@ class EnsembleSearchService
     }
 
     /**
-     * Rerank the top-K results using the injected reranker.
+     * Rerank the top-K results with the given reranker (the one the search was called with, else the injected one).
      *
      * Each top-K score becomes `fused * (1 - blend) + rerank * max_fused * blend`; the default
      * blend 0.6 is the historical 0.4 / 0.6 split.
@@ -364,7 +364,7 @@ class EnsembleSearchService
      * @param  list<FusedHit>  $results
      * @return array{0: list<FusedHit>, 1: string|null} the hits, and the model that scored them when the reranker names it
      */
-    private function rerankTopK(Model $model, array $results, string $query, int $top_k, float $blend): array
+    private function rerankTopK(Model $model, array $results, string $query, int $top_k, float $blend, IReranker $reranker): array
     {
         usort($results, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
 
@@ -395,9 +395,9 @@ class EnsembleSearchService
             throw new RuntimeException('No text to rerank: the hits carry none and the model provides none.');
         }
 
-        $reranked = $this->reranker instanceof IRerankerWithModel
-            ? $this->reranker->scoreWithModel($pairs)
-            : new RerankResult($this->reranker->score($pairs));
+        $reranked = $reranker instanceof IRerankerWithModel
+            ? $reranker->scoreWithModel($pairs)
+            : new RerankResult($reranker->score($pairs));
         $rerank_scores = $reranked->scores;
 
         $original_max = max(array_column($to_rerank, 'score')) ?: 1.0;

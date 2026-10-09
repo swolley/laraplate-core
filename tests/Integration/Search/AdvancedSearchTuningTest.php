@@ -12,6 +12,7 @@ use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\RetrievalTuningProfile;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
 use Modules\Core\Tests\Stubs\Search\EngineBoundStubModel;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 use Modules\Core\Tests\Stubs\Search\FusionFixtureSearchModel;
 
 /**
@@ -36,7 +37,9 @@ function advanced_search_tuning_captured_plan(string $query): array
     $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
     $engine->shouldReceive('supportsOrchestratedVectorSearch')->andReturnTrue();
 
-    $service = new AdvancedSearchService(new SimpleQueryIntentParser(), new FallbackSearchPlanner(), $ensemble, app());
+    $service = new AdvancedSearchService(
+        new FixedSearchStrategyResolver(planner: new FallbackSearchPlanner(), intent_parser: new SimpleQueryIntentParser()),
+        $ensemble, app());
     $service->search(new EngineBoundStubModel($engine), $query, 1, 10);
 
     return $captured;

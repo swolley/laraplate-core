@@ -42,6 +42,7 @@ use Modules\Core\Tests\Stubs\ActivationStubModel;
 use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 
 function crud_cov_set(object $obj, string $prop, mixed $value): void
 {
@@ -168,8 +169,7 @@ function crud_cov_advanced_search_returning(int|string $id): AdvancedSearchServi
         ));
 
     return new AdvancedSearchService(
-        new SimpleQueryIntentParser(),
-        new FallbackSearchPlanner(),
+        new FixedSearchStrategyResolver(planner: new FallbackSearchPlanner(), intent_parser: new SimpleQueryIntentParser()),
         $ensemble,
         app(),
     );

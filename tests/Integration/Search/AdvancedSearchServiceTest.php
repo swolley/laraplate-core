@@ -14,12 +14,12 @@ use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\EnsembleSearchService;
 use Modules\Core\Search\Services\FallbackSearchPlanner;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
+use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
 
 function advanced_search_service_with_ensemble(EnsembleSearchService $ensemble): AdvancedSearchService
 {
     return new AdvancedSearchService(
-        new SimpleQueryIntentParser(),
-        new FallbackSearchPlanner(),
+        new FixedSearchStrategyResolver(planner: new FallbackSearchPlanner(), intent_parser: new SimpleQueryIntentParser()),
         $ensemble,
         app(),
     );
@@ -158,7 +158,6 @@ it('forces keyword only orchestration when the engine does not support orchestra
 
     $embedder = Mockery::mock(ITextEmbedder::class);
     $embedder->shouldNotReceive('embed');
-    app()->instance(ITextEmbedder::class, $embedder);
 
     $ensemble = Mockery::mock(EnsembleSearchService::class);
     $ensemble
@@ -195,8 +194,7 @@ it('forces keyword only orchestration when the engine does not support orchestra
     };
 
     $service = new AdvancedSearchService(
-        new SimpleQueryIntentParser(),
-        $planner,
+        new FixedSearchStrategyResolver(planner: $planner, intent_parser: new SimpleQueryIntentParser(), embedder: $embedder),
         $ensemble,
         app(),
     );
