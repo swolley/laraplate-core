@@ -11,7 +11,8 @@ The CRUD system provides a **dynamic, entity-agnostic** API for Create, Read, Up
 - **Relation Support**: Eager loading with column selection
 - **Pagination**: Multiple pagination strategies (page-based, from-to, limit)
 - **Computed Columns**: Support for appends and method calls
-- **ACL Integration**: Automatic row-level security filtering
+- **ACL Integration**: Automatic row-level security filtering, on related records too
+- **API Access Control**: One guard, one switch and one optional token authentication for every `/api` route
 - **Caching**: Built-in response caching
 - **Versioning**: History tracking for models with `Versionable` trait
 - **Approval Workflow**: Support for modification approval
@@ -98,7 +99,7 @@ HTTP Request
 |----------|--------|-------------|
 | `/api/v1/select/{entity}` | GET, POST | List records with filtering/pagination |
 | `/api/v1/detail/{entity}` | GET | Get single record by primary key |
-| `/api/v1/history/{entity}` | GET | Get record with version history |
+| `/api/v1/history/{entity}` | GET | Get record with version history (needs `update` or `approve` on the entity) |
 | `/api/v1/tree/{entity}` | GET | Get hierarchical record (ancestors/descendants) |
 
 ### Write Operations
@@ -119,22 +120,31 @@ boundary. `CrudService::update` rejects any relation not whitelisted or not a
 `BelongsToMany`/`MorphToMany` with `422`/`400`, then syncs each present relation in the
 update transaction (a present key syncs wholesale, empty clears, an omitted key is untouched).
 
+The sync works only within the related records the writer can read (their `select` permission
+and ACL on the request's guard): related records the writer cannot see stay attached with their
+pivot rows untouched, additions and removals are computed on the visible subset, and submitting
+an id the writer cannot read (hidden or nonexistent) answers `403` and rolls the save back. A
+relation whose related entity the writer may not select at all cannot be synced. Parts of the
+parent (`IsPartOfParent`) sync as before. See [Related records](#related-records).
+
 #### Role-scoped ACLs and dynamic placeholders
 
 An `acls.role_id` (nullable) scopes an ACL to a single role: set, it applies only to that
 role (paired with `permission_id`, i.e. the `role_has_permissions` pair); null keeps the
 legacy behavior (applies to every role holding the permission). This lets two roles that
-share a permission carry different row-level filters — e.g. the anonymous `guest` role is
-restricted while staff roles are not.
+share a permission carry different row-level filters — e.g. the `guest` role of the `api`
+guard (the anonymous reader) is restricted while staff roles are not.
 
 ACL filter values may use dynamic placeholders resolved at query-build time: `@now` and
 `@today` become the live `Carbon::now()` / `Carbon::today()`. This is what lets a stored
 ACL express a moving publication window.
 
 Together these replace what used to be a per-model validity global scope: `CMS\Content`
-publication filtering is a `guest`-scoped ACL on `cms_contents.select` whose `valid_from <=
+publication filtering is an ACL of the `api` `guest` on `cms_contents.select` whose `valid_from <=
 @now AND (valid_to >= @now OR valid_to IS NULL)` filter limits the public reader to
-published content, while staff (no such ACL) read everything.
+published content, while staff (no such ACL) read everything. The same window reaches the
+references and media of those contents through relation filters (see
+[ACL_SYSTEM.md](./ACL_SYSTEM.md#relation-filters)).
 
 Role inheritance never leaks an unwanted restriction: a role with its own ACL for a
 permission uses it and ignores any ancestor ACL. So a child role that would otherwise
@@ -273,6 +283,115 @@ still a JSON error rather than a corrupt download.
 
 `ValidationException` maps to `422` and `DomainException` to `409`.
 
+## API Access Control
+
+Every route under `/api` (Core CRUD and graph, and the `/api` routes of ERP, SAO and MES) shares one
+authentication, one switch and one guard. The full guide, with the operator checklist, is
+[rag/API_ACCESS_CONTROL.md](./rag/API_ACCESS_CONTROL.md); this section is the CRUD-facing summary.
+
+### Guards and per-guard permissions
+
+`php artisan permission:refresh` creates every permission for both guards, `web` and `api`, with the same
+name. A role holds the permissions of its own guard, and roles are identified by `(name, guard)`.
+`AuthorizationService` checks the guard of the current request on every path (direct permission, role,
+ancestor role): `/app` routes run on `web`, `/api` routes on `api`. A permission that does not exist on
+the guard is a denial, never an error.
+
+### `AuthenticateApiRequest`
+
+The middleware (alias `api_access`) runs first in the `api` group of Core and of every module, in this
+order:
+
+1. `core.expose_api` (the `expose_api` setting, default off) false: `403`.
+2. `Auth::shouldUse('api')`.
+3. The caller. **No bearer:** the request runs as the anonymous user (`permission.users.guest`), which holds
+   the `guest` role of both guards. **A bearer token** (optional on every route): resolved by the Sanctum
+   guard, from the token alone and never from a web session. Unknown, malformed, expired or revoked: `401`,
+   never the anonymous user. A superadmin's token: `401`. An address outside the token's `allowed_cidrs`:
+   `403`, logged without the token.
+4. Rate limit: `core.api.rate_limit_per_minute` (default `600`) per token, or per client address without one.
+
+Failed bearer authentications are counted per client address before the token is looked up; an address
+over the limit gets `429`, and successful requests do not consume that budget.
+
+**Self-authenticated routes.** A route whose callers send a secret of their own as the bearer (the ERP
+payment and e-invoice provider callbacks, the MES machine ingest) declares
+`->middleware(SelfAuthenticatedApiRoute::class)`. The switch, the `api` guard and the rate limit still
+apply; the bearer is not read as a Laraplate token, the request runs as the anonymous user, and the route's
+own check authenticates it.
+
+**403 versus 401.** A denied permission, a missing token ability or a forbidden relation answers `401` for
+the anonymous user (a login or a token may change the answer) and `403` for any authenticated principal, a
+session user or a token user.
+
+### Tokens
+
+Users create personal tokens (`/app/auth/user/tokens`, always expiring within
+`core.api_tokens.max_lifetime_days`, default 365); administrators create service accounts and their tokens
+in the Filament user resource. A token's abilities are `api` permission names (`*` is refused), and a
+request needs the role permission and the ability, evaluated per request. Superadmins cannot hold tokens.
+Details in [rag/API_ACCESS_CONTROL.md](./rag/API_ACCESS_CONTROL.md#tokens).
+
+### Related records
+
+Select, detail, search, tree, history and facets share one visibility rule for related records. A relation
+to an independent entity is loaded only if the caller holds that entity's `select` permission on the
+request's guard, and its query receives that entity's ACL, as a root query does. This holds for `relations`,
+dotted `columns`, relation filters, sorts, group-by keys and aggregates, and for search, which reloads the
+hits through the same relation handling.
+
+- A relation the request **explicitly asked for** and the caller may not read answers `403` (`401` for the
+  anonymous user). A relation the model loads on its own (default eager loads, a computed column's
+  dependency, an appended attribute such as a content's `cover`) is left out, or the attribute is `null`.
+- A model that is a **part of its parent** implements `Contracts\IsPartOfParent::parentRelation()`
+  (translations, document lines, BOM lines, approvals). Loaded from its own parent it inherits the parent's
+  visibility and needs no permission of its own; reached from any other model it is checked against its
+  parent's permission and ACL (`RelationAuthorizer`).
+- An entity with no registered `select` permission is readable only if its class is in
+  `PermissionsRefreshCommand`'s deliberate blacklist (versions, modifications, licenses, pivots,
+  translations); any other fails closed. Sanctum tokens are never readable.
+- Every relation name from a request, from a dotted column, filter or sort, or from an ACL goes through
+  `RelationGuard`: it must be a public, non-static method with no required parameter and a declared
+  `Relation` return type, otherwise the request answers `400` before anything is called. A relation method
+  without a return type is therefore not usable by clients until it is typed.
+- The relation black list (`history`, the version relations, `tokens`, the tree-walk relations) is dropped
+  from every path a read loads, in select, detail and search.
+- **Pending modifications.** The `modifications` relation holds proposed, unapproved values. It is returned
+  only to a caller holding the parent entity's `update` or `approve` permission on the request's guard,
+  token abilities included: others get it omitted when appended or default, `403`/`401` when requested.
+- **History.** `GET /api/v1/history/{module}/{entity}` needs the entity's `update` or `approve` permission,
+  because versions hold pre-publication drafts. The `record` is serialized through the model (hidden
+  attributes and media projection apply) and history rows carry no nested copy of it.
+- **Partial relations.** On `detail`, a relation the related ACL narrowed is declared in
+  `meta.relations.{name}.hidden`, the number of related records left out, so a client can warn before
+  editing. `list` and `search` do not carry it.
+- **Search.** ACL column conditions go to the engine; relation filters cannot, and take effect when the hits
+  are reloaded. A page can hold fewer records than requested, and a search's `totalRecords` can count hits
+  the caller may not see.
+
+### Computed `method` columns
+
+A `method` column calls a model method on every returned row, so a request may only name a method the
+model declares in its `crudComputedDependencies()` map (and it must be public, written in the application,
+not a relation and not a write). Anything else answers `400`. No production model declares a computed
+method today, so every client `method` column is refused; declare the method there first when a client needs
+it (see [Computed Columns](#computed-columns)). An appended column needs an attribute accessor, and a
+group-by key may not name a method.
+
+### Columns returned
+
+- **Hidden attributes.** A model that implements `Contracts\IHidesAttributesFromAnonymous` lists attributes
+  removed from every serialization for the anonymous user, as an entity or as a relation: CMS contributors
+  (`user_id`, `user`, `shared_components`), comments and ratings (`user_id`). Staff and token users see them.
+- **Media projection.** On the `api` guard a `Media` is returned as `id`, `collection_name`, `mime_type`,
+  `size`, `width`, `height`, `alt_text`, `url` and a `conversions` map, with no `custom_properties`, `disk`,
+  `conversions_disk` or `file_name`, unless the caller holds `vend_media.update` on the `api` guard. URLs
+  are plain for public disks, temporary (valid `core.media.signed_url_ttl_minutes`, default 60) on disks
+  that can sign, and `null` otherwise. `/app` is unchanged.
+- **Cover preload.** Models that implement `Contracts\IPreloadsAppendedRelations` have the relations their
+  appended attributes read added to the query once per result set, narrowed by the related ACL, instead of
+  one query per row.
+
 ## Request Parameters
 
 ### List Request
@@ -328,8 +447,8 @@ Columns can be of different types:
 | Type | Description | Example |
 |------|-------------|---------|
 | `column` | Standard database column | `name`, `created_at` |
-| `append` | Eloquent accessor (appended attribute) | `full_name` |
-| `method` | Model method call | `getFormattedDate()` |
+| `append` | Eloquent accessor (appended attribute); the model must have the accessor | `full_name` |
+| `method` | Model method call; only a method the model declares in `crudComputedDependencies()` | `getFormattedDate()` |
 | `count` | Aggregate count | `comments:count` |
 | `sum` | Aggregate sum | `items:sum:quantity` |
 | `avg` | Aggregate average | `reviews:avg:rating` |
@@ -475,6 +594,9 @@ Specify columns for relations using dot notation:
 }
 ```
 
+Every relation named here, in a dotted column, in a filter or in a sort obeys the related entity's `select`
+permission and ACL; see [Related records](#related-records).
+
 ## Response Format
 
 ### Success Response
@@ -569,6 +691,11 @@ class Article extends Model
 ```
 
 This allows QueryBuilder to optimize column selection and eager loading.
+
+The same map is the allow list for `method` columns: a request may call a model method as a column only
+when the method is a key of this map (see [Computed `method` columns](#computed-method-columns)). Relations a
+computed column depends on are loaded under the related permission and ACL and left out when the caller may
+not read them.
 
 ## Model Features
 
@@ -822,7 +949,8 @@ Include relations in request to avoid N+1 queries:
 
 ### 5. Define crudComputedDependencies
 
-For models with computed columns, define dependencies to optimize queries:
+For models with computed columns, define dependencies to optimize queries. Declaring the key is also what
+allows a client to request that method as a `method` column:
 
 ```php
 public function crudComputedDependencies(): array
@@ -950,5 +1078,6 @@ Contract covered by `tests/Feature/Controllers/CrudFreshnessTest.php`.
 ## Related Documentation
 
 - [ACL System](./ACL_SYSTEM.md) - Row-level security
+- [API access control](./rag/API_ACCESS_CONTROL.md) - Guards, tokens, default roles, related records, media projection
 - [Permissions](./PERMISSIONS.md) - Permission system
 - [Roles](./ROLES.md) - Role hierarchy

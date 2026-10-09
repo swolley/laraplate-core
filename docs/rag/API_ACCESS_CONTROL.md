@@ -1,0 +1,269 @@
+# API access control: developer and operator guide
+
+How a request to `/api/v1` is authenticated, which permissions apply to it, which records and attributes it can
+read, and how tokens work. Everything here is Core behaviour; CMS, ERP, SAO and MES only add routes, grants and
+hidden attributes. The CRUD mechanics are in [CRUD_SYSTEM.md](../CRUD_SYSTEM.md), the row-level filters in
+[ACL_SYSTEM.md](../ACL_SYSTEM.md).
+
+## One model for every `/api` route
+
+| Question | Answer |
+|---|---|
+| Is the API on? | `expose_api` (runtime setting, config `core.expose_api`, default `false`). Off, every `/api` route answers `403`, Core and modules alike. |
+| Who is calling? | The holder of an `Authorization: Bearer` token, or the anonymous user. |
+| Through which surface? | The `api` guard. `/app` (session, Filament) stays on `web`. |
+| With which permissions? | The roles of the `api` guard, narrowed by the token's abilities, then the row-level ACLs. |
+| From where? | Optional per-token network list (`allowed_cidrs`). |
+
+Turning the API on exposes nothing that a role of the `api` guard has not been granted.
+
+## Permissions exist per guard
+
+`php artisan permission:refresh` creates every permission twice, `guard_name` `web` and `api`, with the same name
+(`default.cms_contents.select`). Existing does not mean granted: a role holds the permissions of its own guard only.
+
+- `User::hasPermission($name, $guard)` and `Role::hasPermission($name, $guard)` take the guard on every path: direct
+  permissions, roles and ancestor roles. Only roles of that guard are considered. With no guard they use the request's
+  (`Auth::getDefaultDriver()`).
+- A permission that does not exist on the guard is "not granted": a `403` (or `401` for the anonymous user), never an error.
+- `AuthorizationService` checks against the request's guard on every route. `/app` routes keep `web`; the `api` middleware
+  switches the default guard to `api` for the request.
+- Roles are identified by `(name, guard)`: the `guest` of `/app` and the `guest` of `/api` are two roles.
+
+## The `/api` request lifecycle
+
+`Modules\Core\Http\Middleware\AuthenticateApiRequest` (alias `api_access`) runs first in the `api` group of Core and of
+every module. In order:
+
+1. The switch: `core.expose_api` false gives `403`.
+2. `Auth::shouldUse('api')`, so every permission check of the request reads the `api` grants.
+3. The caller:
+   - **No `Authorization` header that mentions a bearer:** the request runs as the anonymous user, the account named by
+     `permission.users.guest` (`GUEST_USER`, default `anonymous`). It holds the `guest` role of both guards.
+   - **A bearer claim:** the token is resolved through the Sanctum guard. The principal comes from the token alone; a web
+     session is never consulted. A token that does not resolve (malformed, unknown, expired, revoked) is `401` with
+     `WWW-Authenticate: Bearer` and **never** falls back to the anonymous user. A token of a superadmin is `401`.
+     A token whose `allowed_cidrs` do not contain the client address is `403`, logged with the token id, the owner id and
+     the address, never the token.
+4. The rate limit (limiter `api`): `core.api.rate_limit_per_minute` (default `600`) per token, or per client address when
+   there is no token. Over the limit: `429`.
+
+**Failed authentications are throttled before the token is looked up.** Every `401` and CIDR `403` of a bearer request
+counts against the client address; an address that failed `core.api.rate_limit_per_minute` times in a minute gets `429`
+before any lookup, so a token cannot be guessed at full speed. Successful requests do not consume that budget, so
+legitimate tokens behind one address (a factory network) are limited only by their own per-token limit.
+
+### Status codes
+
+| Situation | Status |
+|---|---|
+| Switch off | `403` |
+| Bearer present but not valid, or superadmin token | `401` |
+| Address outside the token's networks | `403` |
+| Permission denied, anonymous caller | `401` (a login or a token may change the answer; the SPA re-authentication prompt keys on it) |
+| Permission denied or ability missing, authenticated caller (session or token) | `403` |
+| Relation the caller may not read, explicitly requested | same rule as the two lines above |
+| Name in the request that is not a relation, a declared computed method or an attribute accessor | `400` |
+| Too many requests, or too many failed authentications | `429` |
+
+### Routes that carry their own credential
+
+Some callers send a secret of their own in `Authorization: Bearer` (payment and e-invoice provider callbacks, machine
+sources). Their route declares `->middleware(SelfAuthenticatedApiRoute::class)`. For such a route the switch, the `api`
+guard and the rate limit still apply, but the bearer is **not** read as a Laraplate token: the request runs as the
+anonymous user and the route's own check authenticates it. Today these are the two ERP provider callbacks and the MES
+machine ingest route (until the MES service-account migration).
+
+A route without the marker treats every bearer as a Laraplate token. A webhook sender that sends an
+`Authorization: Bearer` header to such a route (SAO webhooks verify custom headers, not `Authorization`) gets `401`.
+
+## Default roles
+
+Seeded by `CoreDatabaseSeeder` and the module seeders. `guest` is the role of the anonymous user.
+
+- `guest` on `web`: **no permission**. `/app` is for authenticated users only; anonymous session reads answer `401`.
+  Info routes (`/app/about`, `/app/auth/user/profile-information` for a guest) check no permission and keep working.
+- `guest` on `api`: the public list below, each entity narrowed by its ACL.
+- `admin`, `publisher`, `system`: their `web` permissions and no `api` permission.
+- `superadmin`: no permissions, full access by construction; cannot use tokens.
+- Roles of the `api` guard for people and integrations are created by administrators when needed.
+
+Public list of `guest` (`api`), all `select`:
+
+| Entity | Row condition (ACL) | Hidden from anonymous |
+|---|---|---|
+| `core_settings` | `is_public` | |
+| `cms_contents` | currently published (`valid_from <= @now` and `valid_to >= @now` or null) | |
+| `cms_contents_references` | owner content published | |
+| `vend_media` | owner is a published CMS content (relation filter with morph type) | safe media projection |
+| `cms_tags`, `cms_locations` | none | |
+| `cms_contributors` | none | `user_id`, `user`, `shared_components` |
+| `cms_comments` | none (pending comments never reach the table) | `user_id` |
+| `cms_contents_ratings` | none | `user_id` |
+
+"None" means no default ACL, not that ACLs are excluded: an installation may add its own. A guard test fails when the
+`api` guest grants differ from this list or when the `web` guest holds any permission.
+
+The publisher (a `web` role) also holds `core_settings.select`, narrowed to public settings by an ACL, and
+`core_entities.select`, narrowed to the CMS entity types: with related records obeying their own permission, the
+content screens read those entities through the contents they load.
+
+Anonymous responses are cached per user, so all anonymous callers share one cached response for an entity that uses the
+response cache. A row that stops being valid stays visible for at most the configured TTL (`cache.duration`, its
+`medium` value). CMS contents do not use the response cache; core settings do.
+
+## Related records obey their own permission and ACL
+
+Select, detail, search, tree, history and facets apply one visibility rule: a relation to an independent entity is
+loaded only if the caller holds that entity's `select` permission on the request's guard, and the related ACL narrows it,
+exactly as it narrows a root query. The rule holds for `relations`, dotted `columns`, relation filters, sorts, group-by
+keys and aggregates.
+
+- A relation the caller **explicitly requested** and may not read: `403`/`401` (see the table above). A relation the
+  model loads on its own (default eager loads, the dependency of a computed column, an appended attribute such as
+  `cover`) and the caller may not read is left out, or `null`.
+- An entity with no registered `select` permission is readable only if its class is in `PermissionsRefreshCommand`'s
+  deliberate blacklist (versions, modifications, licenses, dynamic entities, model embeddings, pivots, translations). Any other fails closed.
+  Personal access tokens are never readable through the CRUD.
+- **Parts of a parent** implement `Modules\Core\Contracts\IsPartOfParent::parentRelation()`: records that only exist
+  inside their parent (translations, document lines, BOM lines, quality plan characteristics, approvals). Loaded from
+  their own parent they inherit its visibility and are not checked separately, although a permission exists for their
+  table. Reached from any other model, they are checked against their parent's permission and ACL. A model qualifies
+  when it has a non-nullable foreign key to its parent with cascade delete and no Filament resource of its own.
+- **Names are checked before anything is called.** `Support\RelationGuard::relationOf()` accepts a name only when it is a
+  public, non-static method with no required parameter and a declared `Relation` return type: a relation method without
+  a return type answers `400` until it is typed (for example `notifiable` on notifications). The relation black list
+  (`history`, the version relations, `tokens`, the tree-walk relations) is dropped, at any depth, from the relations a
+  select, a detail or a search loads; grouping on one is `400`.
+- **Computed `method` columns need a declaration.** A request may call a model method as a column only if the method is a
+  key of the model's `crudComputedDependencies()` map, is not inherited from Eloquent, its builders or a vendor package,
+  is not a relation and not a write (`delete`, `save`, `sync`, `truncate` are refused even if declared). No production
+  model declares one, so every client `method` column is refused today. An appended column needs a real accessor, and a
+  group-by key may not name a method.
+- **Pending modifications** (`modifications`, the values somebody proposed and nobody approved) are readable only by a
+  caller holding the parent entity's `update` or `approve` permission on the request's guard: others get the relation
+  omitted when it is appended or default, and `403`/`401` when explicitly requested.
+- **History** (`/api/v1/history/{entity}`) needs the entity's `update` or `approve` permission, like the pending
+  modifications, because versions hold pre-publication drafts. The `record` is serialized through the model, so hidden
+  attributes and the media projection apply; history rows carry no nested copy of the record. Tree and history reads apply
+  the root entity's ACL to the nodes and versions they return.
+- **Partial relations are declared.** On `detail`, a relation the related ACL narrowed carries
+  `meta.relations.{name}.hidden`, the number of related records left out (one aggregate count per filtered relation, none
+  when no ACL narrows it). `list` and `search` do not carry it.
+- **Scoped sync (writes).** Syncing a many-to-many relation on `update` works only within the related records the writer
+  can read: hidden records stay attached with their pivot rows untouched, additions and removals are computed on the
+  visible subset, and attaching an id the writer cannot read (hidden or nonexistent) is `403` and rolls the save back.
+  Parts of the parent sync as before. `HasMany` relations are not syncable (only many-to-many relations a model whitelists
+  in `syncableRelations()`).
+
+### Search
+
+Search applies the same rule. ACL column conditions go to the engine; a relation filter cannot (the engine takes column
+conditions only, and an OR group holding a relation node is left out of the engine query), so it is applied when the
+hits are reloaded from the database. A search page can therefore hold fewer records than requested, and `totalRecords`
+of a search can count hits the caller may not see. Relations of the reloaded records go through the same authorizer and
+black list as select.
+
+## Columns returned
+
+### Hidden attributes for the anonymous user
+
+A model implements `Contracts\IHidesAttributesFromAnonymous::anonymousHiddenAttributes()` (trait
+`Models\Concerns\HidesAttributesFromAnonymous`). The listed attributes are filtered out of the serialization when the
+authenticated user of the current guard `isGuest()`, on every route and as a relation of another entity; staff, tokens
+and Filament see them. The filter sits in `getArrayableItems()` and never alters the model's `$hidden`, so one instance
+serialized for the anonymous user and then for staff is not left stripped. Declare columns or relations of the model
+itself: fields that the translation and dynamic-content traits merge in afterwards are not covered. With nobody acting
+(console, queue, indexing) the record is serialized in full.
+
+`User::isGuest()` is true for the account named by `permission.users.guest` (by name or username) and for a user with no
+email; a service account is never a guest unless it carries the guest name.
+
+### Media projection and signed URLs
+
+On the `api` guard a `Media` record is serialized as a projection, as an entity, as a relation or as the `cover` of its
+owner: `id`, `collection_name`, `mime_type`, `size`, `width`, `height`, `alt_text`, `url` and a `conversions` map
+(name to URL). `custom_properties`, `disk`, `conversions_disk` and the original `file_name` are never returned. `alt_text`
+comes from `custom_properties.alt_text` and the dimensions from `custom_properties.metadata.width/height`.
+
+A caller holding `vend_media.update` on the `api` guard (within its token's abilities) gets the full record. `/app`, the
+`web` guard and requests with no acting user are unchanged.
+
+URLs come from `Media\MediaUrls::safeUrl()`: a disk configured with `visibility` `public` gives its plain URL; a disk
+whose driver supports temporary URLs (private S3, or a local disk with `serve` on) gives a temporary URL valid for
+`core.media.signed_url_ttl_minutes` (default `60`); any other disk, and a missing one, gives `null`.
+
+Media are readable through `select/core/media` as well as search. Their visibility is the ACL of the `api` guest (media
+of published CMS contents only, through a relation filter), so a SAO ticket attachment or a media of an unpublished
+content is never public.
+
+### Appended relations (`cover`)
+
+A model that implements `Contracts\IPreloadsAppendedRelations` names the relations its appended attributes read. The CRUD
+read adds them to the query once per result set, narrowed by the related permission and ACL, instead of one lazy load per
+row; when the caller may not read the related entity the appended attribute is `null`. CMS contents, contributors and
+categories use it for `cover` (the first media of the `cover` collection).
+
+## Tokens
+
+`Modules\Core\Models\User` holds Sanctum tokens (`HasApiTokens`). `personal_access_tokens` has `allowed_cidrs` (json,
+nullable).
+
+- **Abilities** are `api` permission names (`default.cms_contents.select`). The wildcard `*` is refused. A request passes
+  when the user holds the permission on the `api` guard (through a role, an ancestor role or directly) **and** the token
+  carries it as an ability. Both are evaluated on every request, so revoking the permission from the role denies the next
+  request even for a token issued earlier.
+- **Expiry.** A personal token always expires, at most `core.api_tokens.max_lifetime_days` (default `365`) from now. A
+  service-account token may be non-expiring.
+- **Networks.** `allowed_cidrs` is a list of addresses or CIDR networks; empty or null means any address; a list that
+  cannot be read refuses every address.
+- A superadmin cannot create tokens, and a superadmin token that exists is refused at use. The anonymous account cannot
+  have tokens.
+
+### Personal tokens
+
+Session routes under `/app/auth/user/tokens` (the `auth` group; a bearer token never manages tokens):
+
+| Route | Name | Purpose |
+|---|---|---|
+| `GET /app/auth/user/tokens` | `core.auth.tokens.list` | the caller's tokens: id, name, abilities, `allowed_cidrs`, `last_used_at`, expiry. Never the token. |
+| `POST /app/auth/user/tokens` | `core.auth.tokens.create` | body `name`, `abilities[]`, `expires_at`, optional `allowed_cidrs[]`. The plain token is in the `201` response only (`Cache-Control: no-store`). |
+| `DELETE /app/auth/user/tokens/{token}` | `core.auth.tokens.revoke` | revokes one of the caller's tokens; the next `/api` call with it is `401`. |
+
+Abilities outside the `api` permissions the user holds, `*`, a missing or past expiry, or an expiry beyond the maximum
+life are `422`.
+
+### Service accounts
+
+`users.is_service_account` (boolean, default false) marks a non-interactive user. A service account has no usable
+password, cannot sign in (every sign-in goes through `AuthenticationService`, which refuses it), cannot open a Filament
+panel, cannot be impersonated, and authenticates with tokens only. Administrators create service accounts, assign their
+`api` roles, and issue and revoke their tokens (non-expiring allowed) in the Filament user resource, where the token list
+shows `last_used_at`, expiry and networks.
+
+## Operator checklist
+
+1. Turn the API on only when a consumer needs it: the `expose_api` setting (Filament > Settings). It also gates ERP
+   payment and e-invoice callbacks, SAO webhooks and MES machine data.
+2. Review what the `api` guest and any `api` role you created can read; each role's grants and ACLs are the only exposure.
+3. Set `core.api.rate_limit_per_minute`, `core.api_tokens.max_lifetime_days` and `core.media.signed_url_ttl_minutes` if
+   the defaults do not fit (config keys, no env variable).
+4. After pulling this behaviour into an existing installation, rebuild it with `php artisan migrate:fresh --seed`: there is
+   no migration of roles or permissions, and re-seeding never revokes grants. An installation that is only re-seeded keeps
+   the old `guest` role on `web` with its `select` permissions, which no longer matter to `/api` but still let an
+   anonymous `/app` session read those entities. The anonymous user is cached (`anonymous_user.{name}`): clear the cache
+   after seeding if it was cached before its roles existed.
+5. CMS search indexes need a rebuild (see the CMS README).
+
+## FAQ prompts for RAG
+
+- Why does `/api/v1` answer 403 on every route?
+- Why does a request with an invalid token answer 401 instead of acting as anonymous?
+- Which permissions does the anonymous user hold on `/api`?
+- What is the difference between a 401 and a 403 on `/api`?
+- How do I give an integration read access to some entities only?
+- Why can a token not use a permission its role holds?
+- How do I issue a non-expiring token for an integration?
+- Why does a client `method` column answer 400?
+- What does `meta.relations.media.hidden` mean?
+- Why does a media come back without `custom_properties` on the API?

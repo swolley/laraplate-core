@@ -21,6 +21,7 @@
 -   [Description](#description)
 -   [Installation](#installation)
 -   [Configuration](#configuration)
+-   [Upgrade notes](#upgrade-notes)
 -   [Features](#features)
 -   [Scripts](#scripts)
 -   [Contributing](#contributing)
@@ -37,6 +38,7 @@ The Core Module contains all the necessary functionalities to build a new Larave
 -   Transactional outbox: durable cross-system integration events with an application-replaceable publisher and queued delivery.
 -   [ACL system](docs/ACL_SYSTEM.md): permission and row-level access control behavior.
 -   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior.
+-   [API access control](docs/rag/API_ACCESS_CONTROL.md): guards, the `expose_api` switch, token authentication, default roles, related-record visibility, media projection, personal tokens and service accounts.
 -   [Module import framework](docs/IMPORT_FRAMEWORK.md): abstract command and neutral services for module-owned external importers.
 
 ## Installation
@@ -196,6 +198,19 @@ SLACK_OPENID_CLIENT_ID= 						#slack openid client id
 SLACK_OPENID_CLIENT_SECRET=						#slack openid client secret
 SOCIALITE_REDIRECT= 							#socialite redirect
 ```
+
+### API access configuration
+
+These are config keys under `core.` (set them in the Core config, `Modules/Core/config/config.php`), not environment variables, except where a runtime setting is named:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `core.expose_api` | `false` | Master switch of every `/api` route, Core and modules (ERP callbacks, SAO webhooks, MES machine data included). Off, they answer `403`. A runtime setting named `expose_api` (Filament > Settings, seeded by Core) overrides the default. |
+| `core.api.rate_limit_per_minute` | `600` | Requests a minute per token, or per client address when there is no token. Also the number of failed bearer authentications a client address may make a minute before it gets `429`. |
+| `core.api_tokens.max_lifetime_days` | `365` | Longest life of a personal access token. Service-account tokens may be non-expiring. |
+| `core.media.signed_url_ttl_minutes` | `60` | Minutes a temporary media URL of the `api` projection stays valid, on a disk whose driver can sign URLs. |
+
+The anonymous account is the user named by `GUEST_USER` (default `anonymous`). See [docs/rag/API_ACCESS_CONTROL.md](docs/rag/API_ACCESS_CONTROL.md) for the behaviour behind these keys.
 
 ### Versioning configuration
 
@@ -363,6 +378,15 @@ $user->update([
 Seeded system users (`superadmin`, `admin`, `guest`, `system`) use `valid_from => now()` and `valid_to => null`. Enforce the window at login by checking `$user->isValid()` in Fortify/Socialite providers or auth middleware (not applied automatically on every query).
 
 If you need to override the Core Module or dependencies configs you can publish them by running the following command:
+
+## Upgrade notes
+
+### API access control (guards, tokens, related records)
+
+-   **The API switch is renamed.** The seeded setting `crud.expose_api` (config `core.crud.expose_api`) is now `expose_api` (config `core.expose_api`, default `false`). It gates every `/api` route of Core and of the modules, not only the CRUD routes: with it off, ERP provider callbacks, SAO webhooks and MES machine data answer `403`. Anything that writes the old key literally (scripts, tests) must write the new one; `CrudApiExposure::enable()` already does.
+-   **Rebuild existing installations with `php artisan migrate:fresh --seed`.** There is no migration of roles or permissions: every permission now exists for both the `web` and the `api` guard, the users table gains `is_service_account`, and `personal_access_tokens` gains `allowed_cidrs`, all folded into their create migrations. Re-seeding an existing database is not enough: the seeder creates missing roles only and never revokes a grant, so the old `guest` role of `web` keeps its `select` permissions (it no longer affects `/api`, but an anonymous `/app` session can still read those entities). A freshly seeded `guest` on `web` holds no permission, and `guest` on `api` holds the public list. The anonymous user is cached: clear the cache after seeding if it was cached before its roles existed.
+-   **Related records obey their own permission.** A user who read a relation through its parent without holding the related entity's `select` permission loses it (the seeded roles were given the related permissions their screens need). Clients that send `method` columns now get `400` unless the model declares the method in `crudComputedDependencies()`; no production model does.
+-   Rebuild the CMS search indexes after upgrading (see the CMS README).
 
 ## PHP Attributes
 
@@ -704,6 +728,7 @@ The Core Module includes built-in features such as:
 -   Utilities for translations and model versioning.
 -   Support for Laravel Octane and Horizon for improved performance and queue management.
 -   Multi entities and connections crud endpoints with standardized requests parameters
+-   API access control: one guard, one switch and one optional token authentication for every `/api` route, permissions per guard, personal tokens and service accounts, related records that obey their own permission and ACL, attributes hidden from anonymous callers and a safe media projection ([docs/rag/API_ACCESS_CONTROL.md](docs/rag/API_ACCESS_CONTROL.md))
 -   Strongly validated requests for Core routes
 -   Default common Response Formatter
 -   App settings and configurable Cron-Jobs on db tables

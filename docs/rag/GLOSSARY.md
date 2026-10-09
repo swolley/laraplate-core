@@ -14,6 +14,15 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **AuthorizationService**  | Checks permissions and injects/applies ACL filters on queries.          |
 | **AclResolverService**    | Resolves effective ACLs for a user/permission; combines filters with OR logic. |
 | **unrestricted**          | ACL flag: user sees all rows for that permission (no filter).          |
+| **api guard** | Guard of every `/api` route. Permissions exist for `web` and `api` with the same names; a role holds those of its own guard. |
+| **AuthenticateApiRequest** | Middleware that owns the `expose_api` switch, the bearer token, the anonymous fallback, the token's network list and the rate limit of every `/api` route. |
+| **anonymous user** | Account named by `permission.users.guest`; the caller of `/api` with no token. Holds the `guest` role of both guards. |
+| **SelfAuthenticatedApiRoute** | Marker for an `/api` route whose callers send their own secret as bearer; the route authenticates, Laraplate does not read the bearer as a token. |
+| **service account** | Non-interactive user (`is_service_account`): cannot sign in or open a panel, authenticates with tokens only. |
+| **token ability** | An `api` permission name carried by a token; a request needs the role permission and the ability. |
+| **RelationFilter** | ACL node that conditions a record on a related record (`whereHas` or `whereHasMorph`). |
+| **IsPartOfParent** | Contract of a model that only exists inside its parent record and inherits the parent's visibility. |
+| **media projection** | Safe serialization of a media on the `api` guard: URLs, dimensions and alt text, no storage details. |
 | **License**               | Seat / entitlement record gating module or feature access.              |
 | **Lease**                 | Owned, expiring lock taken by opening an edit form; only its holder may write. |
 | **Hold**                  | Owned lock with no deadline; deliberate, needs the `lock` permission.    |

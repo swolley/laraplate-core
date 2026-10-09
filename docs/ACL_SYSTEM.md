@@ -317,6 +317,25 @@ Result on `vend_media`: only media whose owner is a content valid at the time of
 - The ACL form edits the JSON; the validation rule accepts a relation node whose `filters` is a group.
 - At save, `Rules\AclRelationFilters` checks what the node names: the relation must be a relation method of the entity the ACL's permission is about (nested relation nodes are checked against the related entity), a `MorphTo` needs `morph_types` and any other relation must not carry them, and every morph type must be a model class or morph alias. A failing check rejects the ACL.
 
+#### Strict reading and failing closed
+
+An ACL must never widen because of something it cannot read, so the cast that loads the `filters` JSON (`FiltersGroupCast`) refuses what it does not understand instead of dropping it:
+
+- A node is exactly one kind with exactly its keys: a relation node (`relation`, `filters`, `morph_types`), a filter (`property`, `operator`, `value`) or a group (`operator`, `filters`). An unknown key, or keys of two kinds in one node, throws.
+- The items of a group must be filters, groups or relation nodes (objects), the `filters` of a relation node must be a group (an object, not a bare list) that holds at least one condition, and `morph_types` must be a non-empty list.
+- Undecodable JSON, or a value that is neither an object nor a list, throws. The ACL then fails to load and the request fails: it never runs unfiltered.
+- A stored group that constrains nothing (empty, or made of empty groups) throws as well, because it would match every row. The `unrestricted` flag is the exemption: an ACL flagged `unrestricted` may store an empty group (it contributes no filters by design). A SQL `NULL` or empty `filters` column keeps meaning "no filters".
+- At query time every relation name goes through `Support\RelationGuard` (a public, non-static method with no required parameter and a declared `Relation` return type) before it is called, and a morph relation must name its morph types, never the wildcard. A filter that fails these checks throws, so the query fails closed.
+- The strict reading runs when an ACL is saved (`AclRelationFilters` hydrates the filters through the cast, so an unreadable shape is rejected) and every time it is loaded. The `Rules\QueryBuilder` shape rule shared with `ListRequest` keeps its looser contract for request filters.
+
+#### Relation filters in search
+
+A relation node cannot be pushed to the search engine. The records behind the hits are reloaded from the database with the ACL applied (`CrudService::searchHitsQuery()`), which is where the relation condition takes effect. Consequences: a search page can hold fewer records than requested, and the search `totalRecords` is the engine's count, so it can count hits the caller may not see. A model that implements `IAuthorizesSearchRehydration` (media) adds its own guard on top.
+
+#### ACLs per guard
+
+An ACL is attached to a permission, and a permission belongs to one guard. The default ACLs for the anonymous reader sit on the `guest` role of the `api` guard (published contents and their references and media, public settings); the `guest` of `web` holds no permission. Role-scoped ACLs follow the role's guard like the permission they filter. See [rag/API_ACCESS_CONTROL.md](./rag/API_ACCESS_CONTROL.md).
+
 ## Usage
 
 ### Automatic Integration (CrudService)
