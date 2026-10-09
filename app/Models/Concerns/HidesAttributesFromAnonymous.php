@@ -13,9 +13,13 @@ use Modules\Core\Models\User;
  * for the anonymous user.
  *
  * The user is the authenticated one of the current guard: with nobody acting (console, queue, search indexing)
- * the record is serialized in full. The attributes are filtered out of the serialization itself and never added
- * to the model's own hidden list, so an instance that was serialized for the anonymous user and is serialized
- * again for a staff user, in the same process, still carries them.
+ * the record is serialized in full.
+ *
+ * This deliberately does not call `makeHidden()` in `toArray()`, as the plan's R9 words it: `makeHidden()` changes
+ * the instance for good, so an instance serialized for the anonymous user and serialized again for a staff user, in
+ * the same process (a cached model, a long-lived worker), would stay stripped. The attributes are filtered out of
+ * the serialization itself and never added to the model's hidden list, with the same visible result. The filter
+ * sits in `getArrayableItems()`, which also leaves the `toArray()` overrides of the other model traits alone.
  *
  * @phpstan-require-implements IHidesAttributesFromAnonymous
  *

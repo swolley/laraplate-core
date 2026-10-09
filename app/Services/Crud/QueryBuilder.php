@@ -27,6 +27,7 @@ use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Contracts\IPreloadsAppendedRelations;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
@@ -806,6 +807,16 @@ final class QueryBuilder
         $model = $builder->getModel();
         $drop = [];
         $wrapped = [];
+
+        // The relations the appended attributes read are loaded once for the result set, here, so the attributes
+        // do not load them row by row; each then goes through the same rule below as any default eager load.
+        if ($model instanceof IPreloadsAppendedRelations) {
+            foreach ($model->appendedAttributeRelations() as $appended_relation) {
+                if (! array_key_exists($appended_relation, $builder->getEagerLoads())) {
+                    $builder->with($appended_relation);
+                }
+            }
+        }
 
         foreach ($builder->getEagerLoads() as $name => $constraint) {
             if ($this->isKnownRelationPath($name, $known)) {

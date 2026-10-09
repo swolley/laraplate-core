@@ -15,6 +15,9 @@ use Throwable;
  * a response for the anonymous or API reader carries: a disk configured as public gives its plain URL, a disk
  * whose driver can sign gives a temporary URL valid for `core.media.signed_url_ttl_minutes`, and any other disk
  * (a local one that is not public, an unknown one) gives no URL at all.
+ *
+ * In practice: a `public` disk and a private S3 disk return a URL; a local disk with `serve => true` also signs, through
+ * Laravel's serve route; a local disk that is neither public nor served, and a disk that does not exist, return null.
  */
 final class MediaUrls
 {
