@@ -50,6 +50,10 @@ final readonly class AdvancedSearchService
      * The components come from the strategy the resolver picks for `$mode`, per call: `meta['search']` reports
      * the mode asked for, the mode applied, why they differ (`degraded_reason`) and `retries_used`.
      *
+     * `$retries` is how many times the caller lets a poor result be searched again, capped by the strategy
+     * (`max_retries`, zero for `fast`). A retry is judged by {@see SearchQualityEvaluator} and is not the same
+     * query again: see {@see self::relaxedPlan()}.
+     *
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
     public function search(
@@ -62,6 +66,7 @@ final readonly class AdvancedSearchService
         TextMatchPreference|string|null $matching = null,
         array $matchingOptions = [],
         SearchMode $mode = SearchMode::Fast,
+        ?int $retries = null,
     ): AdvancedSearchResult {
         $strategy = $this->strategies->resolve($mode);
         $timings = (bool) config('core.search.debug_timings', false) ? new SearchStageTimings() : null;
@@ -82,27 +87,46 @@ final readonly class AdvancedSearchService
         $plan = $this->stage($timings, SearchStageTimings::PLAN, fn (): array => $strategy->planner->safePlan($query));
         $plan['intent'] = $intent;
         $plan['retrieval']['size'] = $perPage;
-        $plan = $this->applyEngineCapabilities($engine, $plan);
-        $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
-        $plan = $this->tuningProfile()->apply($plan, QueryClass::fromAnalysis($text_match->analysis));
-        $availability = $this->vectorAvailability($model, $plan, $strategy);
-        $vector = $availability->available ? $this->resolveVector($query, $plan, $strategy, $timings) : null;
+        $run = function (array $plan, string $search_query) use ($model, $engine, $strategy, $query, $page, $perPage, $filters, $sort, $matching, $matchingOptions, $timings): array {
+            $plan = $this->applyEngineCapabilities($engine, $plan);
+            $text_match = app(TextMatchOptionsResolver::class)->resolve($search_query, $matching, $matchingOptions);
+            $plan = $this->tuningProfile()->apply($plan, QueryClass::fromAnalysis($text_match->analysis));
+            $availability = $this->vectorAvailability($model, $plan, $strategy);
+            $vector = $availability->available ? $this->resolveVector($query, $plan, $strategy, $timings) : null;
 
-        $result = $this->stage($timings, SearchStageTimings::ENSEMBLE, fn (): AdvancedSearchResult => $this->ensemble_search->search(
-            model: $model,
-            query: $search_query,
-            plan: $plan,
-            vector: $vector,
-            page: $page,
-            perPage: $perPage,
-            filters: $filters,
-            sort: $sort,
-            textMatch: $text_match,
-            reranker: $strategy->reranker,
-        ));
+            $result = $this->stage($timings, SearchStageTimings::ENSEMBLE, fn (): AdvancedSearchResult => $this->ensemble_search->search(
+                model: $model,
+                query: $search_query,
+                plan: $plan,
+                vector: $vector,
+                page: $page,
+                perPage: $perPage,
+                filters: $filters,
+                sort: $sort,
+                textMatch: $text_match,
+                reranker: $strategy->reranker,
+            ));
+
+            return [$result, $availability, $plan];
+        };
+
+        [$result, $availability, $used_plan] = $run($plan, $search_query);
+
+        $retries_used = 0;
+        $max_retries = min(max(0, $retries ?? 0), $strategy->max_retries);
+        $judge = new SearchQualityEvaluator;
+
+        while ($retries_used < $max_retries && $judge->shouldRetry($judge->evaluate($result->hits), $retries_used + 1, $used_plan)) {
+            [$retry, $retry_availability, $retry_plan] = $run($this->relaxedPlan($plan, $perPage, $strategy), $query);
+            $retries_used++;
+
+            if (count($retry->hits) >= count($result->hits)) {
+                [$result, $availability, $used_plan] = [$retry, $retry_availability, $retry_plan];
+            }
+        }
 
         $meta = $availability->available ? $result->meta : [...$result->meta, 'vector_disabled' => $availability->reason];
-        $meta['search'] = $this->searchMeta($mode, $strategy);
+        $meta['search'] = $this->searchMeta($mode, $strategy, $retries_used);
 
         if ($timings instanceof SearchStageTimings) {
             $meta['timings'] = $timings->toMeta();
@@ -247,15 +271,41 @@ final readonly class AdvancedSearchService
     }
 
     /**
+     * The plan of a retry: the first one found too little, so cast a wider net. The candidate window doubles
+     * (up to 200), the intent expansion is dropped by the caller, which searches the user's own words, and
+     * semantic retrieval is switched on when the strategy has an embedder and vector search is enabled.
+     *
+     * @param  array<string, mixed>  $plan
+     * @return array<string, mixed>
+     */
+    private function relaxedPlan(array $plan, int $per_page, SearchStrategy $strategy): array
+    {
+        $retrieval = $this->planSection($plan, 'retrieval');
+        $retrieval['use_fulltext'] = true;
+        $retrieval['size'] = min(200, max($per_page, (int) ($retrieval['size'] ?? $per_page)) * 2);
+
+        if ($strategy->embedder instanceof ITextEmbedder && (bool) config('core.search.vector.enabled', false)) {
+            $retrieval['use_vector'] = true;
+            $retrieval['use_ensemble'] = true;
+            $plan['ensemble'] = [...$this->planSection($plan, 'ensemble'), 'keyword_weight' => 0.35, 'vector_weight' => 0.35, 'hybrid_weight' => 0.30];
+            $plan['vector'] = [...$this->planSection($plan, 'vector'), 'enabled' => true];
+        }
+
+        $plan['retrieval'] = $retrieval;
+
+        return $plan;
+    }
+
+    /**
      * @return array{mode_requested: string, mode_applied: string, degraded_reason: string|null, retries_used: int}
      */
-    private function searchMeta(SearchMode $requested, SearchStrategy $strategy): array
+    private function searchMeta(SearchMode $requested, SearchStrategy $strategy, int $retries_used = 0): array
     {
         return [
             'mode_requested' => $requested->value,
             'mode_applied' => $strategy->applied_mode->value,
             'degraded_reason' => $strategy->degraded_reason,
-            'retries_used' => 0,
+            'retries_used' => $retries_used,
         ];
     }
 
