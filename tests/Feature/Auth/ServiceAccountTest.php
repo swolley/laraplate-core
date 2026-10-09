@@ -96,6 +96,57 @@ describe('a service account is never anonymous', function (): void {
     });
 });
 
+describe('the guest account stays the guest', function (): void {
+    it('is a guest by its configured name or username even when flagged as a service account', function (): void {
+        config()->set('permission.users.guest', 'visitor');
+
+        $by_name = User::factory()->serviceAccount()->make(['name' => 'visitor', 'username' => 'x1']);
+        $by_username = User::factory()->serviceAccount()->make(['name' => 'Someone', 'username' => 'visitor']);
+
+        expect($by_name->isGuest())->toBeTrue()
+            ->and($by_username->isGuest())->toBeTrue();
+    });
+
+    it('resolves the anonymous user deterministically when a service account shares its name', function (): void {
+        Cache::flush();
+        config()->set('permission.users.guest', 'visitor');
+        $impostor = App\Models\User::query()->findOrFail(User::factory()->serviceAccount()->create(['name' => 'visitor', 'username' => 'svc-visitor'])->getKey());
+        $real = App\Models\User::query()->findOrFail(User::factory()->create(['name' => 'visitor', 'username' => 'visitor'])->getKey());
+
+        $resolved = app(Modules\Core\Services\Authorization\AuthorizationService::class)->resolveAnonymousUser(Illuminate\Http\Request::create('/'));
+
+        expect($resolved?->getKey())->toBe($real->getKey())->not->toBe($impostor->getKey());
+    });
+
+    it('prefers the account that is not a service account when only the name collides', function (): void {
+        Cache::flush();
+        config()->set('permission.users.guest', 'visitor');
+        App\Models\User::query()->findOrFail(User::factory()->serviceAccount()->create(['name' => 'visitor', 'username' => 'svc-visitor'])->getKey());
+        $real = App\Models\User::query()->findOrFail(User::factory()->create(['name' => 'visitor', 'username' => 'the-visitor'])->getKey());
+
+        $resolved = app(Modules\Core\Services\Authorization\AuthorizationService::class)->resolveAnonymousUser(Illuminate\Http\Request::create('/'));
+
+        expect($resolved?->getKey())->toBe($real->getKey());
+    });
+
+    it('never issues a token for the guest account', function (): void {
+        config()->set('permission.users.guest', 'visitor');
+        $guest = serviceAccountTestAccount(serviceAccount: false);
+        $guest->forceFill(['name' => 'visitor'])->save();
+
+        expect(fn () => app(ApiTokenService::class)->issue($guest->fresh(), 'x', [SERVICE_ACCOUNT_TEST_PERMISSION], now()->addDay(), null))
+            ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
+        expect(Laravel\Sanctum\PersonalAccessToken::query()->count())->toBe(0);
+    });
+});
+
+describe('a service account is not impersonable', function (): void {
+    it('cannot be impersonated while an ordinary account can', function (): void {
+        expect(serviceAccountTestAccount()->canBeImpersonated())->toBeFalse()
+            ->and(serviceAccountTestAccount(serviceAccount: false)->canBeImpersonated())->toBeTrue();
+    });
+});
+
 describe('a service account authenticates with tokens only', function (): void {
     it('is served on the api with a non-expiring token issued for it', function (): void {
         CrudApiExposure::enable();
@@ -124,6 +175,22 @@ describe('a service account authenticates with tokens only', function (): void {
 
         expect($token->accessToken->expires_at)->not->toBeNull()
             ->and(json_decode((string) $token->accessToken->getRawOriginal('allowed_cidrs'), true))->toBe(['10.0.0.0/8']);
+    });
+
+    it('leaves no unrestricted token behind when the network restriction cannot be saved', function (): void {
+        $service = serviceAccountTestAccount();
+        Laravel\Sanctum\PersonalAccessToken::updating(static function (): void {
+            throw new RuntimeException('second write failed');
+        });
+
+        try {
+            expect(fn () => app(ApiTokenService::class)->issue($service, 'machine', [SERVICE_ACCOUNT_TEST_PERMISSION], null, ['10.0.0.0/8']))
+                ->toThrow(RuntimeException::class);
+        } finally {
+            Laravel\Sanctum\PersonalAccessToken::flushEventListeners();
+        }
+
+        expect(Laravel\Sanctum\PersonalAccessToken::query()->count())->toBe(0);
     });
 
     it('does not let a non-service account have a non-expiring token through the service', function (): void {

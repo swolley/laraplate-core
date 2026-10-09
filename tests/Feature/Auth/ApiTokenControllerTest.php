@@ -199,6 +199,39 @@ describe('creating a personal token', function (): void {
             ->assertJsonValidationErrors(['expires_at']);
     });
 
+    it('stores the instant that was asked for, whatever offset the client sends', function (string $offset): void {
+        $asked = now()->addDays(30)->startOfSecond();
+        $user = apiTokenTestUser();
+
+        $this->actingAs($user)
+            ->postJson(route('core.auth.tokens.create'), apiTokenTestPayload(['expires_at' => $asked->copy()->setTimezone($offset)->format('Y-m-d\\TH:i:sP')]))
+            ->assertCreated();
+
+        expect(PersonalAccessToken::query()->sole()->expires_at->getTimestamp())->toBe($asked->getTimestamp());
+    })->with(['Z' => ['UTC'], 'east' => ['Asia/Tokyo'], 'far east' => ['Pacific/Kiritimati'], 'west' => ['America/Los_Angeles']]);
+
+    it('refuses an expiry beyond the longest life in any offset', function (string $offset): void {
+        $user = apiTokenTestUser();
+        $beyond = now()->addDays(365)->addHour();
+
+        $this->actingAs($user)
+            ->postJson(route('core.auth.tokens.create'), apiTokenTestPayload(['expires_at' => $beyond->copy()->setTimezone($offset)->format('Y-m-d\\TH:i:sP')]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['expires_at']);
+
+        expect(PersonalAccessToken::query()->count())->toBe(0);
+    })->with(['Z' => ['UTC'], 'east' => ['Asia/Tokyo'], 'far east' => ['Pacific/Kiritimati'], 'west' => ['America/Los_Angeles']]);
+
+    it('cannot be reached with a bearer token', function (): void {
+        $user = apiTokenTestUser();
+        $new = $user->createToken('bearer', [API_TOKEN_TEST_PERMISSION], now()->addDays(10));
+
+        $this->postJson(route('core.auth.tokens.create'), apiTokenTestPayload(), ['Authorization' => 'Bearer ' . $new->plainTextToken])
+            ->assertUnauthorized();
+
+        expect(PersonalAccessToken::query()->count())->toBe(1);
+    });
+
     it('refuses a superadmin', function (): void {
         $user = apiTokenTestUser();
         $user->assignRole(Role::findOrCreate('superadmin', 'web'));

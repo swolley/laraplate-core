@@ -339,8 +339,8 @@ final class AuthorizationService
         // Keyed by the configured name: a stale user must not survive a rename of the guest account.
         // Loaded as the configured user class: the roles of the account are stored under the morph type of
         // that class, so a parent class would load the account with no role at all.
-        $anonymous = Cache::rememberForever('anonymous_user.' . $guest_name, static function () use ($guest_name): ?Model {
-            $id = User::query()->where('name', $guest_name)->value('id');
+        $anonymous = Cache::rememberForever('anonymous_user.' . $guest_name, function () use ($guest_name): ?Model {
+            $id = $this->anonymousUserId($guest_name);
 
             return $id === null ? null : user_class()::query()->whereKey($id)->first();
         });
@@ -359,6 +359,19 @@ final class AuthorizationService
         $request->setUserResolver(fn (): User => $anonymous);
 
         return $anonymous;
+    }
+
+    /**
+     * The id of the account configured as the guest. The username is unique, so a match on it is the
+     * account; otherwise the name (which is not unique) picks an account that is not a service account
+     * first and the oldest one after that, so the answer never depends on the order of the table.
+     */
+    private function anonymousUserId(string $guest_name): mixed
+    {
+        $user = new User();
+
+        return User::query()->where($user->qualifyColumn('username'), $guest_name)->value('id')
+            ?? User::query()->where('name', $guest_name)->orderBy('is_service_account')->orderBy('id')->value('id');
     }
 
     /**

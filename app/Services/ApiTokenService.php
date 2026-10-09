@@ -94,18 +94,27 @@ final class ApiTokenService
         $tokenable = $this->tokenable($user);
 
         abort_if($tokenable->isSuperAdmin(), 403, 'A superadmin cannot have API tokens.');
+        abort_if($tokenable->isGuest(), 403, 'The anonymous account cannot have API tokens.');
 
         $this->assertAbilities($tokenable, $abilities);
         $this->assertExpiry($tokenable, $expires_at);
         $networks = $this->normalizedNetworks($allowed_cidrs);
 
-        $token = $tokenable->createToken($name, $abilities, $expires_at);
+        // Eloquent writes a date in the timezone of the Carbon it is given and reads it back as the
+        // application timezone: a client offset left on the instant would move the stored expiry.
+        $expires_at = $expires_at?->copy()->setTimezone(config()->string('app.timezone'));
 
-        if ($networks !== []) {
-            $token->accessToken->forceFill(['allowed_cidrs' => json_encode($networks)])->save();
-        }
+        // One unit: the restriction is part of the token, so a failed second write must not leave a
+        // token that works from any address.
+        return $tokenable->getConnection()->transaction(static function () use ($tokenable, $name, $abilities, $expires_at, $networks): NewAccessToken {
+            $token = $tokenable->createToken($name, $abilities, $expires_at);
 
-        return $token;
+            if ($networks !== []) {
+                $token->accessToken->forceFill(['allowed_cidrs' => json_encode($networks)])->save();
+            }
+
+            return $token;
+        });
     }
 
     /**

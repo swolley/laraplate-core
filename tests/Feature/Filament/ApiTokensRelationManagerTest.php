@@ -161,3 +161,19 @@ it('replaces the password of an account turned into a service account', function
         ->and($user->getAuthPassword())->not->toBe($before)
         ->and(Hash::check('Password1!', $user->getAuthPassword()))->toBeFalse();
 });
+
+it('refuses to flag the guest account, or an account named like it, as a service account', function (string $field): void {
+    config()->set('permission.users.guest', 'visitor');
+
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => $field === 'name' ? 'visitor' : 'Edge agent',
+            'username' => $field === 'username' ? 'visitor' : 'edge-agent',
+            'email' => 'edge@example.test',
+            'is_service_account' => true,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['is_service_account']);
+
+    expect(App\Models\User::query()->where('email', 'edge@example.test')->exists())->toBeFalse();
+})->with(['name', 'username']);

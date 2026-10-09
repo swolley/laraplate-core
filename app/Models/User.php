@@ -243,11 +243,19 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
      */
     public function isGuest(): bool
     {
+        $guest = config('permission.users.guest');
+        $has_guest_identity = is_string($guest) && $guest !== ''
+            && in_array($guest, [$this->getAttribute('name'), $this->getAttribute('username')], true);
+
+        // First: an account that carries the configured guest name fails safe as a guest, flagged as a
+        // service account or not.
+        if ($has_guest_identity) {
+            return true;
+        }
+
         if ($this->isServiceAccount()) {
             return false;
         }
-
-        $guest = config('permission.users.guest');
 
         if ($this->getAttribute('email') === null) {
             return true;
@@ -257,10 +265,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
             throw new UnexpectedValueException('Configured guest account is invalid.');
         }
 
-        return in_array($guest, [
-            $this->getAttribute('name'),
-            $this->getAttribute('username'),
-        ], true);
+        return false;
     }
 
     public function isSuperAdmin(): bool
@@ -333,7 +338,7 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->isSuperAdmin();
+        return ! $this->isSuperAdmin() && ! $this->isServiceAccount();
     }
 
     /**
