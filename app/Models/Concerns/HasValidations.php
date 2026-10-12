@@ -290,13 +290,16 @@ trait HasValidations
 
     /**
      * The registered permissions any one of which allows the operation on the record, each mapped to the table it
-     * names. Empty when none is registered: the operation is then not governed by a permission.
+     * names, the record's own first. Empty when none is registered: the operation is then not governed by a
+     * permission.
      *
      * Writes ask the record's own permission. A read of a part of its parent ({@see IsPartOfParent}) also accepts
-     * the `select` of the part's owner ({@see PartOwnerResolver}): the part inherits the owner's visibility
-     * (spec 8.1), so a caller who reads the owner hydrates its parts whatever the part's own permission says, while
-     * a caller holding the part's own `select` still reads it from its own endpoint. An owner without a registered
-     * permission, or a chain that does not resolve, leaves the part's own permission alone in charge.
+     * the `select` of every model up the part's chain ({@see PartOwnerResolver}), nearest first: each intermediate
+     * part and the first owner that is not a part. The part inherits the visibility of the record it is loaded from
+     * (spec 8.1), and the relation path loads it from any step of that chain, so a caller who reads any of them
+     * hydrates the part whatever the part's own permission says, while a caller holding the part's own `select`
+     * still reads it from its own endpoint. A model of the chain without a registered permission adds nothing, and
+     * a chain that does not resolve leaves the part's own permission alone in charge.
      *
      * @return array<string, string>
      */
@@ -310,8 +313,9 @@ trait HasValidations
         // `default` standing in for models that follow `database.default`. Dropping
         // the connection segment made every lookup miss, and a miss reads as
         // "permission not registered" -> operation allowed.
-        // Existence is memoized for the current request only: a permission granted or revoked
-        // between requests must be observed by the next one.
+        // Existence is memoized for the life of the process (PermissionExistenceMemo), not per
+        // request: PHP-FPM resets it with every request, but a queue worker keeps its answers until
+        // it restarts, so workers must be restarted after a deploy that registers permissions.
         $permissions = [];
         $own = PermissionName::forModel($model, $operation);
 
@@ -319,14 +323,14 @@ trait HasValidations
             $permissions[$own] = $model->getTable();
         }
 
-        $owner_class = $operation === 'select' ? PartOwnerResolver::ownerClassOf($model) : null;
+        $chain = $operation === 'select' ? PartOwnerResolver::chainClassesOf($model) : null;
 
-        if ($owner_class !== null) {
-            $owner_model = new ReflectionClass($owner_class)->newInstanceWithoutConstructor();
-            $owner = PermissionName::forModel($owner_model, 'select');
+        foreach ($chain ?? [] as $ancestor_class) {
+            $ancestor = new ReflectionClass($ancestor_class)->newInstanceWithoutConstructor();
+            $name = PermissionName::forModel($ancestor, 'select');
 
-            if (PermissionExistenceMemo::exists($permission_class, $owner)) {
-                $permissions[$owner] = $owner_model->getTable();
+            if (PermissionExistenceMemo::exists($permission_class, $name)) {
+                $permissions[$name] = $ancestor->getTable();
             }
         }
 
@@ -334,18 +338,21 @@ trait HasValidations
     }
 
     /**
-     * Names what a refused read was missing: the record's own `select`, the `select` of the owner of a part, or
-     * either of them.
+     * Names what a refused read was missing: the tables whose `select` was checked, the record's own and those of
+     * the owners up the chain of a part.
      */
     protected static function selectRefusalMessage(Model $model): string
     {
-        $tables = array_values(static::governingPermissions($model, 'select'));
+        $permissions = static::governingPermissions($model, 'select');
         $table = $model->getTable();
+        $own = PermissionName::forModel($model, 'select');
+        $owners = array_values(array_diff_key($permissions, [$own => true]));
+        $noun = count($owners) > 1 ? 'owners' : 'owner';
 
         return match (true) {
-            count($tables) > 1 => sprintf('User cannot select %s nor its owner %s', $table, $tables[1]),
-            $tables !== [] && $tables[0] !== $table => sprintf('User cannot select %s, owner of %s', $tables[0], $table),
-            default => 'User cannot select ' . $table,
+            $owners === [] => 'User cannot select ' . $table,
+            array_key_exists($own, $permissions) => sprintf('User cannot select %s nor its %s %s', $table, $noun, implode(', ', $owners)),
+            default => sprintf('User cannot select %s, %s of %s', implode(', ', $owners), $noun, $table),
         };
     }
 

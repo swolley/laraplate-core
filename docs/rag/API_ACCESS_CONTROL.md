@@ -139,12 +139,14 @@ keys and aggregates.
   permission exists for their table: an installation's own ACL on a part applies only when the part is read directly
   (its own endpoint), or reached from any other model, where it is checked against its parent's permission and ACL.
   The per-record check run when a model is hydrated agrees: for reading, a part passes when the caller holds (on the
-  request's guard, within the token's abilities) either the part's own `select` or the `select` of the first owner up
-  its parent chain that is not a part. So a token carrying only `cms_contents.select` reads a content's references
-  and ratings, and a caller holding only a part's own permissions passes the check on the part's own endpoint
-  (detail, update, delete); a caller holding neither does not hydrate the part (the refusal names both tables). An
-  owner with no registered permission, a morph or undeclared parent relation, a cycle or a chain longer than eight
-  parts leaves only the part's own permission in charge. Translations are covered: outside the permission scheme
+  request's guard, within the token's abilities) the `select` of any model along its parent chain: its own, that of
+  every intermediate part, or that of the first owner up the chain that is not a part. So a token carrying only
+  `cms_contents.select` reads a content's references and ratings, a role holding only `shop_product_variants.select`
+  reads a variant's items (parts of the variant, itself a part of its product), and a caller holding only a part's
+  own permissions passes the check on the part's own endpoint (detail, update, delete); a caller holding none does
+  not hydrate the part (the refusal names every table checked). A model of the chain with no registered permission
+  adds nothing; a morph or undeclared parent relation, a cycle or a chain longer than eight parts leaves only the
+  part's own permission in charge. Translations are covered: outside the permission scheme
   themselves, they are hydrated by whoever may read the translated model. Writes to a part keep the part's own
   permission. A model qualifies when it has a non-nullable foreign key to its parent with cascade delete and no
   Filament resource of its own.

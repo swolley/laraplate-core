@@ -10,20 +10,21 @@ use Modules\Core\Tests\Stubs\Crud\RelationPartStub;
 use Modules\Core\Tests\Stubs\Crud\RelationSubPartStub;
 
 /*
- * The owner of a part is the first model up its chain of parent relations that is not a part. A chain that does
- * not resolve answers null, so the hydration check keeps the part's own permission instead of allowing.
+ * The chain of a part is every model up its parent relations, nearest first, ending with the first one that is not
+ * a part. A chain that does not resolve answers null, so the hydration check keeps the part's own permission instead
+ * of allowing.
  */
 
-it('resolves the owner of a part and of a part of a part', function (): void {
-    expect(PartOwnerResolver::ownerClassOf(new RelationPartStub))->toBe(RelationOwnerStub::class)
-        ->and(PartOwnerResolver::ownerClassOf(new RelationSubPartStub))->toBe(RelationOwnerStub::class);
+it('resolves the chain of a part and of a part of a part', function (): void {
+    expect(PartOwnerResolver::chainClassesOf(new RelationPartStub))->toBe([RelationOwnerStub::class])
+        ->and(PartOwnerResolver::chainClassesOf(new RelationSubPartStub))->toBe([RelationPartStub::class, RelationOwnerStub::class]);
 });
 
-it('resolves no owner for a model that is not a part', function (): void {
-    expect(PartOwnerResolver::ownerClassOf(new RelationOwnerStub))->toBeNull();
+it('resolves no chain for a model that is not a part', function (): void {
+    expect(PartOwnerResolver::chainClassesOf(new RelationOwnerStub))->toBeNull();
 });
 
-it('resolves no owner when the chain does not reach one', function (): void {
-    expect(PartOwnerResolver::ownerClassOf(new RelationMisdeclaredPartStub))->toBeNull()
-        ->and(PartOwnerResolver::ownerClassOf(new RelationCyclicPartStub))->toBeNull();
+it('resolves no chain when it does not reach an owner', function (): void {
+    expect(PartOwnerResolver::chainClassesOf(new RelationMisdeclaredPartStub))->toBeNull()
+        ->and(PartOwnerResolver::chainClassesOf(new RelationCyclicPartStub))->toBeNull();
 });

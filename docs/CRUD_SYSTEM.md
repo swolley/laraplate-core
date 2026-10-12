@@ -361,14 +361,16 @@ hits through the same relation handling.
   installation's own ACL on a part applies only when the part is read directly (its own endpoint, or reached
   from another model, where it is checked against its parent's permission and ACL by `RelationAuthorizer`).
   The per-record check run when a model is hydrated (`HasValidations`) agrees: for `select` a part passes when
-  the caller holds, on the request's guard and within the token's abilities, either the part's own `select` or
-  the `select` of the first owner up its parent chain that is not a part (`Authorization\PartOwnerResolver`,
-  memoized per class). A token carrying only the content ability reads the content's references and ratings,
-  a role without the references permission still reads them through the content, and a caller holding only the
-  part's own permissions passes the check on the part's own endpoint (detail, update, delete). A caller
-  holding neither is refused, and the message names both tables. When the owner has no registered permission,
-  or the chain does not resolve (a morph or undeclared parent relation, a cycle, more than eight parts), only
-  the part's own permission is checked. Translations are parts too: outside the permission scheme themselves,
+  the caller holds, on the request's guard and within the token's abilities, the `select` of any model along
+  its chain: the part's own, that of every intermediate part, or that of the first owner up the chain that is
+  not a part (`Authorization\PartOwnerResolver`, which memoizes the chain per class). The check stops at the
+  first one held. A token carrying only the content ability reads the content's references and ratings, a role
+  without the references permission still reads them through the content, a role holding only a Shop variant's
+  `select` reads the variant's items (parts of the variant, itself a part of its product), and a caller holding
+  only the part's own permissions passes the check on the part's own endpoint (detail, update, delete). A
+  caller holding none is refused, and the message names every table checked. A model of the chain without a
+  registered permission adds nothing; when the chain does not resolve (a morph or undeclared parent relation, a
+  cycle, more than eight parts), only the part's own permission is checked. Translations are parts too: outside the permission scheme themselves,
   they are hydrated by whoever may read the translated model. Writes to a part keep the part's own permission.
 - An entity with no registered `select` permission and outside `PermissionsRefreshCommand`'s deliberate
   blacklist fails closed. Of the blacklisted classes, only a pivot record reached through a plain relation
