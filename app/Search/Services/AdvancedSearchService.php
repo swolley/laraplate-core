@@ -50,6 +50,9 @@ final readonly class AdvancedSearchService
      * The components come from the strategy the resolver picks for `$mode`, per call: `meta['search']` reports
      * the mode asked for, the mode applied, why they differ (`degraded_reason`) and `retries_used`.
      *
+     * `$withheld_reason` is set by a caller that already decided the request may not spend what it asked for
+     * (the rate limit): the search runs as `fast` and reports the reason as `degraded_reason`.
+     *
      * `$retries` is how many times the caller lets a poor result be searched again, capped by the strategy
      * (`max_retries`, zero for `fast`). A retry is judged by {@see SearchQualityEvaluator} and is not the same
      * query again: see {@see self::relaxedPlan()}.
@@ -67,8 +70,9 @@ final readonly class AdvancedSearchService
         array $matchingOptions = [],
         SearchMode $mode = SearchMode::Fast,
         ?int $retries = null,
+        ?string $withheld_reason = null,
     ): AdvancedSearchResult {
-        $strategy = $this->strategies->resolve($mode);
+        $strategy = $this->strategyFor($mode, $withheld_reason);
         $timings = (bool) config('core.search.debug_timings', false) ? new SearchStageTimings() : null;
         $engine = $this->engineFor($model);
 
@@ -268,6 +272,25 @@ final readonly class AdvancedSearchService
 
             return null;
         }
+    }
+
+    private function strategyFor(SearchMode $mode, ?string $withheld_reason): SearchStrategy
+    {
+        if ($withheld_reason === null || $mode === SearchMode::Fast) {
+            return $this->strategies->resolve($mode);
+        }
+
+        $cheap = $this->strategies->resolve(SearchMode::Fast);
+
+        return new SearchStrategy(
+            applied_mode: $cheap->applied_mode,
+            planner: $cheap->planner,
+            reranker: $cheap->reranker,
+            intent_parser: $cheap->intent_parser,
+            embedder: $cheap->embedder,
+            max_retries: $cheap->max_retries,
+            degraded_reason: $withheld_reason,
+        );
     }
 
     /**

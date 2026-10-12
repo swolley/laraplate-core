@@ -34,6 +34,8 @@ class SearchRequest extends ListRequest
         return $rules + [
             'qs' => ['string', 'required'],
             'mode' => ['sometimes', Rule::enum(SearchMode::class)],
+            'cost' => ['sometimes', 'string'],
+            'retry' => ['sometimes', 'integer', 'min:0'],
             'matching' => ['sometimes', Rule::enum(TextMatchPreference::class)],
             'matching_options' => ['sometimes', 'array'],
             'matching_options.max_edits' => ['sometimes', 'integer', 'between:0,1'],

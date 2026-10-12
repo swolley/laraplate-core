@@ -169,3 +169,26 @@ it('returns every hit to a user the ACL does not restrict', function (): void {
 
     expect(crud_acl_run([$one->getKey(), $two->getKey()], $admin))->toBe([$one->getKey(), $two->getKey()]);
 });
+
+it('serves a deep search over the per-person limit as fast and reports rate_limited', function (): void {
+    config()->set('core.search.deep_per_minute', 1);
+    config()->set('scout.driver', 'elasticsearch');
+    $user = crud_acl_restricted_user([User::factory()->create()->getKey()]);
+    Illuminate\Support\Facades\RateLimiter::clear('search-deep:user:' . $user->getAuthIdentifier());
+
+    $engine = Mockery::mock(ISearchEngine::class);
+    $engine->shouldReceive('supportsOrchestratedSearch')->andReturnTrue();
+    AclRehydrationUserStub::$engine = $engine;
+    $service = new CrudService(app(AuthorizationService::class), app(QueryBuilder::class), crud_acl_search_returning([]));
+
+    $reasons = [];
+
+    foreach (range(1, 2) as $attempt) {
+        $data = crud_acl_search_data(new AclRehydrationUserStub, $user);
+        crud_acl_set($data, 'cost', Modules\Core\Search\Enums\SearchMode::Deep);
+        $meta = $service->search($data)->meta->search['search'];
+        $reasons[] = [$meta['mode_requested'], $meta['degraded_reason']];
+    }
+
+    expect($reasons)->toBe([['deep', null], ['deep', 'rate_limited']]);
+});

@@ -60,6 +60,11 @@ class ResponseBuilder
      */
     private array $relationsMeta = [];
 
+    /**
+     * @var array{mode_requested: string, mode_applied: string, degraded_reason: string|null, retries_used: int}|array{}
+     */
+    private array $searchMeta = [];
+
     private ResourceCollection|JsonResource|null $resourceResponse = null;
 
     public function __construct(private ?Request $request, private readonly ?Carbon $startedAt = new Carbon())
@@ -406,6 +411,19 @@ class ResponseBuilder
         return $this;
     }
 
+    /**
+     * Declares what a search was asked to spend and what it did spend, as `meta.search`, so that a client
+     * reads `mode_applied` instead of assuming it got the depth it asked for.
+     *
+     * @param  array{mode_requested: string, mode_applied: string, degraded_reason: string|null, retries_used: int}  $search
+     */
+    public function setSearchMeta(array $search): self
+    {
+        $this->searchMeta = $search;
+
+        return $this;
+    }
+
     public function getPreview(): bool
     {
         return $this->preview;
@@ -561,6 +579,10 @@ class ResponseBuilder
 
         if ($this->relationsMeta !== []) {
             $payload['meta']['relations'] = $this->relationsMeta;
+        }
+
+        if ($this->searchMeta !== []) {
+            $payload['meta']['search'] = $this->searchMeta;
         }
 
         if (config('app.debug')) {

@@ -482,6 +482,10 @@ class CrudController extends Controller
             if ($result->meta->relations !== []) {
                 $builder->setRelationsMeta($result->meta->relations);
             }
+
+            if (is_array($result->meta->search['search'] ?? null)) {
+                $builder->setSearchMeta($result->meta->search['search']);
+            }
         }
 
         if ($result->error) {

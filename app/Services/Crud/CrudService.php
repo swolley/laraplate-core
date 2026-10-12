@@ -65,8 +65,10 @@ use Modules\Core\Models\User;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\Search\Contracts\IAuthorizesSearchRehydration;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
+use Modules\Core\Search\Enums\SearchMode as SearchDepth;
 use Modules\Core\Search\Services\AdvancedSearchService;
 use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
+use Modules\Core\Search\Services\SearchCostGuard;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
@@ -2787,6 +2789,11 @@ class CrudService
 
         $this->auth->injectAclFilters($requestData, $permissionName);
 
+        $cost_guard = app(SearchCostGuard::class);
+        $withheld_reason = $requestData->cost === SearchDepth::Deep && ! $cost_guard->allowsDeep($this->searchPersonKey($requestData))
+            ? SearchCostGuard::RATE_LIMITED
+            : null;
+
         try {
             $result = $advanced_search->search(
                 $requestData->model,
@@ -2797,12 +2804,25 @@ class CrudService
                 $requestData->sort,
                 $requestData->matching,
                 $requestData->matching_options,
+                $requestData->cost,
+                $cost_guard->clampRetries($requestData->retry),
+                $withheld_reason,
             );
         } catch (InvalidArgumentException $exception) {
             return $this->invalidSearchConstraintsResult($exception->getMessage());
         }
 
         return $this->searchResultFromAdvancedResult($requestData, $result, $permissionName);
+    }
+
+    /**
+     * Who a deep search is counted against: the signed-in person, else the address the request came from.
+     */
+    private function searchPersonKey(SearchRequestData $requestData): string
+    {
+        $user = $requestData->request->user();
+
+        return $user !== null ? 'user:' . $user->getAuthIdentifier() : 'ip:' . $requestData->request->ip();
     }
 
     private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result, string $permissionName): CrudResult

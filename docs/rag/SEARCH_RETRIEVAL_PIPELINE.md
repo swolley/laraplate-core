@@ -46,6 +46,7 @@ the requested mode produces the cheaper result and says why, in `meta['search'][
 | `search_orchestration_disabled` | the AI overlay is switched off (`AI_SEARCH_ORCHESTRATION_ENABLED=false`) |
 | `embedder_unavailable` | the embedding service could not be built |
 | `deep_unavailable` | the LLM components could not be built |
+| `rate_limited` | the person started more deep searches than `search.deep_per_minute` allows |
 
 A failure during the search is handled where it happens: a failing reranker leaves `reranked=false`, a failing
 embedder is logged and the search runs on keywords, and an LLM planner or intent parser that times out falls back to
@@ -58,6 +59,21 @@ hits, fewer than three distinct ones, or an average score under the plan's `retr
 is not the same query again: the candidate window doubles up to 200, the user's own words replace the intent
 expansion, and vector retrieval is switched on when the strategy has an embedder. The retry replaces the first
 result only if it has at least as many hits. `meta['search']['retries_used']` reports how many ran.
+
+**On the wire.** The search endpoint takes two parameters for this, next to the existing `mode`
+(`auto|basic|orchestrated`, which picks the *path* and is unrelated to cost):
+
+| Parameter | Values | Default | Effect |
+|-----------|--------|---------|--------|
+| `cost` | `fast`, `balanced`, `deep` | `fast` | the search mode above; an unknown value reads as `fast`, never an error |
+| `retry` | integer 0 or more | `0` | retries the caller allows after a poor result; clamped to the setting `search.max_retries` (default 2), then to the strategy's cap |
+
+`cost` matters only on the orchestrated path; a plain Scout search ignores it. (It is not the `depth` of the graph search.) The response carries
+`meta.search` (`mode_requested`, `mode_applied`, `degraded_reason`, `retries_used`); it is the only part of the engine meta the HTTP
+response serializes. `deep` has no permission of its own. It is limited per person by the setting
+`search.deep_per_minute` (default 6, counted per signed-in user, else per IP address); over the limit the
+search is served as `fast` with `degraded_reason: rate_limited` and a 200, not refused. Both settings are in the
+`search` group and change without a deploy.
 
 ## The five steps
 
@@ -351,7 +367,7 @@ so a request in Italian ranks on Italian text and on the vectors.
 | `timings` | present only when the `search.debug_timings` setting is on: `{intent_ms, plan_ms, vector_ms, ensemble_ms, total_ms}`, see [Measuring the stages](#measuring-the-stages) |
 
 `AdvancedSearchResult->meta` is what `CrudService` hands to `CrudMeta->search`. The CRUD HTTP response
-(`CrudController::buildResponse()`) does not serialize `CrudMeta->search` today, so these keys are read
+(`CrudController::buildResponse()`) serializes only its `search` block, as `meta.search`; the other keys are read
 in PHP (tests, tinker, the AI evaluation commands), not in the JSON a client receives.
 
 ### Measuring the stages
