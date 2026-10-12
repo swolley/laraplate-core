@@ -7,13 +7,12 @@ namespace Modules\Core\Models\Concerns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
 use LogicException;
+use Modules\Core\Authorization\PartOwnerResolver;
 use Modules\Core\Authorization\PermissionExistenceMemo;
 use Modules\Core\Authorization\ResolvingAuthorization;
 use Modules\Core\Authorization\RetrievedSelectGuard;
@@ -24,7 +23,7 @@ use Modules\Core\Overrides\ContextualValidationException;
 use Modules\Core\Overrides\ContextualValidator;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Support\PermissionName;
-use Modules\Core\Support\RelationGuard;
+use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;
 use Spatie\Permission\Contracts\Permission as SpatiePermission;
@@ -46,11 +45,6 @@ use Spatie\Permission\Contracts\Role as SpatieRole;
 trait HasValidations
 {
     public const DEFAULT_RULE = 'always';
-
-    /**
-     * How far a chain of parts is climbed to find the owner whose select permission governs it.
-     */
-    private const int PART_CHAIN_MAX_DEPTH = 8;
 
     /**
      * Validation rules per operation: 'create', 'update' and the DEFAULT_RULE
@@ -207,7 +201,9 @@ trait HasValidations
                 return;
             }
 
-            throw_unless(static::checkUserCanDo($model, 'select'), AuthorizationException::class, 'User cannot select ' . $model->getTable());
+            if (! static::checkUserCanDo($model, 'select')) {
+                throw new AuthorizationException(static::selectRefusalMessage($model));
+            }
         });
         static::creating(function (Model $model): void {
             /** @var self $model */
@@ -246,11 +242,6 @@ trait HasValidations
 
     protected static function checkUserCanDo(Model $model, string $operation): bool
     {
-        // Model events fire on the write path, so the name must match exactly what
-        // `permission:refresh` registers: `{connection}.{table}.{operation}`, with
-        // `default` standing in for models that follow `database.default`. Dropping
-        // the connection segment made every lookup miss, and a miss reads as
-        // "permission not registered" -> operation allowed.
         // Both questions below read the acting user's roles and permissions, and those models
         // carry this same guard. Asking whether the user may read them requires knowing what the
         // user is allowed to do, which is what is being worked out. The machinery does not
@@ -259,16 +250,9 @@ trait HasValidations
             return true;
         }
 
-        // A part of its parent inherits the parent's visibility (spec 8.1): it is read when its parent may be read,
-        // whatever the part's own select permission says. Writes keep the part's own permission.
-        $permission = PermissionName::forModel($operation === 'select' ? self::selectPermissionSubject($model) : $model, $operation);
+        $permissions = static::governingPermissions($model, $operation);
 
-        /** @var class-string<Model> $permission_class */
-        $permission_class = config('permission.models.permission');
-
-        // Memoized for the current request only: a permission granted or revoked
-        // between requests must be observed by the next one.
-        if (! PermissionExistenceMemo::exists($permission_class, $permission)) {
+        if ($permissions === []) {
             return true;
         }
 
@@ -286,35 +270,83 @@ trait HasValidations
             // Asked as the CRUD asks it, on the request's guard and within the abilities of the token that
             // authenticated the request: the Gate reads neither, so an `api` role went unseen and a token's
             // abilities did not narrow what its owner's roles grant.
-            return ResolvingAuthorization::resolve(static fn (): bool => $user instanceof User
-                ? resolve(AuthorizationService::class)->userHolds($user, $permission)
-                : $user->can($permission));
+            return ResolvingAuthorization::resolve(static function () use ($user, $permissions): bool {
+                foreach (array_keys($permissions) as $permission) {
+                    $holds = $user instanceof User
+                        ? resolve(AuthorizationService::class)->userHolds($user, $permission)
+                        : $user->can($permission);
+
+                    if ($holds) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
         }
 
         return true;
     }
 
     /**
-     * The model whose select permission decides whether a record may be read: the record itself, or for a part of
-     * its parent ({@see IsPartOfParent}) the first owner along its chain of parent relations that is not itself a
-     * part, as {@see \Modules\Core\Services\Crud\RelationAuthorizer} decides the visibility of a part. A chain
-     * that does not resolve to a relation to one parent model leaves the record's own permission in charge.
+     * The registered permissions any one of which allows the operation on the record, each mapped to the table it
+     * names. Empty when none is registered: the operation is then not governed by a permission.
+     *
+     * Writes ask the record's own permission. A read of a part of its parent ({@see IsPartOfParent}) also accepts
+     * the `select` of the part's owner ({@see PartOwnerResolver}): the part inherits the owner's visibility
+     * (spec 8.1), so a caller who reads the owner hydrates its parts whatever the part's own permission says, while
+     * a caller holding the part's own `select` still reads it from its own endpoint. An owner without a registered
+     * permission, or a chain that does not resolve, leaves the part's own permission alone in charge.
+     *
+     * @return array<string, string>
      */
-    protected static function selectPermissionSubject(Model $model): Model
+    protected static function governingPermissions(Model $model, string $operation): array
     {
-        $subject = $model;
+        /** @var class-string<Model> $permission_class */
+        $permission_class = config('permission.models.permission');
 
-        for ($depth = 0; $subject instanceof IsPartOfParent && $depth < self::PART_CHAIN_MAX_DEPTH; $depth++) {
-            $relation = RelationGuard::relationOf($subject, $subject->parentRelation());
+        // Model events fire on the write path, so the name must match exactly what
+        // `permission:refresh` registers: `{connection}.{table}.{operation}`, with
+        // `default` standing in for models that follow `database.default`. Dropping
+        // the connection segment made every lookup miss, and a miss reads as
+        // "permission not registered" -> operation allowed.
+        // Existence is memoized for the current request only: a permission granted or revoked
+        // between requests must be observed by the next one.
+        $permissions = [];
+        $own = PermissionName::forModel($model, $operation);
 
-            if (! $relation instanceof Relation || $relation instanceof MorphTo) {
-                return $model;
-            }
-
-            $subject = $relation->getRelated();
+        if (PermissionExistenceMemo::exists($permission_class, $own)) {
+            $permissions[$own] = $model->getTable();
         }
 
-        return $subject instanceof IsPartOfParent ? $model : $subject;
+        $owner_class = $operation === 'select' ? PartOwnerResolver::ownerClassOf($model) : null;
+
+        if ($owner_class !== null) {
+            $owner_model = new ReflectionClass($owner_class)->newInstanceWithoutConstructor();
+            $owner = PermissionName::forModel($owner_model, 'select');
+
+            if (PermissionExistenceMemo::exists($permission_class, $owner)) {
+                $permissions[$owner] = $owner_model->getTable();
+            }
+        }
+
+        return $permissions;
+    }
+
+    /**
+     * Names what a refused read was missing: the record's own `select`, the `select` of the owner of a part, or
+     * either of them.
+     */
+    protected static function selectRefusalMessage(Model $model): string
+    {
+        $tables = array_values(static::governingPermissions($model, 'select'));
+        $table = $model->getTable();
+
+        return match (true) {
+            count($tables) > 1 => sprintf('User cannot select %s nor its owner %s', $table, $tables[1]),
+            $tables !== [] && $tables[0] !== $table => sprintf('User cannot select %s, owner of %s', $tables[0], $table),
+            default => 'User cannot select ' . $table,
+        };
     }
 
     /**

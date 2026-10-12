@@ -360,10 +360,16 @@ hits through the same relation handling.
   it inherits the parent's visibility and is not checked, even when a permission exists for its table: an
   installation's own ACL on a part applies only when the part is read directly (its own endpoint, or reached
   from another model, where it is checked against its parent's permission and ACL by `RelationAuthorizer`).
-  The per-record check run when a model is hydrated (`HasValidations`) agrees: for `select` a part asks the
-  select permission (and token ability) of the first owner up its parent chain that is not a part, never its
-  own, so a token carrying only the content ability reads the content's references and a role without the
-  references permission still reads them through the content. Writes to a part keep the part's own permission.
+  The per-record check run when a model is hydrated (`HasValidations`) agrees: for `select` a part passes when
+  the caller holds, on the request's guard and within the token's abilities, either the part's own `select` or
+  the `select` of the first owner up its parent chain that is not a part (`Authorization\PartOwnerResolver`,
+  memoized per class). A token carrying only the content ability reads the content's references and ratings,
+  a role without the references permission still reads them through the content, and a caller holding only the
+  part's own permissions passes the check on the part's own endpoint (detail, update, delete). A caller
+  holding neither is refused, and the message names both tables. When the owner has no registered permission,
+  or the chain does not resolve (a morph or undeclared parent relation, a cycle, more than eight parts), only
+  the part's own permission is checked. Translations are parts too: outside the permission scheme themselves,
+  they are hydrated by whoever may read the translated model. Writes to a part keep the part's own permission.
 - An entity with no registered `select` permission and outside `PermissionsRefreshCommand`'s deliberate
   blacklist fails closed. Of the blacklisted classes, only a pivot record reached through a plain relation
   (the `presettable` link a model loads for its dynamic fields) and a translation loaded from the model it
@@ -422,7 +428,11 @@ group-by key may not name a method.
   projection.
 - **Version contents.** A version's `contents` and `original_contents` mask (`[hidden]`) every attribute in
   the versioned model's `$hidden` (passwords, remember tokens, two-factor secrets), the attributes it hides from
-  the anonymous user when the anonymous user reads them, and any password hash (bcrypt or argon2).
+  the anonymous user when the anonymous user reads them, and any password hash (bcrypt or argon2). Exception:
+  the storage columns of a model using `HasDynamicContents` (`components`, `shared_components`, `entity_id`,
+  `presettable_id`) are in `$hidden` only because the model's serialization flattens them into fields; they
+  hold the record's editorial values and stay visible in its history (an anonymous-hidden one, such as a
+  contributor's `shared_components`, is still masked for the anonymous user).
 - **Cover preload.** Models that implement `Contracts\IPreloadsAppendedRelations` have the relations their
   appended attributes read added to the query once per result set, narrowed by the related ACL, instead of
   one query per row.

@@ -138,10 +138,16 @@ keys and aggregates.
   and ratings). Loaded from their own parent they inherit its visibility and are not checked separately, although a
   permission exists for their table: an installation's own ACL on a part applies only when the part is read directly
   (its own endpoint), or reached from any other model, where it is checked against its parent's permission and ACL.
-  The per-record check run when a model is hydrated agrees: for reading, a part asks the `select` permission (and
-  token ability) of the first owner up its parent chain that is not a part, never its own; a caller who may not read
-  that owner does not hydrate the part. Writes to a part keep the part's own permission. A model qualifies
-  when it has a non-nullable foreign key to its parent with cascade delete and no Filament resource of its own.
+  The per-record check run when a model is hydrated agrees: for reading, a part passes when the caller holds (on the
+  request's guard, within the token's abilities) either the part's own `select` or the `select` of the first owner up
+  its parent chain that is not a part. So a token carrying only `cms_contents.select` reads a content's references
+  and ratings, and a caller holding only a part's own permissions passes the check on the part's own endpoint
+  (detail, update, delete); a caller holding neither does not hydrate the part (the refusal names both tables). An
+  owner with no registered permission, a morph or undeclared parent relation, a cycle or a chain longer than eight
+  parts leaves only the part's own permission in charge. Translations are covered: outside the permission scheme
+  themselves, they are hydrated by whoever may read the translated model. Writes to a part keep the part's own
+  permission. A model qualifies when it has a non-nullable foreign key to its parent with cascade delete and no
+  Filament resource of its own.
 - **Names are checked before anything is called.** `Support\RelationGuard::relationOf()` accepts a name only when it is a
   public, non-static method with no required parameter and a declared `Relation` return type: a relation method without
   a return type answers `400` until it is typed (for example `notifiable` on notifications). The relation black list
@@ -213,7 +219,10 @@ the caller (not in `$hidden`, not hidden from the anonymous user, within the med
 
 Versions (history) mask `[hidden]` in their `contents` and `original_contents` every attribute in the versioned model's
 `$hidden` (passwords, remember tokens, two-factor secrets of a versioned user), the attributes the model hides from
-the anonymous user when the anonymous user reads them, and any bcrypt or argon2 password hash.
+the anonymous user when the anonymous user reads them, and any bcrypt or argon2 password hash. The storage columns of
+a model using `HasDynamicContents` (`components`, `shared_components`, `entity_id`, `presettable_id`) are the exception:
+they are in `$hidden` only because the model's serialization flattens them into fields, they hold the record's
+editorial values, and they stay visible in its history, except an anonymous-hidden one for the anonymous user.
 
 ### Media projection and signed URLs
 
