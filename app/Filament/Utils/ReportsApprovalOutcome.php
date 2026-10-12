@@ -22,6 +22,8 @@ use Override;
  */
 trait ReportsApprovalOutcome
 {
+    use AssignsAttributesOwnedByTheForm;
+
     private bool $sentForApproval = false;
 
     public static function approvalAwareDeleteAction(): DeleteAction
@@ -63,7 +65,8 @@ trait ReportsApprovalOutcome
     #[Override]
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        $record->fill($data);
+        $this->fillFromFormState($record, $data);
+
         $this->saveReportingApprovalOutcome($record);
 
         return $record;
