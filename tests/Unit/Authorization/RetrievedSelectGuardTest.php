@@ -42,3 +42,19 @@ it('scopes suppression to the exact class, not siblings', function (): void {
             ->and(RetrievedSelectGuard::isSuppressed('Acme\\Relation'))->toBeFalse();
     });
 });
+
+it('suppresses every class within a system read, and nothing after it, even when it throws', function (): void {
+    $inside = RetrievedSelectGuard::forSystemRead(fn (): array => [
+        RetrievedSelectGuard::isSuppressed('Acme\\Main'),
+        RetrievedSelectGuard::isSuppressed('Acme\\Relation'),
+    ]);
+
+    expect($inside)->toBe([true, true])
+        ->and(RetrievedSelectGuard::isSuppressed('Acme\\Main'))->toBeFalse();
+
+    expect(fn () => RetrievedSelectGuard::forSystemRead(function (): void {
+        throw new RuntimeException('boom');
+    }))->toThrow(RuntimeException::class);
+
+    expect(RetrievedSelectGuard::isSuppressed('Acme\\Main'))->toBeFalse();
+});

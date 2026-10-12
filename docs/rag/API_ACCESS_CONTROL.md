@@ -147,7 +147,10 @@ keys and aggregates.
   not hydrate the part (the refusal names every table checked). A model of the chain with no registered permission
   adds nothing; a morph or undeclared parent relation, a cycle or a chain longer than eight parts leaves only the
   part's own permission in charge. Translations are covered: outside the permission scheme
-  themselves, they are hydrated by whoever may read the translated model. Writes to a part keep the part's own
+  themselves, they are hydrated by whoever may read the translated model. A side-effect read the application takes on
+  its own behalf (CMS re-indexing a content after a reference changed) runs as a system read
+  (`RetrievedSelectGuard::forSystemRead()`), so a caller holding only a reference's permissions can update or delete it
+  end to end. Writes to a part keep the part's own
   permission. A model qualifies when it has a non-nullable foreign key to its parent with cascade delete and no
   Filament resource of its own.
 - **Names are checked before anything is called.** `Support\RelationGuard::relationOf()` accepts a name only when it is a

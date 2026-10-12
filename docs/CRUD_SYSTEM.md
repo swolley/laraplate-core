@@ -372,6 +372,10 @@ hits through the same relation handling.
   registered permission adds nothing; when the chain does not resolve (a morph or undeclared parent relation, a
   cycle, more than eight parts), only the part's own permission is checked. Translations are parts too: outside the permission scheme themselves,
   they are hydrated by whoever may read the translated model. Writes to a part keep the part's own permission.
+  A read the application takes on its own behalf as a side effect of a write, such as CMS re-indexing a content
+  after one of its references changed, runs inside `Authorization\RetrievedSelectGuard::forSystemRead()`: the
+  per-row select check is lifted for every class within the callback, so the caller's own permissions on the part
+  suffice end to end; writes inside it stay guarded, and search results are filtered again when served.
 - An entity with no registered `select` permission and outside `PermissionsRefreshCommand`'s deliberate
   blacklist fails closed. Of the blacklisted classes, only a pivot record reached through a plain relation
   (the `presettable` link a model loads for its dynamic fields) and a translation loaded from the model it
