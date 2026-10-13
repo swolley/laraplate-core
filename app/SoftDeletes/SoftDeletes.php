@@ -180,9 +180,37 @@ trait SoftDeletes
         });
     }
 
+    /**
+     * Delete the model. With soft deletes switched off, the row really goes, so what follows the
+     * deletion is that of a force delete: `deleted` listeners see {@see isForceDeleting()} true (the
+     * media library removes the files on it) and `forceDeleted` fires (embeddings and shared analyses
+     * are dropped on it). What precedes it is left alone: `deleting` listeners still see a plain
+     * delete, so the `delete` permission keeps gating it, as the permission notes promise.
+     */
+    public function delete(): ?bool
+    {
+        if ($this->forceDeleting || $this->softDeletesEnabledBySettings()) {
+            return parent::delete();
+        }
+
+        try {
+            $deleted = parent::delete();
+        } finally {
+            $this->forceDeleting = false;
+        }
+
+        if ($deleted === true) {
+            $this->fireModelEvent('forceDeleted', false);
+        }
+
+        return $deleted;
+    }
+
     protected function performDeleteOnModel(): void
     {
         if (! $this->softDeletesEnabledBySettings()) {
+            // Set after the `deleting` listeners ran and reset by delete() once `deleted` has fired.
+            $this->forceDeleting = true;
             $this->setKeysForSaveQuery($this->newModelQuery())->forceDelete();
             $this->exists = false;
 

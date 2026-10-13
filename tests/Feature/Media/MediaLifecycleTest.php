@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Modules\Core\Casts\SettingTypeEnum;
+use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Enums\CoreTables;
 use Modules\Core\Events\ModelRequiresIndexing;
 use Modules\Core\Models\Media;
 use Modules\Core\Models\ModelEmbedding;
+use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Tests\Stubs\Search\MediaOwnerStubModel;
 
 beforeEach(function (): void {
@@ -91,4 +97,34 @@ it('tolerates a media whose owner class no longer exists', function (): void {
     Media::query()->findOrFail($media->getKey())->forceDelete();
 
     expect(Media::query()->withoutGlobalScopes()->whereKey($media->getKey())->exists())->toBeFalse();
+});
+
+it('removes the files and the embeddings when a media is deleted with soft deletes switched off', function (): void {
+    Storage::fake('public');
+    [$owner, $media] = lifecycleOwnerWithMedia();
+    Storage::disk('public')->put($media->getPathRelativeToRoot(), 'bytes');
+    $media->embeddings()->create(['embedding' => [0.1, 0.2], 'locale' => null, 'model_key' => 'k', 'content_hash' => 'x']);
+    DB::table(CoreTables::Settings->value)->updateOrInsert(
+        ['name' => PerModelSettingResolver::nameFor(CoreDatabaseSeeder::SOFT_DELETES_NAME_PREFIX, $media->getTable())],
+        [
+            'value' => json_encode(false),
+            'encrypted' => false,
+            'type' => SettingTypeEnum::Boolean->value,
+            'group_name' => 'soft_deletes',
+            'description' => 'Soft deletes of media switched off',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    );
+    app(PerModelSettingResolver::class)->flushGroup('soft_deletes');
+    app(PerModelSettingResolver::class)->flushNameIndex();
+    app()->forgetInstance(PerModelSettingResolver::class);
+    Event::fake([ModelRequiresIndexing::class]);
+
+    Media::query()->findOrFail($media->getKey())->delete();
+
+    expect(Media::query()->withoutGlobalScopes()->whereKey($media->getKey())->exists())->toBeFalse()
+        ->and(Storage::disk('public')->exists($media->getPathRelativeToRoot()))->toBeFalse()
+        ->and(ModelEmbedding::query()->where('model_type', $media->getMorphClass())->where('model_id', $media->getKey())->exists())->toBeFalse();
+    assertOwnerReindexed($owner);
 });

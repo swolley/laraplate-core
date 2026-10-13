@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Tests\Stubs\HardDeletesStubModel;
 use Modules\Core\Tests\Stubs\SoftDeletesStubModel;
 
 beforeEach(function (): void {
@@ -123,4 +125,49 @@ it('throws when updating a trashed model', function (): void {
         expect($e)->toBeInstanceOf(AuthorizationException::class);
         expect($e->getMessage())->toContain('Cannot update');
     }
+});
+
+it('deletes like a force delete after authorization when soft deletes are switched off', function (): void {
+    $model = HardDeletesStubModel::create(['name' => 'gone']);
+    $seen = [];
+    Event::listen('eloquent.deleting: ' . HardDeletesStubModel::class, static function (HardDeletesStubModel $deleting) use (&$seen): void {
+        $seen['deleting'] = $deleting->isForceDeleting();
+    });
+    Event::listen('eloquent.deleted: ' . HardDeletesStubModel::class, static function (HardDeletesStubModel $deleted) use (&$seen): void {
+        $seen['deleted'] = $deleted->isForceDeleting();
+    });
+    Event::listen('eloquent.forceDeleted: ' . HardDeletesStubModel::class, static function () use (&$seen): void {
+        $seen['forceDeleted'] = true;
+    });
+
+    expect($model->delete())->toBeTrue()
+        ->and($seen)->toBe(['deleting' => false, 'deleted' => true, 'forceDeleted' => true])
+        ->and($model->isForceDeleting())->toBeFalse()
+        ->and(DB::table('soft_deletes_stub')->where('id', $model->getKey())->exists())->toBeFalse();
+});
+
+it('fires forceDeleted once when a model with soft deletes switched off is force deleted', function (): void {
+    $model = HardDeletesStubModel::create(['name' => 'gone']);
+    $fired = 0;
+    Event::listen('eloquent.forceDeleted: ' . HardDeletesStubModel::class, static function () use (&$fired): void {
+        $fired++;
+    });
+
+    $model->forceDelete();
+
+    expect($fired)->toBe(1)
+        ->and(DB::table('soft_deletes_stub')->where('id', $model->getKey())->exists())->toBeFalse();
+});
+
+it('fires no forceDeleted on a soft delete', function (): void {
+    $model = SoftDeletesStubModel::create(['name' => 'kept']);
+    $fired = false;
+    Event::listen('eloquent.forceDeleted: ' . SoftDeletesStubModel::class, static function () use (&$fired): void {
+        $fired = true;
+    });
+
+    $model->delete();
+
+    expect($fired)->toBeFalse()
+        ->and(SoftDeletesStubModel::withoutGlobalScopes()->findOrFail($model->getKey())->trashed())->toBeTrue();
 });
