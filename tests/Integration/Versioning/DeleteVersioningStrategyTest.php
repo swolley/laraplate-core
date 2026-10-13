@@ -6,6 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Models\Version;
+use Modules\Core\Tests\Stubs\Versioning\HardDeletedVersionedArticle;
 use Modules\Core\Tests\Stubs\Versioning\SoftDeletedVersionedArticle;
 use Modules\Core\Tests\Stubs\Versioning\VersionedArticle;
 use Overtrue\LaravelVersionable\VersionStrategy;
@@ -18,6 +19,7 @@ beforeEach(function (): void {
         $table->string('title');
         $table->timestamps();
         $table->softDeletes();
+        $table->boolean('is_deleted')->default(false);
     });
 });
 
@@ -33,6 +35,20 @@ it('records a hard delete as a self-contained snapshot tombstone', function (): 
     $tombstone = Version::query()->latest('id')->firstOrFail();
 
     expect($tombstone->change_type)->toBe(VersionChangeType::Deleted)
+        ->and($tombstone->version_strategy)->toBe(VersionStrategy::SNAPSHOT)
+        ->and($tombstone->original_contents)->toBe(['title' => 'First'])
+        ->and($tombstone->contents)->toBe([]);
+});
+
+it('records a delete as a snapshot tombstone when soft deletes are switched off', function (): void {
+    $article = HardDeletedVersionedArticle::query()->create(['title' => 'First']);
+
+    $article->delete();
+
+    $tombstone = Version::query()->latest('id')->firstOrFail();
+
+    expect(HardDeletedVersionedArticle::query()->withoutGlobalScopes()->whereKey($article->getKey())->exists())->toBeFalse()
+        ->and($tombstone->change_type)->toBe(VersionChangeType::Deleted)
         ->and($tombstone->version_strategy)->toBe(VersionStrategy::SNAPSHOT)
         ->and($tombstone->original_contents)->toBe(['title' => 'First'])
         ->and($tombstone->contents)->toBe([]);

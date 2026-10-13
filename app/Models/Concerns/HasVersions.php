@@ -590,6 +590,8 @@ trait HasVersions
      * A hard delete removes the live row, so its tombstone must be a self-contained
      * SNAPSHOT: it cannot rely on a diff chain that the deletion itself breaks.
      * A soft delete is only an update of the deleted-at column and the row survives.
+     * With soft deletes switched off for the model, a delete removes the row too, though
+     * it is not flagged as forced while `deleting` runs.
      */
     private function isHardDelete(): bool
     {
@@ -597,7 +599,11 @@ trait HasVersions
             return true;
         }
 
-        return $this->isForceDeleting();
+        if ($this->isForceDeleting()) {
+            return true;
+        }
+
+        return method_exists($this, 'softDeletesEnabledBySettings') && ! $this->softDeletesEnabledBySettings();
     }
 
     private function getVersionDeletedAtColumn(): ?string
