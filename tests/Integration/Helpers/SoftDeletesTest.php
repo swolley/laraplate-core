@@ -169,5 +169,5 @@ it('fires no forceDeleted on a soft delete', function (): void {
     $model->delete();
 
     expect($fired)->toBeFalse()
-        ->and(SoftDeletesStubModel::withoutGlobalScopes()->findOrFail($model->getKey())->trashed())->toBeTrue();
+        ->and(DB::table('soft_deletes_stub')->where('id', $model->getKey())->whereNotNull('deleted_at')->exists())->toBeTrue();
 });

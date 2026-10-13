@@ -160,27 +160,6 @@ trait SoftDeletes
     }
 
     /**
-     * Boot the soft deleting trait for a model.
-     */
-    protected static function bootSoftDeletes(): void
-    {
-        // Do not call baseBootSoftDeletes() (would register SoftDeletingScope) or
-        // static::withoutGlobalScope() here: the latter is not a Model API and
-        // resolves via __callStatic → query(), which requires a DB connection during
-        // composer package:discover / ide-helper when the resolver is not set yet.
-        static::addGlobalScope(new CustomSoftDeletingScope());
-
-        static::updating(function (self $model): void {
-            throw_if($model->trashed(), AuthorizationException::class, 'Cannot update a softdeleted model');
-        });
-
-        static::saving(function (self $model): void {
-            $is_deleted_column = $model->getIsDeletedColumn();
-            unset($model->attributes[$is_deleted_column], $model->original[$is_deleted_column]);
-        });
-    }
-
-    /**
      * Delete the model. With soft deletes switched off, the row really goes, so what follows the
      * deletion is that of a force delete: `deleted` listeners see {@see isForceDeleting()} true (the
      * media library removes the files on it) and `forceDeleted` fires (embeddings and shared analyses
@@ -204,6 +183,27 @@ trait SoftDeletes
         }
 
         return $deleted;
+    }
+
+    /**
+     * Boot the soft deleting trait for a model.
+     */
+    protected static function bootSoftDeletes(): void
+    {
+        // Do not call baseBootSoftDeletes() (would register SoftDeletingScope) or
+        // static::withoutGlobalScope() here: the latter is not a Model API and
+        // resolves via __callStatic → query(), which requires a DB connection during
+        // composer package:discover / ide-helper when the resolver is not set yet.
+        static::addGlobalScope(new CustomSoftDeletingScope());
+
+        static::updating(function (self $model): void {
+            throw_if($model->trashed(), AuthorizationException::class, 'Cannot update a softdeleted model');
+        });
+
+        static::saving(function (self $model): void {
+            $is_deleted_column = $model->getIsDeletedColumn();
+            unset($model->attributes[$is_deleted_column], $model->original[$is_deleted_column]);
+        });
     }
 
     protected function performDeleteOnModel(): void
