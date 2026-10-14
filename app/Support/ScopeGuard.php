@@ -113,6 +113,28 @@ final class ScopeGuard
     }
 
     /**
+     * Checks a scope node of a client request (a CRUD request, an AI tool call) as it is parsed, before it is merged
+     * with the caller's ACL: the scope must be exposed to clients, its parameters must fit, taken literally (a client
+     * gets no placeholders), and it must add nothing but where conditions. The scope is run once on a throwaway query
+     * of the model, which is built and never executed.
+     *
+     * The refusal is safe to show the client: it names the scope and the reason, with the model as "this entity",
+     * and never a parameter value nor the message of an exception the scope throws itself.
+     *
+     * @throws ScopeFilterException when the node may not be used by a client
+     */
+    public static function assertClientFilterable(Model $model, ScopeFilter $filter): void
+    {
+        try {
+            self::apply($model->newModelQuery(), $filter, 'and', true);
+        } catch (ScopeFilterException $exception) {
+            throw new ScopeFilterException(str_replace($model::class, 'this entity', $exception->getMessage()), previous: $exception);
+        } catch (Throwable $exception) {
+            throw new ScopeFilterException(sprintf('Scope "%s" fails with these parameters.', $filter->scope), previous: $exception);
+        }
+    }
+
+    /**
      * Runs the scope a node names inside its own nested where, joined to the query with `$boolean`, so its
      * conditions stay in their group in AND and OR groups alike.
      *
@@ -164,12 +186,13 @@ final class ScopeGuard
             throw new ScopeFilterException(sprintf('"%s" is not a filter scope of %s.', $filter->scope, $model_class));
         }
 
-        if ($declaration['unsupported'] !== null) {
-            throw new ScopeFilterException(sprintf('Scope "%s" of %s cannot be used as a filter: %s.', $filter->scope, $model_class, $declaration['unsupported']));
-        }
-
+        // The client flag first: what an ACL-only scope cannot carry is none of a client's business.
         if ($client && ! $declaration['client']) {
             throw new ScopeFilterException(sprintf('Scope "%s" of %s can be used only in ACLs.', $filter->scope, $model_class));
+        }
+
+        if ($declaration['unsupported'] !== null) {
+            throw new ScopeFilterException(sprintf('Scope "%s" of %s cannot be used as a filter: %s.', $filter->scope, $model_class, $declaration['unsupported']));
         }
 
         $declared = $declaration['parameters'];

@@ -5,9 +5,13 @@ declare(strict_types=1);
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Casts\ScopeFilter;
+use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\License;
@@ -91,6 +95,36 @@ function reqscope_url(string $base, array $filters): string
 }
 
 /**
+ * The parameter values of the scope nodes of a request tree, to show none of them reaches an error message.
+ *
+ * @param  array<mixed>  $filters
+ * @return list<string>
+ */
+function reqscope_parameter_values(array $filters): array
+{
+    $values = [];
+
+    array_walk_recursive($filters, static function (mixed $value, int|string $key) use (&$values): void {
+        if (is_int($key) && is_string($value)) {
+            $values[] = $value;
+        }
+    });
+
+    return $values;
+}
+
+/**
+ * The request data parsed from a tree that never went through the request validation, as a caller building
+ * ListRequestData by hand (the AI CRUD tools) does.
+ *
+ * @param  array<mixed>  $filters
+ */
+function reqscope_unvalidated(string $entity, array $filters): ListRequestData
+{
+    return new ListRequestData(ListRequest::create('/app/crud/select/core/' . $entity, 'GET'), $entity, ['filters' => $filters], 'id', 'core');
+}
+
+/**
  * @return list<int>
  */
 function reqscope_ids(TestResponse $response): array
@@ -141,7 +175,12 @@ it('refuses with 422 an undeclared scope and a scope with bad parameters', funct
     $response = $this->actingAs(reqscope_superadmin())->getJson(reqscope_url('/api/v1/select/core/licenses', $filters));
 
     $response->assertUnprocessable()->assertJsonValidationErrors('filters');
-    expect(json_encode($response->json('errors'), JSON_THROW_ON_ERROR))->not->toContain('Models');
+    $errors = json_encode($response->json('errors'), JSON_THROW_ON_ERROR);
+    expect($errors)->not->toContain('Models');
+
+    foreach (reqscope_parameter_values($filters) as $value) {
+        expect($errors)->not->toContain($value);
+    }
 })->with([
     'undeclared scope' => [['scope' => 'notAScope']],
     'scope method without the attribute' => [['scope' => 'validityOrdered']],
@@ -177,3 +216,39 @@ it('combines a request scope with the caller ACL by AND and never widens it', fu
     'scope outside the ACL' => [['scope' => 'scheduled'], ''],
     'scope in an OR group' => [['operator' => 'or', 'filters' => [['scope' => 'scheduled'], ['scope' => 'expiredAt', 'parameters' => ['2026-08-19T12:00:00Z']]]], 'expired'],
 ]);
+
+it('refuses with 422 a request scope on the facets endpoint', function (): void {
+    reqscope_licenses();
+
+    $response = $this->actingAs(reqscope_superadmin())->getJson(reqscope_url('/api/v1/facets/core/licenses', ['scope' => 'notAScope']));
+
+    $response->assertUnprocessable()->assertJsonValidationErrors('filters');
+});
+
+it('refuses an ACL-only scope in a tree parsed without the request validation, without naming the model class', function (): void {
+    try {
+        reqscope_unvalidated('cron_jobs', [['scope' => 'active']]);
+        $this->fail('The ACL-only scope should have been refused.');
+    } catch (ValidationException $exception) {
+        expect($exception->getMessage())->toContain('"active"')
+            ->and($exception->getMessage())->toContain('only in ACLs')
+            ->and($exception->getMessage())->not->toContain('Models')
+            ->and($exception->errors())->toHaveKey('filters');
+    }
+});
+
+it('refuses a bad parameter in a tree parsed without the request validation, without echoing it', function (): void {
+    try {
+        reqscope_unvalidated('licenses', [['scope' => 'validAt', 'parameters' => ['@now']]]);
+        $this->fail('The literal placeholder should have been refused.');
+    } catch (ValidationException $exception) {
+        expect($exception->getMessage())->toContain('ISO 8601')
+            ->and($exception->getMessage())->not->toContain('@now');
+    }
+});
+
+it('parses a client scope node into a scope filter', function (): void {
+    $data = reqscope_unvalidated('licenses', [['scope' => 'validAt', 'parameters' => ['2026-08-27']]]);
+
+    expect($data->filters?->filters)->toEqual([new ScopeFilter('validAt', ['2026-08-27'])]);
+});

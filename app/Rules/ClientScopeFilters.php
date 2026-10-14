@@ -12,17 +12,16 @@ use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Support\ScopeGuard;
 use Override;
-use Throwable;
 
 /**
  * Checks the scope nodes of a CRUD request's filters against the requested model, before the request filters are
- * merged with the caller's ACL: a request may name only a scope the model exposes to clients
- * (`#[FilterScope(client: true)]`), with parameters that fit its signature and no placeholder (a client parameter is
- * taken literally, so `@now` is a bad date), and the scope must add nothing but where conditions. Each node is run
- * once on a throwaway query of the model, which is built and never executed.
+ * merged with the caller's ACL ({@see ScopeGuard::assertClientFilterable()}), so a refusal is a 422 naming the node's
+ * path, the scope and the reason, never the model class nor a parameter value. The parser checks every node again
+ * ({@see \Modules\Core\Casts\ListRequestData}), which is the gate for callers that build the request data without
+ * this validation.
  *
  * The shape of the filters is {@see QueryBuilder}'s concern: a malformed scope node is reported there and skipped
- * here. A refusal names the scope and the reason, never the model class nor a parameter value.
+ * here.
  */
 final readonly class ClientScopeFilters implements ValidationRule
 {
@@ -80,12 +79,9 @@ final readonly class ClientScopeFilters implements ValidationRule
         }
 
         try {
-            ScopeGuard::apply($this->model->newModelQuery(), new ScopeFilter($scope, $parameters), 'and', true);
+            ScopeGuard::assertClientFilterable($this->model, new ScopeFilter($scope, $parameters));
         } catch (ScopeFilterException $exception) {
-            $fail($attribute . ' ' . str_replace($this->model::class, 'this entity', $exception->getMessage()));
-        } catch (Throwable) {
-            // The scope's own message may quote a value or an internal detail: none of it reaches the client.
-            $fail(sprintf('%s scope "%s" fails with these parameters', $attribute, $scope));
+            $fail($attribute . ' ' . $exception->getMessage());
         }
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Support\ScopeGuard;
+use Modules\Core\Tests\Stubs\FailingScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ImpureScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ScopeFilterStubModel;
 
@@ -293,3 +294,46 @@ it('refuses at save what it would refuse at use', function (string $model_class,
     'impure through a global scope' => [ImpureScopeFilterStubModel::class, 'globallyScoped', [], 'does more than add where conditions'],
     'refused by the scope itself' => [ScopeFilterStubModel::class, 'releasedWithin', [1], 'fails when it runs'],
 ]);
+
+it('refuses an ACL-only scope to a client before it reports what the scope cannot carry', function (): void {
+    expect(fn (): array => ScopeGuard::assertFilterable(new ScopeFilterStubModel(), new ScopeFilter('namedAnyOf', ['a']), client: true))
+        ->toThrow(fn (ScopeFilterException $exception) => expect($exception->getMessage())->toContain('only in ACLs')->not->toContain('array'));
+});
+
+it('checks a client scope node with a message naming the scope and the reason but never the model class', function (string $scope, array $parameters, string $reason): void {
+    try {
+        ScopeGuard::assertClientFilterable(new ScopeFilterStubModel(), new ScopeFilter($scope, $parameters));
+        $this->fail('The node should have been refused.');
+    } catch (ScopeFilterException $exception) {
+        expect($exception->getMessage())->toContain(sprintf('"%s"', $scope))
+            ->and($exception->getMessage())->toContain($reason)
+            ->and($exception->getMessage())->not->toContain(ScopeFilterStubModel::class)
+            ->and($exception->getMessage())->not->toContain('secret-value-42');
+    }
+})->with([
+    'undeclared' => ['undeclared', [], 'is not a filter scope of this entity'],
+    'ACL-only' => ['priced', [1], 'can be used only in ACLs'],
+    'bad parameter' => ['releasedBefore', ['secret-value-42'], 'must be an ISO 8601 date'],
+]);
+
+it('refuses with a generic message a client scope that throws an exception of its own', function (): void {
+    try {
+        ScopeGuard::assertClientFilterable(new FailingScopeFilterStubModel(), new ScopeFilter('failing', ['secret-value-42']));
+        $this->fail('The node should have been refused.');
+    } catch (ScopeFilterException $exception) {
+        expect($exception->getMessage())->toContain('"failing"')
+            ->and($exception->getMessage())->not->toContain('secret-value-42')
+            ->and($exception->getMessage())->not->toContain('internal detail')
+            ->and($exception->getMessage())->not->toContain(FailingScopeFilterStubModel::class);
+    }
+});
+
+it('takes a placeholder in a client string parameter literally', function (): void {
+    $filter = new ScopeFilter('named', ['@user.name']);
+    ScopeGuard::assertClientFilterable(new ScopeFilterStubModel(), $filter);
+    $query = ScopeFilterStubModel::query();
+
+    ScopeGuard::apply($query, $filter, client: true);
+
+    expect($query->getBindings())->toBe(['@user.name']);
+});

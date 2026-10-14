@@ -6,10 +6,12 @@ namespace Modules\Core\Casts;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
+use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\BooleanInput;
+use Modules\Core\Support\ScopeGuard;
 
 class ListRequestData extends SelectRequestData
 {
@@ -396,21 +398,33 @@ class ListRequestData extends SelectRequestData
     }
 
     /**
-     * A scope node of the request, checked against the model by {@see \Modules\Core\Rules\ClientScopeFilters}
-     * when the request was validated. Its parameters are taken literally: a client request gets no placeholders.
+     * A scope node of the request. Every tree this parser reads is client input (ACL filters arrive as objects through
+     * {@see mergeFilters()}), and not every caller validates it first, so the parser is the gate: the node must name a
+     * scope the model exposes to clients, with parameters taken literally ({@see ScopeGuard::assertClientFilterable()}).
      *
      * @param  array<mixed, mixed>  $raw
+     *
+     * @throws ValidationException when the node is malformed or may not be used by a client; the message names the
+     *                             scope and the reason, never the model class nor a parameter value
      */
     private function conformScopeNode(array $raw): ScopeFilter
     {
         $scope = $raw['scope'];
         $parameters = $raw['parameters'] ?? [];
 
-        if (! is_string($scope) || ! is_array($parameters) || ! Arr::isList($parameters)) {
-            throw new InvalidArgumentException('A scope filter names a scope and lists its parameters.');
+        if (! is_string($scope) || $scope === '' || ! is_array($parameters) || ! Arr::isList($parameters)) {
+            throw ValidationException::withMessages(['filters' => 'A scope filter names a scope and lists its parameters.']);
         }
 
-        return new ScopeFilter($scope, $parameters);
+        $filter = new ScopeFilter($scope, $parameters);
+
+        try {
+            ScopeGuard::assertClientFilterable($this->model, $filter);
+        } catch (ScopeFilterException $exception) {
+            throw ValidationException::withMessages(['filters' => $exception->getMessage()]);
+        }
+
+        return $filter;
     }
 
     /**
