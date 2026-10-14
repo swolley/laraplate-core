@@ -2714,6 +2714,7 @@ class CrudService
             }
         }
 
+        $request_filters = $requestData->filters;
         $this->auth->injectAclFilters($requestData, $permissionName);
 
         try {
@@ -2743,7 +2744,7 @@ class CrudService
             );
         }
 
-        $query = $this->searchHitsQuery($model, $ids->all(), $permissionName);
+        $query = $this->searchHitsQuery($model, $ids->all(), $permissionName, $request_filters, $requestData);
         $this->query_builder->applyRequestedRelations($query, $requestData, $this->relationAuthorizer());
 
         $records = $query->get();
@@ -2787,6 +2788,7 @@ class CrudService
             return $this->invalidSearchConstraintsResult('Orchestrated search does not support CRUD group_by yet.');
         }
 
+        $request_filters = $requestData->filters;
         $this->auth->injectAclFilters($requestData, $permissionName);
 
         $cost_guard = app(SearchCostGuard::class);
@@ -2812,7 +2814,7 @@ class CrudService
             return $this->invalidSearchConstraintsResult($exception->getMessage());
         }
 
-        return $this->searchResultFromAdvancedResult($requestData, $result, $permissionName);
+        return $this->searchResultFromAdvancedResult($requestData, $result, $permissionName, $request_filters);
     }
 
     /**
@@ -2825,7 +2827,10 @@ class CrudService
         return $user !== null ? 'user:' . $user->getAuthIdentifier() : 'ip:' . $requestData->request->ip();
     }
 
-    private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result, string $permissionName): CrudResult
+    /**
+     * @param  FiltersGroup|null  $requestFilters  The filters of the request, without the ACL filters merged in
+     */
+    private function searchResultFromAdvancedResult(SearchRequestData $requestData, AdvancedSearchResult $result, string $permissionName, ?FiltersGroup $requestFilters = null): CrudResult
     {
         $model = $requestData->model;
         $ids = $result->ids();
@@ -2837,7 +2842,7 @@ class CrudService
             );
         }
 
-        $query = $this->searchHitsQuery($model, $ids, $permissionName);
+        $query = $this->searchHitsQuery($model, $ids, $permissionName, $requestFilters, $requestData);
         $this->query_builder->applyRequestedRelations($query, $requestData, $this->relationAuthorizer());
 
         $records = $query->get();
@@ -2868,14 +2873,30 @@ class CrudService
      * query, which is the semantics they have everywhere else in the CRUD service, and the model's own
      * rehydration guard comes on top.
      *
+     * The filters of the request are applied by the engine, except the nodes no engine takes (a scope, which
+     * only the database can run, and the OR group holding it): that part is applied here, so a request scope
+     * narrows the hits as it narrows a list. The ACL filters need no such part: they are applied here whole.
+     *
      * @param  array<int, mixed>  $ids
+     * @param  FiltersGroup|null  $requestFilters  The filters of the request, without the ACL filters merged in
      * @return Builder<Model>
      */
-    private function searchHitsQuery(Model $model, array $ids, string $permissionName): Builder
+    private function searchHitsQuery(Model $model, array $ids, string $permissionName, ?FiltersGroup $requestFilters = null, ?SearchRequestData $requestData = null): Builder
     {
         $query = $model->newQuery()->whereKey($ids);
 
         $this->auth->applyAclFiltersToQuery($query, $permissionName);
+
+        $database_only = $requestFilters instanceof FiltersGroup ? ScoutSearchConstraintApplier::databaseOnlyPart($requestFilters) : null;
+
+        // In its own nested where: an OR group applied to the query itself would join the key and ACL
+        // conditions with OR and widen them.
+        if ($database_only instanceof FiltersGroup) {
+            $query->where(function (Builder $nested) use ($database_only, $requestData): void {
+                $relation_columns = [];
+                $this->query_builder->applyFilters($nested, $database_only, $relation_columns, $this->relationAuthorizer(), $requestData?->request);
+            });
+        }
 
         if ($model instanceof IAuthorizesSearchRehydration) {
             $query = $model->authorizeSearchRehydration($query);

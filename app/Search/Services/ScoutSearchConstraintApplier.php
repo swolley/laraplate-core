@@ -10,6 +10,7 @@ use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Search\Exceptions\UnsupportedSearchEngineException;
 use Modules\Core\Search\Schema\FieldDefinition;
@@ -24,11 +25,54 @@ final readonly class ScoutSearchConstraintApplier
     public const string SORT_ERROR = 'Search sort must be applied by the search engine to keep pagination consistent.';
 
     /**
+     * The part of a filter tree the engine never receives, to be applied when the hits are reloaded from the
+     * database: the complement of {@see withoutDatabaseOnlyNodes()}, so that the engine filters AND this part
+     * select exactly the rows the whole tree selects.
+     *
+     * An AND group gives the database-only nodes it holds (and the database-only part of each child group); an
+     * OR group that lost anything on the way to the engine is given whole, since the engine received it wider
+     * than it is, or not at all. Null when the engine receives the whole tree.
+     *
+     * @throws InvalidArgumentException when the tree holds a node kind this applier does not know
+     */
+    public static function databaseOnlyPart(FiltersGroup $filters): ?FiltersGroup
+    {
+        if ($filters->operator === WhereClause::Or) {
+            return self::holdsDatabaseOnlyNode($filters) ? $filters : null;
+        }
+
+        $left_out = [];
+
+        foreach ($filters->filters as $node) {
+            if ($node instanceof RelationFilter || $node instanceof ScopeFilter) {
+                $left_out[] = $node;
+
+                continue;
+            }
+
+            if ($node instanceof FiltersGroup) {
+                $part = self::databaseOnlyPart($node);
+
+                if ($part instanceof FiltersGroup) {
+                    $left_out[] = $part;
+                }
+
+                continue;
+            }
+
+            // The engine takes a column filter.
+            self::columnFilter($node);
+        }
+
+        return $left_out === [] ? null : new FiltersGroup($left_out, WhereClause::And);
+    }
+
+    /**
      * @param  array<int, \Modules\Core\Casts\Sort>  $sort
      */
     public function apply(mixed $builder, Model $model, ?FiltersGroup $filters = null, array $sort = []): void
     {
-        $filters = $filters instanceof FiltersGroup ? self::withoutRelationFilters($filters) : null;
+        $filters = $filters instanceof FiltersGroup ? self::withoutDatabaseOnlyNodes($filters) : null;
 
         if ($filters instanceof FiltersGroup) {
             $this->applyFilters($builder, $filters, $model);
@@ -46,22 +90,26 @@ final readonly class ScoutSearchConstraintApplier
     }
 
     /**
-     * The filters the engine can take: a relation filter (an ACL condition on a related record) is never
-     * pushed to it, the records behind the hits are checked against it when they are reloaded.
+     * The filters the engine can take. Two node kinds are never pushed to it: a relation filter (a condition on a
+     * related record) and a scope filter (a model scope, which only the database can run). The records behind the
+     * hits are checked against them when they are reloaded ({@see databaseOnlyPart()}).
      *
      * A condition left out means "no engine condition", which only ever widens the hits, so it is dropped
-     * from an AND group. Dropping it from an OR group would narrow the branch the relation filter belongs
-     * to, so the whole group is left out instead. Null when nothing is left to push.
+     * from an AND group. Dropping it from an OR group would narrow the branch it belongs to, so the whole group
+     * is left out instead. Null when nothing is left to push.
+     *
+     * @throws InvalidArgumentException when the tree holds a node kind this applier does not know: skipping it
+     *                                  could drop a condition no reload restores
      */
-    private static function withoutRelationFilters(FiltersGroup $filters): ?FiltersGroup
+    private static function withoutDatabaseOnlyNodes(FiltersGroup $filters): ?FiltersGroup
     {
         $kept = [];
 
         foreach ($filters->filters as $node) {
             $pushable = match (true) {
-                $node instanceof RelationFilter => null,
-                $node instanceof FiltersGroup => self::withoutRelationFilters($node),
-                default => $node,
+                $node instanceof RelationFilter, $node instanceof ScopeFilter => null,
+                $node instanceof FiltersGroup => self::withoutDatabaseOnlyNodes($node),
+                default => self::columnFilter($node),
             };
 
             if ($pushable === null) {
@@ -76,6 +124,50 @@ final readonly class ScoutSearchConstraintApplier
         }
 
         return $kept === [] ? null : new FiltersGroup($kept, $filters->operator);
+    }
+
+    /**
+     * Whether a group holds, at any depth, a node the engine never receives.
+     */
+    private static function holdsDatabaseOnlyNode(FiltersGroup $filters): bool
+    {
+        foreach ($filters->filters as $node) {
+            if ($node instanceof RelationFilter || $node instanceof ScopeFilter) {
+                return true;
+            }
+
+            if ($node instanceof FiltersGroup) {
+                if (self::holdsDatabaseOnlyNode($node)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            self::columnFilter($node);
+        }
+
+        return false;
+    }
+
+    /**
+     * A node of none of the other kinds must be a column filter. A node kind this applier does not know is
+     * refused: skipping it could drop a condition that no reload restores.
+     *
+     * @throws InvalidArgumentException when the node is not a column filter
+     */
+    private static function columnFilter(mixed $node): Filter
+    {
+        if (! $node instanceof Filter) {
+            throw self::unknownNode($node);
+        }
+
+        return $node;
+    }
+
+    private static function unknownNode(mixed $node): InvalidArgumentException
+    {
+        return new InvalidArgumentException(sprintf('The search engine cannot take a %s filter node.', get_debug_type($node)));
     }
 
     /**
@@ -205,9 +297,9 @@ final readonly class ScoutSearchConstraintApplier
                 continue;
             }
 
-            // Left out beforehand by withoutRelationFilters(): the engine takes no relation filter.
-            if ($filter instanceof RelationFilter) {
-                continue;
+            // Only column filters are left: withoutDatabaseOnlyNodes() took out every other node kind.
+            if (! $filter instanceof Filter) {
+                throw self::unknownNode($filter);
             }
 
             $this->applyFilter($builder, $filter, $model);
@@ -251,14 +343,13 @@ final readonly class ScoutSearchConstraintApplier
         $out = [];
 
         foreach ($filters->filters as $filter) {
-            // Never reached: an OR group that holds a relation filter is left out by withoutRelationFilters().
-            if ($filter instanceof RelationFilter) {
-                throw new InvalidArgumentException(self::FILTER_ERROR);
-            }
-
-            $out[] = $filter instanceof FiltersGroup
-                ? $this->normalizeFiltersGroup($filter, $model)
-                : $this->normalizeFilter($filter, $model);
+            // Only column filters and groups are left: withoutDatabaseOnlyNodes() left out every OR group
+            // holding another node kind.
+            $out[] = match (true) {
+                $filter instanceof FiltersGroup => $this->normalizeFiltersGroup($filter, $model),
+                $filter instanceof Filter => $this->normalizeFilter($filter, $model),
+                default => throw self::unknownNode($filter),
+            };
         }
 
         return [
