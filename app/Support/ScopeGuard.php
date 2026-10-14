@@ -8,6 +8,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Support\Carbon;
 use Modules\Core\Attributes\FilterScope;
 use Modules\Core\Casts\ScopeFilter;
@@ -452,6 +453,9 @@ final class ScopeGuard
         $bindings = $base->getRawBindings();
         unset($bindings['where']);
         $shape['bindings'] = $bindings;
+        // Callbacks that narrow the rows once fetched: a nested where never carries them.
+        $shape['after_query'] = self::protectedArray($builder, Builder::class, 'afterQueryCallbacks');
+        $shape['base_after_query'] = self::protectedArray($base, BaseBuilder::class, 'afterQueryCallbacks');
 
         return $shape;
     }
@@ -464,9 +468,20 @@ final class ScopeGuard
      */
     private static function globalScopesOf(Builder $builder): array
     {
-        $scopes = new ReflectionProperty(Builder::class, 'scopes')->getValue($builder);
+        return self::protectedArray($builder, Builder::class, 'scopes');
+    }
 
-        return is_array($scopes) ? $scopes : [];
+    /**
+     * A protected array property of a framework builder, which offers no getter for it.
+     *
+     * @param  class-string  $class
+     * @return array<array-key, mixed>
+     */
+    private static function protectedArray(object $builder, string $class, string $property): array
+    {
+        $value = new ReflectionProperty($class, $property)->getValue($builder);
+
+        return is_array($value) ? $value : [];
     }
 
     /**

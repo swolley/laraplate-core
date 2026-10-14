@@ -6,6 +6,7 @@ use App\Models\User;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -616,3 +617,14 @@ it('keeps query unchanged when OR filter group is empty', function (): void {
 
     expect($query->pluck('id')->all())->toEqualCanonicalizing([$u1->id, $u2->id]);
 });
+
+it('refuses a filter node it cannot apply instead of skipping it, at any depth', function (FiltersGroup $filters): void {
+    $query = User::query();
+
+    expect(fn () => (new QueryBuilder())->applyFilters($query, $filters))
+        ->toThrow(InvalidArgumentException::class, 'cannot apply');
+})->with([
+    'top level' => [new FiltersGroup([new ScopeFilter('valid')])],
+    'beside a column filter in an OR group' => [new FiltersGroup([new Filter('username', 'alpha', FilterOperator::Equals), new ScopeFilter('valid')], WhereClause::Or)],
+    'nested group' => [new FiltersGroup([new FiltersGroup([new ScopeFilter('valid')])])],
+]);

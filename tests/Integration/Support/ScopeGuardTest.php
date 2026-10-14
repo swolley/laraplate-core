@@ -199,6 +199,8 @@ it('refuses a declared scope that does more than add where conditions', function
     'binding outside the where conditions' => 'boundOutsideWhere',
     'condition in a before-query callback' => 'deferred',
     'condition in an added global scope' => 'globallyScoped',
+    'rows narrowed in an after-query callback' => 'filteredAfterwards',
+    'rows narrowed in an after-query callback of the base query' => 'baseFilteredAfterwards',
 ]);
 
 it('refuses a client request for an ACL-only scope and an unknown boolean when applying', function (): void {

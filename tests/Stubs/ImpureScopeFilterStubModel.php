@@ -150,6 +150,30 @@ class ImpureScopeFilterStubModel extends Model
     }
 
     /**
+     * Narrows the rows in a callback run after the query, which a nested where never carries.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function filteredAfterwards(Builder $query): void
+    {
+        $query->afterQuery(static fn (iterable $rows): iterable => $rows);
+    }
+
+    /**
+     * The same on the base query builder.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function baseFilteredAfterwards(Builder $query): void
+    {
+        $query->getQuery()->afterQuery(static fn (iterable $rows): iterable => $rows);
+    }
+
+    /**
      * Puts its conditions on another builder, so they would never reach the filtered query.
      *
      * @param  Builder<static>  $query

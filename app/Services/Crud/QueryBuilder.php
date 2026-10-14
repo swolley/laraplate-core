@@ -24,6 +24,7 @@ use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
@@ -1157,7 +1158,7 @@ final class QueryBuilder
 
     /**
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
-     * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter>  $filters
+     * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter|ScopeFilter>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
@@ -1184,6 +1185,9 @@ final class QueryBuilder
                 $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             } elseif ($subfilter instanceof Filter) {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
+            } else {
+                // A node skipped here would drop its condition and widen the rows: refused instead (fail closed).
+                throw new InvalidArgumentException(sprintf('The CRUD query builder cannot apply a %s filter node.', class_basename($subfilter)));
             }
 
             $first = false;

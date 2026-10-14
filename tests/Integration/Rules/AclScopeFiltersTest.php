@@ -15,8 +15,11 @@ use Modules\Core\Models\ACL;
 use Modules\Core\Models\Field;
 use Modules\Core\Models\Media;
 use Modules\Core\Models\Permission;
+use Modules\Core\Models\Taxonomy;
 use Modules\Core\Models\User;
 use Modules\Core\Overrides\ContextualValidationException;
+use Modules\Core\Rules\AclRelationFilters;
+use Modules\Core\Rules\AclScopeFilters;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\ImpureScopeFilterStubModel;
 
@@ -149,3 +152,27 @@ it('leaves an ACL without scope nodes to the other rules', function (): void {
 
     expect(aclscope_save_errors($acl))->toBe('');
 });
+
+it('rejects at save an abstract model given as a morph type with a validation error, not a crash', function (Filter|ScopeFilter $node): void {
+    $errors = aclscope_save_errors(aclscope_unsaved_acl(aclscope_owner_filter($node, [Taxonomy::class]), Media::class));
+
+    expect($errors)->toContain(sprintf('morph type "%s" is not a model', Taxonomy::class));
+})->with([
+    'a column filter' => [new Filter('name', 'x', FilterOperator::Equals)],
+    'a scope node' => [new ScopeFilter('active')],
+]);
+
+it('refuses a filter node of an unknown kind in both target rules instead of skipping it', function (string $rule_class): void {
+    $permission = Permission::query()->firstOrCreate(['name' => PermissionName::forClass(User::class, 'select'), 'guard_name' => 'api']);
+    $failures = [];
+
+    (new $rule_class)->setData(['permission_id' => $permission->id])->validate(
+        'filters',
+        new FiltersGroup([new FiltersGroup([new stdClass()])]),
+        function (string $message) use (&$failures): void {
+            $failures[] = $message;
+        },
+    );
+
+    expect($failures)->toBe(['filters holds a filter node of an unknown kind']);
+})->with([AclScopeFilters::class, AclRelationFilters::class]);

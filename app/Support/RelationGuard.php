@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use InvalidArgumentException;
 use Modules\Core\Casts\RelationFilter;
+use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -64,7 +65,8 @@ final class RelationGuard
 
     /**
      * The model class a morph type stands for (a class name or a morph alias), or null when it is the
-     * wildcard or does not name a model.
+     * wildcard or does not name a model that can have rows: an abstract model class never owns a record and
+     * cannot be instantiated.
      *
      * @return class-string<Model>|null
      */
@@ -76,7 +78,18 @@ final class RelationGuard
 
         $class = Relation::getMorphedModel($type) ?? $type;
 
-        return class_exists($class) && is_subclass_of($class, Model::class) ? $class : null;
+        return class_exists($class) && is_subclass_of($class, Model::class) && ! new ReflectionClass($class)->isAbstract() ? $class : null;
+    }
+
+    /**
+     * An instance of the model a morph type stands for, built without its constructor (only its class-level data is
+     * read), or null when {@see morphModelClass()} finds no model.
+     */
+    public static function morphModel(string $type): ?Model
+    {
+        $class = self::morphModelClass($type);
+
+        return $class === null ? null : new ReflectionClass($class)->newInstanceWithoutConstructor();
     }
 
     /**

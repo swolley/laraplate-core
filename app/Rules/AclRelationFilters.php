@@ -11,15 +11,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use InvalidArgumentException;
+use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Models\ACL;
-use Modules\Core\Models\Permission;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
 use Override;
-use ReflectionClass;
 
 /**
  * Checks, when an ACL is saved, that every relation filter points at something that exists: the relation
@@ -28,7 +28,8 @@ use ReflectionClass;
  * against the related entity, and against each accepted morph type.
  *
  * The shape of the filters is {@see QueryBuilder}'s concern; this rule only looks at what the shape
- * names, and only when the filters hold a relation filter at all.
+ * names, and only when the filters hold a relation filter at all. A node of an unknown kind is refused, never
+ * skipped.
  */
 final class AclRelationFilters implements DataAwareRule, ValidationRule
 {
@@ -66,7 +67,8 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
             return;
         }
 
-        $model = $this->entityOfPermission();
+        $permission_id = $this->data['permission_id'] ?? null;
+        $model = is_int($permission_id) || is_string($permission_id) ? PermissionName::modelOfPermission($permission_id) : null;
 
         if (! $model instanceof Model) {
             $fail($attribute . ' holds a relation filter but the entity of the permission cannot be resolved');
@@ -77,14 +79,19 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         $this->validateGroup($attribute, $filters, $model, $fail);
     }
 
+    /**
+     * Whether the filters need the walk: they hold a relation filter, or a node of an unknown kind to refuse.
+     */
     private function holdsRelationFilter(FiltersGroup $filters): bool
     {
         foreach ($filters->filters as $node) {
-            if ($node instanceof RelationFilter) {
-                return true;
-            }
+            $holds = match (true) {
+                $node instanceof FiltersGroup => $this->holdsRelationFilter($node),
+                $node instanceof Filter, $node instanceof ScopeFilter => false,
+                default => true,
+            };
 
-            if ($node instanceof FiltersGroup && $this->holdsRelationFilter($node)) {
+            if ($holds) {
                 return true;
             }
         }
@@ -92,39 +99,27 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         return false;
     }
 
-    /**
-     * The entity the ACL restricts: the model whose permission names match the ACL's permission.
-     */
-    private function entityOfPermission(): ?Model
-    {
-        $permission_id = $this->data['permission_id'] ?? null;
-
-        if (! is_int($permission_id) && ! is_string($permission_id)) {
-            return null;
-        }
-
-        $name = Permission::query()->whereKey($permission_id)->value('name');
-        $class = is_string($name) ? PermissionName::modelClassOf($name) : null;
-
-        return $class === null ? null : $this->instance($class);
-    }
-
-    /**
-     * @param  class-string<Model>  $class
-     */
-    private function instance(string $class): Model
-    {
-        return new ReflectionClass($class)->newInstanceWithoutConstructor();
-    }
-
     private function validateGroup(string $attribute, FiltersGroup $filters, Model $model, Closure $fail): void
     {
         foreach ($filters->filters as $node) {
-            if ($node instanceof FiltersGroup) {
-                $this->validateGroup($attribute, $node, $model, $fail);
-            } elseif ($node instanceof RelationFilter) {
-                $this->validateRelation($attribute, $node, $model, $fail);
-            }
+            match (true) {
+                $node instanceof FiltersGroup => $this->validateGroup($attribute, $node, $model, $fail),
+                $node instanceof RelationFilter => $this->validateRelation($attribute, $node, $model, $fail),
+                $node instanceof ScopeFilter => null,
+                default => $this->refuseUnknownNode($attribute, $node, $fail),
+            };
+        }
+    }
+
+    /**
+     * A column filter needs no check here; any other node is of a kind this rule does not know, and is refused.
+     *
+     * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     */
+    private function refuseUnknownNode(string $attribute, mixed $node, Closure $fail): void
+    {
+        if (! $node instanceof Filter) {
+            $fail(sprintf('%s holds a filter node of an unknown kind', $attribute));
         }
     }
 
@@ -157,15 +152,15 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         }
 
         foreach ($filter->morph_types as $type) {
-            $class = RelationGuard::morphModelClass($type);
+            $morph_model = RelationGuard::morphModel($type);
 
-            if ($class === null) {
+            if (! $morph_model instanceof Model) {
                 $fail(sprintf('%s morph type "%s" is not a model', $attribute, $type));
 
                 continue;
             }
 
-            $this->validateGroup($attribute, $filter->filters, $this->instance($class), $fail);
+            $this->validateGroup($attribute, $filter->filters, $morph_model, $fail);
         }
     }
 }

@@ -8,6 +8,7 @@ use function config;
 use function models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Models\Permission;
 use ReflectionClass;
 
 /**
@@ -72,6 +73,18 @@ final class PermissionName
         }
 
         return null;
+    }
+
+    /**
+     * The model the permission row with this key is about, built without its constructor (only its class-level
+     * data is read). Null when the permission does not exist or no model matches its name.
+     */
+    public static function modelOfPermission(int|string $permission_id): ?Model
+    {
+        $name = Permission::query()->whereKey($permission_id)->value('name');
+        $class = is_string($name) ? self::modelClassOf($name) : null;
+
+        return $class === null ? null : new ReflectionClass($class)->newInstanceWithoutConstructor();
     }
 
     /**
