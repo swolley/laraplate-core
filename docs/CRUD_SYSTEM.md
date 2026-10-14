@@ -139,6 +139,10 @@ ACL filter values may use dynamic placeholders resolved at query-build time: `@n
 `@today` become the live `Carbon::now()` / `Carbon::today()`. This is what lets a stored
 ACL express a moving publication window.
 
+An ACL can also name a model scope instead of the columns (`{"scope": "valid"}`, see
+[ACL_SYSTEM.md](./ACL_SYSTEM.md#scope-filters)); the CMS categories ACL of the anonymous reader does. Scope parameters
+accept the same placeholders.
+
 Together these replace what used to be a per-model validity global scope: `CMS\Content`
 publication filtering is an ACL of the `api` `guest` on `cms_contents.select` whose `valid_from <=
 @now AND (valid_to >= @now OR valid_to IS NULL)` filter limits the public reader to
@@ -399,9 +403,9 @@ hits through the same relation handling.
 - **Partial relations.** On `detail`, a relation the related ACL narrowed is declared in
   `meta.relations.{name}.hidden`, the number of related records left out, so a client can warn before
   editing. `list` and `search` do not carry it.
-- **Search.** ACL column conditions go to the engine; relation filters cannot, and take effect when the hits
-  are reloaded. A page can hold fewer records than requested, and a search's `totalRecords` can count hits
-  the caller may not see.
+- **Search.** ACL column conditions go to the engine; relation filters and scope filters cannot, and take
+  effect when the hits are reloaded. A page can hold fewer records than requested, and a search's
+  `totalRecords` can count hits the caller may not see.
 
 ### Computed `method` columns
 
@@ -573,6 +577,31 @@ Filter on related models using dot notation:
   ]
 }
 ```
+
+### Scope Filters in Requests
+
+A filter can also name a **model scope**, `{ "scope": "valid" }` or `{ "scope": "expiring", "parameters": [48] }`, anywhere a filter or a group may appear (`select`, `search` and `facets` requests share the `filters` vocabulary, and so does a tool call of the in-app assistant):
+
+```json
+{
+  "operator": "and",
+  "filters": [
+    { "scope": "valid" },
+    { "property": "status", "operator": "=", "value": "active" }
+  ]
+}
+```
+
+- Only scopes the model exposes to clients work: the method must carry `#[FilterScope(client: true)]`. The declared ones are the validity scopes of `HasValidity` (`valid`, `published`, `draft`, `scheduled`, `expired`, `validAt(date)`, `expiredAt(date)`, `expiring(hours)`) on every model using it. `active` and `inactive` (`HasActivation`) are ACL-only, because a scope may read columns a client cannot filter on. How a module declares its own, the parameter rules (scalars and ISO 8601 dates, strict types) and the purity rule are in [ACL_SYSTEM.md](./ACL_SYSTEM.md#scope-filters).
+- A request gets **no placeholders**: `@now`, `@today` and `@user.*` are taken literally.
+- The scope narrows the caller's ACL, never widens it: the request filters are ANDed with the ACL filters.
+- **`422`** when the scope is not declared, is ACL-only, takes a wrong, missing or extra parameter, or does more than add where conditions. The message names the filters path, the scope and the reason ("scope \"active\" can be used only in ACLs"), with the model shown as "this entity" and never a parameter value. `ListRequest` validates the tree (`Rules\ClientScopeFilters`); `FacetsRequest` and `SearchRequest` inherit it.
+- **The parser is the gate.** `ListRequestData::conformScopeNode()` asserts the client rule for every scope node it builds, because every tree it parses is client input and not every caller validates first. The in-app assistant's CRUD tool builds `ListRequestData` from the model's tool call without a `ListRequest`, so an ACL-only scope is refused there by the same parser.
+- In search the scope is left out of the engine filters and enforced when the hits are reloaded (see [ACL_SYSTEM.md](./ACL_SYSTEM.md#scope-filters-in-search)), so a page can hold fewer records than requested and `totalRecords` can count hits the scope removed.
+
+### Filter groups are always nested
+
+`QueryBuilder::applyFilters()` applies the group it is given inside one nested `where`, so an OR group (a request filter, an ACL, a stored filter) can never escape the conditions already on the query. The facets endpoint (counts, values, relation facets) once applied a request's root OR group next to the ACL without nesting (`where acl and a or b`), which counted hidden rows and returned their keys; it now goes through `applyFilters()` like the list. The CMS and SAO application content retrieval providers, the media owner lookup and the hit reload of search apply their filters through it too.
 
 ### Translated and Dynamic Fields
 

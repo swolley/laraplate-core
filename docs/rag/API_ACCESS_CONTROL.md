@@ -101,6 +101,7 @@ Public list of `guest` (`api`), all `select`:
 | `cms_contents` | currently published (`valid_from <= @now` and `valid_to >= @now` or null) | |
 | `cms_contents_references` | owner content published | |
 | `vend_media` | owner is a published CMS content (relation filter with morph type) | safe media projection |
+| `core_taxonomies` (CMS categories) | scopes `valid` and `active` plus a relation filter on the CMS entity type (the table is shared) | |
 | `cms_tags`, `cms_locations` | none | |
 | `cms_contributors` | none | `user_id`, `user`, `shared_components` |
 | `cms_comments` | none (pending comments never reach the table) | `user_id` |
@@ -182,11 +183,46 @@ keys and aggregates.
 
 ### Search
 
-Search applies the same rule. ACL column conditions go to the engine; a relation filter cannot (the engine takes column
-conditions only, and an OR group holding a relation node is left out of the engine query), so it is applied when the
-hits are reloaded from the database. A search page can therefore hold fewer records than requested, and `totalRecords`
-of a search can count hits the caller may not see. Relations of the reloaded records go through the same authorizer and
-black list as select.
+Search applies the same rule. ACL column conditions go to the engine; a relation filter or a scope filter cannot (the
+engine takes column conditions only, and an OR group holding one of them is left out of the engine query), so it is
+applied when the hits are reloaded from the database. A search page can therefore hold fewer records than requested, and
+`totalRecords` of a search can count hits the caller may not see. Relations of the reloaded records go through the same
+authorizer and black list as select.
+
+## Scope filters in ACLs
+
+An ACL (and a client request, see below) can name a **model scope** instead of repeating its conditions:
+`{"scope": "valid"}`, `{"scope": "expiring", "parameters": [48]}`. The full reference is
+`Modules/Core/docs/ACL_SYSTEM.md#scope-filters`; what an operator or integrator needs:
+
+- **What can be named.** Only a local scope whose method carries `#[FilterScope]` (a module declares its own, a trait's
+  declaration holds for every model using it). Declared: the validity scopes of `HasValidity` (`valid`, `published`,
+  `draft`, `scheduled`, `expired`, `validAt(date)`, `expiredAt(date)`, `expiring(hours)`) usable by clients, and `active`,
+  `inactive` of `HasActivation`, ACL-only. A model overriding a trait scope without the attribute undeclares it for itself
+  (`License::expired`).
+- **Client exposure rule.** `#[FilterScope(client: true)]` allows CRUD requests; the default is ACL-only, because a scope
+  may read columns a client cannot filter on (hidden or anonymous-hidden columns) and would let it probe them. A request
+  naming an ACL-only or undeclared scope, or a wrong parameter, is `422`. The request parser is the gate, so the in-app
+  assistant's CRUD tool is bound by it too. Requests get no placeholders; the scope is ANDed with the caller's ACL and
+  never widens it.
+- **Parameters.** Scalars and ISO 8601 dates, typed from the method signature; strings are strict (an integer is refused
+  for a string parameter); arrays and objects, missing and extra parameters are refused. An ACL parameter may be `@now` or
+  `@today` (date positions only) or `@user.<attribute>` (any position).
+- **Purity.** A scope runs inside its own nested `where` in AND and OR groups alike and may add only where conditions
+  (no joins, orders, columns, groups, limits, unions). A filter never removes or negates a global scope of the model; there
+  is no `not`.
+- **Relation filters.** A scope inside a relation filter is checked and applied on the related model (each morph type).
+- **Fail closed.** Saving an ACL with an undeclared, impure or badly parameterised scope is a validation error. An ACL
+  whose scope stops resolving later (the method was renamed, the signature changed) **denies the read** (`403`, `401` for
+  the anonymous user) and logs a warning with the ACL id and the reason, never a parameter value. The save-time purity run
+  uses the parameter defaults or samples, so a scope that is impure only off the default branch is caught only when used.
+- **Search.** Engines never receive a scope. It is dropped from an AND group, the whole OR group holding it is left out, and
+  the condition is enforced when the hits are reloaded from the database (the database engine does the same). Totals and
+  page sizes can therefore drift from the engine's counts, and an index-only field inside an OR group re-applied at the
+  reload is evaluated by the database's rules, so the results can be narrower (never wider).
+- **CMS defaults.** The anonymous categories ACL is `valid` + `active` + the CMS entity relation filter. The anonymous
+  contents, references and media ACLs stay on columns so that anonymous content search keeps exact totals. Existing
+  installations keep their stored ACLs (the seeder never overwrites one).
 
 ## Columns returned
 
@@ -325,3 +361,6 @@ shows `last_used_at`, expiry and networks.
 - Why does a media come back without `custom_properties` on the API?
 - Why does a facet, sort or filter on `user_id` answer 400 to the anonymous user?
 - Why does a server error say only "Internal Server Error"?
+- Why does a filter `{"scope": "active"}` answer 422 in a request but work in an ACL?
+- Why does a read answer 403 after a model scope was renamed?
+- Why can a search page hold fewer records than requested when an ACL uses a scope?

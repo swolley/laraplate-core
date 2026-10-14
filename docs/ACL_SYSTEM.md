@@ -321,8 +321,8 @@ Result on `vend_media`: only media whose owner is a content valid at the time of
 
 An ACL must never widen because of something it cannot read, so the cast that loads the `filters` JSON (`FiltersGroupCast`) refuses what it does not understand instead of dropping it:
 
-- A node is exactly one kind with exactly its keys: a relation node (`relation`, `filters`, `morph_types`), a filter (`property`, `operator`, `value`) or a group (`operator`, `filters`). An unknown key, or keys of two kinds in one node, throws.
-- The items of a group must be filters, groups or relation nodes (objects), the `filters` of a relation node must be a group (an object, not a bare list) that holds at least one condition, and `morph_types` must be a non-empty list.
+- A node is exactly one kind with exactly its keys: a relation node (`relation`, `filters`, `morph_types`), a scope node (`scope`, `parameters`), a filter (`property`, `operator`, `value`) or a group (`operator`, `filters`). An unknown key, or keys of two kinds in one node, throws.
+- The items of a group must be filters, groups, relation nodes or scope nodes (objects), the `filters` of a relation node must be a group (an object, not a bare list) that holds at least one condition, and `morph_types` must be a non-empty list.
 - Undecodable JSON, or a value that is neither an object nor a list, throws. The ACL then fails to load and the request fails: it never runs unfiltered.
 - A stored group that constrains nothing (empty, or made of empty groups) throws as well, because it would match every row. The `unrestricted` flag is the exemption: an ACL flagged `unrestricted` may store an empty group (it contributes no filters by design). A SQL `NULL`, an empty `filters` column or a stored JSON literal `null` keeps meaning "no filters".
 - At query time every relation name goes through `Support\RelationGuard` (a public, non-static method with no required parameter and a declared `Relation` return type) before it is called, and a morph relation must name its morph types, never the wildcard. A filter that fails these checks throws, so the query fails closed.
@@ -343,6 +343,66 @@ A related record loaded as a relation is narrowed by the ACL of its own entity, 
 #### ACL filters and readable columns
 
 An ACL may filter on any column, including one the caller never receives (a column hidden from the anonymous user, a media column outside the projection): it names columns on its own authority. The filters, sorts, group-by keys and facet fields a request sends may not (`400`): they are checked before the ACL filters are merged in. See [CRUD_SYSTEM.md](./CRUD_SYSTEM.md#columns-returned).
+
+### Scope Filters
+
+A filter can name a **local scope of the filtered model** instead of repeating its conditions column by column. A scope node is `{"scope": "<name>", "parameters": [...]}`; `parameters` is optional and, when present, a list (the arguments are positional, after the query builder). The node has exactly these two keys and a non-empty `scope`; anything else is refused by the cast, as for the other nodes.
+
+```json
+{
+  "filters": [
+    { "scope": "valid" },
+    { "scope": "active" },
+    { "scope": "expiring", "parameters": [48] }
+  ],
+  "operator": "and"
+}
+```
+
+The anonymous reader's category ACL is `valid` + `active` + a relation filter on the CMS entity type: when the model changes what "valid" means, the ACL follows it instead of keeping a stale copy of the window.
+
+#### Declaring a scope
+
+A scope is usable as a filter only when its method carries `#[Modules\Core\Attributes\FilterScope]`, on a `#[Scope]` method or a legacy `scopeXxx` method (it must not be private). The name and the parameter types come from the method signature, read by reflection once per model class (`Support\ScopeGuard`), so the declaration cannot drift from the code. A scope declared in a trait is declared for every model using the trait.
+
+- `#[FilterScope]` is **ACL-only**; `#[FilterScope(client: true)]` also allows CRUD requests (see [CRUD_SYSTEM.md](./CRUD_SYSTEM.md#scope-filters-in-requests)). A scope may read columns a client cannot filter on (hidden or anonymous-hidden columns) and would let a client probe their values; ACLs are written by administrators and do not carry that risk. Expose a scope to clients only when the columns it reads are already serialized.
+- A module declares its own by adding the attribute to its scope method, or by putting the attribute on a scope of a trait it shares. Core needs no change and no registry.
+- Declared in v1: `HasValidity`, with `client: true` (its columns are serialized): `valid`, `published`, `draft`, `scheduled`, `expired`, `validAt(date)`, `expiredAt(date)` and `expiring(hours)`. `HasActivation`, ACL-only because the activation column is hidden from serialization: `active`, `inactive`. Not declared: `validityOrdered` (it orders) and `withValidityFilter` (a duplicate of `validAt`).
+- A model that **overrides** a trait scope without repeating the attribute undeclares it for itself: the declaration belongs to the method that wins. `License` overrides `expired` and so does not offer it as a filter. Put the attribute on the overriding method if the scope must stay usable.
+- Only local scopes can be named. A signature a filter cannot carry (no query builder, a variadic, by-reference, untyped, union or non-scalar non-date parameter, `CarbonImmutable` or a plain `DateTime`) is refused when the node is used, naming the parameter.
+
+#### Parameters and placeholders
+
+- Parameters are scalars (`string`, `int`, `float`, `bool`, `null`) and dates. Arrays and objects are refused, a missing required parameter or an extra one is refused, and a parameter with a default may be left out.
+- Values are checked against the declared type. `string` is strict: an integer is refused for a string parameter. An `int` or `float` also accepts its numeric string, a `bool` the usual boolean spellings, `null` only a nullable parameter.
+- A date parameter is an ISO 8601 string (a calendar date, optionally with time and offset) turned into an `Illuminate\Support\Carbon`. The parameter must be typed `CarbonInterface` or `Carbon`: a `CarbonImmutable` or `DateTime` typed parameter is not supported.
+- In an ACL, a parameter accepts the placeholders of a filter value: `@now` and `@today` **only in a date position**, `@user.<attribute>` in any scalar or date position (its value is typed when the scope is used). They are resolved when the ACL is applied.
+- At save, a placeholder cannot be resolved, so the purity run below uses the parameter's default or, when it has none, a sample of its declared type. A scope that is impure only on a branch the default does not take (say, an `if` on the argument) passes at save and is refused only when used.
+- Client requests get no placeholders: a parameter is taken literally, so `@now` is refused for a date parameter.
+
+#### Purity
+
+A scope runs inside its **own nested `where`** (`where(fn ($q) => $q->scope(...))`), in AND and OR groups alike, so its conditions never leak out of their group. After the call the nested query may hold only `where` conditions: joins, orders, selected columns, distinct, groups, havings, limits, offsets, unions, aggregates, locks, eager loads, query callbacks, a global scope added on the nested query, or a returned builder other than the one it was given, refuse the filter. A scope that does more than narrow rows cannot be a filter even if declared.
+
+A scope node only adds conditions. It **never removes or negates a global scope** of the filtered model, which stays applied as the model decides (a scope that calls `withoutGlobalScope` acts on its own nested query, whose global scopes are never applied: `validAt` does it, and the outer query keeps its own). There is no `not`: the opposite of a scope is declared as its own scope (`active` / `inactive`).
+
+#### Relation filters
+
+A scope node inside a relation node is resolved and checked against the **related** model, and against each morph type of a morph relation. `{"relation": "model", "morph_types": ["Modules\\CMS\\Models\\Content"], "filters": {"filters": [{"scope": "valid"}]}}` narrows the media to those of a valid content.
+
+#### Errors: fail closed
+
+| When | Undeclared, impure or badly parameterised scope |
+|---|---|
+| ACL save (Filament, CRUD on `core_acls`) | Validation error on `filters` naming the scope and the reason (`Rules\AclScopeFilters`, with `AclRelationFilters` for the relations). The Filament form shows it. |
+| ACL use (CRUD read, ACL-checked read, search rehydration, media owner lookup, the application content retrieval of the assistant) | The read is denied (`AuthorizationException`: `403` for an authenticated principal, `401` for the anonymous user) and `Support\AclScopeCheck` logs a warning with the ACL id, the permission, the scope and the reason, never a parameter value. Every walker of the tree refuses a node kind it does not know instead of skipping it. |
+| CRUD request | `422`, see [CRUD_SYSTEM.md](./CRUD_SYSTEM.md#scope-filters-in-requests). |
+
+The check at use runs each scope node on a throwaway query, with its placeholders resolved, before the real query is built.
+
+#### Scope filters in search
+
+A search engine never receives a scope node. It is left out of the engine filters exactly like a relation filter (dropped from an AND group, the whole OR group left out) and enforced when the hits are reloaded from the database. The database engine does not apply a scope in its own SQL either: it takes no scope node, and the scope is enforced at the reload. Consequences, the same as for relation filters: a search page can hold fewer records than requested, and the search `totalRecords` is the engine's count, so it can count hits the caller may not see. An OR group that holds a scope and also column conditions is re-applied at the reload with the database's rules, so a field that only the index knows (an index-only field) inside such a group is evaluated by the database and the results can be narrower than the engine's. Never wider. That is why the CMS keeps the anonymous contents ACL on columns (see `Modules/CMS/README.md`): a scope in it would skew the totals and page sizes of every anonymous content search.
 
 ## Usage
 
