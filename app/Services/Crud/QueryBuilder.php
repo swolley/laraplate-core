@@ -1078,7 +1078,6 @@ final class QueryBuilder
         if ($stored_as === ModelPropertyResolver::TRANSLATED) {
             $this->whereTranslation(
                 $query,
-                $model,
                 $method,
                 function (Builder $translation_query) use ($filter, &$relation_columns, $authorizer, $request): void {
                     $this->applyFilter($translation_query, $filter, 'where', $relation_columns, $authorizer, $request);
@@ -1099,7 +1098,6 @@ final class QueryBuilder
                 $json_filter = new Filter($translation_container . '->' . $filter->property, $filter->value, $filter->operator);
                 $this->whereTranslation(
                     $group,
-                    $model,
                     'orWhere',
                     function (Builder $translation_query) use ($json_filter, &$relation_columns, $authorizer, $request): void {
                         $this->applyFilter($translation_query, $json_filter, 'where', $relation_columns, $authorizer, $request);
@@ -1110,35 +1108,19 @@ final class QueryBuilder
     }
 
     /**
-     * Constrain a query by the translation a request would read: the one of the current locale, or the
-     * default locale when the model falls back and the record has no translation in the current one.
+     * Constrain a query by the translation of the request locale. No fallback to another locale: the
+     * application keeps a single locale setting, so a model never has a distinct default to fall back to
+     * while a request runs, and a record without a translation in the request locale is simply not matched.
      *
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  Closure(Builder<Model>): void  $constraint
      */
-    private function whereTranslation(Builder|Relation $query, Model $model, string $method, Closure $constraint): void
+    private function whereTranslation(Builder|Relation $query, string $method, Closure $constraint): void
     {
         $locale = LocaleContext::get();
-        $default_locale = LocaleContext::getDefault();
-        $falls_back = $locale !== $default_locale && $model->translationFallbackEnabledBySettings();
-        $translations = $model->translations();
 
-        $query->{$method . 'Has'}('translations', function (Builder $translation_query) use ($constraint, $locale, $default_locale, $falls_back, $translations): void {
-            $translation_query->where(function (Builder $scope) use ($locale, $default_locale, $falls_back, $translations): void {
-                $scope->where('locale', $locale);
-
-                if ($falls_back) {
-                    $scope->orWhere(function (Builder $fallback) use ($locale, $default_locale, $translations): void {
-                        $foreign_key = $translations->getForeignKeyName();
-                        $fallback->where('locale', $default_locale)
-                            ->whereNotIn($foreign_key, static fn ($current) => $current
-                                ->select($foreign_key)
-                                ->from($translations->getRelated()->getTable())
-                                ->where('locale', $locale));
-                    });
-                }
-            });
-
+        $query->{$method . 'Has'}('translations', function (Builder $translation_query) use ($constraint, $locale): void {
+            $translation_query->where('locale', $locale);
             $constraint($translation_query);
         });
     }
