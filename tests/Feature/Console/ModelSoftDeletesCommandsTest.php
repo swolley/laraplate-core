@@ -115,6 +115,7 @@ it('writes soft-delete settings through the Setting model connection', function 
         $table->text('value')->nullable();
         $table->boolean('encrypted')->default(false);
         $table->boolean('is_internal')->default(false);
+        $table->boolean('managed')->default(false);
         $table->boolean('is_public')->default(false);
         $table->json('choices')->nullable();
         $table->string('type');
