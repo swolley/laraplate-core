@@ -28,6 +28,7 @@ use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Support\CrudApiExposure;
 use Modules\Core\Support\PermissionName;
+use Modules\Core\Tests\Stubs\ConditionalScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ImpureScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ScopeFilterStubModel;
 
@@ -360,6 +361,27 @@ it('denies an ACL-checked read when a scope of the ACL does more than add condit
     'orders' => [ImpureScopeFilterStubModel::class, new ScopeFilter('ordered')],
     'throws its own exception' => [ScopeFilterStubModel::class, new ScopeFilter('releasedWithin', [1])],
 ]);
+
+it('denies an ACL read whose scope adds no condition for the acting user instead of reading every row', function (): void {
+    aclscope_stub_table();
+    ConditionalScopeFilterStubModel::query()->insert([['name' => 'alpha'], ['name' => 'beta']]);
+    [$reader, $permission_name, $acl] = aclscope_reader(
+        new FiltersGroup([new ScopeFilter('ofName', ['@user.department_code'])]),
+        permission_name: 'default.scope_filter_stub.select',
+    );
+    aclscope_act_as($reader);
+    Log::spy();
+    $query = ConditionalScopeFilterStubModel::query();
+
+    expect(fn () => app(AuthorizationService::class)->applyAclFiltersToQuery($query, $permission_name))
+        ->toThrow(AuthorizationException::class)
+        ->and(fn () => app(AuthorizationService::class)->resolvedAclFilters($permission_name, new ConditionalScopeFilterStubModel))
+        ->toThrow(AuthorizationException::class)
+        ->and($query->getQuery()->wheres)->toBe([]);
+
+    Log::shouldHaveReceived('warning')->twice()->withArgs(static fn (string $message, array $context): bool => ($context['acl_id'] ?? null) === $acl->id
+        && str_contains((string) ($context['reason'] ?? ''), 'adds no condition'));
+});
 
 it('gives the CRUD query builder the ACL filters with their placeholders resolved', function (): void {
     $licenses = aclscope_licenses();

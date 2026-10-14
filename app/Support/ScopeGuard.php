@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Support;
 
 use DateTimeInterface;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -26,9 +27,9 @@ use Throwable;
  * A filter may name only a local scope whose method carries {@see FilterScope}: the declared scopes of a model
  * class are read once by reflection, traits included, and kept per class. Parameters are checked against the
  * method signature and coerced; a scope then runs inside its own nested where and is refused when it left
- * anything on the query but where conditions. Global scopes are never touched: only the named local scope is
- * called. Placeholders (`@now`, `@user.<attribute>`) are resolved by the caller before a node is applied; an ACL
- * being saved holds them unresolved and is checked by {@see assertStorable()}.
+ * anything on the query but where conditions, or no where condition at all. Global scopes are never touched: only
+ * the named local scope is called. Placeholders (`@now`, `@user.<attribute>`) are resolved by the caller before a
+ * node is applied; an ACL being saved holds them unresolved and is checked by {@see assertStorable()}.
  *
  * Every refusal is a {@see ScopeFilterException}, whose message never carries a parameter value.
  *
@@ -115,8 +116,9 @@ final class ScopeGuard
     /**
      * Checks a scope node of a client request (a CRUD request, an AI tool call) as it is parsed, before it is merged
      * with the caller's ACL: the scope must be exposed to clients, its parameters must fit, taken literally (a client
-     * gets no placeholders), and it must add nothing but where conditions. The scope is run once on a throwaway query
-     * of the model, which is built and never executed.
+     * gets no placeholders), and it must add where conditions and nothing else, none of them a subquery or raw SQL
+     * (a relation or another row reached that way would escape its own ACL). The scope is run once on a throwaway
+     * query of the model, which is built and never executed.
      *
      * The refusal is safe to show the client: it names the scope and the reason, with the model as "this entity",
      * and never a parameter value nor the message of an exception the scope throws itself.
@@ -144,9 +146,10 @@ final class ScopeGuard
      * @param  string  $boolean  How the group joins the query: 'and' or 'or'
      * @param  bool  $client  Whether the node comes from a CRUD request rather than an ACL
      *
-     * @throws ScopeFilterException when the node is not filterable ({@see assertFilterable()}) or the scope did more
-     *                              than add where conditions; the query is then left untouched. An exception the
-     *                              scope throws itself goes through unchanged.
+     * @throws ScopeFilterException when the node is not filterable ({@see assertFilterable()}), the scope did more
+     *                              than add where conditions, added no condition at all (the node would match every
+     *                              row), or, for a client, read through a subquery or raw SQL; the query is then left
+     *                              untouched. An exception the scope throws itself goes through unchanged.
      */
     public static function apply(Builder $query, ScopeFilter $filter, string $boolean = 'and', bool $client = false): void
     {
@@ -167,7 +170,72 @@ final class ScopeGuard
             throw new ScopeFilterException(sprintf('Scope "%s" of %s does more than add where conditions, so it cannot be used as a filter.', $filter->scope, $model::class));
         }
 
+        $wheres = $nested->getQuery()->wheres;
+
+        // A nested query without a where is dropped by addNestedWhereQuery(): the node would then match every row.
+        if ($wheres === []) {
+            throw new ScopeFilterException(sprintf('Scope "%s" of %s adds no condition with these parameters, so it cannot be used as a filter.', $filter->scope, $model::class));
+        }
+
+        if ($client && self::readsThroughSubquery($wheres)) {
+            throw new ScopeFilterException(sprintf('Scope "%s" of %s reads through a subquery or raw SQL, which a client request cannot use: the rows it reaches are never checked against their own ACL.', $filter->scope, $model::class));
+        }
+
         $query->getQuery()->addNestedWhereQuery($nested->getQuery(), $boolean);
+    }
+
+    /**
+     * Whether any where condition, nested groups included, holds a subquery (`whereHas`, `has`, `whereExists`,
+     * `whereIn` or a comparison with a subquery) or SQL the guard cannot read (a raw condition, an expression).
+     *
+     * @param  array<int, array<string, mixed>>  $wheres
+     */
+    private static function readsThroughSubquery(array $wheres): bool
+    {
+        foreach ($wheres as $where) {
+            $type = is_string($where['type'] ?? null) ? mb_strtolower($where['type']) : null;
+            $subquery = $where['query'] ?? null;
+
+            if ($type === 'nested' && $subquery instanceof BaseBuilder) {
+                if (self::readsThroughSubquery($subquery->wheres)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($type === 'raw' || $type === 'expression' || $subquery !== null) {
+                return true;
+            }
+
+            foreach (['column', 'value', 'values', 'first', 'second'] as $key) {
+                if (self::holdsExpression($where[$key] ?? null)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the value is, or holds, a raw expression: the shape a count subquery or a `whereIn` subquery takes.
+     */
+    private static function holdsExpression(mixed $value): bool
+    {
+        if ($value instanceof Expression) {
+            return true;
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (self::holdsExpression($item)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

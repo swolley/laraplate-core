@@ -1218,13 +1218,13 @@ final class QueryBuilder
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null, bool $client = false): void
+    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         RelationGuard::assertFilterable($query->getModel(), $filter);
 
         $has_method = $method . ($filter->morph_types !== null ? 'HasMorph' : 'Has');
-        $constraint = function (Builder $q) use ($filter, &$relation_columns, $authorizer, $request, $client): void {
-            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns, $authorizer, $request, $client);
+        $constraint = function (Builder $q) use ($filter, &$relation_columns, $authorizer, $request): void {
+            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns, $authorizer, $request);
         };
 
         if ($filter->morph_types !== null) {
@@ -1239,17 +1239,16 @@ final class QueryBuilder
     /**
      * Applies a filter tree to the query: the first node of an OR group joins with `where`, the others with
      * `orWhere`. A scope node runs in its own nested where ({@see ScopeGuard::apply()}) against the model of the
-     * query it reaches, the related model inside a relation filter.
+     * query it reaches, the related model inside a relation filter. Every scope node is applied as an ACL's would be: a
+     * request's scope nodes were gated when the request was parsed ({@see ListRequestData}), the only client gate.
      *
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter|ScopeFilter>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
-     * @param  bool  $client  Whether the scope nodes come from a CRUD request, which may name only the scopes a model
-     *                        exposes to clients; false for ACL filters
      *
      * @throws InvalidArgumentException when a node cannot be applied (a scope refusal is a {@see ScopeFilterException})
      */
-    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null, bool $client = false): void
+    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
     {
         if ($filters instanceof FiltersGroup) {
             $iterable = $filters->filters;
@@ -1267,12 +1266,12 @@ final class QueryBuilder
 
             if ($subfilter instanceof FiltersGroup) {
                 if (is_callable([$query, $method])) {
-                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns, $authorizer, $request, $client));
+                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns, $authorizer, $request));
                 }
             } elseif ($subfilter instanceof RelationFilter) {
-                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request, $client);
+                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             } elseif ($subfilter instanceof ScopeFilter) {
-                ScopeGuard::apply($query instanceof Relation ? $query->getQuery() : $query, $subfilter, $method === 'orWhere' ? 'or' : 'and', $client);
+                ScopeGuard::apply($query instanceof Relation ? $query->getQuery() : $query, $subfilter, $method === 'orWhere' ? 'or' : 'and');
             } elseif ($subfilter instanceof Filter) {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             } else {

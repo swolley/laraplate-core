@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Support\ScopeGuard;
+use Modules\Core\Tests\Stubs\ConditionalScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\FailingScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ImpureScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ScopeFilterStubModel;
+use Modules\Core\Tests\Stubs\SubqueryScopeFilterStubModel;
 
 it('reads the declared filter scopes of a model and of the traits it uses', function (): void {
     $declarations = ScopeGuard::declarations(ScopeFilterStubModel::class);
@@ -336,4 +338,52 @@ it('takes a placeholder in a client string parameter literally', function (): vo
     ScopeGuard::apply($query, $filter, client: true);
 
     expect($query->getBindings())->toBe(['@user.name']);
+});
+
+it('refuses a scope run that adds no condition instead of matching every row', function (): void {
+    $query = ConditionalScopeFilterStubModel::query();
+
+    expect(fn () => ScopeGuard::apply($query, new ScopeFilter('ofName', [null])))
+        ->toThrow(ScopeFilterException::class, 'Scope "ofName" of ' . ConditionalScopeFilterStubModel::class . ' adds no condition')
+        ->and($query->toSql())->toBe('select * from "scope_filter_stub"');
+
+    $named = ConditionalScopeFilterStubModel::query();
+    ScopeGuard::apply($named, new ScopeFilter('ofName', ['a']));
+
+    expect($named->toSql())->toBe('select * from "scope_filter_stub" where ("scope_filter_stub"."name" = ?)');
+});
+
+it('refuses at save a placeholder whose save-time run adds no condition, and a client run that adds none', function (): void {
+    expect(fn () => ScopeGuard::assertStorable(new ConditionalScopeFilterStubModel(), new ScopeFilter('ofName', ['@user.department_code'])))
+        ->toThrow(ScopeFilterException::class, 'adds no condition')
+        ->and(fn () => ScopeGuard::assertClientFilterable(new ConditionalScopeFilterStubModel(), new ScopeFilter('ofName')))
+        ->toThrow(ScopeFilterException::class, 'Scope "ofName" of this entity adds no condition');
+});
+
+it('refuses to a client a scope that reads other rows through a subquery or raw SQL', function (string $scope): void {
+    $query = SubqueryScopeFilterStubModel::query();
+
+    expect(fn () => ScopeGuard::apply($query, new ScopeFilter($scope), client: true))
+        ->toThrow(ScopeFilterException::class, sprintf('Scope "%s" of %s reads through a subquery or raw SQL', $scope, SubqueryScopeFilterStubModel::class))
+        ->and($query->toSql())->toBe('select * from "scope_filter_stub"')
+        ->and(fn () => ScopeGuard::assertClientFilterable(new SubqueryScopeFilterStubModel(), new ScopeFilter($scope)))
+        ->toThrow(ScopeFilterException::class, sprintf('Scope "%s" of this entity reads through a subquery or raw SQL', $scope));
+})->with([
+    'whereHas' => 'withFlaggedNamesake',
+    'doesntHave inside a nested group' => 'withoutNamesake',
+    'has with a count' => 'withManyNamesakes',
+    'whereIn a subquery' => 'inSubquery',
+    'compared to a subquery' => 'comparedToSubquery',
+    'raw condition' => 'rawCondition',
+]);
+
+it('keeps the subqueries of a scope applied from an ACL, and plain column groups of a client scope', function (): void {
+    $acl = SubqueryScopeFilterStubModel::query();
+    ScopeGuard::apply($acl, new ScopeFilter('withFlaggedNamesake'));
+
+    $client = SubqueryScopeFilterStubModel::query();
+    ScopeGuard::apply($client, new ScopeFilter('cheapOrUnnamed'), client: true);
+
+    expect($acl->toSql())->toContain('where (exists (select * from "scope_filter_stub" as')
+        ->and($client->toSql())->toBe('select * from "scope_filter_stub" where ("scope_filter_stub"."price" < ? or ("scope_filter_stub"."name" is null))');
 });
