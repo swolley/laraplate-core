@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
 use InvalidFormatException;
+use Modules\Core\Attributes\FilterScope;
 use Modules\Core\Contracts\IValidatableModel;
 
 /**
@@ -146,6 +147,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function valid(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($q): void {
@@ -173,6 +175,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function expiring(Builder $query, ?int $within_hours = null): Builder
     {
         $hours = $within_hours ?? static::expiringWithinHours();
@@ -219,6 +222,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function expired(Builder $query): Builder
     {
         return $query->expiredAt(now());
@@ -234,6 +238,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function expiredAt(Builder $query, CarbonInterface $date): Builder
     {
         // Was expired()->validAt($date), which asked for rows past their validity
@@ -255,6 +260,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function validAt(Builder $query, CarbonInterface $date): Builder
     {
         return $query->withoutGlobalScope('valid')->withValidityFilter($date);
@@ -270,6 +276,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function published(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$valid_from_column), '<=', now())->where(function ($query): void {
@@ -287,6 +294,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function draft(Builder $query): Builder
     {
         return $query->whereNull($this->qualifyColumn(static::$valid_from_column));
@@ -302,6 +310,7 @@ trait HasValidity
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope(client: true)]
     protected function scheduled(Builder $query): Builder
     {
         return $query->whereNotNull($this->qualifyColumn(static::$valid_from_column))->where($this->qualifyColumn(static::$valid_from_column), '>', now());

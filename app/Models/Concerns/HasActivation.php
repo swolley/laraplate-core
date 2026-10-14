@@ -6,6 +6,7 @@ namespace Modules\Core\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Attributes\FilterScope;
 use Modules\Core\Contracts\IActivatableModel;
 
 /**
@@ -54,6 +55,7 @@ trait HasActivation
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope]
     protected function active(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$activation_column), true);
@@ -64,6 +66,7 @@ trait HasActivation
      * @return Builder<static>
      */
     #[Scope]
+    #[FilterScope]
     protected function inactive(Builder $query): Builder
     {
         return $query->where($this->qualifyColumn(static::$activation_column), false);
