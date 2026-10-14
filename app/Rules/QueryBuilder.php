@@ -10,6 +10,7 @@ use Illuminate\Support\Arr;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Override;
 
 final class QueryBuilder implements ValidationRule
@@ -26,7 +27,7 @@ final class QueryBuilder implements ValidationRule
     #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if ($value instanceof FiltersGroup || $value instanceof Filter || $value instanceof RelationFilter) {
+        if ($value instanceof FiltersGroup || $value instanceof Filter || $value instanceof RelationFilter || $value instanceof ScopeFilter) {
             return;
         }
 
@@ -59,6 +60,12 @@ final class QueryBuilder implements ValidationRule
 
     private function validateAssociative(string $attribute, array $value, Closure $fail): void
     {
+        if (array_key_exists('scope', $value)) {
+            $this->validateScope($attribute, $value, $fail);
+
+            return;
+        }
+
         if (! array_key_exists('property', $value) && ! array_key_exists('filters', $value)) {
             $fail($attribute . " doesn't have a correct format");
 
@@ -89,6 +96,39 @@ final class QueryBuilder implements ValidationRule
             }
 
             $this->validate($attribute . '.filters', $value['filters'], $fail);
+        }
+    }
+
+    /**
+     * A scope node names a local scope and, optionally, lists its positional parameters as scalars or null; it
+     * takes no other key. Whether the model declares the scope is the target rules' concern.
+     *
+     * @param  array<string, mixed>  $value
+     */
+    private function validateScope(string $attribute, array $value, Closure $fail): void
+    {
+        if (array_diff(array_keys($value), ['scope', 'parameters']) !== []) {
+            $fail($attribute . ' a scope filter takes only "scope" and "parameters"');
+        }
+
+        if (! is_string($value['scope']) || $value['scope'] === '') {
+            $fail($attribute . ' "scope" must be a scope name');
+        }
+
+        if (! array_key_exists('parameters', $value)) {
+            return;
+        }
+
+        $parameters = $value['parameters'];
+
+        if (! is_array($parameters) || ! Arr::isList($parameters)) {
+            $fail($attribute . ' "parameters" must be a list');
+
+            return;
+        }
+
+        if (array_filter($parameters, static fn (mixed $parameter): bool => $parameter !== null && ! is_scalar($parameter)) !== []) {
+            $fail($attribute . ' "parameters" must be a list of scalar values');
         }
     }
 

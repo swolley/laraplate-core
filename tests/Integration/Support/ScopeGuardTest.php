@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\ScopeFilter;
+use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Support\ScopeGuard;
 use Modules\Core\Tests\Stubs\ImpureScopeFilterStubModel;
 use Modules\Core\Tests\Stubs\ScopeFilterStubModel;
@@ -16,7 +17,7 @@ it('reads the declared filter scopes of a model and of the traits it uses', func
     $declarations = ScopeGuard::declarations(ScopeFilterStubModel::class);
 
     expect(array_keys($declarations))->toEqualCanonicalizing([
-        'named', 'legacyNamed', 'priced', 'releasedBefore', 'flagged', 'eitherName', 'namedAnyOf',
+        'named', 'legacyNamed', 'priced', 'releasedBefore', 'releasedWithin', 'withoutItsGlobalScope', 'flagged', 'eitherName', 'namedAnyOf',
     ])
         ->and($declarations['priced']['parameters'])->toBe([
             ['name' => 'min', 'type' => 'int', 'nullable' => false, 'optional' => false, 'default' => null],
@@ -43,7 +44,7 @@ it('reports the client flag of each declaration', function (): void {
 
 it('refuses a scope that is not declared as a filter', function (string $scope): void {
     expect(fn (): array => ScopeGuard::assertFilterable(new ScopeFilterStubModel(), new ScopeFilter($scope)))
-        ->toThrow(InvalidArgumentException::class, sprintf('"%s"', $scope));
+        ->toThrow(ScopeFilterException::class, sprintf('"%s"', $scope));
 })->with([
     'local scope without the attribute' => 'undeclared',
     'attribute on a method that is not a scope' => 'notAScope',
@@ -56,7 +57,7 @@ it('accepts an ACL-only scope in an ACL and refuses it in a client request', fun
 
     expect(ScopeGuard::assertFilterable($model, new ScopeFilter('priced', [1])))->toBe([1])
         ->and(fn (): array => ScopeGuard::assertFilterable($model, new ScopeFilter('priced', [1]), client: true))
-        ->toThrow(InvalidArgumentException::class, 'only in ACLs')
+        ->toThrow(ScopeFilterException::class, 'only in ACLs')
         ->and(ScopeGuard::assertFilterable($model, new ScopeFilter('named', ['a']), client: true))->toBe(['a']);
 });
 
@@ -89,7 +90,7 @@ it('turns an ISO 8601 string or a date into a CarbonInterface for a date paramet
 
 it('refuses parameters that do not fit the declaration', function (string $scope, array $parameters, string $reason): void {
     expect(fn (): array => ScopeGuard::assertFilterable(new ScopeFilterStubModel(), new ScopeFilter($scope, $parameters)))
-        ->toThrow(InvalidArgumentException::class, $reason);
+        ->toThrow(ScopeFilterException::class, $reason);
 })->with([
     'missing required' => ['priced', [], 'needs at least 1'],
     'extra' => ['priced', [1, 2, 3], 'takes at most 2'],
@@ -102,6 +103,9 @@ it('refuses parameters that do not fit the declaration', function (string $scope
     'int for a string' => ['named', [5], 'must be a string'],
     'not a boolean' => ['flagged', ['maybe'], 'must be a bool'],
     'date that is not ISO 8601' => ['releasedBefore', ['next monday'], 'ISO 8601'],
+    'int with a trailing newline' => ['priced', ["5\n"], 'must be an int'],
+    'date with a trailing newline' => ['releasedBefore', ["2026-10-01\n"], 'ISO 8601'],
+    'empty string for a bool' => ['flagged', [''], 'must be a bool'],
     'impossible date' => ['releasedBefore', ['2026-02-31'], 'ISO 8601'],
     'object for a date' => ['releasedBefore', [new stdClass()], 'arrays and objects'],
     'unsupported declaration' => ['namedAnyOf', ['a'], 'cannot be used as a filter'],
@@ -111,7 +115,7 @@ it('never puts a parameter value in the error message', function (): void {
     try {
         ScopeGuard::assertFilterable(new ScopeFilterStubModel(), new ScopeFilter('priced', ['secret-value-42']));
         $this->fail('The parameter should have been refused.');
-    } catch (InvalidArgumentException $exception) {
+    } catch (ScopeFilterException $exception) {
         expect($exception->getMessage())->not->toContain('secret-value-42')
             ->and($exception->getMessage())->toContain('priced')
             ->and($exception->getMessage())->toContain(ScopeFilterStubModel::class);
@@ -178,7 +182,7 @@ it('refuses a declared scope that does more than add where conditions', function
     $query = ImpureScopeFilterStubModel::query();
 
     expect(fn () => ScopeGuard::apply($query, new ScopeFilter($scope)))
-        ->toThrow(InvalidArgumentException::class, sprintf('"%s"', $scope))
+        ->toThrow(ScopeFilterException::class, sprintf('"%s"', $scope))
         ->and($query->getQuery()->wheres)->toBe([])
         ->and($query->toSql())->toBe('select * from "scope_filter_stub"');
 })->with([
@@ -190,13 +194,18 @@ it('refuses a declared scope that does more than add where conditions', function
     'union' => 'unioned',
     'eager load' => 'eagerLoading',
     'conditions on another builder' => 'detached',
+    'distinct' => 'distinctRows',
+    'lock' => 'locked',
+    'binding outside the where conditions' => 'boundOutsideWhere',
+    'condition in a before-query callback' => 'deferred',
+    'condition in an added global scope' => 'globallyScoped',
 ]);
 
 it('refuses a client request for an ACL-only scope and an unknown boolean when applying', function (): void {
     expect(fn () => ScopeGuard::apply(ScopeFilterStubModel::query(), new ScopeFilter('priced', [1]), client: true))
-        ->toThrow(InvalidArgumentException::class, 'only in ACLs')
+        ->toThrow(ScopeFilterException::class, 'only in ACLs')
         ->and(fn () => ScopeGuard::apply(ScopeFilterStubModel::query(), new ScopeFilter('priced', [1]), 'xor'))
-        ->toThrow(InvalidArgumentException::class, 'and" or "or');
+        ->toThrow(ScopeFilterException::class, 'and" or "or');
 });
 
 it('refuses a node whose parameters are not a list', function (): void {
@@ -208,3 +217,77 @@ it('serializes the node with its exact keys', function (): void {
     expect((new ScopeFilter('priced', [1, 2.5]))->toArray())->toBe(['scope' => 'priced', 'parameters' => [1, 2.5]])
         ->and((new ScopeFilter('valid'))->toArray())->toBe(['scope' => 'valid', 'parameters' => []]);
 });
+
+it('ignores a legacy scope shadowed by an undeclared scope of the same name and a declaration on a private method', function (): void {
+    $declarations = ScopeGuard::declarations(ScopeFilterStubModel::class);
+
+    expect($declarations)->not->toHaveKey('shadowed')
+        ->and($declarations)->not->toHaveKey('hiddenAway')
+        ->and(fn (): array => ScopeGuard::assertFilterable(new ScopeFilterStubModel(), new ScopeFilter('shadowed')))
+        ->toThrow(ScopeFilterException::class, '"shadowed"');
+});
+
+it('applies a legacy scope inside its own nested where', function (): void {
+    $query = ScopeFilterStubModel::query();
+
+    ScopeGuard::apply($query, new ScopeFilter('legacyNamed', ['a']));
+
+    expect($query->toSql())->toBe('select * from "scope_filter_stub" where ("scope_filter_stub"."name" = ?)')
+        ->and($query->getBindings())->toBe(['a']);
+});
+
+it('keeps a scope that removes a global scope of its throwaway builder usable, as the validity scopes do', function (): void {
+    $query = ScopeFilterStubModel::query();
+
+    ScopeGuard::apply($query, new ScopeFilter('withoutItsGlobalScope'));
+
+    expect($query->toSql())->toBe('select * from "scope_filter_stub" where ("scope_filter_stub"."price" > ?)');
+});
+
+it('lets the exception a scope throws itself through, so a caller can tell it from a guard refusal', function (): void {
+    expect(fn () => ScopeGuard::apply(ScopeFilterStubModel::query(), new ScopeFilter('releasedWithin', [1])))
+        ->toThrow(fn (InvalidArgumentException $exception) => expect($exception)->not->toBeInstanceOf(ScopeFilterException::class));
+});
+
+it('accepts at save a placeholder in a position of its type', function (string $scope, array $parameters): void {
+    expect(fn () => ScopeGuard::assertStorable(new ScopeFilterStubModel(), new ScopeFilter($scope, $parameters)))
+        ->not->toThrow(Throwable::class);
+})->with([
+    '@now for a date' => ['releasedBefore', ['@now']],
+    '@today for a date' => ['releasedBefore', ['@today']],
+    '@user for a date' => ['releasedBefore', ['@user.created_at']],
+    '@user for an int and a float' => ['priced', ['@user.department_id', '@user.budget']],
+    '@user for a string' => ['named', ['@user.name']],
+    '@user for a bool' => ['flagged', ['@user.is_admin']],
+    '@user beside a literal' => ['eitherName', ['@user.name', 'fixed']],
+    'no parameters' => ['flagged', []],
+    'literals only' => ['priced', [1, 2.5]],
+]);
+
+it('refuses at save a date placeholder in a position that is not a date, naming the scope but not the value', function (string $placeholder): void {
+    expect(fn () => ScopeGuard::assertStorable(new ScopeFilterStubModel(), new ScopeFilter('priced', [$placeholder])))
+        ->toThrow(ScopeFilterException::class, 'Parameter $min of scope "priced"');
+})->with(['@now', '@today']);
+
+it('runs the save-time check with the declared default in place of a placeholder', function (): void {
+    expect(fn () => ScopeGuard::assertStorable(new ScopeFilterStubModel(), new ScopeFilter('releasedWithin', ['@user.window'])))
+        ->not->toThrow(Throwable::class);
+});
+
+it('refuses at save what it would refuse at use', function (string $model_class, string $scope, array $parameters, string $reason): void {
+    try {
+        ScopeGuard::assertStorable(new $model_class(), new ScopeFilter($scope, $parameters));
+        $this->fail('The node should have been refused.');
+    } catch (ScopeFilterException $exception) {
+        expect($exception->getMessage())->toContain(sprintf('"%s"', $scope))
+            ->and($exception->getMessage())->toContain($reason)
+            ->and($exception->getMessage())->not->toContain('secret-value-42');
+    }
+})->with([
+    'undeclared' => [ScopeFilterStubModel::class, 'undeclared', [], 'is not a filter scope'],
+    'bad literal parameter' => [ScopeFilterStubModel::class, 'priced', ['secret-value-42'], 'must be an int'],
+    'missing parameter' => [ScopeFilterStubModel::class, 'priced', [], 'needs at least 1'],
+    'impure' => [ImpureScopeFilterStubModel::class, 'joined', [], 'does more than add where conditions'],
+    'impure through a global scope' => [ImpureScopeFilterStubModel::class, 'globallyScoped', [], 'does more than add where conditions'],
+    'refused by the scope itself' => [ScopeFilterStubModel::class, 'releasedWithin', [1], 'fails when it runs'],
+]);

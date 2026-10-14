@@ -77,7 +77,7 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
-     * A group, or a single node (a filter or a relation node) or a list of nodes standing for a group.
+     * A group, or a single node (a filter, a scope node or a relation node) or a list of nodes standing for a group.
      *
      * @param  array<mixed>  $data
      */
@@ -99,12 +99,12 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
-     * An item of a filters list: an object that is a filter, a group or a relation node.
+     * An item of a filters list: an object that is a filter, a scope node, a group or a relation node.
      */
-    private function hydrateNode(mixed $item): Filter|FiltersGroup|RelationFilter
+    private function hydrateNode(mixed $item): Filter|FiltersGroup|RelationFilter|ScopeFilter
     {
         if (! is_array($item) || array_is_list($item)) {
-            throw new InvalidArgumentException('Every item of a filters list must be a filter, a group or a relation filter.');
+            throw new InvalidArgumentException('Every item of a filters list must be a filter, a scope filter, a group or a relation filter.');
         }
 
         return $this->hydrateAssociative($item);
@@ -112,18 +112,24 @@ final class FiltersGroupCast implements CastsAttributes
 
     /**
      * A node is exactly one kind, with exactly the keys of that kind: a relation node (`relation`, `filters`,
-     * `morph_types`), a filter (`property`, `operator`, `value`) or a group (`operator`, `filters`). A key
-     * outside the kind, or keys of two kinds at once, are refused: whatever a loose reading drops from an AND
-     * group widens access.
+     * `morph_types`), a scope node (`scope`, `parameters`), a filter (`property`, `operator`, `value`) or a group
+     * (`operator`, `filters`). A key outside the kind, or keys of two kinds at once, are refused: whatever a loose
+     * reading drops from an AND group widens access.
      *
      * @param  array<mixed>  $data
      */
-    private function hydrateAssociative(array $data): Filter|FiltersGroup|RelationFilter
+    private function hydrateAssociative(array $data): Filter|FiltersGroup|RelationFilter|ScopeFilter
     {
         if (array_key_exists('relation', $data)) {
             $this->assertKeys($data, ['relation', 'filters', 'morph_types']);
 
             return $this->hydrateRelationFilter($data);
+        }
+
+        if (array_key_exists('scope', $data)) {
+            $this->assertKeys($data, ['scope', 'parameters']);
+
+            return $this->hydrateScopeFilter($data);
         }
 
         if (array_key_exists('property', $data)) {
@@ -224,7 +230,37 @@ final class FiltersGroupCast implements CastsAttributes
     }
 
     /**
-     * Whether the group constrains anything: an empty group, or one made of empty groups, matches every row.
+     * A scope node: the name of a local scope and its positional parameters, scalars or null. Whether the model
+     * declares the scope and the parameters fit it is checked against the model, at save and at use; here only the
+     * shape is read, so nothing is left out.
+     *
+     * @param  array<mixed>  $data
+     */
+    private function hydrateScopeFilter(array $data): ScopeFilter
+    {
+        $scope = $data['scope'];
+        $parameters = array_key_exists('parameters', $data) ? $data['parameters'] : [];
+
+        if (! is_string($scope) || $scope === '') {
+            throw new InvalidArgumentException('A scope filter needs the name of the scope.');
+        }
+
+        if (! is_array($parameters) || ! array_is_list($parameters)) {
+            throw new InvalidArgumentException(sprintf('The parameters of scope filter "%s" must be a list.', $scope));
+        }
+
+        foreach ($parameters as $parameter) {
+            if ($parameter !== null && ! is_scalar($parameter)) {
+                throw new InvalidArgumentException(sprintf('The parameters of scope filter "%s" must be scalar values or null.', $scope));
+            }
+        }
+
+        return new ScopeFilter($scope, $parameters);
+    }
+
+    /**
+     * Whether the group constrains anything: an empty group, or one made of empty groups, matches every row. Any
+     * other node, a scope node included, is a condition.
      */
     private function holdsCondition(FiltersGroup $group): bool
     {

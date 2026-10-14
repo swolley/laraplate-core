@@ -8,7 +8,7 @@ final readonly class FiltersGroup
 {
     public function __construct(
         /**
-         * @var array<Filter|FiltersGroup|RelationFilter>
+         * @var array<Filter|FiltersGroup|RelationFilter|ScopeFilter>
          */
         public array $filters = [],
         public WhereClause $operator = WhereClause::And,

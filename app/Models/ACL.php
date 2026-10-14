@@ -13,6 +13,7 @@ use Modules\Core\Enums\CoreTables;
 use Modules\Core\Observers\AclObserver;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\AclRelationFilters;
+use Modules\Core\Rules\AclScopeFilters;
 use Modules\Core\Rules\QueryBuilder;
 use Override;
 
@@ -75,7 +76,7 @@ final class ACL extends Model
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
             'permission_id' => ['required', 'exists:' . CoreTables::Permissions->value . ',id'],
             'role_id' => ['nullable', 'exists:' . CoreTables::Roles->value . ',id'],
-            'filters' => [new QueryBuilder(), new AclRelationFilters()],
+            'filters' => [new QueryBuilder(), new AclRelationFilters(), new AclScopeFilters()],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
             'description' => ['string', 'max:255', 'nullable'],

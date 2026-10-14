@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Support;
 
 use function config;
+use function models;
 
 use Illuminate\Database\Eloquent\Model;
 use ReflectionClass;
@@ -52,6 +53,25 @@ final class PermissionName
         $instance = new ReflectionClass($model_class)->newInstanceWithoutConstructor();
 
         return self::forModel($instance, $operation);
+    }
+
+    /**
+     * The model a permission name is about: the discovered model whose permission name for the same operation is
+     * this one. Null when no model matches.
+     *
+     * @return class-string<Model>|null
+     */
+    public static function modelClassOf(string $permission_name): ?string
+    {
+        $operation = mb_substr($permission_name, (int) mb_strrpos($permission_name, '.') + 1);
+
+        foreach (models() as $class) {
+            if ($permission_name === self::forClass($class, $operation)) {
+                return $class;
+            }
+        }
+
+        return null;
     }
 
     /**

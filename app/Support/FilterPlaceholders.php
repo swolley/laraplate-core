@@ -32,7 +32,7 @@ final class FilterPlaceholders
             return $value;
         }
 
-        if ($withUser && str_starts_with($value, '@user.')) {
+        if ($withUser && self::isUserAttribute($value)) {
             return self::userAttribute(mb_substr($value, 6));
         }
 
@@ -41,6 +41,30 @@ final class FilterPlaceholders
             '@today' => Carbon::today(),
             default => $value,
         };
+    }
+
+    /**
+     * Whether the value is `@now` or `@today`, the placeholders that resolve to a date.
+     */
+    public static function isDate(mixed $value): bool
+    {
+        return $value === '@now' || $value === '@today';
+    }
+
+    /**
+     * Whether the value is a `@user.<attribute>` placeholder, read from the acting user when it is resolved.
+     */
+    public static function isUserAttribute(mixed $value): bool
+    {
+        return is_string($value) && str_starts_with($value, '@user.');
+    }
+
+    /**
+     * Whether the value is any placeholder {@see resolve()} replaces.
+     */
+    public static function isPlaceholder(mixed $value): bool
+    {
+        return self::isDate($value) || self::isUserAttribute($value);
     }
 
     /**

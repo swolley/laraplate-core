@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Rules;
 
-use function models;
-
 use Closure;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -106,20 +104,9 @@ final class AclRelationFilters implements DataAwareRule, ValidationRule
         }
 
         $name = Permission::query()->whereKey($permission_id)->value('name');
+        $class = is_string($name) ? PermissionName::modelClassOf($name) : null;
 
-        if (! is_string($name)) {
-            return null;
-        }
-
-        $operation = mb_substr($name, (int) mb_strrpos($name, '.') + 1);
-
-        foreach (models() as $class) {
-            if ($name === PermissionName::forClass($class, $operation)) {
-                return $this->instance($class);
-            }
-        }
-
-        return null;
+        return $class === null ? null : $this->instance($class);
     }
 
     /**

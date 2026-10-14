@@ -7,6 +7,7 @@ namespace Modules\Core\Tests\Stubs;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Attributes\FilterScope;
 
 /**
@@ -86,6 +87,66 @@ class ImpureScopeFilterStubModel extends Model
     protected function eagerLoading(Builder $query): void
     {
         $query->with('missing');
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function distinctRows(Builder $query): void
+    {
+        $query->distinct();
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function locked(Builder $query): void
+    {
+        $query->lockForUpdate();
+    }
+
+    /**
+     * Adds a binding outside the where conditions and nothing else.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function boundOutsideWhere(Builder $query): void
+    {
+        $query->getQuery()->addBinding(1, 'select');
+    }
+
+    /**
+     * Adds its condition through a callback run just before the query, which a nested where never carries.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function deferred(Builder $query): void
+    {
+        $query->beforeQuery(function (QueryBuilder $base): void {
+            $base->where('price', '>', 0);
+        });
+    }
+
+    /**
+     * Adds its condition as a global scope of the nested builder, which is never applied.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    #[FilterScope]
+    protected function globallyScoped(Builder $query): void
+    {
+        $query->withGlobalScope('priced', function (Builder $scoped): void {
+            $scoped->where('price', '>', 0);
+        });
     }
 
     /**

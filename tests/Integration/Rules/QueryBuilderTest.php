@@ -112,3 +112,36 @@ it('keeps accepting a request filter list that nests a bare list of conditions',
 
     expect($failures)->toBe([]);
 });
+
+it('accepts a scope node with or without parameters, alone, in a group and inside a relation filter', function (array $value): void {
+    $failures = [];
+
+    (new QueryBuilder)->validate('filters', $value, function (string $message) use (&$failures): void {
+        $failures[] = $message;
+    });
+
+    expect($failures)->toBe([]);
+})->with([
+    'alone' => [['scope' => 'valid']],
+    'with parameters' => [['scope' => 'validAt', 'parameters' => ['2026-10-01', '@now', 5, 1.5, true, null]]],
+    'in a group' => [['operator' => 'or', 'filters' => [['scope' => 'valid'], ['property' => 'id', 'operator' => '=', 'value' => 1]]]],
+    'inside a relation filter' => [['filters' => [['relation' => 'model', 'morph_types' => ['user'], 'filters' => ['scope' => 'valid']]]]],
+]);
+
+it('refuses a malformed scope node', function (array $node, string $reason): void {
+    $failures = [];
+
+    (new QueryBuilder)->validate('filters', ['filters' => [$node]], function (string $message) use (&$failures): void {
+        $failures[] = $message;
+    });
+
+    expect(implode(' | ', $failures))->toContain($reason);
+})->with([
+    'an extra key' => [['scope' => 'valid', 'note' => 'x'], 'takes only "scope" and "parameters"'],
+    'keys of a filter too' => [['scope' => 'valid', 'property' => 'id', 'operator' => '=', 'value' => 1], 'takes only "scope" and "parameters"'],
+    'an empty name' => [['scope' => ''], '"scope" must be a scope name'],
+    'a name that is not a string' => [['scope' => 5], '"scope" must be a scope name'],
+    'parameters keyed by name' => [['scope' => 'validAt', 'parameters' => ['date' => '2026-10-01']], '"parameters" must be a list'],
+    'parameters that are a scalar' => [['scope' => 'expiring', 'parameters' => 24], '"parameters" must be a list'],
+    'an array parameter' => [['scope' => 'named', 'parameters' => [['a']]], '"parameters" must be a list of scalar values'],
+]);
