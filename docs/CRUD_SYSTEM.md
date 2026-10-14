@@ -616,6 +616,8 @@ A client names a property without knowing how the entity stores it. A flat prope
 { "property": "color", "operator": "=", "value": "red" }
 ```
 
+4. **An attribute mounted from a related record**, on a model implementing `IMountsRelatedAttributes` (a shop `Product` presents the title of its content as its own): a property the model does not own becomes the same filter on the relation the model mounts, which resolves it there. `title` on `products` is `content.title`.
+
 The same rule applies to the leaf of a relation path (`categories.name` resolves `name` on the category). Limits: dynamic fields are compared as strings with the operators above (`=`, `!=`, `like`, `not like`, `in`, null checks); no numeric or date comparison, sorting, grouping or facets on them, and a misspelled dynamic name returns no rows instead of an error. Full text relevance search is a different endpoint (`/search/{module}/{entity}`, `Searchable` models only). The resolution lives in `Services/Crud/ModelPropertyResolver` and `QueryBuilder::applyFilter`.
 
 ## Pagination

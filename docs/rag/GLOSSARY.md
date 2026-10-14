@@ -52,7 +52,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **CrudService**    | Orchestrates list/detail/insert/update/delete/history/tree operations.       |
 | **CrudController** | HTTP entry point mapping routes to `CrudService`.                            |
 | **QueryBuilder**   | Builds Eloquent queries from `RequestData` (filters, sorts, relations).      |
-| **ModelPropertyResolver** | Classifies a flat filter property that is not a column: translated field (request locale) or dynamic field (searched in every JSON container). |
+| **ModelPropertyResolver** | Classifies a flat filter property that is not a column: translated field (request locale), dynamic field (searched in every JSON container) or attribute mounted from a related record (`IMountsRelatedAttributes`). |
 | **DynamicEntity**  | Runtime model resolver: maps entity name string to Eloquent class + metadata. |
 | **ResponseBuilder**| Formats `CrudResult` to JSON/XML with optional caching.                      |
 | **FiltersGroup**   | Nested AND/OR filter tree applied by `QueryBuilder`.                         |
