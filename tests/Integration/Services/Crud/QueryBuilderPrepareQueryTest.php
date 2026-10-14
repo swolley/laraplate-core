@@ -673,3 +673,42 @@ it('prepareQuery does not eager-load place for models without HasPlace', functio
 
     expect($query->getEagerLoads())->not->toHaveKey('place');
 });
+
+it('applies the list filter group as one nested condition, so a root OR never escapes the conditions already on the query', function (): void {
+    $query = User::query()->where('users.id', 1);
+    $request_data = qb_make_list_request_data(
+        columns: [new Column('users.username', ColumnType::Column)],
+        filters: new FiltersGroup([
+            new Filter('username', 'alpha', FilterOperator::Equals),
+            new Filter('username', 'beta', FilterOperator::Equals),
+        ], WhereClause::Or),
+    );
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    expect(mb_strtolower($query->toSql()))->toContain('where "users"."id" = ? and ("username" = ? or "username" = ?)');
+});
+
+it('applies the filter group of an eager-loaded relation as one nested condition beside the relation constraint', function (): void {
+    $user = User::factory()->create();
+    $query = User::query();
+    $request_data = qb_make_list_request_data(
+        columns: [
+            new Column('users.username', ColumnType::Column),
+            new Column('users.roles.name', ColumnType::Column),
+        ],
+        relations: ['roles'],
+        filters: new FiltersGroup([
+            new Filter('roles.name', 'sales', FilterOperator::Equals),
+            new Filter('roles.name', 'support', FilterOperator::Equals),
+        ], WhereClause::Or),
+    );
+
+    (new QueryBuilder())->prepareQuery($query, $request_data);
+
+    $relation = $user->roles();
+    $query->getEagerLoads()['roles']($relation);
+    $relation_sql = mb_strtolower($relation->getQuery()->toSql());
+
+    expect($relation_sql)->toMatch('/ and \("[a-z_."]*name" = \? or "[a-z_."]*name" = \?\)/');
+});

@@ -413,7 +413,12 @@ final class QueryBuilder
         }
 
         if ($request_data instanceof ListRequestData && isset($request_data->filters)) {
-            $this->recursivelyApplyFilters($query, $request_data->filters, $columns['relations'], $relation_authorizer, $request);
+            // One nested condition, as in applyFilters(): the query may already hold conditions, and a root OR
+            // group applied to it directly would let its later branches escape them.
+            $list_filters = $request_data->filters;
+            $query->where(function (Builder $nested) use ($list_filters, &$columns, $relation_authorizer, $request): void {
+                $this->recursivelyApplyFilters($nested, $list_filters, $columns['relations'], $relation_authorizer, $request);
+            });
 
             $relations_filters = $this->extractRelationFilters($main_model, $request_data->filters);
 
@@ -1570,7 +1575,11 @@ final class QueryBuilder
                 $relations_columns[$relation] = [];
             }
 
-            $this->recursivelyApplyFilters($query, $relations_filters[$relation], $relations_columns, $authorizer, $request);
+            // One nested condition beside the relation's own constraint (the parent keys) and the related ACL,
+            // so a root OR group of the relation filters cannot escape them.
+            $query->where(function (Builder $nested) use ($relations_filters, $relation, &$relations_columns, $authorizer, $request): void {
+                $this->recursivelyApplyFilters($nested, $relations_filters[$relation], $relations_columns, $authorizer, $request);
+            });
         }
 
         if (array_key_exists($relation, $relations_sorts) && $relations_sorts[$relation] !== []) {

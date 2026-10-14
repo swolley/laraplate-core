@@ -176,3 +176,29 @@ it('refuses a filter node of an unknown kind in both target rules instead of ski
 
     expect($failures)->toBe(['filters holds a filter node of an unknown kind']);
 })->with([AclScopeFilters::class, AclRelationFilters::class]);
+
+it('refuses a scope filter when the permission of the ACL is not chosen or does not resolve to an entity', function (array $data): void {
+    $failures = [];
+    $rule = new AclScopeFilters()->setData($data);
+
+    $rule->validate('filters', new FiltersGroup([new ScopeFilter('valid')]), function (string $message) use (&$failures): void {
+        $failures[] = $message;
+    });
+
+    expect($failures)->toBe(['filters holds a scope filter but the entity of the permission cannot be resolved']);
+})->with([
+    'no permission_id' => [[]],
+    'null permission_id' => [['permission_id' => null]],
+    'unknown permission_id' => [['permission_id' => 999_999]],
+]);
+
+it('accepts filters without a scope node when the permission of the ACL is not chosen', function (): void {
+    $failures = [];
+    $rule = new AclScopeFilters()->setData(['permission_id' => null]);
+
+    $rule->validate('filters', new FiltersGroup([new Filter('name', 'x', FilterOperator::Equals)]), function (string $message) use (&$failures): void {
+        $failures[] = $message;
+    });
+
+    expect($failures)->toBe([]);
+});
