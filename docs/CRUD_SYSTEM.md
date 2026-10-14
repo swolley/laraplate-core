@@ -574,6 +574,21 @@ Filter on related models using dot notation:
 }
 ```
 
+### Translated and Dynamic Fields
+
+A client names a property without knowing how the entity stores it. A flat property (letters, digits and underscores, no dot) is resolved on the model being filtered in this order:
+
+1. **A column** of the model's table: filtered as is.
+2. **A translatable field** (a fillable column of the translation table, such as `title` or `slug` on contents): the filter applies to the translation in the **locale of the request** (the user's language). A record without a translation in that locale is not matched; there is no search across languages and no fallback, because the application keeps a single `app.locale` and a model never has a distinct default while a request runs.
+3. **A dynamic field**, on a model using `HasDynamicContents`: any other name is looked for in the JSON containers that can hold dynamic fields. Whether a field was configured translatable or shared is not known per record, so every container that exists is searched with an OR: `shared_components` of the main row (or `components` on a model without translations) and `components` of the request-locale translation. Presets are not consulted, because one recordset mixes entities with different presets and fields: a record that does not have the field simply does not match.
+
+```json
+{ "property": "title", "operator": "like", "value": "%moon%" }
+{ "property": "color", "operator": "=", "value": "red" }
+```
+
+The same rule applies to the leaf of a relation path (`categories.name` resolves `name` on the category). Limits: dynamic fields are compared as strings with the operators above (`=`, `!=`, `like`, `not like`, `in`, null checks); no numeric or date comparison, sorting, grouping or facets on them, and a misspelled dynamic name returns no rows instead of an error. Full text relevance search is a different endpoint (`/search/{module}/{entity}`, `Searchable` models only). The resolution lives in `Services/Crud/ModelPropertyResolver` and `QueryBuilder::applyFilter`.
+
 ## Pagination
 
 ### Page-Based Pagination
