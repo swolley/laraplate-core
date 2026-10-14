@@ -116,7 +116,9 @@ final class ScopeGuard
      * Runs the scope a node names inside its own nested where, joined to the query with `$boolean`, so its
      * conditions stay in their group in AND and OR groups alike.
      *
-     * @param  Builder<Model>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @param  string  $boolean  How the group joins the query: 'and' or 'or'
      * @param  bool  $client  Whether the node comes from a CRUD request rather than an ACL
      *
@@ -438,7 +440,9 @@ final class ScopeGuard
     /**
      * Everything a scope could change on a query besides its where conditions.
      *
-     * @param  Builder<Model>  $builder
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $builder
      * @return array<string, mixed>
      */
     private static function shapeOf(Builder $builder): array
@@ -463,7 +467,9 @@ final class ScopeGuard
     /**
      * The global scopes registered on a builder. Never applied to the nested builder: only its wheres are taken.
      *
-     * @param  Builder<Model>  $builder
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $builder
      * @return array<array-key, mixed>
      */
     private static function globalScopesOf(Builder $builder): array

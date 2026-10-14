@@ -618,13 +618,38 @@ it('keeps query unchanged when OR filter group is empty', function (): void {
     expect($query->pluck('id')->all())->toEqualCanonicalizing([$u1->id, $u2->id]);
 });
 
-it('refuses a filter node it cannot apply instead of skipping it, at any depth', function (FiltersGroup $filters): void {
+it('refuses a filter node of an unknown kind instead of skipping it, at any depth', function (FiltersGroup $filters): void {
     $query = User::query();
 
     expect(fn () => (new QueryBuilder())->applyFilters($query, $filters))
         ->toThrow(InvalidArgumentException::class, 'cannot apply');
 })->with([
-    'top level' => [new FiltersGroup([new ScopeFilter('valid')])],
-    'beside a column filter in an OR group' => [new FiltersGroup([new Filter('username', 'alpha', FilterOperator::Equals), new ScopeFilter('valid')], WhereClause::Or)],
-    'nested group' => [new FiltersGroup([new FiltersGroup([new ScopeFilter('valid')])])],
+    'top level' => [new FiltersGroup([new stdClass])],
+    'beside a column filter in an OR group' => [new FiltersGroup([new Filter('username', 'alpha', FilterOperator::Equals), new stdClass], WhereClause::Or)],
+    'nested group' => [new FiltersGroup([new FiltersGroup([new stdClass])])],
 ]);
+
+it('applies a scope node in its own nested where, as the first node of an OR group too', function (): void {
+    $alpha = User::factory()->perpetual()->create(['username' => 'alpha']);
+    $expired_alpha = User::factory()->expired()->create(['username' => 'alpha_expired']);
+    $valid = User::factory()->perpetual()->create(['username' => 'beta']);
+    $expired = User::factory()->expired()->create(['username' => 'gamma']);
+
+    $filters = new FiltersGroup([
+        new ScopeFilter('valid'),
+        new Filter('username', 'alpha_expired', FilterOperator::Equals),
+    ], WhereClause::Or);
+    $created = [$alpha->id, $expired_alpha->id, $valid->id, $expired->id];
+
+    $query = User::query()->whereKey($created)->where(fn ($group) => (new QueryBuilder())->applyFilters($group, $filters));
+    $sql_query = User::query();
+    (new QueryBuilder())->applyFilters($sql_query, $filters);
+
+    $ids = $query->pluck('id')->all();
+    sort($ids);
+    $expected = [$alpha->id, $expired_alpha->id, $valid->id];
+    sort($expected);
+
+    expect($ids)->toBe($expected)
+        ->and($sql_query->toSql())->toContain('("users"."valid_from" <= ? and ("users"."valid_to" >= ? or "users"."valid_to" is null)) or "username" = ?');
+});

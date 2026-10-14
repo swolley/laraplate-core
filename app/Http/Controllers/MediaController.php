@@ -229,15 +229,19 @@ final class MediaController extends Controller
 
     /**
      * Load the owner record for the `{id}` route parameter through the caller's
-     * row-level ACL filters. A row hidden by ACL yields no match and surfaces as a
-     * {@see ModelNotFoundException} (mapped to a 404). Unrestricted callers
-     * (`getAclFilters()` returns null) resolve the record exactly as a plain lookup.
+     * row-level ACL filters, their placeholders resolved. A row hidden by ACL yields
+     * no match and surfaces as a {@see ModelNotFoundException} (mapped to a 404), an
+     * ACL whose scope no longer applies denies the request. Unrestricted callers
+     * (`resolvedAclFilters()` returns null) resolve the record exactly as a plain lookup.
+     *
+     * @throws AuthorizationException when a scope of the caller's ACL no longer applies
      */
     private function resolveOwnerRecord(MediaRequest $request, string $permissionName): Model
     {
-        $query = $request->mediaModel()->newQuery()->whereKey($request->route('id'));
+        $model = $request->mediaModel();
+        $query = $model->newQuery()->whereKey($request->route('id'));
 
-        $filters = $this->authorizationService->getAclFilters($permissionName);
+        $filters = $this->authorizationService->resolvedAclFilters($permissionName, $model);
 
         if ($filters instanceof FiltersGroup) {
             $query->where(function (Builder $inner) use ($filters): void {

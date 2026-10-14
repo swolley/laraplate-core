@@ -29,10 +29,13 @@ use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Contracts\IPreloadsAppendedRelations;
+use Modules\Core\Exceptions\ScopeFilterException;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Overrides\CustomSoftDeletingScope;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\RelationGuard;
+use Modules\Core\Support\ScopeGuard;
 use ReflectionMethod;
 
 /**
@@ -1017,6 +1020,14 @@ final class QueryBuilder
             }
         }
 
+        $stored_as = ModelPropertyResolver::resolve($query->getModel(), $filter->property);
+
+        if ($stored_as !== null) {
+            $this->applyStoredPropertyFilter($query, $filter, $method, $stored_as, $relation_columns, $authorizer, $request);
+
+            return;
+        }
+
         if ($filter->value === null) {
             $null_method = $filter->operator === FilterOperator::Equals ? 'Null' : 'NotNull';
             $final_method = $method . $null_method;
@@ -1049,6 +1060,87 @@ final class QueryBuilder
         if ($method !== '' && is_callable([$query, $method])) {
             $query->{$method}($filter->property, $filter->operator->value, $filter->value);
         }
+    }
+
+    /**
+     * A filter on a property that is not a column: a translated field is matched on the translation of
+     * the request's locale, a dynamic field in every JSON container that can hold it, since nothing says
+     * whether a given field was configured as translatable or shared.
+     *
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  array<string,array<int,Column>>  $relation_columns
+     * @param  ModelPropertyResolver::TRANSLATED|ModelPropertyResolver::DYNAMIC  $stored_as
+     */
+    private function applyStoredPropertyFilter(Builder|Relation $query, Filter $filter, string $method, string $stored_as, array &$relation_columns, ?RelationAuthorizer $authorizer, ?Request $request): void
+    {
+        $model = $query->getModel();
+
+        if ($stored_as === ModelPropertyResolver::TRANSLATED) {
+            $this->whereTranslation(
+                $query,
+                $model,
+                $method,
+                function (Builder $translation_query) use ($filter, &$relation_columns, $authorizer, $request): void {
+                    $this->applyFilter($translation_query, $filter, 'where', $relation_columns, $authorizer, $request);
+                },
+            );
+
+            return;
+        }
+
+        $translation_container = ModelPropertyResolver::translationContainer($model);
+        $query->{$method}(function (Builder $group) use ($model, $filter, $translation_container, &$relation_columns, $authorizer, $request): void {
+            foreach (ModelPropertyResolver::mainContainers($model) as $container) {
+                $json_filter = new Filter($container . '->' . $filter->property, $filter->value, $filter->operator);
+                $this->applyFilter($group, $json_filter, 'orWhere', $relation_columns, $authorizer, $request);
+            }
+
+            if ($translation_container !== null) {
+                $json_filter = new Filter($translation_container . '->' . $filter->property, $filter->value, $filter->operator);
+                $this->whereTranslation(
+                    $group,
+                    $model,
+                    'orWhere',
+                    function (Builder $translation_query) use ($json_filter, &$relation_columns, $authorizer, $request): void {
+                        $this->applyFilter($translation_query, $json_filter, 'where', $relation_columns, $authorizer, $request);
+                    },
+                );
+            }
+        });
+    }
+
+    /**
+     * Constrain a query by the translation a request would read: the one of the current locale, or the
+     * default locale when the model falls back and the record has no translation in the current one.
+     *
+     * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
+     * @param  Closure(Builder<Model>): void  $constraint
+     */
+    private function whereTranslation(Builder|Relation $query, Model $model, string $method, Closure $constraint): void
+    {
+        $locale = LocaleContext::get();
+        $default_locale = LocaleContext::getDefault();
+        $falls_back = $locale !== $default_locale && $model->translationFallbackEnabledBySettings();
+        $translations = $model->translations();
+
+        $query->{$method . 'Has'}('translations', function (Builder $translation_query) use ($constraint, $locale, $default_locale, $falls_back, $translations): void {
+            $translation_query->where(function (Builder $scope) use ($locale, $default_locale, $falls_back, $translations): void {
+                $scope->where('locale', $locale);
+
+                if ($falls_back) {
+                    $scope->orWhere(function (Builder $fallback) use ($locale, $default_locale, $translations): void {
+                        $foreign_key = $translations->getForeignKeyName();
+                        $fallback->where('locale', $default_locale)
+                            ->whereNotIn($foreign_key, static fn ($current) => $current
+                                ->select($foreign_key)
+                                ->from($translations->getRelated()->getTable())
+                                ->where('locale', $locale));
+                    });
+                }
+            });
+
+            $constraint($translation_query);
+        });
     }
 
     /**
@@ -1138,13 +1230,13 @@ final class QueryBuilder
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
-    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
+    private function applyRelationFilter(Builder|Relation $query, RelationFilter $filter, string $method, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null, bool $client = false): void
     {
         RelationGuard::assertFilterable($query->getModel(), $filter);
 
         $has_method = $method . ($filter->morph_types !== null ? 'HasMorph' : 'Has');
-        $constraint = function (Builder $q) use ($filter, &$relation_columns, $authorizer, $request): void {
-            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns, $authorizer, $request);
+        $constraint = function (Builder $q) use ($filter, &$relation_columns, $authorizer, $request, $client): void {
+            $this->recursivelyApplyFilters($q, $filter->filters, $relation_columns, $authorizer, $request, $client);
         };
 
         if ($filter->morph_types !== null) {
@@ -1157,11 +1249,19 @@ final class QueryBuilder
     }
 
     /**
+     * Applies a filter tree to the query: the first node of an OR group joins with `where`, the others with
+     * `orWhere`. A scope node runs in its own nested where ({@see ScopeGuard::apply()}) against the model of the
+     * query it reaches, the related model inside a relation filter.
+     *
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  FiltersGroup|array<int, Filter|FiltersGroup|RelationFilter|ScopeFilter>  $filters
      * @param  array<string,array<int,Column>>  $relation_columns
+     * @param  bool  $client  Whether the scope nodes come from a CRUD request, which may name only the scopes a model
+     *                        exposes to clients; false for ACL filters
+     *
+     * @throws InvalidArgumentException when a node cannot be applied (a scope refusal is a {@see ScopeFilterException})
      */
-    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null): void
+    private function recursivelyApplyFilters(Builder|Relation $query, FiltersGroup|array $filters, array &$relation_columns, ?RelationAuthorizer $authorizer = null, ?Request $request = null, bool $client = false): void
     {
         if ($filters instanceof FiltersGroup) {
             $iterable = $filters->filters;
@@ -1179,10 +1279,12 @@ final class QueryBuilder
 
             if ($subfilter instanceof FiltersGroup) {
                 if (is_callable([$query, $method])) {
-                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns, $authorizer, $request));
+                    $query->{$method}(fn (Builder $q) => $this->recursivelyApplyFilters($q, $subfilter, $relation_columns, $authorizer, $request, $client));
                 }
             } elseif ($subfilter instanceof RelationFilter) {
-                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
+                $this->applyRelationFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request, $client);
+            } elseif ($subfilter instanceof ScopeFilter) {
+                ScopeGuard::apply($query instanceof Relation ? $query->getQuery() : $query, $subfilter, $method === 'orWhere' ? 'or' : 'and', $client);
             } elseif ($subfilter instanceof Filter) {
                 $this->applyFilter($query, $subfilter, $method, $relation_columns, $authorizer, $request);
             } else {

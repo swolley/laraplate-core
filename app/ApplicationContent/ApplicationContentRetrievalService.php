@@ -48,7 +48,9 @@ final readonly class ApplicationContentRetrievalService
                     $descriptor->entity,
                     'select',
                 );
-            $acl_filters = $this->authorization->getAclFilters($permission_name);
+            // The providers hand the filters to the CRUD query builder and the search, neither of which knows the
+            // ACL placeholders.
+            $acl_filters = $this->authorization->resolvedAclFilters($permission_name);
             $result = $provider->retrieve(
                 $query,
                 new ApplicationContentAuthorization($permission_name, $acl_filters),

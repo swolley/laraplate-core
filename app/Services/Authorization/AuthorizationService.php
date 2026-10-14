@@ -7,9 +7,13 @@ namespace Modules\Core\Services\Authorization;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Laravel\Sanctum\Contracts\HasAbilities;
 use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Core\Casts\ActionEnum;
@@ -17,13 +21,18 @@ use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Exceptions\ScopeFilterException;
+use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AclResolverService;
 use Modules\Core\Support\FilterPlaceholders;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
+use Modules\Core\Support\ScopeGuard;
+use Throwable;
 
 /**
  * Authorization Service - handles permission checks and ACL filter injection.
@@ -188,15 +197,33 @@ final class AuthorizationService
      */
     public function injectAclFilters(ListRequestData $request_data, string $permission_name): void
     {
-        $acl_filters = $this->getAclFilters($permission_name);
-
-        if (! $acl_filters instanceof FiltersGroup) {
-            return;
-        }
-
         // The list path hands the filters to the CRUD query builder, which knows nothing of the ACL
         // placeholders: they are resolved here, as applyAclFiltersToQuery() does for the same filters.
-        $request_data->mergeFilters($this->resolvePlaceholders($acl_filters));
+        $acl_filters = $this->resolvedAclFilters($permission_name, $request_data->model ?? null);
+
+        if ($acl_filters instanceof FiltersGroup) {
+            $request_data->mergeFilters($acl_filters);
+        }
+    }
+
+    /**
+     * The ACL filters of the acting user on a permission, ready for the CRUD query builder
+     * ({@see \Modules\Core\Services\Crud\QueryBuilder::applyFilters()}), which knows nothing of the ACL
+     * placeholders: every `@now`, `@today` and `@user.<attribute>` is replaced by its live value, in column filter
+     * values and scope parameters alike. Null when no ACL narrows the permission.
+     *
+     * Every scope node of the contributing ACLs is first checked against the model (and the related models of
+     * its relation filters): an ACL whose scope no longer applies denies the read.
+     *
+     * @param  Model|null  $model  The model the permission is about; null reads it from the permission name
+     *
+     * @throws AuthorizationException when a scope node of an ACL no longer applies
+     */
+    public function resolvedAclFilters(string $permission_name, ?Model $model = null): ?FiltersGroup
+    {
+        $acl_filters = $this->checkedAclFilters($permission_name, $model);
+
+        return $acl_filters instanceof FiltersGroup ? $this->resolvePlaceholders($acl_filters) : null;
     }
 
     /**
@@ -281,10 +308,12 @@ final class AuthorizationService
      *
      * @param  Builder<TModel>  $query  The Eloquent query builder
      * @param  string  $permission_name  The permission name for ACL lookup
+     *
+     * @throws AuthorizationException when a scope node of an ACL no longer applies
      */
     public function applyAclFiltersToQuery(Builder $query, string $permission_name): void
     {
-        $acl_filters = $this->getAclFilters($permission_name);
+        $acl_filters = $this->checkedAclFilters($permission_name, $query->getModel());
 
         if (! $acl_filters instanceof FiltersGroup) {
             return;
@@ -380,6 +409,14 @@ final class AuthorizationService
     }
 
     /**
+     * A node skipped by a walker would drop its condition and widen the rows: refused instead (fail closed).
+     */
+    private static function unknownNode(mixed $node): InvalidArgumentException
+    {
+        return new InvalidArgumentException(sprintf('The ACL filters cannot apply a %s filter node.', get_debug_type($node)));
+    }
+
+    /**
      * The id of the account configured as the guest. The username is unique, so a match on it is the
      * account; otherwise the name (which is not unique) picks an account that is not a service account
      * first and the oldest one after that, so the answer never depends on the order of the table.
@@ -442,8 +479,12 @@ final class AuthorizationService
                 });
             } elseif ($filter instanceof RelationFilter) {
                 $this->applyRelationFilter($query, $filter, $method);
-            } else {
+            } elseif ($filter instanceof ScopeFilter) {
+                ScopeGuard::apply($query, $this->resolveScopeParameters($filter), $method === 'orWhere' ? 'or' : 'and');
+            } elseif ($filter instanceof Filter) {
                 $this->applySingleFilter($query, $filter, $method);
+            } else {
+                throw self::unknownNode($filter);
             }
         }
     }
@@ -476,7 +517,9 @@ final class AuthorizationService
 
     /**
      * A copy of the filters with every dynamic value (`@now`, `@today`, `@user.<attribute>`) replaced by its
-     * live value, nested relation filters included.
+     * live value, nested relation filters and scope parameters included.
+     *
+     * @throws InvalidArgumentException on a node of an unknown kind
      */
     private function resolvePlaceholders(FiltersGroup $filters): FiltersGroup
     {
@@ -490,11 +533,195 @@ final class AuthorizationService
                     filters: $this->resolvePlaceholders($node->filters),
                     morph_types: $node->morph_types,
                 ),
-                default => new Filter($node->property, $this->resolveFilterValue($node->value), $node->operator),
+                $node instanceof ScopeFilter => $this->resolveScopeParameters($node),
+                default => $this->resolveFilter($node),
             };
         }
 
         return new FiltersGroup($resolved, $filters->operator);
+    }
+
+    /**
+     * A copy of the column filter with its placeholder value replaced by its live value.
+     *
+     * @throws InvalidArgumentException when the node is not a column filter
+     */
+    private function resolveFilter(mixed $node): Filter
+    {
+        if (! $node instanceof Filter) {
+            throw self::unknownNode($node);
+        }
+
+        return new Filter($node->property, $this->resolveFilterValue($node->value), $node->operator);
+    }
+
+    /**
+     * A copy of the scope node with each placeholder parameter replaced by its live value.
+     */
+    private function resolveScopeParameters(ScopeFilter $filter): ScopeFilter
+    {
+        return new ScopeFilter($filter->scope, array_map($this->resolveFilterValue(...), $filter->parameters));
+    }
+
+    /**
+     * {@see getAclFilters()}, after checking that every scope node of the contributing ACLs still applies to the
+     * model it reaches ({@see assertAclScopesApply()}).
+     *
+     * @param  Model|null  $model  The model the permission is about; null reads it from the permission name
+     *
+     * @throws AuthorizationException when a scope node of an ACL no longer applies
+     */
+    private function checkedAclFilters(string $permission_name, ?Model $model): ?FiltersGroup
+    {
+        $acl_filters = $this->getAclFilters($permission_name);
+        $user = Auth::user();
+
+        if (! $acl_filters instanceof FiltersGroup || ! $user instanceof User || ! $this->holdsScopeFilter($acl_filters)) {
+            return $acl_filters;
+        }
+
+        if (! $model instanceof Model) {
+            $model_class = PermissionName::modelClassOf($permission_name);
+            $model = $model_class === null ? null : new $model_class();
+        }
+
+        $acls = $this->acl_resolver->getEffectiveAcls($user, $this->resolvePermission($permission_name))
+            ->filter(static fn (ACL $acl): bool => ! $acl->isUnrestricted() && $acl->hasFilters());
+
+        foreach ($acls as $acl) {
+            if ($acl->filters instanceof FiltersGroup) {
+                $this->assertAclScopesApply($acl, $permission_name, $acl->filters, $model);
+            }
+        }
+
+        return $acl_filters;
+    }
+
+    /**
+     * Whether the filters hold a scope node, or a node of an unknown kind, at any depth: only then does an ACL need
+     * the use-time check.
+     */
+    private function holdsScopeFilter(FiltersGroup $filters): bool
+    {
+        foreach ($filters->filters as $node) {
+            $holds = match (true) {
+                $node instanceof FiltersGroup => $this->holdsScopeFilter($node),
+                $node instanceof RelationFilter => $this->holdsScopeFilter($node->filters),
+                $node instanceof Filter => false,
+                default => true,
+            };
+
+            if ($holds) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Runs every scope node of an ACL, its placeholders resolved, on a throwaway query of the model it reaches: the
+     * permission's model, the related model inside a relation filter, each morph type of a morph relation. The query
+     * is built, never executed. A scope that is no longer declared, takes the parameters badly, does more than add
+     * where conditions or fails when it runs denies the read; the ACL id is logged, never a parameter value. A
+     * relation that does not resolve is left to the walker, which refuses it as before.
+     *
+     * @throws AuthorizationException when a scope node no longer applies
+     */
+    private function assertAclScopesApply(ACL $acl, string $permission_name, FiltersGroup $filters, ?Model $model): void
+    {
+        foreach ($filters->filters as $node) {
+            if ($node instanceof FiltersGroup) {
+                $this->assertAclScopesApply($acl, $permission_name, $node, $model);
+            } elseif ($node instanceof RelationFilter) {
+                foreach ($this->relatedModels($model, $node) as $related) {
+                    $this->assertAclScopesApply($acl, $permission_name, $node->filters, $related);
+                }
+            } elseif ($node instanceof ScopeFilter) {
+                $this->assertAclScopeApplies($acl, $permission_name, $node, $model);
+            } else {
+                $this->refuseUnknownNode($acl, $permission_name, $node, $model);
+            }
+        }
+    }
+
+    /**
+     * A column filter needs no check here; any other node is of a kind no walker knows, and denies the read.
+     *
+     * @throws AuthorizationException when the node is not a column filter
+     */
+    private function refuseUnknownNode(ACL $acl, string $permission_name, mixed $node, ?Model $model): void
+    {
+        if (! $node instanceof Filter) {
+            $this->denyAclScope($acl, $permission_name, null, $model, 'the filters hold a node of an unknown kind');
+        }
+    }
+
+    /**
+     * @throws AuthorizationException when the scope node no longer applies
+     */
+    private function assertAclScopeApplies(ACL $acl, string $permission_name, ScopeFilter $filter, ?Model $model): void
+    {
+        if (! $model instanceof Model) {
+            $this->denyAclScope($acl, $permission_name, $filter->scope, null, 'the entity of the permission cannot be resolved');
+        }
+
+        try {
+            ScopeGuard::apply($model->newModelQuery(), $this->resolveScopeParameters($filter));
+        } catch (ScopeFilterException $exception) {
+            // The guard's messages name the scope and the model, never a parameter value.
+            $this->denyAclScope($acl, $permission_name, $filter->scope, $model, $exception->getMessage());
+        } catch (Throwable $exception) {
+            // The scope's own message may quote a value: only its class is logged.
+            $this->denyAclScope($acl, $permission_name, $filter->scope, $model, sprintf('the scope fails when it runs (%s)', $exception::class));
+        }
+    }
+
+    /**
+     * The models a relation filter reaches from the model: the related model, or each morph type of a morph
+     * relation. None when the relation does not resolve.
+     *
+     * @return list<Model>
+     */
+    private function relatedModels(?Model $model, RelationFilter $filter): array
+    {
+        $relation = $model instanceof Model ? RelationGuard::relationOf($model, $filter->relation) : null;
+
+        if (! $relation instanceof Relation) {
+            return [];
+        }
+
+        if (! $relation instanceof MorphTo) {
+            return [$relation->getRelated()];
+        }
+
+        $models = [];
+
+        foreach ($filter->morph_types ?? [] as $type) {
+            $morph_model = RelationGuard::morphModel($type);
+
+            if ($morph_model instanceof Model) {
+                $models[] = $morph_model->newInstance();
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * @throws AuthorizationException always
+     */
+    private function denyAclScope(ACL $acl, string $permission_name, ?string $scope, ?Model $model, string $reason): never
+    {
+        Log::warning('An ACL scope filter no longer applies, the read is denied.', [
+            'acl_id' => $acl->getKey(),
+            'permission' => $permission_name,
+            'scope' => $scope,
+            'model' => $model instanceof Model ? $model::class : null,
+            'reason' => $reason,
+        ]);
+
+        throw new AuthorizationException('User not allowed to access this resource');
     }
 
     /**

@@ -119,6 +119,33 @@ it('passes server-resolved row ACL filters to the provider', function (): void {
     expect($this->provider->capturedAuthorization?->filters)->toBeInstanceOf(FiltersGroup::class);
 });
 
+it('passes the row ACL filters to the provider with their placeholders resolved', function (): void {
+    $role = Role::factory()->create(['name' => 'limited_' . uniqid(), 'guard_name' => 'web']);
+    $role->givePermissionTo($this->permission);
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $this->permission->id,
+        'role_id' => $role->id,
+        'filters' => new FiltersGroup([
+            new Filter('created_at', '@now', FilterOperator::LessEquals),
+        ], WhereClause::And),
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+    $this->user->assignRole($role);
+    Cache::flush();
+
+    $this->service->retrieve(
+        $this->request,
+        new ApplicationContentQuery('core.users', 'visible record', 'en', 5),
+    );
+
+    expect($this->provider->capturedAuthorization?->filters?->filters[0]->value)->toBeInstanceOf(Carbon\CarbonInterface::class);
+});
+
 it('fails closed before provider execution for missing or mismatched identity', function (string $case): void {
     if ($case === 'missing') {
         Auth::logout();
