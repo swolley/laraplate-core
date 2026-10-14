@@ -201,7 +201,9 @@ An ACL (and a client request, see below) can name a **model scope** instead of r
   `inactive` of `HasActivation`, ACL-only. A model overriding a trait scope without the attribute undeclares it for itself
   (`License::expired`).
 - **Client exposure rule.** `#[FilterScope(client: true)]` allows CRUD requests; the default is ACL-only, because a scope
-  may read columns a client cannot filter on (hidden or anonymous-hidden columns) and would let it probe them. A request
+  may read columns a client cannot filter on (hidden or anonymous-hidden columns) and would let it probe them. A client
+  scope may also hold no subquery (`whereHas`, `has`, `whereExists`, a subquery comparison) and no raw SQL: the rows it
+  would reach are never checked against their own ACL, so the request is `422` (an ACL keeps them). A request
   naming an ACL-only or undeclared scope, or a wrong parameter, is `422`. The request parser is the gate, so the in-app
   assistant's CRUD tool is bound by it too. Requests get no placeholders; the scope is ANDed with the caller's ACL and
   never widens it.
@@ -209,7 +211,9 @@ An ACL (and a client request, see below) can name a **model scope** instead of r
   for a string parameter); arrays and objects, missing and extra parameters are refused. An ACL parameter may be `@now` or
   `@today` (date positions only) or `@user.<attribute>` (any position).
 - **Purity.** A scope runs inside its own nested `where` in AND and OR groups alike and may add only where conditions
-  (no joins, orders, columns, groups, limits, unions). A filter never removes or negates a global scope of the model; there
+  (no joins, orders, columns, groups, limits, unions). A run that adds no condition at all (a `when()` on a null
+  parameter, an `@user.<attribute>` that does not resolve) is refused too, since it would match every row: at save when
+  the default or sample run adds nothing, otherwise by denying the read. A filter never removes or negates a global scope of the model; there
   is no `not`.
 - **Relation filters.** A scope inside a relation filter is checked and applied on the related model (each morph type).
 - **Fail closed.** Saving an ACL with an undeclared, impure or badly parameterised scope is a validation error. An ACL
@@ -219,7 +223,8 @@ An ACL (and a client request, see below) can name a **model scope** instead of r
 - **Search.** Engines never receive a scope. It is dropped from an AND group, the whole OR group holding it is left out, and
   the condition is enforced when the hits are reloaded from the database (the database engine does the same). Totals and
   page sizes can therefore drift from the engine's counts, and an index-only field inside an OR group re-applied at the
-  reload is evaluated by the database's rules, so the results can be narrower (never wider).
+  reload is evaluated by the database's rules, so the results can be narrower, or the reload fails with a server error
+  when the field is not a column of a model without dynamic contents (never wider: it fails closed).
 - **CMS defaults.** The anonymous categories ACL is `valid` + `active` + the CMS entity relation filter. The anonymous
   contents, references and media ACLs stay on columns so that anonymous content search keeps exact totals. Existing
   installations keep their stored ACLs (the seeder never overwrites one).
