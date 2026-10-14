@@ -28,6 +28,7 @@ use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Casts\Sort;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Contracts\IMountsRelatedAttributes;
 use Modules\Core\Contracts\IPreloadsAppendedRelations;
 use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Helpers\LocaleContext;
@@ -1071,15 +1072,23 @@ final class QueryBuilder
     /**
      * A filter on a property that is not a column: a translated field is matched on the translation of
      * the request's locale, a dynamic field in every JSON container that can hold it, since nothing says
-     * whether a given field was configured as translatable or shared.
+     * whether a given field was configured as translatable or shared, and a mounted attribute on the
+     * relation the model mounts it from.
      *
      * @param  Builder<Model>|Relation<Model, Model, mixed>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
-     * @param  ModelPropertyResolver::TRANSLATED|ModelPropertyResolver::DYNAMIC  $stored_as
+     * @param  ModelPropertyResolver::TRANSLATED|ModelPropertyResolver::DYNAMIC|ModelPropertyResolver::MOUNTED  $stored_as
      */
     private function applyStoredPropertyFilter(Builder|Relation $query, Filter $filter, string $method, string $stored_as, array &$relation_columns, ?RelationAuthorizer $authorizer, ?Request $request): void
     {
         $model = $query->getModel();
+
+        if ($stored_as === ModelPropertyResolver::MOUNTED && $model instanceof IMountsRelatedAttributes) {
+            $mounted_filter = new Filter($model->mountedRelation() . '.' . $filter->property, $filter->value, $filter->operator);
+            $this->applyFilter($query, $mounted_filter, $method, $relation_columns, $authorizer, $request);
+
+            return;
+        }
 
         if ($stored_as === ModelPropertyResolver::TRANSLATED) {
             $this->whereTranslation(

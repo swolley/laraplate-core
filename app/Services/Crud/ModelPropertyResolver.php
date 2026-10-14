@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Services\Crud;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\IMountsRelatedAttributes;
 use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Models\Concerns\HasTranslations;
@@ -13,14 +14,17 @@ use Modules\Core\Models\Concerns\HasTranslations;
  * Tells where a flat filter property lives when it is not a column of the model's own table.
  *
  * A client filters on `title` or `color` without knowing how the entity stores it: the property is
- * a column of the table, a field of the translation table, or a dynamic field kept in a JSON
- * container. The order is that of the models themselves (column, translatable, dynamic).
+ * a column of the table, a field of the translation table, a dynamic field kept in a JSON
+ * container, or an attribute mounted from a related record. The order is that of the models
+ * themselves (column, translatable, dynamic, mounted).
  */
 final class ModelPropertyResolver
 {
     public const string TRANSLATED = 'translated';
 
     public const string DYNAMIC = 'dynamic';
+
+    public const string MOUNTED = 'mounted';
 
     /**
      * JSON containers that can hold dynamic fields on the main table: the shared one of translatable
@@ -39,7 +43,7 @@ final class ModelPropertyResolver
      * Dynamic fields are not checked against the presets: a recordset mixes entities with different
      * presets, so the field is looked for in every record and simply absent from the others.
      *
-     * @return self::TRANSLATED|self::DYNAMIC|null
+     * @return self::TRANSLATED|self::DYNAMIC|self::MOUNTED|null
      */
     public static function resolve(Model $model, string $property): ?string
     {
@@ -51,7 +55,9 @@ final class ModelPropertyResolver
         $is_translatable = isset($traits[HasTranslations::class]);
         $has_dynamic_contents = isset($traits[HasDynamicContents::class]);
 
-        if (! $is_translatable && ! $has_dynamic_contents) {
+        $mounts_attributes = $model instanceof IMountsRelatedAttributes;
+
+        if (! $is_translatable && ! $has_dynamic_contents && ! $mounts_attributes) {
             return null;
         }
 
@@ -68,7 +74,11 @@ final class ModelPropertyResolver
             return self::TRANSLATED;
         }
 
-        return $has_dynamic_contents ? self::DYNAMIC : null;
+        if ($has_dynamic_contents) {
+            return self::DYNAMIC;
+        }
+
+        return $model instanceof IMountsRelatedAttributes && $model->isMountedAttribute($property) ? self::MOUNTED : null;
     }
 
     /**
