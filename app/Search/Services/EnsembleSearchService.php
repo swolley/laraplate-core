@@ -18,6 +18,7 @@ use Modules\Core\Search\Contracts\IRerankerWithModel;
 use Modules\Core\Search\DTOs\AdvancedSearchResult;
 use Modules\Core\Search\DTOs\RerankResult;
 use Modules\Core\Search\DTOs\ResolvedTextMatch;
+use Modules\Core\Search\Support\SearchDegradations;
 use RuntimeException;
 use Throwable;
 
@@ -110,6 +111,7 @@ class EnsembleSearchService
                     'error' => $exception->getMessage(),
                 ]);
 
+                app(SearchDegradations::class)->note(SearchDegradations::RERANKER_FAILED);
                 $use_reranker = false;
             }
         }

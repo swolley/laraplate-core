@@ -96,3 +96,25 @@ it('keeps the keyword results when the embedder throws', function (): void {
 
     expect($seen)->toBeNull()->and($result->meta['strategies_executed'])->toBe(1);
 });
+
+it('reports embedder_failed as the degraded reason when the embedder throws', function (): void {
+    $embedder = Mockery::mock(ITextEmbedder::class);
+    $embedder->shouldReceive('embed')->once()->andThrow(new RuntimeException('embedding service down'));
+    app()->instance(ITextEmbedder::class, $embedder);
+
+    $seen = ['sentinel'];
+    $result = guarded_search($seen);
+
+    expect($result->meta['search']['degraded_reason'])->toBe('embedder_failed')
+        ->and($result->meta['search']['mode_applied'])->toBe('fast');
+});
+
+it('leaves the degraded reason empty when nothing fell back', function (): void {
+    $embedder = Mockery::mock(ITextEmbedder::class);
+    $embedder->shouldReceive('embed')->once()->andReturn([0.1, 0.2]);
+    app()->instance(ITextEmbedder::class, $embedder);
+
+    $seen = null;
+
+    expect(guarded_search($seen)->meta['search']['degraded_reason'])->toBeNull();
+});

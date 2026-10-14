@@ -113,6 +113,8 @@ it('uses scout pagination total for strategy totals while fetching the fusion wi
 
 it('degrades to fused results when the reranker throws', function (): void {
     EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+    $degradations = app(Modules\Core\Search\Support\SearchDegradations::class);
+    $degradations->reset();
 
     $throwing = Mockery::mock(IReranker::class);
     $throwing->shouldReceive('score')->andThrow(new RuntimeException('reranker service down'));
@@ -131,7 +133,8 @@ it('degrades to fused results when the reranker throws', function (): void {
     );
 
     expect($result->hits)->not->toBeEmpty()
-        ->and($result->meta['reranked'])->toBeFalse();
+        ->and($result->meta['reranked'])->toBeFalse()
+        ->and($degradations->first())->toBe('reranker_failed');
 });
 
 it('does not rerank by default when the plan does not specify the flag', function (): void {

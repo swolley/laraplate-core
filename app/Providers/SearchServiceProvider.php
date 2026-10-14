@@ -26,6 +26,7 @@ use Modules\Core\Search\Services\HeuristicReranker;
 use Modules\Core\Search\Services\RetrievalTuningProfile;
 use Modules\Core\Search\Services\SimpleQueryIntentParser;
 use Modules\Core\Search\Services\VectorSearchAvailability;
+use Modules\Core\Search\Support\SearchDegradations;
 
 /**
  * Extended search service provider.
@@ -58,6 +59,7 @@ final class SearchServiceProvider extends ServiceProvider
         $this->app->singletonIf(ISearchPlanner::class, FallbackSearchPlanner::class);
         $this->app->singletonIf(IQueryIntentParser::class, SimpleQueryIntentParser::class);
         $this->app->singletonIf(ISearchStrategyResolver::class, CoreSearchStrategyResolver::class);
+        $this->app->scoped(SearchDegradations::class);
         $this->app->singleton(RetrievalTuningProfile::class);
         $this->app->singleton(AdvancedSearchService::class);
     }

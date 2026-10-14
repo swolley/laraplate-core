@@ -48,10 +48,19 @@ the requested mode produces the cheaper result and says why, in `meta['search'][
 | `deep_unavailable` | the LLM components could not be built |
 | `rate_limited` | the person started more deep searches than `search.deep_per_minute` allows |
 
-A failure during the search is handled where it happens: a failing reranker leaves `reranked=false`, a failing
-embedder is logged and the search runs on keywords, and an LLM planner or intent parser that times out falls back to
-its own rules. This last case does not set `degraded_reason`. A client should read `mode_applied` rather than assume it
-got the mode it asked for.
+A failure during the search is handled where it happens, and the component that falls back notes it in
+`SearchDegradations` (a scoped object, emptied at the start of every search); the first note becomes
+`degraded_reason` when the strategy itself did not degrade:
+
+| `degraded_reason` | Fallback inside the search |
+|-------------------|----------------------------|
+| `llm_unavailable` | the LLM intent parser or planner failed or timed out and the search used its rules; also set when a repeated query is served a cached rule-based plan |
+| `embedder_failed` | the query embedding threw (logged) and the search ran on keywords |
+| `reranker_failed` | the reranker threw (logged) and the fused order was kept, with `reranked=false` |
+
+`mode_applied` still says what the strategy was (`deep`), so a client sees both: it got `deep`, and part of it
+fell back. A client should read `degraded_reason` as well as `mode_applied` rather than assume it got the mode it
+asked for.
 
 **Retries.** `$retries` is how many times the caller lets a poor result be searched again, capped by the strategy
 (`max_retries`: 0 for `fast` and `balanced`, 2 for `deep`). `SearchQualityEvaluator` judges the result (fewer than five

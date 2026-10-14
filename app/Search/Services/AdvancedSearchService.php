@@ -19,6 +19,7 @@ use Modules\Core\Search\DTOs\VectorAvailability;
 use Modules\Core\Search\Enums\QueryClass;
 use Modules\Core\Search\Enums\SearchMode;
 use Modules\Core\Search\Enums\TextMatchPreference;
+use Modules\Core\Search\Support\SearchDegradations;
 use Modules\Core\Search\Support\SearchStageTimings;
 use Throwable;
 
@@ -72,6 +73,8 @@ final readonly class AdvancedSearchService
         ?int $retries = null,
         ?string $withheld_reason = null,
     ): AdvancedSearchResult {
+        $degradations = $this->app->make(SearchDegradations::class);
+        $degradations->reset();
         $strategy = $this->strategyFor($mode, $withheld_reason);
         $timings = (bool) config('core.search.debug_timings', false) ? new SearchStageTimings() : null;
         $engine = $this->engineFor($model);
@@ -130,7 +133,7 @@ final readonly class AdvancedSearchService
         }
 
         $meta = $availability->available ? $result->meta : [...$result->meta, 'vector_disabled' => $availability->reason];
-        $meta['search'] = $this->searchMeta($mode, $strategy, $retries_used);
+        $meta['search'] = $this->searchMeta($mode, $strategy, $retries_used, $degradations->first());
 
         if ($timings instanceof SearchStageTimings) {
             $meta['timings'] = $timings->toMeta();
@@ -269,6 +272,7 @@ final readonly class AdvancedSearchService
         } catch (Throwable $exception) {
             // A search never errors because a model was unavailable: keep the keyword results.
             Log::warning('Query embedding failed; searching without the vector', ['error' => $exception->getMessage()]);
+            $this->app->make(SearchDegradations::class)->note(SearchDegradations::EMBEDDER_FAILED);
 
             return null;
         }
@@ -322,12 +326,12 @@ final readonly class AdvancedSearchService
     /**
      * @return array{mode_requested: string, mode_applied: string, degraded_reason: string|null, retries_used: int}
      */
-    private function searchMeta(SearchMode $requested, SearchStrategy $strategy, int $retries_used = 0): array
+    private function searchMeta(SearchMode $requested, SearchStrategy $strategy, int $retries_used = 0, ?string $noted = null): array
     {
         return [
             'mode_requested' => $requested->value,
             'mode_applied' => $strategy->applied_mode->value,
-            'degraded_reason' => $strategy->degraded_reason,
+            'degraded_reason' => $strategy->degraded_reason ?? $noted,
             'retries_used' => $retries_used,
         ];
     }
