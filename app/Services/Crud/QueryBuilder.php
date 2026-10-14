@@ -246,12 +246,18 @@ final class QueryBuilder
      * Given a relation authorizer, the existence checks of the relation filters receive the related ACL, as in
      * {@see prepareAuthorizedQuery()}; their related permission is checked by the caller beforehand.
      *
+     * The group always joins the query as one condition, inside its own nested `where`: the query usually holds
+     * conditions already (a key, the ACL of the caller), and a root OR group applied to the query itself would
+     * join them with `OR` (`where (acl) and a or b`) and let its later branches escape them.
+     *
      * @param  Builder<Model>  $query
      * @param  array<string,array<int,Column>>  $relation_columns
      */
     public function applyFilters(Builder $query, FiltersGroup $filters, array &$relation_columns = [], ?RelationAuthorizer $relation_authorizer = null, ?Request $request = null): void
     {
-        $this->recursivelyApplyFilters($query, $filters, $relation_columns, $relation_authorizer, $request);
+        $query->where(function (Builder $nested) use ($filters, &$relation_columns, $relation_authorizer, $request): void {
+            $this->recursivelyApplyFilters($nested, $filters, $relation_columns, $relation_authorizer, $request);
+        });
     }
 
     /**

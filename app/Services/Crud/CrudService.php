@@ -2889,13 +2889,10 @@ class CrudService
 
         $database_only = $requestFilters instanceof FiltersGroup ? ScoutSearchConstraintApplier::databaseOnlyPart($requestFilters) : null;
 
-        // In its own nested where: an OR group applied to the query itself would join the key and ACL
-        // conditions with OR and widen them.
+        // applyFilters() joins the group as one nested condition, so an OR group never widens the key and ACL conditions.
         if ($database_only instanceof FiltersGroup) {
-            $query->where(function (Builder $nested) use ($database_only, $requestData): void {
-                $relation_columns = [];
-                $this->query_builder->applyFilters($nested, $database_only, $relation_columns, $this->relationAuthorizer(), $requestData?->request);
-            });
+            $relation_columns = [];
+            $this->query_builder->applyFilters($query, $database_only, $relation_columns, $this->relationAuthorizer(), $requestData?->request);
         }
 
         if ($model instanceof IAuthorizesSearchRehydration) {

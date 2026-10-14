@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Modules\Core\Casts\Filter;
@@ -18,6 +17,7 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Tests\Stubs\Search\ScopedLicenseSearchStub;
+use Modules\Core\Tests\Stubs\Search\ValidatedSearchRequestStub;
 
 /*
  * The database engine is a search engine like the others (S8): it takes no scope node. Every license matches
@@ -58,13 +58,7 @@ function dbscope_search(SearchMode $mode, ?FiltersGroup $filters): array
     Auth::login($user);
 
     $model = new ScopedLicenseSearchStub;
-    $request = new class(['qs' => 'aaaaaaaa']) extends Request
-    {
-        public function validated(?string $key = null, mixed $default = null): mixed
-        {
-            return $key === null ? $this->all() : ($this->all()[$key] ?? $default);
-        }
-    };
+    $request = new ValidatedSearchRequestStub(['qs' => 'aaaaaaaa']);
     $request->setUserResolver(static fn () => $user);
 
     $data = (new ReflectionClass(SearchRequestData::class))->newInstanceWithoutConstructor();
