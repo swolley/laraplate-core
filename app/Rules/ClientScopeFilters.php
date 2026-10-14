@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Core\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
+use Modules\Core\Casts\ScopeFilter;
+use Modules\Core\Exceptions\ScopeFilterException;
+use Modules\Core\Support\ScopeGuard;
+use Override;
+use Throwable;
+
+/**
+ * Checks the scope nodes of a CRUD request's filters against the requested model, before the request filters are
+ * merged with the caller's ACL: a request may name only a scope the model exposes to clients
+ * (`#[FilterScope(client: true)]`), with parameters that fit its signature and no placeholder (a client parameter is
+ * taken literally, so `@now` is a bad date), and the scope must add nothing but where conditions. Each node is run
+ * once on a throwaway query of the model, which is built and never executed.
+ *
+ * The shape of the filters is {@see QueryBuilder}'s concern: a malformed scope node is reported there and skipped
+ * here. A refusal names the scope and the reason, never the model class nor a parameter value.
+ */
+final readonly class ClientScopeFilters implements ValidationRule
+{
+    /**
+     * @param  Model|null  $model  The requested model; null when the entity cannot be resolved
+     */
+    public function __construct(private ?Model $model) {}
+
+    /**
+     * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     */
+    #[Override]
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (! is_array($value)) {
+            return;
+        }
+
+        if (Arr::isList($value)) {
+            foreach ($value as $index => $node) {
+                $this->validate(sprintf('%s.%s', $attribute, $index), $node, $fail);
+            }
+
+            return;
+        }
+
+        if (array_key_exists('scope', $value)) {
+            $this->validateScope($attribute, $value, $fail);
+
+            return;
+        }
+
+        if (array_key_exists('filters', $value)) {
+            $this->validate($attribute . '.filters', $value['filters'], $fail);
+        }
+    }
+
+    /**
+     * @param  array<mixed>  $node
+     * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     */
+    private function validateScope(string $attribute, array $node, Closure $fail): void
+    {
+        $scope = $node['scope'];
+        $parameters = $node['parameters'] ?? [];
+
+        if (! is_string($scope) || $scope === '' || ! is_array($parameters) || ! Arr::isList($parameters)) {
+            return;
+        }
+
+        if (! $this->model instanceof Model) {
+            $fail(sprintf('%s scope "%s" cannot be checked: the entity cannot be resolved', $attribute, $scope));
+
+            return;
+        }
+
+        try {
+            ScopeGuard::apply($this->model->newModelQuery(), new ScopeFilter($scope, $parameters), 'and', true);
+        } catch (ScopeFilterException $exception) {
+            $fail($attribute . ' ' . str_replace($this->model::class, 'this entity', $exception->getMessage()));
+        } catch (Throwable) {
+            // The scope's own message may quote a value or an internal detail: none of it reaches the client.
+            $fail(sprintf('%s scope "%s" fails with these parameters', $attribute, $scope));
+        }
+    }
+}

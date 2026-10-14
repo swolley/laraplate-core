@@ -6,6 +6,7 @@ namespace Modules\Core\Casts;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Modules\Core\Http\Requests\ListRequest;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Support\BooleanInput;
@@ -326,9 +327,9 @@ class ListRequestData extends SelectRequestData
 
     /**
      * @param  array<mixed, mixed>  $raw
-     * @return Filter|FiltersGroup|array<int, Filter|FiltersGroup>
+     * @return Filter|FiltersGroup|ScopeFilter|array<int, Filter|FiltersGroup|ScopeFilter>
      */
-    private function conformFilterNode(array $raw, int $level): Filter|FiltersGroup|array
+    private function conformFilterNode(array $raw, int $level): Filter|FiltersGroup|ScopeFilter|array
     {
         if (Arr::isList($raw)) {
             $result = [];
@@ -340,7 +341,7 @@ class ListRequestData extends SelectRequestData
 
                 $conformed = $this->conformFilterNode($item, $level + 1);
 
-                if ($conformed instanceof Filter || $conformed instanceof FiltersGroup) {
+                if ($conformed instanceof Filter || $conformed instanceof FiltersGroup || $conformed instanceof ScopeFilter) {
                     $result[] = $conformed;
                 } elseif (is_array($conformed)) {
                     array_push($result, ...$conformed);
@@ -352,6 +353,10 @@ class ListRequestData extends SelectRequestData
             }
 
             return $result;
+        }
+
+        if (array_key_exists('scope', $raw)) {
+            return $this->conformScopeNode($raw);
         }
 
         if (Arr::has($raw, 'filters')) {
@@ -388,6 +393,24 @@ class ListRequestData extends SelectRequestData
         $this->conformFilterValue($typed_filter);
 
         return new Filter($typed_filter['property'], $typed_filter['value'], $typed_filter['operator']);
+    }
+
+    /**
+     * A scope node of the request, checked against the model by {@see \Modules\Core\Rules\ClientScopeFilters}
+     * when the request was validated. Its parameters are taken literally: a client request gets no placeholders.
+     *
+     * @param  array<mixed, mixed>  $raw
+     */
+    private function conformScopeNode(array $raw): ScopeFilter
+    {
+        $scope = $raw['scope'];
+        $parameters = $raw['parameters'] ?? [];
+
+        if (! is_string($scope) || ! is_array($parameters) || ! Arr::isList($parameters)) {
+            throw new InvalidArgumentException('A scope filter names a scope and lists its parameters.');
+        }
+
+        return new ScopeFilter($scope, $parameters);
     }
 
     /**

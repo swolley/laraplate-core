@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Requests;
 
 use Modules\Core\Casts\ListRequestData;
+use Modules\Core\Rules\ClientScopeFilters;
 use Modules\Core\Rules\QueryBuilder;
 use Modules\Core\Support\BooleanInput;
 use Override;
@@ -39,7 +40,7 @@ class ListRequest extends SelectRequest
             'totals' => ['boolean'],
             'sort.*.property' => ['string'],
             'sort.*.direction' => ['in:asc,desc,ASC,DESC'],
-            'filters' => [new QueryBuilder()],
+            'filters' => [new QueryBuilder(), new ClientScopeFilters($this->model)],
             'group_by.*' => ['string'],
             /** Snapshot ids for freshness presence (on_page / off_page / gone). */
             'check_ids' => ['sometimes', 'array', 'max:100'],
