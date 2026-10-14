@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Resources\ACLS\Schemas;
 
+use Closure;
 use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\CodeEditor\Enums\Language;
 use Filament\Forms\Components\Repeater;
@@ -15,6 +16,7 @@ use Filament\Schemas\Schema;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\SortDirection;
 use Modules\Core\Filament\Utils\HasForm;
+use Modules\Core\Rules\AclScopeFilters;
 use Modules\Core\Rules\QueryBuilder;
 
 final class ACLForm
@@ -43,9 +45,12 @@ final class ACLForm
                     ->helperText('Grants full access: stored filters are ignored.'),
                 CodeEditor::make('filters')
                     ->language(Language::Json)
-                    ->helperText('Filters group as JSON, e.g. {"operator":"and","filters":[{"property":"status","operator":"=","value":"published"}]}')
+                    ->helperText('Filters group as JSON, e.g. {"operator":"and","filters":[{"property":"status","operator":"=","value":"published"}]}. A local scope of the model is a node too: {"scope":"valid"} or {"scope":"validAt","parameters":["@today"]}.')
                     ->required(static fn (Get $get): bool => $get('unrestricted') !== true)
                     ->rule(new QueryBuilder())
+                    ->rule(static fn (Get $get): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                        new AclScopeFilters()->setData(['permission_id' => $get('permission_id')])->validate($attribute, $value, $fail);
+                    })
                     ->formatStateUsing(static fn (mixed $state): ?string => self::encodeFilters($state))
                     ->dehydrateStateUsing(static fn (mixed $state): ?array => self::decodeFilters($state)),
                 Repeater::make('sort')

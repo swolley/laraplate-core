@@ -2,14 +2,20 @@
 
 declare(strict_types=1);
 
+use Filament\Facades\Filament;
 use Filament\Schemas\Schema;
+use Livewire\Livewire;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\WhereClause;
+use Modules\Core\Filament\Resources\ACLS\Pages\CreateACL;
 use Modules\Core\Filament\Resources\ACLS\Schemas\ACLForm;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
+use Modules\Core\Models\Role;
+use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\Filament\SchemaHarnessComponent;
 
 function acl_with_nested_filters(): ACL
@@ -86,4 +92,60 @@ it('decodes an empty filters editor to null', function (): void {
     expect(ACLForm::decodeFilters(''))->toBeNull()
         ->and(ACLForm::decodeFilters(null))->toBeNull()
         ->and(ACLForm::encodeFilters(null))->toBeNull();
+});
+
+/**
+ * The create page of the ACL resource as a superadmin, on a permission about users.
+ *
+ * @param  class-string<Illuminate\Database\Eloquent\Model>  $model_class
+ * @return array{0: Livewire\Features\SupportTesting\Testable, 1: Permission}
+ */
+function acl_create_page(string $model_class = User::class): array
+{
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::findOrCreate(config('permission.roles.superadmin'), 'web'));
+
+    test()->actingAs($actor);
+    Filament::setCurrentPanel('admin');
+
+    $permission = Permission::query()->firstOrCreate([
+        'name' => PermissionName::forClass($model_class, 'select'),
+        'guard_name' => 'api',
+    ]);
+
+    return [Livewire::test(CreateACL::class), $permission];
+}
+
+it('mentions the scope node in the helper text of the filters editor', function (): void {
+    [$page] = acl_create_page();
+
+    $page->assertSee('{"scope":"valid"}');
+});
+
+it('saves an acl holding a declared scope node through the create page', function (): void {
+    [$page, $permission] = acl_create_page();
+
+    $page->fillForm([
+        'permission_id' => $permission->id,
+        'filters' => json_encode(['operator' => 'and', 'filters' => [['scope' => 'valid'], ['scope' => 'validAt', 'parameters' => ['@today']]]]),
+        'priority' => 1,
+    ])->call('create')->assertHasNoFormErrors();
+
+    $acl = ACL::query()->where('permission_id', $permission->id)->firstOrFail();
+
+    expect($acl->filters->toArray()['filters'])->toBe([['scope' => 'valid', 'parameters' => []], ['scope' => 'validAt', 'parameters' => ['@today']]]);
+});
+
+it('refuses an acl holding an undeclared scope node through the create page', function (): void {
+    [$page, $permission] = acl_create_page();
+
+    $page->fillForm([
+        'permission_id' => $permission->id,
+        'filters' => json_encode(['operator' => 'and', 'filters' => [['scope' => 'doesNotExist']]]),
+        'priority' => 1,
+    ])->call('create');
+
+    expect(ACL::query()->where('permission_id', $permission->id)->exists())->toBeFalse();
+    $page->assertHasFormErrors(['filters']);
+    expect(collect($page->errors()->get('data.filters'))->implode(' '))->toContain('doesNotExist');
 });

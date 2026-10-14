@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
 use Modules\Core\Filament\Resources\ACLS\ACLResource;
 use Modules\Core\Filament\Resources\ACLS\Tables\ACLsTable;
@@ -364,6 +365,46 @@ it('renders the acl filters column as a readable expression', function (): void 
     expect($column->formatState($column->getState()))
         ->toBe('status = published and (country in ["IT","DE"] or archived = false)')
         ->and($column->toEmbeddedHtml())->toContain('status = published');
+});
+
+it('describes scope nodes of an acl filter tree with their parameters', function (): void {
+    $tree = new FiltersGroup([
+        new Filter('status', 'published', FilterOperator::Equals),
+        new ScopeFilter('valid'),
+        new FiltersGroup([
+            new ScopeFilter('validAt', ['2026-10-14']),
+            new ScopeFilter('between', [1, null, true, ['a' => 'b']]),
+        ], WhereClause::Or),
+    ]);
+
+    expect(ACLsTable::describeFilters($tree))
+        ->toBe('status = published and scope valid and (scope validAt(2026-10-14) or scope between(1, null, true, {"a":"b"}))')
+        ->and(ACLsTable::describeFilters(new FiltersGroup([new ScopeFilter('active')])))->toBe('scope active');
+});
+
+it('renders the acl filters column of a stored acl holding a scope node', function (): void {
+    $permission = Permission::factory()->create(['name' => 'default.acl_table_' . uniqid() . '.select']);
+
+    $acl = new ACL;
+    $acl->setSkipValidation(true);
+    $acl->forceFill([
+        'permission_id' => $permission->id,
+        'filters' => new FiltersGroup([new ScopeFilter('validAt', ['@today'])]),
+        'unrestricted' => false,
+        'priority' => 10,
+        'is_active' => true,
+    ]);
+    $acl->save();
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => ACL::query());
+
+    ACLsTable::configure($table);
+
+    $column = $table->getColumns()['filters']->record($acl->fresh());
+
+    expect($column->formatState($column->getState()))->toBe('scope validAt(@today)');
 });
 
 it('renders the acl filters column when no filters are stored', function (): void {

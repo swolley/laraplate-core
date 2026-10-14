@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\RelationFilter;
+use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Filament\Utils\HasTable;
 
 final class ACLsTable
@@ -61,7 +62,9 @@ final class ACLsTable
                 $parts[] = self::describeGroup($node);
             } elseif ($node instanceof RelationFilter) {
                 $parts[] = self::describeRelationFilter($node);
-            } elseif ($node instanceof Filter) {
+            } elseif ($node instanceof ScopeFilter) {
+                $parts[] = self::describeScopeFilter($node);
+            } else {
                 $parts[] = self::describeFilter($node);
             }
         }
@@ -78,6 +81,18 @@ final class ACLsTable
     private static function describeRelationFilter(RelationFilter $filter): string
     {
         return sprintf('%s has (%s)', $filter->relation, self::describeGroup($filter->filters, isRoot: true));
+    }
+
+    /**
+     * Render a scope node as `scope name` or `scope name(arg, ...)`, e.g. `scope validAt(@today)`.
+     */
+    private static function describeScopeFilter(ScopeFilter $filter): string
+    {
+        if ($filter->parameters === []) {
+            return 'scope ' . $filter->scope;
+        }
+
+        return sprintf('scope %s(%s)', $filter->scope, implode(', ', array_map(self::describeValue(...), $filter->parameters)));
     }
 
     private static function describeFilter(Filter $filter): string
