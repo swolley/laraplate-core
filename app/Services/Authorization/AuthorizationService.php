@@ -8,7 +8,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Contracts\HasAbilities;
@@ -22,6 +21,7 @@ use Modules\Core\Casts\WhereClause;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AclResolverService;
+use Modules\Core\Support\FilterPlaceholders;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
 
@@ -537,60 +537,12 @@ final class AuthorizationService
     /**
      * Resolve dynamic placeholders in an ACL filter value at query-build time.
      *
-     * ACL filters are JSON-persisted with frozen literal values, so a stored value
-     * cannot express a moving target such as the current time. A value equal to a
-     * known placeholder token (e.g. `@now`, `@today`) is substituted with its live
-     * value here; array values (for `in` / `between`) are resolved element-wise, and
-     * any other value is returned untouched.
+     * ACL filters are JSON-persisted with frozen literal values, so a stored value cannot express a moving
+     * target such as the current time: {@see FilterPlaceholders} substitutes it with its live value.
      */
     private function resolveFilterValue(mixed $value): mixed
     {
-        if (is_array($value)) {
-            return array_map(fn (mixed $item): mixed => $this->resolveFilterValue($item), $value);
-        }
-
-        if (! is_string($value)) {
-            return $value;
-        }
-
-        if (str_starts_with($value, '@user.')) {
-            return $this->resolveUserAttribute(mb_substr($value, 6));
-        }
-
-        return match ($value) {
-            '@now' => Carbon::now(),
-            '@today' => Carbon::today(),
-            default => $value,
-        };
-    }
-
-    /**
-     * Resolves `@user.<attribute>` against the acting user.
-     *
-     * Deliberately a generic attribute reader rather than a hard-coded `@user.id`: the same
-     * implementation answers `@user.department_id`, `@user.team_id` and `@user.tenant_id`, which are
-     * the cuts an ACL actually needs, and each one added by hand would be the same three lines.
-     *
-     * Only scalar, non-hidden attributes resolve. Hidden attributes are excluded so no ACL, however
-     * it is written, can pull a password hash or a remember token into a query, and relations and
-     * accessors returning objects are excluded because a filter value has to be comparable in SQL.
-     * Anything that does not resolve becomes null, which matches nothing rather than everything.
-     */
-    private function resolveUserAttribute(string $attribute): mixed
-    {
-        $user = Auth::user();
-
-        if (! $user instanceof User || $attribute === '') {
-            return null;
-        }
-
-        if (in_array($attribute, $user->getHidden(), true)) {
-            return null;
-        }
-
-        $value = $user->getAttribute($attribute);
-
-        return is_scalar($value) ? $value : null;
+        return FilterPlaceholders::resolve($value);
     }
 
     /**
