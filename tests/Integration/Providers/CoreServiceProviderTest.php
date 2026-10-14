@@ -213,6 +213,92 @@ it('loadCronJobsFromDatabase returns empty array on exceptions', function (): vo
     expect($result)->toBeArray()->toBeEmpty();
 });
 
+it('loadCronJobsFromDatabase returns the parameters and the flags of an active row', function (): void {
+    $cron = CronJob::factory()->create([
+        'command' => 'cron-probe:prune',
+        'parameters' => ['--all', '--limit=10'],
+        'on_one_server' => false,
+        'without_overlapping' => true,
+        'is_active' => true,
+    ]);
+
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', [$cron->getTable()]);
+
+    expect($result[0]['parameters'])->toBe(['--all', '--limit=10'])
+        ->and($result[0]['on_one_server'])->toBeFalse()
+        ->and($result[0]['without_overlapping'])->toBeTrue();
+});
+
+it('loadCronJobsFromDatabase reads parameters that were stored as a JSON string', function (): void {
+    $cron = CronJob::factory()->create(['command' => 'cron-probe:prune', 'is_active' => true]);
+    Illuminate\Support\Facades\DB::table($cron->getTable())->where('id', $cron->id)
+        ->update(['parameters' => json_encode('["--limit=10"]')]);
+
+    $result = invokePrivate($this->provider, 'loadCronJobsFromDatabase', [$cron->getTable()]);
+
+    expect($result[0]['parameters'])->toBe(['--limit=10']);
+});
+
+it('registerCommandSchedules passes the parameters of a cron row to its command, escaped by Laravel', function (): void {
+    CronJob::factory()->create([
+        'command' => 'cron-probe:prune',
+        'parameters' => ['--all', '--model=Modules\\AI\\Models\\ContextualSuggestion', '--limit=10'],
+        'is_active' => true,
+    ]);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+
+    expect(scheduledCronProbe()->command)
+        ->toContain('cron-probe:prune')
+        ->toContain(' --all')
+        ->toContain("--model='Modules\\AI\\Models\\ContextualSuggestion'")
+        ->toContain('--limit=10');
+});
+
+it('registerCommandSchedules applies the one-server and no-overlap flags of a cron row', function (): void {
+    CronJob::factory()->create([
+        'command' => 'cron-probe:prune',
+        'on_one_server' => false,
+        'without_overlapping' => false,
+        'is_active' => true,
+    ]);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+
+    expect(scheduledCronProbe()->onOneServer)->toBeFalse()
+        ->and(scheduledCronProbe()->withoutOverlapping)->toBeFalse();
+});
+
+it('registerCommandSchedules runs a cron row on one server and without overlapping by default', function (): void {
+    CronJob::factory()->create([
+        'command' => 'cron-probe:prune',
+        'is_active' => true,
+    ]);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+
+    expect(scheduledCronProbe()->onOneServer)->toBeTrue()
+        ->and(scheduledCronProbe()->withoutOverlapping)->toBeTrue();
+});
+
+it('registerCommandSchedules does not schedule a row whose parameters would not be escaped', function (): void {
+    $cron = CronJob::factory()->create(['command' => 'cron-probe:prune', 'is_active' => true]);
+    Illuminate\Support\Facades\DB::table($cron->getTable())->where('id', $cron->id)
+        ->update(['parameters' => json_encode(['--all; rm -rf /'])]);
+
+    invokePrivate($this->provider, 'registerCommandSchedules');
+
+    expect(scheduledCronProbes())->toBe([]);
+});
+
+it('normalizeCronJobs gives parameters and both flags to an entry cached before they existed', function (): void {
+    $result = invokePrivate($this->provider, 'normalizeCronJobs', [[['command' => 'inspire', 'schedule' => '* * * * *']]]);
+
+    expect($result[0]['parameters'])->toBe([])
+        ->and($result[0]['on_one_server'])->toBeTrue()
+        ->and($result[0]['without_overlapping'])->toBeTrue();
+});
+
 it('registerCommandSchedules reads cached cron jobs without database calls', function (): void {
     $cache_key = (new ReflectionClass(CronJob::class))->newInstanceWithoutConstructor()->getTable();
     Cache::put($cache_key, []);
@@ -429,4 +515,24 @@ function runLastBootedCallback(): void
     } else {
         $callback();
     }
+}
+
+/**
+ * @return list<Illuminate\Console\Scheduling\Event>
+ */
+function scheduledCronProbes(): array
+{
+    return array_values(array_filter(
+        app()->make(Illuminate\Console\Scheduling\Schedule::class)->events(),
+        static fn (Illuminate\Console\Scheduling\Event $event): bool => str_contains((string) $event->command, 'cron-probe:prune'),
+    ));
+}
+
+function scheduledCronProbe(): Illuminate\Console\Scheduling\Event
+{
+    $events = scheduledCronProbes();
+
+    expect($events)->toHaveCount(1);
+
+    return $events[0];
 }

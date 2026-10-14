@@ -33,7 +33,7 @@ final class CronJobFactory extends Factory
     {
         return [
             'name' => 'inspire-' . uniqid(),
-            'command' => 'php artisan inspire',
+            'command' => 'inspire',
             // 'parameters',
             'schedule' => '0 * * * *',
             'description' => 'Display an inspiring quote',

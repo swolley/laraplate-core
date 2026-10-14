@@ -19,7 +19,7 @@ it('has fillable attributes', function (): void {
     $cronJobData = [
         'name' => $uniqueName,
         'command' => 'test:command',
-        'parameters' => '{"param1": "value1"}',
+        'parameters' => ['--param1=value1'],
         'schedule' => '0 0 * * *',
         'description' => 'Test cron job description',
     ];
@@ -30,19 +30,19 @@ it('has fillable attributes', function (): void {
 
     expect($cronJob->name)->toBe($uniqueName);
     expect($cronJob->command)->toBe('test:command');
-    expect($cronJob->parameters)->toBe('{"param1": "value1"}');
+    expect($cronJob->parameters)->toBe(['--param1=value1']);
     expect($cronJob->schedule->getExpression())->toBe('0 0 * * *');
     expect($cronJob->description)->toBe('Test cron job description');
     expect($cronJob->is_active)->toBeTrue();
 });
 
-it('has default parameters as empty json', function (): void {
+it('has default parameters as an empty list', function (): void {
     $cronJob = CronJob::factory()->create();
 
     // parameters is cast to json, so it's decoded as array when accessed
-    // The default value is '{}' but when cast it becomes []
+    // The default value is '[]': the parameters are a list of strings
     $parameters = $cronJob->getAttributes()['parameters'] ?? json_encode($cronJob->parameters);
-    expect($parameters)->toBe('{}');
+    expect($parameters)->toBe('[]');
     expect(json_decode($parameters, true))->toBe([]);
 });
 
@@ -84,6 +84,36 @@ it('validates cron expression format', function (): void {
     ]))->not->toThrow(ValidationException::class);
 });
 
+it('runs on one server and without overlapping by default', function (): void {
+    $cronJob = CronJob::factory()->create()->fresh();
+
+    expect($cronJob->on_one_server)->toBeTrue()
+        ->and($cronJob->without_overlapping)->toBeTrue();
+});
+
+it('rejects a command that carries arguments', function (): void {
+    expect(fn () => CronJob::create([
+        'name' => 'arguments-in-command-' . uniqid(),
+        'command' => 'model:prune --model=App\\Models\\User',
+        'schedule' => '0 0 * * *',
+    ]))->toThrow(ValidationException::class);
+});
+
+it('rejects parameters that are not a list of strings', function (array|string $parameters): void {
+    expect(fn () => CronJob::create([
+        'name' => 'bad-parameters-' . uniqid(),
+        'command' => 'test:command',
+        'parameters' => $parameters,
+        'schedule' => '0 0 * * *',
+    ]))->toThrow(ValidationException::class);
+})->with([
+    'an object of options' => [['--limit' => 10]],
+    'a number among the strings' => [['--all', 5]],
+    'a flag that would be run by the shell' => [['--all; rm -rf /']],
+    'an option value that starts with a dash' => [['--offset=-5']],
+    'text that is not JSON' => ['--all'],
+]);
+
 it('has soft deletes trait', function (): void {
     $this->cronJob->delete();
 
@@ -110,7 +140,7 @@ it('can be created with specific attributes', function (): void {
     $cronJobData = [
         'name' => $uniqueName,
         'command' => 'custom:command',
-        'parameters' => '{"custom": "param"}',
+        'parameters' => ['--custom=param'],
         'schedule' => '*/5 * * * *',
         'description' => 'Custom cron job',
     ];
@@ -121,7 +151,7 @@ it('can be created with specific attributes', function (): void {
 
     expect($cronJob->name)->toBe($uniqueName);
     expect($cronJob->command)->toBe('custom:command');
-    expect($cronJob->parameters)->toBe('{"custom": "param"}');
+    expect($cronJob->parameters)->toBe(['--custom=param']);
     expect($cronJob->schedule->getExpression())->toBe('*/5 * * * *');
     expect($cronJob->description)->toBe('Custom cron job');
     expect($cronJob->is_active)->toBeFalse();

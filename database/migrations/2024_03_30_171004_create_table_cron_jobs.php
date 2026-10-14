@@ -23,6 +23,8 @@ return new class() extends Migration
             $table->json('parameters')->nullable(false)->comment('The parameters of the cron job');
             $table->string('schedule')->nullable(false)->comment('The schedule of the cron job');
             $table->boolean('is_active')->nullable(false)->index("{$cron_jobs_table}_is_active_IDX")->comment('Is the cron job active');
+            $table->boolean('on_one_server')->nullable(false)->default(true)->comment('Run on a single server when several share the scheduler');
+            $table->boolean('without_overlapping')->nullable(false)->default(true)->comment('Skip a run while the previous one is still running');
             $table->string('description')->nullable()->comment('The description of the cron job');
 
             MigrateUtils::timestamps(

@@ -46,6 +46,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use InvalidArgumentException;
 use Laravel\Fortify\Features;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Scout\EngineManager;
@@ -106,6 +107,7 @@ use Modules\Core\Search\OwnerAuthorizerRegistry;
 use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\Search\Support\PgvectorProfileIndex;
 use Modules\Core\Services\Authorization\AuthorizationService;
+use Modules\Core\Services\CronParameters;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
@@ -376,7 +378,24 @@ final class CoreServiceProvider extends ModuleServiceProvider
             }
 
             foreach ($crons as $cron) {
-                $schedule->command($cron['command'])->cron($cron['schedule'])->onOneServer();
+                try {
+                    // The parameters go as an array, not appended to the command, so that Laravel escapes them.
+                    $parameters = CronParameters::toScheduleParameters($cron['parameters']);
+                } catch (InvalidArgumentException $exception) {
+                    report(new InvalidArgumentException("Cron job {$cron['command']} is not scheduled: {$exception->getMessage()}", previous: $exception));
+
+                    continue;
+                }
+
+                $event = $schedule->command($cron['command'], $parameters)->cron($cron['schedule']);
+
+                if ($cron['on_one_server']) {
+                    $event->onOneServer();
+                }
+
+                if ($cron['without_overlapping']) {
+                    $event->withoutOverlapping();
+                }
             }
         });
     }
@@ -402,7 +421,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * @return array<int, array{command: string, schedule: string}>
+     * @return array<int, array{command: string, schedule: string, parameters: array<int|string, mixed>, on_one_server: bool, without_overlapping: bool}>
      */
     private function loadCronJobsFromDatabase(): array
     {
@@ -420,7 +439,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
             $cron_jobs = CronJob::query()
                 ->active()
-                ->select(['command', 'schedule'])
+                ->select(['command', 'schedule', 'parameters', 'on_one_server', 'without_overlapping'])
                 ->get();
 
             $normalized = [];
@@ -440,6 +459,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 $normalized[] = [
                     'command' => (string) $command,
                     'schedule' => (string) $schedule,
+                    'parameters' => $this->cronParameters($cron_job->getAttribute('parameters')),
+                    'on_one_server' => (bool) $cron_job->getAttribute('on_one_server'),
+                    'without_overlapping' => (bool) $cron_job->getAttribute('without_overlapping'),
                 ];
             }
 
@@ -452,7 +474,22 @@ final class CoreServiceProvider extends ModuleServiceProvider
     }
 
     /**
-     * @return array<int, array{command: string, schedule: string}>
+     * The parameters of a cron row as the array Laravel's scheduler takes: the column holds JSON, and a
+     * value written as a JSON string comes back as that string.
+     *
+     * @return array<int|string, mixed>
+     */
+    private function cronParameters(mixed $parameters): array
+    {
+        if (is_string($parameters)) {
+            $parameters = json_decode($parameters, true);
+        }
+
+        return is_array($parameters) ? $parameters : [];
+    }
+
+    /**
+     * @return array<int, array{command: string, schedule: string, parameters: array<int|string, mixed>, on_one_server: bool, without_overlapping: bool}>
      */
     private function normalizeCronJobs(mixed $crons): array
     {
@@ -474,9 +511,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 continue;
             }
 
+            // An entry cached before these keys existed runs as it always did: on one server, and now without overlapping.
             $normalized[] = [
                 'command' => $command,
                 'schedule' => $schedule,
+                'parameters' => $this->cronParameters($cron['parameters'] ?? []),
+                'on_one_server' => (bool) ($cron['on_one_server'] ?? true),
+                'without_overlapping' => (bool) ($cron['without_overlapping'] ?? true),
             ];
         }
 

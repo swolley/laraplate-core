@@ -14,6 +14,7 @@ use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Models\Concerns\HasActivation;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Rules\CronExpression as CronExpressionRule;
+use Modules\Core\Rules\CronParametersList;
 use Override;
 
 final class CronJob extends Model implements IActivatableModel, ILockableModel
@@ -44,22 +45,29 @@ final class CronJob extends Model implements IActivatableModel, ILockableModel
         'parameters',
         'schedule',
         'description',
+        'on_one_server',
+        'without_overlapping',
     ];
 
     #[Override]
     protected $attributes = [
-        'parameters' => '{}',
+        'parameters' => '[]',
+        'on_one_server' => true,
+        'without_overlapping' => true,
     ];
 
     public function getRules(): array
     {
         $rules = parent::getRules();
         $rules[Model::DEFAULT_RULE] = array_merge($rules[Model::DEFAULT_RULE], [
-            'command' => ['required', 'string', 'max:255'],
-            'parameters' => ['required', 'json'],
+            // The name of the command only: its arguments go in `parameters`, where Laravel escapes them.
+            'command' => ['required', 'string', 'max:255', 'regex:/^\S+$/'],
+            'parameters' => ['required', new CronParametersList()],
             'schedule' => ['required', new CronExpressionRule()],
             'description' => ['string', 'max:255', 'nullable'],
             'is_active' => ['boolean', 'required'],
+            'on_one_server' => ['boolean'],
+            'without_overlapping' => ['boolean'],
         ]);
         $rules['create'] = array_merge($rules['create'], [
             'name' => [
@@ -94,6 +102,8 @@ final class CronJob extends Model implements IActivatableModel, ILockableModel
             'name' => 'string',
             'command' => 'string',
             'parameters' => 'json',
+            'on_one_server' => 'boolean',
+            'without_overlapping' => 'boolean',
             'schedule' => CronExpressionCast::class,
             'description' => 'string',
             'created_at' => 'immutable_datetime',
