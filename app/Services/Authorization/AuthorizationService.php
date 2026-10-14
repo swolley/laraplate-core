@@ -7,12 +7,9 @@ namespace Modules\Core\Services\Authorization;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Laravel\Sanctum\Contracts\HasAbilities;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -23,16 +20,15 @@ use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
-use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AclResolverService;
+use Modules\Core\Support\AclScopeCheck;
 use Modules\Core\Support\FilterPlaceholders;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\RelationGuard;
 use Modules\Core\Support\ScopeGuard;
-use Throwable;
 
 /**
  * Authorization Service - handles permission checks and ACL filter injection.
@@ -560,12 +556,12 @@ final class AuthorizationService
      */
     private function resolveScopeParameters(ScopeFilter $filter): ScopeFilter
     {
-        return new ScopeFilter($filter->scope, array_map($this->resolveFilterValue(...), $filter->parameters));
+        return AclScopeCheck::resolveParameters($filter);
     }
 
     /**
      * {@see getAclFilters()}, after checking that every scope node of the contributing ACLs still applies to the
-     * model it reaches ({@see assertAclScopesApply()}).
+     * model it reaches ({@see AclScopeCheck::assertApplies()}).
      *
      * @param  Model|null  $model  The model the permission is about; null reads it from the permission name
      *
@@ -576,7 +572,7 @@ final class AuthorizationService
         $acl_filters = $this->getAclFilters($permission_name);
         $user = Auth::user();
 
-        if (! $acl_filters instanceof FiltersGroup || ! $user instanceof User || ! $this->holdsScopeFilter($acl_filters)) {
+        if (! $acl_filters instanceof FiltersGroup || ! $user instanceof User || ! AclScopeCheck::holdsScopeFilter($acl_filters)) {
             return $acl_filters;
         }
 
@@ -590,138 +586,11 @@ final class AuthorizationService
 
         foreach ($acls as $acl) {
             if ($acl->filters instanceof FiltersGroup) {
-                $this->assertAclScopesApply($acl, $permission_name, $acl->filters, $model);
+                AclScopeCheck::assertApplies($acl, $permission_name, $acl->filters, $model);
             }
         }
 
         return $acl_filters;
-    }
-
-    /**
-     * Whether the filters hold a scope node, or a node of an unknown kind, at any depth: only then does an ACL need
-     * the use-time check.
-     */
-    private function holdsScopeFilter(FiltersGroup $filters): bool
-    {
-        foreach ($filters->filters as $node) {
-            $holds = match (true) {
-                $node instanceof FiltersGroup => $this->holdsScopeFilter($node),
-                $node instanceof RelationFilter => $this->holdsScopeFilter($node->filters),
-                $node instanceof Filter => false,
-                default => true,
-            };
-
-            if ($holds) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Runs every scope node of an ACL, its placeholders resolved, on a throwaway query of the model it reaches: the
-     * permission's model, the related model inside a relation filter, each morph type of a morph relation. The query
-     * is built, never executed. A scope that is no longer declared, takes the parameters badly, does more than add
-     * where conditions or fails when it runs denies the read; the ACL id is logged, never a parameter value. A
-     * relation that does not resolve is left to the walker, which refuses it as before.
-     *
-     * @throws AuthorizationException when a scope node no longer applies
-     */
-    private function assertAclScopesApply(ACL $acl, string $permission_name, FiltersGroup $filters, ?Model $model): void
-    {
-        foreach ($filters->filters as $node) {
-            if ($node instanceof FiltersGroup) {
-                $this->assertAclScopesApply($acl, $permission_name, $node, $model);
-            } elseif ($node instanceof RelationFilter) {
-                foreach ($this->relatedModels($model, $node) as $related) {
-                    $this->assertAclScopesApply($acl, $permission_name, $node->filters, $related);
-                }
-            } elseif ($node instanceof ScopeFilter) {
-                $this->assertAclScopeApplies($acl, $permission_name, $node, $model);
-            } else {
-                $this->refuseUnknownNode($acl, $permission_name, $node, $model);
-            }
-        }
-    }
-
-    /**
-     * A column filter needs no check here; any other node is of a kind no walker knows, and denies the read.
-     *
-     * @throws AuthorizationException when the node is not a column filter
-     */
-    private function refuseUnknownNode(ACL $acl, string $permission_name, mixed $node, ?Model $model): void
-    {
-        if (! $node instanceof Filter) {
-            $this->denyAclScope($acl, $permission_name, null, $model, 'the filters hold a node of an unknown kind');
-        }
-    }
-
-    /**
-     * @throws AuthorizationException when the scope node no longer applies
-     */
-    private function assertAclScopeApplies(ACL $acl, string $permission_name, ScopeFilter $filter, ?Model $model): void
-    {
-        if (! $model instanceof Model) {
-            $this->denyAclScope($acl, $permission_name, $filter->scope, null, 'the entity of the permission cannot be resolved');
-        }
-
-        try {
-            ScopeGuard::apply($model->newModelQuery(), $this->resolveScopeParameters($filter));
-        } catch (ScopeFilterException $exception) {
-            // The guard's messages name the scope and the model, never a parameter value.
-            $this->denyAclScope($acl, $permission_name, $filter->scope, $model, $exception->getMessage());
-        } catch (Throwable $exception) {
-            // The scope's own message may quote a value: only its class is logged.
-            $this->denyAclScope($acl, $permission_name, $filter->scope, $model, sprintf('the scope fails when it runs (%s)', $exception::class));
-        }
-    }
-
-    /**
-     * The models a relation filter reaches from the model: the related model, or each morph type of a morph
-     * relation. None when the relation does not resolve.
-     *
-     * @return list<Model>
-     */
-    private function relatedModels(?Model $model, RelationFilter $filter): array
-    {
-        $relation = $model instanceof Model ? RelationGuard::relationOf($model, $filter->relation) : null;
-
-        if (! $relation instanceof Relation) {
-            return [];
-        }
-
-        if (! $relation instanceof MorphTo) {
-            return [$relation->getRelated()];
-        }
-
-        $models = [];
-
-        foreach ($filter->morph_types ?? [] as $type) {
-            $morph_model = RelationGuard::morphModel($type);
-
-            if ($morph_model instanceof Model) {
-                $models[] = $morph_model->newInstance();
-            }
-        }
-
-        return $models;
-    }
-
-    /**
-     * @throws AuthorizationException always
-     */
-    private function denyAclScope(ACL $acl, string $permission_name, ?string $scope, ?Model $model, string $reason): never
-    {
-        Log::warning('An ACL scope filter no longer applies, the read is denied.', [
-            'acl_id' => $acl->getKey(),
-            'permission' => $permission_name,
-            'scope' => $scope,
-            'model' => $model instanceof Model ? $model::class : null,
-            'reason' => $reason,
-        ]);
-
-        throw new AuthorizationException('User not allowed to access this resource');
     }
 
     /**

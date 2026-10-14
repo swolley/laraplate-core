@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Casts\WhereClause;
@@ -22,6 +23,7 @@ use Modules\Core\Models\Media;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Services\AclResolverService;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Support\CrudApiExposure;
@@ -325,22 +327,23 @@ it('denies a CRUD list when a scope of the ACL no longer resolves, logging the A
     'extra parameter' => [new ScopeFilter('valid', ['secret-value'])],
 ]);
 
-it('denies an ACL-checked read and the resolved ACL filters when a scope of the ACL no longer resolves', function (): void {
-    $licenses = aclscope_licenses();
-    [$reader, $permission_name, $acl] = aclscope_reader(new FiltersGroup([
-        new RelationFilter('user', new FiltersGroup([new ScopeFilter('validAt', ['secret-value'])])),
-    ]));
+it('denies an ACL-checked read and the resolved ACL filters when a scope inside a relation filter no longer resolves', function (string $model_class, RelationFilter $relation_filter): void {
+    [$reader, $permission_name, $acl] = aclscope_reader(new FiltersGroup([$relation_filter]), $model_class);
     aclscope_act_as($reader);
     Log::spy();
 
-    expect(fn () => app(AuthorizationService::class)->applyAclFiltersToQuery(License::query(), $permission_name))
+    expect(fn () => app(AuthorizationService::class)->applyAclFiltersToQuery($model_class::query(), $permission_name))
         ->toThrow(AuthorizationException::class);
-    expect(fn () => app(AuthorizationService::class)->resolvedAclFilters($permission_name, $licenses['valid']))
+    expect(fn () => app(AuthorizationService::class)->resolvedAclFilters($permission_name, new $model_class))
         ->toThrow(AuthorizationException::class);
 
     Log::shouldHaveReceived('warning')->twice()->withArgs(static fn (string $message, array $context): bool => ($context['acl_id'] ?? null) === $acl->id
+        && ($context['model'] ?? null) === User::class
         && ! str_contains($message . json_encode($context), 'secret-value'));
-});
+})->with([
+    'relation' => [License::class, new RelationFilter('user', new FiltersGroup([new ScopeFilter('validAt', ['secret-value'])]))],
+    'morph relation' => [Media::class, new RelationFilter('model', new FiltersGroup([new ScopeFilter('validAt', ['secret-value'])]), [User::class])],
+]);
 
 it('denies an ACL-checked read when a scope of the ACL does more than add conditions or fails when it runs', function (string $model_class, ScopeFilter $scope): void {
     aclscope_stub_table();
@@ -378,11 +381,26 @@ it('gives the CRUD query builder the ACL filters with their placeholders resolve
     expect(aclscope_ids($query->pluck('id')->all()))->toBe([$licenses['valid']->id]);
 });
 
-it('refuses a filter node of an unknown kind in every ACL walker instead of skipping it', function (string $method): void {
-    $service = app(AuthorizationService::class);
-    $reflection = new ReflectionMethod(AuthorizationService::class, $method);
-    $filters = new FiltersGroup([new Filter('id', 1, FilterOperator::Equals), new stdClass]);
-    $arguments = $method === 'resolvePlaceholders' ? [$filters] : [License::query(), $filters];
+it('denies every ACL read whose filters hold a node of an unknown kind instead of skipping it', function (): void {
+    [$reader, $permission_name] = aclscope_reader(new FiltersGroup([new Filter('id', 1, FilterOperator::Equals)]));
+    aclscope_act_as($reader);
+    $filters = new FiltersGroup([new Filter('id', 1, FilterOperator::Equals), new FiltersGroup([new stdClass])]);
+    // A stored ACL cannot hold such a node (the cast refuses it): the resolver hands it over as a future node kind would.
+    $acl = Mockery::mock(ACL::class)->makePartial();
+    $acl->shouldReceive('getAttribute')->with('filters')->andReturn($filters);
+    $acl->shouldReceive('getKey')->andReturn(4242);
+    $acl->shouldReceive('isUnrestricted')->andReturnFalse();
+    $acl->shouldReceive('hasFilters')->andReturnTrue();
+    $resolver = Mockery::mock(AclResolverService::class);
+    $resolver->shouldReceive('getEffectiveAcls')->andReturn(collect([$acl]));
+    $resolver->shouldReceive('getCombinedFilters')->andReturn($filters);
+    $service = new AuthorizationService($resolver);
+    $request_data = new ReflectionClass(ListRequestData::class)->newInstanceWithoutConstructor();
+    Log::spy();
 
-    expect(fn () => $reflection->invoke($service, ...$arguments))->toThrow(InvalidArgumentException::class);
-})->with(['applyFiltersRecursively', 'resolvePlaceholders']);
+    expect(fn () => $service->applyAclFiltersToQuery(License::query(), $permission_name))->toThrow(AuthorizationException::class);
+    expect(fn () => $service->resolvedAclFilters($permission_name, new License))->toThrow(AuthorizationException::class);
+    expect(fn () => $service->injectAclFilters($request_data, $permission_name))->toThrow(AuthorizationException::class);
+
+    Log::shouldHaveReceived('warning')->times(3)->withArgs(static fn (string $message, array $context): bool => ($context['acl_id'] ?? null) === 4242);
+});

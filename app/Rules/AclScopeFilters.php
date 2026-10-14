@@ -8,18 +8,14 @@ use Closure;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use InvalidArgumentException;
-use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\FiltersGroupCast;
-use Modules\Core\Casts\RelationFilter;
 use Modules\Core\Casts\ScopeFilter;
 use Modules\Core\Exceptions\ScopeFilterException;
 use Modules\Core\Models\ACL;
+use Modules\Core\Support\AclScopeCheck;
 use Modules\Core\Support\PermissionName;
-use Modules\Core\Support\RelationGuard;
 use Modules\Core\Support\ScopeGuard;
 use Override;
 
@@ -65,7 +61,7 @@ final class AclScopeFilters implements DataAwareRule, ValidationRule
             return;
         }
 
-        if (! $filters instanceof FiltersGroup || ! $this->holdsScopeFilter($filters)) {
+        if (! $filters instanceof FiltersGroup || ! AclScopeCheck::holdsScopeFilter($filters)) {
             return;
         }
 
@@ -82,79 +78,27 @@ final class AclScopeFilters implements DataAwareRule, ValidationRule
     }
 
     /**
-     * Whether the filters need the walk: they hold a scope node at any depth, or a node of an unknown kind to refuse.
-     */
-    private function holdsScopeFilter(FiltersGroup $filters): bool
-    {
-        foreach ($filters->filters as $node) {
-            $holds = match (true) {
-                $node instanceof FiltersGroup => $this->holdsScopeFilter($node),
-                $node instanceof RelationFilter => $this->holdsScopeFilter($node->filters),
-                $node instanceof Filter => false,
-                default => true,
-            };
-
-            if ($holds) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function validateGroup(string $attribute, FiltersGroup $filters, Model $model, Closure $fail): void
-    {
-        foreach ($filters->filters as $node) {
-            match (true) {
-                $node instanceof FiltersGroup => $this->validateGroup($attribute, $node, $model, $fail),
-                $node instanceof RelationFilter => $this->validateRelation($attribute, $node, $model, $fail),
-                $node instanceof ScopeFilter => $this->validateScope($attribute, $node, $model, $fail),
-                default => $this->refuseUnknownNode($attribute, $node, $fail),
-            };
-        }
-    }
-
-    /**
-     * A column filter needs no check here; any other node is of a kind this rule does not know, and is refused.
-     *
      * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
      */
-    private function refuseUnknownNode(string $attribute, mixed $node, Closure $fail): void
+    private function validateGroup(string $attribute, FiltersGroup $filters, Model $model, Closure $fail): void
     {
-        if (! $node instanceof Filter) {
-            $fail(sprintf('%s holds a filter node of an unknown kind', $attribute));
-        }
-    }
+        AclScopeCheck::walk(
+            $filters,
+            $model,
+            static function (ScopeFilter $filter, ?Model $target) use ($attribute, $fail): void {
+                if (! $target instanceof Model) {
+                    return;
+                }
 
-    private function validateScope(string $attribute, ScopeFilter $filter, Model $model, Closure $fail): void
-    {
-        try {
-            ScopeGuard::assertStorable($model, $filter);
-        } catch (ScopeFilterException $exception) {
-            $fail($attribute . ' ' . $exception->getMessage());
-        }
-    }
-
-    private function validateRelation(string $attribute, RelationFilter $filter, Model $model, Closure $fail): void
-    {
-        $relation = RelationGuard::relationOf($model, $filter->relation);
-
-        if (! $relation instanceof Relation) {
-            return;
-        }
-
-        if (! $relation instanceof MorphTo) {
-            $this->validateGroup($attribute, $filter->filters, $relation->getRelated(), $fail);
-
-            return;
-        }
-
-        foreach ($filter->morph_types ?? [] as $type) {
-            $morph_model = RelationGuard::morphModel($type);
-
-            if ($morph_model instanceof Model) {
-                $this->validateGroup($attribute, $filter->filters, $morph_model, $fail);
-            }
-        }
+                try {
+                    ScopeGuard::assertStorable($target, $filter);
+                } catch (ScopeFilterException $exception) {
+                    $fail($attribute . ' ' . $exception->getMessage());
+                }
+            },
+            static function () use ($attribute, $fail): void {
+                $fail(sprintf('%s holds a filter node of an unknown kind', $attribute));
+            },
+        );
     }
 }
