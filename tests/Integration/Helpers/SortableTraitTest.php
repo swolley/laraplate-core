@@ -25,3 +25,20 @@ it('scope ordered qualifies order column and sorts', function (): void {
 
     expect($sql)->toContain('order');
 });
+
+it('puts a new record last whatever position it is given', function (): void {
+    SortableStubModel::query()->create(['order' => 1]);
+
+    $record = SortableStubModel::query()->create(['order' => 40]);
+
+    expect($record->order)->toBe(2);
+});
+
+it('keeps the position a new record is given when asked to', function (): void {
+    SortableStubModel::query()->create(['order' => 1]);
+
+    $record = (new SortableStubModel(['order' => 40]))->keepPositionWhenCreating();
+    $record->save();
+
+    expect($record->fresh()->order)->toBe(40);
+});

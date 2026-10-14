@@ -14,6 +14,25 @@ trait SortableTrait
 {
     use \Spatie\EloquentSortable\SortableTrait {
         scopeOrdered as private scopeOrderedTrait;
+        shouldSortWhenCreating as private shouldSortWhenCreatingByConfiguration;
+    }
+
+    private bool $keepsPositionWhenCreating = false;
+
+    /**
+     * Create this record at the position it was given instead of last, for a writer that owns the order,
+     * such as an import mirroring its source.
+     */
+    public function keepPositionWhenCreating(): static
+    {
+        $this->keepsPositionWhenCreating = true;
+
+        return $this;
+    }
+
+    public function shouldSortWhenCreating(): bool
+    {
+        return ! $this->keepsPositionWhenCreating && $this->shouldSortWhenCreatingByConfiguration();
     }
 
     // public function determineOrderColumnName(): string

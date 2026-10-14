@@ -21,4 +21,12 @@ class SortableStubModel extends Model implements Sortable
     protected $casts = [
         'order' => 'integer',
     ];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected array $sortable = [
+        'order_column_name' => 'order',
+        'sort_when_creating' => true,
+    ];
 }
