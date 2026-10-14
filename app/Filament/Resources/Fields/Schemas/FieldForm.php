@@ -32,8 +32,6 @@ final class FieldForm
                     ->required(),
                 Toggle::make('is_active')
                     ->required(),
-                Toggle::make('is_deleted')
-                    ->required(),
             ]);
     }
 }
