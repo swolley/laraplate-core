@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Modules\Core\Console\Concerns\PromptsForPassword;
+use Modules\Core\Locking\Locked;
 use Modules\Core\Overrides\Command;
 use Override;
 use Symfony\Component\Console\Command\Command as BaseCommand;
@@ -101,7 +102,8 @@ final class ResetUserPasswordCommand extends Command
         $user->forceFill([
             'password' => $new_password,
             'remember_token' => Str::random(60),
-        ])->save();
+        ]);
+        Locked::withoutGuard(fn () => $user->save());
 
         $this->output->info(sprintf('Password reset for %s', $this->attributeAsString($user, 'email')));
 

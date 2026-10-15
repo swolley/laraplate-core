@@ -46,6 +46,23 @@ it('sets the typed password and rotates the remember token', function (): void {
         ->and($user->remember_token)->not->toBe('old-token');
 });
 
+it('resets the password of a locked user and keeps the lock', function (): void {
+    $user = User::factory()->create();
+    $user->lock(User::factory()->create());
+
+    pickUserToReset($this->artisan('auth:reset-password'), $user)
+        ->expectsConfirmation(sprintf('Reset the password of %s?', $user->email), 'yes')
+        ->expectsChoice('How do you want to reset it?', 'type', ['type' => 'Enter a new password', 'email' => 'Send a password reset email'])
+        ->expectsQuestion('New password', 'N3w-Strong-Password!')
+        ->expectsQuestion('Confirm password', 'N3w-Strong-Password!')
+        ->assertExitCode(BaseCommand::SUCCESS);
+
+    $user->refresh();
+
+    expect(Hash::check('N3w-Strong-Password!', $user->password))->toBeTrue()
+        ->and($user->isLocked())->toBeTrue();
+});
+
 it('generates and prints a random password when left blank', function (): void {
     $user = User::factory()->create();
     $old_hash = $user->password;
