@@ -326,7 +326,7 @@ trait Searchable
         if (! class_uses_trait($this, HasTranslations::class)) {
             $text = $this->collectEmbedText(fn (string $attr) => $this->{$attr});
 
-            return $text === '' ? [] : [(string) (config('app.locale') ?: 'en') => $text];
+            return $text === '' ? [] : [LocaleContext::getDefault() => $text];
         }
 
         $result = [];

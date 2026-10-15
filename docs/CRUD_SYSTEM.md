@@ -608,7 +608,7 @@ A filter can also name a **model scope**, `{ "scope": "valid" }` or `{ "scope": 
 A client names a property without knowing how the entity stores it. A flat property (letters, digits and underscores, no dot) is resolved on the model being filtered in this order:
 
 1. **A column** of the model's table: filtered as is.
-2. **A translatable field** (a fillable column of the translation table, such as `title` or `slug` on contents): the filter applies to the translation in the **locale of the request** (the user's language). A record without a translation in that locale is not matched; there is no search across languages and no fallback, because the application keeps a single `app.locale` and a model never has a distinct default while a request runs.
+2. **A translatable field** (a fillable column of the translation table, such as `title` or `slug` on contents): the filter applies to the translation in the **locale of the request** (the user's language). A record without a translation in that locale is not matched; there is no search across languages and no fallback to the default locale, even for a model whose reads fall back to it.
 3. **A dynamic field**, on a model using `HasDynamicContents`: any other name is looked for in the JSON containers that can hold dynamic fields. Whether a field was configured translatable or shared is not known per record, so every container that exists is searched with an OR: `shared_components` of the main row (or `components` on a model without translations) and `components` of the request-locale translation. Presets are not consulted, because one recordset mixes entities with different presets and fields: a record that does not have the field simply does not match.
 
 ```json

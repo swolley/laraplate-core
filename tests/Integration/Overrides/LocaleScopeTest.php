@@ -438,3 +438,41 @@ it('defaults translation fallback to enabled when model has no setting hook', fu
 
     expect($method->invoke($this->scope, $model))->toBeTrue();
 });
+
+/**
+ * A record translated only in the default locale. Inserted below the model so no translation hook runs.
+ */
+function fakeTranslatedOnlyInDefaultLocale(string $title): int
+{
+    $id = (new FakeTranslatableModel)->newQueryWithoutScopes()->insertGetId(['created_at' => now(), 'updated_at' => now()]);
+
+    Modules\Core\Tests\Fixtures\FakeTranslatableModelTranslation::query()->create([
+        'fake_translatable_model_id' => $id,
+        'locale' => LocaleContext::getDefault(),
+        'title' => $title,
+    ]);
+
+    return $id;
+}
+
+it('falls back to the default locale after the request switches language', function (): void {
+    configureFakeTranslatableFallback(true);
+    $id = fakeTranslatedOnlyInDefaultLocale('Only in the default locale');
+
+    LocaleContext::set('de');
+
+    $record = FakeTranslatableModel::query()->find($id);
+
+    expect($record)->not->toBeNull()
+        ->and($record->title)->toBe('Only in the default locale')
+        ->and($record->getTranslation()?->title)->toBe('Only in the default locale');
+});
+
+it('hides a record with no translation in the language of the request when the fallback is off', function (): void {
+    configureFakeTranslatableFallback(false);
+    $id = fakeTranslatedOnlyInDefaultLocale('Only in the default locale');
+
+    LocaleContext::set('de');
+
+    expect(FakeTranslatableModel::query()->find($id))->toBeNull();
+});

@@ -138,7 +138,7 @@ abstract class Taxonomy extends Model implements IActivatableModel, ILockableMod
     public function translation(): HasOne
     {
         $current_locale = LocaleContext::get();
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $fallback_enabled = $this->translationFallbackEnabledBySettings();
 
         $relation = $this->hasOne(static::getTranslationModelClass(), 'taxonomy_id');

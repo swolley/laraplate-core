@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Factories\Concerns\HasDynamicContentFactory;
 use Modules\Core\Database\Factories\Concerns\HasTranslationsFactory;
 use Modules\Core\Database\Factories\Concerns\HasUniqueFactoryValues;
+use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Models\Concerns\HasTranslations;
@@ -44,7 +45,7 @@ abstract class Factory extends BaseFactory
                 if ($this->usesTranslations()) {
                     $this->afterFactoryCreating($model);
 
-                    $default_locale = config('app.locale');
+                    $default_locale = LocaleContext::getDefault();
 
                     if (! $model->translations()->where('locale', $default_locale)->exists()) {
                         $default_translation_data = $this->translatedFieldsArray($model);

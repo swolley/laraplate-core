@@ -17,7 +17,7 @@ use Modules\Core\Tests\Stubs\Search\LocaleHiddenSearchStubModel;
 beforeEach(function (): void {
     LocaleHiddenSearchStubModel::$indexed = [];
 
-    config(['app.locale' => 'it']);
+    config(['app.locale' => 'it', 'app.default_locale' => 'it']);
     LocaleContext::set('it');
 
     Schema::create('core_test_locale_hidden_search_stub', function (Blueprint $table): void {

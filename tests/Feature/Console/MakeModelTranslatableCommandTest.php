@@ -478,7 +478,7 @@ describe('migration stub', function (): void {
         $stub = file_get_contents(stubPath('stubs/make_model_translatable_migration.stub'));
 
         expect($stub)
-            ->toContain("config('app.locale')")
+            ->toContain('LocaleContext::getDefault()')
             ->toContain('->chunk(500,')
             ->toContain('->insert($inserts)');
     });

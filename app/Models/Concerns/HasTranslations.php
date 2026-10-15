@@ -181,7 +181,7 @@ trait HasTranslations
     public function translation(): HasOne
     {
         $current_locale = LocaleContext::get();
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $fallback_enabled = $this->isFallbackEnabled();
 
         $relation = $this->hasOne(static::getTranslationModelClass());
@@ -219,7 +219,7 @@ trait HasTranslations
     public function getTranslation(?string $locale = null, ?bool $with_fallback = null): ?Model
     {
         $locale ??= LocaleContext::get();
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         // Prova a ottenere traduzione per la lingua richiesta
@@ -406,7 +406,7 @@ trait HasTranslations
 
         static::created(function (Model $model): void {
             // Check if default translation exists
-            $default_locale = config('app.locale');
+            $default_locale = LocaleContext::getDefault();
             $default_locale = is_string($default_locale) ? $default_locale : null;
 
             /** @var self $model */
@@ -421,7 +421,7 @@ trait HasTranslations
 
         static::updated(function (Model $model): void {
             // Only translate if default translation was modified
-            $default_locale = config('app.locale');
+            $default_locale = LocaleContext::getDefault();
 
             /** @var self $model */
             $default_translation = $model->getTranslation(is_string($default_locale) ? $default_locale : null);
@@ -487,7 +487,7 @@ trait HasTranslations
     protected function forLocale(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
     {
         $locale ??= LocaleContext::get();
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         // Rimuovi il global scope di default
@@ -533,7 +533,7 @@ trait HasTranslations
     protected function withTranslation(Builder $query, ?string $locale = null, ?bool $with_fallback = null): Builder
     {
         $locale ??= LocaleContext::get();
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $fallback_enabled = $with_fallback ?? $this->isFallbackEnabled();
 
         $query->with(['translation' => function ($q) use ($locale, $default_locale, $fallback_enabled): void {
@@ -559,7 +559,7 @@ trait HasTranslations
     protected function getDefaultTranslation(): ?Model
     {
         return $this->translations()
-            ->where('locale', config('app.locale'))
+            ->where('locale', LocaleContext::getDefault())
             ->first();
     }
 

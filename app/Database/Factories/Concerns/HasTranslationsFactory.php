@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Modules\Core\Database\Factories\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Helpers\LocaleContext;
 use RuntimeException;
 
 trait HasTranslationsFactory
 {
     public function createTranslations(Model $content, ?callable $callback = null): void
     {
-        $default_locale = config('app.locale');
+        $default_locale = LocaleContext::getDefault();
         $all_locales = config('app.available_locales', translations());
 
         $locales_to_duplicate = collect($all_locales)
