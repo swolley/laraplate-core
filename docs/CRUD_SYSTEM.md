@@ -320,7 +320,7 @@ Failed bearer authentications are counted per client address before the token is
 over the limit gets `429`, and successful requests do not consume that budget.
 
 **Self-authenticated routes.** A route whose callers send a secret of their own as the bearer (the ERP
-payment and e-invoice provider callbacks, the MES machine ingest) declares
+payment and e-invoice provider callbacks) declares
 `->middleware(SelfAuthenticatedApiRoute::class)`. The switch, the `api` guard and the rate limit still
 apply; the bearer is not read as a Laraplate token, the request runs as the anonymous user, and the route's
 own check authenticates it.

@@ -108,7 +108,7 @@ describe('the api switch', function (): void {
     })->with([
         'core crud' => ['GET', '/api/v1/select/core/users'],
         'core graph' => ['GET', '/api/v1/crud/graph/search/core/users'],
-        'mes machine data' => ['POST', '/api/v1/mes/machine-data'],
+        'mes machine messages' => ['POST', '/api/v1/insert/mes/machine-messages'],
         'sao webhook' => ['POST', '/api/v1/webhooks/1'],
         'cms relation' => ['GET', '/api/v1/select/cms/tags/1/contents'],
     ]);
@@ -570,7 +570,7 @@ describe('self-authenticated routes', function (): void {
         $this->postJson('/api/v1/_probe/self', [], apiAccessBearer('own-secret'))->assertStatus(429);
     });
 
-    it('is declared on the provider callbacks of ERP and on the MES machine ingest', function (): void {
+    it('is declared on the provider callbacks of ERP only', function (): void {
         $marked = collect(Route::getRoutes()->getRoutes())
             ->filter(static fn (Illuminate\Routing\Route $route): bool => in_array(SelfAuthenticatedApiRoute::class, Route::gatherRouteMiddleware($route), true))
             ->map(static fn (Illuminate\Routing\Route $route): string => $route->uri())
@@ -582,7 +582,6 @@ describe('self-authenticated routes', function (): void {
         expect($marked)->toBe([
             'api/v1/erp/einvoice/{provider}/callbacks',
             'api/v1/erp/payment-requests/{provider}/callbacks',
-            'api/v1/mes/machine-data',
         ]);
     });
 });

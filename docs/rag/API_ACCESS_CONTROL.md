@@ -71,11 +71,11 @@ legitimate tokens behind one address (a factory network) are limited only by the
 
 ### Routes that carry their own credential
 
-Some callers send a secret of their own in `Authorization: Bearer` (payment and e-invoice provider callbacks, machine
-sources). Their route declares `->middleware(SelfAuthenticatedApiRoute::class)`. For such a route the switch, the `api`
-guard and the rate limit still apply, but the bearer is **not** read as a Laraplate token: the request runs as the
-anonymous user and the route's own check authenticates it. Today these are the two ERP provider callbacks and the MES
-machine ingest route (until the MES service-account migration).
+Some callers send a secret of their own in `Authorization: Bearer` (payment and e-invoice provider callbacks). Their
+route declares `->middleware(SelfAuthenticatedApiRoute::class)`. For such a route the switch, the `api` guard and the
+rate limit still apply, but the bearer is **not** read as a Laraplate token: the request runs as the anonymous user and
+the route's own check authenticates it. Today these are the two ERP provider callbacks. The MES machine sources are not
+among them: they send the Laraplate token of their service account.
 
 A route without the marker treats every bearer as a Laraplate token. A webhook sender that sends an
 `Authorization: Bearer` header to such a route (SAO webhooks verify custom headers, not `Authorization`) gets `401`.
