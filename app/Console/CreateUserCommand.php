@@ -6,7 +6,6 @@ namespace Modules\Core\Console;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
-use function Laravel\Prompts\password;
 use function Laravel\Prompts\search;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\text;
@@ -14,6 +13,7 @@ use function Laravel\Prompts\text;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Str;
 use Modules\Core\Console\Concerns\HasCommandUtils;
+use Modules\Core\Console\Concerns\PromptsForPassword;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Overrides\Command;
@@ -24,6 +24,7 @@ use Throwable;
 final class CreateUserCommand extends Command
 {
     use HasCommandUtils;
+    use PromptsForPassword;
 
     /**
      * The name and signature of the console command.
@@ -89,14 +90,7 @@ final class CreateUserCommand extends Command
                                 $answer = text(ucfirst($attribute), $suggestion, required: true, validate: fn (string $value): ?string => $this->validationCallback($attribute, $value, $validations));
                             }
                         } else {
-                            $answer = password(ucfirst($attribute), 'Type a password or let blank to randomly generate it', false, fn (string $value): ?string => $value === '' ? null : $this->validationCallback($attribute, $value, $validations));
-
-                            if ($answer !== '') {
-                                password('Confirm ' . $attribute, required: true, validate: fn (string $value): ?string => $this->validationCallback($attribute, $value, ['password' => 'in:' . $answer]));
-                            } else {
-                                $answer = Str::password();
-                            }
-
+                            $answer = $this->promptPassword($validations)['password'];
                             $password = $answer;
                         }
 

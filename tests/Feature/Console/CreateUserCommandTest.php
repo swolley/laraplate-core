@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Core\Console\Concerns\PromptsForPassword;
 use Modules\Core\Console\CreateUserCommand;
 use Modules\Core\Overrides\Command;
 
@@ -74,7 +75,7 @@ it('command uses Laravel Prompts', function (): void {
 
     expect($source)->toContain('Laravel\Prompts\confirm');
     expect($source)->toContain('Laravel\Prompts\multiselect');
-    expect($source)->toContain('Laravel\Prompts\password');
+    expect($source)->toContain('$this->promptPassword(');
     expect($source)->toContain('Laravel\Prompts\text');
 });
 
@@ -87,10 +88,7 @@ it('command creates users with roles and permissions', function (): void {
 });
 
 it('command generates random passwords', function (): void {
-    $reflection = new ReflectionClass(CreateUserCommand::class);
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)->toContain('Str::password()');
+    expect(class_uses(CreateUserCommand::class))->toContain(PromptsForPassword::class);
 });
 
 it('command validates user input', function (): void {

@@ -630,6 +630,7 @@ When building new module features, reuse these primitives instead of re-implemen
 ### Identity, permissions, approvals
 
 - `auth:create-user`
+- `auth:reset-password` — search a user by email or username, confirm, then either type a new password (blank generates and prints one; the remember token is rotated, API tokens are kept) or send the password reset email through the `users` password broker. Service accounts are refused.
 - `permission:refresh`
 - `approvals:check-pending`
 
