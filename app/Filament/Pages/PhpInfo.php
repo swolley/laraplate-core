@@ -13,9 +13,6 @@ use UnitEnum;
 final class PhpInfo extends Page
 {
     #[Override]
-    protected static ?string $navigationLabel = 'Server';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedServer;
 
     #[Override]
@@ -30,8 +27,20 @@ final class PhpInfo extends Page
     #[Override]
     protected string $view = 'core::filament.pages.phpinfo';
 
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return (string) __('app.pages.server');
+    }
+
     public function mount(): void
     {
         //
+    }
+
+    #[Override]
+    public function getTitle(): string
+    {
+        return (string) __('app.pages.server');
     }
 }

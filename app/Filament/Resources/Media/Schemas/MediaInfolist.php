@@ -24,17 +24,14 @@ final class MediaInfolist
     {
         return $schema
             ->components([
-                Section::make('File')
+                Section::make(__('app.sections.file'))
                     ->columns(2)
                     ->schema([
                         TextEntry::make('name'),
-                        TextEntry::make('file_name')
-                            ->label('File name'),
+                        TextEntry::make('file_name'),
                         TextEntry::make('mime_type')
-                            ->label('Type')
                             ->badge(),
                         TextEntry::make('collection_name')
-                            ->label('Collection')
                             ->badge(),
                         TextEntry::make('size')
                             ->formatStateUsing(static fn (int $state): string => Number::fileSize($state)),
@@ -45,7 +42,7 @@ final class MediaInfolist
                             ->dateTime()
                             ->placeholder('—'),
                     ]),
-                Section::make('Display')
+                Section::make(__('app.sections.display'))
                     ->columns(2)
                     ->schema([
                         TextEntry::make('description')
@@ -53,7 +50,6 @@ final class MediaInfolist
                             ->state(static fn (Media $record): string => self::customString($record, 'description'))
                             ->placeholder('—'),
                         TextEntry::make('alt_text')
-                            ->label('Alt text')
                             ->state(static fn (Media $record): string => self::customString($record, 'alt_text'))
                             ->placeholder('—'),
                         TextEntry::make('keywords')

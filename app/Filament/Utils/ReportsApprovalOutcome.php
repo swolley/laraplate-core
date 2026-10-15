@@ -81,7 +81,7 @@ trait ReportsApprovalOutcome
         try {
             $this->sentForApproval = ! $record->save();
         } catch (PendingDeletionLock) {
-            Notification::make()->danger()->title('A deletion of this record is waiting for approval')->send();
+            Notification::make()->danger()->title(__('app.messages.deletionAwaitingApproval'))->send();
             $this->halt();
         }
 
@@ -99,8 +99,8 @@ trait ReportsApprovalOutcome
 
         return Notification::make()
             ->warning()
-            ->title('Change sent for approval')
-            ->body('The record keeps its current values until the change is approved in Modifications.');
+            ->title(__('app.messages.changeSentForApproval'))
+            ->body(__('app.messages.changeSentForApprovalBody'));
     }
 
     /**

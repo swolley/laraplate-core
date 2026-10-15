@@ -32,26 +32,26 @@ final class CronJobForm
                     ->required()
                     ->maxLength(255)
                     ->rule('regex:/^\S+$/')
-                    ->helperText('The name of the command only, as artisan lists it (e.g. model:prune). Its arguments go in the parameters.'),
+                    ->helperText(__('app.help.cronCommand')),
                 TagsInput::make('parameters')
                     ->default([])
-                    ->placeholder('--all, --limit=10 or an argument')
-                    ->helperText('One element each: a flag (--all), an option with a value (--limit=10) or an argument. A value must not start with a dash; a short option with a value takes two elements (-n, 5). A value of @now or @today is replaced by that date, as ISO 8601, each time the job runs.')
+                    ->placeholder(__('app.help.cronParametersPlaceholder'))
+                    ->helperText(__('app.help.cronParameters'))
                     ->rule(new CronParametersList()),
                 TextInput::make('schedule')
                     ->required()
                     ->maxLength(255)
-                    ->helperText('Cron expression (e.g. * * * * *)'),
+                    ->helperText(__('app.help.cronSchedule')),
                 TextInput::make('description')
                     ->maxLength(255),
                 Toggle::make('on_one_server')
                     ->required()
                     ->default(true)
-                    ->helperText('Run on a single server when several share the scheduler.'),
+                    ->helperText(__('app.help.cronOnOneServer')),
                 Toggle::make('without_overlapping')
                     ->required()
                     ->default(true)
-                    ->helperText('Skip a run while the previous one is still running.'),
+                    ->helperText(__('app.help.cronWithoutOverlapping')),
             ]);
     }
 }

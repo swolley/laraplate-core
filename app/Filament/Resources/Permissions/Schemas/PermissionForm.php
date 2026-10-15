@@ -23,7 +23,7 @@ final class PermissionForm
                     ->maxLength(255)
                     ->unique(ignoreRecord: true)
                     ->regex('/^\\w+\\.\\w+\\.\\w+$/')
-                    ->helperText('Format: module.model.action'),
+                    ->helperText(__('app.help.permissionName')),
                 TextInput::make('guard_name')
                     ->required()
                     ->maxLength(255)

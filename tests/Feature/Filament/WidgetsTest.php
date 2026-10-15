@@ -336,8 +336,8 @@ it('reads horizon pending and recently failed counts from the job repository', f
     $method = new ReflectionMethod(HorizonStatsWidget::class, 'getStats');
     $stats = $method->invoke(new HorizonStatsWidget);
 
-    expect($stats[0]->getLabel())->toBe('Pending Jobs')
+    expect($stats[0]->getLabel())->toBe('Pending jobs')
         ->and($stats[0]->getValue())->toBe(7)
-        ->and($stats[1]->getLabel())->toBe('Failed Jobs')
+        ->and($stats[1]->getLabel())->toBe('Failed jobs')
         ->and($stats[1]->getValue())->toBe(3);
 });

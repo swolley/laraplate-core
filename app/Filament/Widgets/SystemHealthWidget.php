@@ -42,8 +42,8 @@ final class SystemHealthWidget extends BaseWidget
 
         $cache_works = Cache::store()->ping();
 
-        $stats[] = Stat::make('Cache', $cache_driver)
-            ->description($cache_works ? 'Cache is working' : 'Cache is not working')
+        $stats[] = Stat::make(__('app.widgets.cache'), $cache_driver)
+            ->description($cache_works ? __('app.widgets.cacheWorking') : __('app.widgets.cacheNotWorking'))
             ->descriptionIcon($cache_works ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
             ->color($cache_works ? 'success' : 'danger');
 
@@ -84,15 +84,15 @@ final class SystemHealthWidget extends BaseWidget
         $queue_label = ucfirst($queue_driver);
 
         if ($queue_driver === 'sync') {
-            return Stat::make('Queue', $queue_label)
-                ->description('Queue is synchronous')
+            return Stat::make(__('app.widgets.queue'), $queue_label)
+                ->description(__('app.widgets.queueSync'))
                 ->descriptionIcon('heroicon-o-clock')
                 ->color('gray');
         }
 
         if ($queue_driver !== 'redis' || ! interface_exists(MasterSupervisorRepository::class)) {
-            return Stat::make('Queue', $queue_label)
-                ->description('Worker status not tracked')
+            return Stat::make(__('app.widgets.queue'), $queue_label)
+                ->description(__('app.widgets.workerNotTracked'))
                 ->descriptionIcon('heroicon-o-queue-list')
                 ->color('gray');
         }
@@ -100,28 +100,28 @@ final class SystemHealthWidget extends BaseWidget
         try {
             $masters = resolve(MasterSupervisorRepository::class)->all();
         } catch (Throwable) {
-            return Stat::make('Queue', $queue_label)
-                ->description('Unable to check workers')
+            return Stat::make(__('app.widgets.queue'), $queue_label)
+                ->description(__('app.widgets.workersUnchecked'))
                 ->descriptionIcon('heroicon-o-exclamation-triangle')
                 ->color('danger');
         }
 
         if ($masters === []) {
-            return Stat::make('Queue', $queue_label)
-                ->description('Horizon is not running')
+            return Stat::make(__('app.widgets.queue'), $queue_label)
+                ->description(__('app.widgets.horizonNotRunning'))
                 ->descriptionIcon('heroicon-o-x-circle')
                 ->color('danger');
         }
 
         if (collect($masters)->contains(static fn (object $master): bool => $master->status === 'paused')) {
-            return Stat::make('Queue', $queue_label)
-                ->description('Horizon is paused')
+            return Stat::make(__('app.widgets.queue'), $queue_label)
+                ->description(__('app.widgets.horizonPaused'))
                 ->descriptionIcon('heroicon-o-pause-circle')
                 ->color('warning');
         }
 
-        return Stat::make('Queue', $queue_label)
-            ->description('Horizon is running')
+        return Stat::make(__('app.widgets.queue'), $queue_label)
+            ->description(__('app.widgets.horizonRunning'))
             ->descriptionIcon('heroicon-o-check-circle')
             ->color('success');
     }
@@ -131,8 +131,8 @@ final class SystemHealthWidget extends BaseWidget
         $search_driver = config('scout.driver');
 
         if (! is_string($search_driver) || $search_driver === '' || $search_driver === 'null') {
-            return Stat::make('Search', 'None')
-                ->description('Search is disabled')
+            return Stat::make(__('app.widgets.search'), __('app.widgets.none'))
+                ->description(__('app.widgets.searchDisabled'))
                 ->descriptionIcon('heroicon-o-minus-circle')
                 ->color('gray');
         }
@@ -146,8 +146,8 @@ final class SystemHealthWidget extends BaseWidget
             $search_works = false;
         }
 
-        return Stat::make('Search', $search_label)
-            ->description($search_works ? 'Search engine is working' : 'Search engine is not reachable')
+        return Stat::make(__('app.widgets.search'), $search_label)
+            ->description($search_works ? __('app.widgets.searchWorking') : __('app.widgets.searchUnreachable'))
             ->descriptionIcon($search_works ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
             ->color($search_works ? 'success' : 'danger');
     }

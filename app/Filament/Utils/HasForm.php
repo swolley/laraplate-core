@@ -88,7 +88,6 @@ trait HasForm
     {
         return [
             Select::make('dynamic_entity_id')
-                ->label('Entity')
                 ->options(static fn (): array => $model_class::fetchAvailableEntities($entity_type)
                     ->pluck('name', 'id')
                     ->all())
@@ -123,7 +122,6 @@ trait HasForm
                     $set('presettable_id', null);
                 }),
             Select::make('dynamic_preset_id')
-                ->label('Preset')
                 ->options(static function (Get $get) use ($model_class, $entity_type): array {
                     $entity_id = $get('dynamic_entity_id');
 

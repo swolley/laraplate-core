@@ -13,9 +13,6 @@ use UnitEnum;
 final class Swagger extends Page
 {
     #[Override]
-    protected static ?string $navigationLabel = 'API Documentation';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCodeBracket;
 
     #[Override]
@@ -30,6 +27,12 @@ final class Swagger extends Page
     #[Override]
     protected string $view = 'core::filament.pages.swagger';
 
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return (string) __('app.pages.apiDocumentation');
+    }
+
     public function mount(): void
     {
         //
@@ -38,5 +41,11 @@ final class Swagger extends Page
     public function getSwaggerUrl(): string
     {
         return route('swagger.index');
+    }
+
+    #[Override]
+    public function getTitle(): string
+    {
+        return (string) __('app.pages.apiDocumentation');
     }
 }

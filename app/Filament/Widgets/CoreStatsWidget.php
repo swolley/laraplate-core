@@ -66,13 +66,13 @@ final class CoreStatsWidget extends BaseWidget
         });
 
         return [
-            Stat::make('Active Licenses', "{$data['active']} / {$data['total']}")
-                ->description('Currently valid licenses')
+            Stat::make(__('app.widgets.activeLicenses'), "{$data['active']} / {$data['total']}")
+                ->description(__('app.widgets.activeLicensesHint'))
                 ->descriptionIcon('heroicon-o-key')
                 ->color('primary')
                 ->descriptionColor('core'),
-            Stat::make('Occupied Licenses', "{$data['occupied']} / {$data['active']}")
-                ->description('Active sessions')
+            Stat::make(__('app.widgets.occupiedLicenses'), "{$data['occupied']} / {$data['active']}")
+                ->description(__('app.widgets.occupiedLicensesHint'))
                 ->descriptionIcon('heroicon-o-user-plus')
                 ->color('primary')
                 ->descriptionColor('core'),

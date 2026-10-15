@@ -35,17 +35,16 @@ final class ACLForm
                     ->searchable()
                     ->preload(),
                 Select::make('role_id')
-                    ->label('Role')
                     ->relationship('role', 'name')
                     ->searchable()
                     ->preload()
-                    ->helperText('Leave empty to apply the ACL to every role holding the permission.'),
+                    ->helperText(__('app.help.aclRoleId')),
                 Toggle::make('unrestricted')
                     ->live()
-                    ->helperText('Grants full access: stored filters are ignored.'),
+                    ->helperText(__('app.help.aclUnrestricted')),
                 CodeEditor::make('filters')
                     ->language(Language::Json)
-                    ->helperText('Filters group as JSON, e.g. {"operator":"and","filters":[{"property":"status","operator":"=","value":"published"}]}. A local scope of the model is a node too: {"scope":"valid"} or {"scope":"validAt","parameters":["@today"]}.')
+                    ->helperText(__('app.help.aclFilters'))
                     ->required(static fn (Get $get): bool => $get('unrestricted') !== true)
                     ->rule(new QueryBuilder())
                     ->rule(static fn (Get $get): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
@@ -77,7 +76,7 @@ final class ACLForm
                     ->maxValue(65535)
                     ->default(0)
                     ->required()
-                    ->helperText('Higher priority ACLs are evaluated first.'),
+                    ->helperText(__('app.help.aclPriority')),
                 Toggle::make('is_active')
                     ->default(true),
             ]);

@@ -295,7 +295,6 @@ trait HasTable
         if ($hasValidity) {
             $default_columns->add(
                 TextColumn::make('validity')
-                    ->label('Validity')
                     ->getStateUsing(static fn (Model $record): string => self::formatValidityColumnState($record))
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->grow(false)
@@ -364,7 +363,6 @@ trait HasTable
         if ($hasSorts) {
             $default_columns->add(
                 TextColumn::make('order_column')
-                    ->label('Order')
                     ->numeric()
                     ->sortable()
                     ->grow(false)
@@ -376,7 +374,6 @@ trait HasTable
         if ($model_instance->timestamps) {
             $default_columns->add(
                 TextColumn::make('timestamps')
-                    ->label('Timestamps')
                     ->getStateUsing(static fn (Model $record): string => self::formatTimestampsColumnState($record, $hasSoftDeletes))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->grow(false)
@@ -689,16 +686,16 @@ trait HasTable
     {
         $table->pushToolbarActions([
             Action::make('reloadTable')
-                ->label('Reload')
-                ->tooltip('Reload')
+                ->label(__('app.tables.buttons.reload'))
+                ->tooltip(__('app.tables.buttons.reload'))
                 ->icon(Heroicon::OutlinedArrowPath)
                 ->color('gray')
                 ->iconButton()
                 ->action('$refresh')
                 ->livewireTarget('$refresh'),
             Action::make('clearTableFilters')
-                ->label('Clear all filters')
-                ->tooltip('Clear all filters')
+                ->label(__('app.actions.clearFilters'))
+                ->tooltip(__('app.actions.clearFilters'))
                 // Heroicons has no eraser: Core draws it in the same grammar, as for the snowflake.
                 ->icon('laraplate-eraser')
                 ->color('gray')
@@ -728,16 +725,16 @@ trait HasTable
             $default_filters->push(
                 // TrashedFilter::make(),
                 SelectFilter::make($deleted_at_column)
-                    ->label('Deleted at')
+                    ->label(__('app.fields.deleted_at'))
                     ->attribute($deleted_at_column)
                     ->options([
                         // 'all' => 'All',
-                        'none' => 'Without Trashed',
-                        'only' => 'Only Trashed',
-                        'today' => 'Today',
-                        'week' => 'Week',
-                        'month' => 'Month',
-                        'year' => 'Year',
+                        'none' => __('app.filters.withoutTrashed'),
+                        'only' => __('app.filters.onlyTrashed'),
+                        'today' => __('app.filters.today'),
+                        'week' => __('app.filters.week'),
+                        'month' => __('app.filters.month'),
+                        'year' => __('app.filters.year'),
                     ])
                     // Built only when the model is soft-deletable, so the query is one
                     // over a soft-deletable model. Saying so is what resolves the
@@ -769,16 +766,15 @@ trait HasTable
                 //     ->attribute('is_locked')
                 //     ->nullable()
                 SelectFilter::make($locked_at_column)
-                    ->label('Locked at')
                     ->attribute($locked_at_column)
                     ->options([
                         // 'all' => 'All',
-                        'none' => 'Without Locked',
-                        'only' => 'Only Locked',
-                        'today' => 'Today',
-                        'week' => 'Week',
-                        'month' => 'Month',
-                        'year' => 'Year',
+                        'none' => __('app.filters.withoutLocked'),
+                        'only' => __('app.filters.onlyLocked'),
+                        'today' => __('app.filters.today'),
+                        'week' => __('app.filters.week'),
+                        'month' => __('app.filters.month'),
+                        'year' => __('app.filters.year'),
                     ])
                     ->query(static function (Builder $query, array $data) use ($locked_at_column): Builder {
                         /** @var Builder<Model&ILockableModel> $query */
@@ -804,7 +800,7 @@ trait HasTable
         if ($model_instance instanceof IActivatableModel) {
             $default_filters->add(
                 TernaryFilter::make($model_instance::activationColumn())
-                    ->label('Active')
+                    ->label(__('app.fields.active'))
                     ->attribute($model_instance::activationColumn())
                     ->nullable(),
             );
@@ -813,16 +809,15 @@ trait HasTable
         if ($hasValidity) {
             $default_filters->add(
                 SelectFilter::make('is_valid')
-                    ->label('Valid')
                     // 'Expiring' asks the scope with no window, so each model answers
                     // with its own: see HasValidity::expiringWithinHours().
                     ->options([
                         // 'all' => 'All',
-                        'valid' => 'Valid',
-                        'scheduled' => 'Scheduled',
-                        'expiring' => 'Expiring',
-                        'expired' => 'Expired',
-                        'draft' => 'Draft',
+                        'valid' => __('app.filters.valid'),
+                        'scheduled' => __('app.filters.scheduled'),
+                        'expiring' => __('app.filters.expiring'),
+                        'expired' => __('app.filters.expired'),
+                        'draft' => __('app.filters.draft'),
                     ])
                     ->query(static function (Builder $query, array $data): Builder {
                         /** @var Builder<Model&IValidatableModel> $query */
@@ -842,7 +837,6 @@ trait HasTable
         if ($hasTranslations) {
             $default_filters->add(
                 SelectFilter::make('translations.locale')
-                    ->label('Translations')
                     ->multiple()
                     ->options(LocaleContext::getAvailable())
                     ->query(static fn (Builder $query, array $data): Builder => $query->when($data['values'], static fn (Builder $query, $value): Builder => $query->whereIn('translations.locale', $value))),
@@ -857,14 +851,14 @@ trait HasTable
             $updated_at_column = $model_instance->getUpdatedAtColumn() ?? 'updated_at';
             $default_filters->push(
                 SelectFilter::make($created_at_column)
-                    ->label('Created at')
+                    ->label(__('app.fields.created_at'))
                     ->attribute($created_at_column)
                     ->options([
                         // 'all' => 'All',
-                        'today' => 'Today',
-                        'week' => 'Week',
-                        'month' => 'Month',
-                        'year' => 'Year',
+                        'today' => __('app.filters.today'),
+                        'week' => __('app.filters.week'),
+                        'month' => __('app.filters.month'),
+                        'year' => __('app.filters.year'),
                     ])
                     ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query,
@@ -875,14 +869,14 @@ trait HasTable
                         default => $query,
                     })),
                 SelectFilter::make($updated_at_column)
-                    ->label('Updated at')
+                    ->label(__('app.fields.updated_at'))
                     ->attribute($updated_at_column)
                     ->options([
                         // 'all' => 'All',
-                        'today' => 'Today',
-                        'week' => 'Week',
-                        'month' => 'Month',
-                        'year' => 'Year',
+                        'today' => __('app.filters.today'),
+                        'week' => __('app.filters.week'),
+                        'month' => __('app.filters.month'),
+                        'year' => __('app.filters.year'),
                     ])
                     ->query(static fn (Builder $query, array $data): Builder => $query->when($data['value'], static fn (Builder $query, $value): Builder => match ($value) {
                         // 'all' => $query,

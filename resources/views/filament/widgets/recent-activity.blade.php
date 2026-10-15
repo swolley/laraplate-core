@@ -3,7 +3,7 @@
         <x-slot name="heading">
             <div class="flex items-center gap-2">
                 <x-filament::icon icon="heroicon-o-clock" class="w-5 h-5 inline mr-2" />
-                Recent Activity
+                {{ __('app.widgets.recentActivity') }}
             </div>
         </x-slot>
 
@@ -13,7 +13,7 @@
                     <x-filament::icon icon="heroicon-o-exclamation-triangle" />
                 </div>
                 <div class="fi-alert-content">
-                    <strong>Error:</strong> {{ $error }}
+                    <strong>{{ __('app.widgets.error') }}</strong> {{ $error }}
                 </div>
             </div>
         @else
@@ -26,13 +26,13 @@
                                     <table class="fi-ta-table">
                                         <thead>
                                             <tr>
-                                                <th colspan="4" class="fi-ta-header-cell text-center">Recent Contents</th>
+                                                <th colspan="4" class="fi-ta-header-cell text-center">{{ __('app.widgets.recentContents') }}</th>
                                             </tr>
                                             <tr>
-                                                <th class="fi-ta-header-cell text-right">Id</th>
-                                                <th class="fi-ta-header-cell w-full">Title</th>
-                                                <th class="fi-ta-header-cell w-full">Locale</th>
-                                                <th class="fi-ta-header-cell text-right">Last Updated</th>
+                                                <th class="fi-ta-header-cell text-right">{{ __('app.fields.id') }}</th>
+                                                <th class="fi-ta-header-cell w-full">{{ __('app.fields.title') }}</th>
+                                                <th class="fi-ta-header-cell w-full">{{ __('app.widgets.locale') }}</th>
+                                                <th class="fi-ta-header-cell text-right">{{ __('app.widgets.lastUpdated') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -84,12 +84,12 @@
                                     <table class="fi-ta-table">
                                         <thead>
                                             <tr>
-                                                <th colspan="3" class="fi-ta-header-cell text-center">Recent Users</th>
+                                                <th colspan="3" class="fi-ta-header-cell text-center">{{ __('app.widgets.recentUsers') }}</th>
                                             </tr>
                                             <tr>
-                                                <th class="fi-ta-header-cell text-right">Id</th>
-                                                <th class="fi-ta-header-cell w-full">Email</th>
-                                                <th class="fi-ta-header-cell text-right">Last Login</th>
+                                                <th class="fi-ta-header-cell text-right">{{ __('app.fields.id') }}</th>
+                                                <th class="fi-ta-header-cell w-full">{{ __('app.fields.email') }}</th>
+                                                <th class="fi-ta-header-cell text-right">{{ __('app.widgets.lastLogin') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -129,7 +129,7 @@
                 @if(empty($recent_contents) && empty($recent_users))
                     <div class="fi-alert fi-color-gray fi-size-sm">
                         <div class="fi-alert-content">
-                            No recent activity found.
+                            {{ __('app.widgets.noRecentActivity') }}
                         </div>
                     </div>
                 @endif

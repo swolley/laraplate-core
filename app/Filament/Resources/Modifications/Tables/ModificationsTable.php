@@ -43,13 +43,11 @@ final class ModificationsTable
                         ->searchable()
                         ->sortable(),
                     TextColumn::make('modifications.original')
-                        ->label('Original')
                         ->limit(50),
                     TextColumn::make('modifications.modified')
-                        ->label('Modified')
                         ->limit(50),
                     TextColumn::make('meta')
-                        ->label('AI moderation')
+                        ->label(__('app.fields.ai_moderation'))
                         ->badge()
                         // The automated moderator's decision, from the latest automated vote:
                         // auto_approved, auto_rejected or requires_human_review; empty when none voted.
@@ -75,7 +73,6 @@ final class ModificationsTable
                         })
                         ->visible(fn (?Modification $record): bool => self::isAutomaticallyModerated($record)),
                     TextColumn::make('disapprovers_required')
-                        ->label('Disapprovals required')
                         ->numeric()
                         ->visible(fn (?Modification $record): bool => self::isAutomaticallyModerated($record)),
                 ]);
@@ -91,7 +88,7 @@ final class ModificationsTable
         )
             ->defaultGroup(
                 Group::make('modifiable_type')
-                    ->label('Modifiable Type'),
+                    ->label(__('app.fields.modifiable_type')),
             );
     }
 
@@ -101,7 +98,7 @@ final class ModificationsTable
     public static function withdrawAction(): Action
     {
         return Action::make('withdraw')
-            ->label('Withdraw')
+            ->label(__('app.actions.withdraw'))
             ->icon(Heroicon::OutlinedArrowUturnLeft)
             ->color('gray')
             ->requiresConfirmation()
@@ -120,7 +117,7 @@ final class ModificationsTable
                 resolve(ModificationVoteService::class)->withdraw($user, $record);
 
                 Notification::make()
-                    ->title('Request withdrawn')
+                    ->title(__('app.messages.requestWithdrawn'))
                     ->success()
                     ->send();
             });

@@ -41,26 +41,26 @@ final class HorizonStatsWidget extends BaseWidget
         // Throughput (jobs per minute)
         $throughput = method_exists($metrics, 'throughput') ? $metrics->throughput() : 0;
 
-        $stats[] = Stat::make('Pending Jobs', $pendingCount)
-            ->description('Jobs waiting to be processed')
+        $stats[] = Stat::make(__('app.widgets.pendingJobs'), $pendingCount)
+            ->description(__('app.widgets.pendingJobsHint'))
             ->descriptionIcon('heroicon-o-clock')
             ->color($pendingCount > 100 ? 'warning' : 'primary');
 
-        $stats[] = Stat::make('Failed Jobs', $failedCount)
-            ->description('Jobs that failed to process')
+        $stats[] = Stat::make(__('app.widgets.failedJobs'), $failedCount)
+            ->description(__('app.widgets.failedJobsHint'))
             ->descriptionIcon('heroicon-o-x-circle')
             ->color($failedCount > 0 ? 'danger' : 'success');
 
         try {
-            $stats[] = Stat::make('Throughput', number_format($throughput))
-                ->description('Jobs per minute')
+            $stats[] = Stat::make(__('app.widgets.throughput'), number_format($throughput))
+                ->description(__('app.widgets.throughputHint'))
                 ->descriptionIcon('heroicon-o-arrow-trending-up')
                 ->color('primary')
                 ->descriptionColor('core');
         } catch (Exception) {
             // Horizon might not be fully configured
-            $stats[] = Stat::make('Horizon Status', 'Not Available')
-                ->description('Horizon is not properly configured')
+            $stats[] = Stat::make(__('app.widgets.horizonStatus'), __('app.widgets.notAvailable'))
+                ->description(__('app.widgets.horizonNotConfigured'))
                 ->descriptionIcon('heroicon-o-exclamation-triangle')
                 ->color('gray');
         }

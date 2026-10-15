@@ -17,9 +17,6 @@ final class CacheHealth extends Page
     // protected string $view = 'core::filament.pages.cache';
 
     #[Override]
-    protected static ?string $navigationLabel = 'Caches';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
     #[Override]
@@ -27,6 +24,12 @@ final class CacheHealth extends Page
 
     #[Override]
     protected static ?string $slug = 'health/cache';
+
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return (string) __('app.pages.caches');
+    }
 
     // protected static ?int $navigationSort = 1;
 
@@ -47,5 +50,11 @@ final class CacheHealth extends Page
     public function getVisibleWidgets(): array
     {
         return $this->filterVisibleWidgets($this->getWidgets());
+    }
+
+    #[Override]
+    public function getTitle(): string
+    {
+        return (string) __('app.pages.caches');
     }
 }

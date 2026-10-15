@@ -29,9 +29,6 @@ final class ACLResource extends Resource
     protected static ?string $model = ACL::class;
 
     #[Override]
-    protected static ?string $label = 'ACLs';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLockClosed;
 
     #[Override]

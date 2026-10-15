@@ -32,11 +32,9 @@ final class MediaTable
                         ->sortable()
                         ->limit(40),
                     TextColumn::make('mime_type')
-                        ->label('Type')
                         ->badge()
                         ->sortable(),
                     TextColumn::make('collection_name')
-                        ->label('Collection')
                         ->badge()
                         ->sortable(),
                     TextColumn::make('owner')
@@ -54,13 +52,10 @@ final class MediaTable
             filters: static function (Collection $default_filters): void {
                 $default_filters->push(
                     SelectFilter::make('mime_type')
-                        ->label('Type')
                         ->options(static fn (): array => self::distinctOptions('mime_type')),
                     SelectFilter::make('collection_name')
-                        ->label('Collection')
                         ->options(static fn (): array => self::distinctOptions('collection_name')),
                     SelectFilter::make('model_type')
-                        ->label('Owner')
                         ->options(static fn (): array => self::ownerOptions()),
                 );
             },

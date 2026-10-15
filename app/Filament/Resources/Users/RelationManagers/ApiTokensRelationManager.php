@@ -46,10 +46,13 @@ final class ApiTokensRelationManager extends RelationManager
     protected static string $relationship = 'tokens';
 
     #[Override]
-    protected static ?string $title = 'API tokens';
+    protected static string|BackedEnum|null $icon = Heroicon::OutlinedKey;
 
     #[Override]
-    protected static string|BackedEnum|null $icon = Heroicon::OutlinedKey;
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return (string) __('app.pages.apiTokens');
+    }
 
     #[Override]
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
@@ -71,16 +74,15 @@ final class ApiTokensRelationManager extends RelationManager
                     ->limitList(3)
                     ->expandableLimitedList(),
                 TextColumn::make('allowed_cidrs')
-                    ->label('Allowed networks')
                     ->state(static fn (PersonalAccessToken $record): array => self::networks($record))
                     ->badge()
-                    ->placeholder('Any address'),
+                    ->placeholder(__('app.help.anyAddress')),
                 TextColumn::make('last_used_at')
                     ->dateTime()
-                    ->placeholder('Never'),
+                    ->placeholder(__('app.help.never')),
                 TextColumn::make('expires_at')
                     ->dateTime()
-                    ->placeholder('Never expires')
+                    ->placeholder(__('app.help.neverExpires'))
                     ->color(static fn (PersonalAccessToken $record): string => $record->expires_at === null ? 'warning' : 'gray'),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -91,18 +93,18 @@ final class ApiTokensRelationManager extends RelationManager
             ])
             ->recordActions([
                 Action::make('revoke')
-                    ->label('Revoke')
+                    ->label(__('app.actions.revoke'))
                     ->icon(Heroicon::OutlinedNoSymbol)
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalDescription('The token stops working immediately. This cannot be undone.')
+                    ->modalDescription(__('app.messages.tokenRevokeWarning'))
                     ->action(static function (PersonalAccessToken $record): void {
                         $record->delete();
 
-                        Notification::make()->title('Token revoked')->success()->send();
+                        Notification::make()->title(__('app.messages.tokenRevoked'))->success()->send();
                     }),
             ])
-            ->emptyStateHeading('No API tokens');
+            ->emptyStateHeading(__('app.messages.noApiTokens'));
     }
 
     /**
@@ -112,8 +114,8 @@ final class ApiTokensRelationManager extends RelationManager
     public function revealTokenAction(): Action
     {
         return Action::make('revealToken')
-            ->modalHeading('Copy the token now')
-            ->modalDescription('It is shown only once: only its hash is kept, so it cannot be shown again.')
+            ->modalHeading(__('app.messages.tokenCopyNow'))
+            ->modalDescription(__('app.messages.tokenShownOnce'))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('I have copied it')
             ->schema(static fn (array $arguments): array => [
@@ -151,7 +153,7 @@ final class ApiTokensRelationManager extends RelationManager
         $service = resolve(ApiTokenService::class);
 
         return Action::make('issue')
-            ->label('Issue token')
+            ->label(__('app.actions.issueToken'))
             ->icon(Heroicon::OutlinedPlus)
             ->visible(fn (): bool => $this->getOwnerRecord() instanceof User
                 && $this->getOwnerRecord()->isServiceAccount()
@@ -162,8 +164,7 @@ final class ApiTokensRelationManager extends RelationManager
                     ->required()
                     ->maxLength(255),
                 Select::make('abilities')
-                    ->label('Abilities')
-                    ->helperText('The api permissions the account holds through its roles.')
+                    ->helperText(__('app.help.tokenAbilities'))
                     ->multiple()
                     ->required()
                     ->searchable()
@@ -171,13 +172,11 @@ final class ApiTokensRelationManager extends RelationManager
                         ->mapWithKeys(static fn (string $name): array => [$name => $name])
                         ->all()),
                 DateTimePicker::make('expires_at')
-                    ->label('Expires at')
-                    ->helperText('Leave empty for a token that never expires.')
+                    ->helperText(__('app.help.tokenExpiresAt'))
                     ->native(false)
                     ->minDate(now()),
                 TagsInput::make('allowed_cidrs')
-                    ->label('Allowed networks')
-                    ->helperText('Addresses or CIDR networks the token may be used from. Empty means any address.')
+                    ->helperText(__('app.help.tokenAllowedCidrs'))
                     ->placeholder('10.0.0.0/8')
                     ->nestedRecursiveRules(['string', new NetworkAddress]),
             ])
@@ -192,7 +191,7 @@ final class ApiTokensRelationManager extends RelationManager
                     );
                 } catch (ValidationException $exception) {
                     Notification::make()
-                        ->title('The token was not issued')
+                        ->title(__('app.messages.tokenNotIssued'))
                         ->body($exception->validator->errors()->first())
                         ->danger()
                         ->send();

@@ -14,9 +14,6 @@ use UnitEnum;
 final class Welcome extends Page
 {
     #[Override]
-    protected static ?string $navigationLabel = 'Welcome';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
     #[Override]
@@ -30,6 +27,12 @@ final class Welcome extends Page
 
     #[Override]
     protected string $view = 'core::filament.pages.welcome';
+
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return (string) __('app.pages.welcome');
+    }
 
     public function mount(): void
     {
@@ -46,5 +49,11 @@ final class Welcome extends Page
     public function getTranslations(): array
     {
         return translations();
+    }
+
+    #[Override]
+    public function getTitle(): string
+    {
+        return (string) __('app.pages.welcome');
     }
 }

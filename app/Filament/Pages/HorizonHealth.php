@@ -15,9 +15,6 @@ use UnitEnum;
 final class HorizonHealth extends Page
 {
     #[Override]
-    protected static ?string $navigationLabel = 'Queues';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
     #[Override]
@@ -33,6 +30,12 @@ final class HorizonHealth extends Page
     public static function canAccess(): bool
     {
         return class_exists(\Laravel\Horizon\HorizonServiceProvider::class);
+    }
+
+    #[Override]
+    public static function getNavigationLabel(): string
+    {
+        return (string) __('app.pages.queues');
     }
 
     // protected static ?int $navigationSort = 1;
@@ -52,5 +55,11 @@ final class HorizonHealth extends Page
     public function getVisibleWidgets(): array
     {
         return $this->filterVisibleWidgets($this->getWidgets());
+    }
+
+    #[Override]
+    public function getTitle(): string
+    {
+        return (string) __('app.pages.queues');
     }
 }

@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Models\Media;
 
 /**
@@ -32,9 +33,12 @@ final class MediaRelationManager extends RelationManager
 {
     protected static string $relationship = 'media';
 
-    protected static ?string $title = 'Media';
-
     protected static string|BackedEnum|null $icon = Heroicon::OutlinedPhoto;
+
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return (string) __('app.entities.media.plural');
+    }
 
     /**
      * Merge the edited display fields back into `custom_properties`, preserving every
@@ -88,10 +92,8 @@ final class MediaRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('mime_type')
-                    ->label('Type')
                     ->badge(),
                 TextColumn::make('collection_name')
-                    ->label('Collection')
                     ->badge(),
                 TextColumn::make('description')
                     ->state(static fn (Media $record): string => self::customString($record, 'description'))
@@ -100,7 +102,7 @@ final class MediaRelationManager extends RelationManager
             ])
             ->recordActions([
                 EditAction::make()
-                    ->label('Edit metadata')
+                    ->label(__('app.actions.editMetadata'))
                     ->icon(Heroicon::OutlinedPencilSquare)
                     ->schema(self::displayFields())
                     ->fillForm(static fn (Media $record): array => [
@@ -121,7 +123,6 @@ final class MediaRelationManager extends RelationManager
             TextInput::make('description')
                 ->maxLength(1000),
             TextInput::make('alt_text')
-                ->label('Alt text')
                 ->maxLength(255),
             TagsInput::make('keywords'),
         ];

@@ -34,8 +34,8 @@ trait GuardsAgainstStaleRecord
             Notification::make()
                 ->danger()
                 ->persistent()
-                ->title('This record was changed by someone else')
-                ->body('Reload the page to see the latest version, then repeat your changes.')
+                ->title(__('app.messages.recordChangedElsewhere'))
+                ->body(__('app.messages.recordChangedElsewhereBody'))
                 ->send();
         }
     }

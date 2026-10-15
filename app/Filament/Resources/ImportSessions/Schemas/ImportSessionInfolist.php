@@ -15,20 +15,16 @@ final class ImportSessionInfolist
         return $schema
             ->components([
                 TextEntry::make('entity_key')
-                    ->label('Entity')
                     ->badge(),
                 TextEntry::make('status')
                     ->badge(),
                 TextEntry::make('source_format')
-                    ->label('Format')
                     ->badge(),
-                TextEntry::make('original_filename')
-                    ->label('File'),
+                TextEntry::make('original_filename'),
                 TextEntry::make('user.name')
-                    ->label('Started by')
+                    ->label(__('app.fields.started_by'))
                     ->placeholder('—'),
                 TextEntry::make('counters')
-                    ->label('Rows (processed / created / updated / skipped / failed)')
                     ->state(static fn (ImportSession $record): string => sprintf(
                         '%d / %d / %d / %d / %d',
                         $record->processed_rows,
@@ -44,12 +40,10 @@ final class ImportSessionInfolist
                     ->dateTime()
                     ->placeholder('—'),
                 TextEntry::make('detected_columns')
-                    ->label('Detected columns')
                     ->columnSpanFull()
                     ->placeholder('—')
                     ->state(static fn (ImportSession $record): string => implode(', ', $record->detected_columns ?? [])),
                 TextEntry::make('mapping')
-                    ->label('Mapping (field → column)')
                     ->columnSpanFull()
                     ->placeholder('—')
                     ->state(static fn (ImportSession $record): string => (string) json_encode(

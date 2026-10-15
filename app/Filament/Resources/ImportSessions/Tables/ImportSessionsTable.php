@@ -26,26 +26,21 @@ final class ImportSessionsTable
             columns: static function (Collection $default_columns): void {
                 $default_columns->unshift(
                     TextColumn::make('entity_key')
-                        ->label('Entity')
                         ->badge()
                         ->searchable()
                         ->sortable(),
                     TextColumn::make('original_filename')
-                        ->label('File')
                         ->limit(32)
                         ->searchable(),
                     TextColumn::make('source_format')
-                        ->label('Format')
                         ->badge(),
                     TextColumn::make('status')
                         ->badge()
                         ->sortable(),
                     TextColumn::make('processed_rows')
-                        ->label('Processed')
                         ->numeric()
                         ->sortable(),
                     TextColumn::make('failed_rows')
-                        ->label('Failed')
                         ->numeric()
                         ->color('danger')
                         ->sortable(),
@@ -57,7 +52,7 @@ final class ImportSessionsTable
             actions: static function (Collection $default_actions): void {
                 $default_actions->unshift(
                     Action::make('run')
-                        ->label('Run')
+                        ->label(__('app.actions.run'))
                         ->icon(Heroicon::OutlinedPlay)
                         ->requiresConfirmation()
                         ->visible(static fn (ImportSession $record): bool => app(ImportLauncher::class)->isLaunchable($record))
@@ -67,8 +62,8 @@ final class ImportSessionsTable
 
                             if ($missing !== []) {
                                 Notification::make()
-                                    ->title('Mapping incomplete')
-                                    ->body('Map every required field first: ' . implode(', ', $missing) . '.')
+                                    ->title(__('app.messages.mappingIncomplete'))
+                                    ->body(__('app.messages.mapRequiredFieldsFirst', ['fields' => implode(', ', $missing)]))
                                     ->danger()
                                     ->send();
 
@@ -78,13 +73,13 @@ final class ImportSessionsTable
                             $launcher->queue($record);
 
                             Notification::make()
-                                ->title('Import queued')
+                                ->title(__('app.messages.importQueued'))
                                 ->body("Importing {$record->original_filename} in the background.")
                                 ->success()
                                 ->send();
                         }),
                     Action::make('downloadErrors')
-                        ->label('Errors CSV')
+                        ->label(__('app.actions.errorsCsv'))
                         ->icon(Heroicon::OutlinedArrowDownTray)
                         ->visible(static fn (ImportSession $record): bool => $record->failed_rows > 0)
                         ->action(static fn (ImportSession $record): StreamedResponse => self::errorReport($record)),

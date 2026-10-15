@@ -53,7 +53,7 @@ final class ListModifications extends ListRecords
         }
 
         $tabs = [
-            'all' => Tab::make('All')->badge($counts['all']),
+            'all' => Tab::make(__('app.sections.all'))->badge($counts['all']),
         ];
 
         $types = models(filter: fn (string $type): bool => class_uses_trait($type, HasApprovals::class));
@@ -73,7 +73,7 @@ final class ListModifications extends ListRecords
         }
 
         $this->groups[] = Group::make('modifiable_type')
-            ->label('Model')
+            ->label(__('app.fields.modifiable_type'))
             ->getTitleFromRecordUsing(function (Model $record): string {
                 $type = $record->getAttribute('modifiable_type');
 

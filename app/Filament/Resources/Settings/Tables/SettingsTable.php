@@ -76,7 +76,6 @@ final class SettingsTable
                             default => $record->value,
                         }),
                     IconColumn::make('is_public')
-                        ->label('Public')
                         ->boolean()
                         ->trueIcon(Heroicon::OutlinedCheckCircle)
                         ->trueColor('success')
@@ -84,7 +83,6 @@ final class SettingsTable
                         ->alignCenter()
                         ->toggleable(),
                     IconColumn::make('is_internal')
-                        ->label('Internal')
                         ->boolean()
                         ->trueIcon(Heroicon::OutlinedCheckCircle)
                         ->trueColor('success')
@@ -92,7 +90,6 @@ final class SettingsTable
                         ->alignCenter()
                         ->toggleable(isToggledHiddenByDefault: true),
                     IconColumn::make('encrypted')
-                        ->label('Encrypted')
                         ->boolean()
                         ->alignCenter()
                         ->trueIcon('heroicon-o-key')
@@ -118,14 +115,12 @@ final class SettingsTable
                     SelectFilter::make('module')
                         ->options(static fn (): array => self::cachedModuleOptions()),
                     SelectFilter::make('is_public')
-                        ->label('Public')
                         ->searchable()
                         ->options([
                             '1' => 'Public',
                             '0' => 'Private',
                         ]),
                     SelectFilter::make('is_internal')
-                        ->label('Internal')
                         ->searchable()
                         ->options([
                             '1' => 'Internal',
@@ -174,12 +169,12 @@ final class SettingsTable
         try {
             $result = app(SettingActionRunner::class)->run($record);
         } catch (InvalidSettingActionException $exception) {
-            Notification::make()->danger()->title('Action refused')->body($exception->getMessage())->send();
+            Notification::make()->danger()->title(__('app.messages.actionRefused'))->body($exception->getMessage())->send();
 
             return;
         } catch (Throwable $exception) {
             report($exception);
-            Notification::make()->danger()->title('Action failed')->body($exception->getMessage())->send();
+            Notification::make()->danger()->title(__('app.states.actionFailed'))->body($exception->getMessage())->send();
 
             return;
         }
@@ -190,7 +185,7 @@ final class SettingsTable
     private static function notifyResult(SettingActionResult $result): void
     {
         if ($result->queued) {
-            Notification::make()->info()->title('Command queued')->body($result->commandLine)->send();
+            Notification::make()->info()->title(__('app.messages.commandQueued'))->body($result->commandLine)->send();
 
             return;
         }
@@ -198,9 +193,9 @@ final class SettingsTable
         $notification = Notification::make()->body(self::outputTail($result->output));
 
         if ($result->succeeded()) {
-            $notification->success()->title('Command completed');
+            $notification->success()->title(__('app.messages.commandCompleted'));
         } else {
-            $notification->danger()->title('Command failed');
+            $notification->danger()->title(__('app.messages.commandFailed'));
         }
 
         $notification->send();

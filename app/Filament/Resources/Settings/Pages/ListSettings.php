@@ -33,7 +33,7 @@ final class ListSettings extends ListRecords
         $counts = array_merge(['all' => (int) array_sum($counts_by_group)], $counts_by_group);
 
         $tabs = [
-            'all' => Tab::make('All')->badge($counts['all']),
+            'all' => Tab::make(__('app.sections.all'))->badge($counts['all']),
         ];
 
         ksort($counts_by_group);
@@ -51,7 +51,7 @@ final class ListSettings extends ListRecords
         }
 
         $this->groups[] = Group::make('group_name')
-            ->label('Group')
+            ->label(__('app.fields.group_name'))
             ->getTitleFromRecordUsing(fn (Setting $record): string => Str::studly($record->group_name));
 
         return $tabs;

@@ -51,13 +51,12 @@ final class SettingForm
                             ->inline(false)
                             ->disabled()
                             ->dehydrated(false)
-                            ->helperText('If true, this setting value is encrypted in database'),
+                            ->helperText(__('app.help.settingEncrypted')),
                         Toggle::make('is_internal')
-                            ->label('Internal')
                             ->inline(false)
                             ->disabled()
                             ->dehydrated(false)
-                            ->helperText('Shipped by a first-party module seeder'),
+                            ->helperText(__('app.help.settingInternal')),
                     ])
                     ->columnSpanFull(),
                 Grid::make(4)
@@ -73,14 +72,13 @@ final class SettingForm
                                 ->pluck('group_name')
                                 ->all())
                             ->dehydrateStateUsing(static fn (?string $state): ?string => $state === null ? null : mb_trim($state))
-                            ->helperText('Pick an existing group or type a new one'),
+                            ->helperText(__('app.help.settingGroupName')),
                         Group::make()
                             ->schema(static fn (?Setting $record): array => [self::managedAware(self::valueField($record), $record)])
                             ->columnSpan(2),
                         Toggle::make('is_public')
-                            ->label('Public')
                             ->inline(false)
-                            ->helperText('Readable by guests'),
+                            ->helperText(__('app.help.settingPublic')),
                     ])
                     ->columnSpanFull(),
                 TextInput::make('description')
@@ -89,7 +87,6 @@ final class SettingForm
                 Grid::make(4)
                     ->schema([
                         TextInput::make('action_command')
-                            ->label('Action')
                             ->disabled()
                             ->dehydrated(false)
                             ->afterStateHydrated(static function (TextInput $component, ?Setting $record): void {
@@ -97,7 +94,6 @@ final class SettingForm
                             })
                             ->columnSpan(3),
                         Toggle::make('action_queued')
-                            ->label('Queued')
                             ->inline(false)
                             ->disabled()
                             ->dehydrated(false)
@@ -183,7 +179,7 @@ final class SettingForm
         return $field
             ->disabled()
             ->dehydrated(false)
-            ->helperText('Written by a command, not editable here');
+            ->helperText(__('app.help.settingWrittenByCommand'));
     }
 
     /**

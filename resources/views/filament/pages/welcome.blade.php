@@ -25,13 +25,13 @@
                             <div id="docs-card-content" class="flex items-start gap-2 flex-col w-full">
                                 <!-- language -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Languages:</i>
+                                    <i>{{ __('app.welcome.languages') }}</i>
                                     <span style="float: right">{{ implode(', ', $translations) }}</span>
                                 </div>
 
                                 <!-- active modules -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Active Modules:</i>
+                                    <i>{{ __('app.welcome.activeModules') }}</i>
                                     <span style="float: right">{{ implode(', ', modules(true)) }}</span>
                                 </div>
 
@@ -41,7 +41,7 @@
                                     $done = migrations(true, true);
                                     $total = migrations(true, false);
                                     @endphp
-                                    <i>Migrations:</i>
+                                    <i>{{ __('app.welcome.migrations') }}</i>
                                     <div class="ml-4 flex items-center gap-2" style="float: right">
                                         @if ($done !== $total)
                                             <x-core::alert-icon style="color: var(--warning-400);" />
@@ -54,7 +54,7 @@
 
                                 <!-- api versions -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>API Versions:</i>
+                                    <i>{{ __('app.welcome.apiVersions') }}</i>
                                     <span style="float: right">{{ implode(', ', api_versions()) ?: 'v1' }}</span>
                                 </div>
 
@@ -63,7 +63,7 @@
                                     @php
                                     $debug = config('app.debug');
                                     @endphp
-                                    <i>Debug Mode:</i>
+                                    <i>{{ __('app.welcome.debugMode') }}</i>
                                     <div class="flex items-center gap-2" style="float: right; {{ $debug ? 'color: var(--warning-400);' : 'color: var(--color-gray-600);' }}">
                                         @if ($debug)
                                             <x-core::alert-icon />
@@ -75,19 +75,19 @@
 
                                 <!-- environment -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Application Environment:</i>
+                                    <i>{{ __('app.welcome.environment') }}</i>
                                     <span class="flex items-center" style="float: right">{{ config('app.env') }}</span>
                                 </div>
 
                                 <!-- database -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Database Drivers:</i>
+                                    <i>{{ __('app.welcome.databaseDrivers') }}</i>
                                     <span class="flex items-center" style="float: right">{{ implode(', ', connections()) }}</span>
                                 </div>
 
                                 <!-- user registration -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Enable User registration:</i>
+                                    <i>{{ __('app.welcome.userRegistration') }}</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('core.auth.registration.enabled'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
@@ -99,7 +99,7 @@
 
                                 <!-- user verification -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Verify new user:</i>
+                                    <i>{{ __('app.welcome.verifyNewUser') }}</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('core.auth.email_verification.enabled'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
@@ -111,7 +111,7 @@
 
                                 <!-- dynamic entities -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Enable dynamic entities:</i>
+                                    <i>{{ __('app.welcome.dynamicEntities') }}</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (config('core.crud.dynamic_entities'))
                                             <x-core::check-icon style="color: var(--primary-400);" />
@@ -123,7 +123,7 @@
 
                                 <!-- maintenance -->
                                 <div class="text-sm/relaxed w-full">
-                                    <i>Maintenance mode:</i>
+                                    <i>{{ __('app.welcome.maintenanceMode') }}</i>
                                     <div class="flex items-center" style="float: right">
                                         @if (app()->isDownForMaintenance())
                                             <x-core::alert-icon style="color: var(--warning-400);" />
