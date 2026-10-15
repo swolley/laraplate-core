@@ -11,6 +11,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Contracts\Support\HasOnceHash;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -58,7 +59,7 @@ use Spatie\Permission\Traits\HasRoles;
 use UnexpectedValueException;
 
 #[ObservedBy([UserObserver::class])]
-class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail, PasskeyUser
+class User extends BaseUser implements FilamentUser, HasLocalePreference, HasOnceHash, ILockableModel, ISoftDeletableModel, IValidatableModel, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -209,6 +210,17 @@ class User extends BaseUser implements FilamentUser, HasOnceHash, ILockableModel
         $key = $this->getKey();
 
         return static::class . ':' . (is_scalar($key) ? (string) $key : 'unsaved');
+    }
+
+    /**
+     * The language notifications and mailables are sent in: the one the user chose, the
+     * same value the backoffice and the SPA are rendered in.
+     */
+    public function preferredLocale(): ?string
+    {
+        $lang = $this->attributes['lang'] ?? null;
+
+        return is_string($lang) && $lang !== '' ? $lang : null;
     }
 
     public function canAccessPanel(Panel $panel): bool

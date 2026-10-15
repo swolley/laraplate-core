@@ -164,6 +164,7 @@ return [
     'menu' => [
         'dashboard' => 'Tablero',
         'groups' => 'Grupos de usuarios',
+        'language' => 'Idioma',
         'reports' => 'Informes',
         'settings' => 'Configuraciones',
         'systemInfo' => 'Información del sistema',

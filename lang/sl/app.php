@@ -164,6 +164,7 @@ return [
     'menu' => [
         'dashboard' => 'Nadzorna plošča',
         'groups' => 'Uporabniške skupine',
+        'language' => 'Jezik',
         'reports' => 'Poročila',
         'settings' => 'Nastavitve',
         'systemInfo' => 'Sistemske informacije',

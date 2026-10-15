@@ -18,6 +18,12 @@ Nothing about how you use the application is recorded in the background. The app
 your clicks, does not time you and does not learn from what you do. It keeps what you chose, and nothing
 else.
 
+## Your language
+
+The language of the application is part of your account. In the backoffice open the menu under your
+avatar, choose **Language**, pick one and confirm: the page reloads in that language. The choice is saved on
+the server, so the application, your other devices and the notifications and emails sent to you all use it.
+
 ## Seeing and resetting what is saved
 
 The server lets an application show you everything it remembers about you, grouped by the part of the

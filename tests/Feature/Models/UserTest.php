@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Filament\Panel;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Notification;
 use Lab404\Impersonate\Services\ImpersonateManager;
 use Modules\Core\Approvals\Operation;
 use Modules\Core\Casts\ActionEnum;
@@ -13,6 +14,7 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\Pivot\ModelHasRole;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Notifications\PendingApprovalsNotification;
 use Modules\Core\Support\PermissionName;
 use Spatie\Permission\Guard;
 
@@ -504,4 +506,18 @@ it('serves superadmin permissions from the permission registrar cache sorted by 
         ->and($second->pluck('name')->all())->toBe($first->pluck('name')->all())
         ->and($names)->toBe($sorted)
         ->and($names)->toContain('default.alpha.select', 'default.zeta.select');
+});
+
+it('sends notifications in the language the user chose', function (): void {
+    Notification::fake();
+
+    $this->user->update(['lang' => 'it']);
+    $this->user->notify(new PendingApprovalsNotification(collect()));
+
+    expect($this->user->preferredLocale())->toBe('it');
+    Notification::assertSentTo(
+        $this->user,
+        PendingApprovalsNotification::class,
+        static fn (PendingApprovalsNotification $notification, array $channels, User $notifiable, ?string $locale): bool => $locale === 'it',
+    );
 });
