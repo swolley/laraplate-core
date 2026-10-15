@@ -14,6 +14,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Password;
 use Modules\Core\Filament\Utils\HasTable;
 
 final class UsersTable
@@ -70,8 +71,21 @@ final class UsersTable
                         ->label('Reset Password')
                         ->icon('heroicon-o-key')
                         ->authorize(static fn (User $record): bool => ! $record->isServiceAccount())
-                        ->action(function (User $record): void {
-                            $record->sendPasswordResetNotification($record->email);
+                        ->action(static function (User $record): void {
+                            $status = Password::broker()->sendResetLink(['email' => $record->email]);
+
+                            if ($status !== Password::RESET_LINK_SENT) {
+                                Notification::make()
+                                    ->title(__($status))
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Password reset email has been sent.')
+                                ->send();
                         })
                         ->requiresConfirmation(),
                 );

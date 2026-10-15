@@ -8,8 +8,10 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
 use Modules\Core\Casts\FiltersGroup;
@@ -279,20 +281,17 @@ it('executes users table reset password action closure', function (): void {
     $action = $actions['reset_password'];
     $callback = $action->getActionFunction();
 
-    $sent_reset_to = null;
-    $record = Mockery::mock(App\Models\User::class)->makePartial();
-    $record->email = 'reset@example.com';
-    $record->shouldReceive('sendPasswordResetNotification')
-        ->once()
-        ->with('reset@example.com')
-        ->andReturnUsing(function ($token) use (&$sent_reset_to): void {
-            $sent_reset_to = (string) $token;
-        });
+    Notification::fake();
+    $record = App\Models\User::query()->create(User::factory()->raw(['email' => 'reset@example.com']));
 
     expect($callback)->not->toBeNull();
     $callback($record);
 
-    expect($sent_reset_to)->toBe('reset@example.com');
+    Notification::assertSentTo(
+        $record,
+        ResetPassword::class,
+        static fn (ResetPassword $notification): bool => $notification->token !== 'reset@example.com',
+    );
 });
 
 it('configures stacked image overlap to 1 for translations locale', function (): void {
