@@ -1140,7 +1140,7 @@ final class QueryBuilder
         $locale = LocaleContext::get();
 
         $query->{$method . 'Has'}('translations', function (Builder $translation_query) use ($constraint, $locale): void {
-            $translation_query->where('locale', $locale);
+            $translation_query->getQuery()->where('locale', '=', $locale);
             $constraint($translation_query);
         });
     }
