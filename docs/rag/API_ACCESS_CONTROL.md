@@ -338,6 +338,11 @@ passkey sign-in paths go through, and by `AuthenticationService`), cannot open a
 `api` roles, and issue and revoke their tokens (non-expiring allowed) in the Filament user resource, where the token list
 shows `last_used_at`, expiry and networks.
 
+The Core seeder creates the system user (`permission.users.system`) as a service account, and flags it on a re-seed
+when it was created before. It is the actor of system-level operations such as the AI moderation votes and never signs
+in to a panel. The anonymous user is not a service account: a service account cannot take the guest identity, and the
+backoffice refuses the flag on an account named like the guest.
+
 ## Operator checklist
 
 1. Turn the API on only when a consumer needs it: the `expose_api` setting (Filament > Settings). It also gates ERP

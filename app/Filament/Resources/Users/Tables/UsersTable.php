@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Password;
 use Modules\Core\Filament\Utils\HasTable;
+use Modules\Core\Models\Role;
 
 final class UsersTable
 {
@@ -40,10 +41,14 @@ final class UsersTable
                         ->toggleable(),
                     TextColumn::make('roles.name')
                         ->badge()
+                        ->state(static fn (User $record): array => $record->roles
+                            ->map(static fn (Role $role): string => $role->name . ' · ' . $role->guard_name)
+                            ->all())
                         ->toggleable(),
                     IconColumn::make('is_service_account')
                         ->label('Service account')
                         ->boolean()
+                        ->falseIcon(false)
                         ->toggleable(),
                 ]);
 

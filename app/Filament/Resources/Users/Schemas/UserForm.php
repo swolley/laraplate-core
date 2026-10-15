@@ -11,6 +11,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Modules\Core\Filament\Utils\HasForm;
+use Modules\Core\Models\Role;
 
 final class UserForm
 {
@@ -62,6 +63,7 @@ final class UserForm
                 Select::make('roles')
                     ->multiple()
                     ->relationship('roles', 'name')
+                    ->getOptionLabelFromRecordUsing(static fn (Role $record): string => $record->name . ' · ' . $record->guard_name)
                     ->preload(),
             ]);
     }

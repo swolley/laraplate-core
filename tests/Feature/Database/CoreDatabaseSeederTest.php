@@ -53,6 +53,30 @@ it('does not duplicate default users when seeded twice', function () use ($defau
     }
 });
 
+it('seeds only the system user as a service account', function () use ($default_user_roles): void {
+    $service_accounts = user_class()::query()
+        ->withoutGlobalScopes()
+        ->whereIn('username', array_keys($default_user_roles()))
+        ->pluck('is_service_account', 'username')
+        ->all();
+
+    expect($service_accounts)->toEqual([
+        (string) config('permission.users.superadmin') => false,
+        (string) config('permission.users.admin') => false,
+        (string) config('permission.users.guest') => false,
+        (string) config('permission.users.system') => true,
+    ]);
+});
+
+it('flags the system user seeded before the flag existed', function () use ($seed): void {
+    $system = (string) config('permission.users.system');
+    user_class()::query()->withoutGlobalScopes()->where('username', $system)->update(['is_service_account' => false]);
+
+    $seed();
+
+    expect(user_class()::query()->withoutGlobalScopes()->where('username', $system)->value('is_service_account'))->toBeTrue();
+});
+
 it('seeds clearUserAssignedLicenses is_active from the runtime license setting', function (): void {
     $cron = CronJob::query()->withoutGlobalScopes()->where('name', 'clearUserAssignedLicenses')->first();
 

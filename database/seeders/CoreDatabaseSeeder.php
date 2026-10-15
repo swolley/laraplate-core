@@ -153,6 +153,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             $this->defaultSettingAcls();
             $this->defaultUsers();
             $this->ensureAnonymousGuestRoles();
+            $this->ensureSystemServiceAccount();
             $this->defaultCrons();
         });
 
@@ -392,8 +393,9 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
                 'name' => $system,
                 'username' => $system,
                 'email' => "{$system}@" . str_replace('_', '', Str::slug(config('app.name'))) . '.com',
-                'password' => Str::random(16),
+                'password' => Str::random(64),
                 'email_verified_at' => now(),
+                'is_service_account' => true,
                 'roles' => [$this->groups->get(self::roleKey($roles['system'], $web))],
                 'locked_at' => now(),
                 'valid_from' => now(),
@@ -440,6 +442,28 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         foreach ([$this->defaultGuard(), self::API_GUARD] as $guard) {
             $this->groups->get(self::roleKey($guest, $guard))?->users()->syncWithoutDetaching([$anonymous_id]);
         }
+    }
+
+    /**
+     * The system user never signs in: it is a service account, also when it was seeded before the flag existed. The
+     * anonymous user is not one, since a service account cannot take the guest identity.
+     */
+    private function ensureSystemServiceAccount(): void
+    {
+        $system = config('permission.users.system');
+
+        if (! is_string($system) || $system === '') {
+            return;
+        }
+
+        $user_class = user_class();
+        $user = new $user_class();
+
+        $user_class::query()
+            ->withoutGlobalScopes()
+            ->where($user->qualifyColumn('username'), $system)
+            ->where($user->qualifyColumn('is_service_account'), false)
+            ->update(['is_service_account' => true]);
     }
 
     private function defaultSettings(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Contracts\HasTable;
@@ -292,6 +293,37 @@ it('executes users table reset password action closure', function (): void {
         ResetPassword::class,
         static fn (ResetPassword $notification): bool => $notification->token !== 'reset@example.com',
     );
+});
+
+it('shows the service account icon only for a service account', function (): void {
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => User::query());
+
+    UsersTable::configure($table);
+    $column = $table->getColumn('is_service_account');
+
+    expect($column)->toBeInstanceOf(IconColumn::class)
+        ->and($column->getIcon(true))->not->toBeNull()
+        ->and($column->getIcon(false))->toBeNull();
+});
+
+it('shows the guard of every role, so roles sharing a name are told apart', function (): void {
+    $user = App\Models\User::query()->create(User::factory()->raw());
+    $user->roles()->attach([
+        Role::query()->create(['name' => 'shared_name', 'guard_name' => 'web'])->getKey(),
+        Role::query()->create(['name' => 'shared_name', 'guard_name' => 'api'])->getKey(),
+    ]);
+
+    $livewire = $this->createStub(HasTable::class);
+    $table = Table::make($livewire);
+    $table->query(fn () => User::query());
+
+    UsersTable::configure($table);
+
+    $state = $table->getColumn('roles.name')->record($user->fresh())->getState();
+
+    expect($state)->toEqualCanonicalizing(['shared_name · web', 'shared_name · api']);
 });
 
 it('configures stacked image overlap to 1 for translations locale', function (): void {
