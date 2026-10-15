@@ -7,8 +7,8 @@ namespace Modules\Core\Filament\Resources\Modifications;
 use BackedEnum;
 use Coolsam\Modules\Resource;
 use Filament\Panel;
-// use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+// use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Resources\Modifications\Pages\ListModifications;
 use Modules\Core\Filament\Resources\Modifications\Schemas\ModificationForm;
 use Modules\Core\Filament\Resources\Modifications\Tables\ModificationsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Models\Modification;
 use Override;
@@ -24,6 +25,8 @@ use UnitEnum;
 
 final class ModificationResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = Modification::class;
 
@@ -31,7 +34,7 @@ final class ModificationResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHandThumbUp;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 6;

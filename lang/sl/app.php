@@ -42,6 +42,56 @@ return [
         'Tuesday' => 'Torek',
         'Wednesday' => 'Sreda',
     ],
+    'entities' => [
+        'acls' => [
+            'singular' => 'ACL',
+            'plural' => 'ACL-ji',
+        ],
+        'cron_jobs' => [
+            'singular' => 'Načrtovano opravilo',
+            'plural' => 'Načrtovana opravila',
+        ],
+        'fields' => [
+            'singular' => 'Polje',
+            'plural' => 'Polja',
+        ],
+        'import_sessions' => [
+            'singular' => 'Seja uvoza',
+            'plural' => 'Seje uvoza',
+        ],
+        'licenses' => [
+            'singular' => 'Licenca',
+            'plural' => 'Licence',
+        ],
+        'media' => [
+            'singular' => 'Medijska datoteka',
+            'plural' => 'Mediji',
+        ],
+        'modifications' => [
+            'singular' => 'Sprememba',
+            'plural' => 'Spremembe',
+        ],
+        'permissions' => [
+            'singular' => 'Dovoljenje',
+            'plural' => 'Dovoljenja',
+        ],
+        'roles' => [
+            'singular' => 'Vloga',
+            'plural' => 'Vloge',
+        ],
+        'settings' => [
+            'singular' => 'Nastavitev',
+            'plural' => 'Nastavitve',
+        ],
+        'templates' => [
+            'singular' => 'Predloga',
+            'plural' => 'Predloge',
+        ],
+        'users' => [
+            'singular' => 'Uporabnik',
+            'plural' => 'Uporabniki',
+        ],
+    ],
     'fields' => [
         'active' => 'Aktivno',
         'code' => 'Koda',
@@ -227,6 +277,11 @@ return [
         'November' => 'November',
         'October' => 'Oktober',
         'September' => 'September',
+    ],
+    'navigation' => [
+        'core' => 'Core',
+        'documentation' => 'Dokumentacija',
+        'health' => 'Stanje sistema',
     ],
     'permissions' => [
         'note' => [

@@ -42,6 +42,56 @@ return [
         'Tuesday' => 'Tuesday',
         'Wednesday' => 'Wednesday',
     ],
+    'entities' => [
+        'acls' => [
+            'singular' => 'ACL',
+            'plural' => 'ACLs',
+        ],
+        'cron_jobs' => [
+            'singular' => 'Cron job',
+            'plural' => 'Cron jobs',
+        ],
+        'fields' => [
+            'singular' => 'Field',
+            'plural' => 'Fields',
+        ],
+        'import_sessions' => [
+            'singular' => 'Import session',
+            'plural' => 'Import sessions',
+        ],
+        'licenses' => [
+            'singular' => 'License',
+            'plural' => 'Licenses',
+        ],
+        'media' => [
+            'singular' => 'Media file',
+            'plural' => 'Media',
+        ],
+        'modifications' => [
+            'singular' => 'Modification',
+            'plural' => 'Modifications',
+        ],
+        'permissions' => [
+            'singular' => 'Permission',
+            'plural' => 'Permissions',
+        ],
+        'roles' => [
+            'singular' => 'Role',
+            'plural' => 'Roles',
+        ],
+        'settings' => [
+            'singular' => 'Setting',
+            'plural' => 'Settings',
+        ],
+        'templates' => [
+            'singular' => 'Template',
+            'plural' => 'Templates',
+        ],
+        'users' => [
+            'singular' => 'User',
+            'plural' => 'Users',
+        ],
+    ],
     'fields' => [
         'active' => 'Active',
         'code' => 'Code',
@@ -227,6 +277,11 @@ return [
         'November' => 'November',
         'October' => 'October',
         'September' => 'September',
+    ],
+    'navigation' => [
+        'core' => 'Core',
+        'documentation' => 'Documentation',
+        'health' => 'Health',
     ],
     'permissions' => [
         'note' => [

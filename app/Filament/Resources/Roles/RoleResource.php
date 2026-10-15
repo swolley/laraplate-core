@@ -16,12 +16,15 @@ use Modules\Core\Filament\Resources\Roles\Pages\EditRole;
 use Modules\Core\Filament\Resources\Roles\Pages\ListRoles;
 use Modules\Core\Filament\Resources\Roles\Schemas\RoleForm;
 use Modules\Core\Filament\Resources\Roles\Tables\RolesTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Role;
 use Override;
 use UnitEnum;
 
 final class RoleResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = Role::class;
 
@@ -29,7 +32,7 @@ final class RoleResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 2;

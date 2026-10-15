@@ -19,7 +19,7 @@ final class Swagger extends Page
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCodeBracket;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Documentation';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.documentation';
 
     #[Override]
     protected static ?string $slug = 'documentation/swagger';

@@ -15,12 +15,15 @@ use Modules\Core\Filament\Resources\CronJobs\Pages\EditCronJob;
 use Modules\Core\Filament\Resources\CronJobs\Pages\ListCronJobs;
 use Modules\Core\Filament\Resources\CronJobs\Schemas\CronJobForm;
 use Modules\Core\Filament\Resources\CronJobs\Tables\CronJobsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\CronJob;
 use Override;
 use UnitEnum;
 
 final class CronJobResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = CronJob::class;
 
@@ -28,7 +31,7 @@ final class CronJobResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCommandLine;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 5;

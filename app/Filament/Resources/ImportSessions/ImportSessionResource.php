@@ -14,6 +14,7 @@ use Modules\Core\Filament\Resources\ImportSessions\Pages\ListImportSessions;
 use Modules\Core\Filament\Resources\ImportSessions\Pages\ViewImportSession;
 use Modules\Core\Filament\Resources\ImportSessions\Schemas\ImportSessionInfolist;
 use Modules\Core\Filament\Resources\ImportSessions\Tables\ImportSessionsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\ImportSession;
 use Override;
 use UnitEnum;
@@ -27,10 +28,12 @@ use UnitEnum;
  */
 final class ImportSessionResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     protected static ?string $model = ImportSession::class;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 80;

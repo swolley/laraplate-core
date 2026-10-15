@@ -15,6 +15,7 @@ use Modules\Core\Filament\Resources\Media\Pages\ListMedia;
 use Modules\Core\Filament\Resources\Media\Pages\ViewMedia;
 use Modules\Core\Filament\Resources\Media\Schemas\MediaInfolist;
 use Modules\Core\Filament\Resources\Media\Tables\MediaTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Media;
 use Modules\Core\Models\MediaDraft;
 use Override;
@@ -32,10 +33,12 @@ use UnitEnum;
  */
 final class MediaResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     protected static ?string $model = Media::class;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 85;

@@ -18,11 +18,14 @@ use Modules\Core\Filament\Resources\Users\Pages\ListUsers;
 use Modules\Core\Filament\Resources\Users\RelationManagers\ApiTokensRelationManager;
 use Modules\Core\Filament\Resources\Users\Schemas\UserForm;
 use Modules\Core\Filament\Resources\Users\Tables\UsersTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Override;
 use UnitEnum;
 
 final class UserResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = User::class;
 
@@ -30,7 +33,7 @@ final class UserResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 1;

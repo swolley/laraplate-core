@@ -23,7 +23,7 @@ final class CacheHealth extends Page
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Health';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.health';
 
     #[Override]
     protected static ?string $slug = 'health/cache';

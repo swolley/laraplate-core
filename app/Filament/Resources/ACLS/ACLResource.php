@@ -16,12 +16,15 @@ use Modules\Core\Filament\Resources\ACLS\Pages\EditACL;
 use Modules\Core\Filament\Resources\ACLS\Pages\ListACLs;
 use Modules\Core\Filament\Resources\ACLS\Schemas\ACLForm;
 use Modules\Core\Filament\Resources\ACLS\Tables\ACLsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\ACL;
 use Override;
 use UnitEnum;
 
 final class ACLResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = ACL::class;
 
@@ -29,13 +32,10 @@ final class ACLResource extends Resource
     protected static ?string $label = 'ACLs';
 
     #[Override]
-    protected static ?string $navigationLabel = 'ACLs';
-
-    #[Override]
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLockClosed;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 4;

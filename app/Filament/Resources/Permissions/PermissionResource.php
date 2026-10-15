@@ -15,12 +15,15 @@ use Modules\Core\Filament\Resources\Permissions\Pages\EditPermission;
 use Modules\Core\Filament\Resources\Permissions\Pages\ListPermissions;
 use Modules\Core\Filament\Resources\Permissions\Schemas\PermissionForm;
 use Modules\Core\Filament\Resources\Permissions\Tables\PermissionsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Permission;
 use Override;
 use UnitEnum;
 
 final class PermissionResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = Permission::class;
 
@@ -28,7 +31,7 @@ final class PermissionResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 3;

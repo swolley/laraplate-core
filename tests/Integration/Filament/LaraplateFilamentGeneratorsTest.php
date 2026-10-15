@@ -17,6 +17,7 @@ use Modules\Core\Filament\Utils\HasCloseOrCancelFormAction;
 use Modules\Core\Filament\Utils\HasForm;
 use Modules\Core\Filament\Utils\HasRecords;
 use Modules\Core\Filament\Utils\HasTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Setting;
 
 it('binds laraplate filament generators in the container', function (): void {
@@ -132,6 +133,27 @@ it('excludes HasForm-owned columns from generated HasDynamicContents forms', fun
     expect($source)->toContain(HasForm::class)
         ->and($source)->not->toContain("make('entity_id')")
         ->and($source)->not->toContain("make('presettable_id')");
+});
+
+it('emits HasTranslatedResourceLabels on generated resources', function (): void {
+    $source = app(ResourceClassGenerator::class, [
+        'fqn' => 'App\\Filament\\Resources\\Settings\\SettingResource',
+        'modelFqn' => Setting::class,
+        'pageRoutes' => [],
+        'formSchemaFqn' => null,
+        'infolistSchemaFqn' => null,
+        'tableFqn' => null,
+        'clusterFqn' => null,
+        'parentResourceFqn' => null,
+        'recordTitleAttribute' => null,
+        'hasViewOperation' => false,
+        'isGenerated' => false,
+        'isSoftDeletable' => false,
+        'isSimple' => false,
+    ])->generate();
+
+    expect($source)->toContain('use ' . HasTranslatedResourceLabels::class . ';')
+        ->toContain('use HasTranslatedResourceLabels;');
 });
 
 it('emits HasRecords on generated list pages', function (): void {

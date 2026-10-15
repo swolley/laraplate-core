@@ -15,12 +15,15 @@ use Modules\Core\Filament\Resources\Licenses\Pages\EditLicense;
 use Modules\Core\Filament\Resources\Licenses\Pages\ListLicenses;
 use Modules\Core\Filament\Resources\Licenses\Schemas\LicenseForm;
 use Modules\Core\Filament\Resources\Licenses\Tables\LicensesTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\License;
 use Override;
 use UnitEnum;
 
 final class LicenseResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = License::class;
 
@@ -28,7 +31,7 @@ final class LicenseResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFingerPrint;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 6;

@@ -19,7 +19,7 @@ final class PhpInfo extends Page
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedServer;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Documentation';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.documentation';
 
     #[Override]
     protected static ?string $slug = 'documentation/phpinfo';

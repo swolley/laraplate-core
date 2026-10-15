@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Resources\Fields;
 
 use BackedEnum;
-// use Filament\Resources\Resource;
 use Coolsam\Modules\Resource;
+// use Filament\Resources\Resource;
 use Filament\Panel;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -18,12 +18,15 @@ use Modules\Core\Filament\Resources\Fields\Pages\EditField;
 use Modules\Core\Filament\Resources\Fields\Pages\ListFields;
 use Modules\Core\Filament\Resources\Fields\Schemas\FieldForm;
 use Modules\Core\Filament\Resources\Fields\Tables\FieldsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Field;
 use Override;
 use UnitEnum;
 
 final class FieldResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = Field::class;
 
@@ -31,7 +34,7 @@ final class FieldResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 6;

@@ -7,7 +7,7 @@ use Modules\Core\Models\ImportSession;
 
 test('the import session resource is bound to its model under the Core group', function (): void {
     expect(ImportSessionResource::getModel())->toBe(ImportSession::class)
-        ->and(ImportSessionResource::getNavigationGroup())->toBe('Core')
+        ->and(ImportSessionResource::getNavigationGroup())->toBe('app.navigation.core')
         ->and(ImportSessionResource::getSlug())->toStartWith('core/');
 });
 

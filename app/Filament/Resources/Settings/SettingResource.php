@@ -17,6 +17,7 @@ use Modules\Core\Filament\Resources\Settings\Pages\EditSetting;
 use Modules\Core\Filament\Resources\Settings\Pages\ListSettings;
 use Modules\Core\Filament\Resources\Settings\Schemas\SettingForm;
 use Modules\Core\Filament\Resources\Settings\Tables\SettingsTable;
+use Modules\Core\Filament\Utils\HasTranslatedResourceLabels;
 use Modules\Core\Models\Setting;
 use Modules\Core\Services\ForcedVersionStrategySettings;
 use Override;
@@ -24,6 +25,8 @@ use UnitEnum;
 
 final class SettingResource extends Resource
 {
+    use HasTranslatedResourceLabels;
+
     #[Override]
     protected static ?string $model = Setting::class;
 
@@ -31,7 +34,7 @@ final class SettingResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
     #[Override]
-    protected static string|UnitEnum|null $navigationGroup = 'Core';
+    protected static string|UnitEnum|null $navigationGroup = 'app.navigation.core';
 
     #[Override]
     protected static ?int $navigationSort = 7;

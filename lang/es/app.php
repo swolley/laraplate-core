@@ -42,6 +42,56 @@ return [
         'Tuesday' => 'Martes',
         'Wednesday' => 'Miércoles',
     ],
+    'entities' => [
+        'acls' => [
+            'singular' => 'ACL',
+            'plural' => 'ACL',
+        ],
+        'cron_jobs' => [
+            'singular' => 'Tarea programada',
+            'plural' => 'Tareas programadas',
+        ],
+        'fields' => [
+            'singular' => 'Campo',
+            'plural' => 'Campos',
+        ],
+        'import_sessions' => [
+            'singular' => 'Sesión de importación',
+            'plural' => 'Sesiones de importación',
+        ],
+        'licenses' => [
+            'singular' => 'Licencia',
+            'plural' => 'Licencias',
+        ],
+        'media' => [
+            'singular' => 'Archivo multimedia',
+            'plural' => 'Multimedia',
+        ],
+        'modifications' => [
+            'singular' => 'Modificación',
+            'plural' => 'Modificaciones',
+        ],
+        'permissions' => [
+            'singular' => 'Permiso',
+            'plural' => 'Permisos',
+        ],
+        'roles' => [
+            'singular' => 'Rol',
+            'plural' => 'Roles',
+        ],
+        'settings' => [
+            'singular' => 'Ajuste',
+            'plural' => 'Ajustes',
+        ],
+        'templates' => [
+            'singular' => 'Plantilla',
+            'plural' => 'Plantillas',
+        ],
+        'users' => [
+            'singular' => 'Usuario',
+            'plural' => 'Usuarios',
+        ],
+    ],
     'fields' => [
         'active' => 'Activo',
         'code' => 'Código',
@@ -227,6 +277,11 @@ return [
         'November' => 'Noviembre',
         'October' => 'Octubre',
         'September' => 'Septiembre',
+    ],
+    'navigation' => [
+        'core' => 'Core',
+        'documentation' => 'Documentación',
+        'health' => 'Estado del sistema',
     ],
     'permissions' => [
         'note' => [
