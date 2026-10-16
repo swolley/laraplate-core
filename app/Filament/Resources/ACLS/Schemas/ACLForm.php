@@ -58,8 +58,8 @@ final class ACLForm
                             ->required(),
                         Select::make('direction')
                             ->options([
-                                SortDirection::Asc->value => 'Ascending',
-                                SortDirection::Desc->value => 'Descending',
+                                SortDirection::Asc->value => __('app.filters.ascending'),
+                                SortDirection::Desc->value => __('app.filters.descending'),
                             ])
                             ->default(SortDirection::Asc->value)
                             ->required(),

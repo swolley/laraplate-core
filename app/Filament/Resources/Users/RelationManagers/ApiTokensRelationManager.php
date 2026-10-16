@@ -117,7 +117,7 @@ final class ApiTokensRelationManager extends RelationManager
             ->modalHeading(__('app.messages.tokenCopyNow'))
             ->modalDescription(__('app.messages.tokenShownOnce'))
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel('I have copied it')
+            ->modalCancelActionLabel(__('app.actions.copiedIt'))
             ->schema(static fn (array $arguments): array => [
                 Text::make((string) ($arguments['token'] ?? ''))
                     ->copyable()

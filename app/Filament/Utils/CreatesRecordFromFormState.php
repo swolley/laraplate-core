@@ -45,8 +45,8 @@ trait CreatesRecordFromFormState
 
         return Notification::make()
             ->warning()
-            ->title('Creation sent for approval')
-            ->body('The record is created once the request is approved in Modifications.');
+            ->title(__('app.messages.creationSentForApproval'))
+            ->body(__('app.messages.creationSentForApprovalBody'));
     }
 
     #[Override]

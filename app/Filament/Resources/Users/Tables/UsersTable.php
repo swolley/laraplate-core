@@ -46,7 +46,6 @@ final class UsersTable
                             ->all())
                         ->toggleable(),
                     IconColumn::make('is_service_account')
-                        ->label('Service account')
                         ->boolean()
                         ->falseIcon(false)
                         ->toggleable(),
@@ -57,7 +56,7 @@ final class UsersTable
             actions: static function (Collection $default_actions): void {
                 $default_actions->unshift(
                     Action::make('resend_verification_email')
-                        ->label('Resend Verification Email')
+                        ->label(__('app.actions.resendVerificationEmail'))
                         ->icon('heroicon-o-envelope')
                         ->authorize(static fn (User $record): bool => ! $record->isServiceAccount() && ! $record->hasVerifiedEmail())
                         ->action(static function (User $record): void {
@@ -66,14 +65,14 @@ final class UsersTable
 
                             $record->notify($notification);
                             Notification::make()
-                                ->title('Verification email has been resent.')
+                                ->title(__('app.messages.verificationResent'))
                                 ->send();
                         })
                         ->requiresConfirmation(),
                 );
                 $default_actions->unshift(
                     Action::make('reset_password')
-                        ->label('Reset Password')
+                        ->label(__('app.actions.resetPassword'))
                         ->icon('heroicon-o-key')
                         ->authorize(static fn (User $record): bool => ! $record->isServiceAccount())
                         ->action(static function (User $record): void {
@@ -89,7 +88,7 @@ final class UsersTable
                             }
 
                             Notification::make()
-                                ->title('Password reset email has been sent.')
+                                ->title(__('app.messages.passwordResetSent'))
                                 ->send();
                         })
                         ->requiresConfirmation(),
@@ -101,10 +100,8 @@ final class UsersTable
                         ->relationship('roles', 'name')
                         ->multiple()
                         ->preload(),
-                    TernaryFilter::make('is_service_account')
-                        ->label('Service account'),
+                    TernaryFilter::make('is_service_account'),
                     TernaryFilter::make('verified')
-                        ->label('Verified email')
                         ->attribute('email_verified_at')
                         ->nullable(),
                 ]);

@@ -74,7 +74,7 @@ final class ImportSessionsTable
 
                             Notification::make()
                                 ->title(__('app.messages.importQueued'))
-                                ->body("Importing {$record->original_filename} in the background.")
+                                ->body(__('app.messages.importingInBackground', ['file' => $record->original_filename]))
                                 ->success()
                                 ->send();
                         }),

@@ -117,19 +117,19 @@ final class SettingsTable
                     SelectFilter::make('is_public')
                         ->searchable()
                         ->options([
-                            '1' => 'Public',
-                            '0' => 'Private',
+                            '1' => __('app.filters.public'),
+                            '0' => __('app.filters.private'),
                         ]),
                     SelectFilter::make('is_internal')
                         ->searchable()
                         ->options([
-                            '1' => 'Internal',
-                            '0' => 'Not Internal',
+                            '1' => __('app.filters.internal'),
+                            '0' => __('app.filters.notInternal'),
                         ]),
                     SelectFilter::make('encrypted')
                         ->options([
-                            '1' => 'Encrypted',
-                            '0' => 'Not Encrypted',
+                            '1' => __('app.filters.encrypted'),
+                            '0' => __('app.filters.notEncrypted'),
                         ]),
                 ]);
             },

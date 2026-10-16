@@ -36,8 +36,7 @@ final class UserForm
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
                 Toggle::make('is_service_account')
-                    ->label('Service account')
-                    ->helperText('Non-interactive account: no password, no sign-in, no backoffice. It authenticates with API tokens issued here, within the api permissions of its roles.')
+                    ->helperText(__('app.help.serviceAccount'))
                     ->live()
                     ->rules([
                         static fn (Get $get): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($get): void {

@@ -3,7 +3,7 @@
         <iframe 
             src="{{ $this->getSwaggerUrl() }}" 
             class="w-full h-[calc(100vh-12rem)] border-0 rounded-lg"
-            title="Swagger API Documentation"
+            title="{{ __('app.pages.apiDocumentation') }}"
         ></iframe>
     </div>
 </x-filament-panels::page>
