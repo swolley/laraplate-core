@@ -15,19 +15,43 @@ final class LocaleContext
     private static ?string $cached_default_locale = null;
 
     /**
-     * Get current locale context.
+     * The locale translated content is read and written in: the content locale the reader picked, when there
+     * is one, else the language of the request.
      */
     public static function get(): string
     {
-        return App::getLocale() ?: self::getDefault();
+        return self::getContentLocale() ?? (App::getLocale() ?: self::getDefault());
     }
 
     /**
-     * Set locale context.
+     * Switches the locale translated content is read and written in. While a content locale is picked, only
+     * that one moves, so the interface keeps the language of the request.
      */
     public static function set(string $locale): void
     {
+        if (self::getContentLocale() !== null) {
+            self::setContentLocale($locale);
+
+            return;
+        }
+
         App::setLocale($locale);
+    }
+
+    /**
+     * The content locale the reader picked for this request, apart from the language of the interface (the
+     * backoffice does), or null when content follows the language of the request.
+     */
+    public static function getContentLocale(): ?string
+    {
+        $locale = app(ContentLocale::class)->locale;
+
+        return $locale !== null && $locale !== '' ? $locale : null;
+    }
+
+    public static function setContentLocale(?string $locale): void
+    {
+        app(ContentLocale::class)->locale = $locale;
     }
 
     /**

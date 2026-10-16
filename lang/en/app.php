@@ -173,6 +173,7 @@ return [
         'expired' => 'Expired',
         'expiring' => 'Expiring',
         'internal' => 'Internal',
+        'missingTranslation' => 'Without a translation in this language',
         'month' => 'Month',
         'notEncrypted' => 'Not encrypted',
         'notInternal' => 'Not internal',
@@ -231,6 +232,7 @@ return [
             200 => 'Updated correctly',
             201 => 'Created correctly',
         ],
+        'translationLocale' => 'Translation: :locale',
         'unsavedChangesClose' => 'There are unsaved changes. Close anyway?',
         'validation' => [
             0 => 'Ok',
@@ -333,6 +335,7 @@ return [
         'title' => 'System maintenance in progress',
     ],
     'menu' => [
+        'contentLanguage' => 'Content language',
         'dashboard' => 'Dashboard',
         'groups' => 'Users\' groups',
         'language' => 'Language',
@@ -493,6 +496,7 @@ return [
         'selectRow' => 'Select row',
         'selected' => 'selected',
         'showColumn' => 'Show column',
+        'shownInLocale' => 'Shown in :locale',
     ],
     'welcome' => [
         'activeModules' => 'Active modules:',

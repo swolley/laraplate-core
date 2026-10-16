@@ -24,6 +24,20 @@ The language of the application is part of your account. In the backoffice open 
 avatar, choose **Language**, pick one and confirm: the page reloads in that language. The choice is saved on
 the server, so the application, your other devices and the notifications and emails sent to you all use it.
 
+## The language of the content in the backoffice
+
+The backoffice keeps the language of its menus and labels apart from the language of the content you edit.
+Content starts in the default language of the installation. To work on another translation, open the menu
+under your avatar, choose **Content language** and pick one: the page reloads and every list and form shows
+and saves that translation, while menus and labels stay in your own language. The page heading of a form
+says which translation you are writing.
+
+In the backoffice every record is listed, translated into that language or not. Where a record has no
+translation yet, the list shows its text in the default language with the language written below it, and the
+**Without a translation in this language** filter lists only those records. Opening one shows its translated
+fields empty, and saving creates the translation. The choice lasts for
+this browser session: signing in again, or from another device, starts from the default language.
+
 ## Seeing and resetting what is saved
 
 The server lets an application show you everything it remembers about you, grouped by the part of the

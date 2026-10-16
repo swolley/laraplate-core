@@ -24,12 +24,19 @@ final class LocaleScope implements Scope
 
         $use_fallback = $fallback_enabled && $current_locale !== $default_locale;
 
-        $builder->whereHas('translations', function (Builder $query) use ($current_locale, $default_locale, $use_fallback): void {
-            $this->applyLocaleConstraint($query, $current_locale, $default_locale, $use_fallback);
-        });
+        // A reader who picked the content locale (the backoffice) sees every record, translated or not, so a
+        // missing translation can be found and written.
+        if (LocaleContext::getContentLocale() === null) {
+            $builder->whereHas('translations', function (Builder $query) use ($current_locale, $default_locale, $use_fallback): void {
+                $this->applyLocaleConstraint($query, $current_locale, $default_locale, $use_fallback);
+            });
+        }
 
         // Eager load traduzione corrente (con fallback se abilitato)
-        $this->eagerLoadTranslation($builder, $current_locale, $default_locale, $fallback_enabled);
+        // The backoffice lists every record, so where the content locale has no translation it shows the default
+        // one, whatever the model's fallback: an empty cell would read as missing data. Forms do not use this
+        // relation for what they write (they ask for the translation without fallback).
+        $this->eagerLoadTranslation($builder, $current_locale, $default_locale, $fallback_enabled || LocaleContext::getContentLocale() !== null);
     }
 
     /**

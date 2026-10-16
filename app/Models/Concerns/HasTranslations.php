@@ -182,7 +182,9 @@ trait HasTranslations
     {
         $current_locale = LocaleContext::get();
         $default_locale = LocaleContext::getDefault();
-        $fallback_enabled = $this->isFallbackEnabled();
+        // The backoffice (a picked content locale) shows the default text where a translation is missing, whatever
+        // the model's fallback; what it writes never comes from this relation.
+        $fallback_enabled = $this->isFallbackEnabled() || LocaleContext::getContentLocale() !== null;
 
         $relation = $this->hasOne(static::getTranslationModelClass());
 
@@ -240,14 +242,7 @@ trait HasTranslations
      */
     public function setTranslation(string $locale, array $data): self
     {
-        $data = $this->ensureTranslationFieldDefaults($data);
-        $translation = $this->translations()->where('locale', $locale)->first();
-
-        if ($translation) {
-            $translation->update($data);
-        } else {
-            $this->translations()->create(array_merge($data, ['locale' => $locale]));
-        }
+        $this->writeTranslation($locale, $this->ensureTranslationFieldDefaults($data));
 
         // Reload if current translation
         if ($locale === LocaleContext::get()) {
@@ -459,14 +454,7 @@ trait HasTranslations
         }
 
         foreach ($this->pending_translations as $locale => $fields) {
-            $fields = $this->ensureTranslationFieldDefaults($fields);
-            $translation = $this->translations()->where('locale', $locale)->first();
-
-            if ($translation) {
-                $translation->update($fields);
-            } else {
-                $this->translations()->create(array_merge($fields, ['locale' => $locale]));
-            }
+            $this->writeTranslation($locale, $this->ensureTranslationFieldDefaults($fields));
         }
 
         // Clear pending translations
@@ -600,6 +588,20 @@ trait HasTranslations
             return $translation->{$key};
         }
 
+        // Not loaded: the record's own translation in this locale comes before any fallback, and is kept for
+        // the next reads.
+        if (! $this->relationLoaded('translation') && $this->exists) {
+            $translation = $this->translationInLocale($current_locale);
+
+            if ($translation instanceof Model) {
+                $this->setRelation('translation', $translation);
+
+                if (isset($translation->{$key})) {
+                    return $translation->{$key};
+                }
+            }
+        }
+
         // Fallback to default translation if enabled
         if ($fallback_enabled) {
             // Check the already-loaded translations collection before issuing a new query
@@ -660,6 +662,52 @@ trait HasTranslations
     protected function translationsSet(string $key, mixed $value): void
     {
         $this->setTranslatableFieldValue($key, $value);
+    }
+
+    /**
+     * Updates the record's translation in the locale, or creates it. A translation removed earlier is still in
+     * its table and holds the unique (record, locale) key, so it is revived and overwritten, in one write,
+     * instead of being inserted again.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    private function writeTranslation(string $locale, array $fields): void
+    {
+        $query = $this->translations();
+
+        if (method_exists($query->getRelated(), 'trashed')) {
+            $query->withTrashed();
+        }
+
+        $translation = $query->where('locale', $locale)->first();
+
+        if (! $translation instanceof Model) {
+            $this->translations()->create(array_merge($fields, ['locale' => $locale]));
+
+            return;
+        }
+
+        if (method_exists($translation, 'trashed') && $translation->trashed() && method_exists($translation, 'reviveInMemory')) {
+            $translation->reviveInMemory();
+        }
+
+        $translation->fill($fields)->save();
+    }
+
+    /**
+     * The record's translation in the locale, from the loaded translations when there are, else from the database.
+     *
+     * @return TTranslationModel|null
+     */
+    private function translationInLocale(string $locale): ?Model
+    {
+        $loaded_translations = $this->relationLoaded('translations') ? $this->getRelationValue('translations') : null;
+
+        if ($loaded_translations instanceof Collection) {
+            return $loaded_translations->firstWhere('locale', $locale);
+        }
+
+        return $this->translations()->where('locale', $locale)->first();
     }
 
     private function isFallbackEnabled(): bool

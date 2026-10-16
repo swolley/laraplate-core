@@ -72,6 +72,7 @@ use Modules\Core\Graph\Contracts\GraphProviderRegistryInterface;
 use Modules\Core\Graph\Contracts\GraphToolGatewayInterface;
 use Modules\Core\Graph\GraphProviderRegistry;
 use Modules\Core\Graph\GraphToolGateway;
+use Modules\Core\Helpers\ContentLocale;
 use Modules\Core\Http\Controllers\DocsController;
 use Modules\Core\Http\Middleware\AddContext;
 use Modules\Core\Http\Middleware\ApplyDatabaseSettingsOverlay;
@@ -230,6 +231,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // is served by a long-lived worker.
         $this->app->scoped(DynamicContentsService::class);
         $this->app->scoped(DynamicEntityService::class);
+
+        // The content locale a reader picked (the backoffice), for this request or job only.
+        $this->app->scoped(ContentLocale::class);
 
         // Carries the password from Attempting to Login within one request, and never past it.
         $this->app->scoped(LogoutOtherDevicesListener::class);

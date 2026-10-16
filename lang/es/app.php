@@ -173,6 +173,7 @@ return [
         'expired' => 'Caducado',
         'expiring' => 'Por caducar',
         'internal' => 'Internos',
+        'missingTranslation' => 'Sin traducción en este idioma',
         'month' => 'Mes',
         'notEncrypted' => 'No cifrados',
         'notInternal' => 'No internos',
@@ -231,6 +232,7 @@ return [
             200 => 'Modificación realizada',
             201 => 'Inserción realizada',
         ],
+        'translationLocale' => 'Traducción: :locale',
         'unsavedChangesClose' => 'Hay cambios sin guardar. ¿Cerrar de todos modos?',
         'validation' => [
             0 => 'Ok',
@@ -333,6 +335,7 @@ return [
         'title' => 'Mantenimiento del sistema en curso',
     ],
     'menu' => [
+        'contentLanguage' => 'Idioma del contenido',
         'dashboard' => 'Tablero',
         'groups' => 'Grupos de usuarios',
         'language' => 'Idioma',
@@ -493,6 +496,7 @@ return [
         'selectRow' => 'Seleccionar fila',
         'selected' => 'seleccionados',
         'showColumn' => 'Mostrar columna',
+        'shownInLocale' => 'Mostrado en :locale',
     ],
     'welcome' => [
         'activeModules' => 'Módulos activos:',

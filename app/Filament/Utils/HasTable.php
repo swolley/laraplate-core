@@ -23,6 +23,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\BaseFilter;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -383,6 +384,10 @@ trait HasTable
 
         if ($columns !== null) {
             $columns($default_columns);
+        }
+
+        if ($hasTranslations) {
+            self::markTextShownInAnotherLocale($default_columns);
         }
 
         $strip = FilamentTraitResolver::HAS_TABLE_STRIP_FROM_GENERATED_COLUMNS;
@@ -836,6 +841,14 @@ trait HasTable
 
         if ($hasTranslations) {
             $default_filters->add(
+                Filter::make('missing_translation')
+                    ->label(static fn (): string => (string) __('app.filters.missingTranslation'))
+                    ->query(static fn (Builder $query): Builder => $query->whereDoesntHave(
+                        'translations',
+                        static fn (Builder $translations): Builder => $translations->where('locale', LocaleContext::get()),
+                    )),
+            );
+            $default_filters->add(
                 SelectFilter::make('translations.locale')
                     ->multiple()
                     ->options(LocaleContext::getAvailable())
@@ -923,6 +936,39 @@ trait HasTable
      *
      * @return list<string>
      */
+    /**
+     * A translated text column shows the default locale's text where the content locale has no translation
+     * ({@see \Modules\Core\Overrides\LocaleScope}); the column then says so below the text, so the row does not
+     * pass for translated.
+     *
+     * @param  Collection<int, Column>  $columns
+     */
+    private static function markTextShownInAnotherLocale(Collection $columns): void
+    {
+        foreach ($columns as $column) {
+            if (! $column instanceof TextColumn || $column->hasDescription()) {
+                continue;
+            }
+
+            $name = $column->getName();
+
+            // Asked of the record when the cell renders, not while the table is built: resolving the translated
+            // fields loads the translation model, which the table does not otherwise need.
+            $column->description(static function (Model $record) use ($name): ?string {
+                if (! method_exists($record, 'isTranslatableField') || ! $record->isTranslatableField($name)) {
+                    return null;
+                }
+
+                $translation = $record->relationLoaded('translation') ? $record->getRelationValue('translation') : null;
+                $locale = $translation instanceof Model ? $translation->getAttribute('locale') : null;
+
+                return is_string($locale) && $locale !== LocaleContext::get()
+                    ? (string) __('app.tables.shownInLocale', ['locale' => mb_strtoupper($locale)])
+                    : null;
+            });
+        }
+    }
+
     private static function translationFlagUrls(Model $record, FlagCDNService $flag_cdn_service): array
     {
         $translations = $record->getRelationValue('translations');

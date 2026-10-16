@@ -27,7 +27,7 @@ trait AssignsAttributesOwnedByTheForm
     }
 
     /**
-     * Translated fields are written in the current locale, so the page says which one it is.
+     * Translated fields are written in the content locale, so the page says which one it is.
      */
     #[Override]
     public function getSubheading(): string|Htmlable|null
@@ -36,7 +36,7 @@ trait AssignsAttributesOwnedByTheForm
             return parent::getSubheading();
         }
 
-        return 'Translation: ' . LocaleContext::get();
+        return (string) __('app.form.translationLocale', ['locale' => LocaleContext::get()]);
     }
 
     /**

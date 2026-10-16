@@ -173,6 +173,7 @@ return [
         'expired' => 'Abgelaufen',
         'expiring' => 'Läuft bald ab',
         'internal' => 'Intern',
+        'missingTranslation' => 'Ohne Übersetzung in dieser Sprache',
         'month' => 'Monat',
         'notEncrypted' => 'Nicht verschlüsselt',
         'notInternal' => 'Nicht intern',
@@ -231,6 +232,7 @@ return [
             200 => 'Änderung vorgenommen',
             201 => 'Einfügung vorgenommen',
         ],
+        'translationLocale' => 'Übersetzung: :locale',
         'unsavedChangesClose' => 'Es gibt ungespeicherte Änderungen. Trotzdem schließen?',
         'validation' => [
             0 => 'Ok',
@@ -333,6 +335,7 @@ return [
         'title' => 'Systemwartung läuft',
     ],
     'menu' => [
+        'contentLanguage' => 'Inhaltssprache',
         'dashboard' => 'Dashboard',
         'groups' => 'Benutzergruppen',
         'language' => 'Sprache',
@@ -493,6 +496,7 @@ return [
         'selectRow' => 'Zeile auswählen',
         'selected' => 'ausgewählt',
         'showColumn' => 'Spalte anzeigen',
+        'shownInLocale' => 'Angezeigt in :locale',
     ],
     'welcome' => [
         'activeModules' => 'Aktive Module:',

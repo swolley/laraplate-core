@@ -25,3 +25,33 @@ it('keeps the default locale when the request switches language', function (): v
         ->and(LocaleContext::isDefault('en'))->toBeTrue()
         ->and(LocaleContext::isDefault('de'))->toBeFalse();
 });
+
+it('reads the content locale the reader picked instead of the language of the request', function (): void {
+    LocaleContext::set('de');
+    LocaleContext::setContentLocale('it');
+
+    expect(LocaleContext::get())->toBe('it')
+        ->and(App::getLocale())->toBe('de')
+        ->and(LocaleContext::getContentLocale())->toBe('it');
+});
+
+it('moves only the content locale while one is picked, so the interface keeps its language', function (): void {
+    LocaleContext::set('de');
+    LocaleContext::setContentLocale('it');
+
+    $previous = LocaleContext::get();
+    LocaleContext::set('fr');
+    $inside = LocaleContext::get();
+    LocaleContext::set($previous);
+
+    expect($inside)->toBe('fr')
+        ->and(LocaleContext::get())->toBe('it')
+        ->and(App::getLocale())->toBe('de');
+});
+
+it('follows the language of the request when no content locale is picked', function (): void {
+    LocaleContext::set('de');
+
+    expect(LocaleContext::getContentLocale())->toBeNull()
+        ->and(LocaleContext::get())->toBe('de');
+});

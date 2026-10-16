@@ -476,3 +476,22 @@ it('hides a record with no translation in the language of the request when the f
 
     expect(FakeTranslatableModel::query()->find($id))->toBeNull();
 });
+
+it('keeps every record visible when the reader picked a content locale, showing the default text where it is missing', function (): void {
+    configureFakeTranslatableFallback(false);
+    $untranslated = fakeTranslatedOnlyInDefaultLocale('Only in the default locale');
+    $translated = fakeTranslatedOnlyInDefaultLocale('Default text');
+    Modules\Core\Tests\Fixtures\FakeTranslatableModelTranslation::query()->create([
+        'fake_translatable_model_id' => $translated,
+        'locale' => 'de',
+        'title' => 'Deutscher Text',
+    ]);
+
+    LocaleContext::setContentLocale('de');
+
+    $records = FakeTranslatableModel::query()->get()->keyBy('id');
+
+    expect($records->keys()->all())->toEqualCanonicalizing([$untranslated, $translated])
+        ->and($records[$translated]->title)->toBe('Deutscher Text')
+        ->and($records[$untranslated]->title)->toBe('Only in the default locale');
+});

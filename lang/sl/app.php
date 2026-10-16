@@ -173,6 +173,7 @@ return [
         'expired' => 'Poteklo',
         'expiring' => 'Kmalu poteče',
         'internal' => 'Notranje',
+        'missingTranslation' => 'Brez prevoda v tem jeziku',
         'month' => 'Mesec',
         'notEncrypted' => 'Nešifrirane',
         'notInternal' => 'Ne notranje',
@@ -231,6 +232,7 @@ return [
             200 => 'Sprememba izvedena',
             201 => 'Vstavljanje izvedeno',
         ],
+        'translationLocale' => 'Prevod: :locale',
         'unsavedChangesClose' => 'Nekatere spremembe niso shranjene. Vseeno zapreti?',
         'validation' => [
             0 => 'Ok',
@@ -333,6 +335,7 @@ return [
         'title' => 'Vzdrževanje sistema poteka',
     ],
     'menu' => [
+        'contentLanguage' => 'Jezik vsebine',
         'dashboard' => 'Nadzorna plošča',
         'groups' => 'Uporabniške skupine',
         'language' => 'Jezik',
@@ -493,6 +496,7 @@ return [
         'selectRow' => 'Izberi vrstico',
         'selected' => 'izbrano',
         'showColumn' => 'Pokaži stolpec',
+        'shownInLocale' => 'Prikazano v :locale',
     ],
     'welcome' => [
         'activeModules' => 'Aktivni moduli:',
