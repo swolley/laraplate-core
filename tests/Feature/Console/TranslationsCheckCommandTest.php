@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Console\OutputStyle;
+use Illuminate\Support\Facades\Process;
 use Modules\Core\Console\TranslationsCheckCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -167,4 +168,42 @@ it('keeps translation file identifiers unchanged outside the language directory'
 
     expect($method->invoke($command, DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en' . DIRECTORY_SEPARATOR, $file))
         ->toBe($file);
+});
+
+it('rewrites unsorted translation files in the format Pint produces', function (): void {
+    $command = translationsCheckCommandWithOutput(app(TranslationsCheckCommand::class));
+    $sort = new ReflectionMethod(TranslationsCheckCommand::class, 'sortTranslations');
+
+    $base = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tr_pint_' . uniqid('', false);
+    $en_dir = $base . DIRECTORY_SEPARATOR . 'en';
+    mkdir($en_dir, 0755, true);
+
+    $file = $en_dir . DIRECTORY_SEPARATOR . 'messages.php';
+    file_put_contents($file, <<<'PHP'
+        <?php return array('zebra' => 'It\'s a "zebra"', 'empty' => array(), 'nested' => array('b' => 'Back\\slash', 'a' => 'A'), 'alpha' => 'A');
+        PHP);
+
+    $translations = [];
+    $ignored = [];
+    $sort->invokeArgs($command, [&$translations, $en_dir, $file, &$ignored]);
+
+    $written = file_get_contents($file);
+    $pint = Process::path(base_path())->run([base_path('vendor/bin/pint'), '--test', $file]);
+    $sort->invokeArgs($command, [&$translations, $en_dir, $file, &$ignored]);
+    $rewritten_again = file_get_contents($file);
+    $reloaded = require $file;
+
+    unlink($file);
+    rmdir($en_dir);
+    rmdir($base);
+
+    expect($written)->toStartWith("<?php\n\ndeclare(strict_types=1);\n\nreturn [\n")
+        ->and($pint->successful())->toBeTrue($pint->output() . $pint->errorOutput())
+        ->and($rewritten_again)->toBe($written)
+        ->and($reloaded)->toBe([
+            'alpha' => 'A',
+            'empty' => [],
+            'nested' => ['a' => 'A', 'b' => 'Back\\slash'],
+            'zebra' => 'It\'s a "zebra"',
+        ]);
 });

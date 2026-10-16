@@ -110,8 +110,7 @@ final class TranslationsCheckCommand extends Command
             return;
         }
 
-        $replaced = mb_ltrim((string) preg_replace(["/(=> \n\s+)?array \(/", "/\)/"], ['=> [', ']'], $imported), '=> ');
-        file_put_contents($file, "<?php\n\nreturn " . $replaced . ';');
+        file_put_contents($file, "<?php\n\ndeclare(strict_types=1);\n\nreturn " . $this->exportArray(array_sort_keys($labels)) . ";\n");
         $this->output->writeln(sprintf('<info>%s has been sorted</info>', $file));
     }
 
@@ -186,6 +185,38 @@ final class TranslationsCheckCommand extends Command
         if (! $any_missing_file) {
             $this->output->writeln('<info>All languages are correctly translated</info>');
         }
+    }
+
+    /**
+     * Export an array as PHP source in the format Pint produces: short array syntax,
+     * four-space indentation, single-quoted strings and trailing commas.
+     *
+     * @param  array<array-key, mixed>  $values
+     */
+    private function exportArray(array $values, int $depth = 1): string
+    {
+        if ($values === []) {
+            return '[]';
+        }
+
+        $indent = str_repeat('    ', $depth);
+        $lines = [];
+
+        foreach ($values as $key => $value) {
+            $exported_value = is_array($value) ? $this->exportArray($value, $depth + 1) : $this->exportScalar($value);
+            $lines[] = $indent . var_export($key, true) . ' => ' . $exported_value . ',';
+        }
+
+        return "[\n" . implode("\n", $lines) . "\n" . str_repeat('    ', $depth - 1) . ']';
+    }
+
+    private function exportScalar(mixed $value): string
+    {
+        return match (true) {
+            $value === null => 'null',
+            is_bool($value) => $value ? 'true' : 'false',
+            default => var_export($value, true),
+        };
     }
 
     private function buildTranslationFileIdentifier(string $lang_directory, string $file): string
