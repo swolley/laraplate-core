@@ -478,6 +478,10 @@ if (! function_exists('controllers')) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
 
             $controllers_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Http' . DIRECTORY_SEPARATOR . 'Controllers' : $modules_controllers_folder);
+            if (! is_dir($controllers_path)) {
+                continue;
+            }
+            
             $controllers_files = File::allFiles($controllers_path);
 
             if ($is_app) {

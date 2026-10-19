@@ -1,6 +1,7 @@
 @props(['module', 'data'])
 
-<div class="module {{ ! $data['isEnabled'] ? 'disabled' : '' }} flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#a5ac56] dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#a5ac56]">
+<div
+	class="module {{ ! $data['isEnabled'] ? 'disabled' : '' }} flex items-start gap-4 rounded-lg bg-white p-6 shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] transition duration-300 hover:text-black/70 hover:ring-black/20 focus:outline-none focus-visible:ring-[#a5ac56] dark:bg-zinc-900 dark:ring-zinc-800 dark:hover:text-white/70 dark:hover:ring-zinc-700 dark:focus-visible:ring-[#a5ac56]">
 	@if(! $data['isEnabled'])
 		<x-core::cancel-icon style="color: var(--color-gray-600);" />
 	@endif
@@ -25,15 +26,18 @@
 
 				<div class="ml-12">
 					@if ($data['models'] === [])
-					<div class="mt-2 text-sm">
-						<span class="text-gray-700">No Model found</span>
-					</div>
+						<div class="mt-2 text-sm">
+							<span class="text-gray-700">No Model found</span>
+						</div>
 					@else
-					@foreach ($data['models'] as $model)
-					<div class="mt-2 text-sm">
-						<span class="text-gray-600 dark:text-gray-400">{{ Str::afterLast($model, '\\') }}</span>
-					</div>
-					@endforeach
+						@foreach ($data['models'] as $model)
+							<div class="mt-2 text-sm truncate">
+								@php
+									$name = Str::afterLast($model, '\\');
+								@endphp
+								<span class="text-gray-600 dark:text-gray-400" title="{{ $name }}">{{ $name }}</span>
+							</div>
+						@endforeach
 					@endif
 				</div>
 			</div>
@@ -47,15 +51,18 @@
 
 				<div class="ml-12">
 					@if ($data['controllers'] === [])
-					<div class="mt-2 text-sm">
-						<span class="text-gray-700">No Controller found</span>
-					</div>
+						<div class="mt-2 text-sm">
+							<span class="text-gray-700">No Controller found</span>
+						</div>
 					@else
-					@foreach ($data['controllers'] as $controller)
-					<div class="mt-2 text-sm">
-						<span class="text-gray-600 dark:text-gray-400">{{ Str::afterLast($controller, '\\') }}</span>
-					</div>
-					@endforeach
+						@foreach ($data['controllers'] as $controller)
+							@php
+								$name = Str::afterLast($controller, '\\');
+							@endphp
+							<div class="mt-2 text-sm truncate">
+								<span class="text-gray-600 dark:text-gray-400" title="{{ $name }}">{{ $name }}</span>
+							</div>
+						@endforeach
 					@endif
 				</div>
 			</div>
