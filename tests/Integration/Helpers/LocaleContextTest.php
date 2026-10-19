@@ -55,3 +55,26 @@ it('follows the language of the request when no content locale is picked', funct
     expect(LocaleContext::getContentLocale())->toBeNull()
         ->and(LocaleContext::get())->toBe('de');
 });
+
+it('follows the default language setting', function (): void {
+    config(['app.default_locale' => 'en', 'app.available_locales' => ['en', 'it'], 'core.default_language' => 'it']);
+
+    expect(LocaleContext::getDefault())->toBe('it')
+        ->and(LocaleContext::isDefault('it'))->toBeTrue();
+});
+
+it('keeps the installation default when the default language setting is not an available locale', function (): void {
+    config(['app.default_locale' => 'en', 'app.available_locales' => ['en', 'it'], 'core.default_language' => 'xx']);
+
+    expect(LocaleContext::getDefault())->toBe('en');
+});
+
+it('resolves the default locale again when the setting changes', function (): void {
+    config(['app.default_locale' => 'en', 'app.available_locales' => ['en', 'it'], 'core.default_language' => 'en']);
+    expect(LocaleContext::getDefault())->toBe('en');
+
+    config(['core.default_language' => 'it']);
+
+    expect(LocaleContext::getDefault())->toBe('it')
+        ->and(LocaleContext::getDefaultCached())->toBe('it');
+});

@@ -495,3 +495,26 @@ it('keeps every record visible when the reader picked a content locale, showing 
         ->and($records[$translated]->title)->toBe('Deutscher Text')
         ->and($records[$untranslated]->title)->toBe('Only in the default locale');
 });
+
+it('falls back to the locale the default language setting names, once the setting is saved', function (): void {
+    configureFakeTranslatableFallback(true);
+    config(['app.available_locales' => ['en', 'it', 'de']]);
+    $id = (new FakeTranslatableModel)->newQueryWithoutScopes()->insertGetId(['created_at' => now(), 'updated_at' => now()]);
+    Modules\Core\Tests\Fixtures\FakeTranslatableModelTranslation::query()->create([
+        'fake_translatable_model_id' => $id,
+        'locale' => 'it',
+        'title' => 'Solo italiano',
+    ]);
+
+    Setting::factory()->persistedWithoutApprovalCapture()->create([
+        'name' => 'default_language',
+        'module' => 'Core',
+        'value' => 'it',
+        'type' => SettingTypeEnum::String,
+        'group_name' => 'core',
+        'description' => 'test',
+    ]);
+    LocaleContext::set('de');
+
+    expect(FakeTranslatableModel::query()->find($id)?->title)->toBe('Solo italiano');
+});

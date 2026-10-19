@@ -101,3 +101,12 @@ it('writes model-owned seeder records on the owning model connection', function 
         expect($rows)->toBeGreaterThan(0, $model::class . ' rows must exist on its own connection.');
     }
 });
+
+it('seeds the default language from the installation default, not from the language of the request', function () use ($seed): void {
+    Setting::query()->withoutGlobalScopes()->where('name', 'default_language')->forceDelete();
+    config(['app.default_locale' => 'en', 'app.locale' => 'de']);
+
+    $seed();
+
+    expect(Setting::query()->withoutGlobalScopes()->where('name', 'default_language')->sole()->value)->toBe('en');
+});

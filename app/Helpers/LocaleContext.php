@@ -15,6 +15,14 @@ final class LocaleContext
     private static ?string $cached_default_locale = null;
 
     /**
+     * The configured values the cached default was resolved from: when the setting or the installation default
+     * changes, the default is resolved again.
+     *
+     * @var array{0: mixed, 1: mixed}|null
+     */
+    private static ?array $cached_default_source = null;
+
+    /**
      * The locale translated content is read and written in: the content locale the reader picked, when there
      * is one, else the language of the request.
      */
@@ -71,27 +79,32 @@ final class LocaleContext
     }
 
     /**
-     * The locale translations fall back to. Not app.locale, which is the language of the current request:
-     * App::setLocale() rewrites it, and the localization middleware calls it for every user whose language
-     * is not the default one.
+     * The locale translations fall back to: the `default_language` setting (`core.default_language`) when it
+     * names an available locale, else the installation default `app.default_locale` (APP_LOCALE). Not
+     * app.locale, which is the language of the current request: App::setLocale() rewrites it, and the
+     * localization middleware calls it for every user whose language is not the default one.
+     *
+     * Resolved once per configured value: checking availability scans the lang directories, and this runs on
+     * every translated query.
      */
     public static function getDefault(): string
     {
-        $locale = config('app.default_locale');
+        $source = [config('core.default_language'), config('app.default_locale')];
 
-        return is_string($locale) && $locale !== '' ? $locale : (string) config('app.fallback_locale', 'en');
-    }
-
-    /**
-     * Get default locale from config, cached once per request/process.
-     */
-    public static function getDefaultCached(): string
-    {
-        if (self::$cached_default_locale === null) {
-            self::$cached_default_locale = self::getDefault();
+        if (self::$cached_default_locale === null || self::$cached_default_source !== $source) {
+            self::$cached_default_source = $source;
+            self::$cached_default_locale = self::resolveDefault($source[0], $source[1]);
         }
 
         return self::$cached_default_locale;
+    }
+
+    /**
+     * Get default locale from config, cached once per configured value.
+     */
+    public static function getDefaultCached(): string
+    {
+        return self::getDefault();
     }
 
     /**
@@ -100,5 +113,19 @@ final class LocaleContext
     public static function resetDefaultLocaleCache(): void
     {
         self::$cached_default_locale = null;
+        self::$cached_default_source = null;
+    }
+
+    private static function resolveDefault(mixed $configured, mixed $installed): string
+    {
+        $installed = is_string($installed) && $installed !== '' ? $installed : (string) config('app.fallback_locale', 'en');
+
+        if (! is_string($configured) || $configured === '' || $configured === $installed) {
+            return $installed;
+        }
+
+        $available = config('app.available_locales', translations());
+
+        return is_array($available) && in_array($configured, $available, true) ? $configured : $installed;
     }
 }

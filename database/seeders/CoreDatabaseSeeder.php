@@ -473,12 +473,13 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
         $core_settings = [
             [
                 'name' => 'default_language',
-                'value' => config('app.locale'),
+                // The installation default, not app.locale: that is the language of the request running the seeder.
+                'value' => config('app.default_locale'),
                 'encrypted' => false,
                 'choices' => translations(onlyActive: false),
                 'type' => SettingTypeEnum::String,
                 'group_name' => 'core',
-                'description' => 'Default language for the application',
+                'description' => 'Default language: translations fall back to it and automatic translations start from it. Changing it with content in place moves both to the new language; content translated only in the old one loses its fallback.',
             ],
             [
                 'name' => 'crud.pagination',
