@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Modules\CMS\Helpers\HasTags;
 use Modules\Core\Listeners\RemoveOriginOfDeletedRecord;
-use Modules\Core\Models\Concerns\HasApprovals;
 use Modules\Core\Observers\UserObserver;
 use Modules\Core\Search\Traits\RemovesEmbeddingsWithRecord;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -25,12 +24,13 @@ function polymorphic_column_classes(): array
     return [
         'create_taggables_table:taggable' => ['child', HasTags::class],
         'create_model_embeddings_table:model' => ['child', RemovesEmbeddingsWithRecord::class],
-        'create_modifications_table:modifiable' => ['child', HasApprovals::class],
         'create_media_table:model' => ['child', InteractsWithMedia::class],
         'create_record_origins_table:referable' => ['child', RemoveOriginOfDeletedRecord::class],
         'create_notifications_table:notifiable' => ['child', UserObserver::class],
         'create_personal_access_tokens_table:tokenable' => ['child', UserObserver::class],
-        // Who asked for a change and who voted on it: the audit of the approval, kept with the voter shown as deleted.
+        // Who asked for a change and who voted on it: the record of the approval, kept with the record or the
+        // voter shown as deleted. A hard delete closes the modifications still pending (HasApprovals).
+        'create_modifications_table:modifiable' => ['reference'],
         'create_modifications_table:modifier' => ['reference'],
         'create_approvals_table:approver' => ['reference'],
         'create_disapprovals_table:disapprover' => ['reference'],

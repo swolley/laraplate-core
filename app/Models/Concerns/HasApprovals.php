@@ -101,11 +101,12 @@ trait HasApprovals
             return null;
         });
 
-        // The modifications of a record hang from it by a polymorphic key: a record deleted for good takes them
-        // along (their votes follow by foreign key), one moved to the bin keeps them.
+        // A record deleted for good can no longer receive the changes still waiting for approval, so they are
+        // closed. The rows stay, with their votes: they are the record of who asked and who approved, the
+        // deletion itself included when it was approved. A move to the bin changes nothing.
         static::deleted(static function (Model $item): void {
             if (! $item->exists) {
-                $item->modifications()->delete();
+                $item->modifications()->activeOnly()->toBase()->update(['active' => false]);
             }
         });
 

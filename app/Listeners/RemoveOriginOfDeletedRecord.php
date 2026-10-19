@@ -34,6 +34,7 @@ final class RemoveOriginOfDeletedRecord
         $origin->setConnection($model->getConnectionName());
 
         $origin->newQuery()
+            ->toBase()
             ->where('referable_type', $model->getMorphClass())
             ->where('referable_id', $model->getKey())
             ->delete();
