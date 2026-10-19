@@ -15,6 +15,7 @@ enum CoreTables: string
     case Taxonomies = 'core_taxonomies';
     case Places = 'core_places';
     case Licenses = 'core_licenses';
+    case Modules = 'core_modules';
     case CronJobs = 'core_cron_jobs';
     case Templates = 'core_templates';
     case Presets = 'core_presets';

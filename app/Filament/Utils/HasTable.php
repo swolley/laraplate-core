@@ -22,6 +22,7 @@ use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\BaseFilter;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -250,6 +251,36 @@ trait HasTable
         return once(fn (): bool => $user->can($permission));
     }
 
+    /**
+     * Whether the signed-in user holds the `update` permission of the record's table.
+     */
+    protected static function canUpdateRecord(Model $record): bool
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $meta = ModelMetadataRegistry::getInstance()->get($record::class);
+
+        return self::checkPermissionCached(
+            $user,
+            sprintf('%s.%s.update', PermissionName::normalizeConnection($meta->connection), $meta->table),
+        );
+    }
+
+    /**
+     * A boolean column rendered as a switch that saves on click, locked for users who cannot update the record.
+     */
+    protected static function toggleColumn(string $name): ToggleColumn
+    {
+        return ToggleColumn::make($name)
+            ->alignCenter()
+            ->grow(false)
+            ->disabled(static fn (Model $record): bool => ! self::canUpdateRecord($record));
+    }
+
     private static function configureColumns(
         Table $table,
         bool $hasSoftDeletes,
@@ -419,7 +450,7 @@ trait HasTable
         $default_columns->each(static function (Column $column): void {
             // Check if the column is an IconColumn or has boolean formatting
             if (
-                ($column instanceof ImageColumn || $column instanceof IconColumn)
+                ($column instanceof ImageColumn || $column instanceof IconColumn || $column instanceof ToggleColumn)
                 || (method_exists($column, 'isBoolean') && $column->isBoolean())
             ) {
                 $column->alignCenter();

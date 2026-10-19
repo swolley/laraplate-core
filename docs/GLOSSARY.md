@@ -123,7 +123,7 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | Term | Meaning |
 |------|---------|
 | **Setting** | Key/value store (often JSON) for runtime configuration. |
-| **ModuleDatabaseActivator** | Enables/disables modules via `active_modules` setting. |
+| **ModuleDatabaseActivator** | Enables/disables modules through one `core_modules` row per module (`is_active`, frontend `url`); `Core` cannot be disabled. |
 | **CronJob** | Scheduled task definition managed in Filament: the name of an artisan command (no arguments in it), its `parameters` (a list of strings, in order: a flag `--all`, an option with a value `--limit=10`, or an argument; the value is escaped by the scheduler, a value must not start with a dash, and a value of `@now` or `@today` is replaced by that date, as ISO 8601, each time the job runs), a cron expression, and the flags `on_one_server` and `without_overlapping`, both on by default. |
 
 ## Related reading

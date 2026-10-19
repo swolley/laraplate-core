@@ -80,6 +80,10 @@ return [
             'plural' => 'Spremembe',
             'singular' => 'Sprememba',
         ],
+        'modules' => [
+            'plural' => 'Moduli',
+            'singular' => 'Modul',
+        ],
         'permissions' => [
             'plural' => 'Dovoljenja',
             'singular' => 'Dovoljenje',

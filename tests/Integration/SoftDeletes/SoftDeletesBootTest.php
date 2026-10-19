@@ -19,7 +19,7 @@ it('boots soft deletes trait without a database connection resolver', function (
     expect(SoftDeletesStubModel::hasGlobalScope(CustomSoftDeletingScope::class))->toBeTrue();
 });
 
-it('returns false from checkSettingTable when the database is not bound', function (): void {
+it('returns false from checkModulesTable when the database is not bound', function (): void {
     $app = app();
     $had_db = $app->bound('db');
     $db = $had_db ? $app->make('db') : null;
@@ -29,7 +29,7 @@ it('returns false from checkSettingTable when the database is not bound', functi
     }
 
     try {
-        expect(ModuleDatabaseActivator::checkSettingTable())->toBeFalse();
+        expect(ModuleDatabaseActivator::checkModulesTable())->toBeFalse();
     } finally {
         if ($had_db && $db !== null) {
             $app->instance('db', $db);
@@ -59,7 +59,7 @@ it('checks the configured model table and connection without the Eloquent resolv
     Model::unsetConnectionResolver();
 
     try {
-        expect(ModuleDatabaseActivator::checkSettingTable())->toBeTrue();
+        expect(ModuleDatabaseActivator::checkModulesTable())->toBeTrue();
     } finally {
         ModuleDatabaseActivator::$MODEL_NAME = $original_model;
         Cache::forget('modules_db_activator_checked');

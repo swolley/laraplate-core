@@ -4,61 +4,69 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\ModuleDatabaseActivator;
-use Modules\Core\Models\Setting;
+use Modules\Core\Models\Module;
 
 beforeEach(function (): void {
     config()->set('modules.cache.enabled', false);
     Cache::forget('modules_db_activator_statuses');
 });
 
-it('realigns stale choices with the modules on disk when the active modules change', function (): void {
-    $all_modules = ModuleDatabaseActivator::getAllModulesNames();
-    $stale_choices = array_values(array_diff($all_modules, ['Core']));
-
-    Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->forceDelete();
-    Setting::query()->create([
-        'name' => ModuleDatabaseActivator::$RECORD_NAME,
-        'value' => $stale_choices,
-        'choices' => $stale_choices,
-        'type' => 'json',
-        'group_name' => 'core',
-        'description' => 'application modules',
-    ]);
-
-    new ModuleDatabaseActivator(app())->setActiveByName('Core', true);
-
-    $setting = Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->sole();
-
-    expect($setting->value)->toContain('Core')
-        ->and(array_diff($setting->value, $setting->choices))->toBe([])
-        ->and($setting->choices)->toEqualCanonicalizing($all_modules);
-});
-
-it('refreshes stale choices when seeding the backend modules record', function (): void {
-    $all_modules = ModuleDatabaseActivator::getAllModulesNames();
-
-    Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->forceDelete();
-    Setting::query()->create([
-        'name' => ModuleDatabaseActivator::$RECORD_NAME,
-        'value' => ['Core'],
-        'choices' => ['Core'],
-        'type' => 'json',
-        'group_name' => 'core',
-        'description' => 'application modules',
-    ]);
-
-    $setting = ModuleDatabaseActivator::seedBackendModules()->refresh();
-
-    expect($setting->choices)->toEqualCanonicalizing($all_modules);
-});
-
-it('creates the missing backend modules record on first read with every required column', function (): void {
-    Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->forceDelete();
+it('creates an active row for every module on disk on first read', function (): void {
+    Module::query()->delete();
 
     new ModuleDatabaseActivator(app())->hasStatus('Core', true);
 
-    $setting = Setting::query()->where('name', ModuleDatabaseActivator::$RECORD_NAME)->sole();
+    expect(Module::query()->pluck('name')->all())->toEqualCanonicalizing(ModuleDatabaseActivator::getAllModulesNames())
+        ->and(Module::query()->where('is_active', false)->exists())->toBeFalse();
+});
 
-    expect($setting->encrypted)->toBeFalse()
-        ->and($setting->value)->toEqualCanonicalizing(ModuleDatabaseActivator::getAllModulesNames());
+it('adds only the missing modules and keeps the state of the existing rows', function (): void {
+    Module::query()->delete();
+    Module::query()->forceCreate(['name' => 'Core', 'is_active' => true]);
+    Module::query()->forceCreate(['name' => 'CMS', 'is_active' => false, 'url' => 'https://cms.test']);
+
+    ModuleDatabaseActivator::syncModules();
+
+    $cms = Module::query()->where('name', 'CMS')->sole();
+
+    expect(Module::query()->pluck('name')->all())->toEqualCanonicalizing(ModuleDatabaseActivator::getAllModulesNames())
+        ->and($cms->is_active)->toBeFalse()
+        ->and($cms->url)->toBe('https://cms.test');
+});
+
+it('toggles a module with a single row update and reports its status', function (): void {
+    $activator = new ModuleDatabaseActivator(app());
+
+    $activator->setActiveByName('CMS', false);
+
+    expect(Module::query()->where('name', 'CMS')->value('is_active'))->toBeFalse()
+        ->and($activator->hasStatus('CMS', false))->toBeTrue();
+
+    $activator->setActiveByName('CMS', true);
+
+    expect($activator->hasStatus('CMS', true))->toBeTrue();
+});
+
+it('never disables or deletes Core', function (): void {
+    $activator = new ModuleDatabaseActivator(app());
+
+    expect(fn () => $activator->setActiveByName('Core', false))->toThrow(LogicException::class);
+
+    $core = Module::query()->where('name', 'Core')->sole();
+
+    expect(fn () => $core->update(['url' => null]) && $core->deactivate())->toThrow(LogicException::class)
+        ->and(fn () => $core->delete())->toThrow(LogicException::class)
+        ->and(Module::query()->where('name', 'Core')->value('is_active'))->toBeTrue();
+});
+
+it('flushes the cached statuses when a module is saved through Eloquent', function (): void {
+    config()->set('modules.cache.enabled', true);
+    config()->set('modules.cache.driver', config('cache.default'));
+
+    $first = new ModuleDatabaseActivator(app());
+    expect($first->hasStatus('CMS', true))->toBeTrue();
+
+    Module::query()->where('name', 'CMS')->sole()->deactivate();
+
+    expect(new ModuleDatabaseActivator(app())->hasStatus('CMS', false))->toBeTrue();
 });

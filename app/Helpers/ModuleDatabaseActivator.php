@@ -11,7 +11,8 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Modules\Core\Models\Setting;
+use LogicException;
+use Modules\Core\Models\Module as ModuleRecord;
 use Nwidart\Modules\Contracts\ActivatorInterface;
 use Nwidart\Modules\Module;
 use Override;
@@ -20,12 +21,10 @@ use Throwable;
 
 final class ModuleDatabaseActivator implements ActivatorInterface
 {
-    public static string $RECORD_NAME = 'modules.active';
-
     /**
      * @var class-string
      */
-    public static string $MODEL_NAME = Setting::class;
+    public static string $MODEL_NAME = ModuleRecord::class;
 
     private readonly string $cacheKey;
 
@@ -33,22 +32,25 @@ final class ModuleDatabaseActivator implements ActivatorInterface
 
     private readonly Repository $configs;
 
+    /**
+     * @var array<int, string>
+     */
     private array $modulesStatuses;
 
     public function __construct(Container $app)
     {
         $this->configs = $app->make(Repository::class);
-        $this->cacheKey = $this->config('cache-key', 'modules_db_activator_statuses');
+        $this->cacheKey = self::cacheKey();
         $this->cacheLifetime = (int) $this->config('cache-lifetime', 3600);
         $this->modulesStatuses = $this->getModulesStatuses();
     }
 
     /**
-     * Checks whether the settings table exists so the database activator can be used.
+     * Checks whether the modules table exists so the database activator can be used.
      * Uses only the DatabaseManager (Schema) so it works before Eloquent's connection
-     * resolver is set. The core.active_modules record is created on first read by ensureBackendModulesRecord().
+     * resolver is set. The module rows are created on first read by syncModules().
      */
-    public static function checkSettingTable(): bool
+    public static function checkModulesTable(): bool
     {
         try {
             $cache_key = 'modules_db_activator_checked';
@@ -58,9 +60,9 @@ final class ModuleDatabaseActivator implements ActivatorInterface
             }
 
             // Cached "table exists" can be stale after migrate:fresh / drop-all; always verify.
-            [$settings_table, $connection] = self::settingsTableAndConnection();
+            [$modules_table, $connection] = self::modulesTableAndConnection();
 
-            if (Cache::get($cache_key) === true && $connection->getSchemaBuilder()->hasTable($settings_table)) {
+            if (Cache::get($cache_key) === true && $connection->getSchemaBuilder()->hasTable($modules_table)) {
                 return true;
             }
 
@@ -68,7 +70,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
                 Cache::forget($cache_key);
             }
 
-            if (! $connection->getSchemaBuilder()->hasTable($settings_table)) {
+            if (! $connection->getSchemaBuilder()->hasTable($modules_table)) {
                 return false;
             }
 
@@ -100,28 +102,49 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
-     * Creates or updates the core.active_modules record (uses Eloquent; call only when app is booted).
+     * Creates a row, active, for every module on disk that has none. Existing rows are left alone.
+     * Query builder only, no Eloquent, so it is safe while the app is still booting.
      */
-    public static function seedBackendModules(): Setting
+    public static function syncModules(): void
     {
-        $model = self::$MODEL_NAME;
-        $found = $model::where('name', self::$RECORD_NAME)->first();
-        $all_modules = self::getAllModulesNames();
+        [$modules_table, $connection] = self::modulesTableAndConnection();
 
-        if (! $found) {
-            $found = $model::create(self::createBackendModulesRecord($all_modules));
-        } elseif (! self::sameModules((array) $found->choices, $all_modules)) {
-            $found->update(['choices' => $all_modules]);
+        $known = $connection->table($modules_table)->pluck('name')->all();
+        $missing = array_values(array_diff(self::getAllModulesNames(), $known));
+
+        if ($missing === []) {
+            return;
         }
 
-        return $found;
+        $now = now();
+
+        $connection->table($modules_table)->insertOrIgnore(array_map(
+            static fn (string $name): array => [
+                'name' => $name,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            $missing,
+        ));
+
+        Log::info("Created module records '{names}'", ['names' => implode(', ', $missing)]);
+    }
+
+    public static function flushStatusesCache(): void
+    {
+        Cache::store(config('modules.cache.driver'))->forget(self::cacheKey());
     }
 
     #[Override]
     public function reset(): void
     {
-        $this->updateRecordValue(self::getAllModulesNames());
-        $this->flushCache();
+        [$modules_table, $connection] = self::modulesTableAndConnection();
+
+        $connection->table($modules_table)->update(['is_active' => true, 'updated_at' => now()]);
+
+        $this->modulesStatuses = self::getAllModulesNames();
+        self::flushStatusesCache();
     }
 
     #[Override]
@@ -141,11 +164,7 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     {
         $name = $module instanceof Module ? $module->getName() : $module;
 
-        if (! in_array($name, $this->modulesStatuses, true)) {
-            return $status === false;
-        }
-
-        return ($status && in_array($name, $this->modulesStatuses, true)) || (! $status && ! in_array($name, $this->modulesStatuses, true));
+        return in_array($name, $this->modulesStatuses, true) === $status;
     }
 
     #[Override]
@@ -157,44 +176,70 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     #[Override]
     public function setActiveByName(string $name, bool $active): void
     {
-        if ($active && ! in_array($name, $this->modulesStatuses, true)) {
-            $this->modulesStatuses[] = $name;
-            $this->updateRecordValue($this->modulesStatuses);
-            $this->flushCache();
-        } elseif (! $active && in_array($name, $this->modulesStatuses, true)) {
-            $this->modulesStatuses = array_values(array_filter($this->modulesStatuses, fn (string $m): bool => $m !== $name));
-            $this->updateRecordValue($this->modulesStatuses);
-            $this->flushCache();
+        if (! $active && $name === ModuleRecord::CORE) {
+            throw new LogicException('The Core module cannot be disabled.');
         }
+
+        [$modules_table, $connection] = self::modulesTableAndConnection();
+
+        $now = now();
+        $updated = $connection->table($modules_table)
+            ->where('name', $name)
+            ->update(['is_active' => $active, 'updated_at' => $now]);
+
+        if ($updated === 0) {
+            $connection->table($modules_table)->insertOrIgnore([
+                'name' => $name,
+                'is_active' => $active,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $this->modulesStatuses = array_values(array_filter(
+            $this->modulesStatuses,
+            static fn (string $active_name): bool => $active_name !== $name,
+        ));
+
+        if ($active) {
+            $this->modulesStatuses[] = $name;
+        }
+
+        self::flushStatusesCache();
     }
 
+    /**
+     * A deleted module loses its row, so it no longer shows up in the panel.
+     */
     #[Override]
     public function delete(Module $module): void
     {
-        $this->setActiveByName($module->getName(), false);
+        $name = $module->getName();
+
+        if ($name === ModuleRecord::CORE) {
+            throw new LogicException('The Core module cannot be deleted.');
+        }
+
+        [$modules_table, $connection] = self::modulesTableAndConnection();
+
+        $connection->table($modules_table)->where('name', $name)->delete();
+
+        $this->modulesStatuses = array_values(array_filter(
+            $this->modulesStatuses,
+            static fn (string $active_name): bool => $active_name !== $name,
+        ));
+        self::flushStatusesCache();
     }
 
-    private static function createBackendModulesRecord(array $allModules): array
+    private static function cacheKey(): string
     {
-        return [
-            'value' => $allModules,
-            'encrypted' => false,
-            'choices' => $allModules,
-            'name' => self::$RECORD_NAME,
-            'module' => class_module(self::class),
-            'type' => 'json',
-            'group_name' => 'core',
-            'description' => 'application active modules',
-            'seeded_value' => $allModules,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ];
+        return (string) config('modules.activators.database.cache-key', 'modules_db_activator_statuses');
     }
 
     /**
      * @return array{string, Connection}
      */
-    private static function settingsTableAndConnection(): array
+    private static function modulesTableAndConnection(): array
     {
         $model = self::$MODEL_NAME;
 
@@ -214,110 +259,40 @@ final class ModuleDatabaseActivator implements ActivatorInterface
     }
 
     /**
-     * @param  array<int, mixed>  $left
-     * @param  array<int, mixed>  $right
+     * @return array<int, string>
      */
-    private static function sameModules(array $left, array $right): bool
+    private function readStatuses(): array
     {
-        sort($left);
-        sort($right);
+        [$modules_table, $connection] = self::modulesTableAndConnection();
 
-        return $left === $right;
-    }
-
-    /**
-     * Ensures the core.active_modules row exists (query builder only, no Eloquent).
-     */
-    private function ensureBackendModulesRecord(): void
-    {
-        [$settings_table, $connection] = self::settingsTableAndConnection();
-
-        $exists = $connection->table($settings_table)
-            ->where('name', self::$RECORD_NAME)
-            ->whereNull('deleted_at')
-            ->exists();
-
-        if ($exists) {
-            return;
+        if (! $connection->getSchemaBuilder()->hasTable($modules_table)) {
+            return self::getAllModulesNames();
         }
 
-        $all_modules = self::getAllModulesNames();
-        $now = now();
+        self::syncModules();
 
-        $record = self::createBackendModulesRecord($all_modules);
-        $record['value'] = json_encode($record['value']);
-        $record['choices'] = json_encode($record['choices']);
-        $record['seeded_value'] = json_encode($record['seeded_value']);
-
-        $connection->table($settings_table)->insertOrIgnore($record);
-
-        Log::info("Created settings '{name}' config record", ['name' => self::$RECORD_NAME]);
-    }
-
-    /**
-     * Writes the active modules and realigns the choices with the modules on disk,
-     * so the value never holds a module the settings form would reject.
-     */
-    private function updateRecordValue(array $value): void
-    {
-        [$settings_table, $connection] = self::settingsTableAndConnection();
-
-        $connection->table($settings_table)
-            ->where('name', self::$RECORD_NAME)
-            ->whereNull('deleted_at')
-            ->update([
-                'value' => json_encode($value),
-                'choices' => json_encode(self::getAllModulesNames()),
-                'updated_at' => now(),
-            ]);
+        return $connection->table($modules_table)
+            ->where('is_active', true)
+            ->pluck('name')
+            ->all();
     }
 
     /**
      * @return array<int, string>
      */
-    private function readSettings(): array
-    {
-        [$settings_table, $connection] = self::settingsTableAndConnection();
-
-        if (! $connection->getSchemaBuilder()->hasTable($settings_table)) {
-            return self::getAllModulesNames();
-        }
-
-        $raw = $connection->table($settings_table)
-            ->where('name', self::$RECORD_NAME)
-            ->whereNull('deleted_at')
-            ->value('value');
-
-        if ($raw === null) {
-            $this->ensureBackendModulesRecord();
-
-            return self::getAllModulesNames();
-        }
-
-        $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
-
-        return is_array($decoded) ? $decoded : [];
-    }
-
     private function getModulesStatuses(): array
     {
         if (! $this->configs->get('modules.cache.enabled')) {
-            return $this->readSettings();
+            return $this->readStatuses();
         }
 
         $driver = $this->configs->get('modules.cache.driver');
 
-        return Cache::store($driver)->remember($this->cacheKey, $this->cacheLifetime, $this->readSettings(...));
+        return Cache::store($driver)->remember($this->cacheKey, $this->cacheLifetime, $this->readStatuses(...));
     }
 
     private function config(string $key, mixed $default = null): mixed
     {
         return $this->configs->get('modules.activators.database.' . $key, $default);
-    }
-
-    private function flushCache(): void
-    {
-        $driver = $this->configs->get('modules.cache.driver');
-        Cache::store($driver)->forget($this->cacheKey);
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Resources\CronJobs\Tables;
 
 use Filament\Actions\Action;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Collection;
@@ -55,9 +55,7 @@ final class CronJobsTable
                         // ->html()
                         ->alignRight()
                         ->toggleable(),
-                    IconColumn::make('without_overlapping')
-                        ->boolean()
-                        ->grow(false)
+                    self::toggleColumn('without_overlapping')
                         ->toggleable(isToggledHiddenByDefault: true),
                     TextColumn::make('runs')
                         ->formatStateUsing(static fn (CronJob $record): string => sprintf(
@@ -69,6 +67,11 @@ final class CronJobsTable
                         ->grow(false)
                         ->html(),
                 ]);
+
+                // The activation icon becomes a switch.
+                $default_columns->transform(static fn (Column $column): Column => $column->getName() === CronJob::activationColumn()
+                    ? self::toggleColumn(CronJob::activationColumn())->toggleable(isToggledHiddenByDefault: false)
+                    : $column);
             },
             actions: static function (Collection $default_actions): void {
                 $default_actions->unshift(Action::make('run')

@@ -10,6 +10,7 @@ use Modules\Core\Filament\Resources\CronJobs\CronJobResource;
 use Modules\Core\Filament\Resources\Fields\FieldResource;
 use Modules\Core\Filament\Resources\Licenses\LicenseResource;
 use Modules\Core\Filament\Resources\Modifications\ModificationResource;
+use Modules\Core\Filament\Resources\Modules\ModuleResource;
 use Modules\Core\Filament\Resources\Permissions\PermissionResource;
 use Modules\Core\Filament\Resources\Roles\RoleResource;
 use Modules\Core\Filament\Resources\Settings\SettingResource;
@@ -52,6 +53,10 @@ it('exposes expected slugs and relation groups for core resources', function ():
 
     expect(CronJobResource::getSlug())->toBe('core/cron-jobs')
         ->and(CronJobResource::getRelations())->toBe([]);
+
+    expect(ModuleResource::getSlug())->toBe('core/modules')
+        ->and(ModuleResource::getRelations())->toBe([])
+        ->and(array_keys(ModuleResource::getPages()))->toBe(['index', 'edit']);
 
     expect(ACLResource::getSlug())->toBe('core/acls')
         ->and(ACLResource::getRelations())->toBe([]);

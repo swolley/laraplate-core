@@ -80,6 +80,10 @@ return [
             'plural' => 'Modifications',
             'singular' => 'Modification',
         ],
+        'modules' => [
+            'plural' => 'Modules',
+            'singular' => 'Module',
+        ],
         'permissions' => [
             'plural' => 'Permissions',
             'singular' => 'Permission',
