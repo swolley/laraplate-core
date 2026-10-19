@@ -625,3 +625,20 @@ it('creates the api twin of a permission that exists on web only and is idempote
         ->and(Permission::query()->count())->toBe($count_after_first_run)
         ->and($second_output)->not->toContain('Created');
 });
+
+it('generates no permission for the version history, which is read only through its root', function (): void {
+    $table = (new Version)->getTable();
+
+    expect(app(PermissionManifest::class)->excludedModels())->toContain(Version::class);
+
+    Permission::query()->firstOrCreate(
+        ['name' => PermissionName::forClass(Version::class, ActionEnum::Select->value)],
+        ['guard_name' => 'web'],
+    );
+
+    HelpersCache::setModels('active', [Version::class]);
+
+    runPermissionsRefreshForCoverage([]);
+
+    expect(Permission::query()->where('table_name', $table)->count())->toBe(0);
+});

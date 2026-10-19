@@ -13,6 +13,7 @@ use Modules\Core\Models\Notification;
 use Modules\Core\Models\OutboxEvent;
 use Modules\Core\Models\RecordOrigin;
 use Modules\Core\Models\SeedRun;
+use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
 use Override;
 
@@ -37,7 +38,7 @@ final class CorePermissions implements DeclaresPermissions
      * a versioned write, the outbox row behind a published event, the origin row
      * behind an imported record, the draft bucket behind an upload, and the
      * notification a user reads through its own user-scoped endpoint rather than
-     * through the CRUD engine. {@see \Modules\Core\Models\Version} and
+     * through the CRUD engine. {@see Version} and
      * {@see \Modules\Core\Models\Modification} are already excluded by the
      * command's own blacklist; these complete the same subsystems, which were
      * excluded only halfway.
@@ -54,6 +55,9 @@ final class CorePermissions implements DeclaresPermissions
             OutboxEvent::class,
             RecordOrigin::class,
             SeedRun::class,
+            // The history is read only through its root, with `history` and the root's ACL: a permission on the
+            // table itself would list the past of records the reader is not allowed to see.
+            Version::class,
             VersionSet::class,
         ];
     }
