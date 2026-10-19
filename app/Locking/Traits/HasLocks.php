@@ -195,6 +195,26 @@ trait HasLocks
         return $this->isLocked() && $this->{new Locked()->lockedByColumn()} === $user->id;
     }
 
+    /**
+     * Whether the lock keeps the signed-in user from writing this record: it is held by somebody else, or it
+     * is a freeze, which nobody holds. The holder of a lease writes. Like the write guard, it gives way while
+     * the guard is suspended for a system operation or when the deployment allows writes on locked records.
+     */
+    public function blocksWritesByCurrentUser(): bool
+    {
+        $locked = new Locked();
+
+        if (Locked::guardIsSuspended() || $locked->allowsModificationsOnLockedObjects() || ! $this->isLocked()) {
+            return false;
+        }
+
+        $owner = $this->{$locked->lockedByColumn()};
+        $current = Auth::id();
+
+        // Loose for the same reason as unlock(): the key comes back as an int or a string.
+        return $owner === null || $current === null || (int) $owner !== (int) $current;
+    }
+
     public function isNotLocked(): bool
     {
         return ! $this->isLocked();

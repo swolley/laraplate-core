@@ -18,6 +18,7 @@ use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
@@ -369,7 +370,18 @@ trait HasVersions
 
         return (bool) app(VersionSetManagerInterface::class)->run(
             VersionSetRoot::forModel($this),
-            static fn (): bool => (bool) $version->revert(),
+            function () use ($version): bool {
+                // Checked here, after the set has reread the row under lock, so a lock taken since this model
+                // was loaded counts too. The write guard alone is not enough: it sees the record's own row,
+                // and a revert also writes its translations and relations, which carry no lock of their own.
+                throw_if(
+                    method_exists($this, 'blocksWritesByCurrentUser') && $this->blocksWritesByCurrentUser(),
+                    LockedModelException::class,
+                    'This model is locked',
+                );
+
+                return (bool) $version->revert();
+            },
             new VersionSetOptions(
                 kind: VersionSetKind::Revert,
                 actor: $this->getVersionUserId(),

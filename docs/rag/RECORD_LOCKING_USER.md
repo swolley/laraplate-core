@@ -44,6 +44,7 @@ stop changing: a confirmed order, a published document under legal review. It al
 | Somebody else holds it | You are asked to choose: go back to the list, or open read-only |
 | It is frozen | Same choice, and the message says it is frozen rather than naming a person |
 | You try to save a record somebody else holds | The save is refused and nothing is written |
+| You try to bring back an earlier version of a record somebody else holds, or a frozen one | Refused, nothing is written; it needs the lock released, or forcibly removed by someone allowed to |
 
 Read-only really is read-only: the fields are disabled. That is deliberate. Letting you type into a
 form whose save will be refused would waste your work.
