@@ -31,6 +31,15 @@ final class UserObserver
 
     public function deleted(User $user): void
     {
+        // Deleted for good: the row is gone, and saving the model now would insert it again. Its tokens and
+        // notifications hang from it by a polymorphic key and go with it; the license is freed with the row.
+        if (! $user->exists) {
+            $user->tokens()->delete();
+            $user->notifications()->delete();
+
+            return;
+        }
+
         if (config('core.auth.licenses.enabled') && $user->license_id) {
             $user->license_id = null;
             $user->save();

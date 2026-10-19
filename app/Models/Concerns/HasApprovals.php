@@ -101,6 +101,14 @@ trait HasApprovals
             return null;
         });
 
+        // The modifications of a record hang from it by a polymorphic key: a record deleted for good takes them
+        // along (their votes follow by foreign key), one moved to the bin keeps them.
+        static::deleted(static function (Model $item): void {
+            if (! $item->exists) {
+                $item->modifications()->delete();
+            }
+        });
+
         static::deleting(static function (Model $item): ?bool {
             $operation = $item->deletionOperation();
 

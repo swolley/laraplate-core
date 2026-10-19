@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Events\ModificationPreProcessingCompleted;
 use Modules\Core\Events\ModificationRequiresModeration;
+use Modules\Core\Listeners\RemoveOriginOfDeletedRecord;
 use Modules\Core\Locking\LockedModelSubscriber;
 use Modules\Core\Models\CronJob;
 use Modules\Core\Models\Entity;
@@ -73,6 +74,8 @@ final class EventServiceProvider extends ServiceProvider
         // anybody. Subscribing it here is what makes the setting mean something. It stays off by
         // default, so nothing changes for a deployment that has not asked for it.
         Event::subscribe(LockedModelSubscriber::class);
+
+        Event::listen('eloquent.deleted: *', [RemoveOriginOfDeletedRecord::class, 'handle']);
 
         Event::listen('eloquent.saved: ' . Modification::class, function (Modification $modification): void {
             if (! $modification->active || ! $modification->wasRecentlyCreated) {

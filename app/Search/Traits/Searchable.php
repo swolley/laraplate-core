@@ -56,6 +56,7 @@ trait Searchable
         syncMakeSearchable as private baseSyncMakeSearchableSync;
         searchableConnection as private baseSearchableConnection;
     }
+    use RemovesEmbeddingsWithRecord;
 
     /**
      * Field name for indexing timestamp.
