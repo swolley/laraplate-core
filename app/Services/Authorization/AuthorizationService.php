@@ -8,6 +8,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
@@ -287,6 +288,37 @@ final class AuthorizationService
             ->where('module_name', $scope)
             ->whereHas('roles', static fn (Builder $query): Builder => $query->whereKey($role_ids->all()))
             ->exists();
+    }
+
+    /**
+     * Every module the user holds at least one permission on: the set of slugs `userHasModuleAccess` would
+     * accept, read in two queries (direct permissions, then permissions granted by the user's roles) rather
+     * than one lookup per module. A super admin gets every module that has permissions.
+     *
+     * @return Collection<int, string>
+     */
+    public function accessibleModules(User $user): Collection
+    {
+        if ($user->isSuperAdmin()) {
+            $modules = Permission::query()->distinct()->pluck('module_name');
+        } else {
+            $role_ids = $user->roles()->pluck('id');
+
+            $modules = $user->permissions()->distinct()->pluck('module_name')->merge(
+                $role_ids->isEmpty()
+                    ? []
+                    : Permission::query()
+                        ->whereHas('roles', static fn (Builder $query): Builder => $query->whereKey($role_ids->all()))
+                        ->distinct()
+                        ->pluck('module_name'),
+            );
+        }
+
+        return $modules
+            ->map(static fn (mixed $module): string => mb_strtolower((string) $module))
+            ->filter(static fn (string $module): bool => $module !== '')
+            ->unique()
+            ->values();
     }
 
     /**
