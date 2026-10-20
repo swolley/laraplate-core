@@ -38,7 +38,6 @@
     "hedii/laravel-gelf-logger": "^10.1",
     "lab404/laravel-impersonate": "^1.7.8",
     "mtrajano/laravel-swagger": "^0.6.4",
-    "overtrue/laravel-versionable": "^5.5",
     "spatie/laravel-permission": "^6.25",
     "staudenmeir/laravel-adjacency-list": "^1.25.2",
     "laravel/socialite": "^5.27",
