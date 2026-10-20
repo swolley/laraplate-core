@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
 use Modules\Core\Contracts\IOptimisticLockableModel;
@@ -27,24 +28,23 @@ use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
-use Overtrue\LaravelVersionable\Versionable;
 
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 // use Illuminate\Database\Eloquent\Relations\MorphMany;
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
+ * The history of a model: its version rows, written by Core's writer from the model events.
+ *
+ * Parts absorbed from overtrue/laravel-versionable, MIT License, Copyright (c) 2019 overtrue.
+ *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  *
  * @phpstan-type HasVersionsType HasVersions
  */
 trait HasVersions
 {
-    use Versionable {
-        history as private untypedHistory;
-        latestVersions as private untypedLatestVersions;
-        oldestVersions as private untypedOldestVersions;
-    }
+    protected static bool $versioning = true;
 
     protected ?User $_creator;
 
@@ -100,24 +100,38 @@ trait HasVersions
         self::$version_strategy_cache = [];
     }
 
-    /**
-     * Laravel boots recursively imported traits. This override keeps vendor
-     * helpers and relations while preventing its independent writer and purge.
-     */
-    public static function bootVersionable(): void
+    public static function getVersioning(): bool
     {
-        // Lifecycle persistence is owned by bootHasVersions().
+        return static::$versioning;
+    }
+
+    public static function disableVersioning(): void
+    {
+        static::$versioning = false;
+    }
+
+    public static function enableVersioning(): void
+    {
+        static::$versioning = true;
     }
 
     /**
-     * The versions, latest first. Declared with its relation type, which the package leaves to PHPDoc: a
-     * relation a request names is called only when its declaration says it returns a relation.
+     * @return MorphMany<Version, $this>
+     */
+    public function versions(): MorphMany
+    {
+        return $this->morphMany($this->getVersionModel(), 'versionable');
+    }
+
+    /**
+     * The versions, latest first. Declared with its relation type: a relation a request names is called only
+     * when its declaration says it returns a relation.
      *
      * @return MorphMany<Version, $this>
      */
     public function history(): MorphMany
     {
-        return $this->untypedHistory();
+        return $this->latestVersions();
     }
 
     /**
@@ -125,7 +139,7 @@ trait HasVersions
      */
     public function latestVersions(): MorphMany
     {
-        return $this->untypedLatestVersions();
+        return $this->versions()->orderLatestFirst();
     }
 
     /**
@@ -133,7 +147,57 @@ trait HasVersions
      */
     public function oldestVersions(): MorphMany
     {
-        return $this->untypedOldestVersions();
+        return $this->versions()->orderOldestFirst();
+    }
+
+    /**
+     * @return MorphOne<Version, $this>
+     */
+    public function latestVersion(): MorphOne
+    {
+        return $this->morphOne($this->getVersionModel(), 'versionable')->orderLatestFirst();
+    }
+
+    /**
+     * @return MorphOne<Version, $this>
+     */
+    public function lastVersion(): MorphOne
+    {
+        return $this->latestVersion();
+    }
+
+    /**
+     * @return MorphOne<Version, $this>
+     */
+    public function firstVersion(): MorphOne
+    {
+        return $this->morphOne($this->getVersionModel(), 'versionable')->orderOldestFirst();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getVersionable(): array
+    {
+        return property_exists($this, 'versionable') ? $this->versionable : [];
+    }
+
+    public function getRefreshedModel(Model $model): Model
+    {
+        return $model->newQueryWithoutScopes()->findOrFail($model->getKey());
+    }
+
+    /**
+     * @return class-string<Version>
+     */
+    public function getVersionModel(): string
+    {
+        return $this->versionModel ?? config('versionable.version_model', Version::class);
+    }
+
+    public function getUserForeignKeyName(): string
+    {
+        return $this->userForeignKeyName ?? config('versionable.user_foreign_key', 'user_id');
     }
 
     /**

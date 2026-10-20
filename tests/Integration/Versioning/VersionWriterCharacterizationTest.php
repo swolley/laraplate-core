@@ -36,7 +36,7 @@ afterEach(function (): void {
  * - [x] HasVersions::createInitialVersion()
  * - [x] VersioningService::createVersion()
  * - [x] Version::createForModel()
- * - [x] Overtrue\LaravelVersionable\Versionable lifecycle callbacks
+ * - [x] the lifecycle callbacks of the absorbed library trait
  */
 it('uses the Core writer for the initial lifecycle version', function (): void {
     $article = VersionedArticle::query()->create(['title' => 'First']);

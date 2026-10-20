@@ -10,12 +10,12 @@ use Modules\Core\Casts\Column;
 use Modules\Core\Casts\ColumnType;
 use Modules\Core\Casts\SelectRequestData;
 use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelChild;
 use Modules\Core\Tests\Fixtures\CrudServiceTestSingleRelParent;
-use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 it('normalizes scalar and array key values to where condition', function (): void {
@@ -54,7 +54,7 @@ it('detects models using recursive, approval, and history traits', function (): 
 
     $versioned = new class extends Model
     {
-        use Versionable;
+        use HasVersions;
     };
 
     $ref = new ReflectionClass(CrudService::class);

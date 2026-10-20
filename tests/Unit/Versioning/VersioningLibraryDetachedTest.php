@@ -29,6 +29,5 @@ it('leaves no reference to the absorbed versioning library', function (string $s
 
     expect($offenders)->toBe([]);
 })->with([
-    'strategy enum' => ['Overtrue\LaravelVersionable\VersionStrategy'],
-    'version model' => ['Overtrue\LaravelVersionable\Version'],
+    'library' => ['Overtrue\LaravelVersionable'],
 ]);

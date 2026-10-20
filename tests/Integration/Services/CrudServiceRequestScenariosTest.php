@@ -24,6 +24,7 @@ use Modules\Core\Casts\SearchMode;
 use Modules\Core\Casts\SearchRequestData;
 use Modules\Core\Casts\TreeRequestData;
 use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -40,7 +41,6 @@ use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\QueryBuilder;
 use Modules\Core\Tests\Stubs\ActivationStubModel;
 use Modules\Core\Tests\Stubs\Search\FixedSearchStrategyResolver;
-use Overtrue\LaravelVersionable\Versionable;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -916,7 +916,7 @@ it('history returns record and version history for versionable models', function
     $hist_model = new class extends Model
     {
         use HasApprovals;
-        use Versionable;
+        use HasVersions;
 
         protected $table = 'crud_cov_hist_one';
 

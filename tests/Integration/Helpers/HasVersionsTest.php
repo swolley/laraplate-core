@@ -367,3 +367,23 @@ it('attributes a version to the record own user column, and to nobody when there
     $without_column = new VersionableStub();
     expect($without_column->getVersionUserId())->toBeNull();
 });
+
+it('exposes the first and latest versions through the absorbed members', function (): void {
+    config()->set('versionable.version_model', Version::class);
+    Schema::create(VersionedArticle::TABLE, function (Blueprint $table): void {
+        $table->id();
+        $table->string('title');
+        $table->timestamps();
+    });
+
+    try {
+        $article = VersionedArticle::query()->create(['title' => 'First']);
+        $article->update(['title' => 'Second']);
+
+        expect($article->firstVersion->contents['title'])->toBe('First')
+            ->and($article->latestVersion->contents['title'])->toBe('Second')
+            ->and($article->versions()->count())->toBe(2);
+    } finally {
+        Schema::dropIfExists(VersionedArticle::TABLE);
+    }
+});

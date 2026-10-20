@@ -58,6 +58,7 @@ use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Locking\Locked;
 use Modules\Core\Locking\LockIntent;
 use Modules\Core\Models\Concerns\HasApprovals;
+use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\Disapproval;
 use Modules\Core\Models\Modification;
 use Modules\Core\Models\Permission;
@@ -85,7 +86,6 @@ use Modules\Core\Support\ComputedColumnGuard;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\ReadableColumnGuard;
 use Modules\Core\Support\RelationGuard;
-use Overtrue\LaravelVersionable\Versionable;
 use ReflectionMethod;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 use Symfony\Component\HttpFoundation\Response;
@@ -2641,7 +2641,7 @@ class CrudService
 
     private function hasHistory(Model $model): bool
     {
-        return class_uses_trait($model, Versionable::class);
+        return class_uses_trait($model, HasVersions::class);
     }
 
     /**
