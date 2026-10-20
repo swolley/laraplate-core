@@ -7,7 +7,7 @@ namespace Modules\Core\Enums;
 /**
  * How a version row stores its change: only the changed columns, or the whole image.
  *
- * Absorbed from overtrue/laravel-versionable (MIT License, Copyright (c) 2019 overtrue).
+ * Derived from overtrue/laravel-versionable (MIT), see LICENSES/laravel-versionable.md.
  * The case names are kept as in the library so that existing call sites only change their import.
  */
 enum VersionStrategy: string

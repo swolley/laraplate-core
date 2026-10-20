@@ -647,7 +647,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
     -   [doctrine/dbal](https://github.com/doctrine/dbal): Database abstraction layer.
     -   [laravel/fortify](https://github.com/laravel/fortify): Authentication scaffolding.
-    -   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): Model versioning.
+    -   Model versioning is part of Core (`HasVersions`, `Version`), derived from overtrue/laravel-versionable, which is no longer a dependency (see Third-party code).
     -   [spatie/laravel-permission](https://github.com/spatie/laravel-permission): Roles and permissions.
     -   [staudenmeir/laravel-adjacency-list](https://github.com/staudenmeir/laravel-adjacency-list): Hierarchical data handling.
     -   [spatie/eloquent-sortable](https://github.com/spatie/eloquent-sortable): Ordering helpers for Eloquent.
@@ -834,7 +834,8 @@ Core contains code derived from these MIT-licensed libraries, which it does not 
 
 -   [sfolador/laravel-locked](https://github.com/sfolador/laravel-locked): record locking (`app/Locking`), see [`LICENSES/laravel-locked.md`](LICENSES/laravel-locked.md)
 -   [reshadman/laravel-optimistic-locking](https://github.com/reshadman/laravel-optimistic-locking): optimistic locking (`HasOptimisticLocking`), see [`LICENSES/laravel-optimistic-locking.md`](LICENSES/laravel-optimistic-locking.md)
--   [cloudcake/laravel-approval](https://github.com/cloudcake/laravel-approval): approvals (`HasApprovals`, `Modification`, `ModificationVoteService`), see [`LICENSES/laravel-approval.md`](LICENSES/laravel-approval.md).
+-   [cloudcake/laravel-approval](https://github.com/cloudcake/laravel-approval): approvals (`HasApprovals`, `Modification`, `ModificationVoteService`), see [`LICENSES/laravel-approval.md`](LICENSES/laravel-approval.md)
+-   [overtrue/laravel-versionable](https://github.com/overtrue/laravel-versionable): versioning (`HasVersions`, `Version`, `VersionStrategy`), see [`LICENSES/laravel-versionable.md`](LICENSES/laravel-versionable.md).
 
 Core also takes inspiration from, without deriving code from:
 

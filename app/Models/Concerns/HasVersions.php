@@ -36,7 +36,8 @@ use Modules\Core\Versioning\Data\VersionSetRoot;
 /**
  * The history of a model: its version rows, written by Core's writer from the model events.
  *
- * Parts absorbed from overtrue/laravel-versionable, MIT License, Copyright (c) 2019 overtrue.
+ * Derived from overtrue/laravel-versionable (MIT), see LICENSES/laravel-versionable.md: the versioning
+ * switch, the version relations and the attribute helpers were the package's.
  *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  *
@@ -246,7 +247,7 @@ trait HasVersions
     /**
      * The versionable attributes of the row as stored: the changed columns for a `DIFF`, every column for a
      * `SNAPSHOT`, read back from the database so that casts and unsynced attributes do not leak into the image.
-     * Absorbed from overtrue/laravel-versionable (MIT License, Copyright (c) 2019 overtrue), typed on Core's enum.
+     * Derived from overtrue/laravel-versionable (MIT), see LICENSES/laravel-versionable.md; typed on Core's enum.
      *
      * @param  array<string, mixed>  $replacements
      * @return array<string, mixed>

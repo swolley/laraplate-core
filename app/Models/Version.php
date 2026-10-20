@@ -26,7 +26,8 @@ use Override;
 /**
  * One row of the history of a versioned record.
  *
- * Parts absorbed from overtrue/laravel-versionable, MIT License, Copyright (c) 2019 overtrue.
+ * Derived from overtrue/laravel-versionable (MIT), see LICENSES/laravel-versionable.md: the relation to the
+ * versioned record, the ordering scopes, revert() and the uuid key were the package's.
  */
 final class Version extends Model
 {
