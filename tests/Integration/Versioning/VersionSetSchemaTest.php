@@ -244,3 +244,10 @@ it('orders versions by sequence and exposes both belongs-to relations', function
         ->and($version_set->versions()->firstOrFail()->versionSet())->toBeInstanceOf(BelongsTo::class)
         ->and($version_set->versions()->firstOrFail()->versionSet->is($version_set))->toBeTrue();
 });
+
+it('names the history tables core_versions and core_versions_sets', function (): void {
+    expect(CoreTables::Versions->value)->toBe('core_versions')
+        ->and(CoreTables::VersionSets->value)->toBe('core_versions_sets')
+        ->and(Schema::hasTable('core_versions'))->toBeTrue()
+        ->and(Schema::hasTable('core_versions_sets'))->toBeTrue();
+});
