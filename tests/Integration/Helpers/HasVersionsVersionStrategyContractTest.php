@@ -7,8 +7,8 @@ declare(strict_types=1);
  * integration. Uses reflection only (no DB): runtime values depend on {@see Modules\Core\Models\Setting}
  * and cache; {@see false} means versioning is disabled for that table in settings.
  */
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Tests\Unit\Helpers\VersionableStub;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 it('exposes getVersionStrategy as public so external version creation can call it on the model', function (): void {
     $method = new ReflectionMethod(VersionableStub::class, 'getVersionStrategy');

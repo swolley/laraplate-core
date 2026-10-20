@@ -7,7 +7,7 @@ namespace Modules\Core\Versioning\Data;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Enums\VersionChangeType;
-use Overtrue\LaravelVersionable\VersionStrategy;
+use Modules\Core\Enums\VersionStrategy;
 
 final readonly class VersionChange
 {

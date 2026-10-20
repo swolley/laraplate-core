@@ -7,12 +7,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Services\DynamicEntityService;
 use Modules\Core\Tests\Stubs\FakeVersionedModel;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 function persistVersionModelFixture(Version $version): void
 {

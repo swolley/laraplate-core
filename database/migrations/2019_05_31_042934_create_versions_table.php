@@ -7,8 +7,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Helpers\MigrateUtils;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 return new class() extends Migration
 {

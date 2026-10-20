@@ -8,6 +8,7 @@ use Closure;
 use InvalidArgumentException;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\RelationDescriptor;
@@ -17,7 +18,6 @@ use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
 use Modules\Core\Versioning\Exceptions\AggregateRestoreConflictException;
 use Modules\Core\Versioning\Exceptions\MissingRestoreSubjectException;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 /**
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model

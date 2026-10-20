@@ -5,11 +5,11 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
 use Modules\Core\Tests\Stubs\Versioning\HardDeletedVersionedArticle;
 use Modules\Core\Tests\Stubs\Versioning\SoftDeletedVersionedArticle;
 use Modules\Core\Tests\Stubs\Versioning\VersionedArticle;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 beforeEach(function (): void {
     config()->set('versionable.version_model', Version::class);

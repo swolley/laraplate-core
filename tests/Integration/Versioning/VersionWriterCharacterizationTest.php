@@ -6,13 +6,13 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Tests\Stubs\Versioning\SoftDeletedVersionedArticle;
 use Modules\Core\Tests\Stubs\Versioning\VersionedArticle;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetRoot;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 beforeEach(function (): void {
     config()->set('versionable.version_model', Version::class);

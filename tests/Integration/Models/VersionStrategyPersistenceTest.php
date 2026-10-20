@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\User;
 use Modules\Core\Models\Version;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 it('persists version_strategy on the version row', function (): void {
     $user = User::factory()->create(['name' => 'Alice']);

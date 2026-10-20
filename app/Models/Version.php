@@ -14,12 +14,12 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Core\Contracts\IHidesAttributesFromAnonymous;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Override;
 use Overtrue\LaravelVersionable\Version as OvertrueVersion;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class Version extends OvertrueVersion
 {

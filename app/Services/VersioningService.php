@@ -6,10 +6,10 @@ namespace Modules\Core\Services;
 
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class VersioningService
 {

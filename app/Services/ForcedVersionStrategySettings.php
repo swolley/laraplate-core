@@ -6,8 +6,8 @@ namespace Modules\Core\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersions;
-use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 
 final class ForcedVersionStrategySettings

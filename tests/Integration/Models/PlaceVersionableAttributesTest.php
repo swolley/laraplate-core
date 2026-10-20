@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use MatanYadaev\EloquentSpatial\Objects\Point;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Place;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 it('excludes geolocation from versionable snapshot attributes', function (): void {
     $place = Place::query()->create([

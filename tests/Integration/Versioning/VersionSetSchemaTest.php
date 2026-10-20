@@ -11,9 +11,9 @@ use Illuminate\Support\Str;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 it('creates version sets before versions with the expected columns', function (): void {
     $version_sets_table = CoreTables::VersionSets->value;

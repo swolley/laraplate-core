@@ -18,6 +18,7 @@ use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Locking\Exceptions\LockedModelException;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
@@ -27,7 +28,6 @@ use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
 use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 // use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -177,6 +177,33 @@ trait HasVersions
 
         // no need to count already existent versions
         return Arr::hasAny($this->getDirty(), array_keys($versionableAttributes));
+    }
+
+    /**
+     * The versionable attributes of the row as stored: the changed columns for a `DIFF`, every column for a
+     * `SNAPSHOT`, read back from the database so that casts and unsynced attributes do not leak into the image.
+     * Absorbed from overtrue/laravel-versionable (MIT License, Copyright (c) 2019 overtrue), typed on Core's enum.
+     *
+     * @param  array<string, mixed>  $replacements
+     * @return array<string, mixed>
+     */
+    public function getVersionableAttributes(VersionStrategy $strategy, array $replacements = []): array
+    {
+        $versionable = $this->getVersionable();
+        $refreshed = $this->getRefreshedModel($this);
+
+        $keys = match ($strategy) {
+            VersionStrategy::DIFF => array_keys($this->getDirty()),
+            VersionStrategy::SNAPSHOT => array_keys($refreshed->attributesToArray()),
+        };
+
+        $attributes = Arr::only($refreshed->getRawOriginal(), $keys);
+
+        if ($versionable !== []) {
+            $attributes = Arr::only($attributes, $versionable);
+        }
+
+        return Arr::except(array_merge($attributes, $replacements), $this->getDontVersionable());
     }
 
     /**

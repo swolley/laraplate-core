@@ -6,8 +6,8 @@ namespace Modules\Core\Tests\Stubs\Versioning;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersions;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class SoftDeletedVersionedArticle extends Model
 {

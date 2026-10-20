@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Stubs\Versioning;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\SoftDeletes\SoftDeletes;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 /**
  * A versioned model carrying Core's soft deletes and switching them off in its own code, so that

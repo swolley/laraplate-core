@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Tests\Stubs\Versioning\ObserveVersionSetStateJob;
@@ -27,7 +28,6 @@ use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
 use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 beforeEach(function (): void {
     Schema::create(VersionSetManagerArticle::TABLE, function (Blueprint $table): void {

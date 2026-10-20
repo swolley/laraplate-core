@@ -7,10 +7,10 @@ namespace Modules\Core\Tests\Stubs\Versioning\Relations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Core\Enums\RelationOwnership;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersionedRelations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Versioning\Data\RelationDescriptor;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class VersionedRelationRoot extends Model
 {

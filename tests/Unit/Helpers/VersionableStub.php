@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Tests\Unit\Helpers;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersions;
-use Overtrue\LaravelVersionable\VersionStrategy;
 
 final class VersionableStub extends Model
 {

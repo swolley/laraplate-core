@@ -6,13 +6,13 @@ namespace Modules\Core\Tests\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
+use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Locking\Traits\HasLocks;
 use Modules\Core\Locking\Traits\HasOptimisticLocking;
 use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\SoftDeletes\SoftDeletes;
-use Overtrue\LaravelVersionable\VersionStrategy;
 use ReflectionClass;
 use RuntimeException;
 
