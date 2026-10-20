@@ -54,14 +54,14 @@ it('records a delete as a snapshot tombstone when soft deletes are switched off'
         ->and($tombstone->contents)->toBe([]);
 });
 
-it('records a soft delete as an update of deleted_at, not a Deleted row', function (): void {
+it('records a soft delete as a trashed row of deleted_at, not a Deleted row', function (): void {
     $article = SoftDeletedVersionedArticle::query()->create(['title' => 'First']);
 
     $article->delete();
 
     $trashing = Version::query()->latest('id')->firstOrFail();
 
-    expect($trashing->change_type)->toBe(VersionChangeType::Updated)
+    expect($trashing->change_type)->toBe(VersionChangeType::Trashed)
         ->and($trashing->original_contents)->toBe(['deleted_at' => null])
         ->and($trashing->contents)->toHaveKey('deleted_at')
         ->and($trashing->contents['deleted_at'])->not->toBeNull();

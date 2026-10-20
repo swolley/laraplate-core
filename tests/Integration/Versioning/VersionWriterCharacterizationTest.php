@@ -155,7 +155,7 @@ it('captures deletion before the row disappears and keeps history on force delet
         ->and(Version::query()->count())->toBe($history_before_delete + 1);
 });
 
-it('records restore as an update of deleted_at without a duplicate lifecycle row', function (): void {
+it('records restore as a restored row of deleted_at without a duplicate lifecycle row', function (): void {
     $article = SoftDeletedVersionedArticle::query()->create(['title' => 'First']);
     $article->delete();
     $version_count = Version::query()->count();
@@ -165,7 +165,7 @@ it('records restore as an update of deleted_at without a duplicate lifecycle row
     $restore = Version::query()->latest('id')->firstOrFail();
 
     expect(Version::query()->count())->toBe($version_count + 1)
-        ->and($restore->change_type)->toBe(VersionChangeType::Updated)
+        ->and($restore->change_type)->toBe(VersionChangeType::Restored)
         ->and($restore->original_contents)->toHaveKey('deleted_at')
         ->and($restore->contents)->toHaveKey('deleted_at', null);
 });

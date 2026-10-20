@@ -68,7 +68,7 @@ trait HasVersions
     protected array $encryptedVersionable = [];
 
     /**
-     * @var array{strategy: VersionStrategy, keys: list<string>, original: array<string, mixed>}|null
+     * @var array{strategy: VersionStrategy, keys: list<string>, original: array<string, mixed>, type: VersionChangeType}|null
      */
     private ?array $pending_version_update = null;
 
@@ -435,19 +435,16 @@ trait HasVersions
     }
 
     /**
-     * History rows that represent a soft delete (a "trashing"): an update that set the
-     * deleted-at column. The soft restore that later clears it is deliberately excluded.
+     * History rows that represent a soft delete: the `trashed` rows. The restore that later clears the
+     * deleted-at column is a `restored` row and is not one of them.
      *
      * @return Builder<Version>
      */
     public function trashingVersions(): Builder
     {
-        $deleted_at_column = $this->getVersionDeletedAtColumn() ?? 'deleted_at';
-
         return $this->versions()
             ->getQuery()
-            ->where('change_type', VersionChangeType::Updated)
-            ->whereNotNull("contents->{$deleted_at_column}");
+            ->where('change_type', VersionChangeType::Trashed);
     }
 
     /**
@@ -590,8 +587,9 @@ trait HasVersions
         $original = $strategy === VersionStrategy::SNAPSHOT
             ? $this->filterVersionableImage($this->getRawOriginal())
             : Arr::only($this->getRawOriginal(), $keys);
+        $type = $this->isLeavingTheBin($keys) ? VersionChangeType::Restored : VersionChangeType::Updated;
 
-        $this->pending_version_update = compact('strategy', 'keys', 'original');
+        $this->pending_version_update = compact('strategy', 'keys', 'original', 'type');
     }
 
     private function writePendingVersionUpdate(): void
@@ -609,7 +607,7 @@ trait HasVersions
 
         resolve(VersionWriterInterface::class)->write(new VersionChange(
             model: $this,
-            type: VersionChangeType::Updated,
+            type: $pending['type'],
             originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
             contents: VersionChange::encryptSelected($contents, $this->encryptedVersionable),
             strategy: $pending['strategy'],
@@ -677,7 +675,7 @@ trait HasVersions
 
         resolve(VersionWriterInterface::class)->write(new VersionChange(
             model: $this,
-            type: VersionChangeType::Updated,
+            type: VersionChangeType::Trashed,
             originalContents: VersionChange::encryptSelected($pending['original'], $this->encryptedVersionable),
             contents: VersionChange::encryptSelected(
                 [$deleted_at_column => $this->getRawOriginal($deleted_at_column)],
@@ -707,6 +705,21 @@ trait HasVersions
         }
 
         return method_exists($this, 'softDeletesEnabledBySettings') && ! $this->softDeletesEnabledBySettings();
+    }
+
+    /**
+     * An update that clears the deleted-at column takes the record out of the bin.
+     *
+     * @param  list<string>  $keys
+     */
+    private function isLeavingTheBin(array $keys): bool
+    {
+        $deleted_at_column = $this->getVersionDeletedAtColumn();
+
+        return $deleted_at_column !== null
+            && in_array($deleted_at_column, $keys, true)
+            && $this->getRawOriginal($deleted_at_column) !== null
+            && $this->getAttributes()[$deleted_at_column] === null;
     }
 
     private function getVersionDeletedAtColumn(): ?string
