@@ -34,7 +34,6 @@ it('creates version sets before versions with the expected columns', function ()
             'reason',
             'reverted_from_set_id',
             'created_at',
-            'updated_at',
         ]))->toBeTrue()
         ->and(Schema::hasColumn($version_sets_table, 'deleted_at'))->toBeFalse()
         ->and(Schema::hasColumns($versions_table, [
@@ -250,4 +249,15 @@ it('names the history tables core_versions and core_versions_sets', function ():
         ->and(CoreTables::VersionSets->value)->toBe('core_versions_sets')
         ->and(Schema::hasTable('core_versions'))->toBeTrue()
         ->and(Schema::hasTable('core_versions_sets'))->toBeTrue();
+});
+
+it('keeps the history tables append-only', function (): void {
+    expect(Schema::hasColumns('core_versions', ['created_at', 'compacted_at']))->toBeTrue()
+        ->and(Schema::hasColumn('core_versions', 'updated_at'))->toBeFalse()
+        ->and(Schema::hasColumn('core_versions', 'deleted_at'))->toBeFalse()
+        ->and(Schema::hasColumn('core_versions', 'is_deleted'))->toBeFalse()
+        ->and(Schema::hasColumn('core_versions_sets', 'created_at'))->toBeTrue()
+        ->and(Schema::hasColumn('core_versions_sets', 'updated_at'))->toBeFalse()
+        ->and(Version::UPDATED_AT)->toBeNull()
+        ->and(VersionSet::UPDATED_AT)->toBeNull();
 });

@@ -38,6 +38,7 @@ return new class() extends Migration
                 $table,
                 hasCreateUpdate: true,
                 createdAtIndexName: 'vsets_created_IDX',
+                hasUpdatedAt: false,
             );
 
             $table->unique('uuid', 'vsets_uuid_UN');

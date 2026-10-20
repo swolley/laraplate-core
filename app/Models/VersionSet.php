@@ -15,6 +15,11 @@ use Override;
 final class VersionSet extends Model
 {
     /**
+     * The history is append-only: a set is never updated once written (D19).
+     */
+    public const UPDATED_AT = null;
+
+    /**
      * @var string
      */
     #[Override]
@@ -71,7 +76,6 @@ final class VersionSet extends Model
         return [
             'kind' => VersionSetKind::class,
             'created_at' => 'immutable_datetime',
-            'updated_at' => 'datetime',
         ];
     }
 }

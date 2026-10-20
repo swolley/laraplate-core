@@ -125,6 +125,7 @@ final class MigrateUtils
      * @param  bool  $hasValidity  Add validity period columns
      * @param  bool  $isValidityRequired  Make valid_from required
      * @param  string|null  $createdAtIndexName  Override the created_at index name
+     * @param  bool  $hasUpdatedAt  Add updated_at with created_at; off for an append-only table
      *
      * @throws InvalidArgumentException When invalid parameter combination
      */
@@ -137,6 +138,7 @@ final class MigrateUtils
         bool $isValidityRequired = true,
         ?string $createdAtIndexName = null,
         ?ConnectionInterface $connection = null,
+        bool $hasUpdatedAt = true,
     ): void {
         $connection = self::connection($connection);
         $schema = $connection->getSchemaBuilder();
@@ -147,7 +149,7 @@ final class MigrateUtils
                 $table->timestamp(Model::CREATED_AT)->nullable(false)->useCurrent();
             }
 
-            if (! $schema->hasColumn($table_name, Model::UPDATED_AT)) {
+            if ($hasUpdatedAt && ! $schema->hasColumn($table_name, Model::UPDATED_AT)) {
                 $table->timestamp(Model::UPDATED_AT)->nullable(false)->useCurrent()->useCurrentOnUpdate();
             }
 

@@ -33,6 +33,11 @@ final class Version extends Model
     use HasFactory;
 
     /**
+     * The history is append-only: only a compaction rewrites a row, and it marks `compacted_at` (D18, D19).
+     */
+    public const UPDATED_AT = null;
+
+    /**
      * A password hash of the algorithms PHP's password_hash() produces (bcrypt, argon2i, argon2id).
      */
     private const string PASSWORD_HASH_PATTERN = '/^\$(2[aby]|argon2id?)\$/';
@@ -307,7 +312,7 @@ final class Version extends Model
             'subject_key' => 'json',
             'version_strategy' => VersionStrategy::class,
             'created_at' => 'immutable_datetime',
-            'updated_at' => 'datetime',
+            'compacted_at' => 'immutable_datetime',
         ];
     }
 

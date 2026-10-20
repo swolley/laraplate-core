@@ -48,8 +48,9 @@ return new class() extends Migration
             MigrateUtils::timestamps(
                 $table,
                 hasCreateUpdate: true,
-                hasSoftDelete: true,
+                hasUpdatedAt: false,
             );
+            $table->timestamp('compacted_at')->nullable()->comment('Set when a compaction rewrote the row (D18)');
 
             $table->index(['versionable_id', 'versionable_type'], "{$table_name}_versionable_IDX");
             MigrateUtils::prefixIndex($table, 'user_id');

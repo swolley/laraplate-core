@@ -68,7 +68,7 @@ it('casts contains expected json and datetime mappings', function (): void {
         'contents' => 'json',
         'original_contents' => 'json',
         'created_at' => 'immutable_datetime',
-        'updated_at' => 'datetime',
+        'compacted_at' => 'immutable_datetime',
     ]);
 });
 
